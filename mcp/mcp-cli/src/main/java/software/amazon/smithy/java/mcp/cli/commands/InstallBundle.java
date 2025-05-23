@@ -19,7 +19,6 @@ import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.mcp.cli.ConfigUtils;
 import software.amazon.smithy.java.mcp.cli.ExecutionContext;
-import software.amazon.smithy.java.mcp.cli.RegistryUtils;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
 import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.java.mcp.cli.model.McpServerConfig;

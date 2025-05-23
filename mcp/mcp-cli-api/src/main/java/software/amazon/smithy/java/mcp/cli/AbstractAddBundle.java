@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.mcp.cli;
 
 import java.util.Set;
-import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.java.mcp.cli.model.Location;
 
 /**

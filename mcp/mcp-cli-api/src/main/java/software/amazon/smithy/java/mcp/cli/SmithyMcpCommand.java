@@ -8,8 +8,6 @@ package software.amazon.smithy.java.mcp.cli;
 import static software.amazon.smithy.java.mcp.cli.ConfigUtils.loadOrCreateConfig;
 
 import java.util.concurrent.Callable;
-
-import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.cli.model.Config;
 

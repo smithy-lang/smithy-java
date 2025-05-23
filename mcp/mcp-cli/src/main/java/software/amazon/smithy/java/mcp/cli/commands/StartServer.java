@@ -15,7 +15,6 @@ import picocli.CommandLine.Parameters;
 import software.amazon.smithy.java.mcp.cli.ConfigUtils;
 import software.amazon.smithy.java.mcp.cli.ExecutionContext;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
-import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.java.mcp.cli.model.Location;
 import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
 import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
@@ -173,7 +172,6 @@ public final class StartServer extends SmithyMcpCommand {
         private InstallOp(Registry registry) {
             this.registry = registry;
         }
-
 
         @Override
         public InstallServerOutput installServer(InstallServerInput input, RequestContext context) {

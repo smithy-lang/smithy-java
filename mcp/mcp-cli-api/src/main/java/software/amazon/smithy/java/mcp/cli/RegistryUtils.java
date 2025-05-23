@@ -11,7 +11,6 @@ import java.util.ServiceLoader;
 import java.util.ServiceLoader.Provider;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
 import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.mcp.bundle.api.Registry;
 
@@ -31,7 +30,8 @@ class RegistryUtils {
     static Registry getRegistry(String name, Config config) {
 
         if (name == null) {
-            name = Objects.requireNonNull(config.getDefaultRegistry(), "Either configure a default registry or the registry name is required.");
+            name = Objects.requireNonNull(config.getDefaultRegistry(),
+                    "Either configure a default registry or the registry name is required.");
         }
 
         if (!config.getRegistries().containsKey(name)) {

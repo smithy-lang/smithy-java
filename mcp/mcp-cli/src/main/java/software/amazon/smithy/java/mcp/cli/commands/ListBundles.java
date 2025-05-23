@@ -9,11 +9,8 @@ import static picocli.CommandLine.Command;
 
 import picocli.CommandLine.Option;
 import software.amazon.smithy.java.mcp.cli.ExecutionContext;
-import software.amazon.smithy.java.mcp.cli.RegistryUtils;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
 import software.amazon.smithy.java.mcp.cli.model.Config;
-
-import java.util.Objects;
 
 @Command(name = "list", description = "List all the MCP Bundles available in the Registry")
 public class ListBundles extends SmithyMcpCommand {
