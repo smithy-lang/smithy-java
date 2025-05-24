@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -61,6 +62,7 @@ public final class McpServer implements Server {
     private final OutputStream os;
     private final String name;
     private final List<McpServerProxy> proxies;
+    private final CountDownLatch done = new CountDownLatch(1);
 
     McpServer(McpServerBuilder builder) {
         this.tools = createTools(builder.serviceList);
@@ -73,6 +75,8 @@ public final class McpServer implements Server {
                 this.listen();
             } catch (Exception e) {
                 LOG.error("Error handling request", e);
+            } finally {
+                done.countDown();
             }
         });
         listener.setName("stdio-dispatcher");
@@ -348,6 +352,10 @@ public final class McpServer implements Server {
         } else {
             return CompletableFuture.allOf(shutdownFutures.toArray(new CompletableFuture[0]));
         }
+    }
+
+    public void awaitCompletion() throws InterruptedException {
+        done.await();
     }
 
     private record Tool(ToolInfo toolInfo, Operation operation, McpServerProxy proxy) {

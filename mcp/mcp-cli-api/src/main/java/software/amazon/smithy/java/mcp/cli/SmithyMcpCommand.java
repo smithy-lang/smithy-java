@@ -54,7 +54,7 @@ public abstract class SmithyMcpCommand implements Callable<Integer> {
     protected String registryToUse(Config config) {
         return config.getDefaultRegistry();
     }
-  
+
     protected final CommandLine.Model.CommandSpec commandSpec() {
         return commandSpec;
     }

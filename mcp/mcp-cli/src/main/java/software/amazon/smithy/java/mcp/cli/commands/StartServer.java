@@ -8,6 +8,7 @@ package software.amazon.smithy.java.mcp.cli.commands;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -52,6 +53,7 @@ public final class StartServer extends SmithyMcpCommand {
     boolean registryServer;
 
     private volatile McpServer mcpServer;
+    private final CountDownLatch shutdownLatch = new CountDownLatch(1);
 
     /**
      * Executes the start-server command.
@@ -115,10 +117,16 @@ public final class StartServer extends SmithyMcpCommand {
         this.mcpServer =
                 (McpServer) McpServer.builder().stdio().addServices(services).name("smithy-mcp-server").build();
         mcpServer.start();
+
+        boolean shutdown = false;
         try {
-            Thread.currentThread().join();
-        } catch (InterruptedException e) {
+            mcpServer.awaitCompletion();
+            shutdown = true;
             mcpServer.shutdown().join();
+        } catch (Exception e) {
+            if (!shutdown) {
+                mcpServer.shutdown().join();
+            }
         }
     }
 
