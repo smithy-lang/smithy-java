@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -133,6 +132,7 @@ public final class StartServer extends SmithyMcpCommand {
                             .environmentVariables(System.getenv())
                             .build();
                 }
+                default -> throw new IllegalArgumentException("Unknown tool bundle type: " + toolBundleConfig.type());
             }
 
         }
