@@ -29,8 +29,12 @@ structure BundleMetadata {
 
 structure GenericBundle with [CommonBundleConfig] {
     artifact: GenericArtifact
-    install: String
-    command: String
+    install: ExecSpec
+    run: ExecSpec
+}
+
+structure ExecSpec {
+    executable: String
     args: ArgList
 }
 

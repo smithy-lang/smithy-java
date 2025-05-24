@@ -7,7 +7,9 @@ package software.amazon.smithy.java.mcp.cli;
 
 import static software.amazon.smithy.java.io.ByteBufferUtils.getBytes;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -15,13 +17,18 @@ import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.ServiceLoader;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.mcp.cli.model.Config;
+import software.amazon.smithy.java.mcp.cli.model.GenericToolBundleConfig;
 import software.amazon.smithy.java.mcp.cli.model.Location;
 import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
 import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
 import software.amazon.smithy.mcp.bundle.api.model.Bundle;
+import software.amazon.smithy.mcp.bundle.api.model.ExecSpec;
+import software.amazon.smithy.mcp.bundle.api.model.GenericBundle;
 
 /**
  * Utility class for managing Smithy MCP configuration files.
@@ -153,16 +160,78 @@ public class ConfigUtils {
 
     public static McpBundleConfig addMcpBundle(Config config, String toolBundleName, Bundle bundle)
             throws IOException {
-        var mcpBundleConfig = McpBundleConfig.builder()
-                .smithyModeled(SmithyModeledBundleConfig.builder()
-                        .name(toolBundleName)
-                        .bundleLocation(Location.builder()
-                                .fileLocation(ConfigUtils.getBundleFileLocation(toolBundleName).toString())
-                                .build())
-                        .build())
+        var location = Location.builder()
+                .fileLocation(ConfigUtils.getBundleFileLocation(toolBundleName).toString())
                 .build();
+        var builder = McpBundleConfig.builder();
+        switch (bundle.type()) {
+            case smithyBundle -> builder.smithyModeled(SmithyModeledBundleConfig.builder()
+                    .name(toolBundleName)
+                    .bundleLocation(location)
+                    .build());
+            case genericBundle -> {
+                GenericBundle genericBundle = bundle.getValue();
+                install(genericBundle.getInstall());
+                builder.genericConfig(
+                        GenericToolBundleConfig.builder().name(toolBundleName).bundleLocation(location).build());
+            }
+        }
+
+        var mcpBundleConfig = builder.build();
         addMcpBundle(config, toolBundleName, new CliBundle(bundle, mcpBundleConfig));
         addMcpBundleConfig(config, toolBundleName, mcpBundleConfig);
         return mcpBundleConfig;
+    }
+
+    private static void install(ExecSpec execSpec) {
+
+        ProcessBuilder pb = new ProcessBuilder(execSpec.getExecutable());
+        pb.command().addAll(execSpec.getArgs());
+        pb.redirectErrorStream(true);
+        Process process = null;
+        try {
+            process = pb.start();
+            String output = captureProcessOutput(process);
+
+            boolean finished = process.waitFor(5, TimeUnit.MINUTES);
+
+            if (!finished) {
+                process.destroyForcibly();
+                process.waitFor(10, TimeUnit.SECONDS);
+                throw new RuntimeException("Installation timed out after 5 minutes");
+            }
+
+            int exitCode = process.exitValue();
+            if (exitCode != 0) {
+                throw new RuntimeException(String.format(
+                        "Installation failed with exit code %d. Command: %s. Output: %s",
+                        exitCode,
+                        String.join(" ", pb.command()),
+                        output));
+            }
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            if (process.isAlive()) {
+                process.destroyForcibly();
+            }
+            throw new RuntimeException("Installation was interrupted", e);
+
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to start installation process: " +
+                    String.join(" ", pb.command()), e);
+
+        } finally {
+            // Ensure process is cleaned up
+            if (process != null && process.isAlive()) {
+                process.destroyForcibly();
+            }
+        }
+    }
+
+    private static String captureProcessOutput(Process process) throws IOException {
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            return in.lines().collect(Collectors.joining(System.lineSeparator()));
+        }
     }
 }

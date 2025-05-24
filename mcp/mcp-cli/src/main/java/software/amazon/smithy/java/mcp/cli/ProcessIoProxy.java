@@ -191,7 +191,7 @@ public final class ProcessIoProxy {
      * @throws RuntimeException If there is an error starting the process
      */
     public synchronized void start() {
-        if (running.compareAndSet(false, true)) {
+        if (!running.compareAndSet(false, true)) {
             return;
         }
         try {
