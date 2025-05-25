@@ -14,21 +14,21 @@ fun Project.addGenerateSrcsTask(
     service: String?,
     mode: String = "client"
 ): TaskProvider<JavaExec> {
-    val output = layout.buildDirectory.dir("generated-src").get()
+    val taskOutput = layout.buildDirectory.dir("generated-src").get()
     var taskName = "generateSources"
     if (name != null) {
         taskName += name
     }
     val sourceSets = project.the<SourceSetContainer>()
     val task = tasks.register<JavaExec>(taskName) {
-        delete(files(output))
         dependsOn("test")
         classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
         mainClass = className
-        environment("output", output)
+        environment("output", taskOutput)
         service?.let { environment("service", it) }
         environment("mode", mode)
         systemProperty("java.util.logging.config.file", "${project.rootDir}/config/logging/logging.properties")
+        outputs.dir(taskOutput)
     }
     tasks.getByName("integ").dependsOn(task)
     tasks.getByName("compileItJava").dependsOn(task)

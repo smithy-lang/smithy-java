@@ -11,11 +11,15 @@ task("addGitHooks") {
     onlyIf("unix") {
         !Os.isFamily(Os.FAMILY_WINDOWS)
     }
-    exec {
-        commandLine("ln", "-s", "-f", "../../git-hooks/pre-push", ".git/hooks/pre-push")
-        commandLine("ln", "-s", "-f", "../../git-hooks/pre-commit", ".git/hooks/pre-commit")
+    doLast {
+        exec {
+            commandLine("ln", "-s", "-f", "../../git-hooks/pre-push", ".git/hooks/pre-push")
+        }
+        exec {
+            commandLine("ln", "-s", "-f", "../../git-hooks/pre-commit", ".git/hooks/pre-commit")
+        }
+        println("Git hooks added")
     }
-    println("Git hooks added")
 }
 
 val smithyJavaVersion = project.file("VERSION").readText().replace(System.lineSeparator(), "")

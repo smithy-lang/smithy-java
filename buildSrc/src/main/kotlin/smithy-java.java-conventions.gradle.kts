@@ -1,9 +1,5 @@
-import com.diffplug.spotless.FormatterFunc
 import com.github.spotbugs.snom.Effort
-import java.util.regex.Pattern
-import org.gradle.api.Project
-import org.gradle.kotlin.dsl.the
-import java.io.Serializable
+import org.gradle.accessors.dm.LibrariesForLibs
 
 plugins {
     `java-library`
@@ -15,7 +11,7 @@ plugins {
 }
 
 // Workaround per: https://github.com/gradle/gradle/issues/15383
-val Project.libs get() = the<org.gradle.accessors.dm.LibrariesForLibs>()
+val Project.libs get() = the<LibrariesForLibs>()
 
 java {
     toolchain {
@@ -84,27 +80,11 @@ spotless {
 
         eclipse().configFile("${project.rootDir}/config/spotless/formatting.xml")
 
-        // Fixes for some strange formatting applied by eclipse:
-        // see: https://github.com/kamkie/demo-spring-jsf/blob/bcacb9dc90273a5f8d2569470c5bf67b171c7d62/build.gradle.kts#L159
-        // These have to be implemented with anonymous classes this way instead of lambdas because of:
-        // https://github.com/diffplug/spotless/issues/2387
-        custom("Lambda fix", object : Serializable, FormatterFunc {
-            override fun apply(input: String) : String {
-                return input.replace("} )", "})").replace("} ,", "},")
-            }
-        })
-        custom("Long literal fix", object : Serializable, FormatterFunc {
-            override fun apply(input: String) : String {
-                return Pattern.compile("([0-9_]+) [Ll]").matcher(input).replaceAll("\$1L")
-            }
-        })
-
         // Static first, then everything else alphabetically
         removeUnusedImports()
         importOrder("\\#", "")
-
         // Ignore generated generated code for formatter check
-        targetExclude("**/build/**/*.*")
+        targetExclude("**/build/**/*.java", "**/build/generated-src/*.*")
     }
 
     // Formatting for build.gradle.kts files
@@ -131,10 +111,6 @@ spotbugs {
 // We don't need to lint tests.
 tasks.named("spotbugsTest") {
     enabled = false
-}
-
-tasks.spotlessCheck {
-    dependsOn(tasks.spotlessApply)
 }
 
 /*

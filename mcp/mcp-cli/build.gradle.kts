@@ -45,9 +45,10 @@ val generateVersionFile =
                 ?.resolve("software/amazon/smithy/java/mcp/cli/VERSION")!!
 
         outputs.file(versionFile)
+        val projectVersion = project.version.toString()
 
         doLast {
-            versionFile.writeText(project.version.toString())
+            versionFile.writeText(projectVersion)
         }
     }
 
