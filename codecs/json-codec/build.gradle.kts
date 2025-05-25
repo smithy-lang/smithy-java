@@ -16,31 +16,11 @@ dependencies {
     testRuntimeOnly(libs.jackson.core)
 }
 
-tasks.shadowJar {
-    configurations = listOf(project.configurations.compileClasspath.get())
-    dependencies {
-        include(
-            dependency(
-                libs.jackson.core
-                    .get()
-                    .toString(),
-            ),
-        )
-        relocate("com.fasterxml.jackson.core", "software.amazon.smithy.java.internal.com.fasterxml.jackson.core")
-    }
-    archiveClassifier.set("")
-    mergeServiceFiles()
-}
-
-artifacts {
-    archives(tasks.shadowJar)
-}
-
 tasks {
     shadowJar {
         archiveClassifier.set("")
         mergeServiceFiles()
-
+        configurations = listOf(project.configurations.compileClasspath.get())
         dependencies {
             include(
                 dependency(
