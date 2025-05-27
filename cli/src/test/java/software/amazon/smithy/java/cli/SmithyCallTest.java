@@ -1,7 +1,9 @@
 package software.amazon.smithy.java.cli;
 
 import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -11,6 +13,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -22,37 +25,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 class SmithyCallTest {
-    private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
-    private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+
     private final PrintStream originalOut = System.out;
     private final PrintStream originalErr = System.err;
-    private HttpServer mockServer;
-    private static final int PORT = 8080;
+    private static HttpServer MOCK_SERVER;
+    private static int PORT;
+
+    private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+    private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+    private CommandLine commandLine;
 
     @TempDir
     Path tempDir;
 
-    @BeforeEach
-    void setUp() throws IOException {
-        System.setOut(new PrintStream(outContent));
-        System.setErr(new PrintStream(errContent));
-        setupMockServer();
-    }
+    @BeforeAll
+    static void setUpServer() throws IOException {
+        // Get a dynamic port by binding to port 0
+        InetSocketAddress address = new InetSocketAddress(InetAddress.getLoopbackAddress(), 0);
+        MOCK_SERVER = HttpServer.create(address, 0);
+        MOCK_SERVER.setExecutor(Executors.newFixedThreadPool(1));
 
-    @AfterEach
-    void tearDown() {
-        System.setOut(originalOut);
-        System.setErr(originalErr);
-        if (mockServer != null) {
-            mockServer.stop(0);
-        }
-    }
-
-    private void setupMockServer() throws IOException {
-        mockServer = HttpServer.create(new InetSocketAddress(PORT), 0);
-        mockServer.setExecutor(Executors.newFixedThreadPool(1));
-
-        mockServer.createContext("/", exchange -> {
+        MOCK_SERVER.createContext("/", exchange -> {
             String requestBody;
             try (InputStream is = exchange.getRequestBody()) {
                 requestBody = new String(is.readAllBytes(), StandardCharsets.UTF_8);
@@ -86,7 +79,29 @@ class SmithyCallTest {
             }
         });
 
-        mockServer.start();
+        MOCK_SERVER.start();
+        PORT = MOCK_SERVER.getAddress().getPort();
+    }
+
+    @AfterAll
+    static void tearDownServer() {
+        if (MOCK_SERVER != null) {
+            MOCK_SERVER.stop(0);
+        }
+    }
+
+    @BeforeEach
+    void setUp() {
+        commandLine = new CommandLine(new SmithyCall())
+            .setCaseInsensitiveEnumValuesAllowed(true);
+        System.setOut(new PrintStream(outContent));
+        System.setErr(new PrintStream(errContent));
+    }
+
+    @AfterEach
+    void tearDown() {
+        System.setOut(originalOut);
+        System.setErr(originalErr);
     }
 
     @Test
@@ -98,7 +113,7 @@ class SmithyCallTest {
                 "--model-path", modelDir.toString()
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertEquals(0, exitCode);
         String output = outContent.toString().trim();
         assertTrue(output.contains("CreateSprocket"));
@@ -114,7 +129,7 @@ class SmithyCallTest {
                 "--model-path", modelDir.toString()
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("Service smithy.example#UnknownService not found in model"));
@@ -129,7 +144,7 @@ class SmithyCallTest {
                 "--model-path", modelDir.toString()
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("Service UnknownService not found in model"));
@@ -147,7 +162,7 @@ class SmithyCallTest {
                 "--input-json", "{}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertEquals(0, exitCode);
         String output = outContent.toString().trim();
         assertTrue(output.contains("sprocket-123"));
@@ -164,7 +179,7 @@ class SmithyCallTest {
                 "--input-json", "{\"id\":\"sprocket-123\"}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertEquals(0, exitCode);
         String output = outContent.toString().trim();
         assertTrue(output.contains("sprocket-123"));
@@ -181,7 +196,7 @@ class SmithyCallTest {
                 "--input-json", "{\"id\":\"sprocket-123\"}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertEquals(0, exitCode);
         String output = outContent.toString().trim();
         assertTrue(output.contains("sprocket-123"));
@@ -198,7 +213,7 @@ class SmithyCallTest {
                 "--input-json", "{\"id\":\"invalid-id\"}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("InvalidSprocketId"));
@@ -216,7 +231,7 @@ class SmithyCallTest {
                 "--input-json", "{\"id\":\"sprocket-123\"}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("Invalid value for option '--protocol'"));
@@ -232,7 +247,7 @@ class SmithyCallTest {
                 "--input-json", "{\"id\":\"sprocket-123\"}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("Service endpoint URL is required"));
@@ -250,7 +265,7 @@ class SmithyCallTest {
                 "--input-path", "/some/path"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("Cannot specify both '--input-json' and '--input-path'. Please provide only one."));
@@ -267,7 +282,7 @@ class SmithyCallTest {
                 "--input-json", "{}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("Operation 'UnknownOperation' not found in service 'smithy.example#Sprockets'"));
@@ -286,7 +301,7 @@ class SmithyCallTest {
                 "--input-json", "{}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("Unsupported auth type: foo"));
@@ -306,7 +321,7 @@ class SmithyCallTest {
                 "--input-json", "{}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("No auth scheme could be resolved for operation"));
@@ -325,7 +340,7 @@ class SmithyCallTest {
                 "--input-json", "{}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("SigV4 auth requires --aws-region to be set."));
@@ -368,7 +383,7 @@ class SmithyCallTest {
                 "--input-json", "{}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        int exitCode = commandLine.execute(args);
 
         assertEquals(0, exitCode);
         String output = outContent.toString().trim();
