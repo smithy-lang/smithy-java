@@ -27,6 +27,7 @@ public final class ModelBundles {
                 .model(model)
                 .clientConfigurator(plugin::configureClient)
                 .service(ShapeId.from(smithyBundle.getServiceName()))
+                .userAgentAppId("mcp-proxy")
                 .build();
     }
 

@@ -15,6 +15,7 @@ import java.util.function.UnaryOperator;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
+import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.core.error.ModeledException;
@@ -65,6 +66,10 @@ public final class ProxyService implements Service {
         } else {
             clientBuilder.endpointResolver(EndpointResolver.staticEndpoint(builder.proxyEndpoint));
         }
+        if (builder.userAgentAppId != null) {
+            clientBuilder.putConfig(CallContext.APPLICATION_ID, builder.userAgentAppId);
+        }
+
         this.dynamicClient = clientBuilder.build();
         this.schemaConverter = new SchemaConverter(model);
         this.operations = new HashMap<>();
@@ -142,6 +147,7 @@ public final class ProxyService implements Service {
         private String proxyEndpoint;
         private AuthSchemeResolver authScheme;
         private UnaryOperator<DynamicClient.Builder> clientConfigurator;
+        private String userAgentAppId;
 
         private Builder() {}
 
@@ -205,6 +211,17 @@ public final class ProxyService implements Service {
 
         public Builder clientConfigurator(UnaryOperator<DynamicClient.Builder> clientConfigurator) {
             this.clientConfigurator = clientConfigurator;
+            return this;
+        }
+
+        /**
+         * Set the app ID that will be inserted into the "app" section of the user-agent header.
+         *
+         * @param userAgentAppId string that will be inserted into the "app" section of the user-agent header
+         * @return the builder.
+         */
+        public Builder userAgentAppId(String userAgentAppId) {
+            this.userAgentAppId = userAgentAppId;
             return this;
         }
     }
