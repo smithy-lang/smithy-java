@@ -46,7 +46,7 @@ public class InstallBundle extends SmithyMcpCommand {
 
     @Option(names = "--print-only",
             description = "If specified will not edit the client configs and only print to console.")
-    boolean print;
+    Boolean print;
 
     @Override
     protected void execute(ExecutionContext context) throws IOException {
@@ -55,12 +55,18 @@ public class InstallBundle extends SmithyMcpCommand {
         var bundle = registry.getMcpBundle(name);
         ConfigUtils.addMcpBundle(config, name, bundle);
         var newConfig = McpServerConfig.builder().command("mcp-registry").args(List.of("start-server", name)).build();
-        if (print) {
-            System.out.println(newConfig);
-            return;
+        if (print == null) {
+            //By default print the output if there are no configured client configs.
+            print = !config.hasClientConfigs();
         }
         for (var clientConfigs : config.getClientConfigs()) {
             var filePath = Path.of(clientConfigs.getFilePath());
+            if (Files.notExists(filePath)) {
+                System.out.printf("Skipping updating Mcp config file for %s as the file path '%s' does not exist.",
+                        name,
+                        filePath);
+                continue;
+            }
             var currentConfig = Files.readAllBytes(filePath);
             McpServersClientConfig currentMcpConfig;
             if (currentConfig.length == 0) {
@@ -77,6 +83,11 @@ public class InstallBundle extends SmithyMcpCommand {
             Files.write(filePath,
                     ByteBufferUtils.getBytes(JSON_CODEC.serialize(newMcpConfig)),
                     StandardOpenOption.TRUNCATE_EXISTING);
+        }
+        System.out.println("Successfully installed " + name);
+        if (print) {
+            System.out.println("You can add the following to your MCP Servers config to use " + name);
+            System.out.println(newConfig);
         }
     }
 
