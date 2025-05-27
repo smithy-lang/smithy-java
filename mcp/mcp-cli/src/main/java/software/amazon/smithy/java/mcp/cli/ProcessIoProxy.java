@@ -28,6 +28,7 @@ public final class ProcessIoProxy {
     private final InputStream inputStream;
     private final OutputStream outputStream;
     private final OutputStream errorStream;
+    private final boolean usingStdIo;
     private volatile Process process;
     private volatile Thread inputThread;
     private volatile Thread outputThread;
@@ -50,6 +51,12 @@ public final class ProcessIoProxy {
         this.inputStream = builder.inputStream;
         this.outputStream = builder.outputStream;
         this.errorStream = builder.errorStream;
+
+        this.usingStdIo = this.inputStream == System.in && this.outputStream == System.out;
+
+        if (usingStdIo) {
+            processBuilder.inheritIO();
+        }
 
         processBuilder.redirectErrorStream(false); // Keep stderr separate
     }
@@ -95,22 +102,6 @@ public final class ProcessIoProxy {
          */
         public Builder environmentVariables(Map<String, String> environmentVariables) {
             this.environmentVariables = environmentVariables;
-            return this;
-        }
-
-        /**
-         * Customize IoStreams (input, output, error).
-         * Any stream that is null will use the system default (System.in, System.out, System.err).
-         *
-         * @param input The input stream to use (defaults to System.in if null)
-         * @param output The output stream to use (defaults to System.out if null)
-         * @param error The error stream to use (defaults to System.err if null)
-         * @return This builder for method chaining
-         */
-        public Builder streams(InputStream input, OutputStream output, OutputStream error) {
-            this.inputStream = input == null ? System.in : input;
-            this.outputStream = output == null ? System.out : output;
-            this.errorStream = error == null ? System.err : error;
             return this;
         }
 
@@ -197,35 +188,37 @@ public final class ProcessIoProxy {
         try {
             process = processBuilder.start();
 
-            // Thread to forward input to process
-            inputThread = createForwardingThread(
-                    process,
-                    inputStream,
-                    process.getOutputStream(),
-                    "process-stdin-forwarder",
-                    "Error forwarding input to process",
-                    true, // Close the process input stream when done
-                    running);
+            if (!usingStdIo) {
+                // Thread to forward input to process
+                inputThread = createForwardingThread(
+                        process,
+                        inputStream,
+                        process.getOutputStream(),
+                        "process-stdin-forwarder",
+                        "Error forwarding input to process",
+                        true, // Close the process input stream when done
+                        running);
 
-            // Thread to forward process stdout to output
-            outputThread = createForwardingThread(
-                    process,
-                    process.getInputStream(),
-                    outputStream,
-                    "process-stdout-forwarder",
-                    "Error forwarding process stdout",
-                    false, // Don't close the output stream
-                    running);
+                // Thread to forward process stdout to output
+                outputThread = createForwardingThread(
+                        process,
+                        process.getInputStream(),
+                        outputStream,
+                        "process-stdout-forwarder",
+                        "Error forwarding process stdout",
+                        false, // Don't close the output stream
+                        running);
 
-            // Thread to forward process stderr to error
-            errorThread = createForwardingThread(
-                    process,
-                    process.getErrorStream(),
-                    errorStream,
-                    "process-stderr-forwarder",
-                    "Error forwarding process stderr",
-                    false, // Don't close the error stream
-                    running);
+                // Thread to forward process stderr to error
+                errorThread = createForwardingThread(
+                        process,
+                        process.getErrorStream(),
+                        errorStream,
+                        "process-stderr-forwarder",
+                        "Error forwarding process stderr",
+                        false, // Don't close the error stream
+                        running);
+            }
 
         } catch (IOException e) {
             running.set(false);
@@ -253,10 +246,12 @@ public final class ProcessIoProxy {
                             process.destroyForcibly();
                         }
 
-                        // Interrupt the threads
-                        interruptThread(inputThread);
-                        interruptThread(outputThread);
-                        interruptThread(errorThread);
+                        if (!usingStdIo) {
+                            // Interrupt the threads
+                            interruptThread(inputThread);
+                            interruptThread(outputThread);
+                            interruptThread(errorThread);
+                        }
 
                     } catch (InterruptedException e) {
                         LOG.error("Error shutting down process", e);
