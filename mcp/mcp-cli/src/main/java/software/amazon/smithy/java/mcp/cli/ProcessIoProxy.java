@@ -13,6 +13,7 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import software.amazon.smithy.java.logging.InternalLogger;
 
@@ -34,6 +35,7 @@ public final class ProcessIoProxy {
     private volatile Thread outputThread;
     private volatile Thread errorThread;
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final CountDownLatch done = new CountDownLatch(1);
 
     private ProcessIoProxy(Builder builder) {
         processBuilder = new ProcessBuilder();
@@ -224,6 +226,10 @@ public final class ProcessIoProxy {
             running.set(false);
             throw new RuntimeException("Failed to start process: " + e.getMessage(), e);
         }
+    }
+
+    public void awaitCompletion() throws InterruptedException {
+        done.await();
     }
 
     /**

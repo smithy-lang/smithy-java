@@ -8,6 +8,8 @@ package software.amazon.smithy.java.mcp.cli.commands;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -137,8 +139,12 @@ public final class StartServer extends SmithyMcpCommand {
 
         }
 
+        ThrowingRunnable awaitCompletion;
+        Supplier<CompletableFuture<Void>> shutdownMethod;
         if (proxyServer != null) {
             proxyServer.start();
+            awaitCompletion = proxyServer::awaitCompletion;
+            shutdownMethod = proxyServer::shutdown;
         } else {
             if (registryServer) {
                 services.add(McpRegistry.builder()
@@ -150,16 +156,18 @@ public final class StartServer extends SmithyMcpCommand {
             this.mcpServer =
                     (McpServer) McpServer.builder().stdio().addServices(services).name("smithy-mcp-server").build();
             mcpServer.start();
+            awaitCompletion = mcpServer::awaitCompletion;
+            shutdownMethod = mcpServer::shutdown;
+        }
 
-            boolean shutdown = false;
-            try {
-                mcpServer.awaitCompletion();
-                shutdown = true;
-                mcpServer.shutdown().join();
-            } catch (Exception e) {
-                if (!shutdown) {
-                    mcpServer.shutdown().join();
-                }
+        boolean shutdown = false;
+        try {
+            awaitCompletion.run();
+            shutdown = true;
+            shutdownMethod.get().join();
+        } catch (Exception e) {
+            if (!shutdown) {
+                shutdownMethod.get().join();
             }
         }
     }
@@ -229,5 +237,10 @@ public final class StartServer extends SmithyMcpCommand {
 
             return InstallServerOutput.builder().build();
         }
+    }
+
+    @FunctionalInterface
+    private interface ThrowingRunnable {
+        void run() throws Exception;
     }
 }
