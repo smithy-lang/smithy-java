@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.mcp.cli;
 
 import java.util.Map;
-import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.ServiceLoader.Provider;
 import java.util.function.Function;
@@ -30,8 +29,17 @@ class RegistryUtils {
     static Registry getRegistry(String name, Config config) {
 
         if (name == null) {
-            name = Objects.requireNonNull(config.getDefaultRegistry(),
-                    "Either configure a default registry or the registry name is required.");
+            name = config.getDefaultRegistry();
+            if (name == null) {
+                var registries = config.getRegistries();
+                if (registries.isEmpty()) {
+                    throw new IllegalStateException("No registries configured.");
+                } else if (registries.size() > 1) {
+                    throw new IllegalStateException("No registry specified. Either configure a default registry or " +
+                            "explicitly provide one with --registry");
+                }
+                name = registries.keySet().iterator().next();
+            }
         }
 
         if (!config.getRegistries().containsKey(name)) {
