@@ -93,6 +93,18 @@ public final class AwsServiceBundler extends ModelBundler {
         this(serviceName, GithubModelResolver.INSTANCE, exposedOperations, blockedOperations);
     }
 
+    private static ServiceShape findService(Model model, String name) {
+        for (var service : model.getServiceShapes()) {
+            var sigV4 = service.getTrait(SigV4Trait.class);
+            if (sigV4.isPresent()) {
+                if (sigV4.get().getName().equals(name)) {
+                    return service;
+                }
+            }
+        }
+        throw new RuntimeException("couldn't find service with name " + name);
+    }
+
     @Override
     public SmithyBundle bundle() {
         try {
@@ -104,15 +116,12 @@ public final class AwsServiceBundler extends ModelBundler {
                     .assemble()
                     .unwrap();
             var bundle = AwsServiceMetadata.builder();
-            var service = model.getServiceShapes().iterator().next();
+            var service = findService(model, serviceName);
             bundle.serviceName(service.getId().getName())
                     .endpoints(Collections.emptyMap());
-            var sigv4Trait = service.getTrait(SigV4Trait.class);
-            if (sigv4Trait.isEmpty()) {
-                throw new RuntimeException("Service " + serviceName + " does not have a SigV4 trait");
-            }
-
-            var signingName = sigv4Trait.get().getName();
+            // guaranteed to exist
+            var sigv4Trait = service.getTrait(SigV4Trait.class).get();
+            var signingName = sigv4Trait.getName();
             bundle.sigv4SigningName(signingName);
             service.getTrait(EndpointTrait.class);
             for (var trait : service.getAllTraits().values()) {
@@ -124,7 +133,7 @@ public final class AwsServiceBundler extends ModelBundler {
             return SmithyBundle.builder()
                     .config(Document.of(bundle.build()))
                     .configType("aws")
-                    .serviceName(model.getServiceShapes().iterator().next().getId().toString())
+                    .serviceName(service.getId().toString())
                     .model(serializeModel(cleanAndFilter(model)))
                     .additionalInput(AdditionalInput.builder()
                             .identifier(PreRequest.$ID.toString())

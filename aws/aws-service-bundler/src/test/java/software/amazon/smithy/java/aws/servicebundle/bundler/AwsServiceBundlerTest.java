@@ -20,7 +20,8 @@ public class AwsServiceBundlerTest {
 
     @Test
     public void accessAnalyzer() {
-        var bundler = new AwsServiceBundler("accessanalyzer-2019-11-01.json", AwsServiceBundlerTest::getModel);
+        var bundler = new AwsServiceBundler("access-analyzer",
+                serviceName -> getModel("accessanalyzer-2019-11-01.json"));
         var bundle = bundler.bundle();
         var config = bundle.getConfig().asShape(AwsServiceMetadata.builder());
 
@@ -33,8 +34,8 @@ public class AwsServiceBundlerTest {
     @Test
     public void testFilteringApis() {
         var filteredOperations = Set.of("GetFindingsStatistics", "GetFindingRecommendation");
-        var bundler = new AwsServiceBundler("accessanalyzer-2019-11-01.json",
-                AwsServiceBundlerTest::getModel,
+        var bundler = new AwsServiceBundler("access-analyzer",
+                serviceName -> getModel("accessanalyzer-2019-11-01.json"),
                 filteredOperations,
                 Set.of());
         var bundle = bundler.bundle();
