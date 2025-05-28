@@ -18,7 +18,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.regex.Pattern;
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.awsmcp.model.AwsServiceMetadata;
 import software.amazon.smithy.awsmcp.model.PreRequest;
@@ -28,25 +27,16 @@ import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.node.BooleanNode;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
-import software.amazon.smithy.model.shapes.AbstractShapeBuilder;
 import software.amazon.smithy.model.shapes.ModelSerializer;
-import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
-import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.shapes.StructureShape;
-import software.amazon.smithy.model.traits.DocumentationTrait;
 import software.amazon.smithy.model.traits.EndpointTrait;
 import software.amazon.smithy.modelbundle.api.ModelBundler;
-import software.amazon.smithy.modelbundle.api.ModelBundles;
 import software.amazon.smithy.modelbundle.api.model.AdditionalInput;
 import software.amazon.smithy.modelbundle.api.model.SmithyBundle;
-import software.amazon.smithy.utils.ToSmithyBuilder;
 
 public final class AwsServiceBundler extends ModelBundler {
     private static final ShapeId ENDPOINT_TESTS = ShapeId.from("smithy.rules#endpointTests");
-
-    private static final Pattern CLEAN_HTML_PATTERN = Pattern.compile("<[^<]+?>", Pattern.DOTALL);
 
     // visible for testing
     static final Map<String, String> GH_URIS_BY_SERVICE = new HashMap<>();
@@ -134,7 +124,7 @@ public final class AwsServiceBundler extends ModelBundler {
                     .config(Document.of(bundle.build()))
                     .configType("aws")
                     .serviceName(service.getId().toString())
-                    .model(serializeModel(cleanAndFilter(model)))
+                    .model(serializeModel(cleanAndFilterModel(model, service, exposedOperations, blockedOperations)))
                     .additionalInput(AdditionalInput.builder()
                             .identifier(PreRequest.$ID.toString())
                             .model(loadModel("/META-INF/smithy/bundle.smithy"))
@@ -142,29 +132,6 @@ public final class AwsServiceBundler extends ModelBundler {
                     .build();
         } catch (Exception e) {
             throw new RuntimeException("Failed to bundle " + serviceName, e);
-        }
-    }
-
-    private Model cleanAndFilter(Model model) {
-        model = ModelBundles.filterOperations(model, exposedOperations, blockedOperations);
-        var builder = model.toBuilder();
-        var service = model.getServiceShapes().iterator().next();
-        cleanDocumentation(service, builder);
-        for (var operation : service.getAllOperations()) {
-            cleanDocumentation(model.expectShape(operation), builder);
-        }
-        return builder.build();
-    }
-
-    private void cleanDocumentation(Shape shape, Model.Builder builder) {
-        if (shape instanceof ServiceShape || shape instanceof OperationShape || shape instanceof StructureShape) {
-            shape.getTrait(DocumentationTrait.class).ifPresent(trait -> {
-                var documentation = trait.getValue();
-                var cleanedDocumentation = CLEAN_HTML_PATTERN.matcher(documentation).replaceAll("");
-                var shapeBuilder = (AbstractShapeBuilder<?, Shape>) ((ToSmithyBuilder<?>) shape).toBuilder();
-                builder.removeShape(shape.toShapeId());
-                builder.addShape(shapeBuilder.addTrait(new DocumentationTrait(cleanedDocumentation)).build());
-            });
         }
     }
 

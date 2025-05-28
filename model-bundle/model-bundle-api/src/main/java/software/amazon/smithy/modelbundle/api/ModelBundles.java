@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.modelbundle.api;
 
-import java.util.Set;
 import software.amazon.smithy.java.server.ProxyService;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.Model;
@@ -30,21 +29,6 @@ public final class ModelBundles {
                 .service(ShapeId.from(smithyBundle.getServiceName()))
                 .userAgentAppId("mcp-proxy")
                 .build();
-    }
-
-    public static Model filterOperations(Model model, Set<String> allowedOperations, Set<String> blockedOperations) {
-        var builder = model.toBuilder();
-        var service = model.getServiceShapes().iterator().next();
-        var serviceBuilder = service.toBuilder();
-        for (var op : model.getOperationShapes()) {
-            var name = op.getId().getName();
-            if (!allowedOperations.contains(name) || blockedOperations.contains(name)) {
-                builder.removeShape(op.getId());
-                serviceBuilder.removeOperation(op.getId());
-            }
-        }
-        builder.addShape(serviceBuilder.build());
-        return builder.build();
     }
 
     private static Model getModel(SmithyBundle bundle) {
