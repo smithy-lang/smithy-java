@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Pattern;
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.awsmcp.model.AwsServiceMetadata;
@@ -37,6 +38,7 @@ import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.traits.DocumentationTrait;
 import software.amazon.smithy.model.traits.EndpointTrait;
 import software.amazon.smithy.modelbundle.api.ModelBundler;
+import software.amazon.smithy.modelbundle.api.ModelBundles;
 import software.amazon.smithy.modelbundle.api.model.AdditionalInput;
 import software.amazon.smithy.modelbundle.api.model.SmithyBundle;
 import software.amazon.smithy.utils.ToSmithyBuilder;
@@ -64,14 +66,31 @@ public final class AwsServiceBundler extends ModelBundler {
 
     private final ModelResolver resolver;
     private final String serviceName;
+    private final Set<String> exposedOperations;
+    private final Set<String> blockedOperations;
 
-    AwsServiceBundler(String serviceName, ModelResolver resolver) {
+    AwsServiceBundler(
+            String serviceName,
+            ModelResolver resolver,
+            Set<String> exposedOperations,
+            Set<String> blockedOperations
+    ) {
         this.serviceName = serviceName;
         this.resolver = resolver;
+        this.exposedOperations = exposedOperations;
+        this.blockedOperations = blockedOperations;
+    }
+
+    AwsServiceBundler(String serviceName, ModelResolver resolver) {
+        this(serviceName, resolver, Collections.emptySet(), Collections.emptySet());
     }
 
     public AwsServiceBundler(String serviceName) {
-        this(serviceName, GithubModelResolver.INSTANCE);
+        this(serviceName, GithubModelResolver.INSTANCE, Set.of(), Set.of());
+    }
+
+    public AwsServiceBundler(String serviceName, Set<String> exposedOperations, Set<String> blockedOperations) {
+        this(serviceName, GithubModelResolver.INSTANCE, exposedOperations, blockedOperations);
     }
 
     @Override
@@ -106,7 +125,7 @@ public final class AwsServiceBundler extends ModelBundler {
                     .config(Document.of(bundle.build()))
                     .configType("aws")
                     .serviceName(model.getServiceShapes().iterator().next().getId().toString())
-                    .model(serializeModel(clean(model)))
+                    .model(serializeModel(cleanAndFilter(model)))
                     .additionalInput(AdditionalInput.builder()
                             .identifier(PreRequest.$ID.toString())
                             .model(loadModel("/META-INF/smithy/bundle.smithy"))
@@ -117,7 +136,8 @@ public final class AwsServiceBundler extends ModelBundler {
         }
     }
 
-    private Model clean(Model model) {
+    private Model cleanAndFilter(Model model) {
+        model = ModelBundles.filterOperations(model, exposedOperations, blockedOperations);
         var builder = model.toBuilder();
         var service = model.getServiceShapes().iterator().next();
         cleanDocumentation(service, builder);

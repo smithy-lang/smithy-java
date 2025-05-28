@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.aws.mcp.cli.commands;
 
+import java.util.Collections;
 import java.util.Set;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -36,7 +37,7 @@ public class AddAwsServiceBundle extends AbstractAddBundle {
 
     @Override
     protected CliBundle getNewToolConfig() {
-        var bundle = new AwsServiceBundler(awsServiceName).bundle();
+        var bundle = new AwsServiceBundler(awsServiceName, allowedTools(), blockedTools()).bundle();
 
         var bundleConfig = McpBundleConfig.builder()
                 .smithyModeled(SmithyModeledBundleConfig.builder()
@@ -66,11 +67,11 @@ public class AddAwsServiceBundle extends AbstractAddBundle {
 
     @Override
     protected Set<String> allowedTools() {
-        return allowedApis;
+        return allowedApis == null ? Collections.emptySet() : allowedApis;
     }
 
     @Override
     protected Set<String> blockedTools() {
-        return blockedApis;
+        return blockedApis == null ? Collections.emptySet() : blockedApis;
     }
 }

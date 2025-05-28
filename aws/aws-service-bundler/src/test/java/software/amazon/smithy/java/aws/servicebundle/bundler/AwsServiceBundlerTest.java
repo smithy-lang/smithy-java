@@ -5,15 +5,19 @@
 
 package software.amazon.smithy.java.aws.servicebundle.bundler;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.io.InputStreamReader;
 import java.util.Objects;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.awsmcp.model.AwsServiceMetadata;
+import software.amazon.smithy.model.loader.ModelAssembler;
 
 public class AwsServiceBundlerTest {
+
     @Test
     public void accessAnalyzer() {
         var bundler = new AwsServiceBundler("accessanalyzer-2019-11-01.json", AwsServiceBundlerTest::getModel);
@@ -24,6 +28,25 @@ public class AwsServiceBundlerTest {
         assertEquals("AccessAnalyzer", config.getServiceName());
 
         assertNotEquals(0, config.getEndpoints().size());
+    }
+
+    @Test
+    public void testFilteringApis() {
+        var filteredOperations = Set.of("GetFindingsStatistics", "GetFindingRecommendation");
+        var bundler = new AwsServiceBundler("accessanalyzer-2019-11-01.json",
+                AwsServiceBundlerTest::getModel,
+                filteredOperations,
+                Set.of());
+        var bundle = bundler.bundle();
+        var bundleModel = new ModelAssembler().addUnparsedModel("model.json", bundle.getModel())
+                .disableValidation()
+                .putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
+                .assemble()
+                .unwrap();
+        assertThat(bundleModel.getOperationShapes())
+                .hasSize(2)
+                .filteredOn(o -> !filteredOperations.contains(o.getId().getName()))
+                .isEmpty();
     }
 
     private static String getModel(String path) {
