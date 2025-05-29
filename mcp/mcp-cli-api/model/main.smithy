@@ -4,8 +4,12 @@ namespace smithy.mcp.cli
 
 structure Config {
     toolBundles: McpBundleConfigs
+
     defaultRegistry: String
+
     registries: Registries
+
+    @default([])
     clientConfigs: ClientConfigs
 }
 
@@ -72,6 +76,7 @@ list ToolNames {
     member: ToolName
 }
 
+@uniqueItems
 list ClientConfigs {
     member: ClientConfig
 }

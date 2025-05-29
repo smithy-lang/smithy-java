@@ -17,15 +17,21 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonCodec;
+import software.amazon.smithy.java.mcp.cli.model.ClientConfig;
 import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.java.mcp.cli.model.GenericToolBundleConfig;
 import software.amazon.smithy.java.mcp.cli.model.Location;
 import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
+import software.amazon.smithy.java.mcp.cli.model.McpServerConfig;
+import software.amazon.smithy.java.mcp.cli.model.McpServersClientConfig;
 import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
 import software.amazon.smithy.mcp.bundle.api.model.Bundle;
 import software.amazon.smithy.mcp.bundle.api.model.ExecSpec;
@@ -147,6 +153,79 @@ public class ConfigUtils {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static void removeMcpBundle(Config currentConfig, String bundleName) throws IOException {
+        var builder = currentConfig.toBuilder();
+        var newBundles = new LinkedHashMap<>(currentConfig.getToolBundles());
+        newBundles.remove(bundleName);
+        builder.toolBundles(newBundles);
+        var newConfig = builder.build();
+        updateConfig(newConfig);
+        var bundleFile = getBundleFileLocation(bundleName);
+        Files.deleteIfExists(bundleFile);
+    }
+
+    public static void addToClientConfigs(Config config, String name, Set<String> clients, McpServerConfig serverConfig)
+            throws IOException {
+        updateClientConfigs(config, name, clients, serverConfig);
+    }
+
+    public static void removeFromClientConfigs(Config config, String name, Set<String> clients) throws IOException {
+        updateClientConfigs(config, name, clients, null);
+    }
+
+    private static void updateClientConfigs(Config config, String name, Set<String> clients, McpServerConfig newConfig)
+            throws IOException {
+        var clientConfigsToUpdate = getClientConfigsToUpdate(config, clients);
+        boolean isDelete = newConfig == null;
+        for (var clientConfigs : clientConfigsToUpdate) {
+            var filePath = Path.of(clientConfigs.getFilePath());
+            if (Files.notExists(filePath)) {
+                System.out.printf("Skipping updating Mcp config file for %s as the file path '%s' does not exist.",
+                        name,
+                        filePath);
+                continue;
+            }
+            var currentConfig = Files.readAllBytes(filePath);
+            McpServersClientConfig currentMcpConfig;
+            if (currentConfig.length == 0) {
+                if (isDelete) {
+                    continue;
+                }
+                currentMcpConfig = McpServersClientConfig.builder().build();
+            } else {
+                currentMcpConfig =
+                        McpServersClientConfig.builder()
+                                .deserialize(JSON_CODEC.createDeserializer(currentConfig))
+                                .build();
+            }
+            var map = new LinkedHashMap<>(currentMcpConfig.getMcpServers());
+            if (isDelete) {
+                if (map.remove(name) == null) {
+                    continue;
+                }
+            } else {
+                map.put(name, newConfig);
+            }
+            var newMcpConfig = McpServersClientConfig.builder().mcpServers(map).build();
+            Files.write(filePath,
+                    ByteBufferUtils.getBytes(JSON_CODEC.serialize(newMcpConfig)),
+                    StandardOpenOption.TRUNCATE_EXISTING);
+        }
+    }
+
+    private static Set<ClientConfig> getClientConfigsToUpdate(Config config, Set<String> clients) {
+        Set<ClientConfig> clientConfigsToUpdate;
+        if (!clients.isEmpty()) {
+            clientConfigsToUpdate = config.getClientConfigs()
+                    .stream()
+                    .filter(c -> clients.contains(c.getName()))
+                    .collect(Collectors.toUnmodifiableSet());
+        } else {
+            clientConfigsToUpdate = Set.copyOf(config.getClientConfigs());
+        }
+        return clientConfigsToUpdate;
     }
 
     private static void addMcpBundle(Config config, String toolBundleName, CliBundle mcpBundleConfig)

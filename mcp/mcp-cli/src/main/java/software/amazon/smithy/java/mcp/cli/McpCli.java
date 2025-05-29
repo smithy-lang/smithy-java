@@ -13,6 +13,7 @@ import software.amazon.smithy.java.mcp.cli.commands.Configure;
 import software.amazon.smithy.java.mcp.cli.commands.InstallBundle;
 import software.amazon.smithy.java.mcp.cli.commands.ListBundles;
 import software.amazon.smithy.java.mcp.cli.commands.StartServer;
+import software.amazon.smithy.java.mcp.cli.commands.UninstallBundle;
 
 /**
  * Main entry point for the Smithy MCP Command Line Interface.
@@ -32,6 +33,7 @@ public class McpCli {
                 .addSubcommand(new StartServer())
                 .addSubcommand(new ListBundles())
                 .addSubcommand(new InstallBundle())
+                .addSubcommand(new UninstallBundle())
                 .addSubcommand(configureCommand);
         commandLine.execute(args);
     }
