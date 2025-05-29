@@ -22,7 +22,7 @@ import software.amazon.smithy.java.mcp.cli.commands.UninstallBundle;
  * It discovers and registers all available configuration commands and
  * sets up the command hierarchy.
  */
-@Command(name = "smithy-mcp", versionProvider = VersionProvider.class, mixinStandardHelpOptions = true,
+@Command(name = "mcp-registry", versionProvider = VersionProvider.class, mixinStandardHelpOptions = true,
         scope = CommandLine.ScopeType.INHERIT)
 public class McpCli {
 
