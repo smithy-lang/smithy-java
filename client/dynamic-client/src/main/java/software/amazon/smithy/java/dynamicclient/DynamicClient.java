@@ -320,6 +320,16 @@ public final class DynamicClient extends Client {
         }
 
         /**
+         * Returns the model that this client will use, or {@code null} if
+         * {@link #model(Model)} has not yet been invoked.
+         *
+         * @return the client's model, or {@code null} if none is configured yet
+         */
+        public Model model() {
+            return this.model;
+        }
+
+        /**
          * <stong>Required</stong>: Set the service shape ID to call.
          *
          * <p>The given shape ID <em>MUST</em> be present in the model given in {@link #model(Model)}.
@@ -330,6 +340,15 @@ public final class DynamicClient extends Client {
         public Builder service(ShapeId service) {
             this.service = service;
             return this;
+        }
+
+        /**
+         * Returns the ID of the service that will be called by the client, or {@code null} if {@link #service(ShapeId)} has not yet been invoked.
+         *
+         * @return the service shape ID, or {@code null} if none is configured yet
+         */
+        public ShapeId service() {
+            return this.service;
         }
     }
 }
