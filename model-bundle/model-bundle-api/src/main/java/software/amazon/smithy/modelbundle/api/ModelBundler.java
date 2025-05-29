@@ -57,11 +57,15 @@ public abstract class ModelBundler {
         }
         for (var op : model.getOperationShapes()) {
             var name = op.getId().getName();
-            if (!allowedOperations.contains(name) || blockedOperations.contains(name)) {
+            // if no operations are explicitly allowed, all operations are implicitly allowed unless
+            // explicitly blocked
+            var allowed = (allowedOperations.isEmpty() || allowedOperations.contains(name))
+                    && !blockedOperations.contains(name);
+            if (allowed) {
+                cleanDocumentation(op, builder);
+            } else {
                 builder.removeShape(op.getId());
                 serviceBuilder.removeOperation(op.getId());
-            } else {
-                cleanDocumentation(op, builder);
             }
         }
         cleanDocumentation(serviceBuilder.build(), builder);
