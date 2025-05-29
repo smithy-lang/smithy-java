@@ -5,8 +5,9 @@
 
 package software.amazon.smithy.java.mcp.cli;
 
+import java.util.Comparator;
+import java.util.ServiceLoader;
 import picocli.CommandLine;
-import software.amazon.smithy.utils.IoUtils;
 
 /**
  * Provides version information for the Smithy MCP CLI.
@@ -14,10 +15,16 @@ import software.amazon.smithy.utils.IoUtils;
  * This class implements Picocli's IVersionProvider interface to provide
  * version information from a resource file.
  */
-public class VersionProvider implements CommandLine.IVersionProvider {
+public final class VersionProvider implements CommandLine.IVersionProvider {
+
+    private static final McpCliVersionProvider VERSION_PROVIDER = ServiceLoader.load(McpCliVersionProvider.class)
+            .stream()
+            .map(ServiceLoader.Provider::get)
+            .min(Comparator.comparing(McpCliVersionProvider::priority))
+            .orElse(McpCliVersionProvider.getDefault());
 
     @Override
-    public String[] getVersion() throws Exception {
-        return new String[] {IoUtils.readUtf8Resource(VersionProvider.class, "VERSION").trim()};
+    public String[] getVersion() {
+        return new String[] {VERSION_PROVIDER.getVersion()};
     }
 }

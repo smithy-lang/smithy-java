@@ -67,7 +67,7 @@ public class ConfigUtils {
         DEFAULT_CONFIG_PROVIDER = ServiceLoader.load(DefaultConfigProvider.class)
                 .stream()
                 .map(ServiceLoader.Provider::get)
-                .min(Comparator.comparing(DefaultConfigProvider::priority))
+                .max(Comparator.comparing(DefaultConfigProvider::priority))
                 .orElse(new EmptyDefaultConfigProvider());
     }
 
