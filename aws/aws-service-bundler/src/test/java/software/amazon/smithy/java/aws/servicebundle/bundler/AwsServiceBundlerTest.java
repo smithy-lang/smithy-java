@@ -50,6 +50,11 @@ public class AwsServiceBundlerTest {
                 .isEmpty();
     }
 
+    @Test
+    public void cw() {
+        var bundler = new AwsServiceBundler("cloudwatch").bundle();
+    }
+
     private static String getModel(String path) {
         try (var stream = new InputStreamReader(Objects
                 .requireNonNull(AwsServiceBundlerTest.class.getResourceAsStream(path), "No model named " + path))) {
