@@ -46,7 +46,9 @@ public class ConfigUtils {
 
     private ConfigUtils() {}
 
-    private static final JsonCodec JSON_CODEC = JsonCodec.builder().build();
+    private static final JsonCodec JSON_CODEC = JsonCodec.builder()
+            .prettyPrint(true)
+            .build();
 
     private static final Path CONFIG_DIR = resolveFromHomeDir(".config", "smithy-mcp");
     private static final Path BUNDLE_DIR = CONFIG_DIR.resolve("bundles");
