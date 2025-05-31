@@ -20,8 +20,10 @@ public class AwsServiceBundlerTest {
 
     @Test
     public void accessAnalyzer() {
-        var bundler = new AwsServiceBundler("access-analyzer",
-                serviceName -> getModel("accessanalyzer-2019-11-01.json"));
+        var bundler = AwsServiceBundler.builder()
+                .serviceName("access-analyzer")
+                .resolver(serviceName -> getModel("accessanalyzer-2019-11-01.json"))
+                .build();
         var bundle = bundler.bundle();
         var config = bundle.getConfig().asShape(AwsServiceMetadata.builder());
 
@@ -34,10 +36,11 @@ public class AwsServiceBundlerTest {
     @Test
     public void testFilteringApis() {
         var filteredOperations = Set.of("GetFindingsStatistics", "GetFindingRecommendation");
-        var bundler = new AwsServiceBundler("access-analyzer",
-                serviceName -> getModel("accessanalyzer-2019-11-01.json"),
-                filteredOperations,
-                Set.of());
+        var bundler = AwsServiceBundler.builder()
+                .serviceName("access-analyzer")
+                .resolver(serviceName -> getModel("accessanalyzer-2019-11-01.json"))
+                .exposedOperations(filteredOperations)
+                .build();;
         var bundle = bundler.bundle();
         var bundleModel = new ModelAssembler().addUnparsedModel("model.json", bundle.getModel())
                 .disableValidation()
@@ -52,7 +55,7 @@ public class AwsServiceBundlerTest {
 
     @Test
     public void cw() {
-        var bundler = new AwsServiceBundler("cloudwatch").bundle();
+        var bundler = AwsServiceBundler.builder().serviceName("cloudwatch").build().bundle();
     }
 
     private static String getModel(String path) {

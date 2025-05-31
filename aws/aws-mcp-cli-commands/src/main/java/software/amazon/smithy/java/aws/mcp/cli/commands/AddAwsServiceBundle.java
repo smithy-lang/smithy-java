@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.Set;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import software.amazon.smithy.java.aws.mcp.cli.APIStandardTerminology;
 import software.amazon.smithy.java.aws.servicebundle.bundler.AwsServiceBundler;
 import software.amazon.smithy.java.mcp.cli.AbstractAddBundle;
 import software.amazon.smithy.java.mcp.cli.CliBundle;
@@ -35,9 +36,23 @@ public class AddAwsServiceBundle extends AbstractAddBundle {
     @Option(names = {"-b", "--blocked-apis"}, description = "List of APIs to hide in the MCP server")
     protected Set<String> blockedApis;
 
+    @Option(names = "--include-write-apis",
+            description = "Include write APIs in the MCP server",
+            defaultValue = "false")
+    protected boolean includeWriteApis;
+
     @Override
     protected CliBundle getNewToolConfig() {
-        var bundle = new AwsServiceBundler(awsServiceName, allowedTools(), blockedTools()).bundle();
+        AwsServiceBundler.Builder bundleBuilder = AwsServiceBundler.builder()
+                .serviceName(awsServiceName)
+                .exposedOperations(allowedTools())
+                .blockedOperations(blockedTools());
+        if (!includeWriteApis) {
+            bundleBuilder
+                    .allowedPrefixes(APIStandardTerminology.readOnlyApiPrefixes)
+                    .blockedPrefixes(APIStandardTerminology.writeApiPrefixes);
+        }
+        var bundle = bundleBuilder.build().bundle();
 
         var bundleConfig = McpBundleConfig.builder()
                 .smithyModeled(SmithyModeledBundleConfig.builder()

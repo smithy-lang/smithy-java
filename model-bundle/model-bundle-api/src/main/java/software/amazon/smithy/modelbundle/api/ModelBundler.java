@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.AbstractShapeBuilder;
 import software.amazon.smithy.model.shapes.OperationShape;
@@ -29,6 +30,7 @@ import software.amazon.smithy.utils.ToSmithyBuilder;
 public abstract class ModelBundler {
 
     private static final Pattern CLEAN_HTML_PATTERN = Pattern.compile("<[^<]+?>", Pattern.DOTALL);
+    private static final InternalLogger LOG = InternalLogger.getLogger(ModelBundler.class);
 
     public abstract SmithyBundle bundle();
 
@@ -46,7 +48,9 @@ public abstract class ModelBundler {
             Model model,
             ServiceShape allowedService,
             Set<String> allowedOperations,
-            Set<String> blockedOperations
+            Set<String> blockedOperations,
+            Set<String> allowedWords,
+            Set<String> blockedWords
     ) {
         var builder = model.toBuilder();
         var serviceBuilder = allowedService.toBuilder();
@@ -57,19 +61,43 @@ public abstract class ModelBundler {
         }
         for (var op : model.getOperationShapes()) {
             var name = op.getId().getName();
-            // if no operations are explicitly allowed, all operations are implicitly allowed unless
-            // explicitly blocked
-            var allowed = (allowedOperations.isEmpty() || allowedOperations.contains(name))
-                    && !blockedOperations.contains(name);
+            var allowed = filter(name, allowedOperations, blockedOperations, allowedWords, blockedWords);
             if (allowed) {
                 cleanDocumentation(op, builder);
+                LOG.debug("Allowed API " + name);
             } else {
                 builder.removeShape(op.getId());
                 serviceBuilder.removeOperation(op.getId());
+                LOG.debug("Blocked API " + name);
             }
         }
         cleanDocumentation(serviceBuilder.build(), builder);
         return builder.build();
+    }
+
+    static boolean filter(String operationName, Set<String> allowedOperations, Set<String> blockedOperations,
+                          Set<String> allowedPrefixes, Set<String> blockedPrefixes) {
+        var explicitlyAllowed = allowedOperations.contains(operationName);
+        var explicitlyBlocked = blockedOperations.contains(operationName);
+        var startsWithAllowedPrefix = allowedPrefixes.stream()
+                .anyMatch(word -> operationName.startsWith(word));
+        var startsWithBlockedPrefix = blockedPrefixes.stream()
+                .anyMatch(word -> operationName.startsWith(word));
+
+        if (explicitlyBlocked) {
+            return false;
+        } else if (explicitlyAllowed) {
+            return true;
+        } else if (startsWithBlockedPrefix) {
+            return false;
+        } else if (startsWithAllowedPrefix) {
+            return true;
+        } else if (allowedOperations.isEmpty() && allowedPrefixes.isEmpty()) {
+            // all operations are implicitly allowed
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @SuppressWarnings("unchecked")
