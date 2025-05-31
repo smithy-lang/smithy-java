@@ -22,12 +22,14 @@ public class ListBundles extends SmithyMcpCommand {
     @Override
     protected void execute(ExecutionContext context) {
         var registry = context.registry();
+        var installedBundles = context.config().getToolBundles().keySet();
         registry
                 .listMcpBundles()
                 .forEach(bundle -> {
+                    boolean isInstalled = installedBundles.contains(bundle.getName());
                     System.out.println(commandSpec().commandLine()
                             .getColorScheme()
-                            .string("@|bold " + bundle.getName() + "|@"));
+                            .string("@|bold " + bundle.getName() + (isInstalled ? " [installed]" : "") + "|@"));
                     var description = bundle.getDescription();
                     if (description == null) {
                         description = "MCP server for " + bundle.getName();
