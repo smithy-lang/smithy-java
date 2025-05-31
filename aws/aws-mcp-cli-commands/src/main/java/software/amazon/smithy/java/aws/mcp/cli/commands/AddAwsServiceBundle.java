@@ -9,7 +9,6 @@ import java.util.Collections;
 import java.util.Set;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import software.amazon.smithy.java.aws.mcp.cli.APIStandardTerminology;
 import software.amazon.smithy.java.aws.servicebundle.bundler.AwsServiceBundler;
 import software.amazon.smithy.java.mcp.cli.AbstractAddBundle;
 import software.amazon.smithy.java.mcp.cli.CliBundle;
@@ -39,18 +38,16 @@ public class AddAwsServiceBundle extends AbstractAddBundle {
     @Option(names = "--include-write-apis",
             description = "Include write APIs in the MCP server",
             defaultValue = "false")
-    protected boolean includeWriteApis;
+    boolean includeWriteApis;
 
     @Override
     protected CliBundle getNewToolConfig() {
-        AwsServiceBundler.Builder bundleBuilder = AwsServiceBundler.builder()
+        var bundleBuilder = AwsServiceBundler.builder()
                 .serviceName(awsServiceName)
                 .exposedOperations(allowedTools())
                 .blockedOperations(blockedTools());
         if (!includeWriteApis) {
-            bundleBuilder
-                    .allowedPrefixes(APIStandardTerminology.readOnlyApiPrefixes)
-                    .blockedPrefixes(APIStandardTerminology.writeApiPrefixes);
+            bundleBuilder = bundleBuilder.readOnlyOperations();
         }
         var bundle = bundleBuilder.build().bundle();
 

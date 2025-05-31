@@ -55,7 +55,6 @@ public final class AwsServiceBundler extends ModelBundler {
         }
     }
 
-
     private final ModelResolver resolver;
     private final String serviceName;
     private final Set<String> exposedOperations;
@@ -89,7 +88,7 @@ public final class AwsServiceBundler extends ModelBundler {
             return this;
         }
 
-        public Builder resolver(ModelResolver resolver) {
+        Builder resolver(ModelResolver resolver) {
             this.resolver = resolver;
             return this;
         }
@@ -101,6 +100,12 @@ public final class AwsServiceBundler extends ModelBundler {
 
         public Builder blockedOperations(Set<String> blockedOperations) {
             this.blockedOperations = blockedOperations;
+            return this;
+        }
+
+        public Builder readOnlyOperations() {
+            this.allowedPrefixes(ApiStandardTerminology.READ_ONLY_API_PREFIXES);
+            this.blockedPrefixes(ApiStandardTerminology.WRITE_API_PREFIXES);
             return this;
         }
 
@@ -118,7 +123,6 @@ public final class AwsServiceBundler extends ModelBundler {
             return new AwsServiceBundler(this);
         }
     }
-
 
     private static ServiceShape findService(Model model, String name) {
         var nameLower = name.toLowerCase(Locale.ROOT);
@@ -156,7 +160,7 @@ public final class AwsServiceBundler extends ModelBundler {
             bundle.serviceName(service.getId().getName())
                     .endpoints(Collections.emptyMap());
             // guaranteed to exist
-            var sigv4Trait = service.getTrait(SigV4Trait.class).get();
+            var sigv4Trait = service.expectTrait(SigV4Trait.class);
             var signingName = sigv4Trait.getName();
             bundle.sigv4SigningName(signingName);
             service.getTrait(EndpointTrait.class);
@@ -170,8 +174,12 @@ public final class AwsServiceBundler extends ModelBundler {
                     .config(Document.of(bundle.build()))
                     .configType("aws")
                     .serviceName(service.getId().toString())
-                    .model(serializeModel(cleanAndFilterModel(model, service, exposedOperations, blockedOperations,
-                            allowedPrefixes, blockedPrefixes)))
+                    .model(serializeModel(cleanAndFilterModel(model,
+                            service,
+                            exposedOperations,
+                            blockedOperations,
+                            allowedPrefixes,
+                            blockedPrefixes)))
                     .additionalInput(AdditionalInput.builder()
                             .identifier(PreRequest.$ID.toString())
                             .model(loadModel("/META-INF/smithy/bundle.smithy"))
@@ -260,7 +268,7 @@ public final class AwsServiceBundler extends ModelBundler {
         return params.getMember(key).isPresent();
     }
 
-    public interface ModelResolver {
+    interface ModelResolver {
         String getModel(String serviceName) throws Exception;
     }
 

@@ -61,28 +61,33 @@ public abstract class ModelBundler {
         }
         for (var op : model.getOperationShapes()) {
             var name = op.getId().getName();
-            var allowed = filter(name, allowedOperations, blockedOperations, allowedWords, blockedWords);
+            var allowed = isAllowed(name, allowedOperations, blockedOperations, allowedWords, blockedWords);
             if (allowed) {
                 cleanDocumentation(op, builder);
-                LOG.debug("Allowed API " + name);
+                LOG.debug("Allowed API {}", name);
             } else {
                 builder.removeShape(op.getId());
                 serviceBuilder.removeOperation(op.getId());
-                LOG.debug("Blocked API " + name);
+                LOG.debug("Blocked API {}", name);
             }
         }
         cleanDocumentation(serviceBuilder.build(), builder);
         return builder.build();
     }
 
-    static boolean filter(String operationName, Set<String> allowedOperations, Set<String> blockedOperations,
-                          Set<String> allowedPrefixes, Set<String> blockedPrefixes) {
+    static boolean isAllowed(
+            String operationName,
+            Set<String> allowedOperations,
+            Set<String> blockedOperations,
+            Set<String> allowedPrefixes,
+            Set<String> blockedPrefixes
+    ) {
         var explicitlyAllowed = allowedOperations.contains(operationName);
         var explicitlyBlocked = blockedOperations.contains(operationName);
         var startsWithAllowedPrefix = allowedPrefixes.stream()
-                .anyMatch(word -> operationName.startsWith(word));
+                .anyMatch(operationName::startsWith);
         var startsWithBlockedPrefix = blockedPrefixes.stream()
-                .anyMatch(word -> operationName.startsWith(word));
+                .anyMatch(operationName::startsWith);
 
         if (explicitlyBlocked) {
             return false;
@@ -92,12 +97,8 @@ public abstract class ModelBundler {
             return false;
         } else if (startsWithAllowedPrefix) {
             return true;
-        } else if (allowedOperations.isEmpty() && allowedPrefixes.isEmpty()) {
-            // all operations are implicitly allowed
-            return true;
-        } else {
-            return false;
         }
+        return allowedOperations.isEmpty() && allowedPrefixes.isEmpty();
     }
 
     @SuppressWarnings("unchecked")

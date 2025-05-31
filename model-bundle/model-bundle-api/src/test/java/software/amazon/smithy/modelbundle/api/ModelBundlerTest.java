@@ -1,3 +1,8 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.modelbundle.api;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -15,7 +20,7 @@ class ModelBundlerTest {
         Set<String> allowedPrefixes = Set.of("allow_");
         Set<String> blockedPrefixes = Set.of("block_");
 
-        assertFalse(ModelBundler.filter("blocked1", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
+        assertFalse(ModelBundler.isAllowed("blocked1", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
     }
 
     @Test
@@ -25,7 +30,7 @@ class ModelBundlerTest {
         Set<String> allowedPrefixes = Set.of("allow_");
         Set<String> blockedPrefixes = Set.of("block_");
 
-        assertTrue(ModelBundler.filter("allowed1", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
+        assertTrue(ModelBundler.isAllowed("allowed1", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
     }
 
     @Test
@@ -35,7 +40,7 @@ class ModelBundlerTest {
         Set<String> allowedPrefixes = Set.of("allow_");
         Set<String> blockedPrefixes = Set.of("block_");
 
-        assertFalse(ModelBundler.filter("block_test", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
+        assertFalse(ModelBundler.isAllowed("block_test", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
     }
 
     @Test
@@ -45,7 +50,7 @@ class ModelBundlerTest {
         Set<String> allowedPrefixes = Set.of("allow_");
         Set<String> blockedPrefixes = Set.of("block_");
 
-        assertTrue(ModelBundler.filter("allow_test", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
+        assertTrue(ModelBundler.isAllowed("allow_test", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
     }
 
     @Test
@@ -55,7 +60,7 @@ class ModelBundlerTest {
         Set<String> allowedPrefixes = Set.of();
         Set<String> blockedPrefixes = Set.of();
 
-        assertTrue(ModelBundler.filter("any_operation", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
+        assertTrue(ModelBundler.isAllowed("any_operation", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
     }
 
     @Test
@@ -65,7 +70,8 @@ class ModelBundlerTest {
         Set<String> allowedPrefixes = Set.of("allow_");
         Set<String> blockedPrefixes = Set.of();
 
-        assertFalse(ModelBundler.filter("unknown_operation", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
+        assertFalse(
+                ModelBundler.isAllowed("unknown_operation", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
     }
 
     @Test
@@ -75,7 +81,7 @@ class ModelBundlerTest {
         Set<String> allowedPrefixes = Set.of();
         Set<String> blockedPrefixes = Set.of();
 
-        assertFalse(ModelBundler.filter("operation1", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
+        assertFalse(ModelBundler.isAllowed("operation1", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
     }
 
     @Test
@@ -85,7 +91,7 @@ class ModelBundlerTest {
         Set<String> allowedPrefixes = Set.of("test_");
         Set<String> blockedPrefixes = Set.of("test_");
 
-        assertFalse(ModelBundler.filter("test_operation", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
+        assertFalse(ModelBundler.isAllowed("test_operation", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
     }
 
     @Test
@@ -95,7 +101,7 @@ class ModelBundlerTest {
         Set<String> allowedPrefixes = Set.of();
         Set<String> blockedPrefixes = Set.of("operation");
 
-        assertTrue(ModelBundler.filter("operation1", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
+        assertTrue(ModelBundler.isAllowed("operation1", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
     }
 
     @Test
@@ -105,6 +111,6 @@ class ModelBundlerTest {
         Set<String> allowedPrefixes = Set.of("operation");
         Set<String> blockedPrefixes = Set.of();
 
-        assertFalse(ModelBundler.filter("operation1", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
+        assertFalse(ModelBundler.isAllowed("operation1", allowedOps, blockedOps, allowedPrefixes, blockedPrefixes));
     }
 }
