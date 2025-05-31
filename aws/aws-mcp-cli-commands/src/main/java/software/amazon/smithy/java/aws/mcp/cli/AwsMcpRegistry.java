@@ -46,7 +46,7 @@ public class AwsMcpRegistry implements Registry {
 
     @Override
     public Bundle getMcpBundle(String name) {
-        var bundle = new AwsServiceBundler(name).bundle();
+        var bundle = AwsServiceBundler.builder().serviceName(name).build().bundle();
         return Bundle.builder()
                 .smithyBundle(SmithyMcpBundle.builder().bundle(bundle).build())
                 .build();

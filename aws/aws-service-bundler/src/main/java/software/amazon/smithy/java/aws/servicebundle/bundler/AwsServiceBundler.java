@@ -59,29 +59,69 @@ public final class AwsServiceBundler extends ModelBundler {
     private final String serviceName;
     private final Set<String> exposedOperations;
     private final Set<String> blockedOperations;
+    private final Set<String> allowedPrefixes;
+    private final Set<String> blockedPrefixes;
 
-    AwsServiceBundler(
-            String serviceName,
-            ModelResolver resolver,
-            Set<String> exposedOperations,
-            Set<String> blockedOperations
-    ) {
-        this.serviceName = serviceName;
-        this.resolver = resolver;
-        this.exposedOperations = exposedOperations;
-        this.blockedOperations = blockedOperations;
+    private AwsServiceBundler(Builder builder) {
+        this.serviceName = builder.serviceName;
+        this.resolver = builder.resolver;
+        this.exposedOperations = builder.exposedOperations;
+        this.blockedOperations = builder.blockedOperations;
+        this.allowedPrefixes = builder.allowedPrefixes;
+        this.blockedPrefixes = builder.blockedPrefixes;
     }
 
-    AwsServiceBundler(String serviceName, ModelResolver resolver) {
-        this(serviceName, resolver, Collections.emptySet(), Collections.emptySet());
+    public static Builder builder() {
+        return new Builder();
     }
 
-    public AwsServiceBundler(String serviceName) {
-        this(serviceName, GithubModelResolver.INSTANCE, Set.of(), Set.of());
-    }
+    public static class Builder {
+        private String serviceName;
+        private ModelResolver resolver = GithubModelResolver.INSTANCE;
+        private Set<String> exposedOperations = Collections.emptySet();
+        private Set<String> blockedOperations = Collections.emptySet();
+        private Set<String> allowedPrefixes = Collections.emptySet();
+        private Set<String> blockedPrefixes = Collections.emptySet();
 
-    public AwsServiceBundler(String serviceName, Set<String> exposedOperations, Set<String> blockedOperations) {
-        this(serviceName, GithubModelResolver.INSTANCE, exposedOperations, blockedOperations);
+        public Builder serviceName(String serviceName) {
+            this.serviceName = serviceName;
+            return this;
+        }
+
+        Builder resolver(ModelResolver resolver) {
+            this.resolver = resolver;
+            return this;
+        }
+
+        public Builder exposedOperations(Set<String> exposedOperations) {
+            this.exposedOperations = exposedOperations;
+            return this;
+        }
+
+        public Builder blockedOperations(Set<String> blockedOperations) {
+            this.blockedOperations = blockedOperations;
+            return this;
+        }
+
+        public Builder readOnlyOperations() {
+            this.allowedPrefixes(ApiStandardTerminology.READ_ONLY_API_PREFIXES);
+            this.blockedPrefixes(ApiStandardTerminology.WRITE_API_PREFIXES);
+            return this;
+        }
+
+        public Builder allowedPrefixes(Set<String> allowedPrefixes) {
+            this.allowedPrefixes = allowedPrefixes;
+            return this;
+        }
+
+        public Builder blockedPrefixes(Set<String> blockedPrefixes) {
+            this.blockedPrefixes = blockedPrefixes;
+            return this;
+        }
+
+        public AwsServiceBundler build() {
+            return new AwsServiceBundler(this);
+        }
     }
 
     private static ServiceShape findService(Model model, String name) {
@@ -120,7 +160,7 @@ public final class AwsServiceBundler extends ModelBundler {
             bundle.serviceName(service.getId().getName())
                     .endpoints(Collections.emptyMap());
             // guaranteed to exist
-            var sigv4Trait = service.getTrait(SigV4Trait.class).get();
+            var sigv4Trait = service.expectTrait(SigV4Trait.class);
             var signingName = sigv4Trait.getName();
             bundle.sigv4SigningName(signingName);
             service.getTrait(EndpointTrait.class);
@@ -134,7 +174,12 @@ public final class AwsServiceBundler extends ModelBundler {
                     .config(Document.of(bundle.build()))
                     .configType("aws")
                     .serviceName(service.getId().toString())
-                    .model(serializeModel(cleanAndFilterModel(model, service, exposedOperations, blockedOperations)))
+                    .model(serializeModel(cleanAndFilterModel(model,
+                            service,
+                            exposedOperations,
+                            blockedOperations,
+                            allowedPrefixes,
+                            blockedPrefixes)))
                     .additionalInput(AdditionalInput.builder()
                             .identifier(PreRequest.$ID.toString())
                             .model(loadModel("/META-INF/smithy/bundle.smithy"))

@@ -35,9 +35,21 @@ public class AddAwsServiceBundle extends AbstractAddBundle {
     @Option(names = {"-b", "--blocked-apis"}, description = "List of APIs to hide in the MCP server")
     protected Set<String> blockedApis;
 
+    @Option(names = "--include-write-apis",
+            description = "Include write APIs in the MCP server",
+            defaultValue = "false")
+    boolean includeWriteApis;
+
     @Override
     protected CliBundle getNewToolConfig() {
-        var bundle = new AwsServiceBundler(awsServiceName, allowedTools(), blockedTools()).bundle();
+        var bundleBuilder = AwsServiceBundler.builder()
+                .serviceName(awsServiceName)
+                .exposedOperations(allowedTools())
+                .blockedOperations(blockedTools());
+        if (!includeWriteApis) {
+            bundleBuilder = bundleBuilder.readOnlyOperations();
+        }
+        var bundle = bundleBuilder.build().bundle();
 
         var bundleConfig = McpBundleConfig.builder()
                 .smithyModeled(SmithyModeledBundleConfig.builder()

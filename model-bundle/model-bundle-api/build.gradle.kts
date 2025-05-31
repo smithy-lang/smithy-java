@@ -13,6 +13,7 @@ dependencies {
     smithyBuild(project(":codegen:plugins:types-codegen"))
 
     implementation(project(":core"))
+    implementation(project(":logging"))
     implementation(libs.smithy.model)
     api(project(":client:client-auth-api"))
     api(project(":client:client-core"))
