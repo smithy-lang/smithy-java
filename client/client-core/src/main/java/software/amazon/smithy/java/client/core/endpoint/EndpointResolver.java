@@ -72,7 +72,7 @@ public interface EndpointResolver {
      */
     static EndpointResolver staticHost(Endpoint endpoint) {
         Objects.requireNonNull(endpoint);
-        return params -> CompletableFuture.completedFuture(endpoint);
+        return new StaticHostResolver(endpoint);
     }
 
     /**
@@ -83,8 +83,7 @@ public interface EndpointResolver {
      */
     static EndpointResolver staticHost(String endpoint) {
         Objects.requireNonNull(endpoint);
-        var ep = Endpoint.builder().uri(endpoint).build();
-        return params -> CompletableFuture.completedFuture(ep);
+        return staticHost(Endpoint.builder().uri(endpoint).build());
     }
 
     /**
@@ -95,7 +94,6 @@ public interface EndpointResolver {
      */
     static EndpointResolver staticHost(URI endpoint) {
         Objects.requireNonNull(endpoint);
-        var ep = Endpoint.builder().uri(endpoint).build();
-        return params -> CompletableFuture.completedFuture(ep);
+        return staticHost(Endpoint.builder().uri(endpoint).build());
     }
 }

@@ -23,8 +23,11 @@ final class EndpointImpl implements Endpoint {
 
     private EndpointImpl(Builder builder) {
         this.uri = Objects.requireNonNull(builder.uri);
-        this.authSchemes = List.copyOf(builder.authSchemes);
-        this.properties = Map.copyOf(builder.properties);
+        this.authSchemes = builder.authSchemes == null ? List.of() : builder.authSchemes;
+        this.properties = builder.properties == null ? Map.of() : builder.properties;
+        // Clear out the builder, making this class immutable and the builder still reusable.
+        builder.authSchemes = null;
+        builder.properties = null;
     }
 
     @Override
@@ -66,11 +69,16 @@ final class EndpointImpl implements Endpoint {
         return Objects.hash(uri, authSchemes, properties);
     }
 
+    @Override
+    public String toString() {
+        return "Endpoint{uri=" + uri + ", authSchemes=" + authSchemes + ", properties=" + properties + '}';
+    }
+
     static final class Builder implements Endpoint.Builder {
 
         private URI uri;
-        private final List<EndpointAuthScheme> authSchemes = new ArrayList<>();
-        final Map<Context.Key<?>, Object> properties = new HashMap<>();
+        private List<EndpointAuthScheme> authSchemes;
+        private Map<Context.Key<?>, Object> properties;
 
         @Override
         public Builder uri(URI uri) {
@@ -89,12 +97,18 @@ final class EndpointImpl implements Endpoint {
 
         @Override
         public Builder addAuthScheme(EndpointAuthScheme authScheme) {
+            if (this.authSchemes == null) {
+                this.authSchemes = new ArrayList<>();
+            }
             this.authSchemes.add(authScheme);
             return this;
         }
 
         @Override
         public <T> Builder putProperty(Context.Key<T> property, T value) {
+            if (this.properties == null) {
+                this.properties = new HashMap<>();
+            }
             properties.put(property, value);
             return this;
         }
