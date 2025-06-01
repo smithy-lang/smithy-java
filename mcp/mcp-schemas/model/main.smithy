@@ -102,17 +102,16 @@ structure ToolInfo {
 
     description: String
 
-    inputSchema: ToolInputSchema
+    inputSchema: JsonObjectSchema
 }
 
 list ToolInfoList {
     member: ToolInfo
 }
 
-structure ToolInputSchema {
-    @default("object")
+structure JsonObjectSchema {
     @required
-    type: String
+    type: String = "object"
 
     properties: PropertiesMap
 
@@ -121,20 +120,46 @@ structure ToolInputSchema {
     @required
     additionalProperties: PrimitiveBoolean = false
 
+    description: String
+
     @jsonName("$schema")
     schema: String = "http://json-schema.org/draft-07/schema#"
 }
 
-map PropertiesMap {
-    key: String
-    value: PropertyDetails
-}
-
-structure PropertyDetails {
+structure JsonArraySchema {
     @required
-    type: String
+    type: String = "array"
+
+    /// one of JsonObjectSchema | JsonArraySchema | JsonPrimitiveSchema
+    @required
+    items: Document
+
+    uniqueItems: PrimitiveBoolean = false
 
     description: String
+
+    default: Document
+}
+
+structure JsonPrimitiveSchema {
+    @required
+    type: JsonPrimitiveType
+
+    description: String
+}
+
+enum JsonPrimitiveType {
+    NUMBER = "number"
+    STRING = "string"
+    BOOLEAN = "boolean"
+    NULL = "null"
+}
+
+map PropertiesMap {
+    key: String
+
+    /// one of JsonObjectSchema | JsonArraySchema | JsonPrimitiveSchema
+    value: Document
 }
 
 list StringList {

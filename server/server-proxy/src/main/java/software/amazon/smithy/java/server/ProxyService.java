@@ -61,13 +61,14 @@ public final class ProxyService implements Service {
         if (builder.region != null) {
             clientBuilder.putConfig(RegionSetting.REGION, builder.region);
         }
-        if (builder.clientConfigurator != null) {
-            clientBuilder = builder.clientConfigurator.apply(clientBuilder);
-        } else {
+        if (builder.proxyEndpoint != null) {
             clientBuilder.endpointResolver(EndpointResolver.staticEndpoint(builder.proxyEndpoint));
         }
         if (builder.userAgentAppId != null) {
             clientBuilder.putConfig(CallContext.APPLICATION_ID, builder.userAgentAppId);
+        }
+        if (builder.clientConfigurator != null) {
+            clientBuilder = builder.clientConfigurator.apply(clientBuilder);
         }
 
         this.dynamicClient = clientBuilder.build();

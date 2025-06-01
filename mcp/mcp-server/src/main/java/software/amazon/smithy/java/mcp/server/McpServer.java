@@ -29,15 +29,17 @@ import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.model.CallToolResult;
 import software.amazon.smithy.java.mcp.model.Capabilities;
 import software.amazon.smithy.java.mcp.model.InitializeResult;
+import software.amazon.smithy.java.mcp.model.JsonArraySchema;
+import software.amazon.smithy.java.mcp.model.JsonObjectSchema;
+import software.amazon.smithy.java.mcp.model.JsonPrimitiveSchema;
+import software.amazon.smithy.java.mcp.model.JsonPrimitiveType;
 import software.amazon.smithy.java.mcp.model.JsonRpcErrorResponse;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
 import software.amazon.smithy.java.mcp.model.ListToolsResult;
-import software.amazon.smithy.java.mcp.model.PropertyDetails;
 import software.amazon.smithy.java.mcp.model.ServerInfo;
 import software.amazon.smithy.java.mcp.model.TextContent;
 import software.amazon.smithy.java.mcp.model.ToolInfo;
-import software.amazon.smithy.java.mcp.model.ToolInputSchema;
 import software.amazon.smithy.java.mcp.model.Tools;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Server;
@@ -89,14 +91,14 @@ public final class McpServer implements Server {
             var line = scan.nextLine();
             try {
                 var jsonRequest = CODEC.deserializeShape(line, JsonRpcRequest.builder());
-                handleRequest(jsonRequest, line);
+                handleRequest(jsonRequest);
             } catch (Exception e) {
                 LOG.error("Error decoding request", e);
             }
         }
     }
 
-    private void handleRequest(JsonRpcRequest req, String rawRequest) {
+    private void handleRequest(JsonRpcRequest req) {
         try {
             switch (req.getMethod()) {
                 case "initialize" -> writeResponse(req.getId(),
@@ -248,7 +250,7 @@ public final class McpServer implements Server {
                         .description(createDescription(serviceName,
                                 operationName,
                                 schema))
-                        .inputSchema(createInputSchema(operation.getApiOperation().inputSchema()))
+                        .inputSchema(createJsonObjectSchema(operation.getApiOperation().inputSchema()))
                         .build();
                 tools.put(operationName, new Tool(toolInfo, operation));
             }
@@ -256,45 +258,78 @@ public final class McpServer implements Server {
         return tools;
     }
 
-    private static ToolInputSchema createInputSchema(Schema schema) {
-        var properties = new HashMap<String, PropertyDetails>();
+    private static JsonObjectSchema createJsonObjectSchema(Schema schema) {
+        var properties = new HashMap<String, Document>();
         var requiredProperties = new ArrayList<String>();
         for (var member : schema.members()) {
             var name = member.memberName();
             if (member.hasTrait(TraitKey.REQUIRED_TRAIT)) {
                 requiredProperties.add(name);
             }
-            // adapt types to json-schema types
-            // https://json-schema.org/draft-07/schema#
-            var type = switch (member.type()) {
-                case BYTE, SHORT, INTEGER, INT_ENUM, LONG, FLOAT, DOUBLE -> "number";
-                case ENUM, BLOB -> "string";
-                case LIST, SET -> "array";
-                case TIMESTAMP -> resolveTimestampType(member.memberTarget());
-                case MAP, DOCUMENT, STRUCTURE, UNION -> "object";
-                case STRING, BIG_DECIMAL, BIG_INTEGER -> "string";
-                case BOOLEAN -> "boolean";
-                default -> throw new RuntimeException("unsupported type: " + member.type() + "on member " + member);
+
+            var jsonSchema = switch (member.type()) {
+                case LIST, SET -> createJsonArraySchema(member.memberTarget());
+                case MAP, STRUCTURE, UNION -> createJsonObjectSchema(member.memberTarget());
+                default -> createJsonPrimitiveSchema(member);
             };
-            var details = PropertyDetails.builder().typeMember(type);
-            var documentation = member.getTrait(TraitKey.DOCUMENTATION_TRAIT);
-            if (documentation != null) {
-                details.description(documentation.getValue());
-            }
-            properties.put(name, details.build());
+
+            properties.put(name, Document.of(jsonSchema));
         }
-        return ToolInputSchema.builder().properties(properties).required(requiredProperties).build();
+
+        return JsonObjectSchema.builder()
+                .properties(properties)
+                .required(requiredProperties)
+                .description(memberDescription(schema))
+                .build();
     }
 
-    private static String resolveTimestampType(Schema schema) {
+    private static JsonArraySchema createJsonArraySchema(Schema schema) {
+        var listMember = schema.listMember();
+        var items = switch (listMember.type()) {
+            case MAP, STRUCTURE, UNION -> createJsonObjectSchema(listMember);
+            default -> createJsonPrimitiveSchema(listMember);
+        };
+        return JsonArraySchema.builder()
+                .description(memberDescription(schema))
+                .items(Document.of(items))
+                .build();
+    }
+
+    private static JsonPrimitiveSchema createJsonPrimitiveSchema(Schema member) {
+        var type = switch (member.type()) {
+            case BYTE, SHORT, INTEGER, INT_ENUM, LONG, FLOAT, DOUBLE -> JsonPrimitiveType.NUMBER;
+            case ENUM, BLOB, STRING, BIG_DECIMAL, BIG_INTEGER -> JsonPrimitiveType.STRING;
+            case TIMESTAMP -> resolveTimestampType(member.memberTarget());
+            case BOOLEAN -> JsonPrimitiveType.BOOLEAN;
+            default -> throw new RuntimeException(member + " is not a primitive type");
+        };
+
+        return JsonPrimitiveSchema.builder()
+                .typeMember(type)
+                .description(memberDescription(member))
+                .build();
+    }
+
+    private static String memberDescription(Schema schema) {
+        var trait = schema.getTrait(TraitKey.DOCUMENTATION_TRAIT);
+        if (trait != null) {
+            return trait.getValue();
+        } else if (schema.isMember()) {
+            return memberDescription(schema.memberTarget());
+        } else {
+            return null;
+        }
+    }
+
+    private static JsonPrimitiveType resolveTimestampType(Schema schema) {
         var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
         if (trait == null) {
             // default is epoch-seconds
-            return "number";
+            return JsonPrimitiveType.NUMBER;
         }
         return switch (trait.getFormat()) {
-            case EPOCH_SECONDS -> "number";
-            case DATE_TIME, HTTP_DATE -> "string";
+            case EPOCH_SECONDS -> JsonPrimitiveType.NUMBER;
+            case DATE_TIME, HTTP_DATE -> JsonPrimitiveType.STRING;
             default -> throw new RuntimeException("unknown timestamp format: " + trait.getFormat());
         };
     }
