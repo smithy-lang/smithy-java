@@ -95,8 +95,14 @@ map McpServerConfigs {
 structure McpServerConfig {
     command: String
     args: ArgsList
+    env: EnvVars
 }
 
 list ArgsList {
     member: String
+}
+
+map EnvVars {
+    key: String
+    value: String
 }
