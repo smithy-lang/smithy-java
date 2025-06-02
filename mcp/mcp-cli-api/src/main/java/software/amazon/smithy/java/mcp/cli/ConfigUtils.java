@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.mcp.cli.model.ClientConfig;
@@ -189,32 +190,42 @@ public class ConfigUtils {
                         filePath);
                 continue;
             }
-            var currentConfig = Files.readAllBytes(filePath);
-            McpServersClientConfig currentMcpConfig;
-            if (currentConfig.length == 0) {
+            var currentMcpConfig = getClientConfig(filePath);
+
+            if (currentMcpConfig == null) {
                 if (isDelete) {
                     continue;
                 }
                 currentMcpConfig = McpServersClientConfig.builder().build();
-            } else {
-                currentMcpConfig =
-                        McpServersClientConfig.builder()
-                                .deserialize(JSON_CODEC.createDeserializer(currentConfig))
-                                .build();
             }
+
             var map = new LinkedHashMap<>(currentMcpConfig.getMcpServers());
             if (isDelete) {
                 if (map.remove(name) == null) {
                     continue;
                 }
             } else {
-                map.put(name, newConfig);
+                map.put(name, Document.of(newConfig));
             }
             var newMcpConfig = McpServersClientConfig.builder().mcpServers(map).build();
             Files.write(filePath,
                     ByteBufferUtils.getBytes(JSON_CODEC.serialize(newMcpConfig)),
                     StandardOpenOption.TRUNCATE_EXISTING);
         }
+    }
+
+    static McpServersClientConfig getClientConfig(Path filePath) throws IOException {
+        var currentConfig = Files.readAllBytes(filePath);
+        McpServersClientConfig currentMcpConfig;
+        if (currentConfig.length == 0) {
+            return null;
+        } else {
+            currentMcpConfig =
+                    McpServersClientConfig.builder()
+                            .deserialize(JSON_CODEC.createDeserializer(currentConfig))
+                            .build();
+        }
+        return currentMcpConfig;
     }
 
     private static Set<ClientConfig> getClientConfigsToUpdate(Config config, Set<String> clients) {
