@@ -71,8 +71,8 @@ graalvmNative {
         javaLauncher.set(
             javaToolchains.launcherFor {
                 // Use oracle GraalVM JDK for build
-                languageVersion.set(JavaLanguageVersion.of(23))
-                vendor.set(JvmVendorSpec.matching("Oracle Corporation"))
+                languageVersion.set(JavaLanguageVersion.of(24))
+                vendor.set(JvmVendorSpec.matching("GraalVM Community"))
             },
         )
 
