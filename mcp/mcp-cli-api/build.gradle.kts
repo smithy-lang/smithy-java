@@ -12,10 +12,15 @@ dependencies {
     api(project(":core"))
     api(libs.smithy.model)
     api(libs.picocli)
+    annotationProcessor(libs.picocli.codegen)
     api(project(":mcp:mcp-bundle-api"))
     implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(project(":logging"))
     smithyBuild(project(":codegen:plugins:types-codegen"))
+}
+
+tasks.compileJava {
+    options.compilerArgs.add("-Aproject=mcp-cli-api")
 }
 
 sourceSets {

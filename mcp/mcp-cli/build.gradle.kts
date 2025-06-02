@@ -19,6 +19,7 @@ dependencies {
     implementation(project(":server:server-proxy"))
     implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(libs.picocli)
+    annotationProcessor(libs.picocli.codegen)
     api(project(":mcp:mcp-cli-api"))
     api(project(":mcp:mcp-schemas"))
     implementation(libs.smithy.utils)
@@ -34,6 +35,10 @@ application {
     mainClass = "software.amazon.smithy.java.mcp.cli.McpCli"
     applicationDefaultJvmArgs = listOf("-Dorg.slf4j.simpleLogger.defaultLogLevel=off")
     applicationName = "smithy-mcp"
+}
+
+tasks.compileJava {
+    options.compilerArgs.add("-Aproject=mcp-cli")
 }
 
 val generateVersionFile =
