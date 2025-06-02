@@ -55,7 +55,7 @@ public class AwsServiceBundlerTest {
 
     @Test
     public void cw() {
-        assertThat(AwsServiceBundler.builder().serviceName("cloudwatch").build().bundle())
+        assertThat(AwsServiceBundler.builder().serviceName("cloudwatch-logs").build().bundle())
                 .isNotNull();
     }
 

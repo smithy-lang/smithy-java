@@ -18,7 +18,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import software.amazon.smithy.aws.traits.ServiceTrait;
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.awsmcp.model.AwsServiceMetadata;
 import software.amazon.smithy.awsmcp.model.PreRequest;
@@ -125,22 +124,11 @@ public final class AwsServiceBundler extends ModelBundler {
     }
 
     private static ServiceShape findService(Model model, String name) {
-        var nameLower = name.toLowerCase(Locale.ROOT);
         for (var service : model.getServiceShapes()) {
-            if (service.hasTrait(ServiceTrait.ID) && service.expectTrait(ServiceTrait.class)
-                    .getSdkId()
-                    .toLowerCase(Locale.ROOT)
-                    .contains(nameLower)) {
+            // if we find a model with a sigv4 trait, it's the aws service model we just loaded in
+            if (service.hasTrait(SigV4Trait.ID)) {
                 return service;
             }
-            if (service.hasTrait(SigV4Trait.ID)
-                    && service.expectTrait(SigV4Trait.class)
-                            .getName()
-                            .toLowerCase(Locale.ROOT)
-                            .contains(nameLower)) {
-                return service;
-            }
-
         }
         throw new RuntimeException("couldn't find service with name " + name);
     }
