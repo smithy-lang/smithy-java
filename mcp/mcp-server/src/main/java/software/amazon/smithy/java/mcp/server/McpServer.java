@@ -44,6 +44,7 @@ import software.amazon.smithy.java.mcp.model.Tools;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.Service;
+import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
@@ -261,7 +262,10 @@ public final class McpServer implements Server {
     private static JsonObjectSchema createJsonObjectSchema(Schema schema) {
         var properties = new HashMap<String, Document>();
         var requiredProperties = new ArrayList<String>();
-        for (var member : schema.members()) {
+        boolean isMember = schema.isMember();
+        var members = isMember ? schema.memberTarget().members() : schema.members();
+        var type = isMember ? schema.memberTarget().type() : schema.type();
+        for (var member : members) {
             var name = member.memberName();
             if (member.hasTrait(TraitKey.REQUIRED_TRAIT)) {
                 requiredProperties.add(name);
@@ -269,7 +273,7 @@ public final class McpServer implements Server {
 
             var jsonSchema = switch (member.type()) {
                 case LIST, SET -> createJsonArraySchema(member.memberTarget());
-                case MAP, STRUCTURE, UNION -> createJsonObjectSchema(member.memberTarget());
+                case MAP, STRUCTURE, UNION, DOCUMENT -> createJsonObjectSchema(member);
                 default -> createJsonPrimitiveSchema(member);
             };
 
@@ -280,6 +284,7 @@ public final class McpServer implements Server {
                 .properties(properties)
                 .required(requiredProperties)
                 .description(memberDescription(schema))
+                .additionalProperties(type.isShapeType(ShapeType.DOCUMENT))
                 .build();
     }
 
@@ -312,14 +317,20 @@ public final class McpServer implements Server {
     }
 
     private static String memberDescription(Schema schema) {
+        String description = null;
         var trait = schema.getTrait(TraitKey.DOCUMENTATION_TRAIT);
         if (trait != null) {
-            return trait.getValue();
-        } else if (schema.isMember()) {
-            return memberDescription(schema.memberTarget());
-        } else {
-            return null;
+            description = trait.getValue();
         }
+        if (schema.isMember()) {
+            var memberDescription = memberDescription(schema.memberTarget());
+            if (description != null && memberDescription != null) {
+                description = appendSentences(description, memberDescription);
+            } else if (memberDescription != null) {
+                description = memberDescription;
+            }
+        }
+        return description;
     }
 
     private static JsonPrimitiveType resolveTimestampType(Schema schema) {
@@ -403,6 +414,14 @@ public final class McpServer implements Server {
         Tool(ToolInfo toolInfo, McpServerProxy proxy) {
             this(toolInfo, null, proxy);
         }
+    }
+
+    private static String appendSentences(String first, String second) {
+        first = first.trim();
+        if (!first.endsWith(".")) {
+            first = first + ". ";
+        }
+        return first + second;
     }
 
     public static McpServerBuilder builder() {

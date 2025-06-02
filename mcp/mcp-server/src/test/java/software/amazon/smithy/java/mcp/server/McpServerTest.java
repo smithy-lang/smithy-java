@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.mcp.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -79,11 +80,17 @@ public class McpServerTest {
 
         var nested = properties.get("nested").asStringMap();
         assertEquals("object", nested.get("type").asString());
-        assertEquals("A structure that can be nested", nested.get("description").asString());
+        assertEquals("The nested member. A structure that can be nested", nested.get("description").asString());
         var nestedProperties = nested.get("properties").asStringMap();
+
         var nestedStr = nestedProperties.get("nestedStr").asStringMap();
         assertEquals("string", nestedStr.get("type").asString());
         assertEquals("A string that's nested", nestedStr.get("description").asString());
+        assertEquals("string", nestedStr.get("type").asString());
+
+        var nestedDocument = nestedProperties.get("nestedDocument").asStringMap();
+        assertEquals("A document that's nested", nestedDocument.get("description").asString());
+        assertTrue(nestedDocument.get("additionalProperties").asBoolean());
 
         var list = properties.get("list").asStringMap();
         assertEquals("array", list.get("type").asString());
@@ -155,6 +162,9 @@ public class McpServerTest {
             structure Nested {
                 /// A string that's nested
                 nestedStr: String
+
+                /// A document that's nested
+                nestedDocument: Document
             }""";
 
     private static final Model MODEL = Model.assembler()
