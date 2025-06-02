@@ -89,7 +89,7 @@ structure McpServersClientConfig {
 
 map McpServerConfigs {
     key: String
-    value: McpServerConfig
+    value: Document
 }
 
 structure McpServerConfig {
