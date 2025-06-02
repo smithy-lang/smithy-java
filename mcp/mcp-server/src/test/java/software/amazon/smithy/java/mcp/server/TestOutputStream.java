@@ -8,7 +8,6 @@ package software.amazon.smithy.java.mcp.server;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -30,7 +29,7 @@ final class TestOutputStream extends OutputStream {
         int rem = len;
         int pos = off;
         while (rem > 0) {
-            int nl = Arrays.binarySearch(b, pos, pos + rem, (byte) '\n');
+            int nl = find(b, pos, pos + rem, (byte) '\n');
             if (nl == -1) {
                 baos.write(b, off, len);
                 return;
@@ -43,6 +42,18 @@ final class TestOutputStream extends OutputStream {
                 pos += toWrite;
             }
         }
+    }
+
+    private static int find(byte[] arr, int start, int end, byte b) {
+        if (start >= end || end > arr.length) {
+            throw new IllegalArgumentException();
+        }
+        for (int i = start; i < end; i++) {
+            if (arr[i] == b) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     String read() {
