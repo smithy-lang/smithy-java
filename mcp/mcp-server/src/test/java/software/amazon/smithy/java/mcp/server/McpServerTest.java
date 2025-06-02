@@ -84,6 +84,18 @@ public class McpServerTest {
         var nestedStr = nestedProperties.get("nestedStr").asStringMap();
         assertEquals("string", nestedStr.get("type").asString());
         assertEquals("A string that's nested", nestedStr.get("description").asString());
+
+        var list = properties.get("list").asStringMap();
+        assertEquals("array", list.get("type").asString());
+        var listItems = list.get("items").asStringMap();
+        assertEquals("object", listItems.get("type").asString());
+
+        var doubleNestedList = properties.get("doubleNestedList").asStringMap();
+        assertEquals("array", doubleNestedList.get("type").asString());
+        var doubleNestedListItems = doubleNestedList.get("items").asStringMap();
+        assertEquals("array", doubleNestedListItems.get("type").asString());
+        var doubleNestedListItemsItems = doubleNestedListItems.get("items").asStringMap();
+        assertEquals("object", doubleNestedListItemsItems.get("type").asString());
     }
 
     private void write(String method, Document document) {
@@ -125,6 +137,18 @@ public class McpServerTest {
 
                 /// The nested member
                 nested: Nested
+
+                list: NestedList
+
+                doubleNestedList: DoubleNestedList
+            }
+
+            list NestedList {
+                member: Nested
+            }
+
+            list DoubleNestedList {
+                member: NestedList
             }
 
             /// A structure that can be nested
