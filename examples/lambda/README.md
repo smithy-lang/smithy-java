@@ -3,13 +3,13 @@
 ### Usage
 To use this example as a template, run the following command with the [Smithy CLI](https://smithy.io/2.0/guides/smithy-cli/index.html):
 ```console
-smithy init -t lambda --url https://github.com/smithy-lang/smithy-java
+smithy init -t lambda-endpoint --url https://github.com/smithy-lang/smithy-java
 ```
 
 Or
 
 ```console
-smithy init -t lambda --url git@github.com:smithy-lang/smithy-java.git
+smithy init -t lambda-endpoint --url git@github.com:smithy-lang/smithy-java.git
 ```
 
 To generate the zipfile containing the lambda handler, run the following from the root of the project:
