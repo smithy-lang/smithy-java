@@ -18,6 +18,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -277,48 +278,50 @@ public class ConfigUtils {
         return mcpBundleConfig;
     }
 
-    private static void install(ExecSpec execSpec) {
+    private static void install(List<ExecSpec> execSpecs) {
 
-        ProcessBuilder pb = new ProcessBuilder(execSpec.getExecutable());
-        pb.command().addAll(execSpec.getArgs());
-        pb.redirectErrorStream(true);
-        Process process = null;
-        try {
-            process = pb.start();
-            String output = captureProcessOutput(process);
+        for (var execSpec : execSpecs) {
+            ProcessBuilder pb = new ProcessBuilder(execSpec.getExecutable());
+            pb.command().addAll(execSpec.getArgs());
+            pb.redirectErrorStream(true);
+            Process process = null;
+            try {
+                process = pb.start();
+                String output = captureProcessOutput(process);
 
-            boolean finished = process.waitFor(5, TimeUnit.MINUTES);
+                boolean finished = process.waitFor(5, TimeUnit.MINUTES);
 
-            if (!finished) {
-                process.destroyForcibly();
-                process.waitFor(10, TimeUnit.SECONDS);
-                throw new RuntimeException("Installation timed out after 5 minutes");
-            }
+                if (!finished) {
+                    process.destroyForcibly();
+                    process.waitFor(10, TimeUnit.SECONDS);
+                    throw new RuntimeException("Installation timed out after 5 minutes");
+                }
 
-            int exitCode = process.exitValue();
-            if (exitCode != 0) {
-                throw new RuntimeException(String.format(
-                        "Installation failed with exit code %d. Command: %s. Output: %s",
-                        exitCode,
-                        String.join(" ", pb.command()),
-                        output));
-            }
+                int exitCode = process.exitValue();
+                if (exitCode != 0) {
+                    throw new RuntimeException(String.format(
+                            "Installation failed with exit code %d. Command: %s. Output: %s",
+                            exitCode,
+                            String.join(" ", pb.command()),
+                            output));
+                }
 
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            if (process.isAlive()) {
-                process.destroyForcibly();
-            }
-            throw new RuntimeException("Installation was interrupted", e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                if (process.isAlive()) {
+                    process.destroyForcibly();
+                }
+                throw new RuntimeException("Installation was interrupted", e);
 
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to start installation process: " +
-                    String.join(" ", pb.command()), e);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to start installation process: " +
+                        String.join(" ", pb.command()), e);
 
-        } finally {
-            // Ensure process is cleaned up
-            if (process != null && process.isAlive()) {
-                process.destroyForcibly();
+            } finally {
+                // Ensure process is cleaned up
+                if (process != null && process.isAlive()) {
+                    process.destroyForcibly();
+                }
             }
         }
     }
