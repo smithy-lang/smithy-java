@@ -81,7 +81,7 @@ graalvmNative {
 
         buildArgs.addAll(listOf(
             "-H:ResourceConfigurationFiles=${projectDir}/src/resource-config.json",
-            "--enable-url-protocols=http,https",
+            "--enable-url-protocols=http,https,jar",
         ))
 
         // Debug info
