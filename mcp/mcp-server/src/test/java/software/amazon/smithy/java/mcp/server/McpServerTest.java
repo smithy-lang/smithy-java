@@ -8,6 +8,7 @@ package software.amazon.smithy.java.mcp.server;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,8 +49,7 @@ public class McpServerTest {
         }
     }
 
-    @Test
-    public void nestedDefinitions() {
+    private List<Document> getTools() {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
@@ -66,7 +66,12 @@ public class McpServerTest {
         var response = read();
         var tools = response.getResult().asStringMap().get("tools").asList();
         assertEquals(1, tools.size());
-        var tool = tools.get(0).asStringMap();
+        return tools;
+    }
+
+    @Test
+    public void nestedDefinitions() {
+        var tool = getTools().get(0).asStringMap();
         assertEquals("TestOperation", tool.get("name").asString());
         var inputSchema = tool.get("inputSchema").asStringMap();
         assertEquals("object", inputSchema.get("type").asString());
@@ -74,35 +79,79 @@ public class McpServerTest {
                 inputSchema.get("description").asString());
 
         var properties = inputSchema.get("properties").asStringMap();
+        var definitions = inputSchema.get("definitions").asStringMap();
         var str = properties.get("str").asStringMap();
         assertEquals("string", str.get("type").asString());
-        assertEquals("It's a string", str.get("description").asString());
 
         var nested = properties.get("nested").asStringMap();
-        assertEquals("object", nested.get("type").asString());
-        assertEquals("The nested member. A structure that can be nested", nested.get("description").asString());
-        var nestedProperties = nested.get("properties").asStringMap();
+        assertEquals("#/definitions/smithy.test#Nested", nested.get("$ref").asString());
+        assertEquals("nested member", nested.get("description").asString());
+
+        var nestedDef = definitions.get("smithy.test#Nested").asStringMap();
+        assertEquals("object", nestedDef.get("type").asString());
+        assertEquals("A structure that can be nested", nestedDef.get("description").asString());
+
+        var nestedProperties = nestedDef.get("properties").asStringMap();
 
         var nestedStr = nestedProperties.get("nestedStr").asStringMap();
         assertEquals("string", nestedStr.get("type").asString());
-        assertEquals("A string that's nested", nestedStr.get("description").asString());
-        assertEquals("string", nestedStr.get("type").asString());
 
         var nestedDocument = nestedProperties.get("nestedDocument").asStringMap();
-        assertEquals("A document that's nested", nestedDocument.get("description").asString());
-        assertTrue(nestedDocument.get("additionalProperties").asBoolean());
+        assertEquals("#/definitions/smithy.api#Document", nestedDocument.get("$ref").asString());
+
+        assertEquals("nestedDocument member", nestedDocument.get("description").asString());
+
+        var nestedDocumentDef = definitions.get("smithy.api#Document").asStringMap();
+        assertTrue(nestedDocumentDef.get("additionalProperties").asBoolean());
 
         var list = properties.get("list").asStringMap();
         assertEquals("array", list.get("type").asString());
+        assertEquals("A list of Nested", list.get("description").asString());
         var listItems = list.get("items").asStringMap();
-        assertEquals("object", listItems.get("type").asString());
+
+        assertEquals("#/definitions/smithy.test#Nested", listItems.get("$ref").asString());
+        assertEquals("member member", listItems.get("description").asString());
 
         var doubleNestedList = properties.get("doubleNestedList").asStringMap();
         assertEquals("array", doubleNestedList.get("type").asString());
+        assertEquals("A double-nested list of Nested", doubleNestedList.get("description").asString());
         var doubleNestedListItems = doubleNestedList.get("items").asStringMap();
         assertEquals("array", doubleNestedListItems.get("type").asString());
+        assertEquals("A list of Nested", doubleNestedListItems.get("description").asString());
         var doubleNestedListItemsItems = doubleNestedListItems.get("items").asStringMap();
-        assertEquals("object", doubleNestedListItemsItems.get("type").asString());
+
+        assertEquals("#/definitions/smithy.test#Nested", doubleNestedListItemsItems.get("$ref").asString());
+        assertEquals("member member", doubleNestedListItemsItems.get("description").asString());
+    }
+
+    @Test
+    public void recursiveDefinitions() {
+        var tool = getTools().get(0).asStringMap();
+        var inputSchema = tool.get("inputSchema").asStringMap();
+        var definitions = inputSchema.get("definitions").asStringMap();
+
+        var nestedDef = definitions.get("smithy.test#Nested").asStringMap();
+        var nestedProperties = nestedDef.get("properties").asStringMap();
+        var recursive = nestedProperties.get("recursive").asStringMap();
+
+        assertEquals("recursive member", recursive.get("description").asString());
+        assertEquals("#/definitions/smithy.test#Recursive", recursive.get("$ref").asString());
+
+        var recursiveDef = definitions.get("smithy.test#Recursive").asStringMap();
+        assertEquals("object", recursiveDef.get("type").asString());
+        assertEquals("A structure that's recursively referenced", recursiveDef.get("description").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", recursiveDef.get("$schema").asString());
+        assertEquals(false, recursiveDef.get("additionalProperties").asBoolean());
+
+        var recursiveProperties = recursiveDef.get("properties").asStringMap();
+        var recurseNested = recursiveProperties.get("recurseNested").asStringMap();
+        assertEquals("A structure that can be nested", recurseNested.get("description").asString());
+        assertEquals("#/definitions/smithy.test#Nested", recurseNested.get("$ref").asString());
+
+        var nestedRef = recurseNested.get("$ref").asString();
+        var recursiveRef = recursive.get("$ref").asString();
+        assertEquals("#/definitions/smithy.test#Nested", nestedRef);
+        assertEquals("#/definitions/smithy.test#Recursive", recursiveRef);
     }
 
     private void write(String method, Document document) {
@@ -139,32 +188,56 @@ public class McpServerTest {
 
             /// An input for TestOperation with a nested member
             structure TestInput {
-                /// It's a string
+                /// str member
                 str: String
 
-                /// The nested member
+                bool: PrimitiveBoolean = false
+
+                /// nested member
                 nested: Nested
 
+                // list member
                 list: NestedList
 
+                // doubleNestedList member
                 doubleNestedList: DoubleNestedList
+
+                // booleanList member
+                booleanList: BooleanList
             }
 
+            /// A list of Nested
             list NestedList {
+                /// member member
                 member: Nested
             }
 
+            /// A double-nested list of Nested
             list DoubleNestedList {
+                /// doubleNested member
                 member: NestedList
+            }
+
+            list BooleanList {
+                member: PrimitiveBoolean
             }
 
             /// A structure that can be nested
             structure Nested {
-                /// A string that's nested
+                /// nestedStr member
                 nestedStr: String
 
-                /// A document that's nested
+                /// nestedDocument member
                 nestedDocument: Document
+
+                /// recursive member
+                recursive: Recursive
+            }
+
+            /// A structure that's recursively referenced
+            structure Recursive {
+                // recurseNested member
+                recurseNested: Nested
             }""";
 
     private static final Model MODEL = Model.assembler()

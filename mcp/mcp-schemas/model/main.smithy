@@ -109,11 +109,18 @@ list ToolInfoList {
     member: ToolInfo
 }
 
-structure JsonObjectSchema {
+@mixin
+structure Description {
+    description: String
+}
+
+structure JsonObjectSchema with [Description] {
     @required
     type: String = "object"
 
     properties: PropertiesMap
+
+    definitions: PropertiesMap
 
     required: StringList
 
@@ -126,26 +133,28 @@ structure JsonObjectSchema {
     schema: String = "http://json-schema.org/draft-07/schema#"
 }
 
-structure JsonArraySchema {
+structure SchemaRef with [Description] {
+    @required
+    @jsonName("$ref")
+    ref: String
+}
+
+structure JsonArraySchema with [Description] {
     @required
     type: String = "array"
 
-    /// one of JsonObjectSchema | JsonArraySchema | JsonPrimitiveSchema
+    /// one of JsonObjectSchema | JsonArraySchema | JsonPrimitiveSchema | SchemaRef
     @required
     items: Document
 
     uniqueItems: PrimitiveBoolean = false
 
-    description: String
-
     default: Document
 }
 
-structure JsonPrimitiveSchema {
+structure JsonPrimitiveSchema with [Description] {
     @required
     type: JsonPrimitiveType
-
-    description: String
 }
 
 enum JsonPrimitiveType {
@@ -158,7 +167,7 @@ enum JsonPrimitiveType {
 map PropertiesMap {
     key: String
 
-    /// one of JsonObjectSchema | JsonArraySchema | JsonPrimitiveSchema
+    /// one of JsonObjectSchema | JsonArraySchema | JsonPrimitiveSchema | SchemaRef
     value: Document
 }
 

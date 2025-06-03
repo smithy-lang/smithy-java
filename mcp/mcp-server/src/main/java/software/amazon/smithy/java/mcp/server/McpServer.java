@@ -37,6 +37,7 @@ import software.amazon.smithy.java.mcp.model.JsonRpcErrorResponse;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
 import software.amazon.smithy.java.mcp.model.ListToolsResult;
+import software.amazon.smithy.java.mcp.model.SchemaRef;
 import software.amazon.smithy.java.mcp.model.ServerInfo;
 import software.amazon.smithy.java.mcp.model.TextContent;
 import software.amazon.smithy.java.mcp.model.ToolInfo;
@@ -251,7 +252,7 @@ public final class McpServer implements Server {
                         .description(createDescription(serviceName,
                                 operationName,
                                 schema))
-                        .inputSchema(createJsonObjectSchema(operation.getApiOperation().inputSchema()))
+                        .inputSchema(createRootSchema(operation.getApiOperation().inputSchema()))
                         .build();
                 tools.put(operationName, new Tool(toolInfo, operation));
             }
@@ -259,44 +260,68 @@ public final class McpServer implements Server {
         return tools;
     }
 
-    private static JsonObjectSchema createJsonObjectSchema(Schema schema) {
+    private static JsonObjectSchema createRootSchema(Schema schema) {
+        return createJsonObjectSchema0(schema, new HashMap<>(), true);
+    }
+
+    private static final Document CONSTRUCTING = Document.of(0);
+    private static SchemaRef createJsonObjectSchema(Schema schema, Map<String, Document> definitions) {
+        var target = schema.memberTarget();
+        var id = target.id().toString();
+        var cached = definitions.get(id);
+        if (cached == null) {
+            // to dedupe recursive references to this shape
+            definitions.put(id, CONSTRUCTING);
+            var objectSchema = createJsonObjectSchema0(target, definitions, false);
+            definitions.put(id, Document.of(objectSchema));
+        }
+
+        return SchemaRef.builder()
+                .ref("#/definitions/" + id)
+                .description(schemaDescription(schema))
+                .build();
+    }
+
+    private static JsonObjectSchema createJsonObjectSchema0(
+            Schema schema,
+            Map<String, Document> definitions,
+            boolean topLevel
+    ) {
         var properties = new HashMap<String, Document>();
         var requiredProperties = new ArrayList<String>();
-        boolean isMember = schema.isMember();
-        var members = isMember ? schema.memberTarget().members() : schema.members();
-        var type = isMember ? schema.memberTarget().type() : schema.type();
-        for (var member : members) {
+        for (var member : schema.members()) {
             var name = member.memberName();
             if (member.hasTrait(TraitKey.REQUIRED_TRAIT)) {
                 requiredProperties.add(name);
             }
 
             var jsonSchema = switch (member.type()) {
-                case LIST, SET -> createJsonArraySchema(member.memberTarget());
-                case MAP, STRUCTURE, UNION, DOCUMENT -> createJsonObjectSchema(member);
-                default -> createJsonPrimitiveSchema(member);
+                case LIST, SET -> createJsonArraySchema(member.memberTarget(), definitions);
+                case MAP, STRUCTURE, UNION, DOCUMENT -> createJsonObjectSchema(member, definitions);
+                default -> createJsonPrimitiveSchema(member.memberTarget());
             };
 
             properties.put(name, Document.of(jsonSchema));
         }
 
         return JsonObjectSchema.builder()
-                .properties(properties)
-                .required(requiredProperties)
-                .description(memberDescription(schema))
-                .additionalProperties(type.isShapeType(ShapeType.DOCUMENT))
+                .properties(properties.isEmpty() ? null : properties)
+                .required(requiredProperties.isEmpty() ? null : requiredProperties)
+                .description(schemaDescription(schema))
+                .additionalProperties(schema.type().isShapeType(ShapeType.DOCUMENT))
+                .definitions(topLevel ? definitions : null)
                 .build();
     }
 
-    private static JsonArraySchema createJsonArraySchema(Schema schema) {
+    private static JsonArraySchema createJsonArraySchema(Schema schema, Map<String, Document> definitions) {
         var listMember = schema.listMember();
         var items = switch (listMember.type()) {
-            case LIST, SET -> createJsonArraySchema(listMember);
-            case MAP, STRUCTURE, UNION -> createJsonObjectSchema(listMember);
-            default -> createJsonPrimitiveSchema(listMember);
+            case LIST, SET -> createJsonArraySchema(listMember.memberTarget(), definitions);
+            case MAP, STRUCTURE, UNION -> createJsonObjectSchema(listMember, definitions);
+            default -> createJsonPrimitiveSchema(listMember.memberTarget());
         };
         return JsonArraySchema.builder()
-                .description(memberDescription(schema))
+                .description(schemaDescription(schema))
                 .items(Document.of(items))
                 .build();
     }
@@ -305,32 +330,23 @@ public final class McpServer implements Server {
         var type = switch (member.type()) {
             case BYTE, SHORT, INTEGER, INT_ENUM, LONG, FLOAT, DOUBLE -> JsonPrimitiveType.NUMBER;
             case ENUM, BLOB, STRING, BIG_DECIMAL, BIG_INTEGER -> JsonPrimitiveType.STRING;
-            case TIMESTAMP -> resolveTimestampType(member.memberTarget());
+            case TIMESTAMP -> resolveTimestampType(member);
             case BOOLEAN -> JsonPrimitiveType.BOOLEAN;
             default -> throw new RuntimeException(member + " is not a primitive type");
         };
 
         return JsonPrimitiveSchema.builder()
                 .typeMember(type)
-                .description(memberDescription(member))
+                .description(schemaDescription(member))
                 .build();
     }
 
-    private static String memberDescription(Schema schema) {
-        String description = null;
+    private static String schemaDescription(Schema schema) {
         var trait = schema.getTrait(TraitKey.DOCUMENTATION_TRAIT);
         if (trait != null) {
-            description = trait.getValue();
+            return trait.getValue();
         }
-        if (schema.isMember()) {
-            var memberDescription = memberDescription(schema.memberTarget());
-            if (description != null && memberDescription != null) {
-                description = appendSentences(description, memberDescription);
-            } else if (memberDescription != null) {
-                description = memberDescription;
-            }
-        }
-        return description;
+        return null;
     }
 
     private static JsonPrimitiveType resolveTimestampType(Schema schema) {
