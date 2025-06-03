@@ -17,6 +17,7 @@ import software.amazon.smithy.java.mcp.cli.ExecutionContext;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
 import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.java.mcp.cli.model.McpServerConfig;
+import software.amazon.smithy.mcp.bundle.api.model.GenericBundle;
 
 @Command(name = "install", description = "Downloads and adds a bundle from the MCP registry.")
 public class InstallBundle extends SmithyMcpCommand {
@@ -42,17 +43,26 @@ public class InstallBundle extends SmithyMcpCommand {
         var config = context.config();
         var bundle = registry.getMcpBundle(name);
         ConfigUtils.addMcpBundle(config, name, bundle);
-        var newConfig = McpServerConfig.builder().command("mcp-registry").args(List.of("start-server", name)).build();
+        var command = "mcp-registry";
+        var args = List.of("start-server", name);
+        if (bundle.getValue() instanceof GenericBundle genericBundle && genericBundle.isExecuteDirectly()) {
+            command = genericBundle.getRun().getExecutable();
+            args = genericBundle.getRun().getArgs();
+        }
+        var newClientConfig = McpServerConfig.builder()
+                .command(command)
+                .args(args)
+                .build();
         if (print == null) {
             //By default, print the output if there are no configured client configs.
             print = !config.hasClientConfigs();
         }
-        ConfigUtils.addToClientConfigs(config, name, clients, newConfig);
+        ConfigUtils.addToClientConfigs(config, name, clients, newClientConfig);
 
         System.out.println("Successfully installed " + name);
         if (print) {
             System.out.println("You can add the following to your MCP Servers config to use " + name);
-            System.out.println(newConfig);
+            System.out.println(newClientConfig);
         }
     }
 

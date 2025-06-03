@@ -29,8 +29,13 @@ structure BundleMetadata {
 
 structure GenericBundle with [CommonBundleConfig] {
     artifact: GenericArtifact
+
     install: ExecSpec
+
     run: ExecSpec
+
+    /// Whether to invoke the run command directly.
+    executeDirectly: PrimitiveBoolean = false
 }
 
 structure ExecSpec {
