@@ -125,22 +125,11 @@ public final class AwsServiceBundler extends ModelBundler {
     }
 
     private static ServiceShape findService(Model model, String name) {
-        var nameLower = name.toLowerCase(Locale.ROOT);
         for (var service : model.getServiceShapes()) {
             if (service.hasTrait(ServiceTrait.ID) && service.expectTrait(ServiceTrait.class)
-                    .getSdkId()
-                    .toLowerCase(Locale.ROOT)
-                    .contains(nameLower)) {
+                    .getSdkId() != null) {
                 return service;
             }
-            if (service.hasTrait(SigV4Trait.ID)
-                    && service.expectTrait(SigV4Trait.class)
-                            .getName()
-                            .toLowerCase(Locale.ROOT)
-                            .contains(nameLower)) {
-                return service;
-            }
-
         }
         throw new RuntimeException("couldn't find service with name " + name);
     }
