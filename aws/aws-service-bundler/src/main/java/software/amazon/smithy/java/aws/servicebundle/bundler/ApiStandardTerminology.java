@@ -10,7 +10,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-final class ApiStandardTerminology {
+public final class ApiStandardTerminology {
 
     private static final Set<String> COMMON_PREFIXES = Set.of("Batch");
     private static final Set<String> READ_ONLY_TERMS =
@@ -40,8 +40,8 @@ final class ApiStandardTerminology {
             "Untag",
             "Update");
 
-    static final Set<String> READ_ONLY_API_PREFIXES = withCommonsPrefixes(READ_ONLY_TERMS);
-    static final Set<String> WRITE_API_PREFIXES = withCommonsPrefixes(WRITE_TERMS);
+    public static final Set<String> READ_ONLY_API_PREFIXES = withCommonsPrefixes(READ_ONLY_TERMS);
+    public static final Set<String> WRITE_API_PREFIXES = withCommonsPrefixes(WRITE_TERMS);
 
     private ApiStandardTerminology() {}
 
