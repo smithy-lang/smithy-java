@@ -58,7 +58,7 @@ public final class CborReadUtil {
      * Flips all the bits of the given byte[] using the bitwise negation operator (~)
      *
      */
-    private static void flipBytes(final byte[] src) {
+    static void flipBytes(final byte[] src) {
         for (int i = 0; i < src.length; i++) {
             src[i] = (byte) ~src[i];
         }
@@ -149,7 +149,7 @@ public final class CborReadUtil {
         int exponentLength = argLength(getMinor(buffer[cur]));
         long exponent = readLong(buffer, getMajor(buffer[cur]), exponentLength > 0 ? cur + 1 : cur, exponentLength);
         int intExponent = (int) exponent;
-        if (intExponent != exponent) {
+        if (intExponent != exponent || intExponent == Integer.MIN_VALUE) {
             throw new BadCborException("exponent cannot fit into an int");
         }
         cur += exponentLength + 1;

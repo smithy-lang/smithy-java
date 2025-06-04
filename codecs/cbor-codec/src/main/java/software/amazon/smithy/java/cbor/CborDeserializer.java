@@ -211,6 +211,10 @@ final class CborDeserializer implements ShapeDeserializer {
         if (token != Token.FLOAT) {
             throw badType(type, token);
         }
+        return readDouble(token);
+    }
+
+    private double readDouble(byte token) {
 
         int pos = parser.getPosition();
         int len = parser.getItemLength();
@@ -252,12 +256,26 @@ final class CborDeserializer implements ShapeDeserializer {
 
     @Override
     public BigInteger readBigInteger(Schema schema) {
-        throw new UnsupportedOperationException("BigInteger is not supported yet");
+        byte token = parser.currentToken();
+        int tmp = token & 0b11110;
+        if (tmp != Token.POS_INT && tmp != Token.POS_BIGINT) {
+            throw badType("biginteger", token);
+        }
+        return CborReadUtil.readBigInteger(payload, token, parser.getPosition(), parser.getItemLength());
     }
 
     @Override
     public BigDecimal readBigDecimal(Schema schema) {
-        throw new UnsupportedOperationException("BigDecimal is not supported yet");
+        byte token = parser.currentToken();
+        if (token == Token.BIG_DECIMAL) {
+            return CborReadUtil.readBigDecimal(payload, parser.getPosition());
+        } else if (token == Token.FLOAT) {
+            return BigDecimal.valueOf(readDouble(token));
+        } else if (token <= Token.NEG_INT) {
+            return BigDecimal
+                    .valueOf(CborReadUtil.readLong(payload, token, parser.getPosition(), parser.getItemLength()));
+        }
+        throw badType("bigdecimal", token);
     }
 
     @Override

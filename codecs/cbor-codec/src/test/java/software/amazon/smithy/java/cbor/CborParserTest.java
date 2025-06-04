@@ -416,6 +416,8 @@ public class CborParserTest {
         byte[][] payloads = new byte[][] {
                 new byte[] {-60, -126, 27, 0, 0, 0, 7, -1, -1, -1, -1, 1},
                 new byte[] {-60, -126, 59, 0, 0, 0, 7, -1, -1, -1, -1, 1},
+                new byte[] {-60, -126, 58, 127, -1, -1, -1, 1}, // 1^-2147483648
+                new byte[] {-60, -126, 58, -128, 0, 0, 0, 1} // 1^-2147483649
         };
         for (byte[] payload : payloads) {
             cbor = payload;

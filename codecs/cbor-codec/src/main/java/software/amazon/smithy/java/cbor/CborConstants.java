@@ -46,4 +46,8 @@ final class CborConstants {
             TYPE_SIMPLE_BREAK_STREAM = TYPE_SIMPLE | INDEFINITE;
 
     static final byte TAG_TIME_EPOCH = 1; // expect integer or float
+    static final byte TAG_POS_BIG_INT = 2;
+    static final byte TAG_NEG_BIG_INT = 3;
+    static final byte TAG_DECIMAL = 4;
+    static final byte TAG_BIG_FLOAT = 5;
 }

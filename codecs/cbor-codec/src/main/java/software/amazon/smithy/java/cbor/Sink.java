@@ -109,6 +109,7 @@ sealed interface Sink permits Sink.OutputStreamSink, Sink.ResizingSink, Sink.Nul
 
         @Override
         public void write(int b) {
+            ensureCapacity(1);
             bytes[pos++] = (byte) b;
         }
 
@@ -144,8 +145,9 @@ sealed interface Sink permits Sink.OutputStreamSink, Sink.ResizingSink, Sink.Nul
 
         private void ensureCapacity(int len) {
             int cap = bytes.length;
-            if (pos + len > cap) {
-                bytes = Arrays.copyOf(bytes, cap + (cap >> 1));
+            int required = pos + len;
+            if (required > cap) {
+                bytes = Arrays.copyOf(bytes, Math.max(required, cap + (cap >> 1)));
             }
         }
     }

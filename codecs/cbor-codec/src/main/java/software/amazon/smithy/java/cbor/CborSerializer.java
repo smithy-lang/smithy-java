@@ -9,6 +9,9 @@ import static software.amazon.smithy.java.cbor.CborConstants.EIGHT_BYTES;
 import static software.amazon.smithy.java.cbor.CborConstants.FOUR_BYTES;
 import static software.amazon.smithy.java.cbor.CborConstants.INDEFINITE;
 import static software.amazon.smithy.java.cbor.CborConstants.ONE_BYTE;
+import static software.amazon.smithy.java.cbor.CborConstants.TAG_DECIMAL;
+import static software.amazon.smithy.java.cbor.CborConstants.TAG_NEG_BIG_INT;
+import static software.amazon.smithy.java.cbor.CborConstants.TAG_POS_BIG_INT;
 import static software.amazon.smithy.java.cbor.CborConstants.TAG_TIME_EPOCH;
 import static software.amazon.smithy.java.cbor.CborConstants.TWO_BYTES;
 import static software.amazon.smithy.java.cbor.CborConstants.TYPE_ARRAY;
@@ -24,6 +27,7 @@ import static software.amazon.smithy.java.cbor.CborConstants.TYPE_SIMPLE_NULL;
 import static software.amazon.smithy.java.cbor.CborConstants.TYPE_SIMPLE_TRUE;
 import static software.amazon.smithy.java.cbor.CborConstants.TYPE_TAG;
 import static software.amazon.smithy.java.cbor.CborConstants.TYPE_TEXTSTRING;
+import static software.amazon.smithy.java.cbor.CborReadUtil.flipBytes;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -258,14 +262,15 @@ final class CborSerializer implements ShapeSerializer {
 
     @Override
     public void writeBigInteger(Schema schema, BigInteger value) {
-        // TODO: Add BigInteger support
-        throw new UnsupportedOperationException();
+        writeBigInteger(value);
     }
 
     @Override
     public void writeBigDecimal(Schema schema, BigDecimal value) {
-        // TODO: Add BigDecimal support
-        throw new UnsupportedOperationException();
+        sink.write(TYPE_TAG | TAG_DECIMAL);
+        tagAndLength(TYPE_ARRAY, 2);
+        writeLong(-value.scale());
+        writeBigInteger(value.unscaledValue());
     }
 
     @Override
@@ -277,6 +282,36 @@ final class CborSerializer implements ShapeSerializer {
                 serializeDocumentContents = new SerializeDocumentContents(this);
             }
             value.serializeContents(serializeDocumentContents);
+        }
+    }
+
+    private void writeBigInteger(BigInteger value) {
+        int bits = value.bitLength();
+        if (bits < 64) {
+            writeLong(value.longValue());
+        } else {
+            int signum = value.signum() >> 1;
+            if (bits == 64) {
+                byte type;
+                if (signum < 0) {
+                    type = TYPE_NEGINT;
+                } else {
+                    type = TYPE_POSINT;
+                }
+                sink.write(type | EIGHT_BYTES);
+                write8Nonnegative(value.longValue() ^ signum);
+            } else {
+                byte[] bytes = value.toByteArray();
+                byte tag;
+                if (signum < 0) {
+                    tag = TAG_NEG_BIG_INT;
+                    flipBytes(bytes);
+                } else {
+                    tag = TAG_POS_BIG_INT;
+                }
+                sink.write(TYPE_TAG | tag);
+                writeBytes0(TYPE_BYTESTRING, bytes, 0, bytes.length);
+            }
         }
     }
 
