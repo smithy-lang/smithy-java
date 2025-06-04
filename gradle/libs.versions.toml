@@ -1,5 +1,5 @@
 [versions]
-junit5 = "5.12.2"
+junit5 = "5.13.0"
 hamcrest = "3.0"
 smithy = "1.58.0"
 jmh = "0.7.3"
@@ -10,8 +10,8 @@ smithy-gradle-plugins = "1.2.0"
 assertj = "3.27.3"
 jackson = "2.19.0"
 netty = "4.2.1.Final"
-dep-analysis = "2.17.0"
-aws-sdk = "2.31.51"
+dep-analysis = "2.18.0"
+aws-sdk = "2.31.56"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 jreleaser = "1.18.0"
