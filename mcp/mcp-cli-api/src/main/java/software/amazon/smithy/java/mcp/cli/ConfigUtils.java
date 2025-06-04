@@ -50,6 +50,7 @@ public class ConfigUtils {
 
     private static final JsonCodec JSON_CODEC = JsonCodec.builder()
             .prettyPrint(true)
+            .serializeTypeInDocuments(false)
             .build();
 
     private static final Path CONFIG_DIR = resolveFromHomeDir(".config", "smithy-mcp");
