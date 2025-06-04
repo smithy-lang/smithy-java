@@ -93,7 +93,6 @@ public class CborSerializerTest {
         var wingspan = new BigDecimal(input);
         var bird = new CborTestData.BirdBuilder().wingspan(wingspan).build();
         var ser = CODEC.serialize(bird, SETTINGS);
-        System.out.println(HexFormat.of().formatHex(ByteBufferUtils.getBytes(ser)));
         var de = new CborTestData.BirdBuilder().deserialize(CODEC.newDeserializer(ser, SETTINGS)).build();
         assertEquals(wingspan, de.wingspan);
     }
