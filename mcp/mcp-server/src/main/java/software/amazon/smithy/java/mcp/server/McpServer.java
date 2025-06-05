@@ -12,9 +12,11 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -44,6 +46,7 @@ import software.amazon.smithy.java.mcp.model.Tools;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.Service;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
@@ -251,7 +254,7 @@ public final class McpServer implements Server {
                         .description(createDescription(serviceName,
                                 operationName,
                                 schema))
-                        .inputSchema(createJsonObjectSchema(operation.getApiOperation().inputSchema()))
+                        .inputSchema(createJsonObjectSchema(operation.getApiOperation().inputSchema(), new HashSet<>()))
                         .build();
                 tools.put(operationName, new Tool(toolInfo, operation));
             }
@@ -259,12 +262,21 @@ public final class McpServer implements Server {
         return tools;
     }
 
-    private static JsonObjectSchema createJsonObjectSchema(Schema schema) {
+    private static JsonObjectSchema createJsonObjectSchema(Schema schema, Set<ShapeId> visited) {
+        var targetId = schema.id();
+        if (!visited.add(targetId)) {
+            // if we're in a recursive cycle, just say "type": "object" and bail
+            return JsonObjectSchema.builder().build();
+        }
+
         var properties = new HashMap<String, Document>();
         var requiredProperties = new ArrayList<String>();
         boolean isMember = schema.isMember();
         var members = isMember ? schema.memberTarget().members() : schema.members();
         var type = isMember ? schema.memberTarget().type() : schema.type();
+        if (isMember) {
+            System.out.println("huh");
+        }
         for (var member : members) {
             var name = member.memberName();
             if (member.hasTrait(TraitKey.REQUIRED_TRAIT)) {
@@ -272,27 +284,30 @@ public final class McpServer implements Server {
             }
 
             var jsonSchema = switch (member.type()) {
-                case LIST, SET -> createJsonArraySchema(member.memberTarget());
-                case MAP, STRUCTURE, UNION, DOCUMENT -> createJsonObjectSchema(member);
+                case LIST, SET -> createJsonArraySchema(member.memberTarget(), visited);
+                case MAP, STRUCTURE, UNION, DOCUMENT -> createJsonObjectSchema(member.memberTarget(), visited);
                 default -> createJsonPrimitiveSchema(member);
             };
 
             properties.put(name, Document.of(jsonSchema));
         }
 
-        return JsonObjectSchema.builder()
+        visited.remove(targetId);
+        var builder = JsonObjectSchema.builder()
                 .properties(properties)
                 .required(requiredProperties)
-                .description(memberDescription(schema))
-                .additionalProperties(type.isShapeType(ShapeType.DOCUMENT))
-                .build();
+                .description(memberDescription(schema));
+        if (type.isShapeType(ShapeType.DOCUMENT)) {
+            builder.additionalProperties(true);
+        }
+        return builder.build();
     }
 
-    private static JsonArraySchema createJsonArraySchema(Schema schema) {
+    private static JsonArraySchema createJsonArraySchema(Schema schema, Set<ShapeId> visited) {
         var listMember = schema.listMember();
         var items = switch (listMember.type()) {
-            case LIST, SET -> createJsonArraySchema(listMember);
-            case MAP, STRUCTURE, UNION -> createJsonObjectSchema(listMember);
+            case LIST, SET -> createJsonArraySchema(listMember.memberTarget(), visited);
+            case MAP, STRUCTURE, UNION -> createJsonObjectSchema(listMember.memberTarget(), visited);
             default -> createJsonPrimitiveSchema(listMember);
         };
         return JsonArraySchema.builder()

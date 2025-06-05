@@ -117,8 +117,7 @@ structure JsonObjectSchema {
 
     required: StringList
 
-    @required
-    additionalProperties: PrimitiveBoolean = false
+    additionalProperties: Boolean
 
     description: String
 
