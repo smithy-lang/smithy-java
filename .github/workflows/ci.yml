@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -17,13 +20,25 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: gradle/actions/wrapper-validation@v4
-
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java }}
           distribution: 'corretto'
+
+      - name: Cache compiled buildscripts
+        uses: actions/cache@v4
+        with:
+            key: ${{ runner.os }}-gradle-${{ hashFiles('buildSrc/**/*.kts') }}
+            path: |
+              ./buildSrc/build
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          gradle-home-cache-includes: |
+            caches
 
       - name: Clean, build and javadoc
         run: ./gradlew clean build javadoc -Plog-tests --stacktrace
