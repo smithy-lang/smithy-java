@@ -274,9 +274,6 @@ public final class McpServer implements Server {
         boolean isMember = schema.isMember();
         var members = isMember ? schema.memberTarget().members() : schema.members();
         var type = isMember ? schema.memberTarget().type() : schema.type();
-        if (isMember) {
-            System.out.println("huh");
-        }
         for (var member : members) {
             var name = member.memberName();
             if (member.hasTrait(TraitKey.REQUIRED_TRAIT)) {
