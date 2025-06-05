@@ -5,6 +5,7 @@ import org.jreleaser.model.Active
 plugins {
     base
     alias(libs.plugins.jreleaser)
+    idea
 }
 
 task("addGitHooks") {
@@ -72,6 +73,23 @@ jreleaser {
                     releaseRepository.set(true)
                     verifyPom.set(true)
                     stagingRepository(rootProject.layout.buildDirectory.dir("staging").get().asFile.path)
+                }
+            }
+        }
+    }
+}
+
+
+subprojects {
+    plugins.withId("java") {
+        apply(plugin = "idea")
+        afterEvaluate {
+            val sourceSets = the<SourceSetContainer>()
+            sourceSets.findByName("it")?.let {
+                idea {
+                    module {
+                        testSources.from(sourceSets["it"].java.srcDirs)
+                    }
                 }
             }
         }
