@@ -25,6 +25,7 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
           distribution: 'corretto'
+          cache: 'gradle'
 
       - name: Cache compiled buildscripts
         uses: actions/cache@v4
