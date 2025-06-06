@@ -9,17 +9,23 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http.HttpRequest;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import software.amazon.smithy.java.framework.model.UnknownOperationException;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.io.datastream.DataStream;
-import software.amazon.smithy.java.server.core.HttpJob;
-import software.amazon.smithy.java.server.core.HttpResponse;
 import software.amazon.smithy.java.server.core.Orchestrator;
+import software.amazon.smithy.java.server.core.HttpJob;
 import software.amazon.smithy.java.server.core.ProtocolResolver;
 import software.amazon.smithy.java.server.core.ServiceProtocolResolutionRequest;
+import software.amazon.smithy.java.server.core.CorsHeaders;
+import software.amazon.smithy.java.server.core.HttpResponse;
 
 final class HttpRequestHandler extends ChannelDuplexHandler {
 
@@ -98,6 +104,7 @@ final class HttpRequestHandler extends ChannelDuplexHandler {
             if (serializedValue.contentType() != null) {
                 response.headers().set("content-type", serializedValue.contentType());
             }
+            CorsHeaders.of(job).forEach(response.headers()::set);
         } catch (Throwable e) {
             response = new DefaultFullHttpResponse(
                     HttpVersion.HTTP_1_1,
