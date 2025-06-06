@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.core.schema;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import software.amazon.smithy.model.traits.CorsTrait;
 import software.amazon.smithy.model.traits.DefaultTrait;
 import software.amazon.smithy.model.traits.DocumentationTrait;
 import software.amazon.smithy.model.traits.EndpointTrait;
@@ -102,6 +103,7 @@ public final class TraitKey<T extends Trait> {
     public static final TraitKey<XmlAttributeTrait> XML_ATTRIBUTE_TRAIT = TraitKey.get(XmlAttributeTrait.class);
     public static final TraitKey<XmlFlattenedTrait> XML_FLATTENED_TRAIT = TraitKey.get(XmlFlattenedTrait.class);
     public static final TraitKey<XmlNamespaceTrait> XML_NAMESPACE_TRAIT = TraitKey.get(XmlNamespaceTrait.class);
+    public static final TraitKey<CorsTrait> CORS_TRAIT = TraitKey.get(CorsTrait.class);
 
     private final Class<T> traitClass;
     final int id;

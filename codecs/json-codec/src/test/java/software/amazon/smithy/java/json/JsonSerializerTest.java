@@ -286,7 +286,7 @@ public class JsonSerializerTest {
                       "name" : "Toucan",
                       "color" : "red"
                     }""";
-            assertThat(result, equalTo(expectedFormat));
+            assertThat(result.replace("\r", ""), equalTo(expectedFormat));
         }
     }
 
