@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.server.core;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -130,39 +131,41 @@ public class TestStructs {
     }
 
     public static class TestModifiableHttpHeaders implements ModifiableHttpHeaders {
+        Map<String, List<String>> headers = new HashMap<>();
+
         @Override
         public void putHeader(String name, String value) {
-
+            headers.put(name, List.of(value));
         }
 
         @Override
         public void putHeader(String name, List<String> values) {
-
+            headers.put(name, values);
         }
 
         @Override
         public void removeHeader(String name) {
-
+            headers.remove(name);
         }
 
         @Override
         public List<String> allValues(String name) {
-            return List.of();
+            return headers.getOrDefault(name, List.of());
         }
 
         @Override
         public int size() {
-            return 0;
+            return headers.size();
         }
 
         @Override
         public Map<String, List<String>> map() {
-            return Map.of();
+            return headers;
         }
 
         @Override
         public Iterator<Map.Entry<String, List<String>>> iterator() {
-            return null;
+            return headers.entrySet().iterator();
         }
     }
 

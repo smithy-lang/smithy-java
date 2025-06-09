@@ -7,7 +7,6 @@ package software.amazon.smithy.java.server.core;
 
 import static software.amazon.smithy.java.core.schema.TraitKey.CORS_TRAIT;
 
-import io.netty.handler.codec.http.HttpHeaders;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +15,7 @@ public final class CorsHeaders {
 
     private CorsHeaders() {}
 
-    private static final Map<String, Iterable<?>> BASE_CORS_HEADERS = Map.of(
+    private static final Map<String, List<String>> BASE_CORS_HEADERS = Map.of(
             "Access-Control-Allow-Methods",
             List.of("GET, POST, PUT, DELETE, OPTIONS"),
             "Access-Control-Allow-Headers",
@@ -24,7 +23,7 @@ public final class CorsHeaders {
             "Access-Control-Max-Age",
             List.of("600"));
 
-    public static void of(HttpJob job, HttpHeaders headers) {
+    public static void addCorsHeaders(HttpJob job) {
         if (!shouldAddCorsHeaders(job)) {
             return;
         }
@@ -36,11 +35,8 @@ public final class CorsHeaders {
             return;
         }
 
-        for (Map.Entry<String, Iterable<?>> entrySet : BASE_CORS_HEADERS.entrySet()) {
-            headers.set(entrySet.getKey(), entrySet.getValue());
-        }
-
-        headers.set("Access-Control-Allow-Origin", List.of(requestOrigin));
+        job.response().headers().putHeaders(BASE_CORS_HEADERS);
+        job.response().headers().putHeader("Access-Control-Allow-Origin", List.of(requestOrigin));
     }
 
     private static boolean shouldAddCorsHeaders(HttpJob job) {
@@ -54,12 +50,14 @@ public final class CorsHeaders {
     }
 
     private static String getConfiguredOrigin(HttpJob job) {
-        return job.operation()
-                .getApiOperation()
+        var corsTrait = job.operation().getApiOperation()
                 .service()
                 .schema()
-                .getTrait(CORS_TRAIT)
-                .getOrigin();
+                .getTrait(CORS_TRAIT);
+        if (corsTrait != null) {
+            return corsTrait.getOrigin();
+        }
+        return null;
     }
 
     private static boolean isOriginAllowed(String configuredOrigin, String requestOrigin) {

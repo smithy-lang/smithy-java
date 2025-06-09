@@ -16,5 +16,4 @@ dependencies {
     implementation(libs.smithy.model)
     implementation(project(":io"))
     implementation(project(":logging"))
-    implementation(libs.netty.all)
 }
