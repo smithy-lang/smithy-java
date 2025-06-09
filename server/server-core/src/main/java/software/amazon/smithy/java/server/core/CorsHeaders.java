@@ -50,12 +50,14 @@ public final class CorsHeaders {
     }
 
     private static String getConfiguredOrigin(HttpJob job) {
-        return job.operation()
-                .getApiOperation()
+        var corsTrait = job.operation().getApiOperation()
                 .service()
                 .schema()
-                .getTrait(CORS_TRAIT)
-                .getOrigin();
+                .getTrait(CORS_TRAIT);
+        if (corsTrait != null) {
+            return corsTrait.getOrigin();
+        }
+        return null;
     }
 
     private static boolean isOriginAllowed(String configuredOrigin, String requestOrigin) {
