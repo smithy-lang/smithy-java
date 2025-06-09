@@ -40,12 +40,15 @@ public final class ApiStandardTerminology {
             "Untag",
             "Update");
 
+    private  static final Set<String> READ_ONLY_API_PREFIXES = withCommonsPrefixes(READ_ONLY_TERMS);
+    private  static final Set<String> WRITE_API_PREFIXES = withCommonsPrefixes(WRITE_TERMS);
+
     public static Set<String> getReadOnlyApiPrefixes() {
-        return withCommonsPrefixes(READ_ONLY_TERMS);
+        return READ_ONLY_API_PREFIXES;
     }
 
     public static Set<String> getWriteApiPrefixes() {
-        return withCommonsPrefixes(WRITE_TERMS);
+        return WRITE_API_PREFIXES;
     }
 
     private ApiStandardTerminology() {}
