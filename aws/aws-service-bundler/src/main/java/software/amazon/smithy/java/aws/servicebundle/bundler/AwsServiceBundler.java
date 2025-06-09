@@ -43,13 +43,18 @@ public final class AwsServiceBundler extends ModelBundler {
     static final Map<String, String> GH_URIS_BY_SERVICE = new HashMap<>();
 
     static {
-        // line is in the form fooService/service/version/fooService.json
+        // line format: Title (which may contain spaces)|sdk-id/service/YYYY/MM/DD/sdk-id-YYYY-MM-DD.json
+        // sdk title, pipe character, github url to download the model (of which the first component is the sdk id)
         try (var models = new BufferedReader(new InputStreamReader(
                 Objects.requireNonNull(AwsServiceBundler.class.getResourceAsStream("/models.txt")),
                 StandardCharsets.UTF_8))) {
             models.lines()
-                    .forEach(line -> GH_URIS_BY_SERVICE
-                            .put(line.substring(0, line.indexOf("/")).toLowerCase(Locale.ROOT), line));
+                    .forEach(line -> {
+                        var start = line.indexOf("|") + 1;
+                        var end = line.indexOf("/", start);
+                        GH_URIS_BY_SERVICE.put(line.substring(start, end).toLowerCase(Locale.ROOT),
+                                line.substring(start));
+                    });
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

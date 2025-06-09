@@ -197,6 +197,7 @@ public final class StartServer extends SmithyMcpCommand {
                     .listMcpBundles()
                     .stream()
                     .unordered()
+                    .map(Registry.RegistryEntry::getBundleMetadata)
                     .collect(Collectors.toMap(
                             BundleMetadata::getName,
                             bundle -> ServerEntry.builder()
