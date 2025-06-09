@@ -8,7 +8,6 @@ package software.amazon.smithy.java.server.core;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.netty.handler.codec.http.DefaultHttpHeaders;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
@@ -19,6 +18,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.model.traits.CorsTrait;
 
@@ -99,29 +99,28 @@ public class CorsHeadersTest {
         HttpJob job = new HttpJob(testOperation, protocol, request, response);
 
         // Apply CORS headers
-        var responseHeaders = new DefaultHttpHeaders();
-        CorsHeaders.of(job, responseHeaders);
+        CorsHeaders.addCorsHeaders(job);
 
         // Verify headers
         if (testCase.shouldHaveHeaders) {
-            assertContainsHeader(responseHeaders, testCase.expectedAllowOrigin);
+            assertContainsHeader(job.response().headers(), testCase.expectedAllowOrigin);
         } else {
-            assertDoNotContainsHeader(responseHeaders);
+            assertDoNotContainsHeader(job.response().headers());
         }
     }
 
-    private void assertContainsHeader(io.netty.handler.codec.http.HttpHeaders responseHeaders, String allowedOrigin) {
-        assertTrue(responseHeaders.contains("Access-Control-Allow-Methods"));
-        assertTrue(responseHeaders.contains("Access-Control-Allow-Headers"));
-        assertTrue(responseHeaders.contains("Access-Control-Max-Age"));
-        assertTrue(responseHeaders.contains("Access-Control-Allow-Origin"));
-        assertTrue(responseHeaders.get("Access-Control-Allow-Origin").contains(allowedOrigin));
+    private void assertContainsHeader(ModifiableHttpHeaders responseHeaders, String allowedOrigin) {
+        assertTrue(responseHeaders.hasHeader("Access-Control-Allow-Methods"));
+        assertTrue(responseHeaders.hasHeader("Access-Control-Allow-Headers"));
+        assertTrue(responseHeaders.hasHeader("Access-Control-Max-Age"));
+        assertTrue(responseHeaders.hasHeader("Access-Control-Allow-Origin"));
+        assertTrue(responseHeaders.allValues("Access-Control-Allow-Origin").contains(allowedOrigin));
     }
 
-    private void assertDoNotContainsHeader(io.netty.handler.codec.http.HttpHeaders responseHeaders) {
-        assertFalse(responseHeaders.contains("Access-Control-Allow-Methods"));
-        assertFalse(responseHeaders.contains("Access-Control-Allow-Headers"));
-        assertFalse(responseHeaders.contains("Access-Control-Max-Age"));
-        assertFalse(responseHeaders.contains("Access-Control-Allow-Origin"));
+    private void assertDoNotContainsHeader(ModifiableHttpHeaders responseHeaders) {
+        assertFalse(responseHeaders.hasHeader("Access-Control-Allow-Methods"));
+        assertFalse(responseHeaders.hasHeader("Access-Control-Allow-Headers"));
+        assertFalse(responseHeaders.hasHeader("Access-Control-Max-Age"));
+        assertFalse(responseHeaders.hasHeader("Access-Control-Allow-Origin"));
     }
 }

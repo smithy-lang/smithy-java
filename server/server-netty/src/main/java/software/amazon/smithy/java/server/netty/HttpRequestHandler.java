@@ -99,12 +99,12 @@ final class HttpRequestHandler extends ChannelDuplexHandler {
                     HttpVersion.HTTP_1_1,
                     HttpResponseStatus.valueOf(job.response().getStatusCode()),
                     Unpooled.wrappedBuffer(serializedValue.waitForByteBuffer()));
+            CorsHeaders.addCorsHeaders(job);
             response.headers().set(((NettyHttpHeaders) job.response().headers()).getNettyHeaders());
             response.headers().set("content-length", serializedValue.contentLength());
             if (serializedValue.contentType() != null) {
                 response.headers().set("content-type", serializedValue.contentType());
             }
-            CorsHeaders.of(job, response.headers());
         } catch (Throwable e) {
             response = new DefaultFullHttpResponse(
                     HttpVersion.HTTP_1_1,
