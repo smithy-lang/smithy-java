@@ -104,8 +104,8 @@ public final class AwsServiceBundler extends ModelBundler {
         }
 
         public Builder readOnlyOperations() {
-            this.allowedPrefixes(ApiStandardTerminology.READ_ONLY_API_PREFIXES);
-            this.blockedPrefixes(ApiStandardTerminology.WRITE_API_PREFIXES);
+            this.allowedPrefixes(ApiStandardTerminology.getReadOnlyApiPrefixes());
+            this.blockedPrefixes(ApiStandardTerminology.getWriteApiPrefixes());
             return this;
         }
 
