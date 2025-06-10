@@ -13,7 +13,7 @@ import picocli.CommandLine.Spec;
 import software.amazon.smithy.java.mcp.cli.ExecutionContext;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
 import software.amazon.smithy.java.mcp.cli.model.Config;
-import software.amazon.smithy.mcp.bundle.api.model.BundleMetadata;
+import software.amazon.smithy.mcp.bundle.api.Registry;
 
 @Command(name = "list", description = "List all the MCP Bundles available in the Registry")
 public class ListBundles extends SmithyMcpCommand {
@@ -29,19 +29,21 @@ public class ListBundles extends SmithyMcpCommand {
     protected void execute(ExecutionContext context) {
         var registry = context.registry();
         var installedBundles = context.config().getToolBundles().keySet();
-        for (BundleMetadata bundle : registry
-                .listMcpBundles()) {
+        for (Registry.RegistryEntry entry : registry.listMcpBundles()) {
+            var bundle = entry.getBundleMetadata();
             boolean isInstalled = installedBundles.contains(bundle.getName());
             var commandLine = spec.commandLine();
             System.out.println(commandLine
                     .getColorScheme()
-                    .string("@|bold " + bundle.getName() + (isInstalled ? " [installed]" : "") + "|@"));
+                    .string("@|bold " + bundle.getName() + (isInstalled ? " [installed]" : "") + "|@: "
+                            + entry.getTitle()));
             var description = bundle.getDescription();
             if (description == null) {
                 description = "MCP server for " + bundle.getName();
             }
             System.out.print("\tDescription: ");
             System.out.println(description);
+            System.out.println();
         }
 
     }
