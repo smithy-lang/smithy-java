@@ -242,8 +242,7 @@ public final class AwsServiceBundler extends ModelBundler {
             if (endpoint.startsWith("https://")) {
                 if (endpoint.endsWith(region + ".amazonaws.com")
                         || endpoint.contains(region + ".amazonaws.com.")
-                        || endpoint.endsWith(region + ".api.aws")
-                ) {
+                        || endpoint.endsWith(region + ".api.aws")) {
                     var prev = endpoints.put(region, endpoint);
                     if (prev != null && !endpoint.equals(prev)) {
                         throw new RuntimeException(
