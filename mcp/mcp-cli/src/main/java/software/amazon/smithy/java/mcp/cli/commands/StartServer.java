@@ -8,6 +8,7 @@ package software.amazon.smithy.java.mcp.cli.commands;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -77,7 +78,17 @@ public final class StartServer extends SmithyMcpCommand {
         var config = context.config();
         // By default, load all available tools
         if (toolBundles == null || toolBundles.isEmpty()) {
-            toolBundles = new ArrayList<>(config.getToolBundles().keySet());
+            toolBundles = new ArrayList<>(config.getToolBundles()
+                    .entrySet()
+                    .stream()
+                    .filter(entry -> {
+                        // By default, only include smithy bundles if no bundles are specified.
+                        // We can undo this once we have fanout support for generic bundles.
+                        var bundle = entry.getValue();
+                        return bundle.getValue() instanceof McpBundleConfig.SmithyModeledMember;
+                    })
+                    .map(Map.Entry::getKey)
+                    .toList());
         }
 
         if (toolBundles.isEmpty() && !registryServer) {
