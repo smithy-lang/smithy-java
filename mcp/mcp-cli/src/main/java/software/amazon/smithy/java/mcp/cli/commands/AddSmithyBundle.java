@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.mcp.cli.commands;
 
-import java.util.Set;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import software.amazon.smithy.java.mcp.cli.AbstractAddBundle;
@@ -41,16 +40,6 @@ public class AddSmithyBundle extends AbstractAddBundle {
 
     @Override
     protected boolean canOverwrite() {
-        throw new UnsupportedOperationException("Not implemented yet.");
-    }
-
-    @Override
-    protected Set<String> allowedTools() {
-        throw new UnsupportedOperationException("Not implemented yet.");
-    }
-
-    @Override
-    protected Set<String> blockedTools() {
         throw new UnsupportedOperationException("Not implemented yet.");
     }
 }
