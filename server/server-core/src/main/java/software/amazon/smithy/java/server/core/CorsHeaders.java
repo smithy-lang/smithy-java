@@ -50,7 +50,8 @@ public final class CorsHeaders {
     }
 
     private static String getConfiguredOrigin(HttpJob job) {
-        var corsTrait = job.operation().getApiOperation()
+        var corsTrait = job.operation()
+                .getApiOperation()
                 .service()
                 .schema()
                 .getTrait(CORS_TRAIT);
