@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.aws.servicebundle.bundler;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
