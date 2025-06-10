@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.client.http;
 
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
 import java.nio.ByteBuffer;
@@ -31,6 +32,8 @@ import software.amazon.smithy.java.logging.InternalLogger;
  */
 public class JavaHttpClientTransport implements ClientTransport<HttpRequest, HttpResponse> {
 
+    private static URI DUMMY_URI = URI.create("http://localhost");
+
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaHttpClientTransport.class);
     private final HttpClient client;
 
@@ -46,6 +49,17 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
             System.setProperty("jdk.httpclient.allowRestrictedHeaders", "host");
         } else if (!containsHost(currentValues)) {
             System.setProperty("jdk.httpclient.allowRestrictedHeaders", currentValues + ",host");
+        }
+        try {
+            java.net.http.HttpRequest.newBuilder()
+                    .uri(DUMMY_URI)
+                    .setHeader("host", "localhost")
+                    .build();
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Unable to add host header. " +
+                    "This means that the HttpClient was initialized before we could allowlist it. " +
+                    "You need to explicitly set allow `host` via the system property `jdk.httpclient.allowRestrictedHeaders`",
+                    e);
         }
     }
 

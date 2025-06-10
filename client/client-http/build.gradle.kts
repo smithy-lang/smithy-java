@@ -16,3 +16,7 @@ dependencies {
     testImplementation(project(":aws:client:aws-client-awsjson"))
     testImplementation(project(":client:dynamic-client"))
 }
+
+tasks.withType<Test> {
+    systemProperty("jdk.httpclient.allowRestrictedHeaders", "host")
+}
