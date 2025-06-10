@@ -43,6 +43,7 @@ public class ListBundles extends SmithyMcpCommand {
             }
             System.out.print("\tDescription: ");
             System.out.println(description);
+            System.out.println();
         }
 
     }
