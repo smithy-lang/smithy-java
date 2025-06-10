@@ -70,10 +70,10 @@ public final class AwsServiceBundler extends ModelBundler {
     private AwsServiceBundler(Builder builder) {
         this.serviceName = builder.serviceName;
         this.resolver = builder.resolver;
-        this.exposedOperations = builder.exposedOperations;
-        this.blockedOperations = builder.blockedOperations;
-        this.allowedPrefixes = builder.allowedPrefixes;
-        this.blockedPrefixes = builder.blockedPrefixes;
+        this.exposedOperations = builder.exposedOperations == null ? Collections.emptySet() : builder.exposedOperations;
+        this.blockedOperations = builder.blockedOperations == null ? Collections.emptySet() : builder.blockedOperations;
+        this.allowedPrefixes = builder.allowedPrefixes == null ? Collections.emptySet() : builder.allowedPrefixes;
+        this.blockedPrefixes = builder.blockedPrefixes == null ? Collections.emptySet() : builder.blockedPrefixes;
     }
 
     public static Builder builder() {

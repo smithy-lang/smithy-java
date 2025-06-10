@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.mcp.cli;
 
-import java.util.Set;
 import software.amazon.smithy.java.mcp.cli.model.Location;
 
 /**
@@ -55,8 +54,4 @@ public abstract class AbstractAddBundle extends SmithyMcpCommand implements Conf
      * @return true if existing tool bundle can be overwritten, false otherwise
      */
     protected abstract boolean canOverwrite();
-
-    protected abstract Set<String> allowedTools();
-
-    protected abstract Set<String> blockedTools();
 }
