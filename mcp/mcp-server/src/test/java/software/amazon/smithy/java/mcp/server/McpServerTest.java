@@ -6,13 +6,22 @@
 package software.amazon.smithy.java.mcp.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.dynamicschemas.StructDocument;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
@@ -21,6 +30,7 @@ import software.amazon.smithy.java.server.ProxyService;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 public class McpServerTest {
     private static final JsonCodec CODEC = JsonCodec.builder()
@@ -84,6 +94,9 @@ public class McpServerTest {
         var list = properties.get("list").asStringMap();
         assertEquals("array", list.get("type").asString());
 
+        var bigDecimal = properties.get("bigDecimalField").asStringMap();
+        assertEquals("string", bigDecimal.get("type").asString());
+
         var listItems = list.get("items").asStringMap();
         assertEquals("object", listItems.get("type").asString());
         var listItemProperties = listItems.get("properties").asStringMap();
@@ -104,6 +117,111 @@ public class McpServerTest {
         assertEquals("object", doubleNestedListItemsItems.get("type").asString());
         var doubleNestedProperties = doubleNestedListItemsItems.get("properties").asStringMap();
         validateNestedStructure(doubleNestedProperties);
+    }
+
+    @Test
+    void testInputAdaptation() {
+        AtomicReference<StructDocument> capturedInput = new AtomicReference<>();
+        server = McpServer.builder()
+                .input(input)
+                .output(output)
+                .addService(ProxyService.builder()
+                        .service(ShapeId.from("smithy.test#TestService"))
+                        .proxyEndpoint("http://localhost")
+                        .clientConfigurator(
+                                clientConfigurator -> clientConfigurator.addInterceptor(new ClientInterceptor() {
+                                    @Override
+                                    public void readBeforeSerialization(InputHook<?, ?> hook) {
+                                        capturedInput.set((StructDocument) hook.input());
+                                    }
+                                }))
+                        .model(MODEL)
+                        .build())
+                .build();
+
+        server.start();
+
+        var bigDecimalValue = BigDecimal.valueOf(Integer.MAX_VALUE).add(BigDecimal.TEN);
+        var bigIntegerValue = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.valueOf(100));
+        var blobValue = "Hello, World!";
+        var nestedBigDecimalValue = new BigDecimal("123.456");
+        var nestedBigIntegerValue = new BigInteger("9876543210");
+        var nestedBlobValue = "Nested blob content";
+
+        write("tools/call",
+                Document.of(
+                        Map.of("name",
+                                Document.of("TestOperation"),
+                                "arguments",
+                                Document.of(Map.of(
+                                        "bigDecimalField",
+                                        Document.of(bigDecimalValue.toString()),
+                                        "bigIntegerField",
+                                        Document.of(bigIntegerValue.toString()),
+                                        "blobField",
+                                        Document.of(blobValue),
+                                        "nestedWithBigNumbers",
+                                        Document.of(Map.of(
+                                                "nestedBigDecimal",
+                                                Document.of(nestedBigDecimalValue.toString()),
+                                                "nestedBigInteger",
+                                                Document.of(nestedBigIntegerValue.toString()),
+                                                "nestedBlob",
+                                                Document.of(nestedBlobValue),
+                                                "bigDecimalList",
+                                                Document.of(List.of(
+                                                        Document.of("100.25"),
+                                                        Document.of("200.75"))))))))));
+        assertNotNull(read());
+        var inputDocument = capturedInput.get();
+
+        var bigDecimalField = inputDocument.getMember("bigDecimalField");
+        assertNotNull(bigDecimalField);
+        assertEquals(ShapeType.BIG_DECIMAL, bigDecimalField.type());
+        assertEquals(bigDecimalValue, bigDecimalField.asBigDecimal());
+
+        var bigIntegerField = inputDocument.getMember("bigIntegerField");
+        assertNotNull(bigIntegerField);
+        assertEquals(ShapeType.BIG_INTEGER, bigIntegerField.type());
+        assertEquals(bigIntegerValue, bigIntegerField.asBigInteger());
+
+        var blobField = inputDocument.getMember("blobField");
+        assertNotNull(blobField);
+        assertEquals(ShapeType.BLOB, blobField.type());
+        assertEquals(blobValue, new String(blobField.asBlob().array(), StandardCharsets.UTF_8));
+
+        var nestedWithBigNumbers = inputDocument.getMember("nestedWithBigNumbers");
+        assertNotNull(nestedWithBigNumbers);
+        assertEquals(ShapeType.STRUCTURE, nestedWithBigNumbers.type());
+
+        var nestedStruct = (StructDocument) nestedWithBigNumbers;
+
+        var nestedBigDecimalField = nestedStruct.getMember("nestedBigDecimal");
+        assertNotNull(nestedBigDecimalField);
+        assertEquals(ShapeType.BIG_DECIMAL, nestedBigDecimalField.type());
+        assertEquals(nestedBigDecimalValue, nestedBigDecimalField.asBigDecimal());
+
+        var nestedBigIntegerField = nestedStruct.getMember("nestedBigInteger");
+        assertNotNull(nestedBigIntegerField);
+        assertEquals(ShapeType.BIG_INTEGER, nestedBigIntegerField.type());
+        assertEquals(nestedBigIntegerValue, nestedBigIntegerField.asBigInteger());
+
+        var nestedBlobField = nestedStruct.getMember("nestedBlob");
+        assertNotNull(nestedBlobField);
+        assertEquals(ShapeType.BLOB, nestedBlobField.type());
+        assertEquals(nestedBlobValue, new String(nestedBlobField.asBlob().array(), StandardCharsets.UTF_8));
+
+        var bigDecimalListField = nestedStruct.getMember("bigDecimalList");
+        assertNotNull(bigDecimalListField);
+        assertEquals(ShapeType.LIST, bigDecimalListField.type());
+        var bigDecimalList = bigDecimalListField.asList();
+        assertEquals(2, bigDecimalList.size());
+        assertEquals(ShapeType.BIG_DECIMAL, bigDecimalList.get(0).type());
+        assertEquals(ShapeType.BIG_DECIMAL, bigDecimalList.get(1).type());
+        assertEquals(new BigDecimal("100.25"), bigDecimalList.get(0).asBigDecimal());
+        assertEquals(new BigDecimal("200.75"), bigDecimalList.get(1).asBigDecimal());
+
+        server.shutdown().join();
     }
 
     private void validateNestedStructure(Map<String, Document> properties) {
@@ -154,6 +272,7 @@ public class McpServerTest {
             /// A TestOperation
             operation TestOperation {
                 input: TestInput
+                output: TestInput
             }
 
             /// An input for TestOperation with a nested member
@@ -167,6 +286,14 @@ public class McpServerTest {
                 list: NestedList
 
                 doubleNestedList: DoubleNestedList
+
+                bigDecimalField: BigDecimal
+
+                bigIntegerField: BigInteger
+
+                blobField: Blob
+
+                nestedWithBigNumbers: NestedWithBigNumbers
             }
 
             list NestedList {
@@ -193,6 +320,25 @@ public class McpServerTest {
             structure Recursive {
                 /// the nested field that points back to us
                 nested: Nested
+            }
+
+            /// A structure containing big number types
+            structure NestedWithBigNumbers {
+                /// A nested BigDecimal
+                nestedBigDecimal: BigDecimal
+
+                /// A nested BigInteger
+                nestedBigInteger: BigInteger
+
+                /// A nested Blob
+                nestedBlob: Blob
+
+                /// A list of BigDecimals
+                bigDecimalList: BigDecimalList
+            }
+
+            list BigDecimalList {
+                member: BigDecimal
             }""";
 
     private static final Model MODEL = Model.assembler()
