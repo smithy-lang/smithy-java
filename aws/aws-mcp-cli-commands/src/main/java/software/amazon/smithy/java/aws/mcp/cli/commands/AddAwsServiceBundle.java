@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.aws.mcp.cli.commands;
 
-import java.util.Collections;
 import java.util.Set;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -36,18 +35,24 @@ public class AddAwsServiceBundle extends AbstractAddBundle {
     protected Set<String> blockedApis;
 
     @Option(names = "--include-write-apis",
-            description = "Include write APIs in the MCP server",
-            defaultValue = "false")
-    boolean includeWriteApis;
+            description = "Include write APIs in the MCP server")
+    Boolean includeWriteApis;
 
     @Override
     protected CliBundle getNewToolConfig() {
         var bundleBuilder = AwsServiceBundler.builder()
-                .serviceName(awsServiceName)
-                .exposedOperations(allowedTools())
-                .blockedOperations(blockedTools());
-        if (!includeWriteApis) {
-            bundleBuilder = bundleBuilder.readOnlyOperations();
+                .serviceName(awsServiceName);
+        //If nothing is specified then default to only readOnlyOperations.
+        if (allowedApis != null) {
+            // User explicitly specified allowed APIs - use only those
+            bundleBuilder.exposedOperations(allowedApis);
+        } else if (includeWriteApis == null || !includeWriteApis) {
+            // Default case or explicit false - read-only operations
+            bundleBuilder.readOnlyOperations();
+        }
+        // Always apply blocked operations if specified
+        if (blockedApis != null) {
+            bundleBuilder.blockedOperations(blockedApis);
         }
         var bundle = bundleBuilder.build().bundle();
 
@@ -75,15 +80,5 @@ public class AddAwsServiceBundle extends AbstractAddBundle {
     @Override
     protected boolean canOverwrite() {
         return overwrite;
-    }
-
-    @Override
-    protected Set<String> allowedTools() {
-        return allowedApis == null ? Collections.emptySet() : allowedApis;
-    }
-
-    @Override
-    protected Set<String> blockedTools() {
-        return blockedApis == null ? Collections.emptySet() : blockedApis;
     }
 }

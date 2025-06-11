@@ -43,13 +43,18 @@ public final class AwsServiceBundler extends ModelBundler {
     static final Map<String, String> GH_URIS_BY_SERVICE = new HashMap<>();
 
     static {
-        // line is in the form fooService/service/version/fooService.json
+        // line format: Title (which may contain spaces)|sdk-id/service/YYYY/MM/DD/sdk-id-YYYY-MM-DD.json
+        // sdk title, pipe character, github url to download the model (of which the first component is the sdk id)
         try (var models = new BufferedReader(new InputStreamReader(
                 Objects.requireNonNull(AwsServiceBundler.class.getResourceAsStream("/models.txt")),
                 StandardCharsets.UTF_8))) {
             models.lines()
-                    .forEach(line -> GH_URIS_BY_SERVICE
-                            .put(line.substring(0, line.indexOf("/")).toLowerCase(Locale.ROOT), line));
+                    .forEach(line -> {
+                        var start = line.indexOf("|") + 1;
+                        var end = line.indexOf("/", start);
+                        GH_URIS_BY_SERVICE.put(line.substring(start, end).toLowerCase(Locale.ROOT),
+                                line.substring(start));
+                    });
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -65,10 +70,10 @@ public final class AwsServiceBundler extends ModelBundler {
     private AwsServiceBundler(Builder builder) {
         this.serviceName = builder.serviceName;
         this.resolver = builder.resolver;
-        this.exposedOperations = builder.exposedOperations;
-        this.blockedOperations = builder.blockedOperations;
-        this.allowedPrefixes = builder.allowedPrefixes;
-        this.blockedPrefixes = builder.blockedPrefixes;
+        this.exposedOperations = builder.exposedOperations == null ? Collections.emptySet() : builder.exposedOperations;
+        this.blockedOperations = builder.blockedOperations == null ? Collections.emptySet() : builder.blockedOperations;
+        this.allowedPrefixes = builder.allowedPrefixes == null ? Collections.emptySet() : builder.allowedPrefixes;
+        this.blockedPrefixes = builder.blockedPrefixes == null ? Collections.emptySet() : builder.blockedPrefixes;
     }
 
     public static Builder builder() {
@@ -104,8 +109,8 @@ public final class AwsServiceBundler extends ModelBundler {
         }
 
         public Builder readOnlyOperations() {
-            this.allowedPrefixes(ApiStandardTerminology.READ_ONLY_API_PREFIXES);
-            this.blockedPrefixes(ApiStandardTerminology.WRITE_API_PREFIXES);
+            this.allowedPrefixes(ApiStandardTerminology.getReadOnlyApiPrefixes());
+            this.blockedPrefixes(ApiStandardTerminology.getWriteApiPrefixes());
             return this;
         }
 
@@ -234,8 +239,10 @@ public final class AwsServiceBundler extends ModelBundler {
                 continue;
             }
 
-            if (endpoint.startsWith("https://") && endpoint.endsWith(region + ".amazonaws.com")) {
-                if (endpoint.endsWith(region + ".amazonaws.com") || endpoint.contains(region + ".amazonaws.com.")) {
+            if (endpoint.startsWith("https://")) {
+                if (endpoint.endsWith(region + ".amazonaws.com")
+                        || endpoint.contains(region + ".amazonaws.com.")
+                        || endpoint.endsWith(region + ".api.aws")) {
                     var prev = endpoints.put(region, endpoint);
                     if (prev != null && !endpoint.equals(prev)) {
                         throw new RuntimeException(

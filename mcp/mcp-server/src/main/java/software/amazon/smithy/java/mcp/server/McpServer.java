@@ -9,6 +9,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -155,9 +157,9 @@ public final class McpServer implements Server {
                     } else {
                         // Handle locally
                         var operation = tool.operation();
-                        var input = req.getParams()
-                                .getMember("arguments")
-                                .asShape(operation.getApiOperation().inputBuilder());
+                        var argumentsDoc = req.getParams().getMember("arguments");
+                        var adaptedDoc = adaptDocument(argumentsDoc, operation.getApiOperation().inputSchema());
+                        var input = adaptedDoc.asShape(operation.getApiOperation().inputBuilder());
                         var output = operation.function().apply(input, null);
                         var result = CallToolResult.builder()
                                 .content(List.of(TextContent.builder()
@@ -417,14 +419,14 @@ public final class McpServer implements Server {
         done.await();
     }
 
-    private record Tool(ToolInfo toolInfo, Operation operation, McpServerProxy proxy) {
+    private record Tool(ToolInfo toolInfo, Operation operation, McpServerProxy proxy, boolean requiredAdapting) {
 
         Tool(ToolInfo toolInfo, Operation operation) {
-            this(toolInfo, operation, null);
+            this(toolInfo, operation, null, false);
         }
 
         Tool(ToolInfo toolInfo, McpServerProxy proxy) {
-            this(toolInfo, null, proxy);
+            this(toolInfo, null, proxy, false);
         }
     }
 
@@ -434,6 +436,62 @@ public final class McpServer implements Server {
             first = first + ". ";
         }
         return first + second;
+    }
+
+    private static Document adaptDocument(Document doc, Schema schema) {
+        var fromType = doc.type();
+        var toType = schema.type();
+        return switch (toType) {
+            case BIG_DECIMAL -> switch (fromType) {
+                case STRING -> Document.of(new BigDecimal(doc.asString()));
+                case BIG_INTEGER -> doc;
+                default -> badType(fromType, toType);
+            };
+            case BIG_INTEGER ->
+                switch (fromType) {
+                    case STRING -> Document.of(new BigInteger(doc.asString()));
+                    case BIG_INTEGER -> doc;
+                    default -> badType(fromType, toType);
+                };
+            case BLOB -> switch (fromType) {
+                case STRING -> Document.of(doc.asString().getBytes(StandardCharsets.UTF_8));
+                case BLOB -> doc;
+                default -> badType(fromType, toType);
+            };
+            case STRUCTURE, UNION -> {
+                var convertedMembers = new HashMap<String, Document>();
+                var members = schema.members();
+                for (var member : members) {
+                    var memberName = member.memberName();
+                    var memberDoc = doc.getMember(memberName);
+                    if (memberDoc != null) {
+                        convertedMembers.put(memberName, adaptDocument(memberDoc, member.memberTarget()));
+                    }
+                }
+                yield Document.of(convertedMembers);
+            }
+            case LIST, SET -> {
+                var listMember = schema.listMember();
+                var convertedList = new ArrayList<Document>();
+                for (var item : doc.asList()) {
+                    convertedList.add(adaptDocument(item, listMember.memberTarget()));
+                }
+                yield Document.of(convertedList);
+            }
+            case MAP -> {
+                var mapValue = schema.mapValueMember();
+                var convertedMap = new HashMap<String, Document>();
+                for (var entry : doc.asStringMap().entrySet()) {
+                    convertedMap.put(entry.getKey(), adaptDocument(entry.getValue(), mapValue.memberTarget()));
+                }
+                yield Document.of(convertedMap);
+            }
+            default -> doc;
+        };
+    }
+
+    private static Document badType(ShapeType from, ShapeType to) {
+        throw new RuntimeException("Cannot convert from " + from + " to " + to);
     }
 
     public static McpServerBuilder builder() {

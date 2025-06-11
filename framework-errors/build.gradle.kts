@@ -45,6 +45,14 @@ tasks.named("sourcesJar") {
     mustRunAfter("compileJava")
 }
 
+tasks.jar {
+    doFirst {
+        manifest.attributes.remove("Build-Timestamp")
+        manifest.attributes.remove("Build-OS")
+        manifest.attributes.remove("Build-Jdk")
+    }
+}
+
 // Helps Intellij plugin identify models
 sourceSets {
     main {

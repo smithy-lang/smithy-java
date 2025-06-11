@@ -64,8 +64,8 @@ public class AwsServiceBundlerTest {
         var bundler = AwsServiceBundler.builder()
                 .serviceName("dynamodb")
                 .resolver(serviceName -> getModel("dynamodb-2012-08-10.json"))
-                .allowedPrefixes(ApiStandardTerminology.READ_ONLY_API_PREFIXES)
-                .blockedPrefixes(ApiStandardTerminology.WRITE_API_PREFIXES)
+                .allowedPrefixes(ApiStandardTerminology.getReadOnlyApiPrefixes())
+                .blockedPrefixes(ApiStandardTerminology.getWriteApiPrefixes())
                 .build();
         var bundle = bundler.bundle();
         var bundleModel = new ModelAssembler().addUnparsedModel("model.json", bundle.getModel())

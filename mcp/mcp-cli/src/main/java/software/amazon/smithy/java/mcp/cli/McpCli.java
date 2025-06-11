@@ -8,7 +8,6 @@ package software.amazon.smithy.java.mcp.cli;
 import java.util.List;
 import java.util.ServiceLoader;
 import picocli.CommandLine;
-import picocli.CommandLine.Command;
 import software.amazon.smithy.java.mcp.cli.commands.Configure;
 import software.amazon.smithy.java.mcp.cli.commands.InstallBundle;
 import software.amazon.smithy.java.mcp.cli.commands.ListBundles;
@@ -22,20 +21,27 @@ import software.amazon.smithy.java.mcp.cli.commands.UninstallBundle;
  * It discovers and registers all available configuration commands and
  * sets up the command hierarchy.
  */
-@Command(name = "mcp-registry", versionProvider = VersionProvider.class, mixinStandardHelpOptions = true,
-        scope = CommandLine.ScopeType.INHERIT)
-public class McpCli {
+public final class McpCli {
+
+    private McpCli() {
+        throw new UnsupportedOperationException();
+    }
 
     public static void main(String[] args) {
+        addSystemProperties();
         var configureCommand = new CommandLine(new Configure());
         discoverConfigurationCommands().forEach(configureCommand::addSubcommand);
-        var commandLine = new CommandLine(new McpCli())
+        var commandLine = new CommandLine(new McpRegistry())
                 .addSubcommand(new StartServer())
                 .addSubcommand(new ListBundles())
                 .addSubcommand(new InstallBundle())
                 .addSubcommand(new UninstallBundle())
                 .addSubcommand(configureCommand);
         commandLine.execute(args);
+    }
+
+    private static void addSystemProperties() {
+        System.setProperty("jdk.httpclient.allowRestrictedHeaders", "host"); //This is required for JavaHttpClientTransport.
     }
 
     /**
