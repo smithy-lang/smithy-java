@@ -398,12 +398,14 @@ public class ConfigUtils {
         for (var configFile : configFiles) {
             var configPath = resolveFromHomeDir(configFile);
 
-            if (Files.exists(configPath)) {
+            if (Files.exists(configPath) && Files.isWritable(configPath)) {
                 try {
                     // Check if already present
                     var lines = Files.readAllLines(configPath, StandardCharsets.UTF_8);
                     boolean alreadyPresent = lines.stream()
-                            .anyMatch(line -> line.contains(shimsDirStr) && line.contains("PATH"));
+                            .anyMatch(line -> line.contains(shimsDirStr)
+                                    && line.contains("PATH")
+                                    && !(line.trim().startsWith("#")));
 
                     if (!alreadyPresent) {
                         // Add the export statement
