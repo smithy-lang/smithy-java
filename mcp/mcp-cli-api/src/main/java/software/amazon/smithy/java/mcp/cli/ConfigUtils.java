@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -401,7 +402,7 @@ public class ConfigUtils {
             if (Files.exists(configPath) && Files.isWritable(configPath)) {
                 try {
                     // Check if already present
-                    var lines = Files.readAllLines(configPath, StandardCharsets.UTF_8);
+                    var lines = new ArrayList<>(Files.readAllLines(configPath, StandardCharsets.UTF_8));
                     boolean alreadyPresent = lines.stream()
                             .anyMatch(line -> line.contains(shimsDirStr)
                                     && line.contains("PATH")
