@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -53,8 +54,12 @@ public class ConfigUtils {
             .serializeTypeInDocuments(false)
             .build();
 
+    private static final String OS = System.getProperty("os.name").toLowerCase();
+    private static final boolean WINDOWS = OS.contains("windows");
+
     private static final Path CONFIG_DIR = resolveFromHomeDir(".config", "smithy-mcp");
     private static final Path BUNDLE_DIR = CONFIG_DIR.resolve("bundles");
+    private static final Path SHIMS_DIR = CONFIG_DIR.resolve("mcp-servers");
     private static final Path CONFIG_PATH = CONFIG_DIR.resolve("config.json");
 
     private static final DefaultConfigProvider DEFAULT_CONFIG_PROVIDER;
@@ -63,6 +68,7 @@ public class ConfigUtils {
         try {
             ensureDirectoryExists(CONFIG_DIR);
             ensureDirectoryExists(BUNDLE_DIR);
+            ensureDirectoryExists(SHIMS_DIR);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -169,6 +175,8 @@ public class ConfigUtils {
         updateConfig(newConfig);
         var bundleFile = getBundleFileLocation(bundleName);
         Files.deleteIfExists(bundleFile);
+        // Remove wrapper script if it exists
+        removeWrapperScript(bundleName);
     }
 
     public static void addToClientConfigs(Config config, String name, Set<String> clients, McpServerConfig serverConfig)
@@ -332,5 +340,113 @@ public class ConfigUtils {
                 new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             return in.lines().collect(Collectors.joining(System.lineSeparator()));
         }
+    }
+
+    public static void createWrapperScript(String bundleName) throws IOException {
+        Path scriptPath = SHIMS_DIR.resolve(bundleName);
+        String scriptContent = createScriptContent(bundleName);
+
+        Files.writeString(scriptPath, scriptContent, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        scriptPath.toFile().setExecutable(true);
+    }
+
+    private static String createScriptContent(String bundleName) {
+        if (WINDOWS) {
+            return "@echo off\nmcp-registry start-server " + bundleName + " %*\n";
+        } else {
+            return "#!/bin/bash\nexec mcp-registry start-server " + bundleName + " \"$@\"\n";
+        }
+    }
+
+    public static void removeWrapperScript(String bundleName) throws IOException {
+        Path scriptPath = SHIMS_DIR.resolve(bundleName);
+        Files.deleteIfExists(scriptPath);
+    }
+
+    public static boolean isMcpServersDirInPath() {
+        String pathEnv = System.getenv("PATH");
+        if (pathEnv == null) {
+            return false;
+        }
+
+        String shimsDirStr = SHIMS_DIR.toAbsolutePath().toString();
+        return pathEnv.contains(shimsDirStr);
+    }
+
+    public static void ensureMcpServersDirInPath() {
+        if (isMcpServersDirInPath()) {
+            return;
+        }
+
+        String shimsDirStr = SHIMS_DIR.toAbsolutePath().toString();
+
+        if (WINDOWS) {
+            printWindowsPathInstructions(shimsDirStr);
+        } else {
+            if (!tryAddToShellConfigs(shimsDirStr)) {
+                printUnixPathInstructions(shimsDirStr);
+            }
+        }
+    }
+
+    private static boolean tryAddToShellConfigs(String shimsDirStr) {
+        var pathExport = "export PATH=\"" + shimsDirStr + ":$PATH\"";
+        var comment = "# Added by smithy-mcp";
+        var configFiles = List.of(".zshrc", ".bashrc", ".profile", ".bash_profile");
+
+        String addedTo = null;
+
+        for (var configFile : configFiles) {
+            var configPath = resolveFromHomeDir(configFile);
+
+            if (Files.exists(configPath) && Files.isWritable(configPath)) {
+                try {
+                    // Check if already present
+                    var lines = new ArrayList<>(Files.readAllLines(configPath, StandardCharsets.UTF_8));
+                    boolean alreadyPresent = lines.stream()
+                            .anyMatch(line -> line.contains(shimsDirStr)
+                                    && line.contains("PATH")
+                                    && !(line.trim().startsWith("#")));
+
+                    if (!alreadyPresent) {
+                        // Add the export statement
+                        lines.add("");
+                        lines.add(comment);
+                        lines.add(pathExport);
+
+                        Files.write(configPath,
+                                lines,
+                                StandardCharsets.UTF_8,
+                                StandardOpenOption.WRITE,
+                                StandardOpenOption.TRUNCATE_EXISTING);
+
+                        System.out.println("Added mcp-servers directory to PATH in " + configFile);
+                        addedTo = configFile;
+                    }
+                } catch (IOException e) {
+                    // Continue to next config file if this one fails
+                }
+            }
+        }
+
+        if (addedTo != null) {
+            System.out.println("Please restart your shell or run 'source ~/" + configFiles + "' to reload your PATH");
+            return true;
+        }
+        return false;
+    }
+
+    private static void printWindowsPathInstructions(String shimsDirStr) {
+        System.out.println("\nTo use the installed bundle as a command, add the mcp-servers directory to your PATH:");
+        System.out.println("  set PATH=" + shimsDirStr + ";%PATH%");
+        System.out.println("Or permanently add it through System Properties > Environment Variables");
+        System.out.println();
+    }
+
+    private static void printUnixPathInstructions(String shimsDirStr) {
+        System.out.println("\nTo use the installed bundle as a command, add the mcp-servers directory to your PATH:");
+        System.out.println("  export PATH=\"" + shimsDirStr + ":$PATH\"");
+        System.out.println("Add this line to your shell profile (~/.bashrc, ~/.zshrc, etc.) to make it permanent");
+        System.out.println();
     }
 }

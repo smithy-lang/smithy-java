@@ -43,12 +43,22 @@ public class InstallBundle extends SmithyMcpCommand {
         var config = context.config();
         var bundle = registry.getMcpBundle(name);
         ConfigUtils.addMcpBundle(config, name, bundle);
-        var command = "mcp-registry";
-        var args = List.of("start-server", name);
+
+        var command = name;
+        List<String> args = null;
+        boolean shouldCreateWrapper = true;
+
         if (bundle.getValue() instanceof GenericBundle genericBundle && genericBundle.isExecuteDirectly()) {
             command = genericBundle.getRun().getExecutable();
             args = genericBundle.getRun().getArgs();
+            shouldCreateWrapper = false;
         }
+
+        if (shouldCreateWrapper) {
+            ConfigUtils.createWrapperScript(name);
+            ConfigUtils.ensureMcpServersDirInPath();
+        }
+
         var newClientConfig = McpServerConfig.builder()
                 .command(command)
                 .args(args)
@@ -60,6 +70,7 @@ public class InstallBundle extends SmithyMcpCommand {
         ConfigUtils.addToClientConfigs(config, name, clients, newClientConfig);
 
         System.out.println("Successfully installed " + name);
+
         if (print) {
             System.out.println("You can add the following to your MCP Servers config to use " + name);
             System.out.println(newClientConfig);
