@@ -5,7 +5,11 @@
 
 package software.amazon.smithy.java.mcp.cli;
 
+import java.util.List;
+import java.util.Set;
+import picocli.CommandLine;
 import software.amazon.smithy.java.mcp.cli.model.Location;
+import software.amazon.smithy.java.mcp.cli.model.McpServerConfig;
 
 /**
  * Abstract base class for CLI commands that add tool bundles to the Smithy MCP configuration.
@@ -16,6 +20,10 @@ import software.amazon.smithy.java.mcp.cli.model.Location;
  */
 public abstract class AbstractAddBundle extends SmithyMcpCommand implements ConfigurationCommand {
 
+    @CommandLine.Option(names = {"--clients"},
+            description = "Names of client configs to update. If not specified all client configs registered would be updated")
+    protected Set<String> clients = Set.of();
+
     @Override
     public final void execute(ExecutionContext context) throws Exception {
         var config = context.config();
@@ -25,6 +33,11 @@ public abstract class AbstractAddBundle extends SmithyMcpCommand implements Conf
         }
         var newConfig = getNewToolConfig();
         ConfigUtils.addMcpBundle(config, getToolBundleName(), newConfig.mcpBundle());
+        var command = McpServerConfig.builder()
+                .command("mcp-registry")
+                .args(List.of("start-server", getToolBundleName()))
+                .build();
+        ConfigUtils.addToClientConfigs(config, getToolBundleName(), clients, command);
         System.out.println("Added tool bundle " + getToolBundleName());
     }
 
