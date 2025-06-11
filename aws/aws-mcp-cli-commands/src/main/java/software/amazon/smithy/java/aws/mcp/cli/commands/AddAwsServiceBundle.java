@@ -34,24 +34,25 @@ public class AddAwsServiceBundle extends AbstractAddBundle {
     @Option(names = {"-b", "--blocked-apis"}, description = "List of APIs to hide in the MCP server")
     protected Set<String> blockedApis;
 
-    @Option(names = "--include-write-apis",
-            description = "Include write APIs in the MCP server")
-    Boolean includeWriteApis;
+    @Option(names = "--read-only-apis",
+            description = "Include read only APIs in the MCP server",
+            defaultValue = "true")
+    protected boolean readOnlyApis;
 
     @Override
     protected CliBundle getNewToolConfig() {
         var bundleBuilder = AwsServiceBundler.builder()
                 .serviceName(awsServiceName);
-        //If nothing is specified then default to only readOnlyOperations.
+        if (readOnlyApis) {
+            // Include read-only apis unless disabled
+            bundleBuilder.readOnlyOperations();
+        }
         if (allowedApis != null) {
             // User explicitly specified allowed APIs - use only those
             bundleBuilder.exposedOperations(allowedApis);
-        } else if (includeWriteApis == null || !includeWriteApis) {
-            // Default case or explicit false - read-only operations
-            bundleBuilder.readOnlyOperations();
         }
-        // Always apply blocked operations if specified
         if (blockedApis != null) {
+            // Always apply blocked operations if specified
             bundleBuilder.blockedOperations(blockedApis);
         }
         var bundle = bundleBuilder.build().bundle();
