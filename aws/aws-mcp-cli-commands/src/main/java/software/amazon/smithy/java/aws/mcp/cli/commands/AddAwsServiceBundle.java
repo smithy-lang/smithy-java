@@ -35,22 +35,28 @@ public class AddAwsServiceBundle extends AbstractAddBundle {
     protected Set<String> blockedApis;
 
     @Option(names = "--read-only-apis",
-            description = "Include read only APIs in the MCP server",
-            defaultValue = "true")
-    protected boolean readOnlyApis;
+            description = "Include read only APIs in the MCP server")
+    protected Boolean readOnlyApis;
 
     @Override
     protected CliBundle getNewToolConfig() {
         var bundleBuilder = AwsServiceBundler.builder()
                 .serviceName(awsServiceName);
-        if (readOnlyApis) {
-            // Include read-only apis unless disabled
-            bundleBuilder.readOnlyOperations();
-        }
         if (allowedApis != null) {
-            // User explicitly specified allowed APIs - use only those
+            // User explicitly specified allowed APIs
             bundleBuilder.exposedOperations(allowedApis);
+            // If readOnlyApis is also requested, include those as well
+            if (Boolean.TRUE.equals(readOnlyApis)) {
+                bundleBuilder.readOnlyOperations();
+            }
+        } else if (!Boolean.FALSE.equals(readOnlyApis)) {
+            //If nothing is specified then default to only readOnlyOperations.
+            bundleBuilder.readOnlyOperations();
+        } else {
+            throw new IllegalArgumentException("You have turned off readOnlyApis and also not specified any " +
+                    "allowedApis so there are no operations to create a bundle for.");
         }
+
         if (blockedApis != null) {
             // Always apply blocked operations if specified
             bundleBuilder.blockedOperations(blockedApis);
