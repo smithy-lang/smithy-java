@@ -109,7 +109,15 @@ public class ConfigUtils {
             Files.write(CONFIG_PATH, toJson(DEFAULT_CONFIG_PROVIDER.getConfig()), StandardOpenOption.CREATE);
         }
 
-        return fromJson(Files.readAllBytes(CONFIG_PATH));
+        Config config = fromJson(Files.readAllBytes(CONFIG_PATH));
+
+        var postProcessed = DEFAULT_CONFIG_PROVIDER.postProcessConfig(config);
+        if (postProcessed.isPresent()) {
+            config = postProcessed.get();
+            updateConfig(config);
+        }
+
+        return config;
     }
 
     public static Path getBundleFileLocation(String bundleName) {

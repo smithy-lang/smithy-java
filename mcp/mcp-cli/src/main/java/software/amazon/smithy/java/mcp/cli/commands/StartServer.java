@@ -91,7 +91,7 @@ public final class StartServer extends SmithyMcpCommand {
         }
 
         if (toolBundles.isEmpty() && !registryServer) {
-            throw new IllegalStateException("No bundles installed");
+            throw new IllegalArgumentException("No bundles installed");
         }
 
         var registry = context.registry();

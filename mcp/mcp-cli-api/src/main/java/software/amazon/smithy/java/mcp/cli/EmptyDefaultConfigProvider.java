@@ -17,6 +17,7 @@ public final class EmptyDefaultConfigProvider implements DefaultConfigProvider {
                 .clientConfigs(List.of(ClientConfig.builder()
                         .name("q-cli")
                         .filePath(ConfigUtils.resolveFromHomeDir(".aws", "amazonq", "mcp.json").toString())
+                        .isDefault(true)
                         .build()))
                 .build();
     }

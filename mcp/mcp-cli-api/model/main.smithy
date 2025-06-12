@@ -69,7 +69,13 @@ structure GenericToolBundleConfig with [CommonToolConfig] {
 
 structure ClientConfig {
     name: String
+
     filePath: String
+
+    @default(false)
+    isDefault: Boolean
+
+    disabled: Boolean
 }
 
 list ToolNames {
