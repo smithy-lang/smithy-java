@@ -86,6 +86,16 @@ public interface Document extends SerializableShape {
     ShapeType type();
 
     /**
+     * Check if the document is of the specified shape type.
+     *
+     * @param type the shape type to check against.
+     * @return true if the document matches the specified type, false otherwise.
+     */
+    default boolean isType(ShapeType type) {
+        return type.equals(type());
+    }
+
+    /**
      * Attempts to find and parse a shape ID from the document in the document's discriminator field and throws a
      * {@link DiscriminatorException} if no discriminator is found.
      *
