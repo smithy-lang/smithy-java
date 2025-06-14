@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew:*)",
+      "Bash(find:*)",
+      "Bash(ls:/Volumes/workplace/CoralMcp/src/smithy-java*)",
+      "Bash(grep:/Volumes/workplace/CoralMcp/src/smithy-java*)",
+      "Bash(rg:/Volumes/workplace/CoralMcp/src/smithy-java*)",
+      "LS",
+      "Read",
+      "Glob",
+      "Grep",
+      "Task"
+    ]
+  },
+  "enableAllProjectMcpServers": false
+}
