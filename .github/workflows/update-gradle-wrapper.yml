@@ -1,0 +1,17 @@
+name: Update Gradle Wrapper
+# Needed because dependabot doesn't support updating the gradle wrapper
+# see: https://github.com/dependabot/dependabot-core/issues/2223
+
+on:
+  schedule:
+    - cron: "0 14 * * 1" # 2PM UTC (7AM PST) every Monday.
+
+jobs:
+  update-gradle-wrapper:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update Gradle Wrapper
+        uses: gradle-update/update-gradle-wrapper-action@v2
