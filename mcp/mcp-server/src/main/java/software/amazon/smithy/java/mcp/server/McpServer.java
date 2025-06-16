@@ -182,10 +182,19 @@ public final class McpServer implements Server {
 
     private void validate(JsonRpcRequest req) {
         Document id = req.getId();
-        if (!(id.isType(ShapeType.INTEGER) || id.isType(ShapeType.STRING))) {
-            throw ValidationException.builder()
-                    .message("Request id is of invalid type " + id.type().name())
-                    .build();
+        boolean isRequest = !req.getMethod().startsWith("notifications/");
+        if (isRequest) {
+            if (id == null) {
+                throw ValidationException.builder()
+                        .withoutStackTrace()
+                        .message("Requests are expected to have ids")
+                        .build();
+            } else if (!(id.isType(ShapeType.INTEGER) || id.isType(ShapeType.STRING))) {
+                throw ValidationException.builder()
+                        .withoutStackTrace()
+                        .message("Request id is of invalid type " + id.type().name())
+                        .build();
+            }
         }
     }
 

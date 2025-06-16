@@ -205,6 +205,27 @@ public class McpServerTest {
     }
 
     @Test
+    void testRequestsRequireIds() {
+        server = McpServer.builder()
+                .input(input)
+                .output(output)
+                .addService(ProxyService.builder()
+                        .service(ShapeId.from("smithy.test#TestService"))
+                        .proxyEndpoint("http://localhost")
+                        .model(MODEL)
+                        .build())
+                .build();
+
+        server.start();
+
+        // Test regular request without ID (should fail with specific message)
+        write("tools/list", Document.of(Map.of()), null);
+        var response = read();
+        assertNotNull(response.getError());
+        assertTrue(response.getError().getMessage().contains("Requests are expected to have ids"));
+    }
+
+    @Test
     void testInputAdaptation() {
         AtomicReference<StructDocument> capturedInput = new AtomicReference<>();
         server = McpServer.builder()
@@ -309,6 +330,34 @@ public class McpServerTest {
         server.shutdown().join();
     }
 
+    @Test
+    void testNotificationsDoNotRequireRequestId() {
+        server = McpServer.builder()
+                .input(input)
+                .output(output)
+                .addService(ProxyService.builder()
+                        .service(ShapeId.from("smithy.test#TestService"))
+                        .proxyEndpoint("http://localhost")
+                        .model(MODEL)
+                        .build())
+                .build();
+
+        server.start();
+
+        // Test notifications/initialized without ID (should not produce any error response)
+        writeNotification("notifications/initialized", Document.of(Map.of()));
+        output.assertNoOutput();
+
+        // Test another notification to ensure it's consistently handled
+        writeNotification("notifications/progress", Document.of(Map.of("progressToken", Document.of("test"))));
+        output.assertNoOutput();
+
+        // Send a regular request to verify the server is still functioning
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        assertNotNull(response.getResult());
+    }
+
     private void validateNestedStructure(Map<String, Document> properties) {
         var nestedStr = properties.get("nestedStr").asStringMap();
         assertEquals("string", nestedStr.get("type").asString());
@@ -346,6 +395,16 @@ public class McpServerTest {
         var line = output.read();
         System.out.println(line);
         return CODEC.deserializeShape(line, JsonRpcResponse.builder());
+    }
+
+    private void writeNotification(String method, Document params) {
+        var request = JsonRpcRequest.builder()
+                .method(method)
+                .params(params)
+                .jsonrpc("2.0")
+                .build();
+        input.write(CODEC.serializeToString(request));
+        input.write("\n");
     }
 
     private static final String MODEL_STR = """

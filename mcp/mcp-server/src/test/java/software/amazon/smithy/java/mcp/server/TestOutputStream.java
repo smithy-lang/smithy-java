@@ -63,4 +63,25 @@ final class TestOutputStream extends OutputStream {
             throw new RuntimeException(e);
         }
     }
+
+    boolean hasOutput() {
+        return !lines.isEmpty();
+    }
+
+    void assertNoOutput() {
+        assertNoOutput(50);
+    }
+
+    void assertNoOutput(long waitMillis) {
+        // Wait briefly to allow any potential response to be written
+        try {
+            Thread.sleep(waitMillis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        // Verify no output was produced
+        if (hasOutput()) {
+            throw new AssertionError("Expected no output but got : " + read());
+        }
+    }
 }

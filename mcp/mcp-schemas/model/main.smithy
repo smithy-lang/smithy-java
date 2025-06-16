@@ -9,7 +9,6 @@ structure JsonRpcRequest {
     @required
     method: String
 
-    @required
     id: Document
 
     params: Document
@@ -23,7 +22,6 @@ structure JsonRpcResponse {
 
     error: JsonRpcErrorResponse
 
-    @required
     id: Document
 }
 
