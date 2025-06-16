@@ -27,6 +27,7 @@ import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.framework.model.ValidationException;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -106,6 +107,7 @@ public final class McpServer implements Server {
 
     private void handleRequest(JsonRpcRequest req) {
         try {
+            validate(req);
             switch (req.getMethod()) {
                 case "initialize" -> writeResponse(req.getId(),
                         InitializeResult.builder()
@@ -178,6 +180,15 @@ public final class McpServer implements Server {
         }
     }
 
+    private void validate(JsonRpcRequest req) {
+        Document id = req.getId();
+        if (!(id.isType(ShapeType.INTEGER) || id.isType(ShapeType.STRING))) {
+            throw ValidationException.builder()
+                    .message("Request id is of invalid type " + id.type().name())
+                    .build();
+        }
+    }
+
     private static final byte[] TOOLS_CHANGED = """
             {"jsonrpc":"2.0","method":"notifications/tools/list_changed"}
             """.getBytes(StandardCharsets.UTF_8); // newline is important here
@@ -194,7 +205,7 @@ public final class McpServer implements Server {
         }
     }
 
-    private void writeResponse(int id, SerializableStruct value) {
+    private void writeResponse(Document id, SerializableStruct value) {
         writeResponse(JsonRpcResponse.builder()
                 .id(id)
                 .result(Document.of(value))
