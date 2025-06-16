@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
 import software.amazon.smithy.java.mcp.model.ListToolsResult;
@@ -74,8 +75,8 @@ public abstract class McpServerProxy {
     }
 
     // Generate a unique request ID for each RPC call
-    protected int generateRequestId() {
-        return ID_GENERATOR.incrementAndGet();
+    protected Document generateRequestId() {
+        return Document.of(ID_GENERATOR.incrementAndGet());
     }
 
     protected void notify(JsonRpcResponse response) {

@@ -19,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
@@ -34,7 +35,7 @@ public final class StdioProxy extends McpServerProxy {
     private BufferedWriter writer;
     private final Lock writeLock = new ReentrantLock();
     private Thread responseReaderThread;
-    private final Map<Integer, CompletableFuture<JsonRpcResponse>> pendingRequests = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<JsonRpcResponse>> pendingRequests = new ConcurrentHashMap<>();
     private volatile boolean running = false;
 
     private StdioProxy(Builder builder) {
@@ -93,7 +94,7 @@ public final class StdioProxy extends McpServerProxy {
             return future;
         }
 
-        int requestId = request.getId();
+        String requestId = getStringRequestId(request.getId());
         CompletableFuture<JsonRpcResponse> responseFuture = new CompletableFuture<>();
         pendingRequests.put(requestId, responseFuture);
 
@@ -115,6 +116,14 @@ public final class StdioProxy extends McpServerProxy {
         }
 
         return responseFuture;
+    }
+
+    private String getStringRequestId(Document id) {
+        return switch (id.type()) {
+            case STRING -> id.asString();
+            case INTEGER -> Integer.toString(id.asInteger());
+            default -> throw new IllegalStateException("Unexpected value: " + id.type());
+        };
     }
 
     @Override
@@ -162,7 +171,7 @@ public final class StdioProxy extends McpServerProxy {
                                                         responseLine.getBytes(StandardCharsets.UTF_8)))
                                         .build();
 
-                                int responseId = response.getId();
+                                String responseId = getStringRequestId(response.getId());
                                 LOG.debug("Processing response ID: {}", responseId);
 
                                 CompletableFuture<JsonRpcResponse> future = pendingRequests.remove(responseId);
