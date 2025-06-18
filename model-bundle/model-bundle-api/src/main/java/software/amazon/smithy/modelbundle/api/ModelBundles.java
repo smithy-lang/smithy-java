@@ -5,10 +5,14 @@
 
 package software.amazon.smithy.modelbundle.api;
 
+import software.amazon.smithy.java.server.ProxyOperationTrait;
 import software.amazon.smithy.java.server.ProxyService;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
+import software.amazon.smithy.model.shapes.MemberShape;
+import software.amazon.smithy.model.shapes.OperationShape;
+import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.traits.StreamingTrait;
@@ -49,8 +53,20 @@ public final class ModelBundles {
         }
         var b = model.toBuilder();
 
+        var serviceShapes = model.getServiceShapes();
+
+        if (serviceShapes.size() != 1) {
+            throw new IllegalStateException("Expected exactly one service shape but got "
+                    + serviceShapes.stream().map(ServiceShape::getId).toList());
+        }
+
+        var service = serviceShapes.iterator().next();
+
         // mix in the generic arg members
-        for (var op : model.getOperationShapes()) {
+        var serviceShape = service.asServiceShape().get();
+        var serviceBuilder = serviceShape.toBuilder();
+        for (var opId : serviceShape.getAllOperations()) {
+            var op = model.expectShape(opId, OperationShape.class);
             boolean skipOperation = false;
             if (op.getOutput().isPresent()) {
                 for (var member : model.expectShape(op.getOutputShape(), StructureShape.class).members()) {
@@ -67,9 +83,7 @@ public final class ModelBundles {
             }
 
             if (op.getInput().isEmpty() && additionalInputShape != null) {
-                b.addShape(op.toBuilder()
-                        .input(additionalInputShape)
-                        .build());
+                addProxyOperationWithAdditionalInput(op, additionalInputShape, b, serviceBuilder, model);
             } else {
                 var shape = model.expectShape(op.getInputShape(), StructureShape.class);
                 for (var member : shape.members()) {
@@ -85,24 +99,46 @@ public final class ModelBundles {
                 }
 
                 if (additionalInputShape != null) {
-                    var input = shape.toBuilder();
-                    for (var member : additionalInputShape.members()) {
-                        input.addMember(member.toBuilder()
-                                .id(ShapeId.from(input.getId().toString() + "$" + member.getMemberName()))
-                                .build());
-                    }
-                    b.addShape(input.build());
+                    addProxyOperationWithAdditionalInput(op, additionalInputShape, b, serviceBuilder, model);
                 }
             }
         }
 
-        for (var service : model.getServiceShapes()) {
-            b.addShape(service.toBuilder()
-                    // trim the endpoint rules because they're huge and we don't need them
-                    .removeTrait(ShapeId.from("smithy.rules#endpointRuleSet"))
-                    .removeTrait(ShapeId.from("smithy.rules#endpointTests"))
-                    .build());
-        }
+        b.addShape(serviceBuilder
+                // trim the endpoint rules because they're huge and we don't need them
+                .removeTrait(ShapeId.from("smithy.rules#endpointRuleSet"))
+                .removeTrait(ShapeId.from("smithy.rules#endpointTests"))
+                .build());
         return b.build();
+    }
+
+    private static void addProxyOperationWithAdditionalInput(
+            OperationShape op,
+            StructureShape additionalInput,
+            Model.Builder builder,
+            ServiceShape.Builder serviceBuilder,
+            Model model
+    ) {
+        var input = op.getInput();
+        StructureShape finalInput;
+        if (op.getInput().isEmpty()) {
+            finalInput = additionalInput;
+        } else {
+            var inputBuilder = model.expectShape(input.get(), StructureShape.class).toBuilder();
+            inputBuilder.addMember(MemberShape.builder()
+                    .id(ShapeId.from(inputBuilder.getId().toString() + "$additionalInput"))
+                    .target(additionalInput.getId())
+                    .build());
+            finalInput = inputBuilder.id(ShapeId.from(inputBuilder.getId().toString()) + "Proxy").build();
+        }
+        builder.addShape(finalInput);
+        var newOperation = op.toBuilder()
+                .id(ShapeId.from(op.getId().toString() + "Proxy"))
+                .input(finalInput)
+                .output(op.getOutputShape())
+                .addTrait(new ProxyOperationTrait(op.getId()))
+                .build();
+        builder.addShape(newOperation);
+        serviceBuilder.addOperation(newOperation).build();
     }
 }

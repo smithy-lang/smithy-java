@@ -16,8 +16,10 @@ import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
 import software.amazon.smithy.java.client.core.CallContext;
+import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -34,11 +36,12 @@ import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.shapes.ToShapeId;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
 public final class ProxyService implements Service {
+
+    public static final Context.Key<Document> PROXY_INPUT = Context.key("smithy.proxy.input");
 
     private final DynamicClient dynamicClient;
     private final SchemaConverter schemaConverter;
@@ -81,29 +84,87 @@ public final class ProxyService implements Service {
         }
         this.serviceErrorRegistry = registryBuilder.build();
         this.allOperations = new ArrayList<>();
-        for (var operation : TopDownIndex.of(model).getContainedOperations(service.getId())) {
+        var containedOperations = TopDownIndex.of(model).getContainedOperations(service.getId());
+
+        var proxyOperations = new ArrayList<OperationShape>();
+        var nonProxyOperations = new ArrayList<OperationShape>();
+
+        // Server operations are expensive to create due to model-to-schema conversions.
+        // To minimize overhead, we first separate operations into proxy and non-proxy types,
+        // then only create non-proxy operations when an equivalent proxy operation doesn't exist.
+        for (var operation : containedOperations) {
+            if (operation.hasTrait(ProxyOperationTrait.class)) {
+                proxyOperations.add(operation);
+            } else {
+                nonProxyOperations.add(operation);
+            }
+        }
+
+        for (var operation : proxyOperations) {
+            var proxyOperation = model.expectShape(
+                    operation.expectTrait(ProxyOperationTrait.class).getDelegateOperation(),
+                    OperationShape.class);
+            String operationName = proxyOperation.getId().getName();
+            var serverOperation = createServerOperation(
+                    operation,
+                    proxyOperation,
+                    operationName,
+                    true,
+                    model,
+                    service);
+            addOperation(serverOperation, operationName);
+        }
+
+        for (var operation : nonProxyOperations) {
             String operationName = operation.getId().getName();
-            var function =
-                    new DynamicFunction(dynamicClient,
-                            operationName,
-                            schemaConverter,
-                            model,
-                            operation,
-                            service);
-            Operation<StructDocument,
-                    StructDocument> serverOperation = Operation.of(operationName,
-                            function,
-                            DynamicOperation.create(operation,
-                                    schemaConverter,
-                                    model,
-                                    service,
-                                    serviceErrorRegistry,
-                                    (e, rb) -> registerError(e, builder.service, rb, model)),
-                            this);
-            allOperations.add(serverOperation);
-            operations.put(operationName, serverOperation);
+
+            if (!operations.containsKey(operationName)) {
+                var serverOperation = createServerOperation(
+                        operation,
+                        operation,
+                        operationName,
+                        false,
+                        model,
+                        service);
+                addOperation(serverOperation, operationName);
+            }
         }
         this.schema = schemaConverter.getSchema(service);
+    }
+
+    private Operation<StructDocument, StructDocument> createServerOperation(
+            OperationShape sourceOperation,
+            OperationShape targetOperation,
+            String operationName,
+            boolean isProxy,
+            Model model,
+            ServiceShape service
+    ) {
+
+        var apiOperation = DynamicOperation.create(
+                sourceOperation,
+                schemaConverter,
+                model,
+                service,
+                serviceErrorRegistry,
+                (e, rb) -> registerError(e, service.getId(), rb, model));
+
+        var outputSchema = schemaConverter.getSchema(model.expectShape(targetOperation.getOutputShape()));
+
+        var function = new DynamicFunction(
+                dynamicClient,
+                targetOperation.getId().getName(),
+                outputSchema,
+                service,
+                isProxy);
+
+        return Operation.of(operationName, function, apiOperation, this);
+    }
+
+    // Helper method to add operations to collections
+    private void addOperation(Operation<StructDocument, StructDocument> serverOperation, String operationName) {
+        allOperations.add(serverOperation);
+        operations.put(operationName, serverOperation);
     }
 
     private void registerError(ShapeId e, ShapeId serviceId, TypeRegistry.Builder registryBuilder, Model model) {
@@ -230,23 +291,29 @@ public final class ProxyService implements Service {
     private record DynamicFunction(
             DynamicClient dynamicClient,
             String operation,
-            SchemaConverter schemaConverter,
-            Model model,
-            OperationShape operationShape,
-            ServiceShape serviceShape) implements BiFunction<StructDocument, RequestContext, StructDocument> {
+            Schema outputSchema,
+            ServiceShape serviceShape,
+            boolean isProxy) implements BiFunction<StructDocument, RequestContext, StructDocument> {
 
         @Override
         public StructDocument apply(StructDocument input, RequestContext requestContext) {
-            return createStructDocument(operationShape.getOutput().get(), dynamicClient.call(operation, input));
-        }
-
-        private StructDocument createStructDocument(ToShapeId shape, Document value) {
-            var schema = schemaConverter.getSchema(model.expectShape(shape.toShapeId()));
-            if (value.type() != ShapeType.MAP && value.type() != ShapeType.STRUCTURE) {
-                throw new IllegalArgumentException("Document value must be a map or structure, found " + value.type());
+            Document output;
+            if (isProxy) {
+                //We need to stash the original input because dynamic client will erase anything extra.
+                var requestOverride = RequestOverrideConfig.builder()
+                        .putConfig(PROXY_INPUT, input.getMember("additionalInput"))
+                        .build();
+                output = dynamicClient.call(operation, input, requestOverride);
+            } else {
+                output = dynamicClient.call(operation, input);
             }
-            return StructDocument.of(schema, value, serviceShape.getId());
+            if (output.type() != ShapeType.MAP && output.type() != ShapeType.STRUCTURE) {
+                throw new IllegalArgumentException("Document value must be a map or structure, found " + output.type());
+            }
+            return StructDocument.of(outputSchema, output, serviceShape.getId());
         }
     }
+
+    private record OperationTarget(OperationShape source, OperationShape target) {}
 
 }

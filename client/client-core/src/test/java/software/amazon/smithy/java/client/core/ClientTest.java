@@ -169,6 +169,8 @@ public class ClientTest {
                 .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
                     @Override
                     public ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
+                        //RequestOverrides config should be visible here.
+                        assertThat(hook.config().context().get(CallContext.APPLICATION_ID), equalTo(id));
                         // Note that the overrides given to the call itself will override interceptors.
                         var override = RequestOverrideConfig.builder()
                                 .putConfig(CallContext.APPLICATION_ID, "foo")

@@ -80,11 +80,20 @@ public abstract class Client {
         IdentityResolvers callIdentityResolvers = identityResolvers;
         ClientInterceptor callInterceptor = interceptor;
 
-        // First apply overrides from interceptors.
-        ClientConfig callConfig = callInterceptor.modifyBeforeCall(new CallHook<>(operation, config, input));
-        // Overrides given per/operation take precedence over interceptors.
+        //If there is an override config first apply that before sending to interceptors.
+        ClientConfig callConfig = config;
         if (overrideConfig != null) {
             callConfig = callConfig.withRequestOverride(overrideConfig);
+        }
+        ClientConfig afterInterceptionConfig =
+                callInterceptor.modifyBeforeCall(new CallHook<>(operation, callConfig, input));
+        if (afterInterceptionConfig != null && afterInterceptionConfig != callConfig) {
+            if (overrideConfig != null) {
+                callConfig = afterInterceptionConfig.withRequestOverride(overrideConfig);
+            } else {
+                callConfig = afterInterceptionConfig;
+            }
+
         }
 
         // Rebuild the pipeline, resolvers, etc if the config changed.

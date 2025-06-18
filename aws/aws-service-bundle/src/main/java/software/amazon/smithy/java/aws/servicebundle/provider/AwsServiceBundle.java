@@ -5,8 +5,9 @@
 
 package software.amazon.smithy.java.aws.servicebundle.provider;
 
+import static java.util.Objects.requireNonNull;
+
 import java.net.URI;
-import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,8 +26,8 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.CallHook;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
+import software.amazon.smithy.java.server.ProxyService;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.modelbundle.api.BundlePlugin;
@@ -87,12 +88,11 @@ final class AwsServiceBundle implements BundlePlugin {
 
         @Override
         public ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
-            if (!(hook.input() instanceof Document d)) {
-                throw new IllegalArgumentException("Input must be a Document");
-            }
+            var d = requireNonNull(hook.config().context().get(ProxyService.PROXY_INPUT),
+                    "Expected additionalInput in the request");
             var input = d.asShape(PreRequest.builder());
 
-            var endpoint = URI.create(Objects.requireNonNull(serviceMetadata.getEndpoints().get(input.getAwsRegion()),
+            var endpoint = URI.create(requireNonNull(serviceMetadata.getEndpoints().get(input.getAwsRegion()),
                     "no endpoint for region " + input.getAwsRegion()));
 
             var identityResolver =
