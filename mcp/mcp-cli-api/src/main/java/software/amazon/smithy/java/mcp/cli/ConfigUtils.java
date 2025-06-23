@@ -20,6 +20,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -57,7 +58,7 @@ public class ConfigUtils {
     private static final String OS = System.getProperty("os.name").toLowerCase();
     private static final boolean WINDOWS = OS.contains("windows");
 
-    private static final Path CONFIG_DIR = resolveFromHomeDir(".config", "smithy-mcp");
+    private static final Path CONFIG_DIR = getSmithyMcpCliHome();
     private static final Path BUNDLE_DIR = CONFIG_DIR.resolve("bundles");
     private static final Path SHIMS_DIR = CONFIG_DIR.resolve("mcp-servers");
     private static final Path CONFIG_PATH = CONFIG_DIR.resolve("config.json");
@@ -78,6 +79,12 @@ public class ConfigUtils {
                 .map(ServiceLoader.Provider::get)
                 .max(Comparator.comparing(DefaultConfigProvider::priority))
                 .orElse(new EmptyDefaultConfigProvider());
+    }
+
+    private static Path getSmithyMcpCliHome() {
+        return Optional.ofNullable(System.getenv("SMITHY_MCP_CLI_HOME"))
+                .map(Paths::get)
+                .orElseGet(() -> resolveFromHomeDir(".config", "smithy-mcp"));
     }
 
     public static Path resolveFromHomeDir(String... paths) {

@@ -23,7 +23,7 @@ public abstract class SmithyMcpCommand implements Callable<Integer> {
     InternalLogger LOG = InternalLogger.getLogger(SmithyMcpCommand.class);
 
     @Override
-    public final Integer call() throws Exception {
+    public final Integer call() {
         try {
             var config = loadOrCreateConfig();
             execute(new ExecutionContext(config, RegistryUtils.getRegistry(registryToUse(config), config)));
