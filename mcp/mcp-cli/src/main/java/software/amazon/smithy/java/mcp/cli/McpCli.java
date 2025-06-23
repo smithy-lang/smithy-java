@@ -37,7 +37,7 @@ public final class McpCli {
                 .addSubcommand(new InstallBundle())
                 .addSubcommand(new UninstallBundle())
                 .addSubcommand(configureCommand);
-        commandLine.execute(args);
+        System.exit(commandLine.execute(args));
     }
 
     private static void addSystemProperties() {
