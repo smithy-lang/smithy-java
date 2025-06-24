@@ -15,6 +15,8 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.awsmcp.model.AwsServiceMetadata;
 import software.amazon.smithy.model.loader.ModelAssembler;
+import software.amazon.smithy.model.node.Node;
+import software.amazon.smithy.model.shapes.ModelSerializer;
 
 public class AwsServiceBundlerTest {
 
@@ -83,6 +85,35 @@ public class AwsServiceBundlerTest {
 
         assertThat(bundleModel.getOperationShapes())
                 .filteredOn(o -> writeOperations.contains(o.getId().getName()))
+                .isEmpty();
+    }
+
+    @Test
+    void testOnlyOneServiceRetained() {
+        var combinedModel = new ModelAssembler()
+                .addUnparsedModel("model1.json", getModel("dynamodb-2012-08-10.json"))
+                .addUnparsedModel("model2.json", getModel("accessanalyzer-2019-11-01.json"))
+                .disableValidation()
+                .putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
+                .assemble()
+                .unwrap();
+        var totalShapes = combinedModel.getShapeIds().size();
+        var serializedModel = Node.printJson(ModelSerializer.builder().build().serialize(combinedModel));
+        var bundler = AwsServiceBundler.builder()
+                .serviceName("dynamodb")
+                .resolver(serviceName -> serializedModel)
+                .allowedPrefixes(ApiStandardTerminology.getReadOnlyApiPrefixes())
+                .blockedPrefixes(ApiStandardTerminology.getWriteApiPrefixes())
+                .build();
+        var bundle = bundler.bundle();
+        var bundleModel = new ModelAssembler().addUnparsedModel("model.json", bundle.getModel())
+                .disableValidation()
+                .putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
+                .assemble()
+                .unwrap();
+        assertThat(bundleModel.getServiceShapes()).hasSize(1);
+        assertThat(bundleModel.getShapeIds()).hasSizeLessThan(totalShapes)
+                .filteredOn(i -> i.toString().startsWith("com.amazonaws.accessanalyzer"))
                 .isEmpty();
     }
 

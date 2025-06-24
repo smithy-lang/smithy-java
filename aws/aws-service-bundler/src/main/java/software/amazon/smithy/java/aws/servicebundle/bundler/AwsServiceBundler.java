@@ -169,7 +169,7 @@ public final class AwsServiceBundler extends ModelBundler {
                     .configType("aws")
                     .serviceName(service.getId().toString())
                     .model(serializeModel(cleanAndFilterModel(model,
-                            service,
+                            service.getId(),
                             exposedOperations,
                             blockedOperations,
                             allowedPrefixes,

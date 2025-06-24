@@ -18,8 +18,10 @@ import software.amazon.smithy.model.shapes.AbstractShapeBuilder;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.traits.DocumentationTrait;
+import software.amazon.smithy.model.transform.ModelTransformer;
 import software.amazon.smithy.modelbundle.api.model.SmithyBundle;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.SmithyUnstableApi;
@@ -46,14 +48,16 @@ public abstract class ModelBundler {
 
     protected static Model cleanAndFilterModel(
             Model model,
-            ServiceShape allowedService,
+            ShapeId allowedServiceId,
             Set<String> allowedOperations,
             Set<String> blockedOperations,
             Set<String> allowedWords,
             Set<String> blockedWords
     ) {
         var builder = model.toBuilder();
+        var allowedService = model.expectShape(allowedServiceId, ServiceShape.class);
         var serviceBuilder = allowedService.toBuilder();
+        var operations = allowedService.getOperations();
         for (var serviceShape : model.getServiceShapes()) {
             if (!serviceShape.toShapeId().equals(allowedService.toShapeId())) {
                 builder.removeShape(serviceShape.toShapeId());
@@ -71,8 +75,10 @@ public abstract class ModelBundler {
                 LOG.debug("Blocked API {}", name);
             }
         }
-        cleanDocumentation(serviceBuilder.build(), builder);
-        return builder.build();
+        var service = serviceBuilder.build();
+        builder.addShape(service);
+        cleanDocumentation(service, builder);
+        return ModelTransformer.create().removeUnreferencedShapes(builder.build());
     }
 
     static boolean isAllowed(
