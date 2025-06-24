@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.AbstractShapeBuilder;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
@@ -54,16 +55,17 @@ public abstract class ModelBundler {
             Set<String> allowedWords,
             Set<String> blockedWords
     ) {
-        var builder = model.toBuilder();
         var allowedService = model.expectShape(allowedServiceId, ServiceShape.class);
         var serviceBuilder = allowedService.toBuilder();
-        var operations = allowedService.getOperations();
+
+        var builder = model.toBuilder();
         for (var serviceShape : model.getServiceShapes()) {
             if (!serviceShape.toShapeId().equals(allowedService.toShapeId())) {
                 builder.removeShape(serviceShape.toShapeId());
             }
         }
-        for (var op : model.getOperationShapes()) {
+        //This needs to be the TopDownIndex because we need to also consider the resource operations.
+        for (var op : TopDownIndex.of(model).getContainedOperations(allowedService.toShapeId())) {
             var name = op.getId().getName();
             var allowed = isAllowed(name, allowedOperations, blockedOperations, allowedWords, blockedWords);
             if (allowed) {
@@ -78,7 +80,8 @@ public abstract class ModelBundler {
         var service = serviceBuilder.build();
         builder.addShape(service);
         cleanDocumentation(service, builder);
-        return ModelTransformer.create().removeUnreferencedShapes(builder.build());
+        var transformer = ModelTransformer.create();
+        return transformer.removeUnreferencedShapes(transformer.removeUnreferencedTraitDefinitions(builder.build()));
     }
 
     static boolean isAllowed(

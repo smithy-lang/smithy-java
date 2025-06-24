@@ -8,6 +8,7 @@ package software.amazon.smithy.java.aws.servicebundle.bundler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.InputStreamReader;
 import java.util.Objects;
@@ -17,6 +18,8 @@ import software.amazon.smithy.awsmcp.model.AwsServiceMetadata;
 import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.ModelSerializer;
+import software.amazon.smithy.model.shapes.OperationShape;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 public class AwsServiceBundlerTest {
 
@@ -36,13 +39,36 @@ public class AwsServiceBundlerTest {
     }
 
     @Test
+    public void resourceApis() {
+        var bundler = AwsServiceBundler.builder()
+                .serviceName("access-analyzer")
+                .resolver(serviceName -> getModel("accessanalyzer-2019-11-01.json"))
+                .readOnlyOperations()
+                .build();
+        var bundle = bundler.bundle();
+        var bundleModel = new ModelAssembler().addUnparsedModel("model.json", bundle.getModel())
+                .disableValidation()
+                .putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
+                .assemble()
+                .unwrap();
+        //read resource APIS "GET", "LIST" should be present
+        assertNotNull(bundleModel.expectShape(ShapeId.from("com.amazonaws.accessanalyzer#GetAnalyzer"),
+                OperationShape.class));
+        assertNotNull(bundleModel.expectShape(ShapeId.from("com.amazonaws.accessanalyzer#ListAnalyzers"),
+                OperationShape.class));
+
+        //Write APIs should not be present.
+        assertThat(bundleModel.getShape(ShapeId.from("com.amazonaws.accessanalyzer#DeleteAnalyzer"))).isEmpty();
+    }
+
+    @Test
     public void testFilteringApis() {
         var filteredOperations = Set.of("GetFindingsStatistics", "GetFindingRecommendation");
         var bundler = AwsServiceBundler.builder()
                 .serviceName("access-analyzer")
                 .resolver(serviceName -> getModel("accessanalyzer-2019-11-01.json"))
                 .exposedOperations(filteredOperations)
-                .build();;
+                .build();
         var bundle = bundler.bundle();
         var bundleModel = new ModelAssembler().addUnparsedModel("model.json", bundle.getModel())
                 .disableValidation()
@@ -106,14 +132,26 @@ public class AwsServiceBundlerTest {
                 .blockedPrefixes(ApiStandardTerminology.getWriteApiPrefixes())
                 .build();
         var bundle = bundler.bundle();
-        var bundleModel = new ModelAssembler().addUnparsedModel("model.json", bundle.getModel())
+        var bundleModel = new ModelAssembler().addUnparsedModel("bundle.json", bundle.getModel())
                 .disableValidation()
                 .putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
                 .assemble()
                 .unwrap();
         assertThat(bundleModel.getServiceShapes()).hasSize(1);
+
+        var serviceShape = bundleModel.getServiceShapes().iterator().next();
+
+        assertThat(serviceShape.getId().toString()).isEqualTo(bundle.getServiceName());
+        //We do not know which service gets picked because AwsServiceBundle chooses the first one it finds.
+        String excludedNamespace;
+        if (bundle.getServiceName().equals("com.amazonaws.accessanalyzer#AccessAnalyzer")) {
+            excludedNamespace = "com.amazonaws.dynamodb";
+        } else {
+            excludedNamespace = "com.amazonaws.accessanalyzer";
+        }
+
         assertThat(bundleModel.getShapeIds()).hasSizeLessThan(totalShapes)
-                .filteredOn(i -> i.toString().startsWith("com.amazonaws.accessanalyzer"))
+                .filteredOn(i -> i.toString().startsWith(excludedNamespace))
                 .isEmpty();
     }
 
