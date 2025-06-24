@@ -26,7 +26,7 @@ The [codegen](./codegen) directory contains the source code for generating clien
 If this is your first time using Smithy, follow the [Smithy Quickstart guide](https://smithy.io/2.0/quickstart.html) 
 to learn the basics and create a simple Smithy model.
 
-For a guided introduction to this project, see the [Smithy Java Quickstart guide](https://smithy.io/2.0/java/quickstart.html).
+For a guided introduction to this project, see the [Smithy Java Quickstart guide](https://smithy.io/2.0/languages/java/quickstart.html).
 
 The [examples](./examples) are standalone projects that showcase the usage of Smithy Java for generating clients 
 and building services. These examples can be used as a template for a new project using the 
