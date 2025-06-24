@@ -53,17 +53,9 @@ public final class ModelBundles {
         }
         var b = model.toBuilder();
 
-        var serviceShapes = model.getServiceShapes();
-
-        if (serviceShapes.size() != 1) {
-            throw new IllegalStateException("Expected exactly one service shape but got "
-                    + serviceShapes.stream().map(ServiceShape::getId).toList());
-        }
-
-        var service = serviceShapes.iterator().next();
+        var serviceShape = model.expectShape(ShapeId.from(bundle.getServiceName()), ServiceShape.class);
 
         // mix in the generic arg members
-        var serviceShape = service.asServiceShape().get();
         var serviceBuilder = serviceShape.toBuilder();
         for (var opId : serviceShape.getAllOperations()) {
             var op = model.expectShape(opId, OperationShape.class);
