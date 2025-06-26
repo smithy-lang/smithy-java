@@ -19,7 +19,7 @@ public final class PluginProviders {
     public BundlePlugin getPlugin(String identifier, Document input) {
         var provider = providers.get(identifier);
         if (provider == null) {
-            throw new NullPointerException("no auth provider named " + identifier);
+            throw new NullPointerException("No plugin provider named " + identifier);
         }
 
         return provider.createBundlePlugin(input);

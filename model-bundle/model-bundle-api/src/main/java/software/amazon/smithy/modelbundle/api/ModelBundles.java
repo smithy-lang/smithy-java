@@ -36,8 +36,10 @@ public final class ModelBundles {
     }
 
     private static Model getModel(SmithyBundle bundle) {
+        // TODO: model the type in the returned bundle
+        var suffix = bundle.getModel().startsWith("$version") ? "smithy" : "json";
         var modelAssemble = new ModelAssembler().putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
-                .addUnparsedModel("bundle.json", bundle.getModel())
+                .addUnparsedModel("bundle." + suffix, bundle.getModel())
                 .disableValidation();
         var additionalInput = bundle.getAdditionalInput();
         Model model;
