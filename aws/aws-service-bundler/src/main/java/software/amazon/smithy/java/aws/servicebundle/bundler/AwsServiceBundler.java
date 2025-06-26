@@ -176,7 +176,7 @@ public final class AwsServiceBundler extends ModelBundler {
                             blockedPrefixes)))
                     .additionalInput(AdditionalInput.builder()
                             .identifier(PreRequest.$ID.toString())
-                            .model(loadModel("/META-INF/smithy/bundle.smithy"))
+                            .model(loadModel("/META-INF/smithy/awsmcp.smithy"))
                             .build())
                     .build();
         } catch (Exception e) {
