@@ -12,7 +12,6 @@ dependencies {
     api(project(":http:http-api"))
     api(project(":core"))
     api(project(":context"))
-    api(project(":framework-errors"))
     implementation(libs.smithy.model)
     implementation(project(":io"))
     implementation(project(":logging"))
