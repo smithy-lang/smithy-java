@@ -153,9 +153,9 @@ public final class ResourceGenerator
             writer.putContext("props", properties);
             writer.write(
                     """
-                            private static final ${map:T}<${string:T}, ${sdkSchema:T}> $$IDENTIFIERS = ${map:T}.of(${#ids}${key:S}, ${value:L}${^key.last},
+                            private static final ${map:T}<${string:T}, ${sdkSchema:T}> $$IDENTIFIERS = ${map:T}.ofEntries(${#ids}Map.entry(${key:S}, ${value:L})${^key.last},
                                 ${/key.last}${/ids});
-                            private static final ${map:T}<${string:T}, ${sdkSchema:T}> $$PROPERTIES = ${map:T}.of(${#props}${key:S}, ${value:L}${^key.last},
+                            private static final ${map:T}<${string:T}, ${sdkSchema:T}> $$PROPERTIES = ${map:T}.ofEntries(${#props}Map.entry(${key:S}, ${value:L})${^key.last},
                                 ${/key.last}${/props});
                             """);
             writer.popState();
