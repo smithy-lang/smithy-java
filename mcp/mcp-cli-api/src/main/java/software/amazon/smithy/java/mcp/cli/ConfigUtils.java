@@ -144,8 +144,8 @@ public class ConfigUtils {
         return config;
     }
 
-    public static Path getBundleFileLocation(String bundleName) {
-        return BUNDLE_DIR.resolve(bundleName + ".json");
+    public static Path getBundleFileLocation(String id) {
+        return BUNDLE_DIR.resolve(id + ".json");
     }
 
     /**
@@ -188,39 +188,39 @@ public class ConfigUtils {
         updateConfig(newConfig);
     }
 
-    public static Bundle getMcpBundle(String bundleName) {
+    public static Bundle getMcpBundle(String id) {
         try {
             return Bundle.builder()
-                    .deserialize(JSON_CODEC.createDeserializer(Files.readAllBytes(getBundleFileLocation(bundleName))))
+                    .deserialize(JSON_CODEC.createDeserializer(Files.readAllBytes(getBundleFileLocation(id))))
                     .build();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static void removeMcpBundle(Config currentConfig, String bundleName) throws IOException {
+    public static void removeMcpBundle(Config currentConfig, String id) throws IOException {
         var builder = currentConfig.toBuilder();
         var newBundles = new LinkedHashMap<>(currentConfig.getToolBundles());
-        newBundles.remove(bundleName);
+        newBundles.remove(id);
         builder.toolBundles(newBundles);
         var newConfig = builder.build();
         updateConfig(newConfig);
-        var bundleFile = getBundleFileLocation(bundleName);
+        var bundleFile = getBundleFileLocation(id);
         Files.deleteIfExists(bundleFile);
         // Remove wrapper script if it exists
-        removeWrapperScript(bundleName);
+        removeWrapperScript(id);
     }
 
-    public static void addToClientConfigs(Config config, String name, Set<String> clients, McpServerConfig serverConfig)
+    public static void addToClientConfigs(Config config, String id, Set<String> clients, McpServerConfig serverConfig)
             throws IOException {
-        updateClientConfigs(config, name, clients, serverConfig);
+        updateClientConfigs(config, id, clients, serverConfig);
     }
 
-    public static void removeFromClientConfigs(Config config, String name, Set<String> clients) throws IOException {
-        updateClientConfigs(config, name, clients, null);
+    public static void removeFromClientConfigs(Config config, String id, Set<String> clients) throws IOException {
+        updateClientConfigs(config, id, clients, null);
     }
 
-    private static void updateClientConfigs(Config config, String name, Set<String> clients, McpServerConfig newConfig)
+    private static void updateClientConfigs(Config config, String id, Set<String> clients, McpServerConfig newConfig)
             throws IOException {
         var clientConfigsToUpdate = getClientConfigsToUpdate(config, clients);
         boolean isDelete = newConfig == null;
@@ -228,7 +228,7 @@ public class ConfigUtils {
             var filePath = Path.of(clientConfigs.getFilePath());
             if (Files.notExists(filePath)) {
                 System.out.printf("Skipping updating Mcp config file for %s as the file path '%s' does not exist.",
-                        name,
+                        id,
                         filePath);
                 continue;
             }
@@ -243,11 +243,11 @@ public class ConfigUtils {
 
             var map = new LinkedHashMap<>(currentMcpConfig.getMcpServers());
             if (isDelete) {
-                if (map.remove(name) == null) {
+                if (map.remove(id) == null) {
                     continue;
                 }
             } else {
-                map.put(name, Document.of(newConfig));
+                map.put(id, Document.of(newConfig));
             }
             var newMcpConfig = McpServersClientConfig.builder().mcpServers(map).build();
             Files.write(filePath,
@@ -283,10 +283,10 @@ public class ConfigUtils {
         return clientConfigsToUpdate;
     }
 
-    private static void writeMcpBundle(String toolBundleName, Bundle bundle)
+    private static void writeMcpBundle(String id, Bundle bundle)
             throws IOException {
         var serializedBundle = toJson(bundle);
-        Files.write(getBundleFileLocation(toolBundleName),
+        Files.write(getBundleFileLocation(id),
                 serializedBundle,
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.CREATE);
@@ -297,16 +297,16 @@ public class ConfigUtils {
         return addMcpBundle(config, toolBundleName, bundle, false);
     }
 
-    public static McpBundleConfig addMcpBundle(Config config, String toolBundleName, Bundle bundle, boolean isLocal)
+    public static McpBundleConfig addMcpBundle(Config config, String id, Bundle bundle, boolean isLocal)
             throws IOException {
         var location = Location.builder()
-                .fileLocation(ConfigUtils.getBundleFileLocation(toolBundleName).toString())
+                .fileLocation(ConfigUtils.getBundleFileLocation(id).toString())
                 .build();
         var builder = McpBundleConfig.builder();
         switch (bundle.getValue()) {
             case SmithyMcpBundle smithyBundle -> builder.smithyModeled(SmithyModeledBundleConfig.builder()
-                    .name(toolBundleName)
-                    .description(smithyBundle.getMetadata().getDescription())
+                    .name(id)
+                    .metadata(smithyBundle.getMetadata())
                     .bundleLocation(location)
                     .local(isLocal)
                     .build());
@@ -314,18 +314,18 @@ public class ConfigUtils {
                 install(genericBundle.getInstall());
                 builder.genericConfig(
                         GenericToolBundleConfig.builder()
-                                .name(toolBundleName)
+                                .name(id)
                                 .local(isLocal)
                                 .bundleLocation(location)
-                                .description(genericBundle.getMetadata().getDescription())
+                                .metadata(genericBundle.getMetadata())
                                 .build());
             }
             default -> throw new IllegalStateException("Unexpected bundle type: " + bundle.type());
         }
 
         var mcpBundleConfig = builder.build();
-        writeMcpBundle(toolBundleName, bundle);
-        addMcpBundleConfig(config, toolBundleName, mcpBundleConfig);
+        writeMcpBundle(id, bundle);
+        addMcpBundleConfig(config, id, mcpBundleConfig);
         return mcpBundleConfig;
     }
 
@@ -384,9 +384,9 @@ public class ConfigUtils {
         }
     }
 
-    public static void createWrapperScript(String bundleName) throws IOException {
-        Path scriptPath = SHIMS_DIR.resolve(bundleName);
-        String scriptContent = createScriptContent(bundleName);
+    public static void createWrapperScript(String id) throws IOException {
+        Path scriptPath = SHIMS_DIR.resolve(id);
+        String scriptContent = createScriptContent(id);
 
         Files.writeString(scriptPath, scriptContent, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         scriptPath.toFile().setExecutable(true);
@@ -400,8 +400,8 @@ public class ConfigUtils {
         }
     }
 
-    public static void removeWrapperScript(String bundleName) throws IOException {
-        Path scriptPath = SHIMS_DIR.resolve(bundleName);
+    public static void removeWrapperScript(String id) throws IOException {
+        Path scriptPath = SHIMS_DIR.resolve(id);
         Files.deleteIfExists(scriptPath);
     }
 
@@ -502,14 +502,14 @@ public class ConfigUtils {
     }
 
     public static void createWrapperAndUpdateClientConfigs(
-            String name,
+            String id,
             Bundle bundle,
             Config config,
             ClientsInput input
     ) throws IOException {
         boolean shouldCreateWrapper = true;
         List<String> args = List.of();
-        String command = name;
+        String command = id;
         if (bundle.getValue() instanceof GenericBundle genericBundle && genericBundle.isExecuteDirectly()) {
             command = genericBundle.getRun().getExecutable();
             args = genericBundle.getRun().getArgs();
@@ -517,7 +517,7 @@ public class ConfigUtils {
         }
 
         if (shouldCreateWrapper) {
-            createWrapperScript(name);
+            createWrapperScript(id);
             ensureMcpServersDirInPath();
         }
 
@@ -537,11 +537,11 @@ public class ConfigUtils {
         }
 
         if (print) {
-            System.out.println("You can add the following to your MCP Servers config to use " + name);
+            System.out.println("You can add the following to your MCP Servers config to use " + id);
             var serializedConfig = ByteBufferUtils.getBytes(JSON_CODEC.serialize(newClientConfig));
             System.out.println(new String(serializedConfig, StandardCharsets.UTF_8));
         } else {
-            addToClientConfigs(config, name, clientConfigs, newClientConfig);
+            addToClientConfigs(config, id, clientConfigs, newClientConfig);
         }
     }
 }

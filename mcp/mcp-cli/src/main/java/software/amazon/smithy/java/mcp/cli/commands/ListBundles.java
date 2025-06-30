@@ -30,31 +30,33 @@ public class ListBundles extends SmithyMcpCommand {
     @Override
     protected void execute(ExecutionContext context) {
         var registry = context.registry();
-        var installedBundles = context.config().getToolBundles().keySet();
+        var installedBundles = context.config().getToolBundles();
         var commandLine = spec.commandLine();
+
+        System.out.println(commandLine
+                .getColorScheme()
+                .string("@|bold,underline Registry MCP Servers:|@"));
+        System.out.println();
 
         // Display registry bundles
         for (Registry.RegistryEntry entry : registry.listMcpBundles()) {
             var bundle = entry.getBundleMetadata();
-            boolean isInstalled = installedBundles.contains(bundle.getName());
-            System.out.println(commandLine
-                    .getColorScheme()
-                    .string("@|bold " + bundle.getName() + (isInstalled ? " [installed]" : "") + "|@: "
-                            + entry.getTitle()));
-            var description = bundle.getDescription();
-            if (description == null) {
-                description = "MCP server for " + bundle.getName();
+            var installedBundle = installedBundles.get(bundle.getId());
+            //If there is a local bundle with the same name, prefer that.
+            boolean isInstalled = installedBundle != null;
+            boolean hasLocalOverride = isInstalled && switch (installedBundle.getValue()) {
+                case SmithyModeledBundleConfig config -> config.isLocal();
+                case GenericToolBundleConfig config -> config.isLocal();
+                default -> false;
+            };
+            String tag = null;
+            if (hasLocalOverride) {
+                tag = "locally-overriden";
+            } else if (isInstalled) {
+                tag = "installed";
             }
-            System.out.print("\tDescription: ");
-            System.out.println(description);
-            System.out.println();
+            printBundleInfo(commandLine, bundle.getId(), bundle.getName(), bundle.getDescription(), tag);
         }
-
-        // Display locally installed bundles that are not in the registry
-        var registryBundleNames = registry.listMcpBundles()
-                .stream()
-                .map(entry -> entry.getBundleMetadata().getName())
-                .collect(java.util.stream.Collectors.toSet());
 
         var localBundles = context.config()
                 .getToolBundles()
@@ -65,29 +67,27 @@ public class ListBundles extends SmithyMcpCommand {
                     case GenericToolBundleConfig config -> config.isLocal();
                     default -> false;
                 })
-                .filter(entry -> !registryBundleNames.contains(entry.getKey()))
                 .toList();
 
         if (!localBundles.isEmpty()) {
             System.out.println(commandLine
                     .getColorScheme()
-                    .string("@|bold,underline Local Bundles:|@"));
+                    .string("@|bold,underline Local MCP Servers:|@"));
             System.out.println();
 
             for (var localBundle : localBundles) {
-                var bundleName = localBundle.getKey();
-                var description = switch (localBundle.getValue().getValue()) {
-                    case SmithyModeledBundleConfig config -> config.getDescription();
-                    case GenericToolBundleConfig config -> config.getDescription();
-                    default -> "";
+                var bundleId = localBundle.getKey();
+                var bundleMetadata = switch (localBundle.getValue().getValue()) {
+                    case SmithyModeledBundleConfig config -> config.getMetadata();
+                    case GenericToolBundleConfig config -> config.getMetadata();
+                    default -> throw new IllegalStateException();
                 };
 
-                System.out.println(commandLine
-                        .getColorScheme()
-                        .string("@|bold " + bundleName + " [local]|@"));
-                System.out.print("\tDescription: ");
-                System.out.println(description);
-                System.out.println();
+                printBundleInfo(commandLine,
+                        bundleId,
+                        bundleMetadata.getName(),
+                        bundleMetadata.getDescription(),
+                        "local");
             }
         }
     }
@@ -95,5 +95,25 @@ public class ListBundles extends SmithyMcpCommand {
     @Override
     protected String registryToUse(Config config) {
         return registryName;
+    }
+
+    private void printBundleInfo(
+            CommandLine commandLine,
+            String bundleId,
+            String bundleName,
+            String description,
+            String tag
+    ) {
+        tag = tag == null ? "" : " [" + tag + "]";
+        System.out.println(commandLine
+                .getColorScheme()
+                .string("@|bold " + bundleId + tag + "|@: " + bundleName));
+
+        if (description == null) {
+            description = "MCP server for " + bundleName;
+        }
+        System.out.print("\tDescription: ");
+        System.out.println(description);
+        System.out.println();
     }
 }

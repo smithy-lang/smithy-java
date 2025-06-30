@@ -18,11 +18,15 @@ public abstract class AbstractCreateBundle<T extends AbstractCreateBundle.Create
                 defaultValue = "false")
         boolean overwrite;
 
-        @Option(names = {"-n", "--name"}, description = "Name to assign to the MCP server. Eg: (aws-dynamodb-mcp)",
+        @Option(names = {"--id"},
+                description = "Id to assign to the MCP server. This id needs to end in mcp. Eg: (aws-dynamodb-mcp)",
                 required = true)
+        public String id;
+
+        @Option(names = {"--name"}, description = "Name for this MCP server. Eg: (Pipelines MCP Server)")
         public String name;
 
-        @Option(names = {"-d", "--description"}, description = "Description of this mcp server", required = true)
+        @Option(names = {"-d", "--description"}, description = "Description of this mcp server.", required = true)
         public String description;
 
         @ArgGroup
@@ -42,15 +46,22 @@ public abstract class AbstractCreateBundle<T extends AbstractCreateBundle.Create
     protected void execute(ExecutionContext context) throws Exception {
         var input = getInput();
         var config = context.config();
-        if (!input.overwrite && config.getToolBundles().containsKey(input.name)) {
-            throw new IllegalArgumentException("Tool bundle " + input.name
+        if (!input.overwrite && config.getToolBundles().containsKey(input.id)) {
+            throw new IllegalArgumentException("Tool bundle " + input.id
                     + " already exists. Either choose a new name or pass --overwrite to overwrite the existing tool bundle");
         }
 
+        if (input.name == null) {
+            input.name = input.id;
+        }
+        if (input.description == null) {
+            input.description = "[" + input.id + "]" + " MCP Server";
+        }
+
         var bundle = getNewBundle(input);
-        ConfigUtils.addMcpBundle(config, input.name, bundle, true);
-        ConfigUtils.createWrapperAndUpdateClientConfigs(input.name, bundle, config, input.clientsInput);
-        System.out.println("Successfully created bundle " + input.name);
+        ConfigUtils.addMcpBundle(config, input.id, bundle, true);
+        ConfigUtils.createWrapperAndUpdateClientConfigs(input.id, bundle, config, input.clientsInput);
+        System.out.println("Successfully created bundle " + input.id);
     }
 
     protected abstract T getInput();

@@ -55,6 +55,7 @@ public class CreateAwsServiceBundle extends AbstractCreateBundle<CreateAwsServic
                 .smithyBundle(SmithyMcpBundle.builder()
                         .bundle(bundleBuilder.build().bundle())
                         .metadata(BundleMetadata.builder()
+                                .id(input.id)
                                 .name(input.name)
                                 .description(input.description)
                                 .build())

@@ -15,5 +15,5 @@ public final class ClientsInput {
 
     @Option(names = "--print-client-config",
             description = "If specified will not edit the client configs and only print to console.")
-    public Boolean print;
+    public boolean print = false;
 }

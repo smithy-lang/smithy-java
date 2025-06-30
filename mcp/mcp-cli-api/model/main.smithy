@@ -2,6 +2,8 @@ $version: "2"
 
 namespace smithy.mcp.cli
 
+use software.amazon.smithy.mcp.bundle.api#BundleMetadata
+
 structure Config {
     toolBundles: McpBundleConfigs
 
@@ -36,8 +38,8 @@ structure CommonToolConfig {
 
     @default(false)
     local: PrimitiveBoolean
-
-    description: String
+    
+    metadata: BundleMetadata
 }
 
 map Registries {

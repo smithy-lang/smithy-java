@@ -19,6 +19,9 @@ structure CommonBundleConfig {
 }
 
 structure BundleMetadata {
+    // Do not mark required for backward compatibility.
+    id: String
+
     @required
     name: String
 
