@@ -26,7 +26,7 @@ public abstract class AbstractCreateBundle<T extends AbstractCreateBundle.Create
         @Option(names = {"--name"}, description = "Name for this MCP server. Eg: (Pipelines MCP Server)")
         public String name;
 
-        @Option(names = {"-d", "--description"}, description = "Description of this mcp server.", required = true)
+        @Option(names = {"-d", "--description"}, description = "Description of this mcp server.")
         public String description;
 
         @ArgGroup
@@ -61,7 +61,7 @@ public abstract class AbstractCreateBundle<T extends AbstractCreateBundle.Create
         var bundle = getNewBundle(input);
         ConfigUtils.addMcpBundle(config, input.id, bundle, true);
         ConfigUtils.createWrapperAndUpdateClientConfigs(input.id, bundle, config, input.clientsInput);
-        System.out.println("Successfully created bundle " + input.id);
+        System.out.println("Successfully created mcp server " + input.id);
     }
 
     protected abstract T getInput();

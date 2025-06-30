@@ -35,7 +35,7 @@ public class AddAwsServiceBundle extends AbstractAddBundle {
     protected Set<String> blockedApis;
 
     @Option(names = "--read-only-apis",
-            description = "Include read only APIs in the MCP server")
+            description = "Include only read-only APIs in the MCP server")
     protected Boolean readOnlyApis;
 
     @Override

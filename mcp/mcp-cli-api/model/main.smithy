@@ -38,7 +38,7 @@ structure CommonToolConfig {
 
     @default(false)
     local: PrimitiveBoolean
-    
+
     metadata: BundleMetadata
 }
 

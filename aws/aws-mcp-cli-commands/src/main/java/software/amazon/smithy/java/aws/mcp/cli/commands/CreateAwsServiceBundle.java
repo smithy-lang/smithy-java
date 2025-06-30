@@ -73,7 +73,7 @@ public class CreateAwsServiceBundle extends AbstractCreateBundle<CreateAwsServic
     }
 
     public static class CreateAwsServiceBundleInput extends CreateBundleInput {
-        @Parameters(description = "Name of aws service to create the bundle for.")
+        @Parameters(description = "Name of AWS service to create the bundle for")
         String awsServiceName;
 
         @Option(names = {"-a", "--allowed-apis"}, description = "List of APIs to expose in the MCP server")
@@ -83,7 +83,7 @@ public class CreateAwsServiceBundle extends AbstractCreateBundle<CreateAwsServic
         protected Set<String> blockedApis;
 
         @Option(names = "--read-only-apis",
-                description = "Include read only APIs in the MCP server")
+                description = "Include only read-only APIs in the MCP server")
         protected Boolean readOnlyApis;
     }
 }
