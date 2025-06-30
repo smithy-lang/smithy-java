@@ -452,15 +452,16 @@ public class ConfigUtils {
 
                 if (!alreadyPresent) {
                     // Add the export statement
-                    lines.add("");
-                    lines.add(comment);
-                    lines.add(pathExport);
+                    var newLines = new ArrayList<String>();
+                    newLines.add("");
+                    newLines.add(comment);
+                    newLines.add(pathExport);
 
                     Files.write(configPath,
-                            lines,
+                            newLines,
                             StandardCharsets.UTF_8,
                             StandardOpenOption.WRITE,
-                            StandardOpenOption.TRUNCATE_EXISTING);
+                            StandardOpenOption.APPEND);
 
                     System.out.println("Added mcp-servers directory to PATH in " + configFile);
                     System.out.println(
