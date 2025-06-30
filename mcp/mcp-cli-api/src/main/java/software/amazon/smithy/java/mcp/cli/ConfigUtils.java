@@ -88,7 +88,10 @@ public class ConfigUtils {
     }
 
     public static Path resolveFromHomeDir(String... paths) {
-        String userHome = System.getProperty("user.home");
+        String userHome = System.getenv("TEST_USER_HOME");
+        if (userHome == null) {
+            userHome = System.getProperty("user.home");
+        }
         return Paths.get(userHome, paths);
     }
 
