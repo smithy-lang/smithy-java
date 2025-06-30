@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.ServiceLoader;
 import picocli.CommandLine;
 import software.amazon.smithy.java.mcp.cli.commands.Configure;
+import software.amazon.smithy.java.mcp.cli.commands.CreateBundle;
+import software.amazon.smithy.java.mcp.cli.commands.CreateGenericBundle;
 import software.amazon.smithy.java.mcp.cli.commands.InstallBundle;
 import software.amazon.smithy.java.mcp.cli.commands.ListBundles;
 import software.amazon.smithy.java.mcp.cli.commands.StartServer;
@@ -31,12 +33,17 @@ public final class McpCli {
         addSystemProperties();
         var configureCommand = new CommandLine(new Configure());
         discoverConfigurationCommands().forEach(configureCommand::addSubcommand);
+        var createCommand = new CommandLine(new CreateBundle())
+                .addSubcommand(new CreateGenericBundle());
+        discoverCreateBundleCommands().forEach(createCommand::addSubcommand);
         var commandLine = new CommandLine(new McpRegistry())
                 .addSubcommand(new StartServer())
                 .addSubcommand(new ListBundles())
                 .addSubcommand(new InstallBundle())
                 .addSubcommand(new UninstallBundle())
-                .addSubcommand(configureCommand);
+                .addSubcommand(configureCommand)
+                .addSubcommand(createCommand);
+        discoverSmithyMcpCommands().forEach(commandLine::addSubcommand);
         System.exit(commandLine.execute(args));
     }
 
@@ -51,6 +58,30 @@ public final class McpCli {
      */
     private static List<ConfigurationCommand> discoverConfigurationCommands() {
         return ServiceLoader.load(ConfigurationCommand.class)
+                .stream()
+                .map(ServiceLoader.Provider::get)
+                .toList();
+    }
+
+    /**
+     * Discovers and loads all AbstractCreateBundle implementations using the Java ServiceLoader.
+     *
+     * @return A list of discovered configuration commands
+     */
+    private static List<AbstractCreateBundle> discoverCreateBundleCommands() {
+        return ServiceLoader.load(AbstractCreateBundle.class)
+                .stream()
+                .map(ServiceLoader.Provider::get)
+                .toList();
+    }
+
+    /**
+     * Discovers and loads all AbstractCreateBundle implementations using the Java ServiceLoader.
+     *
+     * @return A list of discovered configuration commands
+     */
+    private static List<SmithyMcpCommand> discoverSmithyMcpCommands() {
+        return ServiceLoader.load(SmithyMcpCommand.class)
                 .stream()
                 .map(ServiceLoader.Provider::get)
                 .toList();

@@ -51,6 +51,10 @@ tasks.named("compileJava") {
     dependsOn("smithyBuild")
 }
 
+tasks.withType<JavaCompile> {
+    options.release.set(21)
+}
+
 // Needed because sources-jar needs to run after smithy-build is done
 tasks.sourcesJar {
     mustRunAfter(tasks.compileJava)

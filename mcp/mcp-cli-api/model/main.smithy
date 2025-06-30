@@ -33,6 +33,11 @@ structure CommonToolConfig {
 
     @required
     bundleLocation: Location
+
+    @default(false)
+    local: PrimitiveBoolean
+
+    description: String
 }
 
 map Registries {

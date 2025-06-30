@@ -24,3 +24,7 @@ dependencies {
 tasks.compileJava {
     options.compilerArgs.add("-Aproject=${project.name}")
 }
+
+tasks.withType<JavaCompile> {
+    options.release.set(21)
+}

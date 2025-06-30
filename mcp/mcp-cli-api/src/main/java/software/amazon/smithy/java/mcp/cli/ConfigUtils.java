@@ -41,6 +41,7 @@ import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
 import software.amazon.smithy.mcp.bundle.api.model.Bundle;
 import software.amazon.smithy.mcp.bundle.api.model.ExecSpec;
 import software.amazon.smithy.mcp.bundle.api.model.GenericBundle;
+import software.amazon.smithy.mcp.bundle.api.model.SmithyMcpBundle;
 
 /**
  * Utility class for managing Smithy MCP configuration files.
@@ -282,38 +283,48 @@ public class ConfigUtils {
         return clientConfigsToUpdate;
     }
 
-    private static void addMcpBundle(Config config, String toolBundleName, CliBundle mcpBundleConfig)
+    private static void writeMcpBundle(String toolBundleName, Bundle bundle)
             throws IOException {
-        var serializedBundle = toJson(mcpBundleConfig.mcpBundle());
+        var serializedBundle = toJson(bundle);
         Files.write(getBundleFileLocation(toolBundleName),
                 serializedBundle,
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.CREATE);
-        addMcpBundleConfig(config, toolBundleName, mcpBundleConfig.mcpBundleConfig());
     }
 
     public static McpBundleConfig addMcpBundle(Config config, String toolBundleName, Bundle bundle)
+            throws IOException {
+        return addMcpBundle(config, toolBundleName, bundle, false);
+    }
+
+    public static McpBundleConfig addMcpBundle(Config config, String toolBundleName, Bundle bundle, boolean isLocal)
             throws IOException {
         var location = Location.builder()
                 .fileLocation(ConfigUtils.getBundleFileLocation(toolBundleName).toString())
                 .build();
         var builder = McpBundleConfig.builder();
-        switch (bundle.type()) {
-            case smithyBundle -> builder.smithyModeled(SmithyModeledBundleConfig.builder()
+        switch (bundle.getValue()) {
+            case SmithyMcpBundle smithyBundle -> builder.smithyModeled(SmithyModeledBundleConfig.builder()
                     .name(toolBundleName)
+                    .description(smithyBundle.getMetadata().getDescription())
                     .bundleLocation(location)
+                    .local(isLocal)
                     .build());
-            case genericBundle -> {
-                GenericBundle genericBundle = bundle.getValue();
+            case GenericBundle genericBundle -> {
                 install(genericBundle.getInstall());
                 builder.genericConfig(
-                        GenericToolBundleConfig.builder().name(toolBundleName).bundleLocation(location).build());
+                        GenericToolBundleConfig.builder()
+                                .name(toolBundleName)
+                                .local(isLocal)
+                                .bundleLocation(location)
+                                .description(genericBundle.getMetadata().getDescription())
+                                .build());
             }
             default -> throw new IllegalStateException("Unexpected bundle type: " + bundle.type());
         }
 
         var mcpBundleConfig = builder.build();
-        addMcpBundle(config, toolBundleName, new CliBundle(bundle, mcpBundleConfig));
+        writeMcpBundle(toolBundleName, bundle);
         addMcpBundleConfig(config, toolBundleName, mcpBundleConfig);
         return mcpBundleConfig;
     }
@@ -488,5 +499,49 @@ public class ConfigUtils {
         System.out.println("  export PATH=\"" + shimsDirStr + ":$PATH\"");
         System.out.println("Add this line to your shell profile (~/.bashrc, ~/.zshrc, etc.) to make it permanent");
         System.out.println();
+    }
+
+    public static void createWrapperAndUpdateClientConfigs(
+            String name,
+            Bundle bundle,
+            Config config,
+            ClientsInput input
+    ) throws IOException {
+        boolean shouldCreateWrapper = true;
+        List<String> args = List.of();
+        String command = name;
+        if (bundle.getValue() instanceof GenericBundle genericBundle && genericBundle.isExecuteDirectly()) {
+            command = genericBundle.getRun().getExecutable();
+            args = genericBundle.getRun().getArgs();
+            shouldCreateWrapper = false;
+        }
+
+        if (shouldCreateWrapper) {
+            createWrapperScript(name);
+            ensureMcpServersDirInPath();
+        }
+
+        var newClientConfig = McpServerConfig.builder()
+                .command(command)
+                .args(args)
+                .build();
+        //By default, print the output if there are no configured client configs.
+        Set<String> clientConfigs;
+        boolean print;
+        if (input == null) {
+            clientConfigs = config.getClientConfigs().stream().map(ClientConfig::getName).collect(Collectors.toSet());
+            print = clientConfigs.isEmpty();
+        } else {
+            print = input.print;
+            clientConfigs = input.clients;
+        }
+
+        if (print) {
+            System.out.println("You can add the following to your MCP Servers config to use " + name);
+            var serializedConfig = ByteBufferUtils.getBytes(JSON_CODEC.serialize(newClientConfig));
+            System.out.println(new String(serializedConfig, StandardCharsets.UTF_8));
+        } else {
+            addToClientConfigs(config, name, clientConfigs, newClientConfig);
+        }
     }
 }

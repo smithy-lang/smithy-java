@@ -7,6 +7,6 @@ package software.amazon.smithy.mcp.bundle.api;
 
 import software.amazon.smithy.mcp.bundle.api.model.Bundle;
 
-public interface ModifiableRegistry extends Registry {
-    void publishBundle(Bundle bundle);
+public interface ModifiableRegistry<T> extends Registry {
+    void publishBundle(Bundle bundle, T args);
 }

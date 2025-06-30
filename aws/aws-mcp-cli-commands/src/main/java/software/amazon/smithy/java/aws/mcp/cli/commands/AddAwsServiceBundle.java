@@ -17,7 +17,7 @@ import software.amazon.smithy.mcp.bundle.api.model.Bundle;
 import software.amazon.smithy.mcp.bundle.api.model.BundleMetadata;
 import software.amazon.smithy.mcp.bundle.api.model.SmithyMcpBundle;
 
-@Command(name = "add-aws-bundle")
+@Command(name = "add-aws-bundle", hidden = true, description = "Deprecated!. Use the create command.")
 public class AddAwsServiceBundle extends AbstractAddBundle {
 
     @Option(names = "--overwrite",
