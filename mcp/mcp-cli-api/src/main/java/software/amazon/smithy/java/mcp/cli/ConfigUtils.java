@@ -20,6 +20,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -62,6 +63,18 @@ public class ConfigUtils {
     private static final Path BUNDLE_DIR = CONFIG_DIR.resolve("bundles");
     private static final Path SHIMS_DIR = CONFIG_DIR.resolve("mcp-servers");
     private static final Path CONFIG_PATH = CONFIG_DIR.resolve("config.json");
+
+    private static final Map<String, String> SHELL_TO_CONFIG = Map.of(
+            "zsh",
+            ".zshrc",
+            "bash",
+            ".bashrc",
+            "sh",
+            ".profile",
+            "dash",
+            ".profile",
+            "ksh",
+            ".profile");
 
     private static final DefaultConfigProvider DEFAULT_CONFIG_PROVIDER;
 
@@ -410,46 +423,54 @@ public class ConfigUtils {
     private static boolean tryAddToShellConfigs(String shimsDirStr) {
         var pathExport = "export PATH=\"" + shimsDirStr + ":$PATH\"";
         var comment = "# Added by smithy-mcp";
-        var configFiles = List.of(".zshrc", ".bashrc", ".profile", ".bash_profile");
 
-        String addedTo = null;
+        // Get the current shell from SHELL environment variable
+        String shellPath = System.getenv("SHELL");
+        String configFile = null;
 
-        for (var configFile : configFiles) {
-            var configPath = resolveFromHomeDir(configFile);
-
-            if (Files.exists(configPath) && Files.isWritable(configPath)) {
-                try {
-                    // Check if already present
-                    var lines = new ArrayList<>(Files.readAllLines(configPath, StandardCharsets.UTF_8));
-                    boolean alreadyPresent = lines.stream()
-                            .anyMatch(line -> line.contains(shimsDirStr)
-                                    && line.contains("PATH")
-                                    && !(line.trim().startsWith("#")));
-
-                    if (!alreadyPresent) {
-                        // Add the export statement
-                        lines.add("");
-                        lines.add(comment);
-                        lines.add(pathExport);
-
-                        Files.write(configPath,
-                                lines,
-                                StandardCharsets.UTF_8,
-                                StandardOpenOption.WRITE,
-                                StandardOpenOption.TRUNCATE_EXISTING);
-
-                        System.out.println("Added mcp-servers directory to PATH in " + configFile);
-                        addedTo = configFile;
-                    }
-                } catch (IOException e) {
-                    // Continue to next config file if this one fails
-                }
-            }
+        if (shellPath != null) {
+            // Extract shell name from path (e.g., "/bin/zsh" -> "zsh")
+            String shellName = shellPath.substring(shellPath.lastIndexOf('/') + 1);
+            configFile = SHELL_TO_CONFIG.get(shellName);
         }
 
-        if (addedTo != null) {
-            System.out.println("Please restart your shell or run 'source ~/" + configFiles + "' to reload your PATH");
-            return true;
+        // If we don't have a mapping for the shell or SHELL is not set, fall back to original behavior
+        if (configFile == null) {
+            return false;
+        }
+
+        var configPath = resolveFromHomeDir(configFile);
+
+        if (Files.exists(configPath) && Files.isWritable(configPath)) {
+            try {
+                // Check if already present
+                var lines = new ArrayList<>(Files.readAllLines(configPath, StandardCharsets.UTF_8));
+                boolean alreadyPresent = lines.stream()
+                        .anyMatch(line -> line.contains(shimsDirStr)
+                                && line.contains("PATH")
+                                && !(line.trim().startsWith("#")));
+
+                if (!alreadyPresent) {
+                    // Add the export statement
+                    lines.add("");
+                    lines.add(comment);
+                    lines.add(pathExport);
+
+                    Files.write(configPath,
+                            lines,
+                            StandardCharsets.UTF_8,
+                            StandardOpenOption.WRITE,
+                            StandardOpenOption.TRUNCATE_EXISTING);
+
+                    System.out.println("Added mcp-servers directory to PATH in " + configFile);
+                    System.out.println(
+                            "Please restart your shell or run 'source ~/" + configFile + "' to reload your PATH");
+                    return true;
+                }
+                return true; // Already present, so consider it successful
+            } catch (IOException e) {
+                // Fall through to return false
+            }
         }
         return false;
     }
