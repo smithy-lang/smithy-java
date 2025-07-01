@@ -47,21 +47,21 @@ public abstract class AbstractCreateBundle<T extends AbstractCreateBundle.Create
         var input = getInput();
         var config = context.config();
         if (!input.overwrite && config.getToolBundles().containsKey(input.id)) {
-            throw new IllegalArgumentException("Tool bundle " + input.id
-                    + " already exists. Either choose a new name or pass --overwrite to overwrite the existing tool bundle");
+            throw new IllegalArgumentException("MCP server " + input.id
+                    + " already exists. Either choose a new id or pass --overwrite to overwrite the existing one.");
         }
 
         if (input.name == null) {
             input.name = input.id;
         }
         if (input.description == null) {
-            input.description = "[" + input.id + "]" + " MCP Server";
+            input.description = "[" + input.id + "]" + " MCP server";
         }
 
         var bundle = getNewBundle(input);
         ConfigUtils.addMcpBundle(config, input.id, bundle, true);
         ConfigUtils.createWrapperAndUpdateClientConfigs(input.id, bundle, config, input.clientsInput);
-        System.out.println("Successfully created mcp server " + input.id);
+        System.out.println("Successfully created MCP server " + input.id);
     }
 
     protected abstract T getInput();
