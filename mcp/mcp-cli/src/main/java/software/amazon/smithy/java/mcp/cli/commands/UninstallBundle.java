@@ -13,11 +13,11 @@ import software.amazon.smithy.java.mcp.cli.ConfigUtils;
 import software.amazon.smithy.java.mcp.cli.ExecutionContext;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
 
-@Command(name = "uninstall", description = "Uninstall a MCP bundle.")
+@Command(name = "uninstall", description = "Uninstall a MCP server.")
 public class UninstallBundle extends SmithyMcpCommand {
 
-    @Parameters(description = "Name of the MCP bundle to uninstall.")
-    String name;
+    @Parameters(description = "Id of the MCP server to uninstall.")
+    String id;
 
     @Option(names = {"--clients"},
             description = "Names of client configs to update. If not specified all client configs registered would be updated.")
@@ -26,13 +26,13 @@ public class UninstallBundle extends SmithyMcpCommand {
     @Override
     protected void execute(ExecutionContext context) throws Exception {
         var config = context.config();
-        if (!config.getToolBundles().containsKey(name)) {
-            System.out.println("No such MCP bundle exists. Nothing to do.");
+        if (!config.getToolBundles().containsKey(id)) {
+            System.out.println("No such MCP server is installed. Nothing to do.");
             return;
         }
-        ConfigUtils.removeMcpBundle(config, name);
-        System.out.println("Uninstalled MCP bundle: " + name);
-        ConfigUtils.removeFromClientConfigs(config, name, clients);
+        ConfigUtils.removeMcpBundle(config, id);
+        System.out.println("Uninstalled MCP bundle: " + id);
+        ConfigUtils.removeFromClientConfigs(config, id, clients);
         System.out.println("Updated client configs");
     }
 }

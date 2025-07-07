@@ -41,6 +41,6 @@ public interface Registry {
 
     List<RegistryEntry> listMcpBundles();
 
-    Bundle getMcpBundle(String name);
+    Bundle getMcpBundle(String id);
 
 }
