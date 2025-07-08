@@ -20,13 +20,13 @@ import software.amazon.smithy.model.shapes.ShapeType;
 /**
  * Allows a StructDocument to be used in a ShapeBuilder.
  */
-final class SchemaGuidedDocumentBuilder implements ShapeBuilder<StructDocument> {
+public final class SchemaGuidedDocumentBuilder implements ShapeBuilder<StructDocument> {
 
     private final ShapeId service;
     private final Schema target;
     private final Map<String, Document> map = new LinkedHashMap<>();
 
-    SchemaGuidedDocumentBuilder(Schema target, ShapeId service) {
+    public SchemaGuidedDocumentBuilder(Schema target, ShapeId service) {
         if (target.type() != ShapeType.STRUCTURE && target.type() != ShapeType.UNION) {
             throw new IllegalArgumentException("StructDocument can only deserialize a structure or union, "
                     + "but got " + target);
