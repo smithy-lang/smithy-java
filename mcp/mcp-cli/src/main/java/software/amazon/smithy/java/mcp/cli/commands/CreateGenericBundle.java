@@ -34,6 +34,7 @@ public class CreateGenericBundle extends AbstractCreateBundle<CreateGenericBundl
     protected Bundle getNewBundle(CreateGenericBundleInput input) {
         var genericBundleBuilder = GenericBundle.builder()
                 .metadata(BundleMetadata.builder()
+                        .id(input.id)
                         .name(input.name)
                         .description(input.description)
                         .build())
