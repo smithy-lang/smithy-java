@@ -22,6 +22,9 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -65,20 +68,22 @@ public final class McpServer implements Server {
                     .build())
             .build();
 
-    private final Map<String, Tool> tools;
+    public final Map<String, Tool> tools;
     private final Thread listener;
     private final InputStream is;
     private final OutputStream os;
     private final String name;
-    private final List<McpServerProxy> proxies;
+    public final Map<String, McpServerProxy> proxies;
     private final CountDownLatch done = new CountDownLatch(1);
+    private volatile String instructions = "";
+    private volatile JsonRpcRequest intitializeRequest;
 
     McpServer(McpServerBuilder builder) {
         this.tools = createTools(builder.serviceList);
         this.is = builder.is;
         this.os = builder.os;
         this.name = builder.name;
-        this.proxies = new ArrayList<>(builder.proxyList);
+        this.proxies = builder.proxyList.stream().collect(Collectors.toMap(McpServerProxy::name, Function.identity()));
         this.listener = new Thread(() -> {
             try {
                 this.listen();
@@ -109,16 +114,20 @@ public final class McpServer implements Server {
         try {
             validate(req);
             switch (req.getMethod()) {
-                case "initialize" -> writeResponse(req.getId(),
+                case "initialize" -> {
+                    this.intitializeRequest = req;
+                    writeResponse(req.getId(),
                         InitializeResult.builder()
                                 .capabilities(Capabilities.builder()
                                         .tools(Tools.builder().listChanged(true).build())
                                         .build())
+                                .instructions(instructions)
                                 .serverInfo(ServerInfo.builder()
                                         .name(name)
                                         .version("1.0.0")
                                         .build())
                                 .build());
+                }
                 case "tools/list" -> writeResponse(req.getId(),
                         ListToolsResult.builder().tools(tools.values().stream().map(Tool::toolInfo).toList()).build());
                 case "tools/call" -> {
@@ -214,6 +223,19 @@ public final class McpServer implements Server {
         }
     }
 
+    public void addNewProxy(McpServerProxy mcpServerProxy) {
+        try {
+            synchronized (os) {
+                proxies.put(mcpServerProxy.name(), mcpServerProxy);
+                initialize(mcpServerProxy);
+                os.write(TOOLS_CHANGED);
+                os.flush();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to flush tools changed notification");
+        }
+    }
+
     private void writeResponse(Document id, SerializableStruct value) {
         writeResponse(JsonRpcResponse.builder()
                 .id(id)
@@ -264,9 +286,14 @@ public final class McpServer implements Server {
         }
     }
 
-    private static Map<String, Tool> createTools(List<Service> serviceList) {
+    private Map<String, Tool> createTools(List<Service> serviceList) {
         var tools = new ConcurrentHashMap<String, Tool>();
         for (Service service : serviceList) {
+            if (service.schema().hasTrait(TraitKey.DOCUMENTATION_TRAIT)) {
+                synchronized(this) {
+                    instructions += service.schema().getTrait(TraitKey.DOCUMENTATION_TRAIT).getValue();
+                }
+            }
             var serviceName = service.schema().id().getName();
             for (var operation : service.getAllOperations()) {
                 var operationName = operation.name();
@@ -387,8 +414,7 @@ public final class McpServer implements Server {
     ) {
         var documentationTrait = schema.getTrait(TraitKey.DOCUMENTATION_TRAIT);
         if (documentationTrait != null) {
-            return "This tool invokes %s API of %s.".formatted(operationName, serviceName) +
-                    documentationTrait.getValue();
+            return documentationTrait.getValue();
         } else {
             return "This tool invokes %s API of %s.".formatted(operationName, serviceName);
         }
@@ -397,25 +423,52 @@ public final class McpServer implements Server {
     @Override
     public void start() {
         // Start all proxies first
-        for (McpServerProxy proxy : proxies) {
-            proxy.start();
-            proxy.initialize(this::writeResponse);
-
-            // Get the tools from this proxy
-            try {
-                List<ToolInfo> proxyTools = proxy.listTools();
-
-                // Add each tool to our tool map
-                for (var toolInfo : proxyTools) {
-                    tools.put(toolInfo.getName(), new Tool(toolInfo, proxy));
-                }
-            } catch (Exception e) {
-                LOG.error("Failed to fetch tools from proxy", e);
-            }
+        for (McpServerProxy proxy : proxies.values()) {
+            initialize(proxy);
         }
 
         // Start the listener thread
         listener.start();
+    }
+
+    public void refreshTools(McpServerProxy proxy) {
+        // Get the tools from this proxy
+        try {
+            List<ToolInfo> proxyTools = proxy.listTools();
+
+            // Add each tool to our tool map
+            for (var toolInfo : proxyTools) {
+                tools.put(toolInfo.getName(), new Tool(toolInfo, proxy));
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to fetch tools from proxy", e);
+        }
+
+        try {
+            synchronized (os) {
+                os.write(TOOLS_CHANGED);
+                os.flush();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to flush tools changed notification");
+        }
+    }
+
+    private void initialize(McpServerProxy proxy) {
+        proxy.start();
+        proxy.initialize(this::writeResponse, intitializeRequest);
+
+        // Get the tools from this proxy
+        try {
+            List<ToolInfo> proxyTools = proxy.listTools();
+
+            // Add each tool to our tool map
+            for (var toolInfo : proxyTools) {
+                tools.put(toolInfo.getName(), new Tool(toolInfo, proxy));
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to fetch tools from proxy", e);
+        }
     }
 
     @Override
@@ -423,7 +476,7 @@ public final class McpServer implements Server {
         List<CompletableFuture<Void>> shutdownFutures = new ArrayList<>();
 
         // Shutdown all proxies
-        for (McpServerProxy proxy : proxies) {
+        for (McpServerProxy proxy : proxies.values()) {
             shutdownFutures.add(proxy.shutdown());
         }
 

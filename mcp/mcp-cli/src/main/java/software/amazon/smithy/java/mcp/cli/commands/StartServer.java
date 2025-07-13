@@ -7,11 +7,14 @@ package software.amazon.smithy.java.mcp.cli.commands;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -24,22 +27,23 @@ import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.java.mcp.cli.model.GenericToolBundleConfig;
 import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
 import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
-import software.amazon.smithy.java.mcp.registry.model.InstallServerInput;
-import software.amazon.smithy.java.mcp.registry.model.InstallServerOutput;
-import software.amazon.smithy.java.mcp.registry.model.ListServersInput;
-import software.amazon.smithy.java.mcp.registry.model.ListServersOutput;
-import software.amazon.smithy.java.mcp.registry.model.ServerEntry;
-import software.amazon.smithy.java.mcp.registry.service.InstallServerOperation;
-import software.amazon.smithy.java.mcp.registry.service.ListServersOperation;
+import software.amazon.smithy.java.mcp.model.ToolInfo;
+import software.amazon.smithy.java.mcp.registry.model.InstallToolInput;
+import software.amazon.smithy.java.mcp.registry.model.InstallToolOutput;
+import software.amazon.smithy.java.mcp.registry.model.SearchToolsInput;
+import software.amazon.smithy.java.mcp.registry.model.SearchToolsOutput;
+import software.amazon.smithy.java.mcp.registry.model.Tool;
+import software.amazon.smithy.java.mcp.registry.service.InstallToolOperation;
 import software.amazon.smithy.java.mcp.registry.service.McpRegistry;
+import software.amazon.smithy.java.mcp.registry.service.SearchToolsOperation;
 import software.amazon.smithy.java.mcp.server.McpServer;
+import software.amazon.smithy.java.mcp.server.StdioProxy;
 import software.amazon.smithy.java.server.FilteredService;
 import software.amazon.smithy.java.server.OperationFilters;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.mcp.bundle.api.McpBundles;
 import software.amazon.smithy.mcp.bundle.api.Registry;
-import software.amazon.smithy.mcp.bundle.api.model.BundleMetadata;
 import software.amazon.smithy.mcp.bundle.api.model.GenericBundle;
 
 /**
@@ -158,8 +162,8 @@ public final class StartServer extends SmithyMcpCommand {
         } else {
             if (registryServer) {
                 services.add(McpRegistry.builder()
-                        .addInstallServerOperation(new InstallOp(registry, config))
-                        .addListServersOperation(new ListOp(registry))
+                        .addInstallToolOperation(new InstallTool(registry, config))
+                        .addSearchToolsOperation(new SearchOp(registry))
                         .build());
             }
 
@@ -193,61 +197,78 @@ public final class StartServer extends SmithyMcpCommand {
         return service;
     }
 
-    private static final class ListOp implements ListServersOperation {
+    private static final class SearchOp implements SearchToolsOperation {
 
         private final Registry registry;
 
-        private ListOp(Registry registry) {
+        private SearchOp(Registry registry) {
             this.registry = registry;
         }
 
         @Override
-        public ListServersOutput listServers(ListServersInput input, RequestContext context) {
-            var servers = registry
-                    .listMcpBundles()
-                    .stream()
-                    .unordered()
-                    .map(Registry.RegistryEntry::getBundleMetadata)
-                    .collect(Collectors.toMap(
-                            BundleMetadata::getName,
-                            bundle -> ServerEntry.builder()
-                                    .description(bundle.getDescription())
-                                    .build()));
-            return ListServersOutput.builder()
-                    .servers(servers)
+        public SearchToolsOutput searchTools(SearchToolsInput input, RequestContext context) {
+            var tools = registry.searchTools(input.getToolDescription(), input.getNumberOfTools());
+            return SearchToolsOutput.builder()
+                    .tools(tools.stream()
+                            .map(t -> Tool.builder()
+                                    .serverId(t.serverId())
+                                    .toolName(t.toolName())
+                                    .build())
+                            .toList())
                     .build();
         }
     }
 
-    private final class InstallOp implements InstallServerOperation {
+    private static ConcurrentHashMap<String, Boolean> ALLOWED_TOOLS = new ConcurrentHashMap<>();
+
+    private final class InstallTool implements InstallToolOperation {
 
         private final Registry registry;
         private final Config config;
 
-        private InstallOp(Registry registry, Config config) {
+        private InstallTool(Registry registry, Config config) {
             this.registry = registry;
             this.config = config;
         }
 
         @Override
-        public InstallServerOutput installServer(InstallServerInput input, RequestContext context) {
-            try {
-                if (!config.getToolBundles().containsKey(input.getServerName())) {
-                    var bundle = registry.getMcpBundle(input.getServerName());
-                    if (bundle == null) {
-                        throw new IllegalArgumentException(
-                                "Can't find a configured tool bundle for '" + input.getServerName() + "'.");
-                    } else {
-                        var mcpBundleConfig = ConfigUtils.addMcpBundle(config, input.getServerName(), bundle);
-                        mcpServer.addNewService(bundleToService(mcpBundleConfig.getValue()));
+        public InstallToolOutput installTool(InstallToolInput input, RequestContext context) {
+            var tool = input.getTool();
+            var toolName = tool.getToolName();
+            var serverId = tool.getServerId();
+            if (!config.getToolBundles().containsKey(serverId)) {
+                var bundle = registry.getMcpBundle(serverId);
+                if (bundle == null) {
+                    throw new IllegalArgumentException(
+                            "Can't find a configured tool bundle for '" + serverId + "'.");
+                } else {
+                    try {
+                        var mcpBundleConfig = ConfigUtils.addMcpBundle(config, serverId, bundle);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
                     }
                 }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+            } else {
+                GenericBundle bundle = ConfigUtils.getMcpBundle(serverId).getValue();
+                if (!mcpServer.proxies.containsKey(serverId)) {
+                    ALLOWED_TOOLS.put(toolName, true);
+                    mcpServer.addNewProxy(StdioProxy.builder()
+                            .name(serverId)
+                            .toolFilter(StartServer::toolFilter)
+                            .command(bundle.getRun().getExecutable())
+                            .build());
+                } else {
+                    var proxy = mcpServer.proxies.get(serverId);
+                    ALLOWED_TOOLS.put(toolName, true);
+                    mcpServer.refreshTools(proxy);
+                }
             }
-
-            return InstallServerOutput.builder().build();
+            return InstallToolOutput.builder().message("Tool "+ toolName +" installed. Check your list of tools.").build();
         }
+    }
+
+    private static boolean toolFilter(ToolInfo toolInfo) {
+        return ALLOWED_TOOLS.containsKey(toolInfo.getName());
     }
 
     @FunctionalInterface

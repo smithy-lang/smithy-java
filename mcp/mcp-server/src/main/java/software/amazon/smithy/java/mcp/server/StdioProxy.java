@@ -19,11 +19,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Predicate;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
+import software.amazon.smithy.java.mcp.model.ToolInfo;
 
 public final class StdioProxy extends McpServerProxy {
     private static final InternalLogger LOG = InternalLogger.getLogger(StdioProxy.class);
@@ -35,8 +37,11 @@ public final class StdioProxy extends McpServerProxy {
     private BufferedWriter writer;
     private final Lock writeLock = new ReentrantLock();
     private Thread responseReaderThread;
+    private Thread errorReaderThread;
+    private final Predicate<ToolInfo> toolfilter;
     private final Map<String, CompletableFuture<JsonRpcResponse>> pendingRequests = new ConcurrentHashMap<>();
     private volatile boolean running = false;
+    private String name;
 
     private StdioProxy(Builder builder) {
         processBuilder = new ProcessBuilder();
@@ -51,13 +56,24 @@ public final class StdioProxy extends McpServerProxy {
             processBuilder.environment().putAll(builder.environmentVariables);
         }
 
+        this.toolfilter = builder.toolFilter;
+
+        this.name = builder.name;
+
         processBuilder.redirectErrorStream(false); // Keep stderr separate
     }
 
     public static class Builder {
         private String command;
+        private String name;
         private List<String> arguments;
         private Map<String, String> environmentVariables;
+        private Predicate<ToolInfo> toolFilter = t -> true;
+
+        public Builder name(String name) {
+            this.name = name;
+            return this;
+        }
 
         public Builder command(String command) {
             this.command = command;
@@ -71,6 +87,11 @@ public final class StdioProxy extends McpServerProxy {
 
         public Builder environmentVariables(Map<String, String> environmentVariables) {
             this.environmentVariables = environmentVariables;
+            return this;
+        }
+
+        public Builder toolFilter(Predicate<ToolInfo> toolFilter) {
+            this.toolFilter = toolFilter;
             return this;
         }
 
@@ -138,7 +159,7 @@ public final class StdioProxy extends McpServerProxy {
             running = true;
 
             // Start a thread to consume stderr so it doesn't block
-            Thread stderrConsumer = Thread.ofVirtual().start(() -> {
+            errorReaderThread = Thread.ofVirtual().start(() -> {
                 try (BufferedReader errorReader = new BufferedReader(
                         new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
                     String line;
@@ -149,8 +170,6 @@ public final class StdioProxy extends McpServerProxy {
                     LOG.debug("Error reading MCP server stderr", e);
                 }
             });
-            stderrConsumer.setDaemon(true);
-            stderrConsumer.start();
 
             // Start a thread to read responses asynchronously
             responseReaderThread = Thread.ofVirtual()
@@ -241,5 +260,15 @@ public final class StdioProxy extends McpServerProxy {
                 }
             }
         });
+    }
+
+    @Override
+    protected Predicate<ToolInfo> toolFilter() {
+        return toolfilter;
+    }
+
+    @Override
+    public String name() {
+        return this.name;
     }
 }
