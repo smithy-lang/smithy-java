@@ -41,6 +41,10 @@ public interface Registry {
 
     List<RegistryEntry> listMcpBundles();
 
+    default List<RegistryTool> searchTools(String query, int numberOfTools) {
+        return List.of();
+    }
+
     Bundle getMcpBundle(String id);
 
 }

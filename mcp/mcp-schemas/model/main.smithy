@@ -59,6 +59,8 @@ structure InitializeResult with [BaseResult] {
 
     @required
     serverInfo: ServerInfo
+
+    instructions: String
 }
 
 structure Capabilities {

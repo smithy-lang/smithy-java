@@ -6,10 +6,12 @@
 package software.amazon.smithy.java.mcp.server;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -35,18 +37,18 @@ public abstract class McpServerProxy {
             if (response.getError() != null) {
                 throw new RuntimeException("Error listing tools: " + response.getError().getMessage());
             }
-            return response.getResult().asShape(ListToolsResult.builder()).getTools();
+            return response.getResult()
+                    .asShape(ListToolsResult.builder())
+                    .getTools()
+                    .stream()
+                    .filter(toolFilter())
+                    .toList();
         }).join();
     }
 
-    public void initialize(Consumer<JsonRpcResponse> notificationConsumer) {
-        JsonRpcRequest request = JsonRpcRequest.builder()
-                .method("initialize")
-                .id(generateRequestId())
-                .jsonrpc("2.0")
-                .build();
+    public void initialize(Consumer<JsonRpcResponse> notificationConsumer, JsonRpcRequest initializeRequest) {
 
-        var result = Objects.requireNonNull(rpc(request).join());
+        var result = Objects.requireNonNull(rpc(initializeRequest).join());
         if (result.getError() != null) {
             throw new RuntimeException("Error during initialization: " + result.getError().getMessage());
         }
@@ -74,6 +76,10 @@ public abstract class McpServerProxy {
         });
     }
 
+    protected Predicate<ToolInfo> toolFilter() {
+        return t -> true;
+    }
+
     // Generate a unique request ID for each RPC call
     protected Document generateRequestId() {
         return Document.of(ID_GENERATOR.incrementAndGet());
@@ -82,4 +88,6 @@ public abstract class McpServerProxy {
     protected void notify(JsonRpcResponse response) {
         notificationConsumer.accept(response);
     }
+
+    public abstract String name();
 }
