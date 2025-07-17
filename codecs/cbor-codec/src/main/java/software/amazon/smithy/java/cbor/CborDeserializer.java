@@ -108,10 +108,11 @@ final class CborDeserializer implements ShapeDeserializer {
         if (byteBuffer.hasArray()) {
             byte[] payload = byteBuffer.array();
             this.payload = payload;
+            int start = byteBuffer.arrayOffset() + byteBuffer.position();
             this.parser = new CborParser(
                     payload,
-                    byteBuffer.arrayOffset() + byteBuffer.position(),
-                    byteBuffer.remaining());
+                    start,
+                    start + byteBuffer.remaining());
         } else {
             int pos = byteBuffer.position();
             this.payload = new byte[byteBuffer.remaining()];

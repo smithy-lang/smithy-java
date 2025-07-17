@@ -149,7 +149,7 @@ public final class CborParser {
     }
 
     private final byte[] buffer;
-    private final int len;
+    private final int end;
     private int idx;
     private byte token;
 
@@ -168,10 +168,10 @@ public final class CborParser {
         this(buffer, 0, buffer.length);
     }
 
-    public CborParser(byte[] buffer, int off, int len) {
+    public CborParser(byte[] buffer, int off, int end) {
         this.buffer = buffer;
         this.idx = off;
-        this.len = len;
+        this.end = end;
     }
 
     /**
@@ -229,7 +229,7 @@ public final class CborParser {
             } else if ((state & 3) == 0) {
                 // mask is 0b11: low bit is collection type (map == 0), high bit is 0 if the count is even
                 int i = (idx += itemLength(itemLength) + overhead);
-                if (i >= len) {
+                if (i >= end) {
                     throwIncompleteCollectionException();
                 }
                 return dispatchKey(buffer[i]);
@@ -237,7 +237,7 @@ public final class CborParser {
         }
 
         int i = (idx += itemLength(itemLength) + overhead);
-        if (i >= len) {
+        if (i >= end) {
             return endOfBuffer(i);
         }
 
@@ -260,7 +260,7 @@ public final class CborParser {
     private byte endOfBuffer(int i) {
         itemLength = 0;
         overhead = 0;
-        if (i > len) {
+        if (i > end) {
             throw new BadCborException("unexpected end of payload");
         }
         if (inCollection) {
@@ -506,7 +506,7 @@ public final class CborParser {
         itemLength = 0;
         int scan = ++idx;
         while (true) {
-            if (scan >= len)
+            if (scan >= end)
                 throw new BadCborException("non-terminating string");
             byte b = buffer[scan];
             if (b == SIMPLE_STREAM_BREAK) {
