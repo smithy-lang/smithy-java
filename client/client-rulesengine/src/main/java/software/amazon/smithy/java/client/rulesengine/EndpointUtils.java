@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.rulesengine;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.model.node.ArrayNode;
@@ -23,11 +24,29 @@ import software.amazon.smithy.rulesengine.language.evaluation.value.IntegerValue
 import software.amazon.smithy.rulesengine.language.evaluation.value.RecordValue;
 import software.amazon.smithy.rulesengine.language.evaluation.value.StringValue;
 import software.amazon.smithy.rulesengine.language.evaluation.value.Value;
+import software.amazon.smithy.rulesengine.language.syntax.Identifier;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.ParseUrl;
 
 public final class EndpointUtils {
 
+    // Make number of URIs to cache in the thread-local cache.
+    private static final int MAX_CACHE_SIZE = 32;
+
+    // Caches up to 32 previously parsed URIs in a thread-local LRU cache.
+    private static final ThreadLocal<Map<String, URI>> URI_LRU_CACHE = ThreadLocal.withInitial(() -> {
+        return new LinkedHashMap<>(16, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, URI> eldest) {
+                return size() > MAX_CACHE_SIZE;
+            }
+        };
+    });
+
     private EndpointUtils() {}
+
+    static URI parseUri(String uri) {
+        return URI_LRU_CACHE.get().computeIfAbsent(uri, URI::create);
+    }
 
     // "The type of the value MUST be either a string, boolean or an array of string."
     public static Object convertNode(Node value, boolean allowAllTypes) {
@@ -90,6 +109,32 @@ public final class EndpointUtils {
         }
     }
 
+    static Value convertToValue(Object o) {
+        if (o == null) {
+            return Value.emptyValue();
+        } else if (o instanceof String s) {
+            return Value.stringValue(s);
+        } else if (o instanceof Number n) {
+            return Value.integerValue(n.intValue());
+        } else if (o instanceof Boolean b) {
+            return Value.booleanValue(b);
+        } else if (o instanceof List<?> l) {
+            List<Value> valueList = new ArrayList<>(l.size());
+            for (var entry : l) {
+                valueList.add(convertToValue(entry));
+            }
+            return Value.arrayValue(valueList);
+        } else if (o instanceof Map<?, ?> m) {
+            Map<Identifier, Value> valueMap = new HashMap<>(m.size());
+            for (var e : m.entrySet()) {
+                valueMap.put(Identifier.of(e.getKey().toString()), convertToValue(e.getValue()));
+            }
+            return Value.recordValue(valueMap);
+        } else {
+            throw new RulesEvaluationError("Unsupported value type: " + o);
+        }
+    }
+
     static Object verifyObject(Object value) {
         if (value instanceof String
                 || value instanceof Number
@@ -120,15 +165,9 @@ public final class EndpointUtils {
         throw new UnsupportedOperationException("Unsupported endpoint rules value given: " + value);
     }
 
-    // Read little-endian unsigned short (2 bytes)
+    // Read big-endian unsigned short (2 bytes)
     static int bytesToShort(byte[] instructions, int offset) {
-        return ((instructions[offset + 1] & 0xFF) << 8) | (instructions[offset] & 0xFF);
-    }
-
-    // Write little-endian unsigned short (2 bytes)
-    static void shortToTwoBytes(int value, byte[] instructions, int offset) {
-        instructions[offset] = (byte) (value & 0xFF);
-        instructions[offset + 1] = (byte) ((value >> 8) & 0xFF);
+        return ((instructions[offset] & 0xFF) << 8) | (instructions[offset + 1] & 0xFF);
     }
 
     static Object getUriProperty(URI uri, String key) {

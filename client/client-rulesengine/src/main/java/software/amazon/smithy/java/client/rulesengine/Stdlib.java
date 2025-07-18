@@ -7,7 +7,10 @@ package software.amazon.smithy.java.client.rulesengine;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.io.uri.URLEncoding;
@@ -76,6 +79,21 @@ enum Stdlib implements RulesFunction {
         }
     };
 
+    static final class Extension implements RulesExtension {
+        @Override
+        public void putBuiltinProviders(Map<String, Function<Context, Object>> providers) {
+            providers.put("SDK::Endpoint", ctx -> {
+                var result = ctx.get(ClientContext.CUSTOM_ENDPOINT);
+                return result == null ? null : result.uri().toString();
+            });
+        }
+
+        @Override
+        public Iterable<RulesFunction> getFunctions() {
+            return Arrays.asList(values());
+        }
+    }
+
     private final String name;
     private final int operands;
 
@@ -85,22 +103,12 @@ enum Stdlib implements RulesFunction {
     }
 
     @Override
-    public int getOperandCount() {
+    public int getArgumentCount() {
         return operands;
     }
 
     @Override
     public String getFunctionName() {
         return name;
-    }
-
-    static Object standardBuiltins(String name, Context context) {
-        if (name.equals("SDK::Endpoint")) {
-            var result = context.get(ClientContext.CUSTOM_ENDPOINT);
-            if (result != null) {
-                return result.uri().toString();
-            }
-        }
-        return null;
     }
 }

@@ -16,10 +16,11 @@ dependencies {
 
     testImplementation(project(":aws:client:aws-client-awsjson"))
     testImplementation(project(":client:dynamic-client"))
+    testImplementation(project(":aws:client:aws-client-rulesengine"))
 }
 
 jmh {
-    warmupIterations = 2
+    warmupIterations = 3
     iterations = 5
     fork = 1
     // profilers.add("async:output=flamegraph")

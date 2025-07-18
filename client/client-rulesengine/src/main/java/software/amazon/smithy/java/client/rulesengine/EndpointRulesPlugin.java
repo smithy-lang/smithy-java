@@ -10,16 +10,21 @@ import java.util.Objects;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.client.core.ClientPlugin;
+import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.logging.InternalLogger;
+import software.amazon.smithy.rulesengine.logic.bdd.Bdd;
+import software.amazon.smithy.rulesengine.logic.cfg.Cfg;
+import software.amazon.smithy.rulesengine.traits.BddTrait;
 import software.amazon.smithy.rulesengine.traits.ContextParamTrait;
 import software.amazon.smithy.rulesengine.traits.EndpointRuleSetTrait;
 import software.amazon.smithy.rulesengine.traits.OperationContextParamsTrait;
 import software.amazon.smithy.rulesengine.traits.StaticContextParamsTrait;
 
 /**
- * Attempts to resolve endpoints using smithy.rules#endpointRuleSet or a {@link RulesProgram} compiled from this trait.
+ * Attempts to resolve endpoints using smithy.rules#bdd, smithy.rules#endpointRuleSet, or a precompiled
+ * {@link Bytecode}.
  */
 public final class EndpointRulesPlugin implements ClientPlugin {
 
@@ -39,25 +44,27 @@ public final class EndpointRulesPlugin implements ClientPlugin {
     public static final TraitKey<EndpointRuleSetTrait> ENDPOINT_RULESET_TRAIT =
             TraitKey.get(EndpointRuleSetTrait.class);
 
-    private RulesProgram program;
-    private final RulesEngine engine;
+    public static final TraitKey<BddTrait> BDD_TRAIT = TraitKey.get(BddTrait.class);
 
-    private EndpointRulesPlugin(RulesProgram program, RulesEngine engine) {
-        this.program = program;
+    private Bytecode bytecode;
+    private final RulesEngineBuilder engine;
+
+    private EndpointRulesPlugin(Bytecode bytecode, RulesEngineBuilder engine) {
+        this.bytecode = bytecode;
         this.engine = engine;
     }
 
     /**
-     * Create a RulesEnginePlugin from a precompiled {@link RulesProgram}.
+     * Create a RulesEnginePlugin from a precompiled {@link Bytecode}.
      *
      * <p>This is typically used by code-generated clients.
      *
-     * @param program Program used to resolve endpoint.
+     * @param bytecode Bytecode used to resolve endpoint.
      * @return the rules engine plugin.
      */
-    public static EndpointRulesPlugin from(RulesProgram program) {
-        Objects.requireNonNull(program, "RulesProgram must not be null");
-        return new EndpointRulesPlugin(program, null);
+    public static EndpointRulesPlugin from(Bytecode bytecode) {
+        Objects.requireNonNull(bytecode, "RulesBytecode must not be null");
+        return new EndpointRulesPlugin(bytecode, null);
     }
 
     /**
@@ -68,7 +75,7 @@ public final class EndpointRulesPlugin implements ClientPlugin {
      * @return the plugin.
      */
     public static EndpointRulesPlugin create() {
-        return create(new RulesEngine());
+        return create(new RulesEngineBuilder());
     }
 
     /**
@@ -79,17 +86,17 @@ public final class EndpointRulesPlugin implements ClientPlugin {
      * @param engine RulesEngine to use when creating programs.
      * @return the plugin.
      */
-    public static EndpointRulesPlugin create(RulesEngine engine) {
+    public static EndpointRulesPlugin create(RulesEngineBuilder engine) {
         return new EndpointRulesPlugin(null, engine);
     }
 
     /**
-     * Gets the endpoint rules program that was compiled, or null if no rules were found on the service.
+     * Gets the endpoint rules bytecode that was compiled, or null if no rules were found on the service.
      *
      * @return the rules program or null.
      */
-    public RulesProgram getProgram() {
-        return program;
+    public Bytecode getBytecode() {
+        return bytecode;
     }
 
     @Override
@@ -106,21 +113,31 @@ public final class EndpointRulesPlugin implements ClientPlugin {
         }
 
         if (usePlugin) {
-            if (program == null && config.service() != null) {
-                var ruleset = config.service().schema().getTrait(ENDPOINT_RULESET_TRAIT);
-                if (ruleset != null) {
-                    LOGGER.debug("Found endpoint rules traits on service: {}", config.service());
-                    program = engine.compile(ruleset.getEndpointRuleSet());
+            EndpointResolver resolver = null;
+
+            if (bytecode == null && config.service() != null) {
+                var bdd = config.service().schema().getTrait(BDD_TRAIT);
+                if (bdd != null) {
+                    LOGGER.debug("Found endpoint BDD trait on service: {}", config.service());
+                    bytecode = engine.compile(bdd.getBdd());
+                    resolver = new BytecodeEndpointResolver(
+                            bytecode, engine.getExtensions(), engine.getBuiltinProviders());
+                } else {
+                    var ruleset = config.service().schema().getTrait(ENDPOINT_RULESET_TRAIT);
+                    if (ruleset != null) {
+                        LOGGER.debug("Found endpoint rules trait on service: {}", config.service());
+                        // TODO: use decision tree first, compile in a thread, then switch.
+                        bytecode = engine.compile(Bdd.from(Cfg.from(ruleset.getEndpointRuleSet())));
+                        resolver = new BytecodeEndpointResolver(
+                                bytecode, engine.getExtensions(), engine.getBuiltinProviders());
+                    }
                 }
             }
-            if (program != null) {
-                applyResolver(program, config);
+
+            if (resolver != null) {
+                config.endpointResolver(resolver);
+                LOGGER.debug("Applying EndpointRulesResolver to client: {}", config.service());
             }
         }
-    }
-
-    private void applyResolver(RulesProgram applyProgram, ClientConfig.Builder config) {
-        config.endpointResolver(new EndpointRulesResolver(applyProgram));
-        LOGGER.debug("Applying EndpointRulesResolver to client: {}", config.service());
     }
 }

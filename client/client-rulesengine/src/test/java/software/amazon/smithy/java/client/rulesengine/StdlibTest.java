@@ -11,6 +11,9 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 
 import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -81,7 +84,9 @@ public class StdlibTest {
         var ctx = Context.create();
         var endpoint = Endpoint.builder().uri("https://foo.com").build();
         ctx.put(ClientContext.CUSTOM_ENDPOINT, endpoint);
-        var result = Stdlib.standardBuiltins("SDK::Endpoint", ctx);
+        Map<String, Function<Context, Object>> builtins = new HashMap<>();
+        new Stdlib.Extension().putBuiltinProviders(builtins);
+        var result = builtins.get("SDK::Endpoint").apply(ctx);
 
         assertThat(result, instanceOf(String.class));
         assertThat(result, equalTo(endpoint.uri().toString()));

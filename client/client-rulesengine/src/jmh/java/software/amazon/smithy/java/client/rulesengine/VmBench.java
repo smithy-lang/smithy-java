@@ -2,12 +2,12 @@
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.java.client.rulesengine;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -22,6 +22,11 @@ import org.openjdk.jmh.annotations.Warmup;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.rulesengine.language.EndpointRuleSet;
+import software.amazon.smithy.rulesengine.logic.bdd.Bdd;
+import software.amazon.smithy.rulesengine.logic.bdd.BddEvaluator;
+import software.amazon.smithy.rulesengine.logic.bdd.NodeReversal;
+import software.amazon.smithy.rulesengine.logic.bdd.SiftingOptimization;
+import software.amazon.smithy.rulesengine.logic.cfg.Cfg;
 import software.amazon.smithy.utils.IoUtils;
 
 @State(Scope.Benchmark)
@@ -40,18 +45,11 @@ public class VmBench {
 
     private static final Map<String, Map<String, Object>> CASES = Map.ofEntries(
             Map.entry("example-complex-ruleset.json-1",
-                    Map.of(
-                            "Endpoint",
-                            "https://example.com",
-                            "UseFIPS",
-                            false)),
+                      Map.of(
+                              "Endpoint", "https://example.com"
+                              , "UseFIPS", Boolean.FALSE
+                      )),
             Map.entry("minimal-ruleset.json-1", Map.of("Region", "us-east-1")));
-
-    @Param({
-            "yes",
-            "no",
-    })
-    private String optimize;
 
     @Param({
             "example-complex-ruleset.json-1",
@@ -61,11 +59,15 @@ public class VmBench {
 
     private EndpointRuleSet ruleSet;
     private Map<String, Object> parameters;
-    private RulesProgram program;
+    private Bytecode bytecode;
+    private Bdd bdd;
     private Context ctx;
+    private Map<String, Function<Context, Object>> builtinProviders;
+    private RulesEngineBuilder engine;
+    private BytecodeEvaluator bytecodeEvaluator;
 
     @Setup
-    public void setup() throws Exception {
+    public void setup() {
         parameters = new HashMap<>(CASES.get(testName));
         var actualFile = testName.substring(0, testName.length() - 2);
         var url = VmBench.class.getResource(actualFile);
@@ -75,22 +77,30 @@ public class VmBench {
         var data = Node.parse(IoUtils.readUtf8Url(url));
         ruleSet = EndpointRuleSet.fromNode(data);
 
-        var engine = new RulesEngine();
-        if (optimize.equals("no")) {
-            engine.disableOptimizations();
+        engine = new RulesEngineBuilder();
+        builtinProviders = new HashMap<>();
+        for (var ext : RulesEngineBuilder.EXTENSIONS) {
+            ext.putBuiltinProviders(builtinProviders);
         }
-        program = engine.compile(ruleSet);
-        ctx = Context.create();
-    }
 
-    //    @Benchmark
-    //    public Object compile() {
-    //        // TODO
-    //        return null;
-    //    }
+        var cfg = Cfg.from(ruleSet);
+        bdd = Bdd.from(cfg);
+        bdd = bdd.transform(SiftingOptimization.builder().cfg(cfg).build()).transform(new NodeReversal());
+
+        bytecode = engine.compile(bdd);
+        ctx = Context.create();
+        System.out.println(bytecode);
+
+        bytecodeEvaluator = new BytecodeEvaluator(bytecode, ctx, parameters, builtinProviders, engine.getExtensions());
+    }
 
     @Benchmark
     public Object evaluate() {
-        return program.resolveEndpoint(ctx, parameters);
+        return evaluateBytecode();
+    }
+
+    private Object evaluateBytecode() {
+        int resultIndex = BddEvaluator.from(bdd).evaluate(bytecodeEvaluator);
+        return bytecodeEvaluator.resolveResult(resultIndex);
     }
 }
