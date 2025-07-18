@@ -22,42 +22,50 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.rulesengine.language.EndpointRuleSet;
+import software.amazon.smithy.rulesengine.logic.bdd.BddTrait;
+import software.amazon.smithy.rulesengine.logic.cfg.Cfg;
 import software.amazon.smithy.utils.IoUtils;
 
 public class EndpointRulesPluginTest {
     @Test
     public void addsEndpointResolver() {
         var contents = IoUtils.readUtf8Resource(getClass(), "example-complex-ruleset.json");
-        var program = new RulesEngine().compile(EndpointRuleSet.fromNode(Node.parse(contents)));
+        Cfg cfg = Cfg.from(EndpointRuleSet.fromNode(Node.parse(contents)));
+        BddTrait bdd = BddTrait.from(cfg);
+        var program = new RulesEngineBuilder().compile(bdd);
         var plugin = EndpointRulesPlugin.from(program);
         var builder = ClientConfig.builder();
         plugin.configureClient(builder);
 
-        assertThat(builder.endpointResolver(), instanceOf(EndpointRulesResolver.class));
+        assertThat(builder.endpointResolver(), instanceOf(BytecodeEndpointResolver.class));
     }
 
     @Test
     public void doesNotModifyExistingResolver() {
         var contents = IoUtils.readUtf8Resource(getClass(), "example-complex-ruleset.json");
-        var program = new RulesEngine().compile(EndpointRuleSet.fromNode(Node.parse(contents)));
+        Cfg cfg = Cfg.from(EndpointRuleSet.fromNode(Node.parse(contents)));
+        BddTrait bdd = BddTrait.from(cfg);
+        var program = new RulesEngineBuilder().compile(bdd);
         var plugin = EndpointRulesPlugin.from(program);
         var builder = ClientConfig.builder().endpointResolver(EndpointResolver.staticHost("foo.com"));
         plugin.configureClient(builder);
 
-        assertThat(builder.endpointResolver(), not(instanceOf(EndpointRulesResolver.class)));
+        assertThat(builder.endpointResolver(), not(instanceOf(BytecodeEndpointResolver.class)));
     }
 
     @Test
     public void modifiesResolverIfCustomEndpointSet() {
         var contents = IoUtils.readUtf8Resource(getClass(), "example-complex-ruleset.json");
-        var program = new RulesEngine().compile(EndpointRuleSet.fromNode(Node.parse(contents)));
+        Cfg cfg = Cfg.from(EndpointRuleSet.fromNode(Node.parse(contents)));
+        BddTrait bdd = BddTrait.from(cfg);
+        var program = new RulesEngineBuilder().compile(bdd);
         var plugin = EndpointRulesPlugin.from(program);
         var builder = ClientConfig.builder()
                 .endpointResolver(EndpointResolver.staticHost("foo.com"))
                 .putConfig(ClientContext.CUSTOM_ENDPOINT, Endpoint.builder().uri("https://example.com").build());
         plugin.configureClient(builder);
 
-        assertThat(builder.endpointResolver(), instanceOf(EndpointRulesResolver.class));
+        assertThat(builder.endpointResolver(), instanceOf(BytecodeEndpointResolver.class));
     }
 
     @Test
@@ -83,6 +91,6 @@ public class EndpointRulesPluginTest {
         var builder = ClientConfig.builder().service(api);
         builder.applyPlugin(plugin);
 
-        assertThat(builder.endpointResolver(), instanceOf(EndpointRulesResolver.class));
+        assertThat(builder.endpointResolver(), instanceOf(BytecodeEndpointResolver.class));
     }
 }

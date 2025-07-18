@@ -10,13 +10,13 @@ package software.amazon.smithy.java.client.rulesengine;
  */
 public interface RulesFunction {
     /**
-     * Get the number of operands the function requires.
+     * Get the number of arguments the function requires.
      *
      * <p>The function will be called with this many values.
      *
-     * @return the number of operands.
+     * @return the number of arguments.
      */
-    int getOperandCount();
+    int getArgumentCount();
 
     /**
      * Get the name of the function.
@@ -26,19 +26,19 @@ public interface RulesFunction {
     String getFunctionName();
 
     /**
-     * Apply the function to the given N operands and returns the result or null.
+     * Apply the function to the given N arguments and returns the result or null.
      *
-     * <p>This is called when an operation has more than two operands.
+     * <p>This is called when an operation has more than two arguments.
      *
-     * @param operands Operands to process.
+     * @param arguments Arguments to process.
      * @return the result of the function or null.
      */
-    default Object apply(Object... operands) {
-        throw new IllegalArgumentException("Invalid number of arguments: " + operands.length);
+    default Object apply(Object... arguments) {
+        throw new IllegalArgumentException("Invalid number of arguments: " + arguments.length);
     }
 
     /**
-     * Calls a function that has zero operands.
+     * Calls a function that has zero arguments.
      *
      * @return the result of the function or null.
      */
@@ -47,9 +47,9 @@ public interface RulesFunction {
     }
 
     /**
-     * Calls a function that has one operand.
+     * Calls a function that has one argument.
      *
-     * @param arg1 Operand to process.
+     * @param arg1 Argument to process.
      * @return the result of the function or null.
      */
     default Object apply1(Object arg1) {
@@ -57,10 +57,10 @@ public interface RulesFunction {
     }
 
     /**
-     * Calls a function that has two operands.
+     * Calls a function that has two arguments.
      *
-     * @param arg1 Operand to process.
-     * @param arg2 Operand to process.
+     * @param arg1 Argument to process.
+     * @param arg2 Argument to process.
      * @return the result of the function or null.
      */
     default Object apply2(Object arg1, Object arg2) {
