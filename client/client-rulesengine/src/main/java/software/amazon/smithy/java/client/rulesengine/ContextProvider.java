@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -167,6 +168,20 @@ sealed interface ContextProvider {
             for (ContextProvider provider : providers) {
                 provider.addContext(operation, input, params);
             }
+        }
+    }
+
+    static void createEndpointParams(
+            Map<String, Object> target,
+            ContextProvider operationContextParams,
+            Context context,
+            ApiOperation<?, ?> operation,
+            SerializableStruct input
+    ) {
+        operationContextParams.addContext(operation, input, target);
+        var additionalParams = context.get(EndpointRulesPlugin.ADDITIONAL_ENDPOINT_PARAMS);
+        if (additionalParams != null) {
+            target.putAll(additionalParams);
         }
     }
 }

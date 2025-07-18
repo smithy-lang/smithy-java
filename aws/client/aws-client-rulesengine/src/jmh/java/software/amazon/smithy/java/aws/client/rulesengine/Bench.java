@@ -9,20 +9,17 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
-import org.openjdk.jmh.annotations.Fork;
-import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.annotations.Warmup;
 import software.amazon.smithy.java.aws.client.core.settings.EndpointSettings;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolverParams;
 import software.amazon.smithy.java.client.rulesengine.EndpointRulesPlugin;
-import software.amazon.smithy.java.client.rulesengine.RulesEngine;
+import software.amazon.smithy.java.client.rulesengine.RulesEngineBuilder;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
@@ -38,9 +35,6 @@ import software.amazon.smithy.model.transform.ModelTransformer;
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Mode.AverageTime)
-@Warmup(iterations = 2, time = 3)
-@Measurement(iterations = 3, time = 3)
-@Fork(1)
 public class Bench {
     private DynamicClient client;
     private EndpointResolver endpointResolver;
@@ -57,7 +51,7 @@ public class Bench {
         model = customizeS3Model(model);
         var service = model.expectShape(ShapeId.from("com.amazonaws.s3#AmazonS3"), ServiceShape.class);
 
-        var engine = new RulesEngine();
+        var engine = new RulesEngineBuilder();
         var plugin = EndpointRulesPlugin.create(engine);
 
         client = DynamicClient.builder()
@@ -69,11 +63,13 @@ public class Bench {
         endpointResolver = client.config().endpointResolver();
         var ctx = Context.create();
         ctx.put(EndpointSettings.REGION, "us-east-1");
+//        ctx.put(EndpointRulesPlugin.ADDITIONAL_ENDPOINT_PARAMS, Map.of("ForcePathStyle", true));
 
         var inputValue = client.createStruct(ShapeId.from("com.amazonaws.s3#GetObjectRequest"),
                 Document.of(Map.of(
                         "Bucket",
-                        Document.of("foo"),
+                        Document.of("miked"),
+                        //, Document.of("foo"),
                         "Key",
                         Document.of("bar"))));
         endpointParams = EndpointResolverParams.builder()

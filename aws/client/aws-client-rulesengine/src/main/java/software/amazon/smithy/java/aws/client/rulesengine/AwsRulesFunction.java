@@ -128,7 +128,7 @@ enum AwsRulesFunction implements RulesFunction {
     }
 
     @Override
-    public int getOperandCount() {
+    public int getArgumentCount() {
         return operands;
     }
 

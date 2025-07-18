@@ -15,6 +15,7 @@ dependencies {
 
     testImplementation(libs.smithy.aws.traits)
     testImplementation(project(":aws:client:aws-client-restxml"))
+    testImplementation(project(":aws:client:aws-client-restjson"))
     testImplementation(project(":client:dynamic-client"))
 }
 
@@ -32,10 +33,10 @@ sourceSets {
 }
 
 jmh {
-    warmupIterations = 2
+    warmupIterations = 3
     iterations = 5
     fork = 1
-     profilers.add("async:output=flamegraph")
+    profilers.add("async:output=flamegraph")
     // profilers.add("gc")
-    duplicateClassesStrategy = DuplicatesStrategy.WARN
+    duplicateClassesStrategy = DuplicatesStrategy.EXCLUDE // don't dump a bunch of warnings.
 }

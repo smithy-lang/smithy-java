@@ -27,6 +27,7 @@ import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.rulesengine.EndpointRulesPlugin;
 import software.amazon.smithy.java.client.rulesengine.EndpointUtils;
+import software.amazon.smithy.java.client.rulesengine.RulesEngineBuilder;
 import software.amazon.smithy.java.client.rulesengine.RulesEvaluationError;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
@@ -48,6 +49,9 @@ public class ResolverTest {
     private static ServiceShape service;
     private static EndpointRulesPlugin plugin;
     private static DynamicClient client;
+
+    private Map<String, Object> overrideMap = null;
+    private Object inputParams = null;
 
     // S3 requires a customization to remove buckets from the path :(
     private static Model customizeS3Model(Model m) {
@@ -77,7 +81,8 @@ public class ResolverTest {
                 .unwrap();
         model = customizeS3Model(model);
         service = model.expectShape(ShapeId.from("com.amazonaws.s3#AmazonS3"), ServiceShape.class);
-        plugin = EndpointRulesPlugin.create();
+        var engine = new RulesEngineBuilder();
+        plugin = EndpointRulesPlugin.create(engine);
         client = DynamicClient.builder()
                 .model(model)
                 .service(service.getId())
@@ -95,7 +100,8 @@ public class ResolverTest {
         try {
             var result = resolveEndpoint(test, client);
             if (expectedError != null) {
-                Assertions.fail("Expected ruleset to fail: " + test.getDocumentation() + " : " + expectedError);
+                Assertions.fail("Expected ruleset to fail: " + test.getDocumentation()
+                        + " : " + expectedError + " : but got " + result[0]);
             }
 
             Endpoint ep = (Endpoint) result[0];
@@ -109,7 +115,10 @@ public class ResolverTest {
             // TODO: validate properties too.
         } catch (RulesEvaluationError e) {
             if (expectedError == null) {
-                Assertions.fail("Expected ruleset to succeed: " + test.getDocumentation() + " : " + e, e);
+                String msg = "Expected ruleset to succeed: " + test.getDocumentation();
+                msg += " Input: " + inputParams + "\n";
+                msg += " Overrides: " + overrideMap;
+                Assertions.fail(msg, e);
             }
         }
     }
@@ -144,7 +153,7 @@ public class ResolverTest {
 
         var inputs = test.getOperationInputs().get(0);
         var name = inputs.getOperationName();
-        var inputParams = EndpointUtils.convertNode(inputs.getOperationParams(), true);
+        inputParams = EndpointUtils.convertNode(inputs.getOperationParams(), true);
 
         if (!inputs.getBuiltInParams().isEmpty()) {
             inputs.getBuiltInParams().getStringMember("SDK::Endpoint").ifPresent(value -> {
@@ -179,8 +188,8 @@ public class ResolverTest {
             override.putConfig(S3EndpointSettings.S3_FORCE_PATH_STYLE, value.getValue());
         });
 
-        override.putConfig(EndpointRulesPlugin.ADDITIONAL_ENDPOINT_PARAMS,
-                (Map<String, Object>) EndpointUtils.convertNode(test.getParams(), true));
+        overrideMap = (Map<String, Object>) EndpointUtils.convertNode(test.getParams(), true);
+        override.putConfig(EndpointRulesPlugin.ADDITIONAL_ENDPOINT_PARAMS, overrideMap);
 
         try {
             var document = Document.ofObject(inputParams);

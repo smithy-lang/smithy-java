@@ -7,7 +7,6 @@ package software.amazon.smithy.java.aws.client.rulesengine;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.client.core.settings.AccountIdSetting;
@@ -123,21 +122,12 @@ enum AwsRulesBuiltin implements Function<Context, Object> {
         }
     };
 
-    static final BiFunction<String, Context, Object> BUILTIN_PROVIDER = new BuiltinProvider();
-
-    private static final class BuiltinProvider implements BiFunction<String, Context, Object> {
-        private final Map<String, Function<Context, Object>> providers = new HashMap<>();
-
-        private BuiltinProvider() {
-            for (var e : values()) {
-                providers.put(e.name, e);
-            }
-        }
-
-        @Override
-        public Object apply(String name, Context context) {
-            var match = providers.get(name);
-            return match == null ? null : match.apply(context);
+    static final Map<String, Function<Context, Object>> BUILTINS;
+    static {
+        var values = values();
+        BUILTINS = new HashMap<>(values.length);
+        for (var e : values) {
+            BUILTINS.put(e.name, e);
         }
     }
 
