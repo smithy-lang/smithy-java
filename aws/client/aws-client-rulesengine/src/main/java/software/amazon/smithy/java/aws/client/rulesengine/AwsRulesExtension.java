@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.aws.client.rulesengine;
 
 import java.util.Arrays;
-import java.util.List;
-import java.util.function.BiFunction;
+import java.util.Map;
+import java.util.function.Function;
 import software.amazon.smithy.java.client.rulesengine.RulesExtension;
 import software.amazon.smithy.java.client.rulesengine.RulesFunction;
 import software.amazon.smithy.java.context.Context;
@@ -21,12 +21,12 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 @SmithyUnstableApi
 public class AwsRulesExtension implements RulesExtension {
     @Override
-    public BiFunction<String, Context, Object> getBuiltinProvider() {
-        return AwsRulesBuiltin.BUILTIN_PROVIDER;
+    public void putBuiltinProviders(Map<String, Function<Context, Object>> providers) {
+        providers.putAll(AwsRulesBuiltin.BUILTINS);
     }
 
     @Override
-    public List<RulesFunction> getFunctions() {
+    public Iterable<RulesFunction> getFunctions() {
         return Arrays.asList(AwsRulesFunction.values());
     }
 }

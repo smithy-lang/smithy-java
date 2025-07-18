@@ -7,7 +7,7 @@ package software.amazon.smithy.java.client.rulesengine;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiFunction;
+import java.util.function.Function;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.context.Context;
 
@@ -16,20 +16,18 @@ import software.amazon.smithy.java.context.Context;
  */
 public interface RulesExtension {
     /**
-     * Provides custom builtin values that are used to initialize parameters.
+     * Mutates the given map to add name-based context-providers to the rules engine.
      *
-     * @return the builtin provider or null if there is no custom provider in this extension.
+     * @param providers Provides to add context providers to.
      */
-    default BiFunction<String, Context, Object> getBuiltinProvider() {
-        return null;
-    }
+    default void putBuiltinProviders(Map<String, Function<Context, Object>> providers) {}
 
     /**
-     * Gets a list of the custom functions to register with the VM.
+     * Gets the custom functions to register with the rules engine.
      *
-     * @return the list of functions to register.
+     * @return the functions to register.
      */
-    default List<RulesFunction> getFunctions() {
+    default Iterable<RulesFunction> getFunctions() {
         return List.of();
     }
 
