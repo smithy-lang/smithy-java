@@ -1,6 +1,5 @@
 plugins {
     id("smithy-java.module-conventions")
-    id("me.champeau.jmh") version "0.7.3"
 }
 
 description = "Implements the rules engine traits used to resolve endpoints"
@@ -16,13 +15,5 @@ dependencies {
 
     testImplementation(project(":aws:client:aws-client-awsjson"))
     testImplementation(project(":client:dynamic-client"))
-}
-
-jmh {
-    warmupIterations = 2
-    iterations = 5
-    fork = 1
-    // profilers.add("async:output=flamegraph")
-    // profilers.add("gc")
-    duplicateClassesStrategy = DuplicatesStrategy.WARN
+    testImplementation(project(":aws:client:aws-client-rulesengine"))
 }
