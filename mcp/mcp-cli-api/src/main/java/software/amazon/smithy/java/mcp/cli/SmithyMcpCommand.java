@@ -43,16 +43,17 @@ public abstract class SmithyMcpCommand implements Callable<Integer> {
         telemetry.command(commandName)
                 .cliVersion(spec.version()[0]);
 
-        try (var metrics = new CliMetrics(TELEMETRY_PUBLISHER, telemetry)) {
+        var metrics = new CliMetrics(TELEMETRY_PUBLISHER, telemetry);
+        try (metrics) {
             var config = loadOrCreateConfig();
             execute(new ExecutionContext(config, RegistryUtils.getRegistry(registryToUse(config), config), metrics));
-            return 0;
+            return metrics.exitCode(0);
         } catch (IllegalArgumentException e) {
             System.out.println("Invalid input : [" + e.getMessage() + "]");
-            return 2;
+            return metrics.exitCode(2);
         } catch (Exception e) {
             e.printStackTrace(System.out);
-            return 1;
+            return metrics.exitCode(1);
         }
     }
 

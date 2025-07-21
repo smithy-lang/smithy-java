@@ -44,6 +44,9 @@ structure TelemetryData {
     @default({})
     timings: Timings
 
+    @required
+    exitCode: Integer
+
     params: String
 }
 

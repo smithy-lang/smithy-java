@@ -31,9 +31,14 @@ public final class CliMetrics implements AutoCloseable {
         timings.put(name, time);
     }
 
+    public int exitCode(int exitCode) {
+        telemetryData.exitCode(exitCode);
+        return exitCode;
+    }
+
     @Override
     public void close() {
-        timings.put("Time", System.nanoTime() - startTime);
+        timings.put("ExecutionTime", System.nanoTime() - startTime);
         telemetryData
                 .counters(counters)
                 .timings(timings)
