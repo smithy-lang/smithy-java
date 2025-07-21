@@ -303,14 +303,15 @@ public class ConfigUtils {
                 .fileLocation(ConfigUtils.getBundleFileLocation(id).toString())
                 .build();
         var builder = McpBundleConfig.builder();
-        switch (bundle.getValue()) {
-            case SmithyMcpBundle smithyBundle -> builder.smithyModeled(SmithyModeledBundleConfig.builder()
+        switch (bundle.type()) {
+            case smithyBundle -> builder.smithyModeled(SmithyModeledBundleConfig.builder()
                     .name(id)
-                    .metadata(smithyBundle.getMetadata())
+                    .metadata(((SmithyMcpBundle) (bundle.getValue())).getMetadata())
                     .bundleLocation(location)
                     .local(isLocal)
                     .build());
-            case GenericBundle genericBundle -> {
+            case genericBundle -> {
+                GenericBundle genericBundle = bundle.getValue();
                 install(genericBundle.getInstall());
                 builder.genericConfig(
                         GenericToolBundleConfig.builder()

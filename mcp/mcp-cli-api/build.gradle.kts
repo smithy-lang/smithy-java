@@ -23,14 +23,6 @@ tasks.compileJava {
     options.compilerArgs.add("-Aproject=mcp-cli-api")
 }
 
-sourceSets {
-    main {
-        java {
-            srcDir("model")
-        }
-    }
-}
-
 afterEvaluate {
     val typePath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-type-codegen")
     sourceSets {
@@ -49,10 +41,6 @@ afterEvaluate {
 
 tasks.named("compileJava") {
     dependsOn("smithyBuild")
-}
-
-tasks.withType<JavaCompile> {
-    options.release.set(21)
 }
 
 // Needed because sources-jar needs to run after smithy-build is done
