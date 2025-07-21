@@ -45,7 +45,7 @@ structure TelemetryData {
     timings: Timings
 
     @required
-    exitCode: Integer
+    exitCode: PrimitiveInteger = 0
 
     params: String
 }
