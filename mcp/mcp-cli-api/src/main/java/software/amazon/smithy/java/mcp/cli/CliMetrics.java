@@ -43,6 +43,10 @@ public final class CliMetrics implements AutoCloseable {
                 .counters(counters)
                 .timings(timings)
                 .build();
-        telemetryPublisher.publish(telemetryData.build());
+        try {
+            telemetryPublisher.publish(telemetryData.build());
+        } catch (Exception ignored) {
+            //Do not fail if we can't publish telemetry.
+        }
     }
 }
