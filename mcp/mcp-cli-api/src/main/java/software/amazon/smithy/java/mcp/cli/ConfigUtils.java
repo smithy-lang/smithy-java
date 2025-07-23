@@ -511,7 +511,7 @@ public class ConfigUtils {
         boolean shouldCreateWrapper = true;
         List<String> args = List.of();
         String command = id;
-        if (bundle.getValue() instanceof GenericBundle genericBundle && genericBundle.isExecuteDirectly()) {
+        if (bundle.getValue() instanceof GenericBundle genericBundle) {
             command = genericBundle.getRun().getExecutable();
             args = genericBundle.getRun().getArgs();
             shouldCreateWrapper = false;
