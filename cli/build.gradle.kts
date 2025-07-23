@@ -27,6 +27,7 @@ dependencies {
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.engine)
     testImplementation(libs.junit.jupiter.params)
+    testImplementation(libs.junit.platform.launcher)
 }
 
 tasks.register<Copy>("copySmithyAwsTraits") {
