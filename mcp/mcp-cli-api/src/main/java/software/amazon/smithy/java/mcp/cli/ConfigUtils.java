@@ -7,9 +7,7 @@ package software.amazon.smithy.java.mcp.cli;
 
 import static software.amazon.smithy.java.io.ByteBufferUtils.getBytes;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -312,7 +310,7 @@ public class ConfigUtils {
                     .build());
             case genericBundle -> {
                 GenericBundle genericBundle = bundle.getValue();
-                validate(genericBundle);
+                validate(genericBundle, id);
                 install(genericBundle.getInstall());
                 builder.genericConfig(
                         GenericToolBundleConfig.builder()
@@ -331,9 +329,9 @@ public class ConfigUtils {
         return mcpBundleConfig;
     }
 
-    private static void validate(GenericBundle genericBundle) {
+    private static void validate(GenericBundle genericBundle, String id) {
         if (!genericBundle.isExecuteDirectly() &&
-                genericBundle.getRun().getExecutable().equals(genericBundle.getMetadata().getId())) {
+                genericBundle.getRun().getExecutable().equals(id)) {
             throw new IllegalStateException(
                     "The generic MCP run command has the same value as id which isn't allowed.");
         }
@@ -346,10 +344,10 @@ public class ConfigUtils {
             ProcessBuilder pb = new ProcessBuilder(execSpec.getExecutable());
             pb.command().addAll(execSpec.getArgs());
             pb.redirectErrorStream(true);
+            pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
             Process process = null;
             try {
                 process = pb.start();
-                String output = captureProcessOutput(process);
 
                 boolean finished = process.waitFor(5, TimeUnit.MINUTES);
 
@@ -364,8 +362,7 @@ public class ConfigUtils {
                     throw new RuntimeException(String.format(
                             "Installation failed with exit code %d. Command: %s. Output: %s",
                             exitCode,
-                            String.join(" ", pb.command()),
-                            output));
+                            String.join(" ", pb.command())));
                 }
 
             } catch (InterruptedException e) {
@@ -385,13 +382,6 @@ public class ConfigUtils {
                     process.destroyForcibly();
                 }
             }
-        }
-    }
-
-    private static String captureProcessOutput(Process process) throws IOException {
-        try (BufferedReader in =
-                new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-            return in.lines().collect(Collectors.joining(System.lineSeparator()));
         }
     }
 
