@@ -39,7 +39,7 @@ public class CreateGenericBundle extends AbstractCreateBundle<CreateGenericBundl
                         .description(input.description)
                         .build())
                 .artifact(new GenericArtifact.EmptyMember())
-                .executeDirectly(true);
+                .executeDirectly(input.executeDirectly);
 
         // Parse and add install commands
         if (input.installCommands != null && !input.installCommands.isEmpty()) {
@@ -52,6 +52,10 @@ public class CreateGenericBundle extends AbstractCreateBundle<CreateGenericBundl
 
         // Parse and add run command
         if (input.runCommand != null) {
+            if (!input.executeDirectly && input.runCommand.equals(input.id)) {
+                throw new IllegalArgumentException("Run command cannot be the same as the id for MCPs that are not " +
+                        "executed directly");
+            }
             genericBundleBuilder.run(parseExecSpec(input.runCommand));
         }
 
@@ -98,5 +102,8 @@ public class CreateGenericBundle extends AbstractCreateBundle<CreateGenericBundl
                         "Example: --run 'node server.js' or --run 'python main.py'",
                 required = true)
         protected String runCommand;
+
+        @Option(names = "--execute-directly", description = "Whether to execute the MCP server directly or via the CLI")
+        protected boolean executeDirectly = true; //TODO make this false once our MCP proxy is fully fleshed out.
     }
 }

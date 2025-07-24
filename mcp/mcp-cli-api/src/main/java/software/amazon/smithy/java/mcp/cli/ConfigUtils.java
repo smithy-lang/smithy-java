@@ -312,6 +312,7 @@ public class ConfigUtils {
                     .build());
             case genericBundle -> {
                 GenericBundle genericBundle = bundle.getValue();
+                validate(genericBundle);
                 install(genericBundle.getInstall());
                 builder.genericConfig(
                         GenericToolBundleConfig.builder()
@@ -328,6 +329,15 @@ public class ConfigUtils {
         writeMcpBundle(id, bundle);
         addMcpBundleConfig(config, id, mcpBundleConfig);
         return mcpBundleConfig;
+    }
+
+    private static void validate(GenericBundle genericBundle) {
+        if (!genericBundle.isExecuteDirectly() &&
+                genericBundle.getRun().getExecutable().equals(genericBundle.getMetadata().getId())) {
+            throw new IllegalStateException(
+                    "The generic MCP run command has the same value as id which isn't allowed.");
+        }
+
     }
 
     private static void install(List<ExecSpec> execSpecs) {
@@ -511,7 +521,7 @@ public class ConfigUtils {
         boolean shouldCreateWrapper = true;
         List<String> args = List.of();
         String command = id;
-        if (bundle.getValue() instanceof GenericBundle genericBundle) {
+        if (bundle.getValue() instanceof GenericBundle genericBundle && genericBundle.isExecuteDirectly()) {
             command = genericBundle.getRun().getExecutable();
             args = genericBundle.getRun().getArgs();
             shouldCreateWrapper = false;
