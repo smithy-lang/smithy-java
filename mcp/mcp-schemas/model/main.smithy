@@ -182,3 +182,68 @@ structure TextContent {
 
     text: String
 }
+
+structure ListPromptsResult {
+    prompts: PromptInfoList
+}
+
+list PromptInfoList {
+    member: PromptInfo
+}
+
+structure PromptArgument {
+    @required
+    name: String
+
+    description: String
+
+    required: Boolean
+}
+
+list PromptArgumentList {
+    member: PromptArgument
+}
+
+structure PromptInfo {
+    @required
+    name: String
+
+    description: String
+
+    arguments: PromptArgumentList
+
+    template: String
+}
+
+structure PromptMessageContent {
+    @required
+    type: PromptMessageContentType = "text"
+
+    text: String
+}
+
+enum PromptMessageContentType {
+    TEXT = "text"
+}
+
+structure PromptMessage {
+    @required
+    role: String
+
+    @required
+    content: PromptMessageContent
+}
+
+enum PromptRole {
+    USER = "user"
+    ASSISTANT = "assistant"
+}
+
+list PromptMessageList {
+    member: PromptMessage
+}
+
+structure GetPromptResult {
+    description: String
+    messages: PromptMessageList
+}

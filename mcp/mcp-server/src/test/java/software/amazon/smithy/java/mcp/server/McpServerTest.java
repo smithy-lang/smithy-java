@@ -358,6 +358,248 @@ public class McpServerTest {
         assertNotNull(response.getResult());
     }
 
+    @Test
+    void testPromptsList() {
+        server = McpServer.builder()
+                .input(input)
+                .output(output)
+                .addService(ProxyService.builder()
+                        .service(ShapeId.from("smithy.test#TestService"))
+                        .proxyEndpoint("http://localhost")
+                        .model(MODEL)
+                        .build())
+                .addModel(MODEL)
+                .build();
+
+        server.start();
+
+        write("prompts/list", Document.of(Map.of()));
+        var response = read();
+        var prompts = response.getResult().asStringMap().get("prompts").asList();
+
+        assertEquals(2, prompts.size());
+
+        // Check the prompt (service and operation have same name, so only one is returned)
+        var servicePrompt = prompts.stream()
+                .filter(p -> p.asStringMap().get("name").asString().equals("search_users"))
+                .findFirst()
+                .orElseThrow();
+        var servicePromptMap = servicePrompt.asStringMap();
+        assertEquals("search_users", servicePromptMap.get("name").asString());
+        assertEquals("Test Template", servicePromptMap.get("description").asString());
+        assertEquals("Search for if many results expected.", servicePromptMap.get("template").asString());
+        assertTrue(servicePromptMap.get("arguments").asList().isEmpty());
+    }
+
+    @Test
+    void testPromptsGetWithValidPrompt() {
+        server = McpServer.builder()
+                .input(input)
+                .output(output)
+                .addService(ProxyService.builder()
+                        .service(ShapeId.from("smithy.test#TestService"))
+                        .proxyEndpoint("http://localhost")
+                        .model(MODEL)
+                        .build())
+                .addModel(MODEL)
+                .build();
+
+        server.start();
+
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("search_users"))));
+        var response = read();
+        var result = response.getResult().asStringMap();
+
+        assertEquals("Test Template", result.get("description").asString());
+        var messages = result.get("messages").asList();
+        assertEquals(1, messages.size());
+
+        var message = messages.get(0).asStringMap();
+        assertEquals("user", message.get("role").asString());
+        var content = message.get("content").asStringMap();
+        assertEquals("text", content.get("type").asString());
+        assertEquals("Search for if many results expected.", content.get("text").asString());
+    }
+
+    @Test
+    void testPromptsGetWithInvalidPrompt() {
+        server = McpServer.builder()
+                .input(input)
+                .output(output)
+                .addService(ProxyService.builder()
+                        .service(ShapeId.from("smithy.test#TestService"))
+                        .proxyEndpoint("http://localhost")
+                        .model(MODEL)
+                        .build())
+                .addModel(MODEL)
+                .build();
+
+        server.start();
+
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("nonexistent_prompt"))));
+        var response = read();
+        assertNotNull(response.getError());
+        assertTrue(response.getError().getMessage().contains("Prompt not found: nonexistent_prompt"));
+    }
+
+    @Test
+    void testPromptsGetWithTemplateArguments() {
+        var modelWithArgs = Model.assembler()
+                .addUnparsedModel("test-with-args.smithy", PROMPT_WITH_ARGS)
+                .discoverModels()
+                .assemble()
+                .unwrap();
+
+        server = McpServer.builder()
+                .input(input)
+                .output(output)
+                .addService(ProxyService.builder()
+                        .service(ShapeId.from("smithy.test.args#TestServiceWithArgs"))
+                        .proxyEndpoint("http://localhost")
+                        .model(modelWithArgs)
+                        .build())
+                .addModel(modelWithArgs)
+                .build();
+
+        server.start();
+
+        // Test with arguments provided
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("search_with_args"),
+                        "arguments",
+                        Document.of(Map.of(
+                                "query",
+                                Document.of("test query"),
+                                "limit",
+                                Document.of("10"))))));
+        var response = read();
+        var result = response.getResult().asStringMap();
+
+        var messages = result.get("messages").asList();
+        var message = messages.get(0).asStringMap();
+        var content = message.get("content").asStringMap();
+        assertEquals("Search for test query with limit 10", content.get("text").asString());
+    }
+
+    @Test
+    void testPromptsGetWithMissingRequiredArguments() {
+        var modelWithArgs = Model.assembler()
+                .addUnparsedModel("test-with-args.smithy", PROMPT_WITH_ARGS)
+                .discoverModels()
+                .assemble()
+                .unwrap();
+
+        server = McpServer.builder()
+                .input(input)
+                .output(output)
+                .addService(ProxyService.builder()
+                        .service(ShapeId.from("smithy.test.args#TestServiceWithArgs"))
+                        .proxyEndpoint("http://localhost")
+                        .model(modelWithArgs)
+                        .build())
+                .addModel(modelWithArgs)
+                .build();
+
+        server.start();
+
+        // Test without required arguments
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("search_with_args"))));
+        var response = read();
+        var result = response.getResult().asStringMap();
+
+        var messages = result.get("messages").asList();
+        var message = messages.get(0).asStringMap();
+        assertEquals("user", message.get("role").asString());
+        var content = message.get("content").asStringMap();
+        assertTrue(content.get("text").asString().contains("missing arguments"));
+        assertTrue(content.get("text").asString().contains("query"));
+    }
+
+    @Test
+    void testApplyTemplateArgumentsEdgeCases() {
+        var modelEdgeCases = Model.assembler()
+                .addUnparsedModel("test-edge-cases.smithy", PROMPT_EDGE_CASES)
+                .discoverModels()
+                .assemble()
+                .unwrap();
+
+        server = McpServer.builder()
+                .input(input)
+                .output(output)
+                .addService(ProxyService.builder()
+                        .service(ShapeId.from("smithy.test.edge#TestServiceEdgeCases"))
+                        .proxyEndpoint("http://localhost")
+                        .model(modelEdgeCases)
+                        .build())
+                .addModel(modelEdgeCases)
+                .build();
+
+        server.start();
+
+        // Test with empty template
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("empty_template"))));
+        var response = read();
+        var result = response.getResult().asStringMap();
+        var messages = result.get("messages").asList();
+        var message = messages.get(0).asStringMap();
+        var content = message.get("content").asStringMap();
+        assertEquals("", content.get("text").asString());
+
+        // Test with no placeholders
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("no_placeholders"))));
+        response = read();
+        result = response.getResult().asStringMap();
+        messages = result.get("messages").asList();
+        message = messages.get(0).asStringMap();
+        content = message.get("content").asStringMap();
+        assertEquals("This has no placeholders", content.get("text").asString());
+
+        // Test with multiple same placeholders
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("duplicate_placeholders"),
+                        "arguments",
+                        Document.of(Map.of(
+                                "name",
+                                Document.of("John"))))));
+        response = read();
+        result = response.getResult().asStringMap();
+        messages = result.get("messages").asList();
+        message = messages.get(0).asStringMap();
+        content = message.get("content").asStringMap();
+        assertEquals("Hello John, welcome John!", content.get("text").asString());
+
+        // Test with missing argument (should leave placeholder as-is when no arguments provided)
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("missing_arg_template"))));
+        response = read();
+        result = response.getResult().asStringMap();
+        messages = result.get("messages").asList();
+        message = messages.get(0).asStringMap();
+        content = message.get("content").asStringMap();
+        assertEquals("Hello {{name}}, how are you?", content.get("text").asString());
+    }
+
     private void validateNestedStructure(Map<String, Document> properties) {
         var nestedStr = properties.get("nestedStr").asStringMap();
         assertEquals("string", nestedStr.get("type").asString());
@@ -407,88 +649,162 @@ public class McpServerTest {
         input.write("\n");
     }
 
-    private static final String MODEL_STR = """
-            $version: "2"
+    private static final String MODEL_STR =
+            """
+                    $version: "2"
 
-            namespace smithy.test
+                    namespace smithy.test
 
-            /// A TestService
-            @aws.protocols#awsJson1_0
-            service TestService {
-                operations: [TestOperation]
-            }
+                    use amazon.smithy.llm#prompts
 
-            /// A TestOperation
-            operation TestOperation {
-                input: TestInput
-                output: TestInput
-            }
+                    /// A TestService
+                    @aws.protocols#awsJson1_0
+                    @prompts({
+                        search_users: { description: "Test Template", template: "Search for if many results expected." }
+                    })
+                    service TestService {
+                        operations: [TestOperation]
+                    }
 
-            /// An input for TestOperation with a nested member
-            structure TestInput {
-                /// It's a string
-                str: String
+                    /// A TestOperation
+                    @prompts({
+                        perform_operation: { description: "perform operation", template: "use tool TestOperation with some information." }
+                    })
+                    operation TestOperation {
+                        input: TestInput
+                        output: TestInput
+                    }
 
-                /// The nested member
-                nested: Nested
+                    /// An input for TestOperation with a nested member
+                    structure TestInput {
+                        /// It's a string
+                        str: String
 
-                list: NestedList
+                        /// The nested member
+                        nested: Nested
 
-                doubleNestedList: DoubleNestedList
+                        list: NestedList
 
-                bigDecimalField: BigDecimal
+                        doubleNestedList: DoubleNestedList
 
-                bigIntegerField: BigInteger
+                        bigDecimalField: BigDecimal
 
-                blobField: Blob
+                        bigIntegerField: BigInteger
 
-                nestedWithBigNumbers: NestedWithBigNumbers
-            }
+                        blobField: Blob
 
-            list NestedList {
-                member: Nested
-            }
+                        nestedWithBigNumbers: NestedWithBigNumbers
+                    }
 
-            list DoubleNestedList {
-                member: NestedList
-            }
+                    list NestedList {
+                        member: Nested
+                    }
 
-            /// A structure that can be nested
-            structure Nested {
-                /// A string that's nested
-                nestedStr: String
+                    list DoubleNestedList {
+                        member: NestedList
+                    }
 
-                /// A document that's nested
-                nestedDocument: Document
+                    /// A structure that can be nested
+                    structure Nested {
+                        /// A string that's nested
+                        nestedStr: String
 
-                /// A field that recurses back into us
-                recursive: Recursive
-            }
+                        /// A document that's nested
+                        nestedDocument: Document
 
-            /// A structure that references itself recursively
-            structure Recursive {
-                /// the nested field that points back to us
-                nested: Nested
-            }
+                        /// A field that recurses back into us
+                        recursive: Recursive
+                    }
 
-            /// A structure containing big number types
-            structure NestedWithBigNumbers {
-                /// A nested BigDecimal
-                nestedBigDecimal: BigDecimal
+                    /// A structure that references itself recursively
+                    structure Recursive {
+                        /// the nested field that points back to us
+                        nested: Nested
+                    }
 
-                /// A nested BigInteger
-                nestedBigInteger: BigInteger
+                    /// A structure containing big number types
+                    structure NestedWithBigNumbers {
+                        /// A nested BigDecimal
+                        nestedBigDecimal: BigDecimal
 
-                /// A nested Blob
-                nestedBlob: Blob
+                        /// A nested BigInteger
+                        nestedBigInteger: BigInteger
 
-                /// A list of BigDecimals
-                bigDecimalList: BigDecimalList
-            }
+                        /// A nested Blob
+                        nestedBlob: Blob
 
-            list BigDecimalList {
-                member: BigDecimal
-            }""";
+                        /// A list of BigDecimals
+                        bigDecimalList: BigDecimalList
+                    }
+
+                    list BigDecimalList {
+                        member: BigDecimal
+                    }""";
+
+    private static final String PROMPT_WITH_ARGS =
+            """
+                    $version: "2"
+
+                    namespace smithy.test.args
+
+                    use amazon.smithy.llm#prompts
+                    use aws.protocols#awsJson1_0
+
+                    @awsJson1_0
+                    @prompts({
+                        search_with_args: {
+                            description: "Search with arguments",
+                            template: "Search for {{query}} with limit {{limit}}",
+                            arguments: SearchArgs
+                        }
+                    })
+                    service TestServiceWithArgs {
+                        operations: []
+                    }
+
+                    structure SearchArgs {
+                        @required
+                        query: String
+
+                        limit: String
+                    }""";
+
+    private static final String PROMPT_EDGE_CASES =
+            """
+                    $version: "2"
+
+                    namespace smithy.test.edge
+
+                    use amazon.smithy.llm#prompts
+                    use aws.protocols#awsJson1_0
+
+                    @awsJson1_0
+                    @prompts({
+                        empty_template: {
+                            description: "Empty template",
+                            template: ""
+                        },
+                        no_placeholders: {
+                            description: "No placeholders",
+                            template: "This has no placeholders"
+                        },
+                        duplicate_placeholders: {
+                            description: "Duplicate placeholders",
+                            template: "Hello {{name}}, welcome {{name}}!",
+                            arguments: NameArgs
+                        },
+                        missing_arg_template: {
+                            description: "Missing argument",
+                            template: "Hello {{name}}, how are you?"
+                        }
+                    })
+                    service TestServiceEdgeCases {
+                        operations: []
+                    }
+
+                    structure NameArgs {
+                        name: String
+                    }""";
 
     private static final Model MODEL = Model.assembler()
             .addUnparsedModel("test.smithy", MODEL_STR)

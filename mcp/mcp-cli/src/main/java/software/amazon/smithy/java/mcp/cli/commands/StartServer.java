@@ -164,7 +164,11 @@ public final class StartServer extends SmithyMcpCommand {
             }
 
             this.mcpServer =
-                    (McpServer) McpServer.builder().stdio().addServices(services).name("smithy-mcp-server").build();
+                    (McpServer) McpServer.builder()
+                            .stdio()
+                            .addServices(services)
+                            .name("smithy-mcp-server")
+                            .build();
             mcpServer.start();
             awaitCompletion = mcpServer::awaitCompletion;
             shutdownMethod = mcpServer::shutdown;
@@ -185,6 +189,7 @@ public final class StartServer extends SmithyMcpCommand {
     private static Service bundleToService(SmithyModeledBundleConfig bundleConfig) {
         Service service =
                 McpBundles.getService(ConfigUtils.getMcpBundle(bundleConfig.getName()));
+
         if (bundleConfig.hasAllowListedTools() || bundleConfig.hasBlockListedTools()) {
             var filter = OperationFilters.allowList(bundleConfig.getAllowListedTools())
                     .and(OperationFilters.blockList(bundleConfig.getBlockListedTools()));

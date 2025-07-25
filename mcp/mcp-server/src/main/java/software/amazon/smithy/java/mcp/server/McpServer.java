@@ -41,7 +41,10 @@ import software.amazon.smithy.java.mcp.model.JsonPrimitiveType;
 import software.amazon.smithy.java.mcp.model.JsonRpcErrorResponse;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
+import software.amazon.smithy.java.mcp.model.ListPromptsResult;
 import software.amazon.smithy.java.mcp.model.ListToolsResult;
+import software.amazon.smithy.java.mcp.model.PromptInfo;
+import software.amazon.smithy.java.mcp.model.Prompts;
 import software.amazon.smithy.java.mcp.model.ServerInfo;
 import software.amazon.smithy.java.mcp.model.TextContent;
 import software.amazon.smithy.java.mcp.model.ToolInfo;
@@ -66,6 +69,8 @@ public final class McpServer implements Server {
             .build();
 
     private final Map<String, Tool> tools;
+    private final Map<String, PromptInfo> prompts;
+    private final PromptProcessor promptProcessor;
     private final Thread listener;
     private final InputStream is;
     private final OutputStream os;
@@ -75,6 +80,8 @@ public final class McpServer implements Server {
 
     McpServer(McpServerBuilder builder) {
         this.tools = createTools(builder.serviceList);
+        this.prompts = PromptLoader.loadPrompts(builder.modelList);
+        this.promptProcessor = new PromptProcessor();
         this.is = builder.is;
         this.os = builder.os;
         this.name = builder.name;
@@ -113,12 +120,29 @@ public final class McpServer implements Server {
                         InitializeResult.builder()
                                 .capabilities(Capabilities.builder()
                                         .tools(Tools.builder().listChanged(true).build())
+                                        .prompts(Prompts.builder().listChanged(true).build())
                                         .build())
                                 .serverInfo(ServerInfo.builder()
                                         .name(name)
                                         .version("1.0.0")
                                         .build())
                                 .build());
+                case "prompts/list" -> writeResponse(req.getId(),
+                        ListPromptsResult.builder().prompts(prompts.values().stream().toList()).build());
+                case "prompts/get" -> {
+                    var promptName = req.getParams().getMember("name").asString();
+                    var promptArguments = req.getParams().getMember("arguments");
+
+                    var prompt = prompts.get(promptName);
+
+                    if (prompt == null) {
+                        internalError(req, new RuntimeException("Prompt not found: " + promptName));
+                        return;
+                    }
+
+                    var result = promptProcessor.buildPromptResult(prompt, promptArguments);
+                    writeResponse(req.getId(), result);
+                }
                 case "tools/list" -> writeResponse(req.getId(),
                         ListToolsResult.builder().tools(tools.values().stream().map(Tool::toolInfo).toList()).build());
                 case "tools/call" -> {

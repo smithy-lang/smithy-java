@@ -10,6 +10,7 @@ dependencies {
     val smithyJavaVersion: String by project
 
     smithyBuild("software.amazon.smithy.java:plugins:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:mcp-traits:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:mcp-server:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:server-proxy:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:server-netty:$smithyJavaVersion")

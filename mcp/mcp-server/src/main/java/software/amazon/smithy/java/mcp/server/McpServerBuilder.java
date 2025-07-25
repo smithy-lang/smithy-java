@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.Service;
+import software.amazon.smithy.model.Model;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
@@ -22,6 +23,7 @@ public final class McpServerBuilder {
     OutputStream os;
     List<Service> serviceList = new ArrayList<>();
     List<McpServerProxy> proxyList = new ArrayList<>();
+    List<Model> modelList = new ArrayList<>();
     String name;
 
     McpServerBuilder() {}
@@ -64,6 +66,16 @@ public final class McpServerBuilder {
 
     public McpServerBuilder addMcpService(McpServerProxy proxy) {
         proxyList.add(proxy);
+        return this;
+    }
+
+    public McpServerBuilder addModel(Model... model) {
+        modelList.addAll(Arrays.asList(model));
+        return this;
+    }
+
+    public McpServerBuilder addModels(List<Model> models) {
+        modelList.addAll(models);
         return this;
     }
 

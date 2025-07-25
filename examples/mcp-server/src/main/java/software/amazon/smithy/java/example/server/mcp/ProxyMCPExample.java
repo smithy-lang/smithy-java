@@ -5,6 +5,7 @@ import software.amazon.smithy.java.example.server.mcp.operations.GetCodingStatis
 import software.amazon.smithy.java.example.server.mcp.operations.GetEmployeeDetails;
 import software.amazon.smithy.java.example.server.mcp.service.EmployeeService;
 import software.amazon.smithy.java.mcp.server.McpServer;
+import software.amazon.smithy.java.mcp.server.PromptLoader;
 import software.amazon.smithy.java.server.ProxyService;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.model.Model;
@@ -42,6 +43,7 @@ public class ProxyMCPExample {
                 .stdio()
                 .name("smithy-mcp-server")
                 .addService(mcpService)
+                .addModel(model)
                 .build();
         mcpServer.start();
 
