@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.framework.model.UnknownOperationException;
@@ -77,6 +78,11 @@ public class FilteredServiceTest {
         @Override
         public TypeRegistry typeRegistry() {
             return mockTypeRegistry;
+        }
+
+        @Override
+        public SchemaIndex schemaIndex() {
+            throw new UnsupportedOperationException();
         }
     }
 

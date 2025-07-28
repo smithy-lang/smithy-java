@@ -22,6 +22,7 @@ import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -49,6 +50,7 @@ public final class ProxyService implements Service {
     private final TypeRegistry serviceErrorRegistry;
     private final List<Operation<? extends SerializableStruct, ? extends SerializableStruct>> allOperations;
     private final Schema schema;
+    private final SchemaIndex schemaIndex;
 
     private ProxyService(Builder builder) {
         var model = builder.model;
@@ -130,6 +132,7 @@ public final class ProxyService implements Service {
             }
         }
         this.schema = schemaConverter.getSchema(service);
+        this.schemaIndex = schemaConverter.getSchemaIndex();
     }
 
     private Operation<StructDocument, StructDocument> createServerOperation(
@@ -194,6 +197,11 @@ public final class ProxyService implements Service {
     @Override
     public TypeRegistry typeRegistry() {
         return serviceErrorRegistry;
+    }
+
+    @Override
+    public SchemaIndex schemaIndex() {
+        return schemaIndex;
     }
 
     public static Builder builder() {

@@ -13,6 +13,7 @@ import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -76,6 +77,11 @@ public class TestStructs {
 
         @Override
         public TypeRegistry typeRegistry() {
+            return null;
+        }
+
+        @Override
+        public SchemaIndex schemaIndex() {
             return null;
         }
     }

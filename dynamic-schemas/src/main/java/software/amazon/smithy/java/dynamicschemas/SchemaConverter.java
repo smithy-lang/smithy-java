@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaBuilder;
+import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.Shape;
@@ -188,5 +189,14 @@ public final class SchemaConverter {
                 builder.putMember(member.getMemberName(), targetSchema, memberTraits);
             }
         }
+    }
+
+    public SchemaIndex getSchemaIndex() {
+        return new SchemaIndex() {
+            @Override
+            public Schema getSchema(ShapeId id) {
+                return SchemaConverter.this.getSchema(model.expectShape(id));
+            }
+        };
     }
 }

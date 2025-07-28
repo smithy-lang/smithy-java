@@ -7,6 +7,7 @@ package software.amazon.smithy.java.server;
 
 import java.util.List;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 
@@ -24,4 +25,6 @@ public interface Service {
     Schema schema();
 
     TypeRegistry typeRegistry();
+
+    SchemaIndex schemaIndex();
 }

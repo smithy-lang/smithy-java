@@ -36,4 +36,9 @@ public final class ServerSymbolProperties {
      * Name to use for the operation when used as a field inside the service.
      */
     public static final Property<String> OPERATION_FIELD_NAME = Property.named("operation-field-name");
+
+    /**
+     * Namespace under which types of this service would be generated.
+     */
+    public static final Property<String> TYPES_NAMESPACE = Property.named("types-namespace");
 }

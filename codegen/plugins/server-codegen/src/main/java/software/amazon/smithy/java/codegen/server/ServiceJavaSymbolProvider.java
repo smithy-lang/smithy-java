@@ -70,6 +70,7 @@ public final class ServiceJavaSymbolProvider extends JavaSymbolProvider {
                         CodegenUtils.getServiceExceptionSymbol(packageNamespace(), serviceName))
                 .putProperty(SymbolProperties.SERVICE_API_SERVICE,
                         CodegenUtils.getServiceApiSymbol(packageNamespace(), serviceName))
+                .putProperty(ServerSymbolProperties.TYPES_NAMESPACE, format("%s.model", packageNamespace()))
                 .namespace(format("%s.service", packageNamespace()), ".")
                 .declarationFile(format("./%s/service/%s.java", packageNamespace().replace(".", "/"), serviceName))
                 .build();

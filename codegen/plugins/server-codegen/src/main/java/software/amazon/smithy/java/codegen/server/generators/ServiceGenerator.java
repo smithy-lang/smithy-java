@@ -23,6 +23,7 @@ import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.framework.model.UnknownOperationException;
@@ -55,6 +56,8 @@ public final class ServiceGenerator implements
                 })
                 .toList();
         var operations = operationsInfo.stream().map(OperationInfo::symbol).toList();
+        var generatedSchemaIndex =
+                directive.symbol().expectProperty(ServerSymbolProperties.TYPES_NAMESPACE) + ".GeneratedSchemaIndex";
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
             var template =
@@ -72,6 +75,8 @@ public final class ServiceGenerator implements
                                 ${constructor:C|}
 
                                 ${builder:C|}
+
+                                private static final ${schemaIndex:T} SCHEMA_INDEX = new ${generatedSchemaIndex:L}();
 
                                 @Override
                                 @SuppressWarnings("unchecked")
@@ -93,6 +98,11 @@ public final class ServiceGenerator implements
                                 public ${typeRegistryClass:T} typeRegistry() {
                                     return TYPE_REGISTRY;
                                 }
+
+                                @Override
+                                public ${schemaIndex:T} schemaIndex() {
+                                    return SCHEMA_INDEX;
+                                }
                             }
                             """;
             writer.putContext("operationHolder", Operation.class);
@@ -102,6 +112,8 @@ public final class ServiceGenerator implements
             writer.putContext("service", directive.symbol());
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext("typeRegistryClass", TypeRegistry.class);
+            writer.putContext("schemaIndex", SchemaIndex.class);
+            writer.putContext("generatedSchemaIndex", generatedSchemaIndex);
             var errorSymbols = getImplicitErrorSymbols(
                     directive.symbolProvider(),
                     directive.model(),

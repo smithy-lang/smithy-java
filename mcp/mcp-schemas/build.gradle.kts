@@ -50,8 +50,59 @@ tasks.named("compileJava") {
 // Needed because sources-jar needs to run after smithy-build is done
 tasks.sourcesJar {
     mustRunAfter(tasks.compileJava)
+    configureServiceFileMerging()
 }
 
 tasks.processResources {
     dependsOn(tasks.compileJava)
+    configureServiceFileMerging()
+}
+
+interface Injected {
+    @get:Inject val fs: FileSystemOperations
+}
+
+fun AbstractCopyTask.configureServiceFileMerging() {
+    val serviceEntries = mutableMapOf<String, MutableSet<String>>()
+    val tempServicesDir = temporaryDir // Capture at configuration time
+
+    // Configure Jar tasks to include temp directory at configuration time
+    if (this is Jar) {
+        from(tempServicesDir)
+    }
+
+    eachFile {
+        if (path.startsWith("META-INF/services/")) {
+            val serviceName = path.substring("META-INF/services/".length)
+
+            if (!serviceEntries.containsKey(serviceName)) {
+                serviceEntries[serviceName] = mutableListOf()
+            }
+
+            serviceEntries[serviceName]!!.addAll(
+                file
+                    .readLines()
+                    .filter { it.trim().isNotEmpty() }
+                    .map { it.trim() },
+            )
+
+            exclude()
+        }
+    }
+
+    doLast {
+        val outputDir =
+            when (this) {
+                is ProcessResources -> this.destinationDir
+                else -> tempServicesDir
+            }
+
+        val servicesDir = File(outputDir, "META-INF/services")
+        servicesDir.mkdirs()
+
+        serviceEntries.forEach { (serviceName, lines) ->
+            val serviceFile = File(servicesDir, serviceName)
+            serviceFile.writeText(lines.joinToString("\n") + "\n")
+        }
+    }
 }

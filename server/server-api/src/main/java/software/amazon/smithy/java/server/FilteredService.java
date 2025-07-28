@@ -13,6 +13,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.framework.model.UnknownOperationException;
@@ -94,5 +95,10 @@ public final class FilteredService implements Service {
     @Override
     public TypeRegistry typeRegistry() {
         return delegate.typeRegistry();
+    }
+
+    @Override
+    public SchemaIndex schemaIndex() {
+        return delegate.schemaIndex();
     }
 }

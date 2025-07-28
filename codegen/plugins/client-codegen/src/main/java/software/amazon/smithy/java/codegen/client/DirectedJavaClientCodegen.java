@@ -18,6 +18,7 @@ import software.amazon.smithy.java.codegen.generators.ListGenerator;
 import software.amazon.smithy.java.codegen.generators.MapGenerator;
 import software.amazon.smithy.java.codegen.generators.OperationGenerator;
 import software.amazon.smithy.java.codegen.generators.ResourceGenerator;
+import software.amazon.smithy.java.codegen.generators.SchemaIndexGenerator;
 import software.amazon.smithy.java.codegen.generators.SchemasGenerator;
 import software.amazon.smithy.java.codegen.generators.ServiceExceptionGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
@@ -128,6 +129,7 @@ final class DirectedJavaClientCodegen
         if (!directive.settings().useExternalTypes()) {
             new SchemasGenerator().accept(directive);
             new SharedSerdeGenerator().accept(directive);
+            new SchemaIndexGenerator().accept(directive);
         }
     }
 }

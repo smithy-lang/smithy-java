@@ -5,8 +5,7 @@
 
 package software.amazon.smithy.java.codegen.types;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.net.URL;
@@ -48,17 +47,18 @@ public class CodegenTest {
         var settings = settingsBuilder.build();
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
-        assertEquals(7, manifest.getFiles().size());
-        assertThat(
-                manifest.getFiles(),
-                containsInAnyOrder(
+        assertThat(manifest.getFiles())
+                .hasSize(9)
+                .containsExactlyInAnyOrder(
                         Path.of("/test/smithy/codegen/types/test/model/EnumShape.java"),
                         Path.of("/test/smithy/codegen/types/test/model/IntEnumShape.java"),
                         Path.of("/test/smithy/codegen/types/test/model/Schemas.java"),
                         Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
                         Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
                         Path.of("/test/smithy/codegen/types/test/model/UnionShape.java"),
-                        Path.of("/META-INF/smithy-java/type-mappings.properties")));
+                        Path.of("/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
+                        Path.of("/META-INF/smithy-java/type-mappings.properties"),
+                        Path.of("/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"));
     }
 
     @Test
@@ -68,14 +68,15 @@ public class CodegenTest {
                 .build();
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
-        assertEquals(4, manifest.getFiles().size());
-        assertThat(
-                manifest.getFiles(),
-                containsInAnyOrder(
+        assertThat(manifest.getFiles())
+                .hasSize(6)
+                .containsExactlyInAnyOrder(
                         Path.of("/test/smithy/codegen/types/test/model/Schemas.java"),
                         Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
                         Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
-                        Path.of("/META-INF/smithy-java/type-mappings.properties")));
+                        Path.of("/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
+                        Path.of("/META-INF/smithy-java/type-mappings.properties"),
+                        Path.of("/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"));
     }
 
     @Test
@@ -86,15 +87,17 @@ public class CodegenTest {
                 .build();
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
-        assertEquals(5, manifest.getFiles().size());
-        assertThat(
-                manifest.getFiles(),
-                containsInAnyOrder(
+        assertEquals(7, manifest.getFiles().size());
+        assertThat(manifest.getFiles())
+                .hasSize(7)
+                .containsExactlyInAnyOrder(
                         Path.of("/test/smithy/codegen/types/test/model/Schemas.java"),
                         Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
                         Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
                         Path.of("/test/smithy/codegen/types/test/model/UnionShape.java"),
-                        Path.of("/META-INF/smithy-java/type-mappings.properties")));
+                        Path.of("/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
+                        Path.of("/META-INF/smithy-java/type-mappings.properties"),
+                        Path.of("/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"));
     }
 
 }

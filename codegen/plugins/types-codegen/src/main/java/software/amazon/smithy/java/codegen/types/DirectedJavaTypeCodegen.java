@@ -25,6 +25,7 @@ import software.amazon.smithy.java.codegen.JavaSymbolProvider;
 import software.amazon.smithy.java.codegen.generators.EnumGenerator;
 import software.amazon.smithy.java.codegen.generators.ListGenerator;
 import software.amazon.smithy.java.codegen.generators.MapGenerator;
+import software.amazon.smithy.java.codegen.generators.SchemaIndexGenerator;
 import software.amazon.smithy.java.codegen.generators.SchemasGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
@@ -101,6 +102,7 @@ final class DirectedJavaTypeCodegen
     public void customizeBeforeIntegrations(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         new SharedSerdeGenerator().accept(directive);
         new SchemasGenerator().accept(directive);
+        new SchemaIndexGenerator().accept(directive);
     }
 
     @Override
