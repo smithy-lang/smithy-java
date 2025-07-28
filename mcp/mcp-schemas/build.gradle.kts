@@ -76,7 +76,7 @@ fun AbstractCopyTask.configureServiceFileMerging() {
             val serviceName = path.substring("META-INF/services/".length)
 
             if (!serviceEntries.containsKey(serviceName)) {
-                serviceEntries[serviceName] = mutableListOf()
+                serviceEntries[serviceName] = mutableSetOf()
             }
 
             serviceEntries[serviceName]!!.addAll(
