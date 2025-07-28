@@ -35,8 +35,10 @@ public final class StdioProxy extends McpServerProxy {
     private BufferedWriter writer;
     private final Lock writeLock = new ReentrantLock();
     private Thread responseReaderThread;
+    private Thread errorReaderThread;
     private final Map<String, CompletableFuture<JsonRpcResponse>> pendingRequests = new ConcurrentHashMap<>();
     private volatile boolean running = false;
+    private final String name;
 
     private StdioProxy(Builder builder) {
         processBuilder = new ProcessBuilder();
@@ -51,13 +53,21 @@ public final class StdioProxy extends McpServerProxy {
             processBuilder.environment().putAll(builder.environmentVariables);
         }
 
+        this.name = builder.name;
+
         processBuilder.redirectErrorStream(false); // Keep stderr separate
     }
 
     public static class Builder {
         private String command;
+        private String name;
         private List<String> arguments;
         private Map<String, String> environmentVariables;
+
+        public Builder name(String name) {
+            this.name = name;
+            return this;
+        }
 
         public Builder command(String command) {
             this.command = command;
@@ -138,7 +148,7 @@ public final class StdioProxy extends McpServerProxy {
             running = true;
 
             // Start a thread to consume stderr so it doesn't block
-            Thread stderrConsumer = Thread.ofVirtual().start(() -> {
+            errorReaderThread = Thread.ofVirtual().start(() -> {
                 try (BufferedReader errorReader = new BufferedReader(
                         new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
                     String line;
@@ -149,8 +159,6 @@ public final class StdioProxy extends McpServerProxy {
                     LOG.debug("Error reading MCP server stderr", e);
                 }
             });
-            stderrConsumer.setDaemon(true);
-            stderrConsumer.start();
 
             // Start a thread to read responses asynchronously
             responseReaderThread = Thread.ofVirtual()
@@ -227,6 +235,10 @@ public final class StdioProxy extends McpServerProxy {
                         responseReaderThread.interrupt();
                     }
 
+                    if (errorReaderThread != null && errorReaderThread.isAlive()) {
+                        errorReaderThread.interrupt();
+                    }
+
                     // Destroy the process
                     process.destroy();
 
@@ -241,5 +253,10 @@ public final class StdioProxy extends McpServerProxy {
                 }
             }
         });
+    }
+
+    @Override
+    public String name() {
+        return this.name;
     }
 }

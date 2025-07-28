@@ -9,7 +9,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.Service;
@@ -20,9 +22,10 @@ public final class McpServerBuilder {
 
     InputStream is;
     OutputStream os;
-    List<Service> serviceList = new ArrayList<>();
+    Map<String, Service> services = new HashMap<>();
     List<McpServerProxy> proxyList = new ArrayList<>();
     String name;
+    ToolFilter toolFilter = (server, tool) -> true;
 
     McpServerBuilder() {}
 
@@ -52,25 +55,30 @@ public final class McpServerBuilder {
         return new McpServer(this);
     }
 
-    public McpServerBuilder addService(Service... service) {
-        serviceList.addAll(Arrays.asList(service));
+    public McpServerBuilder addService(String id, Service service) {
+        services.put(id, service);
         return this;
     }
 
-    public McpServerBuilder addServices(List<Service> services) {
-        serviceList.addAll(services);
+    public McpServerBuilder addService(Map<String, Service> services) {
+        this.services.putAll(services);
         return this;
     }
 
-    public McpServerBuilder addMcpService(McpServerProxy proxy) {
-        proxyList.add(proxy);
+    public McpServerBuilder addService(McpServerProxy... proxy) {
+        proxyList.addAll(Arrays.asList(proxy));
+        return this;
+    }
+
+    public McpServerBuilder toolFilter(ToolFilter filter) {
+        this.toolFilter = filter;
         return this;
     }
 
     private void validate() {
         Objects.requireNonNull(is, "MCP server input stream is required");
         Objects.requireNonNull(os, "MCP server output stream is required");
-        if (serviceList.isEmpty() && proxyList.isEmpty()) {
+        if (services.isEmpty() && proxyList.isEmpty()) {
             throw new IllegalArgumentException("MCP server requires at least one service or proxy");
         }
     }

@@ -14,7 +14,7 @@ public final class BundleMCPServerExample {
             var mcpServer = McpServer.builder()
                 .stdio()
                 .name("smithy-mcp-server")
-                .addService(McpBundles.getService(bundle.getValue()))
+                .addService("dynamodb-mcp", McpBundles.getService(bundle.getValue()))
                 .build();
 
             mcpServer.start();

@@ -63,11 +63,12 @@ public class McpServerTest {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
-                .addService(ProxyService.builder()
-                        .service(ShapeId.from("smithy.test#TestService"))
-                        .proxyEndpoint("http://localhost")
-                        .model(MODEL)
-                        .build())
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
                 .build();
 
         server.start();
@@ -81,8 +82,7 @@ public class McpServerTest {
         var properties = inputSchema.get("properties").asStringMap();
 
         assertEquals("TestOperation", tool.get("name").asString());
-        assertEquals("This tool invokes TestOperation API of TestService.A TestOperation",
-                tool.get("description").asString());
+        assertEquals("A TestOperation", tool.get("description").asString());
         assertEquals("object", inputSchema.get("type").asString());
         assertEquals("An input for TestOperation with a nested member",
                 inputSchema.get("description").asString());
@@ -124,11 +124,12 @@ public class McpServerTest {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
-                .addService(ProxyService.builder()
-                        .service(ShapeId.from("smithy.test#TestService"))
-                        .proxyEndpoint("http://localhost")
-                        .model(MODEL)
-                        .build())
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
                 .build();
 
         server.start();
@@ -168,11 +169,12 @@ public class McpServerTest {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
-                .addService(ProxyService.builder()
-                        .service(ShapeId.from("smithy.test#TestService"))
-                        .proxyEndpoint("http://localhost")
-                        .model(MODEL)
-                        .build())
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
                 .build();
 
         server.start();
@@ -209,11 +211,12 @@ public class McpServerTest {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
-                .addService(ProxyService.builder()
-                        .service(ShapeId.from("smithy.test#TestService"))
-                        .proxyEndpoint("http://localhost")
-                        .model(MODEL)
-                        .build())
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
                 .build();
 
         server.start();
@@ -231,18 +234,20 @@ public class McpServerTest {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
-                .addService(ProxyService.builder()
-                        .service(ShapeId.from("smithy.test#TestService"))
-                        .proxyEndpoint("http://localhost")
-                        .clientConfigurator(
-                                clientConfigurator -> clientConfigurator.addInterceptor(new ClientInterceptor() {
-                                    @Override
-                                    public void readBeforeSerialization(InputHook<?, ?> hook) {
-                                        capturedInput.set((StructDocument) hook.input());
-                                    }
-                                }))
-                        .model(MODEL)
-                        .build())
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .clientConfigurator(
+                                        clientConfigurator -> clientConfigurator
+                                                .addInterceptor(new ClientInterceptor() {
+                                                    @Override
+                                                    public void readBeforeSerialization(InputHook<?, ?> hook) {
+                                                        capturedInput.set((StructDocument) hook.input());
+                                                    }
+                                                }))
+                                .model(MODEL)
+                                .build())
                 .build();
 
         server.start();
@@ -335,11 +340,12 @@ public class McpServerTest {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
-                .addService(ProxyService.builder()
-                        .service(ShapeId.from("smithy.test#TestService"))
-                        .proxyEndpoint("http://localhost")
-                        .model(MODEL)
-                        .build())
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
                 .build();
 
         server.start();
@@ -363,11 +369,12 @@ public class McpServerTest {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
-                .addService(ProxyService.builder()
-                        .service(ShapeId.from("smithy.test#TestService"))
-                        .proxyEndpoint("http://localhost")
-                        .model(MODEL)
-                        .build())
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
                 .build();
 
         server.start();
@@ -395,11 +402,12 @@ public class McpServerTest {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
-                .addService(ProxyService.builder()
-                        .service(ShapeId.from("smithy.test#TestService"))
-                        .proxyEndpoint("http://localhost")
-                        .model(MODEL)
-                        .build())
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
                 .build();
 
         server.start();
@@ -427,11 +435,12 @@ public class McpServerTest {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
-                .addService(ProxyService.builder()
-                        .service(ShapeId.from("smithy.test#TestService"))
-                        .proxyEndpoint("http://localhost")
-                        .model(MODEL)
-                        .build())
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
                 .build();
 
         server.start();
@@ -456,11 +465,12 @@ public class McpServerTest {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
-                .addService(ProxyService.builder()
-                        .service(ShapeId.from("smithy.test.args#TestServiceWithArgs"))
-                        .proxyEndpoint("http://localhost")
-                        .model(modelWithArgs)
-                        .build())
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.args#TestServiceWithArgs"))
+                                .proxyEndpoint("http://localhost")
+                                .model(modelWithArgs)
+                                .build())
                 .build();
 
         server.start();
@@ -496,11 +506,12 @@ public class McpServerTest {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
-                .addService(ProxyService.builder()
-                        .service(ShapeId.from("smithy.test.args#TestServiceWithArgs"))
-                        .proxyEndpoint("http://localhost")
-                        .model(modelWithArgs)
-                        .build())
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.args#TestServiceWithArgs"))
+                                .proxyEndpoint("http://localhost")
+                                .model(modelWithArgs)
+                                .build())
                 .build();
 
         server.start();
@@ -532,11 +543,12 @@ public class McpServerTest {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
-                .addService(ProxyService.builder()
-                        .service(ShapeId.from("smithy.test.edge#TestServiceEdgeCases"))
-                        .proxyEndpoint("http://localhost")
-                        .model(modelEdgeCases)
-                        .build())
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.edge#TestServiceEdgeCases"))
+                                .proxyEndpoint("http://localhost")
+                                .model(modelEdgeCases)
+                                .build())
                 .build();
 
         server.start();
@@ -629,7 +641,6 @@ public class McpServerTest {
 
     private JsonRpcResponse read() {
         var line = output.read();
-        System.out.println(line);
         return CODEC.deserializeShape(line, JsonRpcResponse.builder());
     }
 

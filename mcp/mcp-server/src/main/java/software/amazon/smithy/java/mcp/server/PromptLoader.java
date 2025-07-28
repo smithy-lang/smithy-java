@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.mcp.server;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,7 +36,7 @@ final class PromptLoader {
      *
      * @return Map of prompt names to PromptInfo objects
      */
-    public static Map<String, Prompt> loadPrompts(List<Service> services) {
+    public static Map<String, Prompt> loadPrompts(Collection<Service> services) {
         Map<String, Prompt> prompts = new LinkedHashMap<>();
 
         for (var service : services) {

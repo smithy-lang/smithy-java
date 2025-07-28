@@ -16,7 +16,7 @@ public class MCPServerExample {
         var mcpServer = McpServer.builder()
                 .stdio()
                 .name("smithy-mcp-server")
-                .addService(service)
+                .addService("employee-mcp", service)
                 .build();
 
         mcpServer.start();

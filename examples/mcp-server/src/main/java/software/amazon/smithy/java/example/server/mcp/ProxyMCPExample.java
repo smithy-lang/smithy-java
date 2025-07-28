@@ -41,7 +41,7 @@ public class ProxyMCPExample {
         var mcpServer = McpServer.builder()
                 .stdio()
                 .name("smithy-mcp-server")
-                .addService(mcpService)
+                .addService("employee-mcp", mcpService)
                 .build();
         mcpServer.start();
 

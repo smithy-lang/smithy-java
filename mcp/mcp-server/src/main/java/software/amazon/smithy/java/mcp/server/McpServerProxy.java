@@ -35,18 +35,17 @@ public abstract class McpServerProxy {
             if (response.getError() != null) {
                 throw new RuntimeException("Error listing tools: " + response.getError().getMessage());
             }
-            return response.getResult().asShape(ListToolsResult.builder()).getTools();
+            return response.getResult()
+                    .asShape(ListToolsResult.builder())
+                    .getTools()
+                    .stream()
+                    .toList();
         }).join();
     }
 
-    public void initialize(Consumer<JsonRpcResponse> notificationConsumer) {
-        JsonRpcRequest request = JsonRpcRequest.builder()
-                .method("initialize")
-                .id(generateRequestId())
-                .jsonrpc("2.0")
-                .build();
+    public void initialize(Consumer<JsonRpcResponse> notificationConsumer, JsonRpcRequest initializeRequest) {
 
-        var result = Objects.requireNonNull(rpc(request).join());
+        var result = Objects.requireNonNull(rpc(initializeRequest).join());
         if (result.getError() != null) {
             throw new RuntimeException("Error during initialization: " + result.getError().getMessage());
         }
@@ -82,4 +81,6 @@ public abstract class McpServerProxy {
     protected void notify(JsonRpcResponse response) {
         notificationConsumer.accept(response);
     }
+
+    public abstract String name();
 }
