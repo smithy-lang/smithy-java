@@ -55,7 +55,7 @@ final class BytecodeCompiler {
         this.builtinProviders = builtinProviders;
         this.availableFunctions = functions;
         this.bdd = bdd;
-        this.registerAllocator = new RegisterAllocator.FlatAllocator();
+        this.registerAllocator = new RegisterAllocator();
 
         // Add parameters as registry values
         for (var param : bdd.getParameters()) {
@@ -110,7 +110,7 @@ final class BytecodeCompiler {
     private void compileCondition(Condition condition) {
         compileExpression(condition.getFunction());
         condition.getResult().ifPresent(result -> {
-            byte register = registerAllocator.shadow(result.toString());
+            byte register = registerAllocator.getOrAllocateRegister(result.toString());
             writer.writeByte(Opcodes.SET_REGISTER);
             writer.writeByte(register);
         });
@@ -370,7 +370,7 @@ final class BytecodeCompiler {
                 // Simple string with no interpolation
                 addLoadConst(parts.get(0).toString());
             } else if (parts.size() == 1 && parts.get(0) instanceof Template.Dynamic dynamic) {
-                // Single dynamic expression - just evaluate it
+                // Single dynamic expression, so just evaluate it
                 compileExpression(dynamic.toExpression());
             } else {
                 // Multiple parts - need to concatenate
@@ -447,7 +447,6 @@ final class BytecodeCompiler {
         var registerDefs = registerAllocator.getRegistry().toArray(new RegisterDefinition[0]);
         var fns = usedFunctions.toArray(new RulesFunction[0]);
 
-        // Extract BDD nodes to an array using the consumer approach
         Bdd bddData = bdd.getBdd();
         int nodeCount = bddData.getNodeCount();
         int[] bddNodes = new int[nodeCount * 3];
