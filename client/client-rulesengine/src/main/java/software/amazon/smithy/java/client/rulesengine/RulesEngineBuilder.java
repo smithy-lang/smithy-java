@@ -80,6 +80,10 @@ public final class RulesEngineBuilder {
      * @return the RulesEngine.
      */
     public RulesEngineBuilder addExtension(RulesExtension extension) {
+        if (extensions.contains(extension)) {
+            return this;
+        }
+
         extensions.add(extension);
         extension.putBuiltinProviders(builtinProviders);
         for (var f : extension.getFunctions()) {
@@ -120,17 +124,31 @@ public final class RulesEngineBuilder {
      * @return the loaded bytecode program.
      */
     public Bytecode load(byte[] data) {
+        if (data.length < 44) {
+            throw new IllegalArgumentException("Invalid bytecode: too short");
+        }
+
         BytecodeReader reader = new BytecodeReader(data, 0);
 
         // Read and validate header
         int magic = reader.readInt();
         if (magic != Bytecode.MAGIC) {
-            throw new IllegalArgumentException("Invalid magic number: " + Integer.toHexString(magic));
+            throw new IllegalArgumentException("Invalid magic number: 0x" + Integer.toHexString(magic) +
+                    " (expected 0x" + Integer.toHexString(Bytecode.MAGIC) + ")");
         }
 
         short version = reader.readShort();
         if (version != Bytecode.VERSION) {
-            throw new IllegalArgumentException("Unsupported version: " + (version >> 8) + "." + (version & 0xFF));
+            int major = (version >> 8) & 0xFF;
+            int minor = version & 0xFF;
+            int expectedMajor = (Bytecode.VERSION >> 8) & 0xFF;
+            int expectedMinor = Bytecode.VERSION & 0xFF;
+            throw new IllegalArgumentException(String.format(
+                    "Unsupported bytecode version: %d.%d (expected %d.%d)",
+                    major,
+                    minor,
+                    expectedMajor,
+                    expectedMinor));
         }
 
         // Read counts
@@ -142,12 +160,30 @@ public final class RulesEngineBuilder {
         int bddNodeCount = reader.readInt();
         int bddRootRef = reader.readInt();
 
+        if (bddNodeCount < 0) {
+            throw new IllegalArgumentException("Invalid counts in bytecode header");
+        }
+
         // Read offset tables
         int conditionTableOffset = reader.readInt();
         int resultTableOffset = reader.readInt();
         int functionTableOffset = reader.readInt();
         int constantPoolOffset = reader.readInt();
         int bddTableOffset = reader.readInt();
+
+        // Validate offsets are within bounds and in expected order
+        if (conditionTableOffset < 44
+                || conditionTableOffset > data.length
+                || resultTableOffset < conditionTableOffset
+                || resultTableOffset > data.length
+                || functionTableOffset < resultTableOffset
+                || functionTableOffset > data.length
+                || bddTableOffset < functionTableOffset
+                || bddTableOffset > data.length
+                || constantPoolOffset < bddTableOffset
+                || constantPoolOffset > data.length) {
+            throw new IllegalArgumentException("Invalid offsets in bytecode header");
+        }
 
         // Load condition offsets
         reader.offset = conditionTableOffset;
@@ -185,6 +221,10 @@ public final class RulesEngineBuilder {
         int bytecodeStart = bddTableOffset + (bddNodeCount * 12);
         int bytecodeLength = constantPoolOffset - bytecodeStart;
 
+        if (bytecodeLength < 0) {
+            throw new IllegalArgumentException("Invalid bytecode section length");
+        }
+
         // Extract bytecode section (with relative offsets)
         byte[] bytecode = new byte[bytecodeLength];
         System.arraycopy(data, bytecodeStart, bytecode, 0, bytecodeLength);
@@ -192,13 +232,19 @@ public final class RulesEngineBuilder {
         // Adjust offsets to be relative to bytecode start
         for (int i = 0; i < conditionCount; i++) {
             conditionOffsets[i] -= bytecodeStart;
+            if (conditionOffsets[i] < 0 || conditionOffsets[i] >= bytecodeLength) {
+                throw new IllegalArgumentException("Invalid condition offset at index " + i);
+            }
         }
+
         for (int i = 0; i < resultCount; i++) {
             resultOffsets[i] -= bytecodeStart;
+            if (resultOffsets[i] < 0 || resultOffsets[i] >= bytecodeLength) {
+                throw new IllegalArgumentException("Invalid result offset at index " + i);
+            }
         }
 
         Object[] constantPool = loadConstantPool(data, constantPoolOffset, constantCount);
-
         return new Bytecode(
                 bytecode,
                 conditionOffsets,
@@ -219,14 +265,21 @@ public final class RulesEngineBuilder {
 
         // Now resolve the functions in the correct order using this builder's registered functions
         RulesFunction[] resolvedFunctions = new RulesFunction[count];
+        List<String> missingFunctions = new ArrayList<>();
+
         for (int i = 0; i < count; i++) {
             String name = functionNames[i];
             RulesFunction fn = functions.get(name);
             if (fn == null) {
-                throw new RulesEvaluationError("Unknown function in bytecode: " + name +
-                        ". Make sure the function is registered before loading bytecode.");
+                missingFunctions.add(name);
             }
             resolvedFunctions[i] = fn;
+        }
+
+        // Report all missing functions
+        if (!missingFunctions.isEmpty()) {
+            throw new RulesEvaluationError("Missing bytecode functions: " + missingFunctions
+                    + ". Available functions: " + functions.keySet());
         }
 
         return resolvedFunctions;

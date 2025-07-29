@@ -6,6 +6,8 @@
 package software.amazon.smithy.java.client.rulesengine;
 
 import java.io.StringWriter;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.rulesengine.logic.bdd.BddFormatter;
 
@@ -15,13 +17,13 @@ import software.amazon.smithy.rulesengine.logic.bdd.BddFormatter;
 final class BytecodeDisassembler {
 
     private static final Map<Byte, InstructionDef> INSTRUCTION_DEFS = Map.ofEntries(
-            // Basic stack operations (0-3)
+            // Basic stack operations
             Map.entry(Opcodes.LOAD_CONST, new InstructionDef("LOAD_CONST", OperandType.BYTE, Show.CONST)),
             Map.entry(Opcodes.LOAD_CONST_W, new InstructionDef("LOAD_CONST_W", OperandType.SHORT, Show.CONST)),
             Map.entry(Opcodes.SET_REGISTER, new InstructionDef("SET_REGISTER", OperandType.BYTE, Show.REGISTER)),
             Map.entry(Opcodes.LOAD_REGISTER, new InstructionDef("LOAD_REGISTER", OperandType.BYTE, Show.REGISTER)),
 
-            // Boolean operations (4-7)
+            // Boolean operations
             Map.entry(Opcodes.NOT, new InstructionDef("NOT", OperandType.NONE)),
             Map.entry(Opcodes.ISSET, new InstructionDef("ISSET", OperandType.NONE)),
             Map.entry(Opcodes.TEST_REGISTER_ISSET,
@@ -29,13 +31,13 @@ final class BytecodeDisassembler {
             Map.entry(Opcodes.TEST_REGISTER_NOT_SET,
                     new InstructionDef("TEST_REGISTER_NOT_SET", OperandType.BYTE, Show.REGISTER)),
 
-            // List operations (8-11)
+            // List operations
             Map.entry(Opcodes.LIST0, new InstructionDef("LIST0", OperandType.NONE)),
             Map.entry(Opcodes.LIST1, new InstructionDef("LIST1", OperandType.NONE)),
             Map.entry(Opcodes.LIST2, new InstructionDef("LIST2", OperandType.NONE)),
             Map.entry(Opcodes.LISTN, new InstructionDef("LISTN", OperandType.BYTE, Show.NUMBER)),
 
-            // Map operations (12-17)
+            // Map operations
             Map.entry(Opcodes.MAP0, new InstructionDef("MAP0", OperandType.NONE)),
             Map.entry(Opcodes.MAP1, new InstructionDef("MAP1", OperandType.NONE)),
             Map.entry(Opcodes.MAP2, new InstructionDef("MAP2", OperandType.NONE)),
@@ -43,9 +45,8 @@ final class BytecodeDisassembler {
             Map.entry(Opcodes.MAP4, new InstructionDef("MAP4", OperandType.NONE)),
             Map.entry(Opcodes.MAPN, new InstructionDef("MAPN", OperandType.BYTE, Show.NUMBER)),
 
-            // Template operation (18)
-            Map.entry(Opcodes.RESOLVE_TEMPLATE,
-                    new InstructionDef("RESOLVE_TEMPLATE", OperandType.BYTE, Show.NUMBER)),
+            // Template operation
+            Map.entry(Opcodes.RESOLVE_TEMPLATE, new InstructionDef("RESOLVE_TEMPLATE", OperandType.BYTE, Show.NUMBER)),
 
             // Function operations (19-23)
             Map.entry(Opcodes.FN0, new InstructionDef("FN0", OperandType.BYTE, Show.FN)),
@@ -54,7 +55,7 @@ final class BytecodeDisassembler {
             Map.entry(Opcodes.FN3, new InstructionDef("FN3", OperandType.BYTE, Show.FN)),
             Map.entry(Opcodes.FN, new InstructionDef("FN", OperandType.BYTE, Show.FN)),
 
-            // Property access operations (24-27)
+            // Property access operations
             Map.entry(Opcodes.GET_PROPERTY, new InstructionDef("GET_PROPERTY", OperandType.SHORT, Show.CONST)),
             Map.entry(Opcodes.GET_INDEX, new InstructionDef("GET_INDEX", OperandType.BYTE, Show.NUMBER)),
             Map.entry(Opcodes.GET_PROPERTY_REG,
@@ -62,29 +63,32 @@ final class BytecodeDisassembler {
             Map.entry(Opcodes.GET_INDEX_REG,
                     new InstructionDef("GET_INDEX_REG", OperandType.TWO_BYTES, Show.REG_INDEX)),
 
-            // Boolean test operations (28-30)
+            // Boolean test operations
             Map.entry(Opcodes.IS_TRUE, new InstructionDef("IS_TRUE", OperandType.NONE)),
             Map.entry(Opcodes.TEST_REGISTER_IS_TRUE,
                     new InstructionDef("TEST_REGISTER_IS_TRUE", OperandType.BYTE, Show.REGISTER)),
             Map.entry(Opcodes.TEST_REGISTER_IS_FALSE,
                     new InstructionDef("TEST_REGISTER_IS_FALSE", OperandType.BYTE, Show.REGISTER)),
 
-            // Comparison operations (31-33)
+            // Comparison operations
             Map.entry(Opcodes.EQUALS, new InstructionDef("EQUALS", OperandType.NONE)),
             Map.entry(Opcodes.STRING_EQUALS, new InstructionDef("STRING_EQUALS", OperandType.NONE)),
             Map.entry(Opcodes.BOOLEAN_EQUALS, new InstructionDef("BOOLEAN_EQUALS", OperandType.NONE)),
 
-            // String operations (34-37)
+            // String operations
             Map.entry(Opcodes.SUBSTRING, new InstructionDef("SUBSTRING", OperandType.THREE_BYTES, Show.SUBSTRING)),
             Map.entry(Opcodes.IS_VALID_HOST_LABEL, new InstructionDef("IS_VALID_HOST_LABEL", OperandType.NONE)),
             Map.entry(Opcodes.PARSE_URL, new InstructionDef("PARSE_URL", OperandType.NONE)),
             Map.entry(Opcodes.URI_ENCODE, new InstructionDef("URI_ENCODE", OperandType.NONE)),
 
-            // Return operations (38-40)
+            // Return operations
             Map.entry(Opcodes.RETURN_ERROR, new InstructionDef("RETURN_ERROR", OperandType.NONE)),
             Map.entry(Opcodes.RETURN_ENDPOINT,
                     new InstructionDef("RETURN_ENDPOINT", OperandType.BYTE, Show.ENDPOINT_FLAGS)),
-            Map.entry(Opcodes.RETURN_VALUE, new InstructionDef("RETURN_VALUE", OperandType.NONE)));
+            Map.entry(Opcodes.RETURN_VALUE, new InstructionDef("RETURN_VALUE", OperandType.NONE)),
+
+            // Control flow
+            Map.entry(Opcodes.JT_OR_POP, new InstructionDef("JT_OR_POP", OperandType.SHORT, Show.JUMP_OFFSET)));
 
     // Enum to define operand types
     private enum OperandType {
@@ -103,7 +107,7 @@ final class BytecodeDisassembler {
     }
 
     private enum Show {
-        CONST, FN, REGISTER, NUMBER, ENDPOINT_FLAGS, SUBSTRING, REG_PROPERTY, REG_INDEX
+        CONST, FN, REGISTER, NUMBER, ENDPOINT_FLAGS, SUBSTRING, REG_PROPERTY, REG_INDEX, JUMP_OFFSET
     }
 
     // Instruction definition class
@@ -114,9 +118,13 @@ final class BytecodeDisassembler {
     }
 
     // Result class for operand parsing
-    private record OperandResult(int value, int nextPc, int secondValue) {
+    private record OperandResult(int value, int nextPc, int secondValue, int thirdValue) {
         OperandResult(int value, int nextPc) {
-            this(value, nextPc, -1);
+            this(value, nextPc, -1, -1);
+        }
+
+        OperandResult(int value, int nextPc, int secondValue) {
+            this(value, nextPc, secondValue, -1);
         }
     }
 
@@ -129,7 +137,6 @@ final class BytecodeDisassembler {
     String disassemble() {
         StringBuilder s = new StringBuilder();
 
-        // Header
         s.append("=== Bytecode Program ===\n");
         s.append("Conditions: ").append(bytecode.getConditionCount()).append("\n");
         s.append("Results: ").append(bytecode.getResultCount()).append("\n");
@@ -138,6 +145,17 @@ final class BytecodeDisassembler {
         s.append("Constants: ").append(bytecode.getConstantPoolCount()).append("\n");
         s.append("BDD Nodes: ").append(bytecode.getBddNodes().length / 3).append("\n");
         s.append("BDD Root: ").append(BddFormatter.formatReference(bytecode.getBddRootRef())).append("\n");
+
+        Map<String, Integer> instructionCounts = countInstructions();
+        if (!instructionCounts.isEmpty()) {
+            s.append("\nInstruction counts: ");
+            instructionCounts.entrySet()
+                    .stream()
+                    .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                    .limit(10) // Top 10 most common
+                    .forEach(e -> s.append(e.getKey()).append("(").append(e.getValue()).append(") "));
+            s.append("\n");
+        }
         s.append("\n");
 
         // Functions
@@ -145,7 +163,7 @@ final class BytecodeDisassembler {
             s.append("=== Functions ===\n");
             int i = 0;
             for (var fn : bytecode.getFunctions()) {
-                s.append(String.format("  %2d: %-20s [%d args]\n",
+                s.append(String.format("  %2d: %-20s [%d args]%n",
                         i++,
                         fn.getFunctionName(),
                         fn.getArgumentCount()));
@@ -205,7 +223,7 @@ final class BytecodeDisassembler {
         if (bytecode.getConditionCount() > 0) {
             s.append("=== Conditions ===\n");
             for (int i = 0; i < bytecode.getConditionCount(); i++) {
-                s.append(String.format("Condition %d:\n", i));
+                s.append(String.format("Condition %d:%n", i));
                 int startOffset = bytecode.getConditionStartOffset(i);
                 disassembleSection(s, startOffset, Integer.MAX_VALUE, "  ");
                 s.append("\n");
@@ -216,7 +234,7 @@ final class BytecodeDisassembler {
         if (bytecode.getResultCount() > 0) {
             s.append("=== Results ===\n");
             for (int i = 0; i < bytecode.getResultCount(); i++) {
-                s.append(String.format("Result %d:\n", i));
+                s.append(String.format("Result %d:%n", i));
                 int startOffset = bytecode.getResultOffset(i);
                 disassembleSection(s, startOffset, Integer.MAX_VALUE, "  ");
                 s.append("\n");
@@ -226,8 +244,34 @@ final class BytecodeDisassembler {
         return s.toString();
     }
 
+    private Map<String, Integer> countInstructions() {
+        Map<String, Integer> counts = new HashMap<>();
+        byte[] instructions = bytecode.getBytecode();
+
+        int pc = 0;
+        while (pc < instructions.length) {
+            byte opcode = instructions[pc];
+            InstructionDef def = INSTRUCTION_DEFS.get(opcode);
+            if (def == null) {
+                break; // Unknown instruction
+            }
+
+            counts.merge(def.name(), 1, Integer::sum);
+
+            // Skip operands
+            pc += 1 + def.operandType().byteCount;
+        }
+
+        return counts;
+    }
+
     private void disassembleSection(StringBuilder s, int startOffset, int endOffset, String indent) {
         byte[] instructions = bytecode.getBytecode();
+
+        if (startOffset >= instructions.length) {
+            s.append(indent).append("(section starts beyond bytecode end)\n");
+            return;
+        }
 
         for (int pc = startOffset; pc < endOffset && pc < instructions.length;) {
             // Check if this is a return opcode
@@ -258,7 +302,7 @@ final class BytecodeDisassembler {
 
         // Handle unknown instruction
         if (def == null) {
-            s.append(String.format("UNKNOWN_OPCODE(0x%02X)\n", opcode));
+            s.append(String.format("UNKNOWN_OPCODE(0x%02X)%n", opcode));
             return -1;
         }
 
@@ -269,11 +313,12 @@ final class BytecodeDisassembler {
         int nextPc = operandResult.nextPc();
         int displayValue = operandResult.value();
         int secondValue = operandResult.secondValue();
+        int thirdValue = operandResult.thirdValue();
 
         // Add symbolic information if available
         if (def.show() != null) {
             s.append("  ; ");
-            appendSymbolicInfo(s, pc, displayValue, secondValue, def.show, instructions);
+            appendSymbolicInfo(s, pc, displayValue, secondValue, thirdValue, def.show, instructions);
         }
 
         s.append("\n");
@@ -302,7 +347,7 @@ final class BytecodeDisassembler {
                 int b1 = appendByte(s, pc, instructions);
                 int b2 = appendByte(s, pc + 1, instructions);
                 int b3 = appendByte(s, pc + 2, instructions);
-                yield new OperandResult(b1, pc + 4, b2);
+                yield new OperandResult(b1, pc + 4, b2, b3);
             }
         };
     }
@@ -312,6 +357,7 @@ final class BytecodeDisassembler {
             int pc,
             int value,
             int secondValue,
+            int thirdValue,
             Show show,
             byte[] instructions
     ) {
@@ -339,17 +385,12 @@ final class BytecodeDisassembler {
                 s.append("headers=").append(hasHeaders).append(", properties=").append(hasProperties);
             }
             case SUBSTRING -> {
-                if (pc + 3 < instructions.length) {
-                    int start = instructions[pc + 1] & 0xFF;
-                    int end = instructions[pc + 2] & 0xFF;
-                    boolean reverse = (instructions[pc + 3] & 0xFF) != 0;
-                    s.append("start=")
-                            .append(start)
-                            .append(", end=")
-                            .append(end)
-                            .append(", reverse=")
-                            .append(reverse);
-                }
+                s.append("start=")
+                        .append(value)
+                        .append(", end=")
+                        .append(secondValue)
+                        .append(", reverse=")
+                        .append(thirdValue != 0);
             }
             case REG_PROPERTY -> {
                 if (value >= 0 && value < bytecode.getRegisterDefinitions().length) {
@@ -369,12 +410,15 @@ final class BytecodeDisassembler {
                     s.append("[").append(secondValue).append("]");
                 }
             }
+            case JUMP_OFFSET -> {
+                s.append("-> ").append(pc + 3 + value); // pc + 3 because offset is relative to after instruction
+            }
         }
     }
 
     private int appendByte(StringBuilder s, int pc, byte[] instructions) {
         if (instructions.length <= pc + 1) {
-            s.append("??");
+            s.append("?? (out of bounds at ").append(pc + 1).append(")");
             return -1;
         } else {
             int result = instructions[pc + 1] & 0xFF;
@@ -385,7 +429,7 @@ final class BytecodeDisassembler {
 
     private int appendShort(StringBuilder s, int pc, byte[] instructions) {
         if (instructions.length <= pc + 2) {
-            s.append("??");
+            s.append("?? (out of bounds at ").append(pc + 1).append(")");
             return -1;
         } else {
             int result = EndpointUtils.bytesToShort(instructions, pc + 1);
@@ -399,6 +443,10 @@ final class BytecodeDisassembler {
             return "null";
         } else if (value instanceof String) {
             return "\"" + escapeString((String) value) + "\"";
+        } else if (value instanceof List<?> list) {
+            return "List[" + list.size() + " items]";
+        } else if (value instanceof Map<?, ?> map) {
+            return "Map[" + map.size() + " entries]";
         } else {
             return value.getClass().getSimpleName() + "[" + value + "]";
         }
