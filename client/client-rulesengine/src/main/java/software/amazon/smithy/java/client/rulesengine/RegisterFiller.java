@@ -5,12 +5,20 @@
 
 package software.amazon.smithy.java.client.rulesengine;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
 
 /**
  * Fills register arrays with parameter values, builtin providers, and validates required parameters.
+ *
+ * <p>This class optimizes for the common case where endpoint rules have fewer than 64 registers (parameters + temp
+ * variables). For small register counts, we use bitmask operations in {@link FastRegisterFiller} which provides O(1)
+ * checks for which registers need filling and validation.
+ *
+ * <p>For the rare case of 64+ registers, we fall back to {@link LargeRegisterFiller} which uses simple array
+ * iteration. The selection is made at construction time based on the register count.
  */
 abstract class RegisterFiller {
     protected final Function<Context, Object>[] providersByRegister;
@@ -77,7 +85,7 @@ abstract class RegisterFiller {
         Map<String, Integer> inputRegisterMap = bytecode.getInputRegisterMap();
         Object[] registerTemplate = bytecode.getRegisterTemplate();
 
-        if (registerDefinitions.length - 1 < 64) {
+        if (registerDefinitions.length < 64) {
             return new FastRegisterFiller(registerDefinitions,
                     builtinIndices,
                     hardRequiredIndices,
@@ -98,6 +106,7 @@ abstract class RegisterFiller {
     private static final class FastRegisterFiller extends RegisterFiller {
         private final long builtinMask;
         private final long requiredMask;
+        private final long defaultMask;
 
         FastRegisterFiller(
                 RegisterDefinition[] registerDefinitions,
@@ -110,6 +119,7 @@ abstract class RegisterFiller {
             super(registerDefinitions, inputRegisterMap, builtinProviders, builtinIndices, registerTemplate);
             this.builtinMask = makeMask(builtinIndices);
             this.requiredMask = makeMask(hardRequiredIndices);
+            this.defaultMask = makeDefaultMask(registerTemplate);
         }
 
         private static long makeMask(int[] indices) {
@@ -120,12 +130,23 @@ abstract class RegisterFiller {
             return mask;
         }
 
+        private static long makeDefaultMask(Object[] registerTemplate) {
+            long mask = 0L;
+            for (int i = 0; i < registerTemplate.length && i < 64; i++) {
+                if (registerTemplate[i] != null) {
+                    mask |= 1L << i;
+                }
+            }
+            return mask;
+        }
+
         @Override
         Object[] fillRegisters(Object[] sink, Context context, Map<String, Object> parameters) {
             // Copy template to set up defaults and clear old state
             System.arraycopy(registerTemplate, 0, sink, 0, registerTemplate.length);
 
-            long filled = 0L;
+            // Start with defaults already marked as filled
+            long filled = defaultMask;
 
             // Fill parameters
             for (var e : parameters.entrySet()) {
@@ -154,7 +175,7 @@ abstract class RegisterFiller {
             long missingRequired = requiredMask & ~filled;
             if (missingRequired != 0) {
                 int i = Long.numberOfTrailingZeros(missingRequired);
-                throw new RulesEvaluationError("Required parameter missing: " + registerDefinitions[i].name());
+                throw new RulesEvaluationError("Missing required parameter: " + registerDefinitions[i].name());
             }
 
             return sink;
@@ -165,6 +186,7 @@ abstract class RegisterFiller {
     private static final class LargeRegisterFiller extends RegisterFiller {
         private final int[] builtinIndices;
         private final int[] hardRequiredIndices;
+        private final boolean[] hasDefault;
 
         LargeRegisterFiller(
                 RegisterDefinition[] registerDefinitions,
@@ -177,6 +199,12 @@ abstract class RegisterFiller {
             super(registerDefinitions, inputRegisterMap, builtinProviders, builtinIndices, registerTemplate);
             this.builtinIndices = builtinIndices;
             this.hardRequiredIndices = hardRequiredIndices;
+
+            // Precompute what registers have defaults
+            this.hasDefault = new boolean[registerTemplate.length];
+            for (int i = 0; i < registerTemplate.length; i++) {
+                hasDefault[i] = registerTemplate[i] != null;
+            }
         }
 
         @Override
@@ -184,29 +212,34 @@ abstract class RegisterFiller {
             // Copy template to set up defaults and clear old state
             System.arraycopy(registerTemplate, 0, sink, 0, registerTemplate.length);
 
+            // Track what registers have been filled (defaults are already in sink)
+            boolean[] filled = Arrays.copyOf(hasDefault, hasDefault.length);
+
             // Fill parameters
             for (var e : parameters.entrySet()) {
                 Integer i = inputRegisterMap.get(e.getKey());
                 if (i != null) {
                     sink[i] = e.getValue();
+                    filled[i] = true;
                 }
             }
 
-            // Fill builtins (simple null check)
+            // Fill builtins (only if not already filled)
             for (int regIndex : builtinIndices) {
-                if (sink[regIndex] == null) {
-                    var provider = providersByRegister[regIndex];
-                    if (provider != null) {
-                        sink[regIndex] = provider.apply(context);
+                if (!filled[regIndex]) {
+                    Object result = providersByRegister[regIndex].apply(context);
+                    if (result != null) {
+                        sink[regIndex] = result;
+                        filled[regIndex] = true;
                     }
                 }
             }
 
             // Validate required parameters
             for (int regIndex : hardRequiredIndices) {
-                if (sink[regIndex] == null) {
-                    throw new RulesEvaluationError(
-                            "Required parameter missing: " + registerDefinitions[regIndex].name());
+                if (!filled[regIndex]) {
+                    var name = registerDefinitions[regIndex].name();
+                    throw new RulesEvaluationError("Missing required parameter: " + name);
                 }
             }
 

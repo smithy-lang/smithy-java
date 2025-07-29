@@ -77,13 +77,12 @@
     </Match>
 
     <Match>
-        <Class name="software.amazon.smithy.java.client.rulesengine.RulesVm" />
+        <Class name="software.amazon.smithy.java.client.rulesengine.BytecodeEvaluator" />
         <Bug pattern="RC_REF_COMPARISON_BAD_PRACTICE_BOOLEAN" />
     </Match>
 
     <Match>
-        <Class name="software.amazon.smithy.java.client.rulesengine.RulesVm" />
-        <Method name="evaluate" />
+        <Class name="software.amazon.smithy.java.client.rulesengine.BytecodeEvaluator" />
         <Bug pattern="DCN_NULLPOINTER_EXCEPTION" />
     </Match>
 

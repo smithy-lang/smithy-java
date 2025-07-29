@@ -45,8 +45,6 @@ public final class EndpointUtils {
                 return result;
             } else if (value.isNullNode()) {
                 return null;
-            } else {
-                throw new RulesEvaluationError("Unsupported endpoint ruleset parameter type: " + value);
             }
         }
 

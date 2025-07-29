@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 
 final class BytecodeReader {
+    private static final int MAX_NESTING_DEPTH = 100;
+
     final byte[] data;
     int offset;
 
@@ -20,17 +22,26 @@ final class BytecodeReader {
         this.offset = offset;
     }
 
+    private void checkBounds(int bytesNeeded) {
+        if (offset + bytesNeeded > data.length) {
+            throw new IllegalArgumentException("Unexpected end of bytecode data at " + offset);
+        }
+    }
+
     byte readByte() {
+        checkBounds(1);
         return data[offset++];
     }
 
     short readShort() {
+        checkBounds(2);
         int value = ((data[offset] & 0xFF) << 8) | (data[offset + 1] & 0xFF);
         offset += 2;
         return (short) value;
     }
 
     int readInt() {
+        checkBounds(4);
         int value = (data[offset] & 0xFF) << 24;
         value |= (data[offset + 1] & 0xFF) << 16;
         value |= (data[offset + 2] & 0xFF) << 8;
@@ -41,12 +52,21 @@ final class BytecodeReader {
 
     String readUTF() {
         int length = readShort() & 0xFFFF;
+        checkBounds(length);
         String value = new String(data, offset, length, StandardCharsets.UTF_8);
         offset += length;
         return value;
     }
 
     Object readConstant() {
+        return readConstant(0);
+    }
+
+    private Object readConstant(int depth) {
+        if (depth > MAX_NESTING_DEPTH) {
+            throw new IllegalArgumentException("Constant nesting depth exceeded maximum of " + MAX_NESTING_DEPTH);
+        }
+
         byte type = readByte();
         return switch (type) {
             case Bytecode.CONST_NULL -> null;
@@ -57,7 +77,7 @@ final class BytecodeReader {
                 int size = readShort() & 0xFFFF;
                 List<Object> list = new ArrayList<>(size);
                 for (int i = 0; i < size; i++) {
-                    list.add(readConstant());
+                    list.add(readConstant(depth + 1));
                 }
                 yield list;
             }
@@ -66,7 +86,7 @@ final class BytecodeReader {
                 Map<String, Object> map = new LinkedHashMap<>(size);
                 for (int i = 0; i < size; i++) {
                     String key = readUTF();
-                    Object value = readConstant();
+                    Object value = readConstant(depth + 1);
                     map.put(key, value);
                 }
                 yield map;

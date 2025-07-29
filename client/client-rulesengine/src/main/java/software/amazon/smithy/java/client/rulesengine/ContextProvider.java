@@ -32,14 +32,14 @@ sealed interface ContextProvider {
     void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params);
 
     final class OrchestratingProvider implements ContextProvider {
-        private final ConcurrentMap<ShapeId, ContextProvider> PROVIDERS = new ConcurrentHashMap<>();
+        private final ConcurrentMap<ShapeId, ContextProvider> providers = new ConcurrentHashMap<>();
 
         @Override
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params) {
-            var provider = PROVIDERS.get(operation.schema().id());
+            var provider = providers.get(operation.schema().id());
             if (provider == null) {
                 provider = createProvider(operation);
-                var fresh = PROVIDERS.putIfAbsent(operation.schema().id(), provider);
+                var fresh = providers.putIfAbsent(operation.schema().id(), provider);
                 if (fresh != null) {
                     provider = fresh;
                 }
@@ -48,7 +48,7 @@ sealed interface ContextProvider {
         }
 
         private ContextProvider createProvider(ApiOperation<?, ?> operation) {
-            List<ContextProvider> providers = new ArrayList<>();
+            List<ContextProvider> providers = new ArrayList<>(3);
             var operationSchema = operation.schema();
             var inputSchema = operation.inputSchema();
             ContextParamProvider.compute(providers, inputSchema);
@@ -59,13 +59,7 @@ sealed interface ContextProvider {
     }
 
     // Find the smithy.rules#staticContextParams on the operation.
-    final class StaticParamsProvider implements ContextProvider {
-        private final Map<String, Object> params;
-
-        StaticParamsProvider(Map<String, Object> params) {
-            this.params = params;
-        }
-
+    record StaticParamsProvider(Map<String, Object> params) implements ContextProvider {
         @Override
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params) {
             params.putAll(this.params);
@@ -87,15 +81,7 @@ sealed interface ContextProvider {
     }
 
     // Find smithy.rules#contextParam trait on operation input members.
-    final class ContextParamProvider implements ContextProvider {
-        private final Schema member;
-        private final String name;
-
-        ContextParamProvider(Schema member, String name) {
-            this.member = member;
-            this.name = name;
-        }
-
+    record ContextParamProvider(Schema member, String name) implements ContextProvider {
         @Override
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params) {
             var value = input.getMemberValue(member);
@@ -115,18 +101,9 @@ sealed interface ContextProvider {
     }
 
     // Find the smithy.rules#operationContextParams trait on the operation and each JMESPath to extract.
-    // TODO: I wish we didn't have to convert input to a document and could use the struct directly.
-    //       We'd need to add a new code path to the jmespath module, something like JMESPathStructQuery.
-    final class ContextPathProvider implements ContextProvider {
-
-        private final String name;
-        private final JmespathExpression jp;
-
-        ContextPathProvider(String name, JmespathExpression jp) {
-            this.name = name;
-            this.jp = jp;
-        }
-
+    // TODO: Converting input to Document for JMESPath is expensive. Implementing something like JMESPathStructQuery
+    //       that operates directly on SerializableStruct to avoid intermediate Document conversion could help.
+    record ContextPathProvider(String name, JmespathExpression jp) implements ContextProvider {
         @Override
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params) {
             var doc = Document.of(input);
@@ -152,13 +129,7 @@ sealed interface ContextProvider {
     }
 
     // Applies multiple context providers.
-    final class MultiContextParamProvider implements ContextProvider {
-        private final List<ContextProvider> providers;
-
-        MultiContextParamProvider(List<ContextProvider> providers) {
-            this.providers = providers;
-        }
-
+    record MultiContextParamProvider(List<ContextProvider> providers) implements ContextProvider {
         static ContextProvider from(List<ContextProvider> providers) {
             return providers.size() == 1 ? providers.get(0) : new MultiContextParamProvider(providers);
         }

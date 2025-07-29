@@ -325,6 +325,13 @@ public final class Opcodes {
      * <p>Stack: [..., string] → [..., substring]
      *
      * <p><code>SUBSTRING [start:byte] [end:byte] [reverse:byte]</code>
+     *
+     * <p>Operands:
+     * <ul>
+     *   <li>start: Starting position (0-based index)</li>
+     *   <li>end: Ending position (exclusive)</li>
+     *   <li>reverse: If non-zero, count positions from the end of the string</li>
+     * </ul>
      */
     static final byte SUBSTRING = 34;
 
@@ -365,17 +372,23 @@ public final class Opcodes {
     static final byte RETURN_ERROR = 38;
 
     /**
-     * Build and return an endpoint. Pops URL, and optionally properties and headers based on flags.
+     * Build and return an endpoint. Pops URL, and optionally headers and properties based on flags.
      *
      * <p>Stack varies based on flags:
      * <ul>
      *   <li>No flags: [..., url] → (returns endpoint)</li>
-     *   <li>Properties flag: [..., properties, url] → (returns endpoint)</li>
-     *   <li>Headers flag: [..., headers, url] → (returns endpoint)</li>
-     *   <li>Both flags: [..., headers, properties, url] → (returns endpoint)</li>
+     *   <li>Headers flag (bit 0): [..., headers, url] → (returns endpoint)</li>
+     *   <li>Properties flag (bit 1): [..., properties, url] → (returns endpoint)</li>
+     *   <li>Both flags: [..., properties, headers, url] → (returns endpoint)</li>
      * </ul>
      *
      * <p><code>RETURN_ENDPOINT [flags:byte]</code>
+     *
+     * <p>Flag bits:
+     * <ul>
+     *   <li>Bit 0 (0x01): Has headers</li>
+     *   <li>Bit 1 (0x02): Has properties</li>
+     * </ul>
      */
     static final byte RETURN_ENDPOINT = 39;
 
@@ -392,12 +405,15 @@ public final class Opcodes {
      * Jump forward if the value at the top of the stack is truthy (not null and not Boolean.FALSE).
      * If jumping, leave the value on the stack. If not jumping, pop the value.
      *
-     * <p>The offset is an unsigned 16-bit value (0-65535) relative to the instruction
-     * following this one (after the 2-byte offset). Backward jumps are not allowed.
+     * <p>The offset is an unsigned 16-bit value (0-65535) representing the number of bytes to jump
+     * forward, relative to the instruction following this one (after the 2-byte offset). Backward
+     * jumps are not allowed.
      *
      * <p>Stack: [..., value] → [..., value] (if jumping) or [...] (if not jumping)
      *
      * <p><code>JT_OR_POP [offset:ushort]</code>
+     *
+     * <p>Example: At position 100, <code>JT_OR_POP 50</code> would jump to position 153 (100 + 3 + 50)
      */
     static final byte JT_OR_POP = 41;
 }

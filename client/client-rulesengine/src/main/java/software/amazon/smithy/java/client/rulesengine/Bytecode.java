@@ -51,29 +51,25 @@ import software.amazon.smithy.rulesengine.logic.bdd.BddNodeConsumer;
  * <ol>
  *   <li><b>Condition Table</b> - Array of 4-byte offsets pointing to each condition's bytecode</li>
  *   <li><b>Result Table</b> - Array of 4-byte offsets pointing to each result's bytecode</li>
+ *   <li><b>Register Definitions</b> - Array of parameter/register metadata (immediately after result table)</li>
  *   <li><b>Function Table</b> - Array of function names</li>
- *   <li><b>Register Definitions</b> - Array of parameter/register metadata</li>
- *   <li><b>BDD Table</b> - Array of BDD nodes</li>
+ *   <li><b>BDD Table</b> - Array of BDD nodes (3 ints per node)</li>
  *   <li><b>Bytecode Section</b> - Compiled instructions for conditions and results</li>
  *   <li><b>Constant Pool</b> - All constants referenced by the bytecode</li>
  * </ol>
  *
  * <h3>Condition Table</h3>
  * <p>Array of 4-byte offsets pointing to the start of each condition's bytecode.
- * Each offset is absolute from the start of the file.
+ * Each offset is absolute from the start of the file. When loaded, these are
+ * adjusted to be relative to the bytecode section start for efficient access.
  *
  * <h3>Result Table</h3>
  * <p>Array of 4-byte offsets pointing to the start of each result's bytecode.
- * Each offset is absolute from the start of the file.
- *
- * <h3>Function Table</h3>
- * <p>Array of function names used in the bytecode. Each function name is encoded as:
- * <pre>
- * [length:2][UTF-8 bytes]
- * </pre>
+ * Each offset is absolute from the start of the file. When loaded, these are
+ * adjusted to be relative to the bytecode section start for efficient access.
  *
  * <h3>Register Definitions</h3>
- * <p>Immediately follows the function table. Each register is encoded as:
+ * <p>Immediately follows the result table. Each register is encoded as:
  * <pre>
  * [nameLen:2][name:UTF-8][required:1][temp:1][hasDefault:1][default:?][hasBuiltin:1][builtin:?]
  * </pre>
@@ -89,16 +85,38 @@ import software.amazon.smithy.rulesengine.logic.bdd.BddNodeConsumer;
  *   <li>builtin: UTF-8 encoded builtin name (only present if hasBuiltin=1)</li>
  * </ul>
  *
+ * <h3>Function Table</h3>
+ * <p>Array of function names used in the bytecode. Each function name is encoded as:
+ * <pre>
+ * [length:2][UTF-8 bytes]
+ * </pre>
+ *
  * <h3>BDD Table</h3>
  * <p>Array of BDD nodes for efficient condition evaluation. Each node is encoded as 12 bytes:
  * <pre>
  * [varIdx:4][highRef:4][lowRef:4]
  * </pre>
+ * Where:
+ * <ul>
+ *   <li>varIdx: Index of the condition to test (0-based)</li>
+ *   <li>highRef: Reference to follow if condition is true</li>
+ *   <li>lowRef: Reference to follow if condition is false</li>
+ * </ul>
+ *
+ * <p>Reference encoding follows the BDD conventions:
+ * <ul>
+ *   <li>1: TRUE terminal</li>
+ *   <li>-1: FALSE terminal</li>
+ *   <li>2, 3, ...: Node references (node at index ref-1)</li>
+ *   <li>-2, -3, ...: Complement node references (logical NOT)</li>
+ *   <li>100_000_000+: Result terminals (100_000_000 + resultIndex)</li>
+ * </ul>
  *
  * <h3>Bytecode Section</h3>
  * <p>Contains the compiled bytecode instructions for all conditions and results.
- * The condition/result tables point to offsets within this section. Instructions
- * use a stack-based virtual machine with opcodes defined in {@link Opcodes}.
+ * The condition/result tables contain absolute offsets from the start of the file that point into this section.
+ * Instructions use a stack-based virtual machine with opcodes defined in {@link Opcodes}. This section may include
+ * control flow instructions like JT_OR_POP for short-circuit evaluation.
  *
  * <h3>Constant Pool</h3>
  * <p>Contains all constants referenced by the bytecode. Each constant is prefixed
@@ -115,7 +133,7 @@ import software.amazon.smithy.rulesengine.logic.bdd.BddNodeConsumer;
  * 5     MAP     [count:2]([keyLen:2][key:UTF-8][value:?])...
  * </pre>
  *
- * <p>Lists and maps can contain nested values of any supported type.
+ * <p>Lists and maps can contain nested values of any supported type, up to a maximum nesting depth of 100 levels.
  *
  * <h2>Usage</h2>
  *
@@ -171,6 +189,10 @@ public final class Bytecode {
             int[] bddNodes,
             int bddRootRef
     ) {
+        if (bddNodes.length % 3 != 0) {
+            throw new IllegalArgumentException("BDD nodes length must be multiple of 3, got: " + bddNodes.length);
+        }
+
         this.bytecode = Objects.requireNonNull(bytecode);
         this.conditionOffsets = Objects.requireNonNull(conditionOffsets);
         this.resultOffsets = Objects.requireNonNull(resultOffsets);

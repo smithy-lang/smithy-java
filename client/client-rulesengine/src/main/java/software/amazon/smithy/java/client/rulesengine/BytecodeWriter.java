@@ -18,6 +18,8 @@ import java.util.Map;
  * Builds up bytecode incrementally.
  */
 final class BytecodeWriter {
+    private static final int MAX_CONSTANTS = 65536;
+
     private final ByteArrayOutputStream bytecodeStream = new ByteArrayOutputStream();
     private final List<Integer> conditionOffsets = new ArrayList<>();
     private final List<Integer> resultOffsets = new ArrayList<>();
@@ -38,6 +40,9 @@ final class BytecodeWriter {
     }
 
     void writeShort(int value) {
+        if (value < 0 || value > 65535) {
+            throw new IllegalArgumentException("Value out of range for unsigned short: " + value);
+        }
         bytecodeStream.write((value >> 8) & 0xFF);
         bytecodeStream.write(value & 0xFF);
     }
@@ -46,6 +51,9 @@ final class BytecodeWriter {
     int getConstantIndex(Object value) {
         return constantIndices.computeIfAbsent(canonicalizeConstant(value), v -> {
             int index = constants.size();
+            if (index >= MAX_CONSTANTS) {
+                throw new IllegalStateException("Too many constants: " + index);
+            }
             constants.add(v);
             return index;
         });
@@ -73,11 +81,10 @@ final class BytecodeWriter {
             int bddRootRef
     ) {
         ByteArrayOutputStream complete = new ByteArrayOutputStream();
-        try {
+        try (DataOutputStream dos = new DataOutputStream(complete)) {
             int bddNodeCount = bddNodes.length / 3;
 
-            // Write header (44 bytes)
-            writeHeader(complete, registerDefinitions.length, functions.length, bddNodeCount, bddRootRef);
+            writeHeader(dos, registerDefinitions.length, functions.length, bddNodeCount, bddRootRef);
 
             // Calculate where each section will be
             int headerSize = 44;
@@ -100,7 +107,6 @@ final class BytecodeWriter {
             int bytecodeOffset = bddTableOffset + bddTableSize;
 
             // Write condition offsets (adjusted to absolute positions)
-            DataOutputStream dos = new DataOutputStream(complete);
             for (int offset : conditionOffsets) {
                 dos.writeInt(bytecodeOffset + offset);
             }
@@ -110,24 +116,17 @@ final class BytecodeWriter {
                 dos.writeInt(bytecodeOffset + offset);
             }
 
-            // Write function table
-            writeFunctionTable(complete);
+            writeFunctionTable(dos);
+            dos.write(regDefBytes);
+            writeBddTable(dos, bddNodes);
 
-            // Write register definitions
-            complete.write(regDefBytes);
-
-            // Write BDD table
-            writeBddTable(complete, bddNodes);
-
-            // Write bytecode
             byte[] bytecode = bytecodeStream.toByteArray();
-            complete.write(bytecode);
+            dos.write(bytecode);
 
-            // Write constant pool
             int constantPoolOffset = complete.size();
-            writeConstantPool(complete);
+            writeConstantPool(dos);
 
-            // Now patch the header with actual offsets
+            // patch the header with actual offsets
             byte[] data = complete.toByteArray();
             patchInt(data, 24, headerSize);
             patchInt(data, 28, resultTableOffset);
@@ -135,9 +134,8 @@ final class BytecodeWriter {
             patchInt(data, 36, constantPoolOffset);
             patchInt(data, 40, bddTableOffset);
 
-            // Return the complete bytecode array wrapped in Bytecode
             return new Bytecode(
-                    bytecode, // Just the bytecode portion
+                    bytecode,
                     conditionOffsets.stream().mapToInt(Integer::intValue).toArray(),
                     resultOffsets.stream().mapToInt(Integer::intValue).toArray(),
                     registerDefinitions,
@@ -152,13 +150,12 @@ final class BytecodeWriter {
     }
 
     private void writeHeader(
-            ByteArrayOutputStream out,
+            DataOutputStream dos,
             int registerCount,
             int functionCount,
             int bddNodeCount,
             int bddRootRef
     ) throws IOException {
-        DataOutputStream dos = new DataOutputStream(out);
         dos.writeInt(Bytecode.MAGIC);
         dos.writeShort(Bytecode.VERSION);
         dos.writeShort(conditionOffsets.size());
@@ -177,8 +174,7 @@ final class BytecodeWriter {
         dos.writeInt(0); // BDD table offset
     }
 
-    private void writeBddTable(ByteArrayOutputStream out, int[] nodes) throws IOException {
-        DataOutputStream dos = new DataOutputStream(out);
+    private void writeBddTable(DataOutputStream dos, int[] nodes) throws IOException {
         int nodeCount = nodes.length / 3;
         for (int i = 0; i < nodeCount; i++) {
             int baseIdx = i * 3;
@@ -196,8 +192,7 @@ final class BytecodeWriter {
         return size;
     }
 
-    private void writeFunctionTable(ByteArrayOutputStream out) throws IOException {
-        DataOutputStream dos = new DataOutputStream(out);
+    private void writeFunctionTable(DataOutputStream dos) throws IOException {
         for (String name : functionNames) {
             writeUTF(dos, name);
         }
@@ -208,43 +203,34 @@ final class BytecodeWriter {
         DataOutputStream dos = new DataOutputStream(out);
 
         for (RegisterDefinition reg : registers) {
-            // Write name
             writeUTF(dos, reg.name());
-
-            // Write required flag
             dos.writeByte(reg.required() ? 1 : 0);
-
-            // Write temp flag
             dos.writeByte(reg.temp() ? 1 : 0);
 
-            // Write default value
             if (reg.defaultValue() != null) {
                 dos.writeByte(1); // hasDefault
                 writeConstantValue(dos, reg.defaultValue());
             } else {
-                dos.writeByte(0); // no default
+                dos.writeByte(0);
             }
 
-            // Write builtin
             if (reg.builtin() != null) {
                 dos.writeByte(1); // hasBuiltin
                 writeUTF(dos, reg.builtin());
             } else {
-                dos.writeByte(0); // no builtin
+                dos.writeByte(0);
             }
         }
+
+        dos.flush();
     }
 
-    private void writeConstantPool(ByteArrayOutputStream out) throws IOException {
-        DataOutputStream dos = new DataOutputStream(out);
-
-        // Write each constant
+    private void writeConstantPool(DataOutputStream dos) throws IOException {
         for (Object constant : constants) {
             writeConstantValue(dos, constant);
         }
     }
 
-    // Helper method to write a constant value
     private void writeConstantValue(DataOutputStream dos, Object value) throws IOException {
         if (value == null) {
             dos.writeByte(Bytecode.CONST_NULL);
@@ -278,14 +264,15 @@ final class BytecodeWriter {
         }
     }
 
-    // Helper to write UTF string (length-prefixed)
     private void writeUTF(DataOutputStream dos, String value) throws IOException {
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length > 65535) {
+            throw new IOException("String too long for UTF encoding: " + bytes.length + " bytes");
+        }
         dos.writeShort(bytes.length);
         dos.write(bytes);
     }
 
-    // Helper to patch an int value in a byte array
     private void patchInt(byte[] data, int offset, int value) {
         data[offset] = (byte) ((value >> 24) & 0xFF);
         data[offset + 1] = (byte) ((value >> 16) & 0xFF);
