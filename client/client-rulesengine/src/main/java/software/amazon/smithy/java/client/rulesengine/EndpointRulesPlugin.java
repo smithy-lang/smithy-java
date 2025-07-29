@@ -15,9 +15,6 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.rulesengine.logic.bdd.BddTrait;
-import software.amazon.smithy.rulesengine.logic.bdd.NodeReversal;
-import software.amazon.smithy.rulesengine.logic.bdd.SiftingOptimization;
-import software.amazon.smithy.rulesengine.logic.cfg.Cfg;
 import software.amazon.smithy.rulesengine.traits.ContextParamTrait;
 import software.amazon.smithy.rulesengine.traits.EndpointRuleSetTrait;
 import software.amazon.smithy.rulesengine.traits.OperationContextParamsTrait;
@@ -47,7 +44,7 @@ public final class EndpointRulesPlugin implements ClientPlugin {
 
     public static final TraitKey<BddTrait> BDD_TRAIT = TraitKey.get(BddTrait.class);
 
-    private Bytecode bytecode;
+    private final Bytecode bytecode;
     private final RulesEngineBuilder engine;
 
     private EndpointRulesPlugin(Bytecode bytecode, RulesEngineBuilder engine) {
@@ -120,23 +117,18 @@ public final class EndpointRulesPlugin implements ClientPlugin {
                 var bddTrait = config.service().schema().getTrait(BDD_TRAIT);
                 if (bddTrait != null) {
                     LOGGER.debug("Found endpoint BDD trait on service: {}", config.service());
-                    bytecode = engine.compile(bddTrait);
                     resolver = new BytecodeEndpointResolver(
-                            bytecode,
+                            engine.compile(bddTrait),
                             engine.getExtensions(),
                             engine.getBuiltinProviders());
                 } else {
                     var ruleset = config.service().schema().getTrait(ENDPOINT_RULESET_TRAIT);
                     if (ruleset != null) {
-                        LOGGER.debug("Found endpoint rules trait on service: {}", config.service());
-                        var cfg = Cfg.from(ruleset.getEndpointRuleSet());
-                        var bdd = BddTrait.from(cfg);
-                        var nodes = SiftingOptimization.builder().cfg(cfg).build().apply(bdd.getBdd());
-                        nodes = NodeReversal.reverse(nodes);
-                        bdd = bdd.toBuilder().bdd(nodes).build();
-                        bytecode = engine.compile(bdd);
-                        var providers = engine.getBuiltinProviders();
-                        resolver = new BytecodeEndpointResolver(bytecode, engine.getExtensions(), providers);
+                        LOGGER.debug("Using decision tree based endpoint resolver for service: {}", config.service());
+                        resolver = new DecisionTreeEndpointResolver(
+                                ruleset.getEndpointRuleSet(),
+                                engine.getExtensions(),
+                                engine.getBuiltinProviders());
                     }
                 }
             }

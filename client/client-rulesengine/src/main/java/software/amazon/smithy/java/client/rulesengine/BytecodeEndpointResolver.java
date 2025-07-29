@@ -19,7 +19,7 @@ import software.amazon.smithy.rulesengine.logic.bdd.Bdd;
 /**
  * Endpoint resolver that uses a compiled endpoint rules program from a BDD.
  */
-final class BytecodeEndpointResolver implements EndpointResolver {
+public final class BytecodeEndpointResolver implements EndpointResolver {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(BytecodeEndpointResolver.class);
     private static final CompletableFuture<Endpoint> NULL_RESULT = CompletableFuture.completedFuture(null);
@@ -31,7 +31,7 @@ final class BytecodeEndpointResolver implements EndpointResolver {
     private final ContextProvider ctxProvider = new ContextProvider.OrchestratingProvider();
     private final ThreadLocal<BytecodeEvaluator> threadLocalEvaluator;
 
-    BytecodeEndpointResolver(
+    public BytecodeEndpointResolver(
             Bytecode bytecode,
             List<RulesExtension> extensions,
             Map<String, Function<Context, Object>> builtinProviders
