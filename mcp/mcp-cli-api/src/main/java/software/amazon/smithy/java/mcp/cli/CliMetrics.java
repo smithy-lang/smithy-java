@@ -15,6 +15,7 @@ public final class CliMetrics implements AutoCloseable {
     private final TelemetryData.Builder telemetryData;
     private final Map<String, Long> counters = new ConcurrentHashMap<>();
     private final Map<String, Long> timings = new ConcurrentHashMap<>();
+    private final Map<String, String> properties = new ConcurrentHashMap<>();
     private final long startTime;
 
     CliMetrics(final TelemetryPublisher telemetryPublisher, TelemetryData.Builder telemetryData) {
@@ -31,6 +32,10 @@ public final class CliMetrics implements AutoCloseable {
         timings.put(name, time);
     }
 
+    public void addProperty(String name, String value) {
+        properties.put(name, value);
+    }
+
     public int exitCode(int exitCode) {
         telemetryData.exitCode(exitCode);
         return exitCode;
@@ -42,6 +47,7 @@ public final class CliMetrics implements AutoCloseable {
         telemetryData
                 .counters(counters)
                 .timings(timings)
+                .properties(properties)
                 .build();
         try {
             telemetryPublisher.publish(telemetryData.build());
