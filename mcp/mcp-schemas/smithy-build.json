@@ -7,8 +7,8 @@
       "runtimeTraits": ["smithy.api#documentation", "smithy.api#examples" ]
     },
     "java-server-codegen": {
-      "service": "smithy.mcp.registry#McpRegistry",
-      "namespace": "software.amazon.smithy.java.mcp.registry",
+      "service": "smithy.mcp.toolassistant#ToolAssistant",
+      "namespace": "software.amazon.smithy.java.mcp.toolassistant",
       "headerFile": "license.txt",
       "runtimeTraits": ["smithy.api#documentation", "smithy.api#examples" ]
     }

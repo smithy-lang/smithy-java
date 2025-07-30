@@ -5,8 +5,11 @@
 
 package software.amazon.smithy.java.mcp.cli.commands;
 
+import static picocli.CommandLine.*;
+
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -15,8 +18,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Unmatched;
 import software.amazon.smithy.java.mcp.cli.ConfigUtils;
@@ -27,17 +30,17 @@ import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.java.mcp.cli.model.GenericToolBundleConfig;
 import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
 import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
-import software.amazon.smithy.java.mcp.registry.model.InstallToolInput;
-import software.amazon.smithy.java.mcp.registry.model.InstallToolOutput;
-import software.amazon.smithy.java.mcp.registry.model.SearchToolsInput;
-import software.amazon.smithy.java.mcp.registry.model.SearchToolsOutput;
-import software.amazon.smithy.java.mcp.registry.model.Tool;
-import software.amazon.smithy.java.mcp.registry.service.InstallToolOperation;
-import software.amazon.smithy.java.mcp.registry.service.McpRegistry;
-import software.amazon.smithy.java.mcp.registry.service.SearchToolsOperation;
 import software.amazon.smithy.java.mcp.server.McpServer;
 import software.amazon.smithy.java.mcp.server.StdioProxy;
 import software.amazon.smithy.java.mcp.server.ToolFilter;
+import software.amazon.smithy.java.mcp.toolassistant.model.InstallToolInput;
+import software.amazon.smithy.java.mcp.toolassistant.model.InstallToolOutput;
+import software.amazon.smithy.java.mcp.toolassistant.model.SearchToolsInput;
+import software.amazon.smithy.java.mcp.toolassistant.model.SearchToolsOutput;
+import software.amazon.smithy.java.mcp.toolassistant.model.Tool;
+import software.amazon.smithy.java.mcp.toolassistant.service.InstallToolOperation;
+import software.amazon.smithy.java.mcp.toolassistant.service.SearchToolsOperation;
+import software.amazon.smithy.java.mcp.toolassistant.service.ToolAssistant;
 import software.amazon.smithy.java.server.FilteredService;
 import software.amazon.smithy.java.server.OperationFilters;
 import software.amazon.smithy.java.server.RequestContext;
@@ -58,11 +61,12 @@ import software.amazon.smithy.mcp.bundle.api.model.GenericBundle;
 @Command(name = "start-server", description = "Starts an MCP server.")
 public final class StartServer extends SmithyMcpCommand {
 
-    @Parameters(paramLabel = "TOOL_BUNDLES", description = "Name(s) of the Tool Bundles to expose in this MCP Server.")
-    List<String> toolBundles;
+    @Parameters(paramLabel = "MCP_SERVER_IDS",
+            description = "Id(s) of MCP Servers to start and expose as a single MCP server.")
+    List<String> mcpServerIds = List.of();
 
-    @Option(names = "--registry-server", description = "Serve the registry as an MCP server")
-    boolean registryServer;
+    @Option(names = {"--tool-assistant", "-ts"}, description = "Exposes a Tool Assistant to Search and Install tools")
+    boolean toolAssistant;
 
     @Unmatched
     List<String> additionalArgs;
@@ -82,9 +86,9 @@ public final class StartServer extends SmithyMcpCommand {
     public void execute(ExecutionContext context) throws IOException {
 
         var config = context.config();
-        // By default, load all available tools
-        if (toolBundles == null || toolBundles.isEmpty()) {
-            toolBundles = config.getToolBundles()
+        // By default, load all available tools only if not in tool-assistant mode.
+        if (!toolAssistant && mcpServerIds.isEmpty()) {
+            mcpServerIds = config.getToolBundles()
                     .entrySet()
                     .stream()
                     .filter(entry -> {
@@ -96,22 +100,22 @@ public final class StartServer extends SmithyMcpCommand {
                     .toList();
         }
 
-        if (toolBundles.isEmpty() && !registryServer) {
-            throw new IllegalArgumentException("No bundles installed");
+        if (!toolAssistant && mcpServerIds.isEmpty()) {
+            throw new IllegalArgumentException("No MCP servers installed");
         }
 
         var registry = context.registry();
 
-        List<McpBundleConfig> toolBundleConfigs = new ArrayList<>(toolBundles.size());
+        List<McpBundleConfig> toolBundleConfigs = new ArrayList<>(mcpServerIds.size());
 
-        for (var toolBundle : toolBundles) {
-            var toolBundleConfig = config.getToolBundles().get(toolBundle);
+        for (var id : mcpServerIds) {
+            var toolBundleConfig = config.getToolBundles().get(id);
             if (toolBundleConfig == null) {
-                var bundle = registry.getMcpBundle(toolBundle);
+                var bundle = registry.getMcpBundle(id);
                 if (bundle == null) {
-                    throw new IllegalArgumentException("Can't find a configured tool bundle for '" + toolBundle + "'.");
+                    throw new IllegalArgumentException("Can't find a configured MCP server for '" + id + "'.");
                 } else {
-                    toolBundleConfig = ConfigUtils.addMcpBundle(config, toolBundle, bundle);
+                    toolBundleConfig = ConfigUtils.addMcpBundle(config, id, bundle);
                 }
             }
             toolBundleConfigs.add(toolBundleConfig);
@@ -168,7 +172,7 @@ public final class StartServer extends SmithyMcpCommand {
             awaitCompletion = proxyServer::awaitCompletion;
             shutdownMethod = proxyServer::shutdown;
         } else {
-            if (registryServer) {
+            if (toolAssistant) {
                 allowedTools = new CopyOnWriteArraySet<>();
                 final SearchToolsOperation searchToolsOperation;
                 if (registry instanceof SearchableRegistry searchableRegistry) {
@@ -180,8 +184,8 @@ public final class StartServer extends SmithyMcpCommand {
                     };
                 }
                 allowedTools.add("InstallTool");
-                services.put("registry-mcp",
-                        McpRegistry.builder()
+                services.put("tool-assistant",
+                        ToolAssistant.builder()
                                 .addInstallToolOperation(new InstallTool(registry, config, allowedTools))
                                 .addSearchToolsOperation(searchToolsOperation)
                                 .build());
@@ -248,8 +252,7 @@ public final class StartServer extends SmithyMcpCommand {
             return SearchToolsOutput.builder()
                     .tools(tools.stream()
                             .map(t -> Tool.builder()
-                                    .serverId(t.serverId())
-                                    .toolName(t.toolName())
+                                    .toolName(t.serverId() + "__" + t.toolName())
                                     .build())
                             .toList())
                     .build();
@@ -270,9 +273,13 @@ public final class StartServer extends SmithyMcpCommand {
 
         @Override
         public InstallToolOutput installTool(InstallToolInput input, RequestContext context) {
-            var tool = input.getTool();
-            var toolName = tool.getToolName();
-            var serverId = tool.getServerId();
+            var tool = input.getToolName();
+            var toolParts = tool.split("__");
+            if (toolParts.length < 2) {
+                throw new IllegalArgumentException("Invalid tool name");
+            }
+            var serverId = toolParts[0];
+            var toolName = Arrays.stream(toolParts).skip(1).collect(Collectors.joining("__"));
             Bundle bundle;
             if (!config.getToolBundles().containsKey(serverId)) {
                 bundle = registry.getMcpBundle(serverId);
