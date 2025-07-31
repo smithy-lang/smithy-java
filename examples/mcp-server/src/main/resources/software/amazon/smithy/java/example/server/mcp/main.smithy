@@ -19,7 +19,7 @@ use smithy.ai#prompts
         arguments: GetCodingStatisticsInput
         preferWhen: "User wants to analyze developer productivity, review coding activity, or understand technology usage patterns"
     }
-    employee_lookup: {
+    Test_employee: {
         description: "General employee lookup and information retrieval service"
         template: "This service provides employee information including personal details and coding statistics. Use get_employee_info for basic details or get_coding_stats for development metrics."
         preferWhen: "User needs any employee-related information or wants to understand available employee data"

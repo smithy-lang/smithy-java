@@ -40,7 +40,9 @@ final class PromptLoader {
         Map<String, Prompt> prompts = new LinkedHashMap<>();
 
         for (var service : services) {
+            var serviceName = service.schema().id().getName();
             Map<String, PromptTemplateDefinition> promptDefinitions = new HashMap<>();
+
             var servicePromptTrait = service.schema().getTrait(PROMPTS_TRAIT_KEY);
             if (servicePromptTrait != null) {
                 promptDefinitions.putAll(servicePromptTrait.getValues());
@@ -50,12 +52,15 @@ final class PromptLoader {
                 if (operationPromptsTrait != null) {
                     promptDefinitions.putAll(operationPromptsTrait.getValues());
                 }
-
             });
+
             for (Map.Entry<String, PromptTemplateDefinition> entry : promptDefinitions.entrySet()) {
-                var promptName = entry.getKey().toLowerCase();
+                var originalPromptName = entry.getKey();
                 var promptTemplateDefinition = entry.getValue();
                 var templateString = promptTemplateDefinition.getTemplate();
+
+                // Generate the new prompt name with service prefix
+                var promptName = serviceName + "__" + originalPromptName;
 
                 var finalTemplateString = promptTemplateDefinition.getPreferWhen().isPresent()
                         ? templateString + TOOL_PREFERENCE_PREFIX

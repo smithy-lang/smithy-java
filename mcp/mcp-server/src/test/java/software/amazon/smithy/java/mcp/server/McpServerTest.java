@@ -388,11 +388,11 @@ public class McpServerTest {
 
         // Check the prompt (service and operation have same name, so only one is returned)
         var servicePrompt = prompts.stream()
-                .filter(p -> p.asStringMap().get("name").asString().equals("search_users"))
+                .filter(p -> p.asStringMap().get("name").asString().equals("TestService__search_users"))
                 .findFirst()
                 .orElseThrow();
         var servicePromptMap = servicePrompt.asStringMap();
-        assertEquals("search_users", servicePromptMap.get("name").asString());
+        assertEquals("TestService__search_users", servicePromptMap.get("name").asString());
         assertEquals("Test Template", servicePromptMap.get("description").asString());
         assertTrue(servicePromptMap.get("arguments").asList().isEmpty());
     }
@@ -415,7 +415,7 @@ public class McpServerTest {
         write("prompts/get",
                 Document.of(Map.of(
                         "name",
-                        Document.of("search_users"))));
+                        Document.of("TestService__search_users"))));
         var response = read();
         var result = response.getResult().asStringMap();
 
@@ -479,7 +479,7 @@ public class McpServerTest {
         write("prompts/get",
                 Document.of(Map.of(
                         "name",
-                        Document.of("search_with_args"),
+                        Document.of("TestServiceWithArgs__search_with_args"),
                         "arguments",
                         Document.of(Map.of(
                                 "query",
@@ -520,7 +520,7 @@ public class McpServerTest {
         write("prompts/get",
                 Document.of(Map.of(
                         "name",
-                        Document.of("search_with_args"))));
+                        Document.of("TestServiceWithArgs__search_with_args"))));
         var response = read();
         var result = response.getResult().asStringMap();
 
@@ -557,7 +557,7 @@ public class McpServerTest {
         write("prompts/get",
                 Document.of(Map.of(
                         "name",
-                        Document.of("empty_template"))));
+                        Document.of("TestServiceEdgeCases__empty_template"))));
         var response = read();
         var result = response.getResult().asStringMap();
         var messages = result.get("messages").asList();
@@ -569,7 +569,7 @@ public class McpServerTest {
         write("prompts/get",
                 Document.of(Map.of(
                         "name",
-                        Document.of("no_placeholders"))));
+                        Document.of("TestServiceEdgeCases__no_placeholders"))));
         response = read();
         result = response.getResult().asStringMap();
         messages = result.get("messages").asList();
@@ -581,7 +581,7 @@ public class McpServerTest {
         write("prompts/get",
                 Document.of(Map.of(
                         "name",
-                        Document.of("duplicate_placeholders"),
+                        Document.of("TestServiceEdgeCases__duplicate_placeholders"),
                         "arguments",
                         Document.of(Map.of(
                                 "name",
@@ -597,7 +597,7 @@ public class McpServerTest {
         write("prompts/get",
                 Document.of(Map.of(
                         "name",
-                        Document.of("missing_arg_template"))));
+                        Document.of("TestServiceEdgeCases__missing_arg_template"))));
         response = read();
         result = response.getResult().asStringMap();
         messages = result.get("messages").asList();

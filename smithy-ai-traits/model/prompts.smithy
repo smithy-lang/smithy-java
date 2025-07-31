@@ -2,15 +2,17 @@ $version: "2"
 
 namespace smithy.ai
 
-// Prompt template trait - applied at operation level to provide guidance to LLMs
-@trait(selector: ":is(service, resource, operation)")
+@trait(selector: ":is(service, operation)")
 map prompts {
     /// Name of the prompt template
-    key: String
+    key: PromptName
 
     /// Definition of the prompt template
     value: PromptTemplateDefinition
 }
+
+@pattern("^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)*$")
+string PromptName
 
 /// Defines the structure of the prompt
 @private
