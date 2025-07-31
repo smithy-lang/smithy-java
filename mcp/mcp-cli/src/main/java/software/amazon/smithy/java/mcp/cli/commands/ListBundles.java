@@ -7,6 +7,9 @@ package software.amazon.smithy.java.mcp.cli.commands;
 
 import static picocli.CommandLine.Command;
 
+import java.util.Map;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
@@ -14,6 +17,7 @@ import software.amazon.smithy.java.mcp.cli.ExecutionContext;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
 import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.java.mcp.cli.model.GenericToolBundleConfig;
+import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
 import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
 import software.amazon.smithy.mcp.bundle.api.Registry;
 
@@ -38,25 +42,7 @@ public class ListBundles extends SmithyMcpCommand {
                 .string("@|bold,underline Registry MCP Servers:|@"));
         System.out.println();
 
-        // Display registry bundles
-        for (Registry.RegistryEntry entry : registry.listMcpBundles()) {
-            var bundle = entry.getBundleMetadata();
-            var installedBundle = installedBundles.get(bundle.getId());
-            //If there is a local bundle with the same name, prefer that.
-            boolean isInstalled = installedBundle != null;
-            boolean hasLocalOverride = isInstalled && switch (installedBundle.getValue()) {
-                case SmithyModeledBundleConfig config -> config.isLocal();
-                case GenericToolBundleConfig config -> config.isLocal();
-                default -> false;
-            };
-            String tag = null;
-            if (hasLocalOverride) {
-                tag = "locally-overriden";
-            } else if (isInstalled) {
-                tag = "installed";
-            }
-            printBundleInfo(commandLine, bundle.getId(), bundle.getName(), bundle.getDescription(), tag);
-        }
+        displayRegistryBundlesPaginated(registry, installedBundles, commandLine);
 
         var localBundles = context.config()
                 .getToolBundles()
@@ -97,6 +83,46 @@ public class ListBundles extends SmithyMcpCommand {
         return registryName;
     }
 
+    private void displayRegistryBundlesPaginated(
+            Registry registry,
+            Map<String, McpBundleConfig> installedBundles,
+            CommandLine commandLine
+    ) {
+        var registryIterator = registry.listMcpBundles().iterator();
+        int displayedCount = 0;
+        final int pageSize = 10;
+
+        while (registryIterator.hasNext()) {
+            if (displayedCount > 0 && displayedCount % pageSize == 0) {
+                System.out.println("Press down arrow for more...");
+                if (!waitForDownArrow()) {
+                    break;
+                }
+            }
+
+            var entry = registryIterator.next();
+            var bundle = entry.getBundleMetadata();
+            var installedBundle = installedBundles.get(bundle.getId());
+
+            boolean isInstalled = installedBundle != null;
+            boolean hasLocalOverride = isInstalled && switch (installedBundle.getValue()) {
+                case SmithyModeledBundleConfig config -> config.isLocal();
+                case GenericToolBundleConfig config -> config.isLocal();
+                default -> false;
+            };
+
+            String tag = null;
+            if (hasLocalOverride) {
+                tag = "locally-overriden";
+            } else if (isInstalled) {
+                tag = "installed";
+            }
+
+            printBundleInfo(commandLine, bundle.getId(), bundle.getName(), bundle.getDescription(), tag);
+            displayedCount++;
+        }
+    }
+
     private void printBundleInfo(
             CommandLine commandLine,
             String bundleId,
@@ -115,5 +141,25 @@ public class ListBundles extends SmithyMcpCommand {
         System.out.print("\tDescription: ");
         System.out.println(description);
         System.out.println();
+    }
+
+    private boolean waitForDownArrow() {
+        try (Terminal terminal = TerminalBuilder.builder()
+                .system(true)
+                .build()) {
+            terminal.enterRawMode();
+            int ch = terminal.reader().read();
+
+            if (ch == 27) {
+                int bracket = terminal.reader().read();
+                if (bracket == 91) {
+                    int arrow = terminal.reader().read();
+                    return arrow == 66;
+                }
+            }
+            return false;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

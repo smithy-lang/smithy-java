@@ -16,6 +16,7 @@ osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 jreleaser = "1.19.0"
 picocli = "4.7.7"
+jline = "3.30.4"
 graalvm-native = "0.11.0"
 shadow = "8.3.8"
 
@@ -46,6 +47,8 @@ netty-all = {module = "io.netty:netty-all", version.ref = "netty"}
 # CLI related dependencies
 picocli = { module = "info.picocli:picocli", version.ref = "picocli" }
 picocli-codegen = { module = "info.picocli:picocli-codegen", version.ref = "picocli" }
+jline-terminal = { module = "org.jline:jline-terminal", version.ref = "jline" }
+jline-reader = { module = "org.jline:jline-reader", version.ref = "jline" }
 
 # Test dependencies
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit5" }

@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.stream.Stream;
 import software.amazon.smithy.java.aws.servicebundle.bundler.AwsServiceBundler;
 import software.amazon.smithy.mcp.bundle.api.Registry;
 import software.amazon.smithy.mcp.bundle.api.model.Bundle;
@@ -51,8 +52,8 @@ public final class AwsMcpRegistry implements Registry {
     }
 
     @Override
-    public List<RegistryEntry> listMcpBundles() {
-        return availableMcpBundles;
+    public Stream<RegistryEntry> listMcpBundles() {
+        return availableMcpBundles.stream();
     }
 
     @Override

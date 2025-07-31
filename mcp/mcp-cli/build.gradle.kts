@@ -20,6 +20,8 @@ dependencies {
     implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(libs.picocli)
     annotationProcessor(libs.picocli.codegen)
+    implementation(libs.jline.terminal)
+    implementation(libs.jline.reader)
     api(project(":mcp:mcp-cli-api"))
     api(project(":mcp:mcp-schemas"))
     implementation(libs.smithy.utils)

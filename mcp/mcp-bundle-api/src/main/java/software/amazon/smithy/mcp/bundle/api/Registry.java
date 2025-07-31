@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.mcp.bundle.api;
 
-import java.util.List;
+import java.util.stream.Stream;
 import software.amazon.smithy.mcp.bundle.api.model.Bundle;
 import software.amazon.smithy.mcp.bundle.api.model.BundleMetadata;
 
@@ -39,7 +39,7 @@ public interface Registry {
 
     String name();
 
-    List<RegistryEntry> listMcpBundles();
+    Stream<RegistryEntry> listMcpBundles();
 
     Bundle getMcpBundle(String id);
 
