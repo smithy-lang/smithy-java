@@ -191,6 +191,14 @@ public final class StartServer extends SmithyMcpCommand {
                                 .build());
             }
 
+            var metrics = context.metrics();
+            var mcpsStarted = String.join(":", services.keySet());
+            metrics.addProperty("McpStarted", mcpsStarted);
+
+            if (toolAssistant) {
+                metrics.addCount("ToolAssistant", 1);
+            }
+
             this.mcpServer =
                     (McpServer) McpServer.builder()
                             .stdio()
