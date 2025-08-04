@@ -12,6 +12,7 @@ dependencies {
     api(project(":core"))
     api(libs.smithy.model)
     api(project(":server:server-api"))
+    api(project(":smithy-ai-traits"))
     smithyBuild(project(":codegen:plugins:types-codegen"))
     smithyBuild(project(":codegen:plugins:server-codegen"))
 }

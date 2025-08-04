@@ -10,7 +10,7 @@
       "service": "smithy.mcp.toolassistant#ToolAssistant",
       "namespace": "software.amazon.smithy.java.mcp.toolassistant",
       "headerFile": "license.txt",
-      "runtimeTraits": ["smithy.api#documentation", "smithy.api#examples" ]
+      "runtimeTraits": ["smithy.api#documentation", "smithy.api#examples", "smithy.ai#prompts" ]
     }
   }
 }

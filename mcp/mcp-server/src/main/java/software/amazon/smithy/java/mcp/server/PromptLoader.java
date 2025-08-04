@@ -14,6 +14,7 @@ import java.util.Map;
 import software.amazon.smithy.ai.PromptTemplateDefinition;
 import software.amazon.smithy.ai.PromptsTrait;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.mcp.model.PromptArgument;
 import software.amazon.smithy.java.mcp.model.PromptInfo;
@@ -62,6 +63,8 @@ final class PromptLoader {
                                 + promptTemplateDefinition.getPreferWhen().get()
                         : templateString;
 
+                var schemaIndex = SchemaIndex.compose(service.schemaIndex(), SchemaIndex.getCombinedSchemaIndex());
+
                 var promptInfo = PromptInfo
                         .builder()
                         .name(promptName)
@@ -69,8 +72,7 @@ final class PromptLoader {
                         .description(promptTemplateDefinition.getDescription())
                         .arguments(promptTemplateDefinition.getArguments().isPresent()
                                 ? convertArgumentShapeToPromptArgument(
-                                        service.schemaIndex()
-                                                .getSchema(promptTemplateDefinition.getArguments().get()))
+                                        schemaIndex.getSchema(promptTemplateDefinition.getArguments().get()))
                                 : List.of())
                         .build();
 

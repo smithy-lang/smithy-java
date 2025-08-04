@@ -43,4 +43,8 @@ public abstract class SchemaIndex {
             throw new IllegalArgumentException("No schema found for id `" + id + "`");
         }
     }
+
+    public static SchemaIndex compose(SchemaIndex... indexes) {
+        return new CombinedSchemaIndex(List.of(indexes));
+    }
 }
