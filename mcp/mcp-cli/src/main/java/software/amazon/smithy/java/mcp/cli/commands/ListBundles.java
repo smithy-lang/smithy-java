@@ -146,6 +146,7 @@ public class ListBundles extends SmithyMcpCommand {
     private boolean waitForDownArrow() {
         try (Terminal terminal = TerminalBuilder.builder()
                 .system(true)
+                .dumb(true)
                 .build()) {
             terminal.enterRawMode();
             int ch = terminal.reader().read();
