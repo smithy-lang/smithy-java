@@ -14,6 +14,7 @@ operation Exceptions {
         SimpleException
         EmptyException
         OptionalMessageException
+        ExceptionWithCapitalMessage
     ]
 }
 
@@ -23,6 +24,12 @@ structure ExceptionWithExtraStringException {
     message: String
 
     extra: String
+}
+
+@error("server")
+structure ExceptionWithCapitalMessage {
+    @required
+    Message: String
 }
 
 @error("server")

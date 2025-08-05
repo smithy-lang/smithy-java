@@ -214,7 +214,12 @@ public final class StructureGenerator<
                                 // Here just in case we ever expand this trait.
                                 writer.putContext("errorFaultType", "OTHER");
                             }
-                            if (shape.getMember("message").isPresent()) {
+                            boolean isMessagePresent = shape.getAllMembers()
+                                    .values()
+                                    .stream()
+                                    .map(symbolProvider::toMemberName)
+                                    .anyMatch("message"::equals);
+                            if (isMessagePresent) {
                                 writer.write(
                                         "super($$SCHEMA, builder.message, builder.$$cause, ${errorFault:T}.${errorFaultType:L}, builder.$$captureStackTrace, builder.$$deserialized);");
                             } else {

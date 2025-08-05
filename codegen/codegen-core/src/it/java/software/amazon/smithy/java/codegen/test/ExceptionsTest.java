@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.codegen.test.model.EmptyException;
+import software.amazon.smithy.java.codegen.test.model.ExceptionWithCapitalMessage;
 import software.amazon.smithy.java.codegen.test.model.ExceptionWithExtraStringException;
 import software.amazon.smithy.java.codegen.test.model.OptionalMessageException;
 import software.amazon.smithy.java.codegen.test.model.SimpleException;
@@ -88,6 +89,12 @@ public class ExceptionsTest {
         } finally {
             disableGlobalStackTraceCapture();
         }
+    }
+
+    @Test
+    void testMessageMemberCapital() {
+        var exception = ExceptionWithCapitalMessage.builder().message("OOOPS!").build();
+        assertThat(exception.getMessage()).isEqualTo("OOOPS!");
     }
 
     private static Throwable getCauseThrowable() {
