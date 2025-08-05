@@ -66,14 +66,14 @@ public class CodeGenerationContext
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(CodeGenerationContext.class);
 
-    private static final List<ShapeId> PRELUDE_RUNTIME_TRAITS = List.of(
+    // visible for testing
+    static final List<ShapeId> PRELUDE_RUNTIME_TRAITS = List.of(
             // Validation Traits
             LengthTrait.ID,
             PatternTrait.ID,
             RangeTrait.ID,
             RequiredTrait.ID,
             SensitiveTrait.ID,
-            IdempotencyTokenTrait.ID,
             SparseTrait.ID,
             UniqueItemsTrait.ID,
             RequiresLengthTrait.ID,
@@ -96,7 +96,9 @@ public class CodeGenerationContext
             IdempotencyTokenTrait.ID,
             RetryableTrait.ID,
             RequestCompressionTrait.ID,
-            StreamingTrait.ID);
+            StreamingTrait.ID,
+            // AI traits (experimental)
+            ShapeId.from("smithy.ai#prompts"));
 
     private final Model model;
     private final JavaCodegenSettings settings;

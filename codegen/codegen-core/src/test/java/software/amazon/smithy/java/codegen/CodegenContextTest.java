@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 
+import java.util.HashSet;
 import java.util.Objects;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -20,37 +21,6 @@ import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.AnnotationTrait;
-import software.amazon.smithy.model.traits.CorsTrait;
-import software.amazon.smithy.model.traits.DefaultTrait;
-import software.amazon.smithy.model.traits.EndpointTrait;
-import software.amazon.smithy.model.traits.ErrorTrait;
-import software.amazon.smithy.model.traits.EventHeaderTrait;
-import software.amazon.smithy.model.traits.EventPayloadTrait;
-import software.amazon.smithy.model.traits.HostLabelTrait;
-import software.amazon.smithy.model.traits.HttpErrorTrait;
-import software.amazon.smithy.model.traits.HttpPayloadTrait;
-import software.amazon.smithy.model.traits.HttpQueryTrait;
-import software.amazon.smithy.model.traits.HttpTrait;
-import software.amazon.smithy.model.traits.IdempotencyTokenTrait;
-import software.amazon.smithy.model.traits.JsonNameTrait;
-import software.amazon.smithy.model.traits.LengthTrait;
-import software.amazon.smithy.model.traits.MediaTypeTrait;
-import software.amazon.smithy.model.traits.PaginatedTrait;
-import software.amazon.smithy.model.traits.PatternTrait;
-import software.amazon.smithy.model.traits.RangeTrait;
-import software.amazon.smithy.model.traits.RequestCompressionTrait;
-import software.amazon.smithy.model.traits.RequiredTrait;
-import software.amazon.smithy.model.traits.RequiresLengthTrait;
-import software.amazon.smithy.model.traits.RetryableTrait;
-import software.amazon.smithy.model.traits.SensitiveTrait;
-import software.amazon.smithy.model.traits.SparseTrait;
-import software.amazon.smithy.model.traits.StreamingTrait;
-import software.amazon.smithy.model.traits.TimestampFormatTrait;
-import software.amazon.smithy.model.traits.UniqueItemsTrait;
-import software.amazon.smithy.model.traits.XmlAttributeTrait;
-import software.amazon.smithy.model.traits.XmlFlattenedTrait;
-import software.amazon.smithy.model.traits.XmlNameTrait;
-import software.amazon.smithy.model.traits.XmlNamespaceTrait;
 
 public class CodegenContextTest {
     private static Model model;
@@ -82,47 +52,19 @@ public class CodegenContextTest {
                 .build();
         plugin.execute(context);
 
+        var expected = new HashSet<>(CodeGenerationContext.PRELUDE_RUNTIME_TRAITS);
+        expected.add(ShapeId.from("smithy.java.codegen#selectedTrait"));
+        expected.add(ShapeId.from("smithy.api#httpError"));
+        expected.add(ShapeId.from("smithy.api#httpPayload"));
+        expected.add(ShapeId.from("smithy.api#timestampFormat"));
+        expected.add(ShapeId.from("smithy.api#cors"));
+        expected.add(ShapeId.from("smithy.api#http"));
+        expected.add(ShapeId.from("smithy.api#httpQuery"));
+        expected.add(ShapeId.from("smithy.api#endpoint"));
+
         assertThat(
                 plugin.capturedContext.runtimeTraits(),
-                containsInAnyOrder(
-                        // Prelude validation traits
-                        LengthTrait.ID,
-                        PatternTrait.ID,
-                        RangeTrait.ID,
-                        RequiredTrait.ID,
-                        SensitiveTrait.ID,
-                        SparseTrait.ID,
-                        UniqueItemsTrait.ID,
-                        RequiresLengthTrait.ID,
-                        ErrorTrait.ID,
-                        DefaultTrait.ID,
-                        // Base Prelude Protocol traits
-                        JsonNameTrait.ID,
-                        TimestampFormatTrait.ID,
-                        MediaTypeTrait.ID,
-                        XmlNameTrait.ID,
-                        XmlFlattenedTrait.ID,
-                        XmlAttributeTrait.ID,
-                        XmlNamespaceTrait.ID,
-                        EventHeaderTrait.ID,
-                        EventPayloadTrait.ID,
-                        HostLabelTrait.ID,
-                        EndpointTrait.ID,
-                        // Protocol Traits
-                        CorsTrait.ID,
-                        HttpTrait.ID,
-                        // Auth traits
-                        HttpQueryTrait.ID,
-                        HttpPayloadTrait.ID,
-                        // Prelude behavior traits
-                        PaginatedTrait.ID,
-                        IdempotencyTokenTrait.ID,
-                        RetryableTrait.ID,
-                        RequestCompressionTrait.ID,
-                        StreamingTrait.ID,
-                        // Added by settings
-                        HttpErrorTrait.ID,
-                        ShapeId.from("smithy.java.codegen#selectedTrait")));
+                containsInAnyOrder(expected.toArray()));
     }
 
     @Test
@@ -141,36 +83,7 @@ public class CodegenContextTest {
 
         assertThat(
                 plugin.capturedContext.runtimeTraits(),
-                containsInAnyOrder(
-                        // Prelude Validation Traits
-                        LengthTrait.ID,
-                        PatternTrait.ID,
-                        RangeTrait.ID,
-                        RequiredTrait.ID,
-                        SensitiveTrait.ID,
-                        SparseTrait.ID,
-                        UniqueItemsTrait.ID,
-                        RequiresLengthTrait.ID,
-                        ErrorTrait.ID,
-                        DefaultTrait.ID,
-                        // Base Prelude Protocol traits
-                        JsonNameTrait.ID,
-                        TimestampFormatTrait.ID,
-                        MediaTypeTrait.ID,
-                        XmlNameTrait.ID,
-                        XmlFlattenedTrait.ID,
-                        XmlAttributeTrait.ID,
-                        XmlNamespaceTrait.ID,
-                        EventHeaderTrait.ID,
-                        EventPayloadTrait.ID,
-                        HostLabelTrait.ID,
-                        EndpointTrait.ID,
-                        // Prelude behavior traits
-                        PaginatedTrait.ID,
-                        IdempotencyTokenTrait.ID,
-                        RetryableTrait.ID,
-                        RequestCompressionTrait.ID,
-                        StreamingTrait.ID));
+                containsInAnyOrder(CodeGenerationContext.PRELUDE_RUNTIME_TRAITS.toArray()));
     }
 
     public static class SelectedTrait extends AnnotationTrait {
