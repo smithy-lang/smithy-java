@@ -11,14 +11,14 @@ assertj = "3.27.3"
 jackson = "2.19.2"
 netty = "4.2.3.Final"
 dep-analysis = "2.19.0"
-aws-sdk = "2.32.11"
+aws-sdk = "2.32.16"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 jreleaser = "1.19.0"
 picocli = "4.7.7"
 jline = "3.30.4"
 graalvm-native = "0.11.0"
-shadow = "8.3.8"
+shadow = "8.3.9"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
