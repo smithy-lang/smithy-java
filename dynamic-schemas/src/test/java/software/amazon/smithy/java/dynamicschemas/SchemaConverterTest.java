@@ -68,6 +68,15 @@ public class SchemaConverterTest {
                             foo: String
                         }
 
+                        structure NestedStruct {
+                            foo: SimpleStruct
+                            bar: SimpleStruct
+                        }
+
+                        structure ParentStruct {
+                            foo: NestedStruct
+                        }
+
                         union SimpleUnion {
                             foo: String
                         }
@@ -134,9 +143,65 @@ public class SchemaConverterTest {
                 Arguments.of(ShapeType.LIST, "SimpleList"),
                 Arguments.of(ShapeType.MAP, "SimpleMap"),
                 Arguments.of(ShapeType.STRUCTURE, "SimpleStruct"),
+                Arguments.of(ShapeType.STRUCTURE, "NestedStruct"),
+                Arguments.of(ShapeType.STRUCTURE, "ParentStruct"),
                 Arguments.of(ShapeType.UNION, "SimpleUnion"),
                 Arguments.of(ShapeType.LIST, "RecursiveList"),
                 Arguments.of(ShapeType.MAP, "RecursiveMap"),
                 Arguments.of(ShapeType.STRUCTURE, "RecursiveStructure"));
+    }
+
+    @MethodSource("detectsRecursiveSchemasSource")
+    @ParameterizedTest
+    public void detectsRecursiveSchemas(String name) {
+        var converter = new SchemaConverter(model);
+        var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#" + name)));
+
+        // Detecting that SchemaConverter handled this schema as recursive by checking classname is
+        // hacky, but public API doesn't expose a cleaner way, and probably shouldn't.
+        assertThat(schema.getClass().getSimpleName(), is("DeferredRootSchema"));
+    }
+
+    static List<Arguments> detectsRecursiveSchemasSource() {
+        return List.of(
+                Arguments.of("RecursiveList"),
+                Arguments.of("RecursiveMap"),
+                Arguments.of("RecursiveStructure"));
+    }
+
+    @MethodSource("detectsNonRecursiveSchemasSource")
+    @ParameterizedTest
+    public void detectsNonRecursiveSchemas(String name) {
+        var converter = new SchemaConverter(model);
+        var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#" + name)));
+
+        // Detecting that SchemaConverter handled this schema as non-recursive by checking classname is
+        // hacky, but public API doesn't expose a cleaner way, and probably shouldn't.
+        assertThat(schema.getClass().getSimpleName(), not("DeferredRootSchema"));
+    }
+
+    static List<Arguments> detectsNonRecursiveSchemasSource() {
+        return List.of(
+                Arguments.of("MyDocument"),
+                Arguments.of("MyString"),
+                Arguments.of("MyBoolean"),
+                Arguments.of("MyTimestamp"),
+                Arguments.of("MyBlob"),
+                Arguments.of("MyByte"),
+                Arguments.of("MyShort"),
+                Arguments.of("MyInteger"),
+                Arguments.of("MyLong"),
+                Arguments.of("MyFloat"),
+                Arguments.of("MyDouble"),
+                Arguments.of("MyBigInteger"),
+                Arguments.of("MyBigDecimal"),
+                Arguments.of("MyEnum"),
+                Arguments.of("MyIntEnum"),
+                Arguments.of("SimpleList"),
+                Arguments.of("SimpleMap"),
+                Arguments.of("SimpleStruct"),
+                Arguments.of("NestedStruct"),
+                Arguments.of("ParentStruct"),
+                Arguments.of("SimpleUnion"));
     }
 }

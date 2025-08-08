@@ -101,7 +101,7 @@ public final class SchemaConverter {
             return true;
         }
 
-        return switch (shape.getType().getCategory()) {
+        var result = switch (shape.getType().getCategory()) {
             case SIMPLE, SERVICE -> false;
             case MEMBER -> isRecursive(visited, model.expectShape(shape.asMemberShape().orElseThrow().getTarget()));
             case AGGREGATE -> {
@@ -113,6 +113,10 @@ public final class SchemaConverter {
                 yield false;
             }
         };
+
+        // "Pop" the current node off the "stack" -- other branches are still allowed to contain this shape.
+        visited.remove(shape.getId());
+        return result;
     }
 
     private Schema createNonRecursiveSchema(Shape shape) {
