@@ -15,11 +15,13 @@ final class DeferredMemberSchema extends Schema {
 
     private final SchemaBuilder target;
     private final TraitMap directTraits;
+    private final long requiredByValidationBitmask;
 
     DeferredMemberSchema(MemberSchemaBuilder builder) {
         super(builder);
         this.target = builder.targetBuilder;
         this.directTraits = builder.directTraits;
+        this.requiredByValidationBitmask = builder.requiredByValidationBitmask;
     }
 
     @Override
@@ -44,7 +46,9 @@ final class DeferredMemberSchema extends Schema {
 
     @Override
     long requiredByValidationBitmask() {
-        return memberTarget().requiredByValidationBitmask();
+        // The bitmask applies to the member itself, not its target schema, so this should not be forwarded
+        // to memberTarget as the previous accessors do.
+        return requiredByValidationBitmask;
     }
 
     @Override

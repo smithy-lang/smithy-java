@@ -131,6 +131,39 @@ public class ValidatorTest {
         assertThat(errors.get(0).path(), equalTo("/"));
     }
 
+    @Test
+    public void detectsPresenceForNestedRecursiveFields() {
+        var innerBuilder = Schema.structureBuilder(ShapeId.from("smithy.example#Inner"))
+                .putMember("foo", PreludeSchemas.STRING, new RequiredTrait());
+        var innerSchema = innerBuilder.build();
+
+        var innerInstance = TestHelper.create(innerSchema, (schema, serializer) -> {
+            serializer.writeString(schema.member("foo"), "bar");
+        });
+
+        var rootSchemaWithMember = Schema.structureBuilder(ShapeId.from("smithy.example#Root"))
+                .putMember("inner", innerSchema, new RequiredTrait())
+                .build();
+        var rootInstanceWithMember = TestHelper.create(rootSchemaWithMember, (schema, serializer) -> {
+            serializer.writeStruct(schema.member("inner"), innerInstance);
+        });
+
+        var rootSchemaWithDeferredMember = Schema.structureBuilder(ShapeId.from("smithy.example#Root"))
+                .putMember("inner", innerBuilder, new RequiredTrait())
+                .build();
+        var rootInstanceWithDeferredMember = TestHelper.create(rootSchemaWithDeferredMember, (schema, serializer) -> {
+            serializer.writeStruct(schema.member("inner"), innerInstance);
+        });
+
+        var validator = Validator.builder().build();
+
+        var memberErrors = validator.validate(rootInstanceWithMember);
+        assertThat(memberErrors, empty());
+
+        var deferredMemberErrors = validator.validate(rootInstanceWithDeferredMember);
+        assertThat(deferredMemberErrors, empty());
+    }
+
     private List<Schema> createListSchemas(int depth) {
         List<Schema> schemas = new ArrayList<>(depth);
         for (int i = depth; i > 0; i--) {
