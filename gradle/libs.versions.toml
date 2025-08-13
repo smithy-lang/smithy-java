@@ -18,7 +18,7 @@ jreleaser = "1.19.0"
 picocli = "4.7.7"
 jline = "3.30.5"
 graalvm-native = "0.11.0"
-shadow = "8.3.9"
+shadow = "9.0.1"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
