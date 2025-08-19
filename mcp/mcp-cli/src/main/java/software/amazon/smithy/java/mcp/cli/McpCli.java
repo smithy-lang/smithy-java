@@ -8,6 +8,7 @@ package software.amazon.smithy.java.mcp.cli;
 import java.util.List;
 import java.util.ServiceLoader;
 import picocli.CommandLine;
+import picocli.CommandLine.HelpCommand;
 import software.amazon.smithy.java.mcp.cli.commands.Configure;
 import software.amazon.smithy.java.mcp.cli.commands.CreateBundle;
 import software.amazon.smithy.java.mcp.cli.commands.CreateGenericBundle;
@@ -37,6 +38,7 @@ public final class McpCli {
                 .addSubcommand(new CreateGenericBundle());
         discoverCreateBundleCommands().forEach(createCommand::addSubcommand);
         var commandLine = new CommandLine(new McpRegistry())
+                .addSubcommand(new HelpCommand())
                 .addSubcommand(new StartServer())
                 .addSubcommand(new ListBundles())
                 .addSubcommand(new InstallBundle())

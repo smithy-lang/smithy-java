@@ -6,7 +6,8 @@
 package software.amazon.smithy.java.mcp.cli;
 
 import picocli.CommandLine;
+import picocli.CommandLine.Command;
 
-@CommandLine.Command(name = "mcp-registry", versionProvider = VersionProvider.class, mixinStandardHelpOptions = true,
+@Command(name = "mcp-registry", versionProvider = VersionProvider.class, mixinStandardHelpOptions = true,
         scope = CommandLine.ScopeType.INHERIT)
 final class McpRegistry {}
