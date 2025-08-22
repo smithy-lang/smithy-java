@@ -60,6 +60,7 @@ import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.shapes.ShapeVisitor;
 import software.amazon.smithy.model.shapes.ShortShape;
 import software.amazon.smithy.model.shapes.StringShape;
@@ -400,13 +401,20 @@ public final class StructureGenerator<
             var iter = shape.members().iterator();
             while (iter.hasNext()) {
                 var member = iter.next();
+                var target = model.expectShape(member.getTarget());
                 var memberSymbol = symbolProvider.toSymbol(member);
                 writer.pushState();
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
-                // Use `==` instead of `equals` for unboxed primitives
+                // Avoid `equals` for unboxed primitives
                 if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE)
                         && !CodegenUtils.isNullableMember(model, member)) {
-                    writer.writeInline("this.${memberName:L} == that.${memberName:L}");
+                    if (target.getType() == ShapeType.FLOAT) {
+                        writer.writeInline("Float.compare(this.${memberName:L}, that.${memberName:L}) == 0");
+                    } else if (target.getType() == ShapeType.DOUBLE) {
+                        writer.writeInline("Double.compare(this.${memberName:L}, that.${memberName:L}) == 0");
+                    } else {
+                        writer.writeInline("this.${memberName:L} == that.${memberName:L}");
+                    }
                 } else {
                     Class<?> comparator = CodegenUtils.isJavaArray(memberSymbol) ? Arrays.class : Objects.class;
                     writer.writeInline("$T.equals(this.${memberName:L}, that.${memberName:L})", comparator);

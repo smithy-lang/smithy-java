@@ -60,6 +60,7 @@ include(":codegen:plugins")
 include(":codegen:plugins:client-codegen")
 include(":codegen:plugins:server-codegen")
 include(":codegen:plugins:types-codegen")
+include(":codegen:test-utils")
 
 // Utilities
 include(":jmespath")
