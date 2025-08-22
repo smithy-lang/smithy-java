@@ -32,12 +32,12 @@ import software.amazon.smithy.rulesengine.language.syntax.rule.NoMatchRule;
 import software.amazon.smithy.rulesengine.language.syntax.rule.Rule;
 import software.amazon.smithy.rulesengine.logic.bdd.Bdd;
 import software.amazon.smithy.rulesengine.logic.bdd.BddNodeConsumer;
-import software.amazon.smithy.rulesengine.logic.bdd.BddTrait;
+import software.amazon.smithy.rulesengine.logic.bdd.EndpointBddTrait;
 
 final class BytecodeCompiler {
 
     private final List<RulesExtension> extensions;
-    private final BddTrait bdd;
+    private final EndpointBddTrait bdd;
     private final Map<String, Function<Context, Object>> builtinProviders;
     private final BytecodeWriter writer = new BytecodeWriter();
     private final List<RulesFunction> usedFunctions = new ArrayList<>();
@@ -47,7 +47,7 @@ final class BytecodeCompiler {
 
     BytecodeCompiler(
             List<RulesExtension> extensions,
-            BddTrait bdd,
+            EndpointBddTrait bdd,
             Map<String, RulesFunction> functions,
             Map<String, Function<Context, Object>> builtinProviders
     ) {
@@ -259,6 +259,29 @@ final class BytecodeCompiler {
 
                 // Handle special built-in functions
                 switch (fnId) {
+                    case "coalesce" -> {
+                        if (args.size() < 2) {
+                            throw new RulesEvaluationError(
+                                    "Coalesce requires at least 2 arguments, got " + args.size());
+                        }
+
+                        String endLabel = writer.createLabel();
+
+                        // Compile all but the last argument with JNN_OR_POP
+                        for (int i = 0; i < args.size() - 1; i++) {
+                            compileExpression(args.get(i));
+                            writer.writeByte(Opcodes.JNN_OR_POP);
+                            writer.writeJumpPlaceholder(endLabel);
+                        }
+
+                        // Compile the last argument (fallback)
+                        compileExpression(args.get(args.size() - 1));
+
+                        // Mark the end label
+                        writer.markLabel(endLabel);
+
+                        return null;
+                    }
                     case "substring" -> {
                         compileExpression(args.get(0)); // string
                         writer.writeByte(Opcodes.SUBSTRING);

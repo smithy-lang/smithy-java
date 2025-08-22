@@ -203,7 +203,7 @@ public final class Bytecode {
         this.bddRootRef = bddRootRef;
 
         this.registerTemplate = createRegisterTemplate(registerDefinitions);
-        this.builtinIndices = findBuiltinIndicesWithoutDefaults(registerDefinitions);
+        this.builtinIndices = findBuiltinIndices(registerDefinitions);
         this.hardRequiredIndices = findRequiredIndicesWithoutDefaultsOrBuiltins(registerDefinitions);
         this.inputRegisterMap = createInputRegisterMap(registerDefinitions);
     }
@@ -397,17 +397,19 @@ public final class Bytecode {
     private static Object[] createRegisterTemplate(RegisterDefinition[] definitions) {
         Object[] template = new Object[definitions.length];
         for (int i = 0; i < definitions.length; i++) {
-            template[i] = definitions[i].defaultValue();
+            // Only pre-fill defaults if there's no builtin; if there's a builtin, it's handled as a fallback
+            if (definitions[i].builtin() == null) {
+                template[i] = definitions[i].defaultValue();
+            }
         }
         return template;
     }
 
-    private static int[] findBuiltinIndicesWithoutDefaults(RegisterDefinition[] definitions) {
+    private static int[] findBuiltinIndices(RegisterDefinition[] definitions) {
         List<Integer> indices = new ArrayList<>();
         for (int i = 0; i < definitions.length; i++) {
-            RegisterDefinition def = definitions[i];
-            // Only track builtins that don't already have defaults
-            if (def.builtin() != null && def.defaultValue() == null) {
+            // Track all registers with builtins, regardless of defaults
+            if (definitions[i].builtin() != null) {
                 indices.add(i);
             }
         }

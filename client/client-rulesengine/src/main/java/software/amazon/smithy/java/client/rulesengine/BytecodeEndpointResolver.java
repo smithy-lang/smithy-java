@@ -40,10 +40,7 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
         this.extensions = extensions.toArray(new RulesExtension[0]);
         this.registerFiller = RegisterFiller.of(bytecode, builtinProviders);
         this.bdd = bytecode.getBdd();
-
-        this.threadLocalEvaluator = ThreadLocal.withInitial(() -> {
-            return new BytecodeEvaluator(bytecode, this.extensions);
-        });
+        this.threadLocalEvaluator = ThreadLocal.withInitial(() -> new BytecodeEvaluator(bytecode, this.extensions));
     }
 
     @Override
