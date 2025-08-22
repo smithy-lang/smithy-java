@@ -43,3 +43,14 @@ tasks {
 configurePublishing {
     customComponent = components["shadow"] as SoftwareComponent
 }
+
+// Ensure sources and javadocs jars are included in shadow component
+afterEvaluate {
+    val shadowComponent = components["shadow"] as AdhocComponentWithVariants
+    shadowComponent.addVariantsFromConfiguration(configurations.sourcesElements.get()) {
+        mapToMavenScope("runtime")
+    }
+    shadowComponent.addVariantsFromConfiguration(configurations.javadocElements.get()) {
+        mapToMavenScope("runtime")
+    }
+}
