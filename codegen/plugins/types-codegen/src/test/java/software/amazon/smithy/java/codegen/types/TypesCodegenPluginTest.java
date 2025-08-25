@@ -40,7 +40,8 @@ public class TypesCodegenPluginTest {
     }
 
     // Uncomment this test to render the java files when we there are changes to the codegen logic.
-    @ParameterizedTest(name = "[{index}] => {0}") @MethodSource("testCases")
+    @ParameterizedTest(name = "[{index}] => {0}")
+    @MethodSource("testCases")
     public void renderExpected(TestCase test) throws IOException {
         test.builder().build();
         var got = test.manifests().stream().flatMap(x -> x.getFiles().stream()).collect(Collectors.toSet());
