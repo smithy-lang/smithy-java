@@ -16,7 +16,7 @@ public final class EventStreamFrameEncodingProcessor<F extends Frame<?>, T exten
     private final EventEncoder<F> eventEncoder;
     private final FrameEncoder<F> encoder;
 
-    public EventStreamFrameEncodingProcessor(
+    private EventStreamFrameEncodingProcessor(
             Flow.Publisher<T> publisher,
             EventEncoder<F> eventEncoder,
             FrameEncoder<F> encoder
@@ -26,8 +26,8 @@ public final class EventStreamFrameEncodingProcessor<F extends Frame<?>, T exten
         this.encoder = encoder;
     }
 
-    public static <F extends Frame<?>> EventStreamFrameEncodingProcessor<F, ?> create(
-            Flow.Publisher<? extends SerializableStruct> publisher,
+    public static <F extends Frame<?>> EventStreamFrameEncodingProcessor<F, SerializableStruct> create(
+            Flow.Publisher<SerializableStruct> publisher,
             EventEncoderFactory<F> encoderFactory
     ) {
         return new EventStreamFrameEncodingProcessor<>(

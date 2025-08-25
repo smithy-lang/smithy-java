@@ -44,7 +44,7 @@ public final class SchemaUtils {
 
             @Override
             public <T> T getMemberValue(Schema member) {
-                return memberPredicate.test(schema()) ? getMemberValue(member) : null;
+                return memberPredicate.test(schema()) ? struct.getMemberValue(member) : null;
             }
         };
     }
