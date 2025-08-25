@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.codegen.test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -19,17 +17,12 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.build.MockManifest;
@@ -41,8 +34,6 @@ public class PluginTestRunner {
 
     private PluginTestRunner() {}
 
-    private static final Predicate<String> NOT_COMMENT = Predicate.not(Pattern.compile("^ *//.*$").asMatchPredicate());
-
     public static Optional<String> findGotContent(Path found, TestCase test) {
         for (var manifest : test.manifests) {
             var fileInsideBaseDir =
@@ -53,24 +44,6 @@ public class PluginTestRunner {
             }
         }
         return Optional.empty();
-    }
-
-    public static void assertContentEquals(String left, String right) {
-        try {
-            assertEquals(normalizeSpace(left), normalizeSpace(right));
-        } catch (Throwable e) {
-            assertEquals(left, right);
-        }
-    }
-
-    private static String normalizeSpace(String value) {
-        return value
-                .replaceAll("\n +", "\n")
-                .replaceAll(" +\n", "\n");
-    }
-
-    public static Path findExpected(String expected, Set<Path> manifestFiles) {
-        return manifestFiles.stream().filter(path -> path.toString().contains(expected)).findFirst().orElse(null);
     }
 
     public static List<TestCase> addTestCasesFromUrl(URL url) {
@@ -120,15 +93,15 @@ public class PluginTestRunner {
                 .fileManifestFactory(fileManifestFactory)
                 .config(config)
                 .model(model);
-        var javaFiles = new ArrayList<Path>();
+        var expectedFiles = new ArrayList<Path>();
         var expectedDir = new File(dir, "expected").toPath();
 
         try {
-            Files.walkFileTree(expectedDir, new JavaFileVisitor(javaFiles));
+            Files.walkFileTree(expectedDir, new ExpectedFileVisitor(expectedFiles));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        var expectedToContents = getExpectedContents(expectedDir, javaFiles);
+        var expectedToContents = getExpectedContents(expectedDir, expectedFiles);
         return builder()
                 .name(dir.toPath().getFileName().toString())
                 .builder(builder)
@@ -144,23 +117,12 @@ public class PluginTestRunner {
             for (var path : paths) {
                 var relative = path.toString().replace(prefix, "");
                 var contents = Files.readString(path);
-                result.put(relative, removeSingleLineComments(contents));
+                result.put(relative, contents);
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         return result;
-    }
-
-    /**
-     * Removes single line comments that can be added to the expected class to annotate specific behavior.
-     */
-    private static String removeSingleLineComments(String contents) {
-        return Arrays.asList(contents.split("\\n"))
-                .stream()
-                .filter(NOT_COMMENT)
-                .collect(Collectors.joining("\n"))
-                .trim();
     }
 
     public static TestCaseBuilder builder() {
@@ -233,17 +195,17 @@ public class PluginTestRunner {
         }
     }
 
-    public static class JavaFileVisitor extends SimpleFileVisitor<Path> {
-        private final List<Path> javaFiles;
+    public static class ExpectedFileVisitor extends SimpleFileVisitor<Path> {
+        private final List<Path> expectedFiles;
 
-        public JavaFileVisitor(List<Path> javaFiles) {
-            this.javaFiles = javaFiles;
+        public ExpectedFileVisitor(List<Path> expectedFiles) {
+            this.expectedFiles = expectedFiles;
         }
 
         @Override
         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-            if (Files.isRegularFile(file) && file.toString().endsWith(".java")) {
-                javaFiles.add(file);
+            if (Files.isRegularFile(file)) {
+                expectedFiles.add(file);
             }
             return FileVisitResult.CONTINUE;
         }

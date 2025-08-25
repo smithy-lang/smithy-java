@@ -5,10 +5,10 @@
 
 package software.amazon.smithy.java.codegen.types;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static software.amazon.smithy.java.codegen.test.PluginTestRunner.addTestCasesFromUrl;
-import static software.amazon.smithy.java.codegen.test.PluginTestRunner.assertContentEquals;
 import static software.amazon.smithy.java.codegen.test.PluginTestRunner.findGotContent;
 
 import java.io.File;
@@ -35,7 +35,7 @@ public class TypesCodegenPluginTest {
             assertNotNull(found, "Expected to find " + expected + " in the manifest");
             var contents = findGotContent(found, test);
             assertTrue(contents.isPresent());
-            assertContentEquals(test.expectedToContents().get(expected), contents.get().trim());
+            assertEquals(test.expectedToContents().get(expected), contents.get());
         }
     }
 
