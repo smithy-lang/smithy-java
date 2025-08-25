@@ -196,7 +196,7 @@ public final class PrimitivesNullable implements SerializableStruct {
         /**
          * @return this builder.
          */
-        public Builder byteMember(byte byteMember) {
+        public Builder byteMember(Byte byteMember) {
             this.byteMember = byteMember;
             return this;
         }
@@ -204,7 +204,7 @@ public final class PrimitivesNullable implements SerializableStruct {
         /**
          * @return this builder.
          */
-        public Builder shortMember(short shortMember) {
+        public Builder shortMember(Short shortMember) {
             this.shortMember = shortMember;
             return this;
         }
@@ -212,7 +212,7 @@ public final class PrimitivesNullable implements SerializableStruct {
         /**
          * @return this builder.
          */
-        public Builder intMember(int intMember) {
+        public Builder intMember(Integer intMember) {
             this.intMember = intMember;
             return this;
         }
@@ -220,7 +220,7 @@ public final class PrimitivesNullable implements SerializableStruct {
         /**
          * @return this builder.
          */
-        public Builder longMember(long longMember) {
+        public Builder longMember(Long longMember) {
             this.longMember = longMember;
             return this;
         }
@@ -228,7 +228,7 @@ public final class PrimitivesNullable implements SerializableStruct {
         /**
          * @return this builder.
          */
-        public Builder floatMember(float floatMember) {
+        public Builder floatMember(Float floatMember) {
             this.floatMember = floatMember;
             return this;
         }
@@ -236,7 +236,7 @@ public final class PrimitivesNullable implements SerializableStruct {
         /**
          * @return this builder.
          */
-        public Builder doubleMember(double doubleMember) {
+        public Builder doubleMember(Double doubleMember) {
             this.doubleMember = doubleMember;
             return this;
         }
@@ -244,7 +244,7 @@ public final class PrimitivesNullable implements SerializableStruct {
         /**
          * @return this builder.
          */
-        public Builder booleanMember(boolean booleanMember) {
+        public Builder booleanMember(Boolean booleanMember) {
             this.booleanMember = booleanMember;
             return this;
         }
@@ -258,13 +258,13 @@ public final class PrimitivesNullable implements SerializableStruct {
         @SuppressWarnings("unchecked")
         public void setMemberValue(Schema member, Object value) {
             switch (member.memberIndex()) {
-                case 0 -> byteMember((byte) SchemaUtils.validateSameMember($SCHEMA_BYTE_MEMBER, member, value));
-                case 1 -> shortMember((short) SchemaUtils.validateSameMember($SCHEMA_SHORT_MEMBER, member, value));
-                case 2 -> intMember((int) SchemaUtils.validateSameMember($SCHEMA_INT_MEMBER, member, value));
-                case 3 -> longMember((long) SchemaUtils.validateSameMember($SCHEMA_LONG_MEMBER, member, value));
-                case 4 -> floatMember((float) SchemaUtils.validateSameMember($SCHEMA_FLOAT_MEMBER, member, value));
-                case 5 -> doubleMember((double) SchemaUtils.validateSameMember($SCHEMA_DOUBLE_MEMBER, member, value));
-                case 6 -> booleanMember((boolean) SchemaUtils.validateSameMember($SCHEMA_BOOLEAN_MEMBER, member, value));
+                case 0 -> byteMember((Byte) SchemaUtils.validateSameMember($SCHEMA_BYTE_MEMBER, member, value));
+                case 1 -> shortMember((Short) SchemaUtils.validateSameMember($SCHEMA_SHORT_MEMBER, member, value));
+                case 2 -> intMember((Integer) SchemaUtils.validateSameMember($SCHEMA_INT_MEMBER, member, value));
+                case 3 -> longMember((Long) SchemaUtils.validateSameMember($SCHEMA_LONG_MEMBER, member, value));
+                case 4 -> floatMember((Float) SchemaUtils.validateSameMember($SCHEMA_FLOAT_MEMBER, member, value));
+                case 5 -> doubleMember((Double) SchemaUtils.validateSameMember($SCHEMA_DOUBLE_MEMBER, member, value));
+                case 6 -> booleanMember((Boolean) SchemaUtils.validateSameMember($SCHEMA_BOOLEAN_MEMBER, member, value));
                 default -> ShapeBuilder.super.setMemberValue(member, value);
             }
         }
