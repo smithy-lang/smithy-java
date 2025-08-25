@@ -754,11 +754,12 @@ public final class StructureGenerator<
                 writer.putContext("memberSymbol", symbolProvider.toSymbol(member));
                 writer.putContext("tracked", CodegenUtils.isRequiredWithNoDefault(member));
                 writer.putContext("check", CodegenUtils.requiresSetterNullCheck(symbolProvider, member));
+                writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
                 writer.putContext("schemaName", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
 
                 writer.write(
                         """
-                                public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
+                                public Builder ${memberName:L}(${?isNullable}${memberSymbol:B}${/isNullable}${^isNullable}${memberSymbol:N}${/isNullable} ${memberName:L}) {
                                     this.${memberName:L} = ${?check}${objects:T}.requireNonNull(${/check}${memberName:L}${?check}, "${memberName:L} cannot be null")${/check};${?tracked}
                                     tracker.setMember(${schemaName:L});${/tracked}
                                     return this;

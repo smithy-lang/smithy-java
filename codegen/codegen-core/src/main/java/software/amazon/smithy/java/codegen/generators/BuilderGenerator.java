@@ -159,8 +159,9 @@ abstract class BuilderGenerator implements Runnable {
             writer.putContext("type", symbolProvider.toSymbol(member));
             writer.putContext("memberSchema", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
             writer.putContext("schemaUtilsClass", SchemaUtils.class);
+            writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
             writer.write(
-                    "case $L -> ${memberName:L}((${type:T}) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, value));",
+                    "case $L -> ${memberName:L}((${?isNullable}${type:B}${/isNullable}${^isNullable}${type:N}${/isNullable}) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, value));",
                     idx);
             writer.popState();
         }

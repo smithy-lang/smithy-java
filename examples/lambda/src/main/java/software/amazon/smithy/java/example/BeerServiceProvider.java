@@ -33,7 +33,7 @@ public final class BeerServiceProvider implements SmithyServiceProvider {
     private static final Logger LOGGER = Logger.getLogger(BeerServiceProvider.class.getName());
     private static final Service SERVICE;
     private static final Map<String, Beer> FRIDGE = new HashMap<>(
-            Map.of("TXVuaWNoIEhlbGxlcw==", Beer.builder().name("Munich Helles").quantity(1).build()));
+            Map.of("TXVuaWNoIEhlbGxlcw==", Beer.builder().name("Munich Helles").quantity(1L).build()));
     private static final Base64.Encoder ENCODER = Base64.getEncoder();
 
     static {
