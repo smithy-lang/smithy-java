@@ -90,7 +90,7 @@ public class ServiceBuilderTest {
         var output = getBeer.asyncFunction().apply(GetBeerInput.builder().id(1).build(), null);
         assertThat(output.get().getValue())
                 .hasSize(1)
-                .containsExactly(Beer.builder().id(1).name("TestBeer").build());
+                .containsExactly(Beer.builder().id(1L).name("TestBeer").build());
 
         Operation<EchoInput, EchoOutput> echo = service.getOperation("Echo");
         assertThat("Echo").isEqualTo(echo.name());
