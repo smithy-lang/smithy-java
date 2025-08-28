@@ -32,12 +32,12 @@ import software.amazon.smithy.rulesengine.language.syntax.rule.NoMatchRule;
 import software.amazon.smithy.rulesengine.language.syntax.rule.Rule;
 import software.amazon.smithy.rulesengine.logic.bdd.Bdd;
 import software.amazon.smithy.rulesengine.logic.bdd.BddNodeConsumer;
-import software.amazon.smithy.rulesengine.logic.bdd.BddTrait;
+import software.amazon.smithy.rulesengine.logic.bdd.EndpointBddTrait;
 
 final class BytecodeCompiler {
 
     private final List<RulesExtension> extensions;
-    private final BddTrait bdd;
+    private final EndpointBddTrait bdd;
     private final Map<String, Function<Context, Object>> builtinProviders;
     private final BytecodeWriter writer = new BytecodeWriter();
     private final List<RulesFunction> usedFunctions = new ArrayList<>();
@@ -47,7 +47,7 @@ final class BytecodeCompiler {
 
     BytecodeCompiler(
             List<RulesExtension> extensions,
-            BddTrait bdd,
+            EndpointBddTrait bdd,
             Map<String, RulesFunction> functions,
             Map<String, Function<Context, Object>> builtinProviders
     ) {
@@ -120,10 +120,9 @@ final class BytecodeCompiler {
     private void compileEndpointRule(EndpointRule rule) {
         var e = rule.getEndpoint();
 
-        // Add endpoint header instructions
+        // Add endpoint header instructions (Header values. Then header name)
         if (!e.getHeaders().isEmpty()) {
             for (var entry : e.getHeaders().entrySet()) {
-                // Header values. Then header name.
                 for (var h : entry.getValue()) {
                     compileExpression(h);
                 }
@@ -147,7 +146,6 @@ final class BytecodeCompiler {
             compileMapCreation(e.getProperties().size());
         }
 
-        // Compile the URL expression
         compileExpression(e.getUrl());
 
         // Add the return endpoint instruction
@@ -259,6 +257,29 @@ final class BytecodeCompiler {
 
                 // Handle special built-in functions
                 switch (fnId) {
+                    case "coalesce" -> {
+                        if (args.size() < 2) {
+                            throw new RulesEvaluationError(
+                                    "Coalesce requires at least 2 arguments, got " + args.size());
+                        }
+
+                        String endLabel = writer.createLabel();
+
+                        // Compile all but the last argument with JNN_OR_POP
+                        for (int i = 0; i < args.size() - 1; i++) {
+                            compileExpression(args.get(i));
+                            writer.writeByte(Opcodes.JNN_OR_POP);
+                            writer.writeJumpPlaceholder(endLabel);
+                        }
+
+                        // Compile the last argument (fallback)
+                        compileExpression(args.get(args.size() - 1));
+
+                        // Mark the end label
+                        writer.markLabel(endLabel);
+
+                        return null;
+                    }
                     case "substring" -> {
                         compileExpression(args.get(0)); // string
                         writer.writeByte(Opcodes.SUBSTRING);
@@ -285,37 +306,21 @@ final class BytecodeCompiler {
                     }
                 }
 
-                // Regular function call
+                // A generic function call without a special opcode
                 var index = getFunctionIndex(fnId);
-
-                // Compile arguments
                 for (var arg : args) {
                     compileExpression(arg);
                 }
 
-                // Use the appropriate function opcode based on argument count
-                switch (args.size()) {
-                    case 0 -> {
-                        writer.writeByte(Opcodes.FN0);
-                        writer.writeByte(index);
-                    }
-                    case 1 -> {
-                        writer.writeByte(Opcodes.FN1);
-                        writer.writeByte(index);
-                    }
-                    case 2 -> {
-                        writer.writeByte(Opcodes.FN2);
-                        writer.writeByte(index);
-                    }
-                    case 3 -> {
-                        writer.writeByte(Opcodes.FN3);
-                        writer.writeByte(index);
-                    }
-                    default -> {
-                        writer.writeByte(Opcodes.FN);
-                        writer.writeByte(index);
-                    }
-                }
+                writer.writeByte(switch (args.size()) {
+                    case 0 -> Opcodes.FN0;
+                    case 1 -> Opcodes.FN1;
+                    case 2 -> Opcodes.FN2;
+                    case 3 -> Opcodes.FN3;
+                    default -> Opcodes.FN;
+                });
+
+                writer.writeByte(index);
                 return null;
             }
         });
