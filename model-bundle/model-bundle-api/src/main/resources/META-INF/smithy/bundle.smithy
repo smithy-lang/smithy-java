@@ -15,6 +15,10 @@ structure SmithyBundle {
     /// field may be omitted.
     config: Document
 
+    /// Bundle-specific metadata. If this bundle does not require any additional metadata, this
+    /// field may be omitted.
+    metadata: Document
+
     /// model that describes the service. The service given in `serviceName` must be present.
     @required
     model: SmithyModel
