@@ -27,6 +27,11 @@ final class BytecodeWriter {
     private final List<Object> constants = new ArrayList<>();
     private final List<String> functionNames = new ArrayList<>();
 
+    // Jump patching
+    private final Map<Integer, String> jumpPatches = new HashMap<>();
+    private final Map<String, Integer> labels = new HashMap<>();
+    private int labelCounter = 0;
+
     void markConditionStart() {
         conditionOffsets.add(bytecodeStream.size());
     }
@@ -45,6 +50,19 @@ final class BytecodeWriter {
         }
         bytecodeStream.write((value >> 8) & 0xFF);
         bytecodeStream.write(value & 0xFF);
+    }
+
+    String createLabel() {
+        return "L" + (labelCounter++);
+    }
+
+    void markLabel(String label) {
+        labels.put(label, bytecodeStream.size());
+    }
+
+    void writeJumpPlaceholder(String label) {
+        jumpPatches.put(bytecodeStream.size(), label);
+        writeShort(0);
     }
 
     // Get or allocate constant index
@@ -120,7 +138,16 @@ final class BytecodeWriter {
             dos.write(regDefBytes);
             writeBddTable(dos, bddNodes);
 
-            byte[] bytecode = bytecodeStream.toByteArray();
+            // Apply jump patches to get the final bytecode
+            byte[] originalBytecode = bytecodeStream.toByteArray();
+            byte[] bytecode = originalBytecode;
+            if (!jumpPatches.isEmpty()) {
+                ByteArrayOutputStream patchedStream = new ByteArrayOutputStream();
+                DataOutputStream patchedDos = new DataOutputStream(patchedStream);
+                writePatchedBytecode(patchedDos, originalBytecode);
+                patchedDos.flush();
+                bytecode = patchedStream.toByteArray();
+            }
             dos.write(bytecode);
 
             int constantPoolOffset = complete.size();
@@ -146,6 +173,44 @@ final class BytecodeWriter {
 
         } catch (IOException e) {
             throw new RuntimeException("Failed to build bytecode", e);
+        }
+    }
+
+    private void writePatchedBytecode(DataOutputStream dos, byte[] bytecode) throws IOException {
+        // Sort patches by offset to process them in order
+        List<Map.Entry<Integer, String>> sortedPatches = new ArrayList<>(jumpPatches.entrySet());
+        sortedPatches.sort(Map.Entry.comparingByKey());
+
+        // Write bytecode, patching jumps as we go
+        int lastWritten = 0;
+        for (Map.Entry<Integer, String> patch : sortedPatches) {
+            int patchOffset = patch.getKey();
+            String label = patch.getValue();
+
+            // Write everything up to the patch point
+            if (patchOffset > lastWritten) {
+                dos.write(bytecode, lastWritten, patchOffset - lastWritten);
+            }
+
+            // Calculate and write the jump offset
+            Integer targetOffset = labels.get(label);
+            if (targetOffset == null) {
+                throw new IllegalStateException("Undefined label: " + label);
+            }
+
+            int relativeJump = targetOffset - (patchOffset + 2);
+            if (relativeJump < 0 || relativeJump > 65535) {
+                throw new IllegalStateException("Jump offset out of range: " + relativeJump
+                        + " (from " + patchOffset + " to " + targetOffset + ")");
+            }
+
+            dos.writeShort(relativeJump);
+            lastWritten = patchOffset + 2;
+        }
+
+        // Write any remaining bytecode after the last patch
+        if (lastWritten < bytecode.length) {
+            dos.write(bytecode, lastWritten, bytecode.length - lastWritten);
         }
     }
 
