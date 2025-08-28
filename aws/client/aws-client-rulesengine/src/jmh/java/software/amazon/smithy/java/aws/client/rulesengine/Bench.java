@@ -74,7 +74,7 @@ public class Bench {
 
         var ctx = Context.create();
         ctx.put(EndpointSettings.REGION, "us-east-1");
-        //        ctx.put(EndpointRulesPlugin.ADDITIONAL_ENDPOINT_PARAMS, Map.of("UseFIPS", true, "UseDualStack", true));
+        //ctx.put(EndpointRulesPlugin.ADDITIONAL_ENDPOINT_PARAMS, Map.of("UseFIPS", true, "UseDualStack", true));
 
         endpointParams = EndpointResolverParams.builder()
                 .context(ctx)
@@ -105,17 +105,4 @@ public class Bench {
     public Object evaluate() throws Exception {
         return endpointResolver.resolveEndpoint(endpointParams).get();
     }
-
-    //    public static final TraitKey<EndpointRuleSetTrait> ENDPOINT_RULESET_TRAIT =
-    //            TraitKey.get(EndpointRuleSetTrait.class);
-    //
-    //    @Benchmark
-    //    public Object compileBdd() {
-    //        var ruleset = client.config().service().schema().getTrait(ENDPOINT_RULESET_TRAIT);
-    //        var cfg = Cfg.from(ruleset.getEndpointRuleSet());
-    //        var bdd = BddTrait.from(cfg).transform(SiftingOptimization.builder().cfg(cfg).build()).transform(new NodeReversal());
-    //        var bytecode = engine.compile(bdd);
-    //        var providers = engine.getBuiltinProviders();
-    //        return new BytecodeEndpointResolver(bytecode, engine.getExtensions(), providers);
-    //    }
 }

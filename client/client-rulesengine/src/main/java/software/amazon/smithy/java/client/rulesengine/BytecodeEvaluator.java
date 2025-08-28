@@ -38,33 +38,27 @@ final class BytecodeEvaluator implements ConditionEvaluator {
     private int pc;
     private final StringBuilder stringBuilder = new StringBuilder(64);
     private final UriFactory uriFactory = new UriFactory();
+    private final RegisterFiller registerFiller;
     private Context context;
 
-    BytecodeEvaluator(Bytecode bytecode, RulesExtension[] extensions) {
+    BytecodeEvaluator(Bytecode bytecode, RulesExtension[] extensions, RegisterFiller registerFiller) {
         this.bytecode = bytecode;
         this.extensions = extensions;
         this.registers = new Object[bytecode.getRegisterDefinitions().length];
+        this.registerFiller = registerFiller;
     }
 
     /**
-     * Get the registers array for external filling by RegisterFiller.
+     * Reset the evaluator and registers of the evaluator so it can be reused, using the given context and
+     * input parameters.
      *
-     * @return the registers array
+     * @param context Context to get context from.
+     * @param parameters Parameters to get input from.
      */
-    Object[] getRegisters() {
-        return registers;
-    }
-
-    /**
-     * Reset the evaluator with pre-filled registers.
-     *
-     * <p>This method assumes the registers have already been filled by RegisterFiller.
-     * It only resets the stack position and sets the context.
-     */
-    BytecodeEvaluator resetWithFilledRegisters(Context context) {
+    void reset(Context context, Map<String, Object> parameters) {
         this.context = context;
         this.stackPosition = 0;
-        return this;
+        registerFiller.fillRegisters(registers, context, parameters);
     }
 
     @Override
@@ -238,7 +232,6 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     stackPosition = firstArgPosition + 1;
                 }
                 case Opcodes.FN0 -> {
-                    // Can't optimize: no args to pop
                     var fn = functions[instructions[pc++] & 0xFF];
                     push(fn.apply0());
                 }
@@ -377,15 +370,15 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                 case Opcodes.RETURN_VALUE -> {
                     return stack[--stackPosition];
                 }
-                case Opcodes.JT_OR_POP -> {
+                case Opcodes.JNN_OR_POP -> {
                     Object value = stack[stackPosition - 1];
                     // Read as unsigned 16-bit value (0-65535)
                     int offset = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     pc += 2;
-                    if (value != null && value != Boolean.FALSE) {
+                    if (value != null) {
                         pc += offset; // Jump forward, keeping value on stack
                     } else {
-                        stackPosition--; // Pop the falsey value
+                        stackPosition--; // Pop the null value
                     }
                 }
                 default -> throw new RulesEvaluationError("Unknown rules engine instruction: " + opcode, pc);
