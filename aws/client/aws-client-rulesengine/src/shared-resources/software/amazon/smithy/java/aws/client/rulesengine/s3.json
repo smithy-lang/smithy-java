@@ -537,9 +537,6 @@
           "target": "com.amazonaws.s3#RestoreObject"
         },
         {
-          "target": "com.amazonaws.s3#SelectObjectContent"
-        },
-        {
           "target": "com.amazonaws.s3#UploadPart"
         },
         {
@@ -593,7 +590,8 @@
             "type": "boolean"
           }
         },
-        "smithy.rules#bdd": {
+        "smithy.rules#endpointBdd": {
+            "version": "1.1",
             "parameters": {
                 "Bucket": {
                     "required": false,
@@ -706,54 +704,37 @@
                     ]
                 },
                 {
+                    "fn": "booleanEquals",
+                    "argv": [
+                        {
+                            "ref": "Accelerate"
+                        },
+                        true
+                    ]
+                },
+                {
+                    "fn": "booleanEquals",
+                    "argv": [
+                        {
+                            "ref": "UseFIPS"
+                        },
+                        true
+                    ]
+                },
+                {
+                    "fn": "isSet",
+                    "argv": [
+                        {
+                            "ref": "Endpoint"
+                        }
+                    ]
+                },
+                {
                     "fn": "isSet",
                     "argv": [
                         {
                             "ref": "Bucket"
                         }
-                    ]
-                },
-                {
-                    "fn": "booleanEquals",
-                    "argv": [
-                        {
-                            "ref": "ForcePathStyle"
-                        },
-                        true
-                    ]
-                },
-                {
-                    "fn": "isSet",
-                    "argv": [
-                        {
-                            "ref": "DisableAccessPoints"
-                        }
-                    ]
-                },
-                {
-                    "fn": "booleanEquals",
-                    "argv": [
-                        {
-                            "ref": "DisableAccessPoints"
-                        },
-                        true
-                    ]
-                },
-                {
-                    "fn": "isSet",
-                    "argv": [
-                        {
-                            "ref": "UseArnRegion"
-                        }
-                    ]
-                },
-                {
-                    "fn": "booleanEquals",
-                    "argv": [
-                        {
-                            "ref": "UseArnRegion"
-                        },
-                        false
                     ]
                 },
                 {
@@ -770,6 +751,263 @@
                     ]
                 },
                 {
+                    "fn": "stringEquals",
+                    "argv": [
+                        "arn:",
+                        {
+                            "fn": "coalesce",
+                            "argv": [
+                                {
+                                    "fn": "substring",
+                                    "argv": [
+                                        {
+                                            "ref": "Bucket"
+                                        },
+                                        0,
+                                        4,
+                                        false
+                                    ]
+                                },
+                                ""
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        "--x-s3",
+                        {
+                            "fn": "coalesce",
+                            "argv": [
+                                {
+                                    "fn": "substring",
+                                    "argv": [
+                                        {
+                                            "ref": "Bucket"
+                                        },
+                                        0,
+                                        6,
+                                        true
+                                    ]
+                                },
+                                ""
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        "--xa-s3",
+                        {
+                            "fn": "coalesce",
+                            "argv": [
+                                {
+                                    "fn": "substring",
+                                    "argv": [
+                                        {
+                                            "ref": "Bucket"
+                                        },
+                                        0,
+                                        7,
+                                        true
+                                    ]
+                                },
+                                ""
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "isSet",
+                    "argv": [
+                        {
+                            "fn": "parseURL",
+                            "argv": [
+                                {
+                                    "ref": "Endpoint"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "aws.partition",
+                    "argv": [
+                        {
+                            "ref": "Region"
+                        }
+                    ],
+                    "assign": "partitionResult"
+                },
+                {
+                    "fn": "isSet",
+                    "argv": [
+                        {
+                            "ref": "UseS3ExpressControlEndpoint"
+                        }
+                    ]
+                },
+                {
+                    "fn": "booleanEquals",
+                    "argv": [
+                        {
+                            "ref": "UseS3ExpressControlEndpoint"
+                        },
+                        true
+                    ]
+                },
+                {
+                    "fn": "parseURL",
+                    "argv": [
+                        {
+                            "ref": "Endpoint"
+                        }
+                    ],
+                    "assign": "url"
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        "http",
+                        {
+                            "fn": "getAttr",
+                            "argv": [
+                                {
+                                    "ref": "url"
+                                },
+                                "scheme"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "aws.isVirtualHostableS3Bucket",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        true
+                    ]
+                },
+                {
+                    "fn": "substring",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        8,
+                        12,
+                        true
+                    ],
+                    "assign": "regionPrefix"
+                },
+                {
+                    "fn": "substring",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        32,
+                        49,
+                        true
+                    ],
+                    "assign": "outpostId_ssa_2"
+                },
+                {
+                    "fn": "substring",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        0,
+                        7,
+                        true
+                    ],
+                    "assign": "accessPointSuffix"
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        {
+                            "ref": "accessPointSuffix"
+                        },
+                        "--op-s3"
+                    ]
+                },
+                {
+                    "fn": "substring",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        49,
+                        50,
+                        true
+                    ],
+                    "assign": "hardwareType"
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        "aws-cn",
+                        {
+                            "fn": "getAttr",
+                            "argv": [
+                                {
+                                    "ref": "partitionResult"
+                                },
+                                "name"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        {
+                            "ref": "regionPrefix"
+                        },
+                        "beta"
+                    ]
+                },
+                {
+                    "fn": "booleanEquals",
+                    "argv": [
+                        {
+                            "ref": "ForcePathStyle"
+                        },
+                        true
+                    ]
+                },
+                {
+                    "fn": "aws.parseArn",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        }
+                    ]
+                },
+                {
+                    "fn": "aws.isVirtualHostableS3Bucket",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        false
+                    ]
+                },
+                {
+                    "fn": "isValidHostLabel",
+                    "argv": [
+                        {
+                            "ref": "Region"
+                        },
+                        false
+                    ]
+                },
+                {
                     "fn": "aws.parseArn",
                     "argv": [
                         {
@@ -777,6 +1015,188 @@
                         }
                     ],
                     "assign": "bucketArn"
+                },
+                {
+                    "fn": "uriEncode",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        }
+                    ],
+                    "assign": "uri_encoded_bucket"
+                },
+                {
+                    "fn": "booleanEquals",
+                    "argv": [
+                        true,
+                        {
+                            "fn": "getAttr",
+                            "argv": [
+                                {
+                                    "ref": "url"
+                                },
+                                "isIp"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "isSet",
+                    "argv": [
+                        {
+                            "ref": "UseObjectLambdaEndpoint"
+                        }
+                    ]
+                },
+                {
+                    "fn": "booleanEquals",
+                    "argv": [
+                        {
+                            "ref": "UseObjectLambdaEndpoint"
+                        },
+                        true
+                    ]
+                },
+                {
+                    "fn": "isValidHostLabel",
+                    "argv": [
+                        {
+                            "ref": "Region"
+                        },
+                        true
+                    ]
+                },
+                {
+                    "fn": "booleanEquals",
+                    "argv": [
+                        {
+                            "ref": "UseDualStack"
+                        },
+                        true
+                    ]
+                },
+                {
+                    "fn": "booleanEquals",
+                    "argv": [
+                        false,
+                        {
+                            "fn": "getAttr",
+                            "argv": [
+                                {
+                                    "ref": "url"
+                                },
+                                "isIp"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "isSet",
+                    "argv": [
+                        {
+                            "ref": "DisableS3ExpressSessionAuth"
+                        }
+                    ]
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        {
+                            "ref": "Region"
+                        },
+                        "aws-global"
+                    ]
+                },
+                {
+                    "fn": "booleanEquals",
+                    "argv": [
+                        {
+                            "ref": "DisableS3ExpressSessionAuth"
+                        },
+                        true
+                    ]
+                },
+                {
+                    "fn": "substring",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        7,
+                        15,
+                        true
+                    ],
+                    "assign": "s3expressAvailabilityZoneId_ssa_6"
+                },
+                {
+                    "fn": "substring",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        6,
+                        14,
+                        true
+                    ],
+                    "assign": "s3expressAvailabilityZoneId_ssa_1"
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        "--",
+                        {
+                            "fn": "coalesce",
+                            "argv": [
+                                {
+                                    "fn": "substring",
+                                    "argv": [
+                                        {
+                                            "ref": "Bucket"
+                                        },
+                                        14,
+                                        16,
+                                        true
+                                    ]
+                                },
+                                ""
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        {
+                            "ref": "Region"
+                        },
+                        "us-east-1"
+                    ]
+                },
+                {
+                    "fn": "booleanEquals",
+                    "argv": [
+                        {
+                            "ref": "UseGlobalEndpoint"
+                        },
+                        true
+                    ]
+                },
+                {
+                    "fn": "isSet",
+                    "argv": [
+                        {
+                            "ref": "DisableAccessPoints"
+                        }
+                    ]
+                },
+                {
+                    "fn": "booleanEquals",
+                    "argv": [
+                        {
+                            "ref": "DisableAccessPoints"
+                        },
+                        true
+                    ]
                 },
                 {
                     "fn": "isSet",
@@ -788,6 +1208,41 @@
                                     "ref": "bucketArn"
                                 },
                                 "resourceId[2]"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "substring",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        6,
+                        15,
+                        true
+                    ],
+                    "assign": "s3expressAvailabilityZoneId_ssa_2"
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        "--",
+                        {
+                            "fn": "coalesce",
+                            "argv": [
+                                {
+                                    "fn": "substring",
+                                    "argv": [
+                                        {
+                                            "ref": "Bucket"
+                                        },
+                                        15,
+                                        17,
+                                        true
+                                    ]
+                                },
+                                ""
                             ]
                         }
                     ]
@@ -817,6 +1272,41 @@
                     "assign": "arnType"
                 },
                 {
+                    "fn": "substring",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        7,
+                        16,
+                        true
+                    ],
+                    "assign": "s3expressAvailabilityZoneId_ssa_7"
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        "--",
+                        {
+                            "fn": "coalesce",
+                            "argv": [
+                                {
+                                    "fn": "substring",
+                                    "argv": [
+                                        {
+                                            "ref": "Bucket"
+                                        },
+                                        16,
+                                        18,
+                                        true
+                                    ]
+                                },
+                                ""
+                            ]
+                        }
+                    ]
+                },
+                {
                     "fn": "stringEquals",
                     "argv": [
                         {
@@ -826,6 +1316,18 @@
                     ]
                 },
                 {
+                    "fn": "substring",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        6,
+                        20,
+                        true
+                    ],
+                    "assign": "s3expressAvailabilityZoneId_ssa_4"
+                },
+                {
                     "fn": "stringEquals",
                     "argv": [
                         {
@@ -835,519 +1337,6 @@
                     ]
                 },
                 {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "Region"
-                        },
-                        {
-                            "fn": "getAttr",
-                            "argv": [
-                                {
-                                    "ref": "bucketArn"
-                                },
-                                "region"
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "fn": "getAttr",
-                    "argv": [
-                        {
-                            "ref": "bucketArn"
-                        },
-                        "resourceId[1]"
-                    ],
-                    "assign": "accessPointName"
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "accessPointName"
-                        },
-                        ""
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        0,
-                        4,
-                        false
-                    ],
-                    "assign": "arnPrefix"
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "arnPrefix"
-                        },
-                        "arn:"
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        0,
-                        7,
-                        true
-                    ],
-                    "assign": "accessPointSuffix"
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "accessPointSuffix"
-                        },
-                        "--xa-s3"
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        0,
-                        6,
-                        true
-                    ],
-                    "assign": "bucketSuffix"
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "bucketSuffix"
-                        },
-                        "--x-s3"
-                    ]
-                },
-                {
-                    "fn": "isSet",
-                    "argv": [
-                        {
-                            "ref": "UseS3ExpressControlEndpoint"
-                        }
-                    ]
-                },
-                {
-                    "fn": "booleanEquals",
-                    "argv": [
-                        {
-                            "ref": "UseS3ExpressControlEndpoint"
-                        },
-                        true
-                    ]
-                },
-                {
-                    "fn": "isSet",
-                    "argv": [
-                        {
-                            "ref": "DisableS3ExpressSessionAuth"
-                        }
-                    ]
-                },
-                {
-                    "fn": "booleanEquals",
-                    "argv": [
-                        {
-                            "ref": "DisableS3ExpressSessionAuth"
-                        },
-                        true
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        0,
-                        7,
-                        true
-                    ],
-                    "assign": "bucketAliasSuffix"
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        32,
-                        49,
-                        true
-                    ],
-                    "assign": "outpostId_1"
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "bucketAliasSuffix"
-                        },
-                        "--op-s3"
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        49,
-                        50,
-                        true
-                    ],
-                    "assign": "hardwareType"
-                },
-                {
-                    "fn": "aws.partition",
-                    "argv": [
-                        {
-                            "ref": "Region"
-                        }
-                    ],
-                    "assign": "regionPartition"
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        8,
-                        12,
-                        true
-                    ],
-                    "assign": "regionPrefix"
-                },
-                {
-                    "fn": "booleanEquals",
-                    "argv": [
-                        {
-                            "ref": "Accelerate"
-                        },
-                        true
-                    ]
-                },
-                {
-                    "fn": "isSet",
-                    "argv": [
-                        {
-                            "ref": "Endpoint"
-                        }
-                    ]
-                },
-                {
-                    "fn": "isSet",
-                    "argv": [
-                        {
-                            "fn": "parseURL",
-                            "argv": [
-                                {
-                                    "ref": "Endpoint"
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "fn": "aws.parseArn",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        }
-                    ]
-                },
-                {
-                    "fn": "aws.partition",
-                    "argv": [
-                        {
-                            "ref": "Region"
-                        }
-                    ],
-                    "assign": "partitionResult"
-                },
-                {
-                    "fn": "aws.isVirtualHostableS3Bucket",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        false
-                    ]
-                },
-                {
-                    "fn": "parseURL",
-                    "argv": [
-                        {
-                            "ref": "Endpoint"
-                        }
-                    ],
-                    "assign": "url"
-                },
-                {
-                    "fn": "booleanEquals",
-                    "argv": [
-                        true,
-                        {
-                            "fn": "getAttr",
-                            "argv": [
-                                {
-                                    "ref": "url"
-                                },
-                                "isIp"
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "fn": "aws.isVirtualHostableS3Bucket",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        true
-                    ]
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        "http",
-                        {
-                            "fn": "getAttr",
-                            "argv": [
-                                {
-                                    "ref": "url"
-                                },
-                                "scheme"
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "fn": "uriEncode",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        }
-                    ],
-                    "assign": "uri_encoded_bucket"
-                },
-                {
-                    "fn": "booleanEquals",
-                    "argv": [
-                        {
-                            "ref": "UseFIPS"
-                        },
-                        true
-                    ]
-                },
-                {
-                    "fn": "aws.partition",
-                    "argv": [
-                        {
-                            "fn": "getAttr",
-                            "argv": [
-                                {
-                                    "ref": "bucketArn"
-                                },
-                                "region"
-                            ]
-                        }
-                    ],
-                    "assign": "bucketPartition"
-                },
-                {
-                    "fn": "isValidHostLabel",
-                    "argv": [
-                        {
-                            "ref": "Region"
-                        },
-                        false
-                    ]
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        "aws-cn",
-                        {
-                            "fn": "getAttr",
-                            "argv": [
-                                {
-                                    "ref": "partitionResult"
-                                },
-                                "name"
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "fn": "booleanEquals",
-                    "argv": [
-                        {
-                            "ref": "UseDualStack"
-                        },
-                        true
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        7,
-                        15,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneId_5"
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        6,
-                        14,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneId"
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        14,
-                        16,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneDelim"
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "s3expressAvailabilityZoneDelim"
-                        },
-                        "--"
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        15,
-                        17,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneDelim_1"
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "s3expressAvailabilityZoneDelim_1"
-                        },
-                        "--"
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        6,
-                        15,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneId_1"
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        6,
-                        19,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneId_2"
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        16,
-                        18,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneDelim_2"
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        7,
-                        16,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneId_6"
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "s3expressAvailabilityZoneDelim_2"
-                        },
-                        "--"
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        19,
-                        21,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneDelim_3"
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "s3expressAvailabilityZoneDelim_3"
-                        },
-                        "--"
-                    ]
-                },
-                {
                     "fn": "substring",
                     "argv": [
                         {
@@ -1357,85 +1346,27 @@
                         20,
                         true
                     ],
-                    "assign": "s3expressAvailabilityZoneId_7"
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        20,
-                        22,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneDelim_4"
+                    "assign": "s3expressAvailabilityZoneId_ssa_8"
                 },
                 {
                     "fn": "stringEquals",
                     "argv": [
+                        "--",
                         {
-                            "ref": "s3expressAvailabilityZoneDelim_4"
-                        },
-                        "--"
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        21,
-                        23,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneDelim_5"
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        7,
-                        21,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneId_8"
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "s3expressAvailabilityZoneDelim_5"
-                        },
-                        "--"
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        6,
-                        20,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneId_3"
-                },
-                {
-                    "fn": "booleanEquals",
-                    "argv": [
-                        false,
-                        {
-                            "fn": "getAttr",
+                            "fn": "coalesce",
                             "argv": [
                                 {
-                                    "ref": "url"
+                                    "fn": "substring",
+                                    "argv": [
+                                        {
+                                            "ref": "Bucket"
+                                        },
+                                        20,
+                                        22,
+                                        true
+                                    ]
                                 },
-                                "isIp"
+                                ""
                             ]
                         }
                     ]
@@ -1456,69 +1387,19 @@
                     ]
                 },
                 {
-                    "fn": "isSet",
+                    "fn": "aws.partition",
                     "argv": [
                         {
-                            "ref": "UseObjectLambdaEndpoint"
+                            "fn": "getAttr",
+                            "argv": [
+                                {
+                                    "ref": "bucketArn"
+                                },
+                                "region"
+                            ]
                         }
-                    ]
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "regionPrefix"
-                        },
-                        "beta"
-                    ]
-                },
-                {
-                    "fn": "booleanEquals",
-                    "argv": [
-                        {
-                            "ref": "UseObjectLambdaEndpoint"
-                        },
-                        true
-                    ]
-                },
-                {
-                    "fn": "isValidHostLabel",
-                    "argv": [
-                        {
-                            "ref": "Region"
-                        },
-                        true
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        26,
-                        28,
-                        true
                     ],
-                    "assign": "s3expressAvailabilityZoneDelim_6"
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "Region"
-                        },
-                        "aws-global"
-                    ]
-                },
-                {
-                    "fn": "isValidHostLabel",
-                    "argv": [
-                        {
-                            "ref": "outpostId_1"
-                        },
-                        false
-                    ]
+                    "assign": "bucketPartition"
                 },
                 {
                     "fn": "stringEquals",
@@ -1538,20 +1419,37 @@
                 {
                     "fn": "stringEquals",
                     "argv": [
+                        "--",
                         {
-                            "ref": "s3expressAvailabilityZoneDelim_6"
-                        },
-                        "--"
+                            "fn": "coalesce",
+                            "argv": [
+                                {
+                                    "fn": "substring",
+                                    "argv": [
+                                        {
+                                            "ref": "Bucket"
+                                        },
+                                        21,
+                                        23,
+                                        true
+                                    ]
+                                },
+                                ""
+                            ]
+                        }
                     ]
                 },
                 {
-                    "fn": "stringEquals",
+                    "fn": "substring",
                     "argv": [
                         {
-                            "ref": "hardwareType"
+                            "ref": "Bucket"
                         },
-                        "e"
-                    ]
+                        7,
+                        21,
+                        true
+                    ],
+                    "assign": "s3expressAvailabilityZoneId_ssa_9"
                 },
                 {
                     "fn": "stringEquals",
@@ -1569,6 +1467,76 @@
                     ]
                 },
                 {
+                    "fn": "substring",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        6,
+                        19,
+                        true
+                    ],
+                    "assign": "s3expressAvailabilityZoneId_ssa_3"
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        "--",
+                        {
+                            "fn": "coalesce",
+                            "argv": [
+                                {
+                                    "fn": "substring",
+                                    "argv": [
+                                        {
+                                            "ref": "Bucket"
+                                        },
+                                        19,
+                                        21,
+                                        true
+                                    ]
+                                },
+                                ""
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        "--",
+                        {
+                            "fn": "coalesce",
+                            "argv": [
+                                {
+                                    "fn": "substring",
+                                    "argv": [
+                                        {
+                                            "ref": "Bucket"
+                                        },
+                                        27,
+                                        29,
+                                        true
+                                    ]
+                                },
+                                ""
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "substring",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        7,
+                        27,
+                        true
+                    ],
+                    "assign": "s3expressAvailabilityZoneId_ssa_10"
+                },
+                {
                     "fn": "getAttr",
                     "argv": [
                         {
@@ -1576,22 +1544,142 @@
                         },
                         "resourceId[1]"
                     ],
-                    "assign": "outpostId"
+                    "assign": "outpostId_ssa_1"
                 },
                 {
                     "fn": "isValidHostLabel",
                     "argv": [
                         {
-                            "ref": "accessPointName"
+                            "ref": "outpostId_ssa_1"
+                        },
+                        false
+                    ]
+                },
+                {
+                    "fn": "getAttr",
+                    "argv": [
+                        {
+                            "ref": "bucketArn"
+                        },
+                        "resourceId[1]"
+                    ],
+                    "assign": "accessPointName_ssa_1"
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        "--",
+                        {
+                            "fn": "coalesce",
+                            "argv": [
+                                {
+                                    "fn": "substring",
+                                    "argv": [
+                                        {
+                                            "ref": "Bucket"
+                                        },
+                                        26,
+                                        28,
+                                        true
+                                    ]
+                                },
+                                ""
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "substring",
+                    "argv": [
+                        {
+                            "ref": "Bucket"
+                        },
+                        6,
+                        26,
+                        true
+                    ],
+                    "assign": "s3expressAvailabilityZoneId_ssa_5"
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        {
+                            "ref": "accessPointName_ssa_1"
+                        },
+                        ""
+                    ]
+                },
+                {
+                    "fn": "booleanEquals",
+                    "argv": [
+                        {
+                            "ref": "DisableMultiRegionAccessPoints"
                         },
                         true
+                    ]
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        {
+                            "ref": "Region"
+                        },
+                        {
+                            "fn": "getAttr",
+                            "argv": [
+                                {
+                                    "ref": "bucketArn"
+                                },
+                                "region"
+                            ]
+                        }
                     ]
                 },
                 {
                     "fn": "isValidHostLabel",
                     "argv": [
                         {
-                            "ref": "outpostId"
+                            "ref": "accessPointName_ssa_1"
+                        },
+                        true
+                    ]
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
+                        {
+                            "fn": "getAttr",
+                            "argv": [
+                                {
+                                    "ref": "bucketArn"
+                                },
+                                "partition"
+                            ]
+                        },
+                        {
+                            "fn": "getAttr",
+                            "argv": [
+                                {
+                                    "ref": "partitionResult"
+                                },
+                                "name"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "fn": "isSet",
+                    "argv": [
+                        {
+                            "ref": "UseArnRegion"
+                        }
+                    ]
+                },
+                {
+                    "fn": "booleanEquals",
+                    "argv": [
+                        {
+                            "ref": "UseArnRegion"
                         },
                         false
                     ]
@@ -1620,27 +1708,6 @@
                     ]
                 },
                 {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "hardwareType"
-                        },
-                        "o"
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        6,
-                        26,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneId_4"
-                },
-                {
                     "fn": "isValidHostLabel",
                     "argv": [
                         {
@@ -1651,42 +1718,6 @@
                                 },
                                 "region"
                             ]
-                        },
-                        true
-                    ]
-                },
-                {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        7,
-                        27,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneId_9"
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        "s3",
-                        {
-                            "fn": "getAttr",
-                            "argv": [
-                                {
-                                    "ref": "bucketArn"
-                                },
-                                "service"
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "fn": "booleanEquals",
-                    "argv": [
-                        {
-                            "ref": "DisableMultiRegionAccessPoints"
                         },
                         true
                     ]
@@ -1707,6 +1738,21 @@
                     ]
                 },
                 {
+                    "fn": "stringEquals",
+                    "argv": [
+                        "s3",
+                        {
+                            "fn": "getAttr",
+                            "argv": [
+                                {
+                                    "ref": "bucketArn"
+                                },
+                                "service"
+                            ]
+                        }
+                    ]
+                },
+                {
                     "fn": "isValidHostLabel",
                     "argv": [
                         {
@@ -1722,22 +1768,13 @@
                     ]
                 },
                 {
-                    "fn": "stringEquals",
+                    "fn": "isValidHostLabel",
                     "argv": [
                         {
-                            "ref": "Region"
+                            "ref": "accessPointName_ssa_1"
                         },
-                        "us-east-1"
+                        false
                     ]
-                },
-                {
-                    "fn": "aws.partition",
-                    "argv": [
-                        {
-                            "ref": "Region"
-                        }
-                    ],
-                    "assign": "mrapPartition"
                 },
                 {
                     "fn": "getAttr",
@@ -1757,7 +1794,7 @@
                         },
                         "resourceId[3]"
                     ],
-                    "assign": "accessPointName_1"
+                    "assign": "accessPointName_ssa_2"
                 },
                 {
                     "fn": "stringEquals",
@@ -1769,40 +1806,10 @@
                     ]
                 },
                 {
-                    "fn": "substring",
-                    "argv": [
-                        {
-                            "ref": "Bucket"
-                        },
-                        27,
-                        29,
-                        true
-                    ],
-                    "assign": "s3expressAvailabilityZoneDelim_7"
-                },
-                {
-                    "fn": "booleanEquals",
-                    "argv": [
-                        {
-                            "ref": "UseGlobalEndpoint"
-                        },
-                        true
-                    ]
-                },
-                {
-                    "fn": "stringEquals",
-                    "argv": [
-                        {
-                            "ref": "s3expressAvailabilityZoneDelim_7"
-                        },
-                        "--"
-                    ]
-                },
-                {
                     "fn": "isValidHostLabel",
                     "argv": [
                         {
-                            "ref": "accessPointName"
+                            "ref": "outpostId_ssa_2"
                         },
                         false
                     ]
@@ -1811,56 +1818,59 @@
                     "fn": "stringEquals",
                     "argv": [
                         {
-                            "fn": "getAttr",
-                            "argv": [
-                                {
-                                    "ref": "bucketArn"
-                                },
-                                "partition"
-                            ]
+                            "ref": "hardwareType"
                         },
+                        "e"
+                    ]
+                },
+                {
+                    "fn": "stringEquals",
+                    "argv": [
                         {
-                            "fn": "getAttr",
-                            "argv": [
-                                {
-                                    "ref": "mrapPartition"
-                                },
-                                "name"
-                            ]
-                        }
+                            "ref": "hardwareType"
+                        },
+                        "o"
                     ]
                 }
             ],
             "results": [
                 {
+                    "conditions": [],
                     "error": "Accelerate cannot be used with FIPS",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Cannot set dual-stack in combination with a custom endpoint.",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "A custom endpoint cannot be combined with FIPS",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "A custom endpoint cannot be combined with S3 Accelerate",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Partition does not support FIPS",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "S3Express does not support Dual-stack.",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "S3Express does not support S3 Accelerate.",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{url#authority}/{uri_encoded_bucket}{url#path}",
                         "properties": {
@@ -1879,6 +1889,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{Bucket}.{url#authority}{url#path}",
                         "properties": {
@@ -1897,10 +1908,12 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "error": "S3Express bucket name is not a valid virtual hostable name.",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{url#authority}/{uri_encoded_bucket}{url#path}",
                         "properties": {
@@ -1919,6 +1932,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{Bucket}.{url#authority}{url#path}",
                         "properties": {
@@ -1937,6 +1951,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3express-control-fips.{Region}.{partitionResult#dnsSuffix}/{uri_encoded_bucket}",
                         "properties": {
@@ -1955,6 +1970,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3express-control.{Region}.{partitionResult#dnsSuffix}/{uri_encoded_bucket}",
                         "properties": {
@@ -1973,8 +1989,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_1}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -1991,8 +2008,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_1}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2009,8 +2027,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_1}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_2}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2027,8 +2046,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_1}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_2}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2045,8 +2065,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_2}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_3}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2063,8 +2084,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_2}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_3}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2081,8 +2103,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_3}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_4}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2099,8 +2122,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_3}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_4}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2117,8 +2141,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_4}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_5}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2135,8 +2160,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_4}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_5}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2153,12 +2179,14 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "error": "Unrecognized S3Express bucket name format.",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_1}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2175,8 +2203,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_1}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2193,8 +2222,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_1}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_2}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2211,8 +2241,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_1}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_2}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2229,8 +2260,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_2}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_3}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2247,8 +2279,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_2}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_3}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2265,8 +2298,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_3}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_4}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2283,8 +2317,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_3}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_4}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2301,8 +2336,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_4}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_5}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2319,8 +2355,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_4}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_5}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2337,8 +2374,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_5}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_6}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2355,8 +2393,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_5}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_6}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2373,8 +2412,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_6}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_7}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2391,8 +2431,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_6}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_7}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2409,8 +2450,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_7}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_8}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2427,8 +2469,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_7}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_8}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2445,8 +2488,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_8}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_9}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2463,8 +2507,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_8}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_9}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2481,8 +2526,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_9}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_10}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2499,8 +2545,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_9}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_10}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2517,8 +2564,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_5}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_6}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2535,8 +2583,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_5}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_6}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2553,8 +2602,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_6}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_7}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2571,8 +2621,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_6}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_7}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2589,8 +2640,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_7}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_8}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2607,8 +2659,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_7}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_8}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2625,8 +2678,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_8}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_9}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2643,8 +2697,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_8}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_9}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2661,8 +2716,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_9}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-fips-{s3expressAvailabilityZoneId_ssa_10}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2679,8 +2735,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_9}.{Region}.{partitionResult#dnsSuffix}",
+                        "url": "https://{Bucket}.s3express-{s3expressAvailabilityZoneId_ssa_10}.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "backend": "S3Express",
                             "authSchemes": [
@@ -2697,6 +2754,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{url#authority}{url#path}",
                         "properties": {
@@ -2715,6 +2773,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3express-control-fips.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -2733,6 +2792,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3express-control.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -2751,10 +2811,12 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "error": "Expected a endpoint to be specified but no endpoint was found",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.ec2.{url#authority}",
                         "properties": {
@@ -2780,8 +2842,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.ec2.s3-outposts.{Region}.{regionPartition#dnsSuffix}",
+                        "url": "https://{Bucket}.ec2.s3-outposts.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -2805,8 +2868,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.op-{outpostId_1}.{url#authority}",
+                        "url": "https://{Bucket}.op-{outpostId_ssa_2}.{url#authority}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -2830,8 +2894,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{Bucket}.op-{outpostId_1}.s3-outposts.{Region}.{regionPartition#dnsSuffix}",
+                        "url": "https://{Bucket}.op-{outpostId_ssa_2}.s3-outposts.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -2855,22 +2920,27 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "error": "Unrecognized hardware type: \"Expected hardware type o or e but got {hardwareType}\"",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: The outpost Id must only contain a-z, A-Z, 0-9 and `-`.",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Custom endpoint `{Endpoint}` was not a valid URI",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "S3 Accelerate cannot be used in this region",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.s3-fips.dualstack.us-east-1.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -2888,6 +2958,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.s3-fips.dualstack.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -2905,6 +2976,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.s3-fips.us-east-1.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -2922,6 +2994,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.s3-fips.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -2939,6 +3012,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.s3-accelerate.dualstack.us-east-1.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -2956,6 +3030,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.s3-accelerate.dualstack.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -2973,6 +3048,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.s3.dualstack.us-east-1.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -2990,6 +3066,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.s3.dualstack.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3007,6 +3084,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{url#authority}{url#normalizedPath}{Bucket}",
                         "properties": {
@@ -3024,6 +3102,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{Bucket}.{url#authority}{url#path}",
                         "properties": {
@@ -3041,6 +3120,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{url#authority}{url#normalizedPath}{Bucket}",
                         "properties": {
@@ -3058,6 +3138,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{Bucket}.{url#authority}{url#path}",
                         "properties": {
@@ -3075,6 +3156,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.s3-accelerate.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3092,6 +3174,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.s3-accelerate.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3109,6 +3192,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.s3.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3126,6 +3210,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.s3.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3143,6 +3228,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://{Bucket}.s3.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3160,32 +3246,39 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid region: region was not a valid DNS name.",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "S3 Object Lambda does not support Dual-stack",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "S3 Object Lambda does not support S3 Accelerate",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Access points are not supported for this operation",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid configuration: region from ARN `{bucketArn#region}` does not match client region `{Region}` and UseArnRegion is `false`",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: Missing account id",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "{url#scheme}://{accessPointName}-{bucketArn#accountId}.{url#authority}{url#path}",
+                        "url": "{url#scheme}://{accessPointName_ssa_1}-{bucketArn#accountId}.{url#authority}{url#path}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -3201,8 +3294,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{accessPointName}-{bucketArn#accountId}.s3-object-lambda-fips.{bucketArn#region}.{bucketPartition#dnsSuffix}",
+                        "url": "https://{accessPointName_ssa_1}-{bucketArn#accountId}.s3-object-lambda-fips.{bucketArn#region}.{bucketPartition#dnsSuffix}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -3218,8 +3312,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{accessPointName}-{bucketArn#accountId}.s3-object-lambda.{bucketArn#region}.{bucketPartition#dnsSuffix}",
+                        "url": "https://{accessPointName_ssa_1}-{bucketArn#accountId}.s3-object-lambda.{bucketArn#region}.{bucketPartition#dnsSuffix}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -3235,44 +3330,54 @@
                     "type": "endpoint"
                 },
                 {
-                    "error": "Invalid ARN: The access point name may only contain a-z, A-Z, 0-9 and `-`. Found: `{accessPointName}`",
+                    "conditions": [],
+                    "error": "Invalid ARN: The access point name may only contain a-z, A-Z, 0-9 and `-`. Found: `{accessPointName_ssa_1}`",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: The account id may only contain a-z, A-Z, 0-9 and `-`. Found: `{bucketArn#accountId}`",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid region in ARN: `{bucketArn#region}` (invalid DNS name)",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Client was configured for partition `{partitionResult#name}` but ARN (`{Bucket}`) has `{bucketPartition#name}`",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: The ARN may only contain a single resource component after `accesspoint`.",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: bucket ARN is missing a region",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: Expected a resource of the format `accesspoint:<accesspoint name>` but no name was provided",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: Object Lambda ARNs only support `accesspoint` arn types, but found: `{arnType}`",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Access Points do not support S3 Accelerate",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{accessPointName}-{bucketArn#accountId}.s3-accesspoint-fips.dualstack.{bucketArn#region}.{bucketPartition#dnsSuffix}",
+                        "url": "https://{accessPointName_ssa_1}-{bucketArn#accountId}.s3-accesspoint-fips.dualstack.{bucketArn#region}.{bucketPartition#dnsSuffix}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -3288,8 +3393,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{accessPointName}-{bucketArn#accountId}.s3-accesspoint-fips.{bucketArn#region}.{bucketPartition#dnsSuffix}",
+                        "url": "https://{accessPointName_ssa_1}-{bucketArn#accountId}.s3-accesspoint-fips.{bucketArn#region}.{bucketPartition#dnsSuffix}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -3305,8 +3411,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{accessPointName}-{bucketArn#accountId}.s3-accesspoint.dualstack.{bucketArn#region}.{bucketPartition#dnsSuffix}",
+                        "url": "https://{accessPointName_ssa_1}-{bucketArn#accountId}.s3-accesspoint.dualstack.{bucketArn#region}.{bucketPartition#dnsSuffix}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -3322,8 +3429,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "{url#scheme}://{accessPointName}-{bucketArn#accountId}.{url#authority}{url#path}",
+                        "url": "{url#scheme}://{accessPointName_ssa_1}-{bucketArn#accountId}.{url#authority}{url#path}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -3339,8 +3447,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{accessPointName}-{bucketArn#accountId}.s3-accesspoint.{bucketArn#region}.{bucketPartition#dnsSuffix}",
+                        "url": "https://{accessPointName_ssa_1}-{bucketArn#accountId}.s3-accesspoint.{bucketArn#region}.{bucketPartition#dnsSuffix}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -3356,28 +3465,34 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: The ARN was not for the S3 service, found: {bucketArn#service}",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "S3 MRAP does not support dual-stack",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "S3 MRAP does not support FIPS",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "S3 MRAP does not support S3 Accelerate",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid configuration: Multi-Region Access Point ARNs are disabled.",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{accessPointName}.accesspoint.s3-global.{mrapPartition#dnsSuffix}",
+                        "url": "https://{accessPointName_ssa_1}.accesspoint.s3-global.{partitionResult#dnsSuffix}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -3395,32 +3510,39 @@
                     "type": "endpoint"
                 },
                 {
-                    "error": "Client was configured for partition `{mrapPartition#name}` but bucket referred to partition `{bucketArn#partition}`",
+                    "conditions": [],
+                    "error": "Client was configured for partition `{partitionResult#name}` but bucket referred to partition `{bucketArn#partition}`",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid Access Point Name",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "S3 Outposts does not support Dual-stack",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "S3 Outposts does not support FIPS",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "S3 Outposts does not support S3 Accelerate",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid Arn: Outpost Access Point ARN contains sub resources",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{accessPointName_1}-{bucketArn#accountId}.{outpostId}.{url#authority}",
+                        "url": "https://{accessPointName_ssa_2}-{bucketArn#accountId}.{outpostId_ssa_1}.{url#authority}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -3444,8 +3566,9 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
-                        "url": "https://{accessPointName_1}-{bucketArn#accountId}.{outpostId}.s3-outposts.{bucketArn#region}.{bucketPartition#dnsSuffix}",
+                        "url": "https://{accessPointName_ssa_2}-{bucketArn#accountId}.{outpostId_ssa_1}.s3-outposts.{bucketArn#region}.{bucketPartition#dnsSuffix}",
                         "properties": {
                             "authSchemes": [
                                 {
@@ -3469,42 +3592,52 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "error": "Expected an outpost type `accesspoint`, found {outpostType}",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: expected an access point name",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: Expected a 4-component resource",
                     "type": "error"
                 },
                 {
-                    "error": "Invalid ARN: The outpost Id may only contain a-z, A-Z, 0-9 and `-`. Found: `{outpostId}`",
+                    "conditions": [],
+                    "error": "Invalid ARN: The outpost Id may only contain a-z, A-Z, 0-9 and `-`. Found: `{outpostId_ssa_1}`",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: The Outpost Id was not set",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: Unrecognized format: {Bucket} (type: {arnType})",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: No ARN type specified",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Invalid ARN: `{Bucket}` was not a valid ARN",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "error": "Path-style addressing cannot be used with ARN buckets",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3-fips.dualstack.us-east-1.{partitionResult#dnsSuffix}/{uri_encoded_bucket}",
                         "properties": {
@@ -3522,6 +3655,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3-fips.dualstack.{Region}.{partitionResult#dnsSuffix}/{uri_encoded_bucket}",
                         "properties": {
@@ -3539,6 +3673,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3-fips.us-east-1.{partitionResult#dnsSuffix}/{uri_encoded_bucket}",
                         "properties": {
@@ -3556,6 +3691,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3-fips.{Region}.{partitionResult#dnsSuffix}/{uri_encoded_bucket}",
                         "properties": {
@@ -3573,6 +3709,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3.dualstack.us-east-1.{partitionResult#dnsSuffix}/{uri_encoded_bucket}",
                         "properties": {
@@ -3590,6 +3727,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3.dualstack.{Region}.{partitionResult#dnsSuffix}/{uri_encoded_bucket}",
                         "properties": {
@@ -3607,6 +3745,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{url#authority}{url#normalizedPath}{uri_encoded_bucket}",
                         "properties": {
@@ -3624,6 +3763,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{url#authority}{url#normalizedPath}{uri_encoded_bucket}",
                         "properties": {
@@ -3641,6 +3781,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3.{partitionResult#dnsSuffix}/{uri_encoded_bucket}",
                         "properties": {
@@ -3658,6 +3799,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3.{partitionResult#dnsSuffix}/{uri_encoded_bucket}",
                         "properties": {
@@ -3675,6 +3817,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3.{Region}.{partitionResult#dnsSuffix}/{uri_encoded_bucket}",
                         "properties": {
@@ -3692,10 +3835,12 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "error": "Path-style addressing cannot be used with S3 Accelerate",
                     "type": "error"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{url#authority}{url#path}",
                         "properties": {
@@ -3713,6 +3858,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3-object-lambda-fips.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3730,6 +3876,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3-object-lambda.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3747,6 +3894,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3-fips.dualstack.us-east-1.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3764,6 +3912,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3-fips.dualstack.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3781,6 +3930,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3-fips.us-east-1.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3798,6 +3948,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3-fips.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3815,6 +3966,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3.dualstack.us-east-1.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3832,6 +3984,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3.dualstack.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3849,6 +4002,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{url#authority}{url#path}",
                         "properties": {
@@ -3866,6 +4020,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "{url#scheme}://{url#authority}{url#path}",
                         "properties": {
@@ -3883,6 +4038,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3900,6 +4056,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3917,6 +4074,7 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "endpoint": {
                         "url": "https://s3.{Region}.{partitionResult#dnsSuffix}",
                         "properties": {
@@ -3934,13 +4092,14 @@
                     "type": "endpoint"
                 },
                 {
+                    "conditions": [],
                     "error": "A region must be set when sending requests to S3.",
                     "type": "error"
                 }
             ],
             "root": 2,
-            "nodes": "AQIBAAa6hq9fAn4ILgoMMGIMQkYORC4QShK6hq9fWBoUYFoWjgEYUpIB2ApSXoqEr18cYCYejgEgIpIBogoilAEkqoWvX5gBqIavX6qGr1+OASgqkgGMCyqUASyqha9fmAGkhq9fpoavX0owyApOOjJYgA80YISEr182jgE4qoWvX5IB2Aqqha9fWIAPPGCEhK9fPo4BQEKSAegKQpQBRKqFr1+YAbCGr1+yhq9fRIgPSEpK+gpYgoSvX0xgWk6OAVBSkgGGC1KUAVSqha9fmAG0hq9fVrwBWLiGr1/IAbaGr1+4hq9fjgFcXpIBjAtelAFgqoWvX5gBrIavX66Gr19CeGREbGZKaLqGr19YavSEr19eioSvX/KEr19KbsgKTnRwWIAPcmCEhK9f9ISvX1iAD3ZghISvX/CEr19EiA96Snz6CliChK9f9ISvXwTKCYABBoIBhAEIqgSEAQqGAYgBDKIBiAEOjAGKARCOAcAEEI4B9AQSnAGQARSWAZIBFpQBzAgYmgG6BBaYAcwIGJoB2gYazAiIAhTUA54BFqABzAgY2AO6BA6mAaQBEKgBwAQQqAH0BBLOA6oBFLABrAEWrgHMCBi0AagFFrIBzAgYtAHaBhrMCLYBHIgCuAEeugGUCCCUCLwBJr4BwAEowAvAASrCAcQBLPQMxAE2xgHQATjIAdABOsoB0AE8zAHQAT7OAdABQJIL0AFC9gHSAUTkAdQBStgB1gFY4AHcAUzsCNoBWN4B3AFghAL0AV6KhK9f4AFghALiAYwB2geyha9fRuYBwApK6AHwAUycCeoBTuwB8AFS7gHwAVSWCfABWIAP8gFghISvX/QBjAHwB7KFr19EiA/4AUr6AfwBTL4J/AFYgoSvX/4BYIQCgAKMAYgIggKcAa6Fr1+yha9fjAGQCIYCnAGsha9fsoWvXx6KApQIIJQIjAImjgKQAijAC5ACKpIClAIs9AyUAjaWAqACOJgCoAI6mgKgAjycAqACPp4CoAJAkgugAkKwA6ICROgCpAJKpgL4A0zsCKgCWLwCqgJarAL+A2CuAvYCjAGQCLACnAGsha9fsgKqAbQCwoWvX7ABtgLAha9ftAG4AtiFr1+6AboCvoWvX8wB0oWvX7yFr19avgKABF6KhK9fwAJg2gLCAowB2gfEApwB0ALGAqoByALCha9fsAHKAsCFr1+0AcwC2IWvX7oBzgK+ha9fzAHQha9fvIWvX6oB0gLCha9fsAHUAsCFr1+4AbSFr1/WAroB2AK+ha9fzAG4ha9fvIWvX4wBkAjcApwBrIWvX94CqgHgAsKFr1+wAeICwIWvX7QB5ALYha9fugHmAr6Fr1/MAc6Fr1+8ha9fRuoCwApK7AKSBEycCe4CTo4D8AJYgA/yAlr0ApQEYISEr1/2AowB8Af4ApwBhAP6AqoB/ALCha9fsAH+AsCFr1+0AYAD2IWvX7oBggO+ha9fzAHWha9fvIWvX6oBhgPCha9fsAGIA8CFr1+4AbSFr1+KA7oBjAO+ha9fzAG6ha9fvIWvX1KQA5IDVJYJkgNYgA+UA1qWA5QEYISEr1+YA4wB8AeaA5wBpgOcA6oBngPCha9fsAGgA8CFr1+0AaID2IWvX7oBpAO+ha9fzAHUha9fvIWvX6oBqAPCha9fsAGqA8CFr1+4AbSFr1+sA7oBrgO+ha9fzAG2ha9fvIWvX0SID7IDSrQDngRMvgm2A1iChK9fuANaugOgBGDAA7wDjAGICL4DnAGuha9fxAOMAZAIwgOcAayFr1/EA6oBxgPCha9fsAHIA8CFr1+0AcoD2IWvX7oBzAO+ha9fzAHMha9fvIWvXxTUA9ADFtIDzAgY2AOoBRbWA8wIGNgD2gYazAjaAx7cA5QIIJQI3gMm4APiAyjAC+IDKuQD5gMs9AzmAzboA/IDOOoD8gM67APyAzzuA/IDPvAD8gNAkgvyA0KYBPQDRIYE9gNK+gP4A1iCBP4DTOwI/ANYgAT+A2CmBJYEXoqEr1+CBGCmBIQEjAHaB8SFr19GiATACkqKBJIETJwJjAROjgSSBFKQBJIEVJYJkgRYgA+UBGCEhK9flgSMAfAHxIWvX0SID5oESpwEngRMvgmeBFiChK9foARgpgSiBIwBiAikBJwBroWvX8SFr1+MAZAIqAScAayFr1/Eha9fCqwErgQMvASuBA6yBLAEELQEwAQQtAT0BBTWBrYEFrgEzAgYrAe6BBrMCOYFDvIEvgQQogXABCLCBPQEJMQE9AQmxgTIBCjAC8gEKsoEzAQs9AzMBDbOBNgEONAE2AQ60gTYBDzUBNgEPtYE2ARAkgvYBELsBNoEROAE3ARK3gSChq9fTOwI6glG4gTACkrkBPAJTJwJ5gRO6ATwCVLqBPAJVJYJ8AlEiA/uBErwBPYJTL4J9gkQogX0BCb2BPgEKMAL+AQq+gT8BCz0DPwENv4EiAU4gAWIBTqCBYgFPIQFiAU+hgWIBUCSC4gFQpwFigVEkAWMBUqOBbqGr19M7AiUCkaSBcAKSpQFyApMnAmWBU6YBc4KUpoF3gpUlgneCkSID54FSqAF+gpMvgn8ChTWBqQFFqYFzAgYrAeoBRrMCKoFHOYFrAUmrgWwBSjAC7AFKrIFtAUs9Ay0BTa2BcAFOLgFwAU6ugXABTy8BcAFPr4FwAVAkgvABUKaB8IFRM4FxAVKyAXGBViAB8wFTOwIygVY/gbMBWCoB94FRtAFwApK0gXaBUycCdQFTtYF2gVS2AXaBVSWCdoFWIAP3AVghISvX94FnAHKha9f4AWiAeIF/oWvX6QB5AX8ha9fqAGyha9f+oWvXyboBeoFKMAL6gUq7AXuBSz0DO4FNvAF+gU48gX6BTr0BfoFPPYF+gU++AX6BUCSC/oFQpoH/AVEjAb+BUqCBoAGWIAHiAZM7AiEBlj+BoYGWooGiAZgqAe6BmCoB5wGRo4GwApKkgaQBliAD7gGTJwJlAZOsAaWBliAD5gGWpoGuAZghISvX5wGnAHKha9fngaiAaAG/oWvX6QBogb8ha9fqAGkBvqFr1+qAaYGwoWvX7ABqAbAha9fugGqBr6Fr1/AAawG+IWvX8IBrgb2ha9fxAHyha9f9IWvX1KyBrQGVJYJtAZYgA+2BlrABrgGYISEr1+6BpwByoWvX7wGogG+Bv6Fr1+kAfqFr1/8ha9fYISEr1/CBpwByoWvX8QGogHGBv6Fr1+kAcgG/IWvX6gBygb6ha9fqgHMBsKFr1+wAc4GwIWvX7oB0Aa+ha9fwAHSBviFr1/CAdQG9oWvX8QB8IWvX/SFr18W2AbMCBisB9oGGswI3AYm3gbgBijAC+AGKuIG5AYs9AzkBjbmBvAGOOgG8AY66gbwBjzsBvAGPu4G8AZAkgvwBkKaB/IGRIYH9AZK+Ab2BliAB/wGTOwI+gZY/gb8BmCoB5YHXoqEr1+AB2CoB4IHnAHKha9fhAeiAeqFr1/+ha9fRogHwApKigeSB0ycCYwHTo4HkgdSkAeSB1SWCZIHWIAPlAdghISvX5YHnAHKha9fmAeiAe6Fr1/+ha9fRIgPnAdKngegB0y+CaAHWIKEr1+iB2CoB6QHnAHKha9fpgeiAeyFr1/+ha9fnAHKha9fqgeiAeiFr1/+ha9fGswIrgcesAeUCCCUCLIHJrQHtgcowAu2Byq4B7oHLPQMugc2vAfGBzi+B8YHOsAHxgc8wgfGBz7EB8YHQJILxgdC+gfIB0TeB8oHSs4HzAdY1gfSB0zsCNAHWNQH0gdgjAjuB16KhK9f1gdgjAjYB4wB2gewha9fnAHGha9f3AemAdyFr1/mha9fRuAHwApK4gfqB0ycCeQHTuYH6gdS6AfqB1SWCeoHWIAP7AdghISvX+4HjAHwB7CFr1+cAcaFr1/yB6YB9Afmha9ftgHgha9f9ge+AfgH5oWvX84B4oWvX+SFr19EiA/8B0r+B4AITL4JgAhYgoSvX4IIYIwIhAiMAYgIhgicAa6Fr1+wha9fnAGuha9figimAd6Fr1/mha9fjAGQCI4InAGsha9fsIWvX5wBrIWvX5IIpgHaha9f5oWvXyaWCJgIKMALmAgqmgicCCz0DJwINp4IqAg4oAioCDqiCKgIPKQIqAg+pgioCECSC6gIQsQIqghEtAisCEquCMiFr19M7AiwCFiyCMiFr19eioSvX8iFr19GtgjACkq4CMAITJwJughOvAjACFK+CMAIVJYJwAhYgA/CCGCEhK9fyIWvX0SID8YISsgIyghMvgnKCFiChK9fyIWvXybOCNAIKMAL0Agq0gjUCCz0DNQINtYI4Ag42AjgCDraCOAIPNwI4Ag+3gjgCECSC+AIQrYJ4ghEhgnkCErmCICGr19M7AjoCFjqCICGr19eioSvX4CGr19Y+gjuCFzwCKqFr19g+AjyCJgBpIWvX/QIvAH2CKiFr1/IAaaFr1+oha9fmAGUha9floWvX1z+CPwIXoqEr1+qha9fXoqEr1+ACWCECYIJmAGMha9fjoWvX5gBiIWvX4qFr19GiAnACkqKCZIJTJwJjAlOjgmSCVKQCZIJVJYJkglYgA+UCWCEhK9fgIavX1iAD5gJXJoJsAlghISvX56Fr19OoAmeCViAD7AJUKwJoglYgA+kCVymCbAJYISEr1+oCYoBqgmqha9fmAGaha9fnoWvX1iAD64JXLIJsAlghISvX6qFr19ghISvX7QJmAGYha9fnIWvX0SID7gJSroJvAlMvgm8CViChK9fgIavX1iChK9fwAlcwgmqha9fXoaFr1/ECWDICcYJmAGgha9fooWvX5gBkIWvX5KFr18O+AnMCSLOCfgJJNAJ+Akm0gnUCSjAC9QJKtYJ2Aks9AzYCTbaCeQJONwJ5Ak63gnkCTzgCeQJPuIJ5AlAkgvkCUL0CeYJRO4J6AlK6gmChq9fWOwJgoavX16KhK9fgoavX0bwCcAKWIAP8glghISvX4KGr19EiA/2CViChK9fgoavXyb6CfwJKMAL/Akq/gmACiz0DIAKNoIKjAo4hAqMCjqGCowKPIgKjAo+igqMCkCSC4wKQvQKjgpEvgqQCki4CpIKSpQKuoavX1akCpYKWJoKmApgiAvUCl6KhK9fnApgiAueCo4BoAq6hq9fkgGiCrqGr1+UAaCGr1+qha9fWLAKpgpgrgqoCpgBloavX6oKvAGsCpqGr1/IAZiGr1+ahq9fmAGOhq9fkIavX16KhK9fsgpgtgq0CpgBioavX4yGr1+YAYaGr1+Ihq9fSroKhIavX1i8CoSGr19eioSvX4SGr19GxArACliAD8IKYISEr1+Eha9fSPAKxgpKzArICliAD8oKYISEr1+6hq9fTt4KzgpW2grQCliAD9IKYISEr1/UCo4B1gq6hq9fkgHYCrqGr1+UAaKGr1+qha9fWIAP3ApghISvX5yGr19W6grgCliAD+IKYISEr1/kCo4B5gq6hq9fkgHoCrqGr1+UAZ6Gr1+qha9fWIAP7ApghISvX+4KmAGShq9flIavX1iAD/IKYISEr1+Ehq9fRIgP9gpIkAv4Ckr8CvoKWIKEr1+6hq9fVo4L/gpYgoSvX4ALYIgLgguOAYQLuoavX5IBhgu6hq9flAGuha9fqoWvX44Bigu6hq9fkgGMC7qGr1+UAayFr1+qha9fWIKEr1+chq9fWIKEr1+Ehq9fQq4LlAtEnAuWC0qYC7ILWJoLsgteioSvX7ILTqILngtYgA+gC2CEhK9ftAtYgA+kC2CEhK9fpguQAagLtAuaAaoLgoWvX6AB+ISvX6wLrAH8hK9fgIWvX0SID7ALWIKEr1+yC5ABugu0C5oBtguCha9foAH6hK9fuAusAf6Er1+Aha9fmgG8C4KFr1+gAfaEr1++C6wB9oSvX4CFr18qwgvECyz0DMQLMsYLyAs0ngzIC0KCD8oLRPYLzAtKzguMDkzQC4gOWNQL0gtgjISvX4AMXoqEr1/WC2CMhK9f2Ati2gveC2rcC94LbNyEr1/eC3LgC+QLdOIL5At24ISvX+QLfOYL6gt+6AvqC4AB5ISvX+oLggHsC/ALhAHuC/ALhgHohK9f8AuyAfILsoSvX8YB9AuyhK9fygHshK9fsoSvX0r4C8INTPoLyA1O8g38C1iAD/4LYISEr1+ADGKCDIYMaoQMhgxs3oSvX4YMcogMjAx0igyMDHbihK9fjAx8jgySDH6QDJIMgAHmhK9fkgyCAZQMmAyEAZYMmAyGAeqEr1+YDLIBmgyyhK9fxgGcDLKEr1/KAe6Er1+yhK9fQoIPoAxEzAyiDEqkDIwOTKYMiA5YqgyoDGCMhK9f1gxeioSvX6wMYIyEr1+uDGKwDLQMarIMtAxsyISvX7QMcrYMugx0uAy6DHbMhK9fugx8vAzADH6+DMAMgAHQhK9fwAyCAcIMxgyEAcQMxgyGAdSEr1/GDLIByAyyhK9fxgHKDLKEr1/KAdiEr1+yhK9fSs4MwA5M0AzGDk70DtIMWIAP1AxghISvX9YMYtgM3Axq2gzcDGzKhK9f3Axy3gziDHTgDOIMds6Er1/iDHzkDOgMfuYM6AyAAdKEr1/oDIIB6gzuDIQB7AzuDIYB1oSvX+4MsgHwDLKEr1/GAfIMsoSvX8oB2oSvX7KEr18u9gz4DDCMDfgMMvoM/Aw0hA38DEKCD/4MRMANgA1Kgg2MDkyaDYgOQoIPhg1Evg6IDUqKDYwOTJAOiA4yjg2QDTT+DZANQoIPkg1EwA2UDUqWDYwOTJgNhg5Wtg6aDVieDZwNYIyEr1/UDV6KhK9foA1gjISvX6INZKQNqA1mpg2oDWi0hK9fqA1qqg2uDWysDa4NbriEr1+uDXCwDbQNeLINtA16vISvX7QNfrYNug2AAbgNug2IAcCEr1+6DZYBvA2yhK9fngG+DbKEr1+uAcSEr1+yhK9fSsYNwg1MxA3IDU7yDcwOTM4NyA1Oyg3MDlDMDcwOVvoNzA5O8g3QDViAD9INYISEr1/UDWTWDdoNZtgN2g1otoSvX9oNatwN4A1s3g3gDW66hK9f4A1w4g3mDXjkDeYNer6Er1/mDX7oDewNgAHqDewNiAHChK9f7A2WAe4NsoSvX54B8A2yhK9frgHGhK9fsoSvX1D0DfYNVvoN9g1YgA/4DWCEhK9fmISvX1iAD/wNYISEr1+WhK9fQoIPgA5Evg6CDkqEDowOTI4Ohg5Wtg6IDliKDowOXoqEr1+MDmCMhK9flISvX1a2DpAOWJQOkg5gjISvX9YOXoqEr1+WDmCMhK9fmA5kmg6eDmacDp4OaJ6Er1+eDmqgDqQObKIOpA5uooSvX6QOcKYOqg54qA6qDnqmhK9fqg5+rA6wDoABrg6wDogBqoSvX7AOlgGyDrKEr1+eAbQOsoSvX64BroSvX7KEr19Yug64DmCMhK9fnISvX16KhK9fvA5gjISvX5qEr19KxA7ADkzCDsYOTvQOzA5M0A7GDk7IDswOUMoOzA5W/A7MDliAD84OYISEr1+UhK9fTvQO0g5YgA/UDmCEhK9f1g5k2A7cDmbaDtwOaKCEr1/cDmreDuIObOAO4g5upISvX+IOcOQO6A545g7oDnqohK9f6A5+6g7uDoAB7A7uDogBrISvX+4OlgHwDrKEr1+eAfIOsoSvX64BsISvX7KEr19Q9g74Dlb8DvgOWIAP+g5ghISvX5KEr19YgA/+DmCEhK9fkISvX2CEhK9fhoSvX0SID4QPWIKEr1+GD2CMhK9fjoSvX1iChK9fig9ghISvX4iEr18=",
-            "nodeCount": 965
+            "nodeCount": 807,
+            "nodes": "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"
         },
         "smithy.rules#endpointTests": {
           "testCases": [
@@ -20989,14 +21148,6 @@
     "com.amazonaws.s3#GetObjectOutput": {
       "type": "structure",
       "members": {
-        "Body": {
-          "target": "com.amazonaws.s3#StreamingBlob",
-          "traits": {
-            "smithy.api#default": "",
-            "smithy.api#documentation": "<p>Object data.</p>",
-            "smithy.api#httpPayload": {}
-          }
-        },
         "DeleteMarker": {
           "target": "com.amazonaws.s3#DeleteMarker",
           "traits": {
@@ -21664,14 +21815,6 @@
     "com.amazonaws.s3#GetObjectTorrentOutput": {
       "type": "structure",
       "members": {
-        "Body": {
-          "target": "com.amazonaws.s3#StreamingBlob",
-          "traits": {
-            "smithy.api#default": "",
-            "smithy.api#documentation": "<p>A Bencoded dictionary as defined by the BitTorrent specification</p>",
-            "smithy.api#httpPayload": {}
-          }
-        },
         "RequestCharged": {
           "target": "com.amazonaws.s3#RequestCharged",
           "traits": {
@@ -29011,14 +29154,6 @@
             "smithy.api#httpHeader": "x-amz-acl"
           }
         },
-        "Body": {
-          "target": "com.amazonaws.s3#StreamingBlob",
-          "traits": {
-            "smithy.api#default": "",
-            "smithy.api#documentation": "<p>Object data.</p>",
-            "smithy.api#httpPayload": {}
-          }
-        },
         "Bucket": {
           "target": "com.amazonaws.s3#BucketName",
           "traits": {
@@ -30309,12 +30444,6 @@
             "smithy.api#documentation": "<p>The optional description for the job.</p>"
           }
         },
-        "SelectParameters": {
-          "target": "com.amazonaws.s3#SelectParameters",
-          "traits": {
-            "smithy.api#documentation": "<important>\n            <p>Amazon S3 Select is no longer available to new customers. Existing customers of Amazon S3 Select can continue to use the feature as usual. <a href=\"http://aws.amazon.com/blogs/storage/how-to-optimize-querying-your-data-in-amazon-s3/\">Learn more</a>\n            </p>\n         </important>\n         <p>Describes the parameters for Select job types.</p>"
-          }
-        },
         "OutputLocation": {
           "target": "com.amazonaws.s3#OutputLocation",
           "traits": {
@@ -30596,209 +30725,6 @@
       },
       "traits": {
         "smithy.api#documentation": "<p>Specifies the byte range of the object to get the records from. A record is processed\n         when its first byte is contained by the range. This parameter is optional, but when\n         specified, it must not be empty. See RFC 2616, Section 14.35.1 about how to specify the\n         start and end of the range.</p>"
-      }
-    },
-    "com.amazonaws.s3#SelectObjectContent": {
-      "type": "operation",
-      "input": {
-        "target": "com.amazonaws.s3#SelectObjectContentRequest"
-      },
-      "output": {
-        "target": "com.amazonaws.s3#SelectObjectContentOutput"
-      },
-      "traits": {
-        "smithy.api#documentation": "<note>\n            <p>This operation is not supported for directory buckets.</p>\n         </note>\n         <p>This action filters the contents of an Amazon S3 object based on a simple structured query\n         language (SQL) statement. In the request, along with the SQL expression, you must also\n         specify a data serialization format (JSON, CSV, or Apache Parquet) of the object. Amazon S3 uses\n         this format to parse object data into records, and returns only records that match the\n         specified SQL expression. You must also specify the data serialization format for the\n         response.</p>\n         <p>This functionality is not supported for Amazon S3 on Outposts.</p>\n         <p>For more information about Amazon S3 Select, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/selecting-content-from-objects.html\">Selecting Content from\n            Objects</a> and <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-glacier-select-sql-reference-select.html\">SELECT\n            Command</a> in the <i>Amazon S3 User Guide</i>.</p>\n         <p></p>\n         <dl>\n            <dt>Permissions</dt>\n            <dd>\n               <p>You must have the <code>s3:GetObject</code> permission for this operation.\u00a0Amazon S3\n                  Select does not support anonymous access. For more information about permissions,\n                  see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/using-with-s3-actions.html\">Specifying Permissions in\n                     a Policy</a> in the <i>Amazon S3 User Guide</i>.</p>\n            </dd>\n            <dt>Object Data Formats</dt>\n            <dd>\n               <p>You can use Amazon S3 Select to query objects that have the following format\n                  properties:</p>\n               <ul>\n                  <li>\n                     <p>\n                        <i>CSV, JSON, and Parquet</i> - Objects must be in CSV,\n                        JSON, or Parquet format.</p>\n                  </li>\n                  <li>\n                     <p>\n                        <i>UTF-8</i> - UTF-8 is the only encoding type Amazon S3 Select\n                        supports.</p>\n                  </li>\n                  <li>\n                     <p>\n                        <i>GZIP or BZIP2</i> - CSV and JSON files can be compressed\n                        using GZIP or BZIP2. GZIP and BZIP2 are the only compression formats that\n                        Amazon S3 Select supports for CSV and JSON files. Amazon S3 Select supports columnar\n                        compression for Parquet using GZIP or Snappy. Amazon S3 Select does not support\n                        whole-object compression for Parquet objects.</p>\n                  </li>\n                  <li>\n                     <p>\n                        <i>Server-side encryption</i> - Amazon S3 Select supports\n                        querying objects that are protected with server-side encryption.</p>\n                     <p>For objects that are encrypted with customer-provided encryption keys\n                        (SSE-C), you must use HTTPS, and you must use the headers that are\n                        documented in the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html\">GetObject</a>. For more\n                        information about SSE-C, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/ServerSideEncryptionCustomerKeys.html\">Server-Side Encryption (Using Customer-Provided Encryption Keys)</a>\n                        in the <i>Amazon S3 User Guide</i>.</p>\n                     <p>For objects that are encrypted with Amazon S3 managed keys (SSE-S3) and\n                        Amazon Web Services KMS keys (SSE-KMS), server-side encryption is handled transparently,\n                        so you don't need to specify anything. For more information about\n                        server-side encryption, including SSE-S3 and SSE-KMS, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/serv-side-encryption.html\">Protecting Data Using Server-Side Encryption</a> in the\n                           <i>Amazon S3 User Guide</i>.</p>\n                  </li>\n               </ul>\n            </dd>\n            <dt>Working with the Response Body</dt>\n            <dd>\n               <p>Given the response size is unknown, Amazon S3 Select streams the response as a\n                  series of messages and includes a <code>Transfer-Encoding</code> header with\n                     <code>chunked</code> as its value in the response. For more information, see\n                     <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/RESTSelectObjectAppendix.html\">Appendix:\n                     SelectObjectContent\n                  Response</a>.</p>\n            </dd>\n            <dt>GetObject Support</dt>\n            <dd>\n               <p>The <code>SelectObjectContent</code> action does not support the following\n                     <code>GetObject</code> functionality. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html\">GetObject</a>.</p>\n               <ul>\n                  <li>\n                     <p>\n                        <code>Range</code>: Although you can specify a scan range for an Amazon S3 Select\n                        request (see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_SelectObjectContent.html#AmazonS3-SelectObjectContent-request-ScanRange\">SelectObjectContentRequest - ScanRange</a> in the request\n                        parameters), you cannot specify the range of bytes of an object to return.\n                     </p>\n                  </li>\n                  <li>\n                     <p>The <code>GLACIER</code>, <code>DEEP_ARCHIVE</code>, and\n                           <code>REDUCED_REDUNDANCY</code> storage classes, or the\n                           <code>ARCHIVE_ACCESS</code> and <code>DEEP_ARCHIVE_ACCESS</code> access\n                        tiers of the <code>INTELLIGENT_TIERING</code> storage class: You cannot\n                        query objects in the <code>GLACIER</code>, <code>DEEP_ARCHIVE</code>, or\n                           <code>REDUCED_REDUNDANCY</code> storage classes, nor objects in the\n                           <code>ARCHIVE_ACCESS</code> or <code>DEEP_ARCHIVE_ACCESS</code> access\n                        tiers of the <code>INTELLIGENT_TIERING</code> storage class. For more\n                        information about storage classes, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html\">Using Amazon S3\n                           storage classes</a> in the\n                        <i>Amazon S3 User Guide</i>.</p>\n                  </li>\n               </ul>\n            </dd>\n            <dt>Special Errors</dt>\n            <dd>\n               <p>For a list of special errors for this operation, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html#SelectObjectContentErrorCodeList\">List of SELECT Object Content Error Codes</a>\n               </p>\n            </dd>\n         </dl>\n         <p>The following operations are related to <code>SelectObjectContent</code>:</p>\n         <ul>\n            <li>\n               <p>\n                  <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html\">GetObject</a>\n               </p>\n            </li>\n            <li>\n               <p>\n                  <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketLifecycleConfiguration.html\">GetBucketLifecycleConfiguration</a>\n               </p>\n            </li>\n            <li>\n               <p>\n                  <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketLifecycleConfiguration.html\">PutBucketLifecycleConfiguration</a>\n               </p>\n            </li>\n         </ul>",
-        "smithy.api#http": {
-          "method": "POST",
-          "uri": "/{Bucket}/{Key+}?select&select-type=2",
-          "code": 200
-        }
-      }
-    },
-    "com.amazonaws.s3#SelectObjectContentEventStream": {
-      "type": "union",
-      "members": {
-        "Records": {
-          "target": "com.amazonaws.s3#RecordsEvent",
-          "traits": {
-            "smithy.api#documentation": "<p>The Records Event.</p>"
-          }
-        },
-        "Stats": {
-          "target": "com.amazonaws.s3#StatsEvent",
-          "traits": {
-            "smithy.api#documentation": "<p>The Stats Event.</p>"
-          }
-        },
-        "Progress": {
-          "target": "com.amazonaws.s3#ProgressEvent",
-          "traits": {
-            "smithy.api#documentation": "<p>The Progress Event.</p>"
-          }
-        },
-        "Cont": {
-          "target": "com.amazonaws.s3#ContinuationEvent",
-          "traits": {
-            "smithy.api#documentation": "<p>The Continuation Event.</p>"
-          }
-        },
-        "End": {
-          "target": "com.amazonaws.s3#EndEvent",
-          "traits": {
-            "smithy.api#documentation": "<p>The End Event.</p>"
-          }
-        }
-      },
-      "traits": {
-        "smithy.api#documentation": "<p>The container for selecting objects from a content event stream.</p>",
-        "smithy.api#streaming": {}
-      }
-    },
-    "com.amazonaws.s3#SelectObjectContentOutput": {
-      "type": "structure",
-      "members": {
-        "Payload": {
-          "target": "com.amazonaws.s3#SelectObjectContentEventStream",
-          "traits": {
-            "smithy.api#documentation": "<p>The array of results.</p>",
-            "smithy.api#httpPayload": {}
-          }
-        }
-      },
-      "traits": {
-        "smithy.api#output": {}
-      }
-    },
-    "com.amazonaws.s3#SelectObjectContentRequest": {
-      "type": "structure",
-      "members": {
-        "Bucket": {
-          "target": "com.amazonaws.s3#BucketName",
-          "traits": {
-            "smithy.api#documentation": "<p>The S3 bucket.</p>",
-            "smithy.api#httpLabel": {},
-            "smithy.api#required": {},
-            "smithy.rules#contextParam": {
-              "name": "Bucket"
-            }
-          }
-        },
-        "Key": {
-          "target": "com.amazonaws.s3#ObjectKey",
-          "traits": {
-            "smithy.api#documentation": "<p>The object key.</p>",
-            "smithy.api#httpLabel": {},
-            "smithy.api#required": {}
-          }
-        },
-        "SSECustomerAlgorithm": {
-          "target": "com.amazonaws.s3#SSECustomerAlgorithm",
-          "traits": {
-            "smithy.api#documentation": "<p>The server-side encryption (SSE) algorithm used to encrypt the object. This parameter is needed only when the object was created \n    using a checksum algorithm. For more information,\n    see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/ServerSideEncryptionCustomerKeys.html\">Protecting data using SSE-C keys</a> in the\n    <i>Amazon S3 User Guide</i>.</p>",
-            "smithy.api#httpHeader": "x-amz-server-side-encryption-customer-algorithm"
-          }
-        },
-        "SSECustomerKey": {
-          "target": "com.amazonaws.s3#SSECustomerKey",
-          "traits": {
-            "smithy.api#documentation": "<p>The server-side encryption (SSE) customer managed key. This parameter is needed only when the object was created using a checksum algorithm. \n    For more information, see\n    <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/ServerSideEncryptionCustomerKeys.html\">Protecting data using SSE-C keys</a> in the\n    <i>Amazon S3 User Guide</i>.</p>",
-            "smithy.api#httpHeader": "x-amz-server-side-encryption-customer-key"
-          }
-        },
-        "SSECustomerKeyMD5": {
-          "target": "com.amazonaws.s3#SSECustomerKeyMD5",
-          "traits": {
-            "smithy.api#documentation": "<p>The MD5 server-side encryption (SSE) customer managed key. This parameter is needed only when the object was created using a checksum \n    algorithm. For more information,\n    see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/ServerSideEncryptionCustomerKeys.html\">Protecting data using SSE-C keys</a> in the\n    <i>Amazon S3 User Guide</i>.</p>",
-            "smithy.api#httpHeader": "x-amz-server-side-encryption-customer-key-MD5"
-          }
-        },
-        "Expression": {
-          "target": "com.amazonaws.s3#Expression",
-          "traits": {
-            "smithy.api#documentation": "<p>The expression that is used to query the object.</p>",
-            "smithy.api#required": {}
-          }
-        },
-        "ExpressionType": {
-          "target": "com.amazonaws.s3#ExpressionType",
-          "traits": {
-            "smithy.api#documentation": "<p>The type of the provided expression (for example, SQL).</p>",
-            "smithy.api#required": {}
-          }
-        },
-        "RequestProgress": {
-          "target": "com.amazonaws.s3#RequestProgress",
-          "traits": {
-            "smithy.api#documentation": "<p>Specifies if periodic request progress information should be enabled.</p>"
-          }
-        },
-        "InputSerialization": {
-          "target": "com.amazonaws.s3#InputSerialization",
-          "traits": {
-            "smithy.api#documentation": "<p>Describes the format of the data in the object that is being queried.</p>",
-            "smithy.api#required": {}
-          }
-        },
-        "OutputSerialization": {
-          "target": "com.amazonaws.s3#OutputSerialization",
-          "traits": {
-            "smithy.api#documentation": "<p>Describes the format of the data that you want Amazon S3 to return in response.</p>",
-            "smithy.api#required": {}
-          }
-        },
-        "ScanRange": {
-          "target": "com.amazonaws.s3#ScanRange",
-          "traits": {
-            "smithy.api#documentation": "<p>Specifies the byte range of the object to get the records from. A record is processed\n         when its first byte is contained by the range. This parameter is optional, but when\n         specified, it must not be empty. See RFC 2616, Section 14.35.1 about how to specify the\n         start and end of the range.</p>\n         <p>\n            <code>ScanRange</code>may be used in the following ways:</p>\n         <ul>\n            <li>\n               <p>\n                  <code><scanrange><start>50</start><end>100</end></scanrange></code>\n               - process only the records starting between the bytes 50 and 100 (inclusive, counting\n               from zero)</p>\n            </li>\n            <li>\n               <p>\n                  <code><scanrange><start>50</start></scanrange></code> -\n               process only the records starting after the byte 50</p>\n            </li>\n            <li>\n               <p>\n                  <code><scanrange><end>50</end></scanrange></code> -\n               process only the records within the last 50 bytes of the file.</p>\n            </li>\n         </ul>"
-          }
-        },
-        "ExpectedBucketOwner": {
-          "target": "com.amazonaws.s3#AccountId",
-          "traits": {
-            "smithy.api#documentation": "<p>The account ID of the expected bucket owner. If the account ID that you provide does not match the actual owner of the bucket, the request fails with the HTTP status code <code>403 Forbidden</code> (access denied).</p>",
-            "smithy.api#httpHeader": "x-amz-expected-bucket-owner"
-          }
-        }
-      },
-      "traits": {
-        "smithy.api#documentation": "<note>\n            <p>Learn Amazon S3 Select is no longer available to new customers. Existing customers of Amazon S3 Select can continue to use the feature as usual. <a href=\"http://aws.amazon.com/blogs/storage/how-to-optimize-querying-your-data-in-amazon-s3/\">Learn more</a>\n            </p>\n         </note>\n         <p>Request to filter the contents of an Amazon S3 object based on a simple Structured Query\n         Language (SQL) statement. In the request, along with the SQL expression, you must specify a\n         data serialization format (JSON or CSV) of the object. Amazon S3 uses this to parse object data\n         into records. It returns only records that match the specified SQL expression. You must\n         also specify the data serialization format for the response. For more information, see\n            <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectSELECTContent.html\">S3Select API Documentation</a>.</p>",
-        "smithy.api#input": {}
-      }
-    },
-    "com.amazonaws.s3#SelectParameters": {
-      "type": "structure",
-      "members": {
-        "InputSerialization": {
-          "target": "com.amazonaws.s3#InputSerialization",
-          "traits": {
-            "smithy.api#documentation": "<p>Describes the serialization format of the object.</p>",
-            "smithy.api#required": {}
-          }
-        },
-        "ExpressionType": {
-          "target": "com.amazonaws.s3#ExpressionType",
-          "traits": {
-            "smithy.api#documentation": "<p>The type of the provided expression (for example, SQL).</p>",
-            "smithy.api#required": {}
-          }
-        },
-        "Expression": {
-          "target": "com.amazonaws.s3#Expression",
-          "traits": {
-            "smithy.api#documentation": "<important>\n            <p>Amazon S3 Select is no longer available to new customers. Existing customers of Amazon S3 Select can continue to use the feature as usual. <a href=\"http://aws.amazon.com/blogs/storage/how-to-optimize-querying-your-data-in-amazon-s3/\">Learn more</a>\n            </p>\n         </important>\n         <p>The expression that is used to query the object.</p>",
-            "smithy.api#required": {}
-          }
-        },
-        "OutputSerialization": {
-          "target": "com.amazonaws.s3#OutputSerialization",
-          "traits": {
-            "smithy.api#documentation": "<p>Describes how the results of the Select job are serialized.</p>",
-            "smithy.api#required": {}
-          }
-        }
-      },
-      "traits": {
-        "smithy.api#documentation": "<important>\n            <p>Amazon S3 Select is no longer available to new customers. Existing customers of Amazon S3 Select can continue to use the feature as usual. <a href=\"http://aws.amazon.com/blogs/storage/how-to-optimize-querying-your-data-in-amazon-s3/\">Learn more</a>\n            </p>\n         </important>\n         <p>Describes the parameters for Select job types.</p>\n         <p>Learn <a href=\"http://aws.amazon.com/blogs/storage/how-to-optimize-querying-your-data-in-amazon-s3/\">How to optimize querying your data in Amazon S3</a>  using\n         <a href=\"https://docs.aws.amazon.com/athena/latest/ug/what-is.html\">Amazon Athena</a>, <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/userguide/transforming-objects.html\">S3 Object Lambda</a>, or client-side filtering.</p>"
       }
     },
     "com.amazonaws.s3#ServerSideEncryption": {
@@ -31186,12 +31112,6 @@
             "smithy.api#enumValue": "V_1"
           }
         }
-      }
-    },
-    "com.amazonaws.s3#StreamingBlob": {
-      "type": "blob",
-      "traits": {
-        "smithy.api#streaming": {}
       }
     },
     "com.amazonaws.s3#Suffix": {
@@ -31949,14 +31869,6 @@
     "com.amazonaws.s3#UploadPartRequest": {
       "type": "structure",
       "members": {
-        "Body": {
-          "target": "com.amazonaws.s3#StreamingBlob",
-          "traits": {
-            "smithy.api#default": "",
-            "smithy.api#documentation": "<p>Object data.</p>",
-            "smithy.api#httpPayload": {}
-          }
-        },
         "Bucket": {
           "target": "com.amazonaws.s3#BucketName",
           "traits": {
@@ -32211,14 +32123,6 @@
             "smithy.api#documentation": "<p>A single use encrypted token that maps <code>WriteGetObjectResponse</code> to the end\n         user <code>GetObject</code> request.</p>",
             "smithy.api#httpHeader": "x-amz-request-token",
             "smithy.api#required": {}
-          }
-        },
-        "Body": {
-          "target": "com.amazonaws.s3#StreamingBlob",
-          "traits": {
-            "smithy.api#default": "",
-            "smithy.api#documentation": "<p>The object data.</p>",
-            "smithy.api#httpPayload": {}
           }
         },
         "StatusCode": {

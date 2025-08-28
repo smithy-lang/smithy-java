@@ -158,8 +158,9 @@ public final class DocumentUtils {
     @SmithyInternalApi
     public static <T> T getMemberValue(Document container, Schema containerSchema, Schema member) {
         // Make sure it's part of the schema.
-        var value = SchemaUtils.validateMemberInSchema(containerSchema, member,
-                                                       container.getMember(member.memberName()));
+        var value = SchemaUtils.validateMemberInSchema(containerSchema,
+                member,
+                container.getMember(member.memberName()));
         if (value == null) {
             return null;
         }

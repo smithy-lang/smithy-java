@@ -88,7 +88,7 @@ final class BytecodeDisassembler {
             Map.entry(Opcodes.RETURN_VALUE, new InstructionDef("RETURN_VALUE", OperandType.NONE)),
 
             // Control flow
-            Map.entry(Opcodes.JT_OR_POP, new InstructionDef("JT_OR_POP", OperandType.SHORT, Show.JUMP_OFFSET)));
+            Map.entry(Opcodes.JNN_OR_POP, new InstructionDef("JNN_OR_POP", OperandType.SHORT, Show.JUMP_OFFSET)));
 
     // Enum to define operand types
     private enum OperandType {

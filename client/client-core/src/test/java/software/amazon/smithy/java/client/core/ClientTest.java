@@ -170,7 +170,7 @@ public class ClientTest {
                     @Override
                     public ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
                         //RequestOverrides config should be visible here.
-                        assertThat(hook.config().context().get(CallContext.APPLICATION_ID), equalTo(id));
+                        assertThat(hook.config().context().get(ClientContext.APPLICATION_ID), equalTo(id));
                         // Note that the overrides given to the call itself will override interceptors.
                         var override = RequestOverrideConfig.builder()
                                 .putConfig(ClientContext.APPLICATION_ID, "foo")

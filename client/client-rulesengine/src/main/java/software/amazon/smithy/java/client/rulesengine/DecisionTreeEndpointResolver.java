@@ -18,13 +18,13 @@ import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.rulesengine.language.EndpointRuleSet;
 import software.amazon.smithy.rulesengine.language.evaluation.RuleEvaluator;
 import software.amazon.smithy.rulesengine.language.evaluation.value.EndpointValue;
+import software.amazon.smithy.rulesengine.language.evaluation.value.StringValue;
 import software.amazon.smithy.rulesengine.language.evaluation.value.Value;
 import software.amazon.smithy.rulesengine.language.syntax.Identifier;
 
 /**
  * Resolves endpoints by interpreting the endpoint ruleset decision tree. This is significantly slower that using the
- * bytecode interpreter, but it's not practical for a dynamic client to compile a BDD then bytecode
- * (that's easily 150 ms+).
+ * bytecode interpreter, but it's not practical for a dynamic client to compile a BDD, then bytecode, or do sifting.
  */
 final class DecisionTreeEndpointResolver implements EndpointResolver {
 
@@ -121,9 +121,11 @@ final class DecisionTreeEndpointResolver implements EndpointResolver {
             var result = RuleEvaluator.evaluate(rules, input);
             if (result instanceof EndpointValue ev) {
                 return CompletableFuture.completedFuture(convertEndpoint(params, ev));
+            } else if (result instanceof StringValue sv) {
+                return CompletableFuture.failedFuture(new RulesEvaluationError(sv.getValue()));
+            } else {
+                throw new IllegalStateException("Expected decision tree to return an endpoint, but found " + result);
             }
-
-            throw new IllegalStateException("Expected decision tree to return an endpoint, but found " + result);
         } catch (RulesEvaluationError e) {
             return CompletableFuture.failedFuture(e);
         }

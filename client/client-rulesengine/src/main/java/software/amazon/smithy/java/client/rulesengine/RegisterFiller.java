@@ -22,6 +22,7 @@ import software.amazon.smithy.java.context.Context;
  */
 abstract class RegisterFiller {
     protected final Function<Context, Object>[] providersByRegister;
+    protected final Object[] defaultsByRegister; // Defaults for registers with builtins
     protected final Map<String, Integer> inputRegisterMap;
     protected final RegisterDefinition[] registerDefinitions;
     protected final Object[] registerTemplate;
@@ -45,15 +46,20 @@ abstract class RegisterFiller {
                     registerDefinitions.length));
         }
 
-        // Align providers by register index for O(1) access
+        // Set up builtin providers and their fallback defaults
         this.providersByRegister = new Function[registerDefinitions.length];
+        this.defaultsByRegister = new Object[registerDefinitions.length];
+
         for (int regIndex : builtinIndices) {
-            String builtinName = registerDefinitions[regIndex].builtin();
+            RegisterDefinition def = registerDefinitions[regIndex];
+            String builtinName = def.builtin();
             Function<Context, Object> provider = builtinProviders.get(builtinName);
             if (provider == null) {
                 throw new IllegalStateException("Missing builtin provider: " + builtinName);
             }
             this.providersByRegister[regIndex] = provider;
+            // Store the default for this builtin (may be null)
+            this.defaultsByRegister[regIndex] = def.defaultValue();
         }
     }
 
@@ -157,15 +163,21 @@ abstract class RegisterFiller {
                 }
             }
 
-            // Fill builtins, and early exit if all filled
-            if ((filled & builtinMask) != builtinMask) {
-                long unfilled = builtinMask & ~filled;
-                while (unfilled != 0) {
-                    int i = Long.numberOfTrailingZeros(unfilled);
-                    unfilled &= unfilled - 1; // Clear lowest set bit
-                    var result = providersByRegister[i].apply(context);
-                    if (result != null) {
-                        sink[i] = result;
+            // Apply builtins for unfilled slots with builtin providers
+            long unfilledBuiltins = builtinMask & ~filled;
+            while (unfilledBuiltins != 0) {
+                int i = Long.numberOfTrailingZeros(unfilledBuiltins);
+                unfilledBuiltins &= unfilledBuiltins - 1; // Clear lowest set bit
+
+                Object result = providersByRegister[i].apply(context);
+                if (result != null) {
+                    sink[i] = result;
+                    filled |= 1L << i;
+                } else {
+                    // Builtin returned null, use default if available
+                    Object defaultValue = defaultsByRegister[i];
+                    if (defaultValue != null) {
+                        sink[i] = defaultValue;
                         filled |= 1L << i;
                     }
                 }
@@ -182,7 +194,6 @@ abstract class RegisterFiller {
         }
     }
 
-    // Fallback implementation for > 64 registers using simple array-based approach.
     private static final class LargeRegisterFiller extends RegisterFiller {
         private final int[] builtinIndices;
         private final int[] hardRequiredIndices;
@@ -212,10 +223,10 @@ abstract class RegisterFiller {
             // Copy template to set up defaults and clear old state
             System.arraycopy(registerTemplate, 0, sink, 0, registerTemplate.length);
 
-            // Track what registers have been filled (defaults are already in sink)
+            // Track what's been filled
             boolean[] filled = Arrays.copyOf(hasDefault, hasDefault.length);
 
-            // Fill parameters
+            // Apply parameters (overrides defaults and will override builtins)
             for (var e : parameters.entrySet()) {
                 Integer i = inputRegisterMap.get(e.getKey());
                 if (i != null) {
@@ -231,6 +242,13 @@ abstract class RegisterFiller {
                     if (result != null) {
                         sink[regIndex] = result;
                         filled[regIndex] = true;
+                    } else {
+                        // Builtin returned null, use default if available
+                        Object defaultValue = defaultsByRegister[regIndex];
+                        if (defaultValue != null) {
+                            sink[regIndex] = defaultValue;
+                            filled[regIndex] = true;
+                        }
                     }
                 }
             }

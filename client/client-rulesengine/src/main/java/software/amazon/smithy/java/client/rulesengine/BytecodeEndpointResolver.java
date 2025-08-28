@@ -38,11 +38,12 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
     ) {
         this.bytecode = bytecode;
         this.extensions = extensions.toArray(new RulesExtension[0]);
-        this.registerFiller = RegisterFiller.of(bytecode, builtinProviders);
         this.bdd = bytecode.getBdd();
 
+        // Create and reuse this register filler across thread local evaluators.
+        this.registerFiller = RegisterFiller.of(bytecode, builtinProviders);
         this.threadLocalEvaluator = ThreadLocal.withInitial(() -> {
-            return new BytecodeEvaluator(bytecode, this.extensions);
+            return new BytecodeEvaluator(bytecode, this.extensions, registerFiller);
         });
     }
 
@@ -52,16 +53,16 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
             var evaluator = threadLocalEvaluator.get();
             var operation = params.operation();
             var ctx = params.context();
+
             // Get reusable params array and clear it
             var inputParams = evaluator.paramsCache;
             inputParams.clear();
+
             // Prep the input parameters by grabbing them from the input and from other traits.
             ContextProvider.createEndpointParams(inputParams, ctxProvider, ctx, operation, params.inputValue());
 
-            // Use RegisterFiller to set up registers
-            Object[] registers = evaluator.getRegisters();
-            registerFiller.fillRegisters(registers, ctx, inputParams);
-            evaluator.resetWithFilledRegisters(ctx);
+            // Reset the evaluator and prepare new registers.
+            evaluator.reset(ctx, inputParams);
 
             LOGGER.debug("Resolving endpoint of {} using VM with params: {}", operation, inputParams);
 

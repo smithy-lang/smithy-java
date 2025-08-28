@@ -14,7 +14,7 @@ import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.logging.InternalLogger;
-import software.amazon.smithy.rulesengine.logic.bdd.BddTrait;
+import software.amazon.smithy.rulesengine.logic.bdd.EndpointBddTrait;
 import software.amazon.smithy.rulesengine.traits.ContextParamTrait;
 import software.amazon.smithy.rulesengine.traits.EndpointRuleSetTrait;
 import software.amazon.smithy.rulesengine.traits.OperationContextParamsTrait;
@@ -42,10 +42,10 @@ public final class EndpointRulesPlugin implements ClientPlugin {
     public static final TraitKey<EndpointRuleSetTrait> ENDPOINT_RULESET_TRAIT =
             TraitKey.get(EndpointRuleSetTrait.class);
 
-    public static final TraitKey<BddTrait> BDD_TRAIT = TraitKey.get(BddTrait.class);
+    public static final TraitKey<EndpointBddTrait> BDD_TRAIT = TraitKey.get(EndpointBddTrait.class);
 
     private final Bytecode bytecode;
-    private final RulesEngineBuilder engine;
+    private RulesEngineBuilder engine;
 
     private EndpointRulesPlugin(Bytecode bytecode, RulesEngineBuilder engine) {
         this.bytecode = bytecode;
@@ -97,6 +97,13 @@ public final class EndpointRulesPlugin implements ClientPlugin {
         return bytecode;
     }
 
+    private RulesEngineBuilder getEngine() {
+        if (engine == null) {
+            engine = new RulesEngineBuilder();
+        }
+        return engine;
+    }
+
     @Override
     public void configureClient(ClientConfig.Builder config) {
         // Only modify the endpoint resolver if it isn't set already or if CUSTOM_ENDPOINT is set,
@@ -110,33 +117,38 @@ public final class EndpointRulesPlugin implements ClientPlugin {
             LOGGER.debug("Trying to use EndpointRulesPlugin resolver because CUSTOM_ENDPOINT is set");
         }
 
-        if (usePlugin) {
-            EndpointResolver resolver = null;
+        if (!usePlugin) {
+            LOGGER.debug("Not using EndpointRulesPlugin");
+            return;
+        }
 
-            if (bytecode == null && config.service() != null) {
-                var bddTrait = config.service().schema().getTrait(BDD_TRAIT);
-                if (bddTrait != null) {
-                    LOGGER.debug("Found endpoint BDD trait on service: {}", config.service());
-                    resolver = new BytecodeEndpointResolver(
-                            engine.compile(bddTrait),
-                            engine.getExtensions(),
-                            engine.getBuiltinProviders());
-                } else {
-                    var ruleset = config.service().schema().getTrait(ENDPOINT_RULESET_TRAIT);
-                    if (ruleset != null) {
-                        LOGGER.debug("Using decision tree based endpoint resolver for service: {}", config.service());
-                        resolver = new DecisionTreeEndpointResolver(
-                                ruleset.getEndpointRuleSet(),
-                                engine.getExtensions(),
-                                engine.getBuiltinProviders());
-                    }
+        EndpointResolver resolver = null;
+        RulesEngineBuilder e = getEngine();
+
+        if (bytecode != null) {
+            LOGGER.debug("Using explicitly provided bytecode: {}", config.service());
+            resolver = new BytecodeEndpointResolver(bytecode, e.getExtensions(), e.getBuiltinProviders());
+        } else if (config.service() != null) {
+            var bddTrait = config.service().schema().getTrait(BDD_TRAIT);
+            if (bddTrait != null) {
+                LOGGER.debug("Found endpoint BDD trait on service: {}", config.service());
+                var bytecode = e.compile(bddTrait);
+                resolver = new BytecodeEndpointResolver(bytecode, e.getExtensions(), e.getBuiltinProviders());
+            } else {
+                var rs = config.service().schema().getTrait(ENDPOINT_RULESET_TRAIT);
+                if (rs != null) {
+                    LOGGER.debug("Using decision tree based endpoint resolver for service: {}", config.service());
+                    resolver = new DecisionTreeEndpointResolver(
+                            rs.getEndpointRuleSet(),
+                            e.getExtensions(),
+                            e.getBuiltinProviders());
                 }
             }
+        }
 
-            if (resolver != null) {
-                config.endpointResolver(resolver);
-                LOGGER.debug("Applying EndpointRulesResolver to client: {}", config.service());
-            }
+        if (resolver != null) {
+            config.endpointResolver(resolver);
+            LOGGER.info("Applying EndpointRulesResolver to client: {}", config.service());
         }
     }
 }

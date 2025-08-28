@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.rulesengine.logic.bdd.BddTrait;
+import software.amazon.smithy.rulesengine.logic.bdd.EndpointBddTrait;
 
 /**
  * Compiles and loads a rules engine used to resolve endpoints based on Smithy's rules engine traits.
@@ -98,7 +98,7 @@ public final class RulesEngineBuilder {
      * @param bdd BDD Rules to compile.
      * @return the compiled program.
      */
-    public Bytecode compile(BddTrait bdd) {
+    public Bytecode compile(EndpointBddTrait bdd) {
         return new BytecodeCompiler(extensions, bdd, functions, builtinProviders).compile();
     }
 
