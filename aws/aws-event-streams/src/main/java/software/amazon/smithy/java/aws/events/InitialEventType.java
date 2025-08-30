@@ -12,13 +12,13 @@ public enum InitialEventType {
     INITIAL_REQUEST("initial-request"),
     INITIAL_RESPONSE("initial-response");
 
-    private final String name;
+    private final String value;
 
-    InitialEventType(String name) {
-        this.name = name;
+    InitialEventType(String value) {
+        this.value = value;
     }
 
-    public String getName() {
-        return name;
+    public String value() {
+        return value;
     }
 }
