@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -47,9 +48,10 @@ final class RootSchema extends Schema {
             TraitMap traits,
             List<MemberSchemaBuilder> memberBuilders,
             Set<String> stringEnumValues,
-            Set<Integer> intEnumValues
+            Set<Integer> intEnumValues,
+            Supplier<ShapeBuilder<?>> builderSupplier
     ) {
-        super(type, id, traits, memberBuilders, stringEnumValues);
+        super(type, id, traits, memberBuilders, stringEnumValues, builderSupplier);
         this.stringEnumValues = Collections.unmodifiableSet(stringEnumValues);
         this.intEnumValues = Collections.unmodifiableSet(intEnumValues);
 
@@ -70,6 +72,17 @@ final class RootSchema extends Schema {
                     memberList,
                     Schema::requiredByValidationBitmask);
         }
+    }
+
+    RootSchema(
+            ShapeType type,
+            ShapeId id,
+            TraitMap traits,
+            List<MemberSchemaBuilder> memberBuilders,
+            Set<String> stringEnumValues,
+            Set<Integer> intEnumValues
+    ) {
+        this(type, id, traits, memberBuilders, stringEnumValues, intEnumValues, null);
     }
 
     @Override

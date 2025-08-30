@@ -12,6 +12,8 @@ import software.amazon.smithy.model.traits.DocumentationTrait;
 import software.amazon.smithy.model.traits.EndpointTrait;
 import software.amazon.smithy.model.traits.EnumTrait;
 import software.amazon.smithy.model.traits.ErrorTrait;
+import software.amazon.smithy.model.traits.EventHeaderTrait;
+import software.amazon.smithy.model.traits.EventPayloadTrait;
 import software.amazon.smithy.model.traits.HostLabelTrait;
 import software.amazon.smithy.model.traits.HttpErrorTrait;
 import software.amazon.smithy.model.traits.HttpHeaderTrait;
@@ -104,6 +106,8 @@ public final class TraitKey<T extends Trait> {
     public static final TraitKey<XmlFlattenedTrait> XML_FLATTENED_TRAIT = TraitKey.get(XmlFlattenedTrait.class);
     public static final TraitKey<XmlNamespaceTrait> XML_NAMESPACE_TRAIT = TraitKey.get(XmlNamespaceTrait.class);
     public static final TraitKey<CorsTrait> CORS_TRAIT = TraitKey.get(CorsTrait.class);
+    public static final TraitKey<EventHeaderTrait> EVENT_HEADER_TRAIT = TraitKey.get(EventHeaderTrait.class);
+    public static final TraitKey<EventPayloadTrait> EVENT_PAYLOAD_TRAIT = TraitKey.get(EventPayloadTrait.class);
 
     private final Class<T> traitClass;
     final int id;

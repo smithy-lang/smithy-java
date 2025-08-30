@@ -315,19 +315,22 @@ public final class SchemasGenerator
                     template = """
                                 ${name:L}_BUILDER${?hasMembers}
                                     ${C|}
-                                    ${/hasMembers}.build();
+                                    ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder)
+                                    .build();
                             """;
                 } else {
                     template =
                             """
                                     static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.${builderMethod:L}(${shapeId:T}.from(${id:S})${traits:C})${?hasMembers}
                                              ${C|}
-                                             ${/hasMembers}.build();
+                                             ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder)
+                                             .build();
                                     """;
                 }
                 writer.pushState();
                 writer.putContext("hasMembers", !shape.members().isEmpty());
                 writer.putContext("builderMethod", builderMethod);
+                writer.putContext("schemaTypeClass", context.symbolProvider().toSymbol(shape));
 
                 writer.write(
                         template,

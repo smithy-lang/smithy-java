@@ -5,9 +5,13 @@
 
 package software.amazon.smithy.java.aws.events;
 
+import java.nio.ByteBuffer;
+import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Flow;
 import java.util.function.Supplier;
+import software.amazon.eventstream.HeaderValue;
 import software.amazon.eventstream.Message;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -52,7 +56,7 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends
     public SerializableStruct decode(AwsEventFrame frame) {
         var message = frame.unwrap();
         var eventType = getEventType(message);
-        if (initialEventType.getName().equals(eventType)) {
+        if (initialEventType.value().equals(eventType)) {
             return decodeInitialResponse(frame);
         }
         return decodeEvent(frame);
@@ -71,9 +75,14 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends
             throw new IllegalArgumentException("Unsupported event type: " + eventType);
         }
         var codecDeserializer = codec.createDeserializer(message.getPayload());
-        var eventDeserializer = new AwsEventDeserializer(memberSchema, codecDeserializer);
+        var headers = message.getHeaders();
+        var deserializer = new EventStreamDeserializer(codecDeserializer, new HeadersDeserializer(headers));
+        var memberTarget = memberSchema.memberTarget();
+        var shapeBuilder = memberTarget.shapeBuilder().get();
+        shapeBuilder.deserialize(deserializer);
         var builder = eventBuilder.get();
-        return builder.deserialize(eventDeserializer).build();
+        builder.setMemberValue(memberSchema, shapeBuilder.build());
+        return builder.build();
     }
 
     private IR decodeInitialResponse(AwsEventFrame frame) {
@@ -82,8 +91,13 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends
         var builder = initialEventBuilder.get();
         builder.deserialize(codecDeserializer);
         var publisherMember = getPublisherMember(builder.schema());
-        var responseDeserializer = new EventStreamDeserializer(publisherMember, publisher);
+        // Set the publisher member
+        var responseDeserializer = new InitialResponseDeserializer(publisherMember, publisher);
         builder.deserialize(responseDeserializer);
+        // Deserialize the rest of the members if any
+        var headers = message.getHeaders();
+        var deserializer = new EventStreamDeserializer(codecDeserializer, new HeadersDeserializer(headers));
+        builder.deserialize(deserializer);
         return builder.build();
     }
 
@@ -100,11 +114,11 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends
         return message.getHeaders().get(":event-type").getString();
     }
 
-    static class EventStreamDeserializer extends SpecificShapeDeserializer {
+    static class InitialResponseDeserializer extends SpecificShapeDeserializer {
         private final Schema publisherMember;
         private final Flow.Publisher<? extends SerializableStruct> publisher;
 
-        EventStreamDeserializer(Schema publisherMember, Flow.Publisher<? extends SerializableStruct> publisher) {
+        InitialResponseDeserializer(Schema publisherMember, Flow.Publisher<? extends SerializableStruct> publisher) {
             this.publisherMember = publisherMember;
             this.publisher = publisher;
         }
@@ -117,6 +131,101 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends
         @Override
         public <T> void readStruct(Schema schema, T state, ShapeDeserializer.StructMemberConsumer<T> consumer) {
             consumer.accept(state, publisherMember, this);
+        }
+    }
+
+    static class EventStreamDeserializer extends SpecificShapeDeserializer {
+        private final ShapeDeserializer codecDeserializer;
+        private final HeadersDeserializer headersDeserializer;
+
+        EventStreamDeserializer(ShapeDeserializer codecDeserializer, HeadersDeserializer headersDeserializer) {
+            this.codecDeserializer = codecDeserializer;
+            this.headersDeserializer = headersDeserializer;
+        }
+
+        @Override
+        public <T> void readStruct(Schema schema, T builder, ShapeDeserializer.StructMemberConsumer<T> consumer) {
+            var payloadWritten = false;
+            for (Schema member : schema.members()) {
+                if (member.hasTrait(TraitKey.EVENT_HEADER_TRAIT)) {
+                    consumer.accept(builder, member, headersDeserializer);
+                } else if (member.hasTrait(TraitKey.EVENT_PAYLOAD_TRAIT)) {
+                    consumer.accept(builder, member, codecDeserializer);
+                    payloadWritten = true;
+                }
+            }
+            // Deserialize from the payload if still needed.
+            if (!payloadWritten) {
+                codecDeserializer.readStruct(schema, builder, consumer);
+            }
+        }
+    }
+
+    static class HeadersDeserializer extends SpecificShapeDeserializer {
+        private final Map<String, HeaderValue> headers;
+
+        HeadersDeserializer(Map<String, HeaderValue> headers) {
+            this.headers = headers;
+        }
+
+        @Override
+        public ByteBuffer readBlob(Schema schema) {
+            return getValueForShapeType(schema);
+        }
+
+        @Override
+
+        public byte readByte(Schema schema) {
+            return getValueForShapeType(schema);
+        }
+
+        @Override
+        public short readShort(Schema schema) {
+            return getValueForShapeType(schema);
+        }
+
+        @Override
+        public int readInteger(Schema schema) {
+            return getValueForShapeType(schema);
+        }
+
+        @Override
+        public long readLong(Schema schema) {
+            return getValueForShapeType(schema);
+        }
+
+        @Override
+        public String readString(Schema schema) {
+            return getValueForShapeType(schema);
+        }
+
+        @Override
+        public boolean readBoolean(Schema schema) {
+            return getValueForShapeType(schema);
+        }
+
+        @Override
+        public Instant readTimestamp(Schema schema) {
+            return getValueForShapeType(schema);
+        }
+
+        @SuppressWarnings("unchecked")
+        private <T> T getValueForShapeType(Schema member) {
+            HeaderValue value = headers.get(member.memberName());
+            if (value == null) {
+                return null;
+            }
+            return (T) switch (member.type()) {
+                case BLOB -> value.getByteBuffer();
+                case BOOLEAN -> value.getBoolean();
+                case BYTE -> value.getByte();
+                case SHORT -> value.getShort();
+                case INTEGER, INT_ENUM -> value.getInteger();
+                case LONG -> value.getLong();
+                case TIMESTAMP -> value.getTimestamp();
+                case STRING -> value.getString();
+                default -> throw new IllegalArgumentException("Unsupported shape type: " + member.type());
+            };
         }
     }
 }
