@@ -744,6 +744,30 @@ class BytecodeEvaluatorTest {
         evaluator.test(0);
     }
 
+    @Test
+    void testSplitWithLimit() {
+        writer.markConditionStart();
+        writer.writeByte(Opcodes.LOAD_CONST);
+        writer.writeByte(writer.getConstantIndex("a--b--c--d"));
+        writer.writeByte(Opcodes.LOAD_CONST);
+        writer.writeByte(writer.getConstantIndex("--"));
+        writer.writeByte(Opcodes.LOAD_CONST);
+        writer.writeByte(writer.getConstantIndex(2));
+        writer.writeByte(Opcodes.SPLIT);
+        // Get the second element (should be "b--c--d")
+        writer.writeByte(Opcodes.GET_INDEX);
+        writer.writeByte(1);
+        writer.writeByte(Opcodes.LOAD_CONST);
+        writer.writeByte(writer.getConstantIndex("b--c--d"));
+        writer.writeByte(Opcodes.STRING_EQUALS);
+        writer.writeByte(Opcodes.RETURN_VALUE);
+
+        bytecode = buildBytecode();
+        evaluator = createEvaluator(bytecode);
+
+        assertTrue(evaluator.test(0));
+    }
+
     private BytecodeEvaluator createEvaluator(Bytecode bytecode) {
         RegisterFiller filler = RegisterFiller.of(bytecode, Collections.emptyMap());
         BytecodeEvaluator eval = new BytecodeEvaluator(bytecode, new RulesExtension[0], filler);

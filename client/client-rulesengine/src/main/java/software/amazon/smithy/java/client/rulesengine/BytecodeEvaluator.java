@@ -18,6 +18,7 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.io.uri.URLEncoding;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.IsValidHostLabel;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.ParseUrl;
+import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Split;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Substring;
 import software.amazon.smithy.rulesengine.logic.ConditionEvaluator;
 
@@ -380,6 +381,15 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     } else {
                         stackPosition--; // Pop the null value
                     }
+                }
+                case Opcodes.SPLIT -> {
+                    // Pops 3, pushes 1
+                    int idx = stackPosition - 3;
+                    var string = (String) stack[idx];
+                    var delimiter = (String) stack[idx + 1];
+                    var limit = ((Number) stack[idx + 2]).intValue();
+                    stack[idx] = Split.split(string, delimiter, limit);
+                    stackPosition = idx + 1;
                 }
                 default -> throw new RulesEvaluationError("Unknown rules engine instruction: " + opcode, pc);
             }

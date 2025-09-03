@@ -80,6 +80,7 @@ final class BytecodeDisassembler {
             Map.entry(Opcodes.IS_VALID_HOST_LABEL, new InstructionDef("IS_VALID_HOST_LABEL", OperandType.NONE)),
             Map.entry(Opcodes.PARSE_URL, new InstructionDef("PARSE_URL", OperandType.NONE)),
             Map.entry(Opcodes.URI_ENCODE, new InstructionDef("URI_ENCODE", OperandType.NONE)),
+            Map.entry(Opcodes.SPLIT, new InstructionDef("SPLIT", OperandType.NONE)),
 
             // Return operations
             Map.entry(Opcodes.RETURN_ERROR, new InstructionDef("RETURN_ERROR", OperandType.NONE)),
