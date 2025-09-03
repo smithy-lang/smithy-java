@@ -32,7 +32,7 @@ import software.amazon.smithy.rulesengine.language.syntax.rule.NoMatchRule;
 import software.amazon.smithy.rulesengine.language.syntax.rule.Rule;
 import software.amazon.smithy.rulesengine.logic.bdd.Bdd;
 import software.amazon.smithy.rulesengine.logic.bdd.BddNodeConsumer;
-import software.amazon.smithy.rulesengine.logic.bdd.EndpointBddTrait;
+import software.amazon.smithy.rulesengine.traits.EndpointBddTrait;
 
 final class BytecodeCompiler {
 
@@ -302,6 +302,14 @@ final class BytecodeCompiler {
                     case "uriEncode" -> {
                         compileExpression(args.get(0)); // string
                         writer.writeByte(Opcodes.URI_ENCODE);
+                        return null;
+                    }
+                    case "split" -> {
+                        // Compile all three arguments (string, delimiter, limit)
+                        compileExpression(args.get(0));
+                        compileExpression(args.get(1));
+                        compileExpression(args.get(2));
+                        writer.writeByte(Opcodes.SPLIT);
                         return null;
                     }
                 }

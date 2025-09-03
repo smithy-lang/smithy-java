@@ -25,8 +25,8 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.rulesengine.language.EndpointRuleSet;
-import software.amazon.smithy.rulesengine.logic.bdd.EndpointBddTrait;
 import software.amazon.smithy.rulesengine.logic.cfg.Cfg;
+import software.amazon.smithy.rulesengine.traits.EndpointBddTrait;
 import software.amazon.smithy.utils.IoUtils;
 
 public class EndpointRulesPluginTest {
