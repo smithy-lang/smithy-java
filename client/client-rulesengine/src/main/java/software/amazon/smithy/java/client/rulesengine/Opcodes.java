@@ -413,4 +413,13 @@ public final class Opcodes {
      * <p><code>JNN_OR_POP [offset:ushort]</code>
      */
     public static final byte JNN_OR_POP = 42;
+
+    /**
+     * Pop a string, delimiter, and limit from the stack and push the split result.
+     *
+     * <p>Stack: [..., string, delimiter, limit] => [..., list]
+     *
+     * <p><code>SPLIT</code>
+     */
+    public static final byte SPLIT = 41;
 }
