@@ -121,6 +121,7 @@ public final class ResponseSerializer {
      *
      * @return Returns the created response.
      */
+    @SuppressWarnings("unchecked")
     public HttpResponse serializeResponse() {
         Objects.requireNonNull(shapeValue, "shapeValue is not set");
         Objects.requireNonNull(operation, "operation is not set");
@@ -151,8 +152,7 @@ public final class ResponseSerializer {
 
         var eventStream = (Flow.Publisher<SerializableStruct>) serializer.getEventStream();
         if (eventStream != null && operation instanceof OutputEventStreamingApiOperation<?, ?, ?>) {
-            builder.body(
-                    EventStreamFrameEncodingProcessor.create(eventStream, eventEncoderFactory));
+            builder.body(EventStreamFrameEncodingProcessor.create(eventStream, eventEncoderFactory));
             serializer.setContentType(eventEncoderFactory.contentType());
         } else if (serializer.hasBody()) {
             builder.body(serializer.getBody());

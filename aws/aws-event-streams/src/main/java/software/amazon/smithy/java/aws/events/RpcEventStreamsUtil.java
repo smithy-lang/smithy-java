@@ -29,10 +29,7 @@ public final class RpcEventStreamsUtil {
             SerializableStruct input
     ) {
         Flow.Publisher<SerializableStruct> eventStream = input.getMemberValue(streamingMember(input.schema()));
-        var publisher = EventStreamFrameEncodingProcessor.create(eventStream, eventStreamEncodingFactory);
-        // Queue the input as the initial-request.
-        publisher.onNext(input);
-        return publisher;
+        return EventStreamFrameEncodingProcessor.create(eventStream, eventStreamEncodingFactory, input);
     }
 
     public static <O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
@@ -62,7 +59,7 @@ public final class RpcEventStreamsUtil {
 
             @Override
             public void onComplete() {
-                result.completeExceptionally(new RuntimeException("Unexpected vent stream completion"));
+                result.completeExceptionally(new RuntimeException("Unexpected event stream completion"));
             }
         });
 

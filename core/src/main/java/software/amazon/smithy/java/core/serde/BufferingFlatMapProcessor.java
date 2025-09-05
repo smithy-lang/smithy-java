@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
+import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * A processor abstraction that maps inputs of type I from an upstream publisher to 0-n items of type O
@@ -27,12 +28,12 @@ import java.util.stream.Stream;
 public abstract class BufferingFlatMapProcessor<I, O> implements
         Flow.Processor<I, O>,
         Flow.Subscription {
+    private static final InternalLogger LOG = InternalLogger.getLogger(BufferingFlatMapProcessor.class);
     private static final Throwable COMPLETE_SENTINEL = new RuntimeException();
 
-    private final AtomicReference<Throwable> terminalEvent = new AtomicReference<>();
+    private final AtomicReference<Throwable> terminalEventHolder = new AtomicReference<>();
     private final AtomicLong pendingRequests = new AtomicLong();
     private final AtomicInteger pendingFlushes = new AtomicInteger();
-    private final Flow.Publisher<I> publisher;
     private final BlockingQueue<O> queue = new LinkedBlockingQueue<>();
 
     private volatile Flow.Subscription upstreamSubscription;
@@ -42,7 +43,6 @@ public abstract class BufferingFlatMapProcessor<I, O> implements
     public BufferingFlatMapProcessor(
             Flow.Publisher<I> publisher
     ) {
-        this.publisher = publisher;
         publisher.subscribe(this);
     }
 
@@ -67,10 +67,28 @@ public abstract class BufferingFlatMapProcessor<I, O> implements
         try {
             map(item).forEach(this::addToQueue);
         } catch (Exception e) {
+            LOG.warn("Malformed input", e);
             onError(new SerializationException("Malformed input", e));
             return;
         }
         flush();
+    }
+
+    /**
+     * Used to add the initial message to the queue. This message won't be sent until
+     * a flush happens, either by a calling {@link #request(long)} or {@link #onNext(Object)}.
+     * <p>
+     * This method will re-throw any exception caught when calling {@link #map} without calling
+     * {@link #onError(Throwable)} since it's assumed that the processor is not yet fully setup
+     * when this method is called.
+     */
+    protected final void enqueueItem(I item) {
+        try {
+            map(item).forEach(this::addToQueue);
+        } catch (RuntimeException e) {
+            LOG.warn("Malformed input", e);
+            throw e;
+        }
     }
 
     private void addToQueue(O item) {
@@ -80,7 +98,7 @@ public abstract class BufferingFlatMapProcessor<I, O> implements
     @Override
     public final void onError(Throwable t) {
         upstreamSubscription.cancel();
-        terminalEvent.compareAndSet(null, t);
+        terminalEventHolder.compareAndSet(null, t);
         if (upstreamSubscription != null && downstream != null) {
             flush();
         }
@@ -88,7 +106,7 @@ public abstract class BufferingFlatMapProcessor<I, O> implements
 
     @Override
     public final void onComplete() {
-        terminalEvent.compareAndSet(null, COMPLETE_SENTINEL);
+        terminalEventHolder.compareAndSet(null, COMPLETE_SENTINEL);
         if (upstreamSubscription != null && downstream != null) {
             flush();
         }
@@ -107,6 +125,10 @@ public abstract class BufferingFlatMapProcessor<I, O> implements
 
     private void flush() {
         if (upstreamSubscription == null || downstream == null) {
+            LOG.warn("flush() requested before upstream and downstream fully wired, " +
+                    "upstreamSubscription is null: {}, downstream is null: {}",
+                    upstreamSubscription == null,
+                    downstream == null);
             onError(new IllegalStateException("flush() requested before upstream and downstream fully wired."));
             return;
         }
@@ -126,8 +148,8 @@ public abstract class BufferingFlatMapProcessor<I, O> implements
             Flow.Subscriber<? super O> subscriber = downstream;
             long delivered = sendMessages(subscriber, pending);
             boolean empty = queue.isEmpty();
-            Throwable term = terminalEvent.get();
-            if (term != null && attemptTermination(subscriber, term, empty)) {
+            Throwable terminalEvent = terminalEventHolder.get();
+            if (terminalEvent != null && attemptTermination(subscriber, terminalEvent, empty)) {
                 terminated = true;
                 return;
             }
@@ -184,12 +206,12 @@ public abstract class BufferingFlatMapProcessor<I, O> implements
     /**
      * @return true if this decoder is in a terminal state
      */
-    private boolean attemptTermination(Flow.Subscriber<? super O> subscriber, Throwable term, boolean done) {
+    private boolean attemptTermination(Flow.Subscriber<? super O> subscriber, Throwable terminalEvent, boolean done) {
         if (done && subscriber != null) {
-            if (term == COMPLETE_SENTINEL) {
+            if (terminalEvent == COMPLETE_SENTINEL) {
                 subscriber.onComplete();
             } else {
-                handleError(term, subscriber);
+                handleError(terminalEvent, subscriber);
             }
             return true;
         }
@@ -238,7 +260,7 @@ public abstract class BufferingFlatMapProcessor<I, O> implements
         }
     }
 
-    private static long accumulate(AtomicLong l, long n) {
-        return l.accumulateAndGet(n, BufferingFlatMapProcessor::accumulate);
+    private static void accumulate(AtomicLong l, long n) {
+        l.accumulateAndGet(n, BufferingFlatMapProcessor::accumulate);
     }
 }

@@ -14,6 +14,7 @@ dependencies {
     api(project(":io"))
     api(project(":retries-api"))
     api(libs.smithy.model)
+    implementation(project(":logging"))
 }
 
 jmh {}

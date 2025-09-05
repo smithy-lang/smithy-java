@@ -13,6 +13,7 @@ tasks.test {
 
 dependencies {
     api(project(":core"))
+    implementation(project(":logging"))
     api("software.amazon.eventstream:eventstream:1.0.1")
     testImplementation(project(":codecs:json-codec"))
 }
