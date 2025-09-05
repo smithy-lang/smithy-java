@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.core.endpoint;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,8 +24,8 @@ final class EndpointImpl implements Endpoint {
 
     private EndpointImpl(Builder builder) {
         this.uri = Objects.requireNonNull(builder.uri);
-        this.authSchemes = builder.authSchemes == null ? List.of() : builder.authSchemes;
-        this.properties = builder.properties == null ? Map.of() : builder.properties;
+        this.authSchemes = builder.authSchemes == null ? List.of() : Collections.unmodifiableList(builder.authSchemes);
+        this.properties = builder.properties == null ? Map.of() : Collections.unmodifiableMap(builder.properties);
         // Clear out the builder, making this class immutable and the builder still reusable.
         builder.authSchemes = null;
         builder.properties = null;

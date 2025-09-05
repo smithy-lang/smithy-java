@@ -40,6 +40,10 @@ final class BytecodeReader {
         return (short) value;
     }
 
+    int readUnsignedShort() {
+        return readShort() & 0xFFFF;
+    }
+
     int readInt() {
         checkBounds(4);
         int value = (data[offset] & 0xFF) << 24;

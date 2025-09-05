@@ -18,7 +18,7 @@ import java.util.Map;
  * Builds up bytecode incrementally.
  */
 final class BytecodeWriter {
-    private static final int MAX_CONSTANTS = 65536;
+    private static final int MAX_CONSTANTS = 0xFFFF + 1;
 
     private final ByteArrayOutputStream bytecodeStream = new ByteArrayOutputStream();
     private final List<Integer> conditionOffsets = new ArrayList<>();
@@ -45,7 +45,7 @@ final class BytecodeWriter {
     }
 
     void writeShort(int value) {
-        if (value < 0 || value > 65535) {
+        if (value < 0 || value > 0xFFFF) {
             throw new IllegalArgumentException("Value out of range for unsigned short: " + value);
         }
         bytecodeStream.write((value >> 8) & 0xFF);
