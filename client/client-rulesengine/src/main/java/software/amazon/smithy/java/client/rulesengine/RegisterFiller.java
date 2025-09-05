@@ -108,7 +108,7 @@ abstract class RegisterFiller {
         }
     }
 
-    // Fast implementation for <= 64 registers using single long bitmasks.
+    // Fast implementation for < 64 registers using single long bitmasks.
     private static final class FastRegisterFiller extends RegisterFiller {
         private final long builtinMask;
         private final long requiredMask;

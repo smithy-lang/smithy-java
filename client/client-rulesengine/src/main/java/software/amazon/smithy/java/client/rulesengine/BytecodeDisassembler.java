@@ -139,6 +139,7 @@ final class BytecodeDisassembler {
         StringBuilder s = new StringBuilder();
 
         s.append("=== Bytecode Program ===\n");
+        s.append("Version: ").append(bytecode.getVersion()).append("\n");
         s.append("Conditions: ").append(bytecode.getConditionCount()).append("\n");
         s.append("Results: ").append(bytecode.getResultCount()).append("\n");
         s.append("Registers: ").append(bytecode.getRegisterDefinitions().length).append("\n");

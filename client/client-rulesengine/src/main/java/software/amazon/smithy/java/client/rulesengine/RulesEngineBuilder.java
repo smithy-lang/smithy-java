@@ -34,6 +34,12 @@ public final class RulesEngineBuilder {
         }
     }
 
+    private static final int BYTECODE_HEADER_SIZE = Integer.BYTES // magic number
+            + Short.BYTES // version
+            + (5 * Short.BYTES) // counts
+            + (2 * Integer.BYTES) // bddNodeCount, bddRootRef
+            + (5 * Integer.BYTES); // offsets
+
     private final List<RulesExtension> extensions = new ArrayList<>();
     private final Map<String, RulesFunction> functions = new LinkedHashMap<>();
     private final Map<String, Function<Context, Object>> builtinProviders = new HashMap<>();
@@ -138,25 +144,19 @@ public final class RulesEngineBuilder {
         }
 
         short version = reader.readShort();
-        if (version != Bytecode.VERSION) {
-            int major = (version >> 8) & 0xFF;
-            int minor = version & 0xFF;
-            int expectedMajor = (Bytecode.VERSION >> 8) & 0xFF;
-            int expectedMinor = Bytecode.VERSION & 0xFF;
+        if (version > Bytecode.VERSION) {
             throw new IllegalArgumentException(String.format(
-                    "Unsupported bytecode version: %d.%d (expected %d.%d)",
-                    major,
-                    minor,
-                    expectedMajor,
-                    expectedMinor));
+                    "Unsupported bytecode version: %d (maximum supported: %d)",
+                    version,
+                    Bytecode.VERSION));
         }
 
         // Read counts
-        int conditionCount = reader.readShort() & 0xFFFF;
-        int resultCount = reader.readShort() & 0xFFFF;
-        int registerCount = reader.readShort() & 0xFFFF;
-        int constantCount = reader.readShort() & 0xFFFF;
-        int functionCount = reader.readShort() & 0xFFFF;
+        int conditionCount = reader.readUnsignedShort();
+        int resultCount = reader.readUnsignedShort();
+        int registerCount = reader.readUnsignedShort();
+        int constantCount = reader.readUnsignedShort();
+        int functionCount = reader.readUnsignedShort();
         int bddNodeCount = reader.readInt();
         int bddRootRef = reader.readInt();
 
@@ -172,7 +172,7 @@ public final class RulesEngineBuilder {
         int bddTableOffset = reader.readInt();
 
         // Validate offsets are within bounds and in expected order
-        if (conditionTableOffset < 44
+        if (conditionTableOffset < BYTECODE_HEADER_SIZE
                 || conditionTableOffset > data.length
                 || resultTableOffset < conditionTableOffset
                 || resultTableOffset > data.length
@@ -253,7 +253,8 @@ public final class RulesEngineBuilder {
                 constantPool,
                 resolvedFunctions,
                 bddNodes,
-                bddRootRef);
+                bddRootRef,
+                version);
     }
 
     private RulesFunction[] loadFunctions(BytecodeReader reader, int count) {
