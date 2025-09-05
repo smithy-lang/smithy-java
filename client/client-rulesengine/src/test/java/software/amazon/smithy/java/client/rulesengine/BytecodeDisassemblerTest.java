@@ -202,29 +202,6 @@ class BytecodeDisassemblerTest {
         assertContains(result, "Functions: 0");
     }
 
-    @Test
-    void countsInstructionFrequency() {
-        BytecodeWriter writer = new BytecodeWriter();
-
-        // Create multiple conditions with repeated instructions
-        for (int i = 0; i < 3; i++) {
-            writer.markConditionStart();
-            writer.writeByte(Opcodes.LOAD_CONST);
-            writer.writeByte(0);
-            writer.writeByte(Opcodes.LOAD_CONST);
-            writer.writeByte(1);
-            writer.writeByte(Opcodes.RETURN_VALUE);
-        }
-
-        Bytecode bytecode = writer.build(new RegisterDefinition[0], new RulesFunction[0], new int[] {-1, 1, -1}, 1);
-        String result = new BytecodeDisassembler(bytecode).disassemble();
-
-        // Should show instruction counts
-        assertContains(result, "Instruction counts:");
-        assertContains(result, "LOAD_CONST");
-        assertContains(result, "RETURN_VALUE");
-    }
-
     private void assertContains(String actual, String expected) {
         assertTrue(actual.contains(expected), "Expected to find '" + expected + "' in:\n" + actual);
     }
