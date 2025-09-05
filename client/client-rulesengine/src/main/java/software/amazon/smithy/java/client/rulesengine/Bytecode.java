@@ -30,7 +30,7 @@ import software.amazon.smithy.rulesengine.logic.bdd.BddNodeConsumer;
  * Offset  Size  Description
  * ------  ----  -----------
  * 0       4     Magic number (0x52554C45 = "RULE")
- * 4       2     Version (major.minor, currently 0x0101 = 1.1)
+ * 4       2     Version (rolling version number, currently 1)
  * 6       2     Condition count (unsigned short)
  * 8       2     Result count (unsigned short)
  * 10      2     Register count (unsigned short)
@@ -152,7 +152,7 @@ import software.amazon.smithy.rulesengine.logic.bdd.BddNodeConsumer;
 public final class Bytecode {
 
     static final int MAGIC = 0x52554C45; // "RULE"
-    static final short VERSION = 0x0101; // 1.1
+    static final short VERSION = 1;
     static final byte CONST_NULL = 0;
     static final byte CONST_STRING = 1;
     static final byte CONST_INTEGER = 2;
@@ -160,6 +160,7 @@ public final class Bytecode {
     static final byte CONST_LIST = 4;
     static final byte CONST_MAP = 5;
 
+    private final short version;
     private final byte[] bytecode;
     private final int[] conditionOffsets;
     private final int[] resultOffsets;
@@ -188,6 +189,28 @@ public final class Bytecode {
             int[] bddNodes,
             int bddRootRef
     ) {
+        this(bytecode,
+                conditionOffsets,
+                resultOffsets,
+                registerDefinitions,
+                constantPool,
+                functions,
+                bddNodes,
+                bddRootRef,
+                VERSION);
+    }
+
+    Bytecode(
+            byte[] bytecode,
+            int[] conditionOffsets,
+            int[] resultOffsets,
+            RegisterDefinition[] registerDefinitions,
+            Object[] constantPool,
+            RulesFunction[] functions,
+            int[] bddNodes,
+            int bddRootRef,
+            short version
+    ) {
         if (bddNodes.length % 3 != 0) {
             throw new IllegalArgumentException("BDD nodes length must be multiple of 3, got: " + bddNodes.length);
         }
@@ -205,6 +228,16 @@ public final class Bytecode {
         this.builtinIndices = findBuiltinIndices(registerDefinitions);
         this.hardRequiredIndices = findRequiredIndicesWithoutDefaultsOrBuiltins(registerDefinitions);
         this.inputRegisterMap = createInputRegisterMap(registerDefinitions);
+        this.version = version;
+    }
+
+    /**
+     * Get the bytecode version.
+     *
+     * @return bytecode version number.
+     */
+    public short getVersion() {
+        return version;
     }
 
     /**
