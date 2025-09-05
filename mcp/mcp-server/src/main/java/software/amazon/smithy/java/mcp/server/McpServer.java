@@ -388,7 +388,7 @@ public final class McpServer implements Server {
         var listMember = schema.listMember();
         var items = switch (listMember.type()) {
             case LIST, SET -> createJsonArraySchema(listMember.memberTarget(), visited);
-            case MAP, STRUCTURE, UNION -> createJsonObjectSchema(listMember.memberTarget(), visited);
+            case MAP, STRUCTURE, UNION, DOCUMENT -> createJsonObjectSchema(listMember.memberTarget(), visited);
             default -> createJsonPrimitiveSchema(listMember);
         };
         return JsonArraySchema.builder()
