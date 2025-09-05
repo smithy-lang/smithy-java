@@ -527,15 +527,21 @@ class BytecodeCompilerTest {
         assertOpcodePresent(bytecode, Opcodes.MAPN);
     }
 
-    private void assertOpcodePresent(Bytecode bytecode, byte opcode) {
+    private void assertOpcodePresent(Bytecode bytecode, byte expectedOpcode) {
+        BytecodeWalker walker = new BytecodeWalker(bytecode.getBytecode());
         boolean found = false;
-        for (byte b : bytecode.getBytecode()) {
-            if (b == opcode) {
+
+        while (walker.hasNext()) {
+            if (walker.currentOpcode() == expectedOpcode) {
                 found = true;
                 break;
             }
+            if (!walker.advance()) {
+                break; // Unknown opcode encountered
+            }
         }
-        assertTrue(found, "Expected opcode " + opcode + " to be present in bytecode");
+
+        assertTrue(found, "Expected opcode " + expectedOpcode + " to be present in bytecode");
     }
 
     private void assertConstantPresent(Bytecode bytecode, Object expectedConstant) {
@@ -549,11 +555,21 @@ class BytecodeCompilerTest {
         assertTrue(found, "Expected constant " + expectedConstant + " to be present in constant pool");
     }
 
-    private OpcodeWithValue findOpcodeWithValue(Bytecode bytecode, byte opcode) {
-        byte[] code = bytecode.getBytecode();
-        for (int i = 0; i < code.length; i++) {
-            if (code[i] == opcode && i + 1 < code.length) {
-                return new OpcodeWithValue(true, code[i + 1] & 0xFF);
+    private OpcodeWithValue findOpcodeWithValue(Bytecode bytecode, byte expectedOpcode) {
+        BytecodeWalker walker = new BytecodeWalker(bytecode.getBytecode());
+
+        while (walker.hasNext()) {
+            if (walker.currentOpcode() == expectedOpcode) {
+                try {
+                    int value = walker.getOperand(0);
+                    return new OpcodeWithValue(true, value);
+                } catch (IllegalArgumentException e) {
+                    // Opcode doesn't have operands
+                    return new OpcodeWithValue(true, 0);
+                }
+            }
+            if (!walker.advance()) {
+                break;
             }
         }
         return new OpcodeWithValue(false, 0);
