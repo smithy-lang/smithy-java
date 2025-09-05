@@ -477,9 +477,9 @@ public abstract sealed class Schema implements MemberLookup
     }
 
     /**
-     * Returns the supplier to create builders for this schema.
+     * Returns a new shape builder for this schema.
      *
-     * @return The supplier to create builders for this schema
+     * @return A new shape builder for this schema.
      */
     public final ShapeBuilder<?> shapeBuilder() {
         if (shapeBuilder == null) {
