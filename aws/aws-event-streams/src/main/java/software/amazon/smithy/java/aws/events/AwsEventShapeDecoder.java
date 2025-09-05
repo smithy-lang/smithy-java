@@ -78,7 +78,7 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends
         var headers = message.getHeaders();
         var deserializer = new EventStreamDeserializer(codecDeserializer, new HeadersDeserializer(headers));
         var memberTarget = memberSchema.memberTarget();
-        var shapeBuilder = memberTarget.shapeBuilder().get();
+        var shapeBuilder = memberTarget.shapeBuilder();
         shapeBuilder.deserialize(deserializer);
         var builder = eventBuilder.get();
         builder.setMemberValue(memberSchema, shapeBuilder.build());

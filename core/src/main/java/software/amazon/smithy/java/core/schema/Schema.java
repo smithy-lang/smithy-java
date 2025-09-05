@@ -481,11 +481,11 @@ public abstract sealed class Schema implements MemberLookup
      *
      * @return The supplier to create builders for this schema
      */
-    public final Supplier<ShapeBuilder<?>> shapeBuilder() {
+    public final ShapeBuilder<?> shapeBuilder() {
         if (shapeBuilder == null) {
             throw new IllegalStateException("Schema does not have a shape builder");
         }
-        return shapeBuilder;
+        return shapeBuilder.get();
     }
 
     /**
