@@ -2,6 +2,7 @@ $version: "2"
 
 namespace smithy.ai
 
+@unstable
 @trait(selector: ":is(service, operation)")
 map prompts {
     /// Name of the prompt template
