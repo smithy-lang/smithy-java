@@ -8,19 +8,12 @@ plugins {
     idea
 }
 
-task("addGitHooks") {
+tasks.register<Copy>("addGitHooks") {
     onlyIf("unix") {
         !Os.isFamily(Os.FAMILY_WINDOWS)
     }
-    doLast {
-        exec {
-            commandLine("ln", "-s", "-f", "../../git-hooks/pre-push", ".git/hooks/pre-push")
-        }
-        exec {
-            commandLine("ln", "-s", "-f", "../../git-hooks/pre-commit", ".git/hooks/pre-commit")
-        }
-        println("Git hooks added")
-    }
+    from(File(rootProject.rootDir, "git-hooks"))
+    into(File(rootProject.rootDir, ".git/hooks"))
 }
 
 val smithyJavaVersion = project.file("VERSION").readText().replace(System.lineSeparator(), "")

@@ -17,6 +17,10 @@ dependencies {
 
 addGenerateSrcsTask("software.amazon.smithy.java.codegen.client.TestServerJavaClientCodegenRunner")
 
+tasks.test {
+    failOnNoDiscoveredTests = false
+}
+
 sourceSets {
     it {
         // Add test plugin to classpath

@@ -11,4 +11,8 @@ dependencies {
     implementation(project(":server:server-core"))
 }
 
+tasks.test {
+    failOnNoDiscoveredTests = false
+}
+
 addGenerateSrcsTask("software.amazon.smithy.java.codegen.server.TestServerJavaCodegenRunner")

@@ -81,7 +81,6 @@ include(":aws:aws-auth-api")
 // AWS service bundling code
 include(":aws:aws-service-bundle")
 include(":aws:aws-service-bundler")
-include(":aws:aws-mcp-provider")
 include(":aws:aws-mcp-types")
 include(":aws:aws-mcp-cli-commands")
 

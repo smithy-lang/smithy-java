@@ -43,7 +43,7 @@ tasks.withType<Javadoc>() {
 // Include an Automatic-Module-Name in all JARs.
 afterEvaluate {
     val moduleName: String by extra
-    tasks.withType<Jar>() {
+    tasks.withType<Jar> {
         metaInf.with(licenseSpec)
         inputs.property("moduleName", moduleName)
         manifest {

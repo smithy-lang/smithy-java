@@ -45,12 +45,6 @@ repositories {
 }
 
 tasks.shadowJar {
-    val shadePrefix = "software.amazon.smithy.java.internal"
-    relocate("com.jsoniter", "$shadePrefix.jsoniter")
-    relocate("com.fasterxml.jackson", "$shadePrefix.com.fasterxml.jackson")
-    relocate("META-INF/native/libnetty", "META-INF/native/lib${shadePrefix.replace('.', '_')}_netty")
-    relocate("META-INF/native/netty", "META-INF/native/${shadePrefix.replace('.', '_')}_netty")
-    exclude("META-INF/maven/**")
     mergeServiceFiles()
     transform(AppendingTransformer::class.java) {
         resource = "META-INF/smithy/manifest"
