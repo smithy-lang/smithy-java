@@ -9,10 +9,10 @@ import java.math.BigDecimal;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -34,6 +34,7 @@ public final class SchemaBuilder {
     final ShapeType type;
     final TraitMap traits;
     final List<MemberSchemaBuilder> members;
+    private Supplier<ShapeBuilder<?>> builderSupplier;
     private Schema builtShape;
 
     SchemaBuilder(ShapeId id, ShapeType type, Trait... traits) {
@@ -72,6 +73,17 @@ public final class SchemaBuilder {
      */
     public SchemaBuilder putMember(String name, SchemaBuilder target, Trait... traits) {
         return putMember(name, new MemberSchemaBuilder(id.withMember(name), target, traits));
+    }
+
+    /**
+     * Used for structure shapes to set a supplier to create builders to create instances of this schema.
+     *
+     * @param builderSupplier The builder supplier.
+     * @return the builder.
+     */
+    public SchemaBuilder builderSupplier(Supplier<ShapeBuilder<?>> builderSupplier) {
+        this.builderSupplier = builderSupplier;
+        return this;
     }
 
     private SchemaBuilder putMember(String name, MemberSchemaBuilder builder) {
@@ -140,8 +152,9 @@ public final class SchemaBuilder {
                     id,
                     traits,
                     new ArrayList<>(members),
-                    Collections.emptySet(),
-                    Collections.emptySet(),
+                    Set.of(),
+                    Set.of(),
+                    builderSupplier,
                     this);
         } else {
             builtShape = new RootSchema(
@@ -149,8 +162,9 @@ public final class SchemaBuilder {
                     id,
                     traits,
                     new ArrayList<>(members),
-                    Collections.emptySet(),
-                    Collections.emptySet());
+                    Set.of(),
+                    Set.of(),
+                    builderSupplier);
         }
 
         return builtShape;
@@ -161,24 +175,6 @@ public final class SchemaBuilder {
             throw new IllegalStateException("Cannot resolve built shape " + id);
         }
         this.builtShape = schema;
-    }
-
-    @SuppressWarnings("unchecked")
-    static Map<Class<? extends Trait>, Trait> createTraitMap(Trait[] traits) {
-        var size = traits == null ? 0 : traits.length;
-        return switch (size) {
-            case 0 -> Map.of();
-            case 1 -> Map.of(traits[0].getClass(), traits[0]);
-            case 2 -> new Map2<>(traits[0].getClass(), traits[0], traits[1].getClass(), traits[1]);
-            default -> {
-                Map.Entry<Class<? extends Trait>, Trait>[] entries = new Map.Entry[traits.length];
-                for (var i = 0; i < traits.length; i++) {
-                    var trait = traits[i];
-                    entries[i] = Map.entry(trait.getClass(), trait);
-                }
-                yield Map.ofEntries(entries);
-            }
-        };
     }
 
     static int computeRequiredMemberCount(ShapeType type, Collection<MemberSchemaBuilder> members) {
@@ -251,7 +247,7 @@ public final class SchemaBuilder {
                         lengthTrait,
                         traits.get(TraitKey.PATTERN_TRAIT));
             } else {
-                stringValidation = ValidatorOfString.of(Collections.emptyList());
+                stringValidation = ValidatorOfString.of(List.of());
             }
 
             // Range traits use BigDecimal, so use null when missing rather than any kind of default.
@@ -380,8 +376,8 @@ public final class SchemaBuilder {
     @SuppressWarnings("unchecked")
     static Map<String, Schema> createMembers(List<Schema> members) {
         return switch (members.size()) {
-            case 0 -> Collections.emptyMap();
-            case 1 -> Collections.singletonMap(members.get(0).memberName(), members.get(0));
+            case 0 -> Map.of();
+            case 1 -> Map.of(members.get(0).memberName(), members.get(0));
             case 2 -> new Map2<>(
                     members.get(0).memberName(),
                     members.get(0),

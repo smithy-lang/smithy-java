@@ -11,8 +11,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import smithy.java.codegen.server.test.model.A;
-import smithy.java.codegen.server.test.model.B;
+import smithy.java.codegen.server.test.model.Astruct;
+import smithy.java.codegen.server.test.model.Bstruct;
 import smithy.java.codegen.server.test.model.MyNestedStruct;
 import smithy.java.codegen.server.test.model.MyStruct;
 import smithy.java.codegen.server.test.model.MyUnion;
@@ -43,7 +43,7 @@ public class GenericSerdeTest {
                                 .build(),
                         UsesOtherStructs.builder()),
                 Arguments.of(new MyUnion.OptionAMember("Value"), MyUnion.builder()),
-                Arguments.of(A.builder().b(B.builder().build()).value("top").build(), A.builder()));
+                Arguments.of(Astruct.builder().b(Bstruct.builder().build()).value("top").build(), Astruct.builder()));
     }
 
     @ParameterizedTest

@@ -8,10 +8,12 @@ package software.amazon.smithy.java.http.binding;
 import java.net.URI;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Flow;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.InputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
@@ -157,7 +159,7 @@ public final class RequestSerializer {
                 .method(httpTrait.getMethod())
                 .uri(targetEndpoint);
 
-        var eventStream = serializer.getEventStream();
+        var eventStream = (Flow.Publisher<SerializableStruct>) serializer.getEventStream();
         if (eventStream != null && operation instanceof InputEventStreamingApiOperation<?, ?, ?>) {
             builder.body(EventStreamFrameEncodingProcessor.create(eventStream, eventStreamEncodingFactory));
             serializer.setContentType(eventStreamEncodingFactory.contentType());

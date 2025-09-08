@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.function.Supplier;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.Trait;
@@ -61,6 +62,8 @@ public abstract sealed class Schema implements MemberLookup
     private Schema mapKeyMember;
     private Schema mapValueMember;
 
+    final Supplier<ShapeBuilder<?>> shapeBuilder;
+
     private final int hash;
 
     Schema(
@@ -68,12 +71,14 @@ public abstract sealed class Schema implements MemberLookup
             ShapeId id,
             TraitMap traits,
             List<MemberSchemaBuilder> members,
-            Set<String> stringEnumValues
+            Set<String> stringEnumValues,
+            Supplier<ShapeBuilder<?>> shapeBuilder
     ) {
         this.type = type;
         this.id = id;
         this.traits = traits;
         this.memberName = null;
+        this.shapeBuilder = shapeBuilder;
 
         // Structure shapes need to sort members so that required members come before optional members.
         if (type == ShapeType.STRUCTURE) {
@@ -106,6 +111,16 @@ public abstract sealed class Schema implements MemberLookup
         this.hash = computeHash(this);
     }
 
+    Schema(
+            ShapeType type,
+            ShapeId id,
+            TraitMap traits,
+            List<MemberSchemaBuilder> members,
+            Set<String> stringEnumValues
+    ) {
+        this(type, id, traits, members, stringEnumValues, null);
+    }
+
     Schema(MemberSchemaBuilder builder) {
         this.type = builder.type;
         this.id = builder.id;
@@ -113,6 +128,7 @@ public abstract sealed class Schema implements MemberLookup
         this.memberName = builder.id.getMember().orElseThrow();
         this.memberIndex = builder.memberIndex;
         this.isRequiredByValidation = builder.isRequiredByValidation;
+        this.shapeBuilder = null;
 
         this.minLengthConstraint = builder.validationState.minLengthConstraint();
         this.maxLengthConstraint = builder.validationState.maxLengthConstraint();
@@ -343,8 +359,8 @@ public abstract sealed class Schema implements MemberLookup
      * Get a trait if present.
      *
      * @param trait Trait to get.
+     * @param <T>   Trait type to get.
      * @return Returns the trait, or null if not found.
-     * @param <T> Trait type to get.
      */
     public final <T extends Trait> T getTrait(TraitKey<T> trait) {
         return traits.get(trait);
@@ -364,8 +380,8 @@ public abstract sealed class Schema implements MemberLookup
      * Requires that the given trait type is found and returns it.
      *
      * @param trait Trait type to get.
+     * @param <T>   Trait to get.
      * @return Returns the found value.
-     * @param <T> Trait to get.
      * @throws NoSuchElementException if the value does not exist.
      */
     public final <T extends Trait> T expectTrait(TraitKey<T> trait) {
@@ -385,8 +401,8 @@ public abstract sealed class Schema implements MemberLookup
      * {@link #getTrait} for non-member shapes.
      *
      * @param trait Trait to get.
+     * @param <T>   Trait to get.
      * @return the trait if found, or null.
-     * @param <T> Trait to get.
      */
     public <T extends Trait> T getDirectTrait(TraitKey<T> trait) {
         return getTrait(trait);
@@ -461,6 +477,18 @@ public abstract sealed class Schema implements MemberLookup
     }
 
     /**
+     * Returns a new shape builder for this schema.
+     *
+     * @return A new shape builder for this schema.
+     */
+    public final ShapeBuilder<?> shapeBuilder() {
+        if (shapeBuilder == null) {
+            throw new IllegalStateException("Schema does not have a shape builder");
+        }
+        return shapeBuilder.get();
+    }
+
+    /**
      * Get the allowed values of the string.
      *
      * @return allowed string values (only relevant if not empty).
@@ -479,13 +507,11 @@ public abstract sealed class Schema implements MemberLookup
     }
 
     /**
-     *
      * @return The structure member count that are required by validation.
      */
     abstract int requiredMemberCount();
 
     /**
-     *
      * @return The bitmask to use for this member to compute a required member bitfield. This value will match the
      * memberIndex if the member is required and has no default value. It will be zero if
      * isRequiredByValidation == false.
@@ -493,7 +519,6 @@ public abstract sealed class Schema implements MemberLookup
     abstract long requiredByValidationBitmask();
 
     /**
-     *
      * @return The result of creating a bitfield of the memberIndex of every required member with no default value.
      * This allows for an inexpensive comparison for required structure member validation.
      */

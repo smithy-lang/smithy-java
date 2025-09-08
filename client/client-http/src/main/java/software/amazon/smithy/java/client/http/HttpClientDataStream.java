@@ -121,8 +121,9 @@ record HttpClientDataStream(
         private void drainAndRequest() {
             drain();
 
-            if (queue.isEmpty() && !senderFinished.get()) {
-                upstreamSubscription.request(demand.get());
+            var currentDemand = demand.get();
+            if (currentDemand > 0 && queue.isEmpty() && !senderFinished.get()) {
+                upstreamSubscription.request(currentDemand);
             }
         }
     }

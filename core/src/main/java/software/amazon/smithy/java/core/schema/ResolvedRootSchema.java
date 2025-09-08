@@ -25,7 +25,8 @@ final class ResolvedRootSchema extends Schema {
                 deferredRootSchema.id(),
                 deferredRootSchema.traits,
                 deferredRootSchema.memberBuilders,
-                deferredRootSchema.stringEnumValues);
+                deferredRootSchema.stringEnumValues,
+                deferredRootSchema.shapeBuilder);
         var resolvedMembers = deferredRootSchema.resolvedMembers();
         this.memberList = resolvedMembers.memberList();
         this.requiredMemberCount = resolvedMembers.requiredMemberCount();

@@ -7,10 +7,12 @@ package software.amazon.smithy.java.http.binding;
 
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Flow;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
@@ -119,6 +121,7 @@ public final class ResponseSerializer {
      *
      * @return Returns the created response.
      */
+    @SuppressWarnings("unchecked")
     public HttpResponse serializeResponse() {
         Objects.requireNonNull(shapeValue, "shapeValue is not set");
         Objects.requireNonNull(operation, "operation is not set");
@@ -126,7 +129,7 @@ public final class ResponseSerializer {
         Objects.requireNonNull(payloadMediaType, "payloadMediaType is not set");
 
         Schema schema;
-        boolean isFailure = errorSchema != null;
+        var isFailure = errorSchema != null;
         if (isFailure) {
             schema = errorSchema;
         } else {
@@ -147,10 +150,9 @@ public final class ResponseSerializer {
         var builder = HttpResponse.builder()
                 .statusCode(serializer.getResponseStatus());
 
-        var eventStream = serializer.getEventStream();
+        var eventStream = (Flow.Publisher<SerializableStruct>) serializer.getEventStream();
         if (eventStream != null && operation instanceof OutputEventStreamingApiOperation<?, ?, ?>) {
-            builder.body(
-                    EventStreamFrameEncodingProcessor.create(eventStream, eventEncoderFactory));
+            builder.body(EventStreamFrameEncodingProcessor.create(eventStream, eventEncoderFactory));
             serializer.setContentType(eventEncoderFactory.contentType());
         } else if (serializer.hasBody()) {
             builder.body(serializer.getBody());

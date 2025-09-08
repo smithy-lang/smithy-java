@@ -14,6 +14,7 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicschemas.SchemaConverter;
 import software.amazon.smithy.java.dynamicschemas.StructDocument;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
  * A {@link ModeledException} that provides access to the contents of the exception as a document.
@@ -23,8 +24,23 @@ public final class DocumentException extends ModeledException {
     private final StructDocument document;
 
     DocumentException(Schema schema, String message, StructDocument document) {
-        super(schema, message);
+        super(schema, createMessage(message, document));
         this.document = document;
+    }
+
+    // Inject the "message" member into the exception message if we can find it, and it isn't there already.
+    private static String createMessage(String message, StructDocument document) {
+        var messageMember = document.getMember("message");
+        if (messageMember == null) {
+            messageMember = document.getMember("Message");
+        }
+        if (messageMember != null && messageMember.isType(ShapeType.STRING)) {
+            var messageMemberValue = messageMember.asString();
+            if (!message.contains(messageMemberValue)) {
+                message = message + ": " + messageMemberValue;
+            }
+        }
+        return message;
     }
 
     @Override

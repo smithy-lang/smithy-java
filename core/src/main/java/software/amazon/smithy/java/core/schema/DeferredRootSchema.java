@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -31,9 +32,10 @@ final class DeferredRootSchema extends Schema {
             List<MemberSchemaBuilder> memberBuilders,
             Set<String> stringEnumValues,
             Set<Integer> intEnumValues,
+            Supplier<ShapeBuilder<?>> builderSupplier,
             SchemaBuilder schemaBuilder
     ) {
-        super(type, id, traits, memberBuilders, stringEnumValues);
+        super(type, id, traits, memberBuilders, stringEnumValues, builderSupplier);
         this.stringEnumValues = Collections.unmodifiableSet(stringEnumValues);
         this.intEnumValues = Collections.unmodifiableSet(intEnumValues);
         this.memberBuilders = memberBuilders;

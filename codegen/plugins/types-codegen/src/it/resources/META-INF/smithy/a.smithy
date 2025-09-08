@@ -14,12 +14,11 @@ union MyUnion {
     optionB: Integer
 }
 
-structure A {
+structure Astruct {
     value: String
-    b: B
+    b: Bstruct
 }
 
-structure B {
-    a: A
+structure Bstruct {
+    a: Astruct
 }
-
