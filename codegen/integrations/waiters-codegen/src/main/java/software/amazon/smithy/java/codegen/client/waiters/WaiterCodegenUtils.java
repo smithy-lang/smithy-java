@@ -16,12 +16,11 @@ final class WaiterCodegenUtils {
      * Determine the symbol to use for the Waiter container
      * @param clientSymbol Symbol for the client this waiter container is being created for.
      * @param settings Code generation settings
-     * @param async whether this container will contain asynchronous waiters.
      * @return Symbol representing waiter container class.
      */
-    static Symbol getWaiterSymbol(Symbol clientSymbol, JavaCodegenSettings settings, boolean async) {
+    static Symbol getWaiterSymbol(Symbol clientSymbol, JavaCodegenSettings settings) {
         var baseClientName = clientSymbol.getName().substring(0, clientSymbol.getName().lastIndexOf("Client"));
-        var waiterName = async ? baseClientName + "AsyncWaiter" : baseClientName + "Waiter";
+        var waiterName = baseClientName + "Waiter";
         return Symbol.builder()
                 .name(waiterName)
                 .namespace(format("%s.client", settings.packageNamespace()), ".")

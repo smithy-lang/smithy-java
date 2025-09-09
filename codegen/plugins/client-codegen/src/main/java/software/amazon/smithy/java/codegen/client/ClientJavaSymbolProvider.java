@@ -27,8 +27,8 @@ final class ClientJavaSymbolProvider extends JavaSymbolProvider {
 
     @Override
     public Symbol serviceShape(ServiceShape serviceShape) {
-        return getSymbolFromName(false).toBuilder()
-                .putProperty(ClientSymbolProperties.ASYNC_SYMBOL, getSymbolFromName(true))
+        return getSymbolFromName()
+                .toBuilder()
                 .putProperty(SymbolProperties.SERVICE_EXCEPTION,
                         CodegenUtils.getServiceExceptionSymbol(packageNamespace(), serviceName))
                 .putProperty(SymbolProperties.SERVICE_API_SERVICE,
@@ -36,12 +36,11 @@ final class ClientJavaSymbolProvider extends JavaSymbolProvider {
                 .build();
     }
 
-    private Symbol getSymbolFromName(boolean async) {
-        var name = async ? serviceName + "AsyncClient" : serviceName + "Client";
+    private Symbol getSymbolFromName() {
+        var name = serviceName + "Client";
         var symbol = Symbol.builder()
                 .name(name)
                 .putProperty(SymbolProperties.IS_PRIMITIVE, false)
-                .putProperty(ClientSymbolProperties.ASYNC, async)
                 .namespace(format("%s.client", packageNamespace()), ".")
                 .definitionFile(format("./%s/client/%s.java", packageNamespace().replace(".", "/"), name))
                 .build();

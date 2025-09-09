@@ -120,7 +120,7 @@ public class ClientTest {
                 .build();
 
         var exception = Assertions.assertThrows(TransportException.class, () -> c.call("GetSprocket"));
-        assertSame(exception.getCause(), expectedException);
+        assertSame(expectedException, exception.getCause());
     }
 
     @Test

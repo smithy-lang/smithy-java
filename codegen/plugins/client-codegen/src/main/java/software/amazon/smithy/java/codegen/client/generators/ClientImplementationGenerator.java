@@ -39,10 +39,7 @@ public final class ClientImplementationGenerator
 
     @Override
     public void accept(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        // Write Synchronous implementation
         writeForSymbol(directive.symbol(), directive);
-        // Write Async implementation
-        writeForSymbol(directive.symbol().expectProperty(ClientSymbolProperties.ASYNC_SYMBOL), directive);
     }
 
     public static void writeForSymbol(
@@ -88,8 +85,7 @@ public final class ClientImplementationGenerator
                             writer,
                             directive.shape(),
                             directive.symbolProvider(),
-                            directive.model(),
-                            symbol.expectProperty(ClientSymbolProperties.ASYNC)));
+                            directive.model()));
             writer.write(template);
             writer.popState();
         });
@@ -99,8 +95,7 @@ public final class ClientImplementationGenerator
             JavaWriter writer,
             ServiceShape service,
             SymbolProvider symbolProvider,
-            Model model,
-            boolean async) implements Runnable {
+            Model model) implements Runnable {
 
         @Override
         public void run() {
@@ -108,15 +103,14 @@ public final class ClientImplementationGenerator
             var template =
                     """
                             @Override
-                            public ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig) {
-                                ${^async}try {
-                                    ${/async}return call(input, ${operation:T}.instance(), overrideConfig)${^async}.join()${/async};${^async}
+                            public ${output:T} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig) {
+                                try {
+                                    return call(input, ${operation:T}.instance(), overrideConfig);
                                 } catch (${completionException:T} e) {
                                     throw unwrapAndThrow(e);
-                                }${/async}
+                                }
                             }
                             """;
-            writer.putContext("async", async);
             writer.putContext("overrideConfig", RequestOverrideConfig.class);
             var opIndex = OperationIndex.of(model);
             for (var operation : TopDownIndex.of(model).getContainedOperations(service)) {
@@ -128,7 +122,7 @@ public final class ClientImplementationGenerator
                 writer.write(template);
                 writer.popState();
             }
-            writer.injectSection(new ClientImplAdditionalMethodsSection(service, async));
+            writer.injectSection(new ClientImplAdditionalMethodsSection(service));
             writer.popState();
         }
     }

@@ -11,7 +11,6 @@ import static org.hamcrest.Matchers.instanceOf;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.http.AmznErrorHeaderExtractor;
 import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
@@ -38,7 +37,7 @@ public class HttpBindingErrorDeserializerTest {
     private static final ShapeId OPERATION = ShapeId.from("com.foo#PutFoo");
 
     @Test
-    public void deserializesErrorsWithHttpBindingsToo() throws Exception {
+    public void deserializesErrorsWithHttpBindingsToo() {
         var deserializer = HttpErrorDeserializer.builder()
                 .codec(CODEC)
                 .serviceId(SERVICE)
@@ -51,20 +50,18 @@ public class HttpBindingErrorDeserializerTest {
                 .statusCode(400)
                 .body(DataStream.ofString("{\"__type\": \"com.foo#Baz\"}"));
         var response = responseBuilder.build();
-        var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
+        var result = deserializer.createError(Context.create(), OPERATION, registry, response);
 
         assertThat(result, instanceOf(Baz.class));
     }
 
     @Test
-    public void usesGenericErrorWhenPayloadTypeIsUnknown() throws Exception {
+    public void usesGenericErrorWhenPayloadTypeIsUnknown() {
         var deserializer = HttpErrorDeserializer.builder()
                 .codec(CODEC)
                 .serviceId(SERVICE)
                 .knownErrorFactory(new HttpBindingErrorFactory())
-                .unknownErrorFactory(
-                        (fault, message, response) -> CompletableFuture
-                                .completedFuture(new CallException("Hi!", fault)))
+                .unknownErrorFactory((fault, message, response) -> new CallException("Hi!", fault))
                 .build();
         var registry = TypeRegistry.builder()
                 .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
@@ -73,22 +70,20 @@ public class HttpBindingErrorDeserializerTest {
                 .statusCode(400)
                 .body(DataStream.ofString("{\"__type\": \"com.foo#SomeUnknownError\"}"));
         var response = responseBuilder.build();
-        var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
+        var result = deserializer.createError(Context.create(), OPERATION, registry, response);
 
         assertThat(result, instanceOf(CallException.class));
         assertThat(result.getMessage(), equalTo("Hi!"));
     }
 
     @Test
-    public void usesGenericErrorWhenHeaderTypeIsUnknown() throws Exception {
+    public void usesGenericErrorWhenHeaderTypeIsUnknown() {
         var deserializer = HttpErrorDeserializer.builder()
                 .codec(CODEC)
                 .serviceId(SERVICE)
                 .knownErrorFactory(new HttpBindingErrorFactory())
                 .headerErrorExtractor(new AmznErrorHeaderExtractor())
-                .unknownErrorFactory(
-                        (fault, message, response) -> CompletableFuture
-                                .completedFuture(new CallException("Hi!", fault)))
+                .unknownErrorFactory((fault, message, response) -> new CallException("Hi!", fault))
                 .build();
         var registry = TypeRegistry.builder()
                 .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
@@ -104,7 +99,7 @@ public class HttpBindingErrorDeserializerTest {
                                         List.of("com.foo#SomeUnknownError"))))
                 .body(DataStream.ofString("{}"));
         var response = responseBuilder.build();
-        var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
+        var result = deserializer.createError(Context.create(), OPERATION, registry, response);
 
         assertThat(result, instanceOf(CallException.class));
         assertThat(result.getMessage(), equalTo("Hi!"));

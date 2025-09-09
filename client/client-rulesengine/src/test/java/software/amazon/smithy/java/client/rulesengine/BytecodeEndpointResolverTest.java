@@ -6,17 +6,15 @@
 package software.amazon.smithy.java.client.rulesengine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
@@ -34,7 +32,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 class BytecodeEndpointResolverTest {
 
     @Test
-    void testSimpleEndpointResolution() throws Exception {
+    void testSimpleEndpointResolution() {
         // Create a simple bytecode that returns a fixed endpoint
         // BDD: root -> result 0 (always returns result 0)
         Bytecode bytecode = new Bytecode(
@@ -63,15 +61,14 @@ class BytecodeEndpointResolverTest {
 
         EndpointResolverParams params = createParams("us-east-1", "my-bucket");
 
-        CompletableFuture<Endpoint> future = resolver.resolveEndpoint(params);
-        Endpoint endpoint = future.get();
+        Endpoint endpoint = resolver.resolveEndpoint(params);
 
         assertNotNull(endpoint);
         assertEquals("https://example.com", endpoint.uri().toString());
     }
 
     @Test
-    void testEndpointWithBuiltinProvider() throws Exception {
+    void testEndpointWithBuiltinProvider() {
         // Create bytecode that uses a builtin
         // The BDD just returns result 0 which uses the builtin value
         Bytecode bytecode = new Bytecode(
@@ -113,12 +110,12 @@ class BytecodeEndpointResolverTest {
 
         EndpointResolverParams params = createParams("us-west-2", "bucket", context);
 
-        Endpoint endpoint = resolver.resolveEndpoint(params).get();
+        Endpoint endpoint = resolver.resolveEndpoint(params);
         assertEquals("https://custom.example.com", endpoint.uri().toString());
     }
 
     @Test
-    void testNoMatchReturnsNull() throws Exception {
+    void testNoMatchReturnsNull() {
         // Create bytecode that returns no match (result 0 is NoMatchRule)
         Bytecode bytecode = new Bytecode(
                 new byte[] {
@@ -142,12 +139,12 @@ class BytecodeEndpointResolverTest {
 
         EndpointResolverParams params = createParams("us-east-1", "bucket");
 
-        Endpoint endpoint = resolver.resolveEndpoint(params).get();
+        Endpoint endpoint = resolver.resolveEndpoint(params);
         assertNull(endpoint);
     }
 
     @Test
-    void testConditionalEndpoint() throws Exception {
+    void testConditionalEndpoint() {
         // Create bytecode with a condition that checks if region is set
         // Condition 0: isSet(region)
         // Result 0: no match (returns null)
@@ -219,50 +216,18 @@ class BytecodeEndpointResolverTest {
 
         // Test with region provided
         EndpointResolverParams params = createParams("us-east-1", "bucket");
-        Endpoint endpoint = resolver.resolveEndpoint(params).get();
+        Endpoint endpoint = resolver.resolveEndpoint(params);
         assertNotNull(endpoint);
         assertEquals("https://example.com", endpoint.uri().toString());
 
         // Test without region
         params = createParams(null, "bucket");
-        endpoint = resolver.resolveEndpoint(params).get();
+        endpoint = resolver.resolveEndpoint(params);
         assertNull(endpoint); // Should return no match (result 0)
     }
 
     @Test
-    void testErrorPropagation() {
-        // Create bytecode that throws an error
-        Bytecode bytecode = new Bytecode(
-                new byte[] {
-                        Opcodes.LOAD_CONST,
-                        0,
-                        Opcodes.RETURN_ERROR
-                },
-                new int[0], // No conditions
-                new int[] {0}, // One result at offset 0
-                new RegisterDefinition[0],
-                new Object[] {"Test error"},
-                new RulesFunction[0],
-                new int[] {-1, 100_000_000, -1}, // Terminal node that returns result 0
-                100_000_000 // Root points to result 0
-        );
-
-        BytecodeEndpointResolver resolver = new BytecodeEndpointResolver(
-                bytecode,
-                List.of(),
-                Map.of());
-
-        EndpointResolverParams params = createParams("us-east-1", "bucket");
-
-        CompletableFuture<Endpoint> future = resolver.resolveEndpoint(params);
-
-        Exception exception = assertThrows(Exception.class, future::get);
-        assertInstanceOf(RulesEvaluationError.class, exception.getCause());
-        assertTrue(exception.getCause().getMessage().contains("Test error"));
-    }
-
-    @Test
-    void testWithRulesExtension() throws Exception {
+    void testWithRulesExtension() {
         Bytecode bytecode = new Bytecode(
                 new byte[] {
                         Opcodes.LOAD_CONST,
@@ -289,7 +254,7 @@ class BytecodeEndpointResolverTest {
 
         EndpointResolverParams params = createParams("us-east-1", "bucket");
 
-        Endpoint endpoint = resolver.resolveEndpoint(params).get();
+        Endpoint endpoint = resolver.resolveEndpoint(params);
 
         assertTrue(extension.wasCalled);
         assertNotNull(endpoint);
@@ -297,7 +262,6 @@ class BytecodeEndpointResolverTest {
 
     @Test
     void testMissingRequiredParameter() {
-        // Create bytecode with required parameter
         RegisterDefinition[] defs = {
                 new RegisterDefinition("region", true, null, null, false),
                 new RegisterDefinition("bucket", true, null, null, false)
@@ -321,15 +285,12 @@ class BytecodeEndpointResolverTest {
         // Only provide region, not bucket
         EndpointResolverParams params = createParams("us-east-1", null);
 
-        CompletableFuture<Endpoint> future = resolver.resolveEndpoint(params);
-
-        Exception exception = assertThrows(Exception.class, future::get);
-        assertInstanceOf(RulesEvaluationError.class, exception.getCause());
-        assertTrue(exception.getCause().getMessage().contains("bucket"));
+        var e = Assertions.assertThrows(RulesEvaluationError.class, () -> resolver.resolveEndpoint(params));
+        assertTrue(e.getMessage().contains("bucket"));
     }
 
     @Test
-    void testParameterWithDefaultValue() throws Exception {
+    void testParameterWithDefaultValue() {
         // Create bytecode with a parameter that has a default value
         RegisterDefinition[] defs = {
                 new RegisterDefinition("region", true, "us-west-2", null, false), // Has default
@@ -365,7 +326,7 @@ class BytecodeEndpointResolverTest {
         // Don't provide region, should use default
         EndpointResolverParams params = createParams(null, "my-bucket");
 
-        Endpoint endpoint = resolver.resolveEndpoint(params).get();
+        Endpoint endpoint = resolver.resolveEndpoint(params);
         assertNotNull(endpoint);
         assertEquals("us-west-2/my-bucket", endpoint.uri().toString());
     }

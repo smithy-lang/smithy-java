@@ -10,10 +10,8 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.concurrent.ExecutionException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.Codec;
-import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -28,11 +26,7 @@ final class PayloadDeserializer implements ShapeDeserializer {
     }
 
     private ByteBuffer resolveBodyBytes() {
-        try {
-            return body.asByteBuffer().get();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new SerializationException("Failed to get payload bytes", e);
-        }
+        return body.waitForByteBuffer();
     }
 
     private ShapeDeserializer createDeserializer() {
@@ -125,17 +119,10 @@ final class PayloadDeserializer implements ShapeDeserializer {
             return null;
         }
 
-        try {
-            return body.asByteBuffer()
-                    .thenApply(buffer -> {
-                        int pos = buffer.arrayOffset() + buffer.position();
-                        int len = buffer.remaining();
-                        return new String(buffer.array(), pos, len, StandardCharsets.UTF_8);
-                    })
-                    .get();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new SerializationException("Failed to get payload bytes", e);
-        }
+        var buffer = body.waitForByteBuffer();
+        int pos = buffer.arrayOffset() + buffer.position();
+        int len = buffer.remaining();
+        return new String(buffer.array(), pos, len, StandardCharsets.UTF_8);
     }
 
     @Override

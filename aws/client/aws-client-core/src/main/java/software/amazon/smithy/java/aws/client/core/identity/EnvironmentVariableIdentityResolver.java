@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.aws.client.core.identity;
 
-import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
@@ -33,16 +32,15 @@ public final class EnvironmentVariableIdentityResolver implements AwsCredentials
             + "AWS_SECRET_ACCESS_KEY environment variables";
 
     @Override
-    public CompletableFuture<IdentityResult<AwsCredentialsIdentity>> resolveIdentity(Context requestProperties) {
+    public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context requestProperties) {
         String accessKey = System.getenv(ACCESS_KEY_PROPERTY);
         String secretKey = System.getenv(SECRET_KEY_PROPERTY);
         String sessionToken = System.getenv(SESSION_TOKEN_PROPERTY);
 
         if (accessKey == null || secretKey == null) {
-            return CompletableFuture.completedFuture(IdentityResult.ofError(getClass(), ERROR_MESSAGE));
+            return IdentityResult.ofError(getClass(), ERROR_MESSAGE);
         }
 
-        return CompletableFuture.completedFuture(
-                IdentityResult.of(AwsCredentialsIdentity.create(accessKey, secretKey, sessionToken)));
+        return IdentityResult.of(AwsCredentialsIdentity.create(accessKey, secretKey, sessionToken));
     }
 }

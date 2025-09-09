@@ -10,8 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.auth.api.identity.IdentityNotFoundException;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
@@ -26,7 +25,7 @@ public class IdentityResolverTest {
     @Test
     void testStaticIdentityReturnsExpected() {
         assertEquals(TEST_RESOLVER.identityType(), TEST_IDENTITY.getClass());
-        var resolved = TEST_RESOLVER.resolveIdentity(Context.empty()).join();
+        var resolved = TEST_RESOLVER.resolveIdentity(Context.empty());
         assertEquals(IdentityResult.of(TEST_IDENTITY), resolved);
     }
 
@@ -38,7 +37,7 @@ public class IdentityResolverTest {
                         EmptyResolver.INSTANCE,
                         EmptyResolver.INSTANCE,
                         TEST_RESOLVER));
-        var result = resolver.resolveIdentity(Context.empty()).join();
+        var result = resolver.resolveIdentity(Context.empty());
         assertEquals(result, IdentityResult.of(TEST_IDENTITY));
     }
 
@@ -50,8 +49,8 @@ public class IdentityResolverTest {
                         EmptyResolver.INSTANCE,
                         FailingResolver.INSTANCE));
         var exc = assertThrows(
-                CompletionException.class,
-                () -> resolver.resolveIdentity(Context.empty()).join());
+                IllegalArgumentException.class,
+                () -> resolver.resolveIdentity(Context.empty()));
         assertTrue(exc.getMessage().contains("BAD!"));
     }
 
@@ -62,16 +61,16 @@ public class IdentityResolverTest {
                         EmptyResolver.INSTANCE,
                         EmptyResolver.INSTANCE,
                         EmptyResolver.INSTANCE));
-        var result = resolver.resolveIdentity(Context.empty()).join();
 
-        assertTrue(
-                result.error()
-                        .contains(
-                                "[IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.client.core.auth.identity.IdentityResolverTest$EmptyResolver], "
-                                        + "IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.client.core.auth.identity.IdentityResolverTest$EmptyResolver], "
-                                        + "IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.client.core.auth.identity.IdentityResolverTest$EmptyResolver]]"));
+        var e = Assertions.assertThrows(
+                IdentityNotFoundException.class,
+                () -> resolver.resolveIdentity(Context.empty()).unwrap());
 
-        var e = assertThrows(IdentityNotFoundException.class, result::unwrap);
+        assertTrue(e.getMessage()
+                .contains(
+                        "[IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.client.core.auth.identity.IdentityResolverTest$EmptyResolver], "
+                                + "IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.client.core.auth.identity.IdentityResolverTest$EmptyResolver], "
+                                + "IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.client.core.auth.identity.IdentityResolverTest$EmptyResolver]]"));
 
         assertTrue(e.getMessage().startsWith("Unable to resolve an identity: Attempted resolvers: "));
     }
@@ -83,8 +82,8 @@ public class IdentityResolverTest {
         private static final EmptyResolver INSTANCE = new EmptyResolver();
 
         @Override
-        public CompletableFuture<IdentityResult<TokenIdentity>> resolveIdentity(Context requestProperties) {
-            return CompletableFuture.completedFuture(IdentityResult.ofError(getClass(), "No token. Womp Womp."));
+        public IdentityResult<TokenIdentity> resolveIdentity(Context requestProperties) {
+            return IdentityResult.ofError(getClass(), "No token. Womp Womp.");
         }
 
         @Override
@@ -94,15 +93,15 @@ public class IdentityResolverTest {
     }
 
     /**
-     * Always returns a failed future with a {@link IllegalArgumentException}.
+     * Always throws {@link IllegalArgumentException}.
      */
     private static final class FailingResolver implements IdentityResolver<TokenIdentity> {
         private static final FailingResolver INSTANCE = new FailingResolver();
         private static final IllegalArgumentException ILLEGAL_ARGUMENT_EXCEPTION = new IllegalArgumentException("BAD!");
 
         @Override
-        public CompletableFuture<IdentityResult<TokenIdentity>> resolveIdentity(Context requestProperties) {
-            return CompletableFuture.failedFuture(ILLEGAL_ARGUMENT_EXCEPTION);
+        public IdentityResult<TokenIdentity> resolveIdentity(Context requestProperties) {
+            throw ILLEGAL_ARGUMENT_EXCEPTION;
         }
 
         @Override

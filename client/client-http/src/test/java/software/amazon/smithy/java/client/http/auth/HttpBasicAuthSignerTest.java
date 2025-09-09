@@ -12,7 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.auth.api.identity.LoginIdentity;
 import software.amazon.smithy.java.context.Context;
@@ -22,7 +21,7 @@ import software.amazon.smithy.java.http.api.HttpVersion;
 
 public class HttpBasicAuthSignerTest {
     @Test
-    void testBasicAuthSigner() throws ExecutionException, InterruptedException {
+    void testBasicAuthSigner() {
         var username = "username";
         var password = "password";
         var testIdentity = LoginIdentity.create(username, password);
@@ -34,13 +33,13 @@ public class HttpBasicAuthSignerTest {
 
         var expectedHeader = "Basic " + Base64.getEncoder()
                 .encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, Context.empty()).get();
+        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, Context.empty());
         var authHeader = signedRequest.headers().firstValue("authorization");
         assertEquals(authHeader, expectedHeader);
     }
 
     @Test
-    void overwritesExistingHeader() throws ExecutionException, InterruptedException {
+    void overwritesExistingHeader() {
         var username = "username";
         var password = "password";
         var testIdentity = LoginIdentity.create(username, password);
@@ -53,7 +52,7 @@ public class HttpBasicAuthSignerTest {
 
         var expectedHeader = "Basic " + Base64.getEncoder()
                 .encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, Context.empty()).get();
+        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, Context.empty());
         var authHeader = signedRequest.headers().firstValue("authorization");
         assertEquals(authHeader, expectedHeader);
     }

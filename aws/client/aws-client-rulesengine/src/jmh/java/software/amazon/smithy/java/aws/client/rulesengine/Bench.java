@@ -102,7 +102,7 @@ public class Bench {
     }
 
     @Benchmark
-    public Object evaluate() throws Exception {
-        return endpointResolver.resolveEndpoint(endpointParams).get();
+    public Object evaluate() {
+        return endpointResolver.resolveEndpoint(endpointParams);
     }
 }
