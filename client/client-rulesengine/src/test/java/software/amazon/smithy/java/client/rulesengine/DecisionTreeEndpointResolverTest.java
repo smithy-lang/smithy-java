@@ -6,9 +6,7 @@
 package software.amazon.smithy.java.client.rulesengine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
@@ -16,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolverParams;
@@ -61,7 +60,7 @@ public class DecisionTreeEndpointResolverTest {
     }
 
     @Test
-    void testSimpleEndpointResolution() throws Exception {
+    void testSimpleEndpointResolution() {
         var url = "https://example.com";
         var endpointRule = EndpointRule.builder().endpoint(Endpoint.builder().url(Expression.of(url)).build());
 
@@ -72,15 +71,14 @@ public class DecisionTreeEndpointResolverTest {
 
         var resolver = new DecisionTreeEndpointResolver(ruleSet, List.of(), builtinProviders);
         var params = createParams(operation, input, context);
-        var future = resolver.resolveEndpoint(params);
-        var endpoint = future.get();
+        var endpoint = resolver.resolveEndpoint(params);
 
         assertNotNull(endpoint);
         assertEquals(URI.create(url), endpoint.uri());
     }
 
     @Test
-    void testParameterWithDefault() throws Exception {
+    void testParameterWithDefault() {
         Parameter param = Parameter.builder()
                 .name(Identifier.of("region"))
                 .type(ParameterType.STRING)
@@ -98,14 +96,13 @@ public class DecisionTreeEndpointResolverTest {
 
         var resolver = new DecisionTreeEndpointResolver(ruleSet, List.of(), builtinProviders);
         var params = createParams(operation, input, context);
-        var future = resolver.resolveEndpoint(params);
-        var endpoint = future.get();
+        var endpoint = resolver.resolveEndpoint(params);
 
         assertEquals(URI.create("us-east-1"), endpoint.uri());
     }
 
     @Test
-    void testParameterOverridesDefault() throws Exception {
+    void testParameterOverridesDefault() {
         Parameter param = Parameter.builder()
                 .name(Identifier.of("region"))
                 .type(ParameterType.STRING)
@@ -127,14 +124,13 @@ public class DecisionTreeEndpointResolverTest {
 
         var resolver = new DecisionTreeEndpointResolver(ruleSet, List.of(), builtinProviders);
         var params = createParams(operation, input, context);
-        var future = resolver.resolveEndpoint(params);
-        var endpoint = future.get();
+        var endpoint = resolver.resolveEndpoint(params);
 
         assertEquals(URI.create("us-west-2"), endpoint.uri());
     }
 
     @Test
-    void testBuiltinParameter() throws Exception {
+    void testBuiltinParameter() {
         Parameter param = Parameter.builder()
                 .name(Identifier.of("endpoint"))
                 .type(ParameterType.STRING)
@@ -159,14 +155,13 @@ public class DecisionTreeEndpointResolverTest {
 
         var resolver = new DecisionTreeEndpointResolver(ruleSet, List.of(), builtinProviders);
         var params = createParams(operation, input, context);
-        var future = resolver.resolveEndpoint(params);
-        var endpoint = future.get();
+        var endpoint = resolver.resolveEndpoint(params);
 
         assertEquals(URI.create("https://custom.example.com"), endpoint.uri());
     }
 
     @Test
-    void testBuiltinReturnsNull() throws Exception {
+    void testBuiltinReturnsNull() {
         Parameter param = Parameter.builder()
                 .name(Identifier.of("endpoint"))
                 .type(ParameterType.STRING)
@@ -187,14 +182,13 @@ public class DecisionTreeEndpointResolverTest {
 
         var resolver = new DecisionTreeEndpointResolver(ruleSet, List.of(), builtinProviders);
         var params = createParams(operation, input, context);
-        var future = resolver.resolveEndpoint(params);
-        var endpoint = future.get();
+        var endpoint = resolver.resolveEndpoint(params);
 
         assertEquals(URI.create("https://default.com"), endpoint.uri());
     }
 
     @Test
-    void testMultipleParameterTypes() throws Exception {
+    void testMultipleParameterTypes() {
         var stringParam = Parameter.builder()
                 .name(Identifier.of("bucket"))
                 .type(ParameterType.STRING)
@@ -233,8 +227,7 @@ public class DecisionTreeEndpointResolverTest {
 
         var resolver = new DecisionTreeEndpointResolver(ruleSet, List.of(), builtinProviders);
         var params = createParams(operation, input, context);
-        var future = resolver.resolveEndpoint(params);
-        var endpoint = future.get();
+        var endpoint = resolver.resolveEndpoint(params);
 
         assertNotNull(endpoint);
         assertEquals(URI.create("https://example.com"), endpoint.uri());
@@ -262,15 +255,13 @@ public class DecisionTreeEndpointResolverTest {
 
         var resolver = new DecisionTreeEndpointResolver(ruleSet, List.of(), builtinProviders);
         var params = createParams(operation, input, context);
-        var future = resolver.resolveEndpoint(params);
 
-        Exception exception = assertThrows(Exception.class, future::get);
-        assertInstanceOf(RulesEvaluationError.class, exception.getCause());
-        assertTrue(exception.getCause().getMessage().contains("Invalid configuration"));
+        var e = Assertions.assertThrows(RulesEvaluationError.class, () -> resolver.resolveEndpoint(params));
+        assertTrue(e.getMessage().contains("Invalid configuration"));
     }
 
     @Test
-    void testParameterPriority() throws Exception {
+    void testParameterPriority() {
         Parameter param = Parameter.builder()
                 .name(Identifier.of("region"))
                 .type(ParameterType.STRING)
@@ -295,14 +286,13 @@ public class DecisionTreeEndpointResolverTest {
 
         var resolver = new DecisionTreeEndpointResolver(ruleSet, List.of(), builtinProviders);
         var params = createParams(operation, input, context);
-        var future = resolver.resolveEndpoint(params);
-        var endpoint = future.get();
+        var endpoint = resolver.resolveEndpoint(params);
 
         assertEquals(URI.create("supplied-region"), endpoint.uri());
     }
 
     @Test
-    void testListParameterConversion() throws Exception {
+    void testListParameterConversion() {
         Parameter param = Parameter.builder()
                 .name(Identifier.of("regions"))
                 .type(ParameterType.STRING_ARRAY)
@@ -322,14 +312,13 @@ public class DecisionTreeEndpointResolverTest {
 
         var resolver = new DecisionTreeEndpointResolver(ruleSet, List.of(), builtinProviders);
         var params = createParams(operation, input, context);
-        var future = resolver.resolveEndpoint(params);
-        var endpoint = future.get();
+        var endpoint = resolver.resolveEndpoint(params);
 
         assertNotNull(endpoint);
     }
 
     @Test
-    void testMapParameterConversion() throws Exception {
+    void testMapParameterConversion() {
         var endpointRule = EndpointRule.builder()
                 .endpoint(Endpoint.builder().url(Expression.of(("https://example.com"))).build());
 
@@ -347,8 +336,7 @@ public class DecisionTreeEndpointResolverTest {
 
         var resolver = new DecisionTreeEndpointResolver(ruleSet, List.of(), builtinProviders);
         var params = createParams(operation, input, context);
-        var future = resolver.resolveEndpoint(params);
-        var endpoint = future.get();
+        var endpoint = resolver.resolveEndpoint(params);
 
         assertNotNull(endpoint);
     }

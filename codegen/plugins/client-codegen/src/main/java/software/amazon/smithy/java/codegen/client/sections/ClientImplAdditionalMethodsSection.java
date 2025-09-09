@@ -12,6 +12,5 @@ import software.amazon.smithy.utils.CodeSection;
  * This section provides a hook for adding additional methods to the generated client implementation.
  *
  * @param client Client shape that these methods will be added to.
- * @param async true if the client is an async client.
  */
-public record ClientImplAdditionalMethodsSection(ServiceShape client, boolean async) implements CodeSection {}
+public record ClientImplAdditionalMethodsSection(ServiceShape client) implements CodeSection {}

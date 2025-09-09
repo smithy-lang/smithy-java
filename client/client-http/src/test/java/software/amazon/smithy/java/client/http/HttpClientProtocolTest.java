@@ -9,7 +9,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
 import java.net.URI;
-import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.context.Context;
@@ -42,7 +41,7 @@ public class HttpClientProtocolTest {
 
             @Override
             public <I extends SerializableStruct,
-                    O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
+                    O extends SerializableStruct> O deserializeResponse(
                             ApiOperation<I, O> operation,
                             Context context,
                             TypeRegistry errorRegistry,

@@ -9,7 +9,6 @@ import java.net.ConnectException;
 import java.net.ProtocolException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.SSLException;
 import software.amazon.smithy.java.client.core.error.ConnectTimeoutException;
 import software.amazon.smithy.java.client.core.error.TlsException;
@@ -43,9 +42,9 @@ public interface ClientTransport<RequestT, ResponseT> extends ClientPlugin {
      *
      * @param context Call context.
      * @param request Request to send.
-     * @return a CompletableFuture that is completed with the response.
+     * @return the response.
      */
-    CompletableFuture<ResponseT> send(Context context, RequestT request);
+    ResponseT send(Context context, RequestT request);
 
     /**
      * Get the message exchange.

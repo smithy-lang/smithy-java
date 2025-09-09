@@ -43,8 +43,8 @@ final class WaiterContainerGenerator implements Consumer<CodeGenerationContext> 
         if (serviceSymbol.getProperty(ClientSymbolProperties.CLIENT_IMPL).isEmpty()) {
             return;
         }
-        // TODO : Allow for async waiters.
-        var symbol = WaiterCodegenUtils.getWaiterSymbol(serviceSymbol, context.settings(), false);
+
+        var symbol = WaiterCodegenUtils.getWaiterSymbol(serviceSymbol, context.settings());
         context.settings().addSymbol(symbol);
         context.writerDelegator().useSymbolWriter(symbol, writer -> {
             var template = """

@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.aws.sdkv2.auth;
 
-import java.util.concurrent.CompletableFuture;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
@@ -38,10 +37,10 @@ public class SdkCredentialsResolver implements AwsCredentialsResolver {
      * expiration time (if available) will be included in the identity.
      *
      * @param requestProperties The request properties used to resolve an Identity.
-     * @return A future that completes with the resolved AWS credentials identity.
+     * @return the resolved AWS credentials identity.
      */
     @Override
-    public CompletableFuture<IdentityResult<AwsCredentialsIdentity>> resolveIdentity(Context requestProperties) {
+    public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context requestProperties) {
         var credentials = sdkCredentialsProvider.resolveCredentials();
         AwsCredentialsIdentity identity;
         if (credentials instanceof AwsSessionCredentials s) {
@@ -50,6 +49,6 @@ public class SdkCredentialsResolver implements AwsCredentialsResolver {
         } else {
             identity = AwsCredentialsIdentity.create(credentials.accessKeyId(), credentials.secretAccessKey());
         }
-        return CompletableFuture.completedFuture(IdentityResult.of(identity));
+        return IdentityResult.of(identity);
     }
 }

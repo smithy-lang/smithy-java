@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.http.binding;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -114,7 +113,7 @@ public final class ResponseDeserializer {
     /**
      * Finish setting up and deserialize the response into the builder.
      */
-    public CompletableFuture<Void> deserialize() {
+    public void deserialize() {
         Schema schema;
         if (outputShapeBuilder != null) {
             schema = outputShapeBuilder.schema();
@@ -128,13 +127,7 @@ public final class ResponseDeserializer {
         deserBuilder.bindingMatcher(matcher);
 
         HttpBindingDeserializer deserializer = deserBuilder.build();
-
-        if (outputShapeBuilder != null) {
-            outputShapeBuilder.deserialize(deserializer);
-        } else {
-            errorShapeBuilder.deserialize(deserializer);
-        }
-
-        return deserializer.completeBodyDeserialization();
+        var target = outputShapeBuilder != null ? outputShapeBuilder : errorShapeBuilder;
+        target.deserialize(deserializer);
     }
 }

@@ -37,7 +37,7 @@ public final class UserAgentPlugin implements ClientPlugin {
     /**
      * Adds a default User-Agent header if none is set.
      *
-     * <p>The agent is in the form of {@code smithy-java/0.1 ua/2.1 os/macos#14.6.1Lang/java#17.0.12 m/a,b}, where
+     * <p>The agent is in the form of {@code smithy-java/0.1 ua/2.1 os/macos#14.6.1Lang/java#21.0.12 m/a,b}, where
      * "m/a,b" are feature IDs set via {@link CallContext#FEATURE_IDS}.
      *
      * <p>A pair of "app/{id}" is added if {@link CallContext#APPLICATION_ID} is set, or a value is set in the

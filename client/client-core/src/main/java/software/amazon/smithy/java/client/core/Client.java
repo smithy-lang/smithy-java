@@ -7,7 +7,6 @@ package software.amazon.smithy.java.client.core;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
@@ -72,7 +71,7 @@ public abstract class Client {
      * @param <O>         Output shape.
      * @return Returns the deserialized output.
      */
-    protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
+    protected <I extends SerializableStruct, O extends SerializableStruct> O call(
             I input,
             ApiOperation<I, O> operation,
             RequestOverrideConfig overrideConfig
@@ -94,7 +93,6 @@ public abstract class Client {
             } else {
                 callConfig = afterInterceptionConfig;
             }
-
         }
 
         // Rebuild the pipeline, resolvers, etc if the config changed.

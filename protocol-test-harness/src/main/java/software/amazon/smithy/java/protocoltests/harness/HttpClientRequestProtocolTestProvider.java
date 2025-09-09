@@ -7,7 +7,6 @@ package software.amazon.smithy.java.protocoltests.harness;
 
 import java.util.Base64;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.Extension;
@@ -182,9 +181,9 @@ final class HttpClientRequestProtocolTestProvider extends
         }
 
         @Override
-        public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
+        public HttpResponse send(Context context, HttpRequest request) {
             this.capturedRequest = request;
-            return CompletableFuture.completedFuture(exceptionalResponse);
+            return exceptionalResponse;
         }
 
         @Override

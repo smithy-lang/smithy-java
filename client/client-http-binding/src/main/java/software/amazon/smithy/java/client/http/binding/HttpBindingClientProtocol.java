@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.client.http.binding;
 
 import java.net.URI;
-import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
 import software.amazon.smithy.java.context.Context;
@@ -87,7 +86,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
+    public <I extends SerializableStruct, O extends SerializableStruct> O deserializeResponse(
             ApiOperation<I, O> operation,
             Context context,
             TypeRegistry typeRegistry,
@@ -95,9 +94,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
             HttpResponse response
     ) {
         if (!isSuccess(operation, context, response)) {
-            return createError(operation, context, typeRegistry, request, response).thenApply(e -> {
-                throw e;
-            });
+            throw createError(operation, context, typeRegistry, request, response);
         }
 
         LOGGER.trace("Deserializing successful response with {}", getClass().getName());
@@ -113,13 +110,10 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
             deser.eventDecoderFactory(getEventDecoderFactory(o));
         }
 
-        return deser
-                .deserialize()
-                .thenApply(ignore -> {
-                    O output = outputBuilder.errorCorrection().build();
-                    LOGGER.trace("Successfully built {} from HTTP response with {}", output, getClass().getName());
-                    return output;
-                });
+        deser.deserialize();
+        O output = outputBuilder.errorCorrection().build();
+        LOGGER.trace("Successfully built {} from HTTP response with {}", output, getClass().getName());
+        return output;
     }
 
     /**
@@ -144,14 +138,13 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
      * @param response HTTP response to deserialize.
      * @return Returns the deserialized error.
      */
-    protected <I extends SerializableStruct,
-            O extends SerializableStruct> CompletableFuture<? extends CallException> createError(
-                    ApiOperation<I, O> operation,
-                    Context context,
-                    TypeRegistry typeRegistry,
-                    HttpRequest request,
-                    HttpResponse response
-            ) {
+    protected <I extends SerializableStruct, O extends SerializableStruct> CallException createError(
+            ApiOperation<I, O> operation,
+            Context context,
+            TypeRegistry typeRegistry,
+            HttpRequest request,
+            HttpResponse response
+    ) {
         return getErrorDeserializer(context).createError(context, operation.schema().id(), typeRegistry, response);
     }
 }

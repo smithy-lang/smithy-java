@@ -56,7 +56,7 @@ public final class ClientConfig {
 
     private ClientConfig(Builder builder) {
         // Transports can change between builders to toBuilder. Transports can modify the builder when they're applied.
-        // To prevent a previous configuration meant for one transport to impact a future configuration, we create a
+        // To prevent a previous configuration meant for one transport to impact other configurations, we create a
         // copy of the original builder. We also don't want to apply the transport modifications multiple times.
         // This builder is used in toBuilder.
         this.originalBuilder = builder.copyBuilder();

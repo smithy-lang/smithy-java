@@ -5,14 +5,12 @@
 
 package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
-import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.Security;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -110,9 +108,9 @@ public class SigV4SignerTrials {
     }
 
     @Benchmark
-    public void sign() throws IOException, ExecutionException, InterruptedException {
+    public void sign() {
         if (!skipTest) {
-            signer.sign(request, TEST_IDENTITY, TEST_PROPERTIES).get();
+            signer.sign(request, TEST_IDENTITY, TEST_PROPERTIES);
         } else {
             System.out.println("Skipping benchmark on Windows");
         }

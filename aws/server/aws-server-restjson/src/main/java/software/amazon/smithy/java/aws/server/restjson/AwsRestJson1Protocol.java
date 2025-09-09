@@ -144,7 +144,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
                 .payloadMediaType("application/json");
 
         try {
-            deser.deserialize().get();
+            deser.deserialize();
         } catch (Exception e) {
             //TODO do exception translation.
             return CompletableFuture.failedFuture(e);

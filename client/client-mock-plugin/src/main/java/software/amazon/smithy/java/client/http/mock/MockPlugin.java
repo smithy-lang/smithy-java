@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.ServiceLoader;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.client.core.ClientConfig;
@@ -198,7 +197,7 @@ public final class MockPlugin implements ClientPlugin {
         }
 
         @Override
-        public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
+        public <I extends SerializableStruct, O extends SerializableStruct> O deserializeResponse(
                 ApiOperation<I, O> operation,
                 Context context,
                 TypeRegistry typeRegistry,
@@ -216,7 +215,7 @@ public final class MockPlugin implements ClientPlugin {
         }
 
         @Override
-        public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
+        public HttpResponse send(Context context, HttpRequest request) {
             var currentRequest = context.expect(CURRENT_REQUEST);
 
             // Update the current context value with the potentially changed request.
@@ -245,21 +244,34 @@ public final class MockPlugin implements ClientPlugin {
             }
 
             if (result instanceof MockedResult.Response res) {
-                return CompletableFuture.completedFuture(res.response());
+                return res.response();
             } else if (result instanceof MockedResult.Error err) {
-                return CompletableFuture.failedFuture(err.e());
-            } else if (result instanceof MockedResult.Output o) {
-                return replyWithMockOutput(currentRequest, o);
-            } else {
-                throw new IllegalStateException("Unknown result type: " + result.getClass().getName());
+                var e = err.e();
+                if (e instanceof RuntimeException re) {
+                    throw re;
+                } else {
+                    sneakyThrows(e);
+                } // ^ guaranteed to throw
             }
+
+            if (result instanceof MockedResult.Output o) {
+                return replyWithMockOutput(currentRequest, o);
+            }
+
+            throw new IllegalStateException("Unknown result type: " + result.getClass().getName());
         }
     }
 
-    private CompletableFuture<HttpResponse> replyWithMockOutput(
-            CurrentRequest currentRequest,
-            MockedResult.Output output
-    ) {
+    @SuppressWarnings("unchecked")
+    private static <E extends Throwable> E sneakyThrows(Throwable e) throws E {
+        Throwable cause = e.getCause();
+        if (cause != null) {
+            throw (E) cause;
+        }
+        throw (E) e;
+    }
+
+    private HttpResponse replyWithMockOutput(CurrentRequest currentRequest, MockedResult.Output output) {
         var cRequest = currentRequest.request().request();
         var serverRequest = new software.amazon.smithy.java.server.core.HttpRequest(
                 cRequest.headers(),
@@ -276,20 +288,17 @@ public final class MockPlugin implements ClientPlugin {
         var response = new software.amazon.smithy.java.server.core.HttpResponse(HttpHeaders.ofModifiable());
         var job = new HttpJob(currentRequest.operation(), protocol, serverRequest, response);
 
-        CompletableFuture<Void> future;
         if (output.output() instanceof RuntimeException e) {
-            future = protocol.serializeError(job, e);
+            protocol.serializeError(job, e).join();
         } else {
-            future = protocol.serializeOutput(job, output.output());
+            protocol.serializeOutput(job, output.output()).join();
         }
 
-        return future.thenApply(ignored -> {
-            return HttpResponse.builder()
-                    .statusCode(response.getStatusCode())
-                    .headers(response.headers())
-                    .body(response.getSerializedValue())
-                    .build();
-        });
+        return HttpResponse.builder()
+                .statusCode(response.getStatusCode())
+                .headers(response.headers())
+                .body(response.getSerializedValue())
+                .build();
     }
 
     private static ServerProtocol detectServerProtocol(ShapeId id) {

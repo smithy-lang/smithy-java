@@ -8,9 +8,6 @@ package software.amazon.smithy.java.client.waiters;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.client.waiters.models.GetFoosInput;
 import software.amazon.smithy.java.client.waiters.models.GetFoosOutput;
@@ -18,7 +15,6 @@ import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 
 final class MockClient {
-    private final Executor executor = CompletableFuture.delayedExecutor(3, TimeUnit.MILLISECONDS);
     private final String expectedId;
     private final Iterator<? extends SerializableStruct> iterator;
 
@@ -28,10 +24,6 @@ final class MockClient {
     }
 
     public GetFoosOutput getFoosSync(GetFoosInput in, RequestOverrideConfig override) {
-        return getFoosAsync(in, override).join();
-    }
-
-    public CompletableFuture<GetFoosOutput> getFoosAsync(GetFoosInput in, RequestOverrideConfig override) {
         if (!Objects.equals(expectedId, in.id())) {
             throw new IllegalArgumentException("ID: " + in.id() + " does not match expected " + expectedId);
         } else if (!iterator.hasNext()) {
@@ -39,7 +31,7 @@ final class MockClient {
         }
         var next = iterator.next();
         if (next instanceof GetFoosOutput output) {
-            return CompletableFuture.supplyAsync(() -> output, executor);
+            return output;
         } else if (next instanceof ModeledException exc) {
             // Throw exception
             throw exc;

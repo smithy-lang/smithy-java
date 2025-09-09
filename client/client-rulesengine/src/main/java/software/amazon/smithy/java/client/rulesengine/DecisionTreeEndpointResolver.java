@@ -8,7 +8,6 @@ package software.amazon.smithy.java.client.rulesengine;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
@@ -78,56 +77,52 @@ final class DecisionTreeEndpointResolver implements EndpointResolver {
     }
 
     @Override
-    public CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params) {
-        try {
-            var operation = params.operation();
+    public Endpoint resolveEndpoint(EndpointResolverParams params) {
+        var operation = params.operation();
 
-            // Start with defaults
-            Map<Identifier, Value> input = new HashMap<>(defaultValues);
+        // Start with defaults
+        Map<Identifier, Value> input = new HashMap<>(defaultValues);
 
-            // Collect and apply supplied parameters (typically just a few)
-            Map<String, Object> endpointParams = new HashMap<>();
-            ContextProvider.createEndpointParams(
-                    endpointParams,
-                    operationContextParams,
-                    params.context(),
-                    operation,
-                    params.inputValue());
+        // Collect and apply supplied parameters (typically just a few)
+        Map<String, Object> endpointParams = new HashMap<>();
+        ContextProvider.createEndpointParams(
+                endpointParams,
+                operationContextParams,
+                params.context(),
+                operation,
+                params.inputValue());
 
-            // Convert supplied values and override defaults
-            for (var e : endpointParams.entrySet()) {
-                Identifier id = paramNameToIdentifier.get(e.getKey());
-                if (id != null) {
-                    input.put(id, EndpointUtils.convertToValue(e.getValue()));
+        // Convert supplied values and override defaults
+        for (var e : endpointParams.entrySet()) {
+            Identifier id = paramNameToIdentifier.get(e.getKey());
+            if (id != null) {
+                input.put(id, EndpointUtils.convertToValue(e.getValue()));
+            }
+        }
+
+        // Apply builtins only for parameters that need them
+        var context = params.context();
+        for (var entry : builtinById.entrySet()) {
+            Identifier id = entry.getKey();
+            if (!input.containsKey(id)) {
+                Object value = entry.getValue().apply(context);
+                if (value != null) {
+                    input.put(id, EndpointUtils.convertToValue(value));
                 }
             }
+        }
 
-            // Apply builtins only for parameters that need them
-            var context = params.context();
-            for (var entry : builtinById.entrySet()) {
-                Identifier id = entry.getKey();
-                if (!input.containsKey(id)) {
-                    Object value = entry.getValue().apply(context);
-                    if (value != null) {
-                        input.put(id, EndpointUtils.convertToValue(value));
-                    }
-                }
-            }
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Resolving endpoint of {} using VM with params: {}", operation, input);
+        }
 
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Resolving endpoint of {} using VM with params: {}", operation, input);
-            }
-
-            var result = RuleEvaluator.evaluate(rules, input);
-            if (result instanceof EndpointValue ev) {
-                return CompletableFuture.completedFuture(convertEndpoint(params, ev));
-            } else if (result instanceof StringValue sv) {
-                return CompletableFuture.failedFuture(new RulesEvaluationError(sv.getValue()));
-            } else {
-                throw new IllegalStateException("Expected decision tree to return an endpoint, but found " + result);
-            }
-        } catch (RulesEvaluationError e) {
-            return CompletableFuture.failedFuture(e);
+        var result = RuleEvaluator.evaluate(rules, input);
+        if (result instanceof EndpointValue ev) {
+            return convertEndpoint(params, ev);
+        } else if (result instanceof StringValue sv) {
+            throw new RulesEvaluationError(sv.getValue());
+        } else {
+            throw new IllegalStateException("Expected decision tree to return an endpoint, but found " + result);
         }
     }
 

@@ -10,7 +10,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.net.http.HttpClient;
 import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
@@ -189,12 +188,9 @@ public class ClientConfigTest {
         static final class RegionalEndpointResolver implements EndpointResolver {
 
             @Override
-            public CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params) {
+            public Endpoint resolveEndpoint(EndpointResolverParams params) {
                 String region = params.context().get(REGION);
-                return CompletableFuture.completedFuture(
-                        Endpoint.builder()
-                                .uri("http://" + region + ".example.com")
-                                .build());
+                return Endpoint.builder().uri("http://" + region + ".example.com").build();
             }
         }
     }

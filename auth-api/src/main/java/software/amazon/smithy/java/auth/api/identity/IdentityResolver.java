@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.auth.api.identity;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.context.Context;
 
 /**
@@ -20,9 +19,9 @@ public interface IdentityResolver<IdentityT extends Identity> {
      * error string. Unexpected errors like malformed input or networking errors are allowed to throw exceptions.
      *
      * @param requestProperties The request properties used to resolve an Identity.
-     * @return a CompletableFuture for the resolved identity result.
+     * @return the resolved identity result.
      */
-    CompletableFuture<IdentityResult<IdentityT>> resolveIdentity(Context requestProperties);
+    IdentityResult<IdentityT> resolveIdentity(Context requestProperties);
 
     /**
      * Retrieve the class of the identity resolved by this identity resolver.
@@ -42,7 +41,8 @@ public interface IdentityResolver<IdentityT extends Identity> {
     }
 
     /**
-     * Create an implementation of {@link IdentityResolver} that returns a specific, pre-defined instance of {@link Identity}.
+     * Create an implementation of {@link IdentityResolver} that returns a specific, pre-defined instance of
+     * {@link Identity}.
      */
     static <I extends Identity> IdentityResolver<I> of(I identity) {
         return new StaticIdentityResolver<>(identity);

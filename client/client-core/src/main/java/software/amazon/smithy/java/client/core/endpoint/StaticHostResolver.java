@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.client.core.endpoint;
 
-import java.util.concurrent.CompletableFuture;
-
 /**
  * An endpoint resolver that always returns the same endpoint.
  *
@@ -14,7 +12,7 @@ import java.util.concurrent.CompletableFuture;
  */
 record StaticHostResolver(Endpoint endpoint) implements EndpointResolver {
     @Override
-    public CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params) {
-        return CompletableFuture.completedFuture(endpoint);
+    public Endpoint resolveEndpoint(EndpointResolverParams params) {
+        return endpoint;
     }
 }

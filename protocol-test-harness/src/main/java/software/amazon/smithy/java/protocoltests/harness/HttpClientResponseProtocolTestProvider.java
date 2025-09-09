@@ -12,7 +12,6 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
@@ -143,7 +142,7 @@ final class HttpClientResponseProtocolTestProvider extends
             ClientTransport<HttpRequest, HttpResponse> {
 
         @Override
-        public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
+        public HttpResponse send(Context context, HttpRequest request) {
             var builder = HttpResponse.builder()
                     .httpVersion(HttpVersion.HTTP_1_1)
                     .statusCode(testCase.getCode());
@@ -170,7 +169,7 @@ final class HttpClientResponseProtocolTestProvider extends
                 }
             });
 
-            return CompletableFuture.completedFuture(builder.build());
+            return builder.build();
         }
 
         @Override

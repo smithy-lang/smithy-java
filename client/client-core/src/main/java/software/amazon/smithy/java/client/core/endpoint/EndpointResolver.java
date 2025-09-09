@@ -7,7 +7,6 @@ package software.amazon.smithy.java.client.core.endpoint;
 
 import java.net.URI;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Resolves an endpoint for an operation.
@@ -18,9 +17,9 @@ public interface EndpointResolver {
      * Resolves an endpoint using the provided parameters.
      *
      * @param params The parameters used during endpoint resolution.
-     * @return a CompletableFuture for the resolved endpoint.
+     * @return a resolved endpoint.
      */
-    CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params);
+    Endpoint resolveEndpoint(EndpointResolverParams params);
 
     /**
      * Create a default endpoint resolver that always returns the same endpoint with prefixes added if relevant.
