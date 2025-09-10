@@ -9,7 +9,6 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -43,7 +42,6 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private final BindingMatcher bindingMatcher;
     private final DataStream body;
     private final EventDecoderFactory<?> eventDecoderFactory;
-    private CompletableFuture<Void> bodyDeserializationCf;
     private final String payloadMediaType;
 
     private HttpBindingDeserializer(Builder builder) {
@@ -130,11 +128,10 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                         });
                     } else if (member.type() == ShapeType.STRUCTURE || member.type() == ShapeType.UNION) {
                         // Read the payload into a byte buffer to deserialize a shape in the body.
-                        bodyDeserializationCf = bodyAsByteBuffer().thenAccept(bb -> {
-                            if (bb.remaining() > 0) {
-                                structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bb));
-                            }
-                        }).toCompletableFuture();
+                        ByteBuffer bb = bodyAsByteBuffer();
+                        if (bb.remaining() > 0) {
+                            structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bb));
+                        }
                     } else if (body != null && body.contentLength() > 0) {
                         structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
                     }
@@ -150,12 +147,11 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         if (bindingMatcher.hasBody()) {
             validateMediaType();
             // Need to read the entire payload into a byte buffer to deserialize via a codec.
-            bodyDeserializationCf = bodyAsByteBuffer().thenAccept(bb -> {
-                payloadCodec.createDeserializer(bb).readStruct(schema, bindingMatcher, (body, m, de) -> {
-                    if (bindingMatcher.match(m) == BindingMatcher.Binding.BODY) {
-                        structMemberConsumer.accept(state, m, de);
-                    }
-                });
+            ByteBuffer bb = bodyAsByteBuffer();
+            payloadCodec.createDeserializer(bb).readStruct(schema, bindingMatcher, (body, m, de) -> {
+                if (bindingMatcher.match(m) == BindingMatcher.Binding.BODY) {
+                    structMemberConsumer.accept(state, m, de);
+                }
             });
         }
     }
@@ -165,15 +161,8 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     // TODO: Should there be a configurable limit on the client/server for how much can be read in memory?
-    private CompletableFuture<ByteBuffer> bodyAsByteBuffer() {
-        return body.asByteBuffer();
-    }
-
-    CompletableFuture<Void> completeBodyDeserialization() {
-        if (bodyDeserializationCf == null) {
-            return CompletableFuture.completedFuture(null);
-        }
-        return bodyDeserializationCf;
+    private ByteBuffer bodyAsByteBuffer() {
+        return body.waitForByteBuffer();
     }
 
     private void validateMediaType() {

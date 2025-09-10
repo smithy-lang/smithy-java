@@ -23,7 +23,7 @@ public class InputStreamDataStreamTest {
 
         assertThat(ds.contentLength(), equalTo(-1L));
         assertThat(ds.contentType(), nullValue());
-        assertThat(ds.asByteBuffer().get(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+        assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
         assertThat(ds.isReplayable(), is(false));
     }
 
@@ -36,7 +36,7 @@ public class InputStreamDataStreamTest {
 
         assertThat(ds.contentLength(), equalTo(6L));
         assertThat(ds.contentType(), equalTo("text/plain"));
-        assertThat(ds.asByteBuffer().get(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+        assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
     }
 
     @Test

@@ -54,10 +54,9 @@ public class DynamoDBSerde {
     }
 
     @Benchmark
-    public void getItem(GetItemState s, Blackhole bh) throws Exception {
+    public void getItem(GetItemState s, Blackhole bh) {
         var resp = fullResponse(s.testItem.utf8);
-        var result = s.protocol.deserializeResponse(s.operation, s.context, s.operation.errorRegistry(), s.req, resp)
-                .get();
+        var result = s.protocol.deserializeResponse(s.operation, s.context, s.operation.errorRegistry(), s.req, resp);
         bh.consume(result);
     }
 

@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.auth.api.identity.TokenIdentity;
 import software.amazon.smithy.java.context.Context;
@@ -20,7 +19,7 @@ import software.amazon.smithy.java.http.api.HttpVersion;
 
 public class HttpBearerAuthSignerTest {
     @Test
-    void testBearerAuthSigner() throws ExecutionException, InterruptedException {
+    void testBearerAuthSigner() {
         var tokenIdentity = TokenIdentity.create("token");
         var request = HttpRequest.builder()
                 .httpVersion(HttpVersion.HTTP_1_1)
@@ -28,13 +27,13 @@ public class HttpBearerAuthSignerTest {
                 .uri(URI.create("https://www.example.com"))
                 .build();
 
-        var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, Context.empty()).get();
+        var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, Context.empty());
         var authHeader = signedRequest.headers().firstValue("authorization");
         assertEquals(authHeader, "Bearer token");
     }
 
     @Test
-    void overwritesExistingHeader() throws ExecutionException, InterruptedException {
+    void overwritesExistingHeader() {
         var tokenIdentity = TokenIdentity.create("token");
         var request = HttpRequest.builder()
                 .httpVersion(HttpVersion.HTTP_1_1)
@@ -43,7 +42,7 @@ public class HttpBearerAuthSignerTest {
                 .uri(URI.create("https://www.example.com"))
                 .build();
 
-        var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, Context.empty()).get();
+        var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, Context.empty());
         var authHeader = signedRequest.headers().firstValue("authorization");
         assertEquals(authHeader, "Bearer token");
     }

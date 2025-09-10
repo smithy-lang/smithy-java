@@ -338,17 +338,13 @@ final class BytecodeDisassembler {
     }
 
     private String formatConstant(Object value) {
-        if (value == null) {
-            return "null";
-        } else if (value instanceof String) {
-            return "\"" + escapeString((String) value) + "\"";
-        } else if (value instanceof List<?> list) {
-            return "List[" + list.size() + " items]";
-        } else if (value instanceof Map<?, ?> map) {
-            return "Map[" + map.size() + " entries]";
-        } else {
-            return value.getClass().getSimpleName() + "[" + value + "]";
-        }
+        return switch (value) {
+            case null -> "null";
+            case String s -> "\"" + escapeString(s) + "\"";
+            case List<?> list -> "List[" + list.size() + " items]";
+            case Map<?, ?> map -> "Map[" + map.size() + " entries]";
+            default -> value.getClass().getSimpleName() + "[" + value + "]";
+        };
     }
 
     private String formatValue(Object value) {

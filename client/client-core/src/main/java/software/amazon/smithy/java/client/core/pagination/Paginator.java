@@ -52,7 +52,7 @@ public interface Paginator<O extends SerializableStruct> extends PaginatorSettin
      * @param input Base input to use for repeated requests to service.
      * @param operation API model for operation being paginated.
      * @param call Synchronous call that retrieves pages from service.
-     * @return Asynchronous paginator
+     * @return paginator
      *
      * @param <I> Operation input shape type.
      * @param <O> Operation output shape type.

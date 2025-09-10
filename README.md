@@ -35,7 +35,7 @@ and building services. These examples can be used as a template for a new projec
 ## Usage
 
 > [!WARNING]
-> Smithy-Java only supports **Java 17** or later. Older Java versions are not supported.
+> Smithy-Java only supports **Java 21** or later. Older Java versions are not supported.
 
 ### Codegen (Gradle)
 

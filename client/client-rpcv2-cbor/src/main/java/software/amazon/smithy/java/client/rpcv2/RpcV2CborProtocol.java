@@ -9,7 +9,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.aws.events.AwsEventDecoderFactory;
 import software.amazon.smithy.java.aws.events.AwsEventEncoderFactory;
 import software.amazon.smithy.java.aws.events.AwsEventFrame;
@@ -90,7 +89,7 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
+    public <I extends SerializableStruct, O extends SerializableStruct> O deserializeResponse(
             ApiOperation<I, O> operation,
             Context context,
             TypeRegistry typeRegistry,
@@ -98,10 +97,7 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
             HttpResponse response
     ) {
         if (response.statusCode() != 200) {
-            return errorDeserializer.createError(context, operation.schema().id(), typeRegistry, response)
-                    .thenApply(e -> {
-                        throw e;
-                    });
+            throw errorDeserializer.createError(context, operation.schema().id(), typeRegistry, response);
         }
 
         if (operation instanceof OutputEventStreamingApiOperation<I, O, ?> o) {
@@ -112,12 +108,11 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
         var builder = operation.outputBuilder();
         var content = response.body();
         if (content.contentLength() == 0) {
-            return CompletableFuture.completedFuture(builder.build());
+            return builder.build();
         }
 
-        return content.asByteBuffer()
-                .thenApply(bytes -> CBOR_CODEC.deserializeShape(bytes, builder))
-                .toCompletableFuture();
+        var bytes = content.waitForByteBuffer();
+        return CBOR_CODEC.deserializeShape(bytes, builder);
     }
 
     private static DataStream bodyDataStream(HttpResponse response) {
@@ -165,9 +160,7 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
     private EventDecoderFactory<AwsEventFrame> getEventDecoderFactory(
             OutputEventStreamingApiOperation<?, ?, ?> outputOperation
     ) {
-        return AwsEventDecoderFactory.forOutputStream(outputOperation,
-                payloadCodec(),
-                f -> f);
+        return AwsEventDecoderFactory.forOutputStream(outputOperation, payloadCodec(), f -> f);
     }
 
     public static final class Factory implements ClientProtocolFactory<Rpcv2CborTrait> {

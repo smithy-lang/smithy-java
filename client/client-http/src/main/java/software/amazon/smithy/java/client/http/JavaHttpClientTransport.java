@@ -5,14 +5,12 @@
 
 package software.amazon.smithy.java.client.http;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
-import java.nio.ByteBuffer;
 import java.time.Duration;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Flow;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.client.core.MessageExchange;
@@ -24,6 +22,7 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.io.ByteBufferUtils;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -32,7 +31,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
  */
 public class JavaHttpClientTransport implements ClientTransport<HttpRequest, HttpResponse> {
 
-    private static URI DUMMY_URI = URI.create("http://localhost");
+    private static final URI DUMMY_URI = URI.create("http://localhost");
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaHttpClientTransport.class);
     private final HttpClient client;
@@ -103,7 +102,7 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
     }
 
     @Override
-    public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
+    public HttpResponse send(Context context, HttpRequest request) {
         return sendRequest(createJavaRequest(context, request));
     }
 
@@ -141,32 +140,35 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
         return httpRequestBuilder.build();
     }
 
-    private CompletableFuture<HttpResponse> sendRequest(java.net.http.HttpRequest request) {
-        return client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofPublisher())
-                .thenApply(this::createSmithyResponse)
-                .exceptionally(e -> {
-                    if (e instanceof HttpConnectTimeoutException) {
-                        throw new ConnectTimeoutException(e);
-                    }
-                    // The client pipeline also does this remapping, but to adhere to the required contract of
-                    // ClientTransport, we remap here too if needed.
-                    throw ClientTransport.remapExceptions(e);
-                });
+    private HttpResponse sendRequest(java.net.http.HttpRequest request) {
+        try {
+            var res = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofInputStream());
+            return createSmithyResponse(res);
+        } catch (IOException | InterruptedException | RuntimeException e) {
+            if (e instanceof HttpConnectTimeoutException) {
+                throw new ConnectTimeoutException(e);
+            }
+            // The client pipeline also does this remapping, but to adhere to the required contract of
+            // ClientTransport, we remap here too if needed.
+            throw ClientTransport.remapExceptions(e);
+        }
     }
 
-    private HttpResponse createSmithyResponse(java.net.http.HttpResponse<Flow.Publisher<List<ByteBuffer>>> response) {
+    private HttpResponse createSmithyResponse(java.net.http.HttpResponse<InputStream> response) {
         var headerMap = response.headers().map();
         LOGGER.trace("Got response: {}; headers: {}", response, headerMap);
 
         var headers = HttpHeaders.of(headerMap);
         var length = headers.contentLength();
         var adaptedLength = length == null ? -1 : length;
+        var contentType = headers.contentType();
+        var body = DataStream.ofInputStream(response.body(), contentType, adaptedLength);
 
         return HttpResponse.builder()
                 .httpVersion(javaToSmithyVersion(response.version()))
                 .statusCode(response.statusCode())
                 .headers(headers)
-                .body(new HttpClientDataStream(response.body(), adaptedLength, headers.contentType()))
+                .body(body)
                 .build();
     }
 

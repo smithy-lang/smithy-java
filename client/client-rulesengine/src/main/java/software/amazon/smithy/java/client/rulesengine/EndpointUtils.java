@@ -56,29 +56,27 @@ public final class EndpointUtils {
     }
 
     static Value convertToValue(Object o) {
-        if (o == null) {
-            return Value.emptyValue();
-        } else if (o instanceof String s) {
-            return Value.stringValue(s);
-        } else if (o instanceof Number n) {
-            return Value.integerValue(n.intValue());
-        } else if (o instanceof Boolean b) {
-            return Value.booleanValue(b);
-        } else if (o instanceof List<?> l) {
-            List<Value> valueList = new ArrayList<>(l.size());
-            for (var entry : l) {
-                valueList.add(convertToValue(entry));
+        return switch (o) {
+            case null -> Value.emptyValue();
+            case String s -> Value.stringValue(s);
+            case Number n -> Value.integerValue(n.intValue());
+            case Boolean b -> Value.booleanValue(b);
+            case List<?> l -> {
+                List<Value> valueList = new ArrayList<>(l.size());
+                for (var entry : l) {
+                    valueList.add(convertToValue(entry));
+                }
+                yield Value.arrayValue(valueList);
             }
-            return Value.arrayValue(valueList);
-        } else if (o instanceof Map<?, ?> m) {
-            Map<Identifier, Value> valueMap = new HashMap<>(m.size());
-            for (var e : m.entrySet()) {
-                valueMap.put(Identifier.of(e.getKey().toString()), convertToValue(e.getValue()));
+            case Map<?, ?> m -> {
+                Map<Identifier, Value> valueMap = new HashMap<>(m.size());
+                for (var e : m.entrySet()) {
+                    valueMap.put(Identifier.of(e.getKey().toString()), convertToValue(e.getValue()));
+                }
+                yield Value.recordValue(valueMap);
             }
-            return Value.recordValue(valueMap);
-        } else {
-            throw new RulesEvaluationError("Unsupported value type: " + o);
-        }
+            default -> throw new RulesEvaluationError("Unsupported value type: " + o);
+        };
     }
 
     // Read big-endian unsigned short (2 bytes)

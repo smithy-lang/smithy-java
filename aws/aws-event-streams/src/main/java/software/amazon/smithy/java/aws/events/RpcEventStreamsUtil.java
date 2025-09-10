@@ -32,7 +32,8 @@ public final class RpcEventStreamsUtil {
         return EventStreamFrameEncodingProcessor.create(eventStream, eventStreamEncodingFactory, input);
     }
 
-    public static <O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
+    // TODO: Make more synchronous
+    public static <O extends SerializableStruct> O deserializeResponse(
             EventDecoderFactory<AwsEventFrame> eventDecoderFactory,
             DataStream bodyDataStream
     ) {
@@ -63,7 +64,7 @@ public final class RpcEventStreamsUtil {
             }
         });
 
-        return result;
+        return result.join();
     }
 
     private static Schema streamingMember(Schema schema) {

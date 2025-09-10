@@ -14,19 +14,6 @@ import software.amazon.smithy.codegen.core.Symbol;
  * @see software.amazon.smithy.java.codegen.SymbolProperties for other properties that may be added to symbols.
  */
 public final class ClientSymbolProperties {
-
-    /**
-     * Indicates if a symbol represents an async implementation.
-     */
-    public static final Property<Boolean> ASYNC = Property.named("is-async");
-
-    /**
-     * Symbol representing the async implementation of Symbol.
-     *
-     * <p>This property is expected on all {@code Service} shape symbols.
-     */
-    public static final Property<Symbol> ASYNC_SYMBOL = Property.named("async-symbol");
-
     /**
      * Symbol representing the implementation class for a client.
      *

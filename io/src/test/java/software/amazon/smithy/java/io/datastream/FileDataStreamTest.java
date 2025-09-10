@@ -21,7 +21,7 @@ public class FileDataStreamTest {
 
         assertThat(ds.contentLength(), equalTo(6L));
         assertThat(ds.contentType(), equalTo("text/plain"));
-        assertThat(ds.asByteBuffer().get(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+        assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
         assertThat(ds.isReplayable(), is(true));
     }
 
@@ -31,7 +31,7 @@ public class FileDataStreamTest {
 
         assertThat(ds.contentLength(), equalTo(6L));
         assertThat(ds.contentType(), equalTo("text/foo"));
-        assertThat(ds.asByteBuffer().get(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+        assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
     }
 
     @Test

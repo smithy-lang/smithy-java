@@ -9,7 +9,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.client.http.AmznErrorHeaderExtractor;
 import software.amazon.smithy.java.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
@@ -82,7 +81,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
+    public <I extends SerializableStruct, O extends SerializableStruct> O deserializeResponse(
             ApiOperation<I, O> operation,
             Context context,
             TypeRegistry typeRegistry,
@@ -91,11 +90,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
     ) {
         // Is it an error?
         if (response.statusCode() != 200) {
-            return errorDeserializer
-                    .createError(context, operation.schema().id(), typeRegistry, response)
-                    .thenApply(e -> {
-                        throw e;
-                    });
+            throw errorDeserializer.createError(context, operation.schema().id(), typeRegistry, response);
         }
 
         var builder = operation.outputBuilder();
@@ -103,9 +98,10 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
 
         // If the payload is empty, then use "{}" as the default empty payload.
         if (content.contentLength() == 0) {
-            return CompletableFuture.completedFuture(codec.deserializeShape(EMPTY_PAYLOAD, builder));
+            return codec.deserializeShape(EMPTY_PAYLOAD, builder);
         }
 
-        return content.asByteBuffer().thenApply(bytes -> codec.deserializeShape(bytes, builder));
+        var bytes = content.waitForByteBuffer();
+        return codec.deserializeShape(bytes, builder);
     }
 }

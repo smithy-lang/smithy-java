@@ -27,7 +27,6 @@ import software.amazon.smithy.java.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeFactory;
-import software.amazon.smithy.java.client.core.pagination.AsyncPaginator;
 import software.amazon.smithy.java.client.core.pagination.Paginator;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
@@ -82,10 +81,7 @@ public final class ClientInterfaceGenerator
 
     @Override
     public void accept(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        // Write synchronous interface
         writeForSymbol(directive.symbol(), directive);
-        // Write async interface
-        writeForSymbol(directive.symbol().expectProperty(ClientSymbolProperties.ASYNC_SYMBOL), directive);
     }
 
     private static void writeForSymbol(
@@ -312,13 +308,13 @@ public final class ClientInterfaceGenerator
         @Override
         public void run() {
             var templateDefault = """
-                    default ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input) {
+                    default ${output:T} ${name:L}(${input:T} input) {
                         return ${name:L}(input, null);
                     }
                     """;
             var templateBase =
                     """
-                            ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig);
+                            ${output:T} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig);
                             """;
             var templatePaginated = """
                     /**
@@ -332,11 +328,9 @@ public final class ClientInterfaceGenerator
                     }
                     """;
             writer.pushState();
-            var isAsync = symbol.expectProperty(ClientSymbolProperties.ASYNC);
-            writer.putContext("async", isAsync);
             writer.putContext("overrideConfig", RequestOverrideConfig.class);
             writer.putContext("future", CompletableFuture.class);
-            writer.putContext("paginator", isAsync ? AsyncPaginator.class : Paginator.class);
+            writer.putContext("paginator", Paginator.class);
 
             var opIndex = OperationIndex.of(model);
             for (var operation : TopDownIndex.of(model).getContainedOperations(service)) {
@@ -361,7 +355,7 @@ public final class ClientInterfaceGenerator
                 writer.popState();
             }
             // Add any additional operations from integrations
-            writer.injectSection(new ClientInterfaceAdditionalMethodsSection(service, isAsync));
+            writer.injectSection(new ClientInterfaceAdditionalMethodsSection(service));
             writer.popState();
         }
     }

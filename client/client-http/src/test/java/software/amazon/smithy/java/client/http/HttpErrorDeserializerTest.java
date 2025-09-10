@@ -12,7 +12,6 @@ import static org.hamcrest.Matchers.instanceOf;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -41,7 +40,7 @@ public class HttpErrorDeserializerTest {
 
     @ParameterizedTest
     @MethodSource("genericErrorCases")
-    public void createErrorFromHints(int status, String payload, String message) throws Exception {
+    public void createErrorFromHints(int status, String payload, String message) {
         var deserializer = HttpErrorDeserializer.builder()
                 .codec(CODEC)
                 .serviceId(SERVICE)
@@ -55,7 +54,7 @@ public class HttpErrorDeserializerTest {
                     HttpHeaders.of(Map.of("content-length", List.of(Integer.toString(payload.length())))));
         }
         var response = responseBuilder.build();
-        var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
+        var result = deserializer.createError(Context.create(), OPERATION, registry, response);
 
         assertThat(result.getMessage(), containsString(message));
     }
@@ -77,7 +76,7 @@ public class HttpErrorDeserializerTest {
     }
 
     @Test
-    public void deserializesIntoErrorBasedOnHeaders() throws Exception {
+    public void deserializesIntoErrorBasedOnHeaders() {
         var deserializer = HttpErrorDeserializer.builder()
                 .codec(CODEC)
                 .serviceId(SERVICE)
@@ -97,13 +96,13 @@ public class HttpErrorDeserializerTest {
                                         List.of(Baz.SCHEMA.id().toString()))))
                 .body(DataStream.ofString("{}"));
         var response = responseBuilder.build();
-        var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
+        var result = deserializer.createError(Context.create(), OPERATION, registry, response);
 
         assertThat(result, instanceOf(Baz.class));
     }
 
     @Test
-    public void deserializesUsingDocumentViaPayloadWithNoContentLength() throws Exception {
+    public void deserializesUsingDocumentViaPayloadWithNoContentLength() {
         var deserializer = HttpErrorDeserializer.builder()
                 .codec(CODEC)
                 .serviceId(SERVICE)
@@ -116,19 +115,17 @@ public class HttpErrorDeserializerTest {
                 .statusCode(400)
                 .body(DataStream.ofString("{\"__type\": \"com.foo#Baz\"}"));
         var response = responseBuilder.build();
-        var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
+        var result = deserializer.createError(Context.create(), OPERATION, registry, response);
 
         assertThat(result, instanceOf(Baz.class));
     }
 
     @Test
-    public void usesGenericErrorWhenPayloadTypeIsUnknown() throws Exception {
+    public void usesGenericErrorWhenPayloadTypeIsUnknown() {
         var deserializer = HttpErrorDeserializer.builder()
                 .codec(CODEC)
                 .serviceId(SERVICE)
-                .unknownErrorFactory(
-                        (fault, message, response) -> CompletableFuture
-                                .completedFuture(new CallException("Hi!", fault)))
+                .unknownErrorFactory((fault, message, response) -> new CallException("Hi!", fault))
                 .build();
         var registry = TypeRegistry.builder()
                 .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
@@ -137,21 +134,19 @@ public class HttpErrorDeserializerTest {
                 .statusCode(400)
                 .body(DataStream.ofString("{\"__type\": \"com.foo#SomeUnknownError\"}"));
         var response = responseBuilder.build();
-        var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
+        var result = deserializer.createError(Context.create(), OPERATION, registry, response);
 
         assertThat(result, instanceOf(CallException.class));
         assertThat(result.getMessage(), equalTo("Hi!"));
     }
 
     @Test
-    public void usesGenericErrorWhenHeaderTypeIsUnknown() throws Exception {
+    public void usesGenericErrorWhenHeaderTypeIsUnknown() {
         var deserializer = HttpErrorDeserializer.builder()
                 .codec(CODEC)
                 .serviceId(SERVICE)
                 .headerErrorExtractor(new AmznErrorHeaderExtractor())
-                .unknownErrorFactory(
-                        (fault, message, response) -> CompletableFuture
-                                .completedFuture(new CallException("Hi!", fault)))
+                .unknownErrorFactory((fault, message, response) -> new CallException("Hi!", fault))
                 .build();
         var registry = TypeRegistry.builder()
                 .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
@@ -167,7 +162,7 @@ public class HttpErrorDeserializerTest {
                                         List.of("com.foo#SomeUnknownError"))))
                 .body(DataStream.ofString("{}"));
         var response = responseBuilder.build();
-        var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
+        var result = deserializer.createError(Context.create(), OPERATION, registry, response);
 
         assertThat(result, instanceOf(CallException.class));
         assertThat(result.getMessage(), equalTo("Hi!"));

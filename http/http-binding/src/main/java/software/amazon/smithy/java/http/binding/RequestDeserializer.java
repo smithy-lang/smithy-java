@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.http.binding;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
@@ -99,7 +98,7 @@ public final class RequestDeserializer {
     /**
      * Finish setting up and deserialize the response into the builder.
      */
-    public CompletableFuture<Void> deserialize() {
+    public void deserialize() {
         if (inputShapeBuilder == null) {
             throw new IllegalStateException("inputShapeBuilder must be set");
         }
@@ -109,6 +108,5 @@ public final class RequestDeserializer {
         HttpBindingDeserializer deserializer = deserBuilder.build();
 
         inputShapeBuilder.deserialize(deserializer);
-        return deserializer.completeBodyDeserialization();
     }
 }

@@ -7,7 +7,6 @@ package software.amazon.smithy.java.client.rulesengine;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
@@ -22,7 +21,6 @@ import software.amazon.smithy.rulesengine.logic.bdd.Bdd;
 public final class BytecodeEndpointResolver implements EndpointResolver {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(BytecodeEndpointResolver.class);
-    private static final CompletableFuture<Endpoint> NULL_RESULT = CompletableFuture.completedFuture(null);
 
     private final Bytecode bytecode;
     private final Bdd bdd;
@@ -48,31 +46,27 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
     }
 
     @Override
-    public CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params) {
-        try {
-            var evaluator = threadLocalEvaluator.get();
-            var operation = params.operation();
-            var ctx = params.context();
+    public Endpoint resolveEndpoint(EndpointResolverParams params) {
+        var evaluator = threadLocalEvaluator.get();
+        var operation = params.operation();
+        var ctx = params.context();
 
-            // Get reusable params array and clear it
-            var inputParams = evaluator.paramsCache;
-            inputParams.clear();
+        // Get reusable params array and clear it
+        var inputParams = evaluator.paramsCache;
+        inputParams.clear();
 
-            // Prep the input parameters by grabbing them from the input and from other traits.
-            ContextProvider.createEndpointParams(inputParams, ctxProvider, ctx, operation, params.inputValue());
+        // Prep the input parameters by grabbing them from the input and from other traits.
+        ContextProvider.createEndpointParams(inputParams, ctxProvider, ctx, operation, params.inputValue());
 
-            // Reset the evaluator and prepare new registers.
-            evaluator.reset(ctx, inputParams);
+        // Reset the evaluator and prepare new registers.
+        evaluator.reset(ctx, inputParams);
 
-            LOGGER.debug("Resolving endpoint of {} using VM with params: {}", operation, inputParams);
+        LOGGER.debug("Resolving endpoint of {} using VM with params: {}", operation, inputParams);
 
-            var resultIndex = bdd.evaluate(evaluator);
-            if (resultIndex < 0) {
-                return NULL_RESULT;
-            }
-            return CompletableFuture.completedFuture(evaluator.resolveResult(resultIndex));
-        } catch (RulesEvaluationError e) {
-            return CompletableFuture.failedFuture(e);
+        var resultIndex = bdd.evaluate(evaluator);
+        if (resultIndex < 0) {
+            return null;
         }
+        return evaluator.resolveResult(resultIndex);
     }
 }

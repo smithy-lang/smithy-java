@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -636,40 +637,33 @@ public interface Document extends SerializableShape {
      * @throws UnsupportedOperationException if the given object {@code o} cannot be converted to a document.
      */
     static Document ofObject(Object o) {
-        if (o instanceof Document d) {
-            return d;
-        } else if (o instanceof SerializableShape s) {
-            return of(s);
-        } else if (o instanceof String s) {
-            return of(s);
-        } else if (o instanceof Boolean b) {
-            return of(b);
-        } else if (o instanceof Number n) {
-            return ofNumber(n);
-        } else if (o instanceof ByteBuffer b) {
-            return of(b);
-        } else if (o instanceof byte[] b) {
-            return of(b);
-        } else if (o instanceof Instant i) {
-            return of(i);
-        } else if (o instanceof List<?> l) {
-            List<Document> values = new ArrayList<>(l.size());
-            for (var v : l) {
-                values.add(ofObject(v));
+        return switch (o) {
+            case Document d -> d;
+            case SerializableShape s -> of(s);
+            case String s -> of(s);
+            case Boolean b -> of(b);
+            case Number n -> ofNumber(n);
+            case ByteBuffer b -> of(b);
+            case byte[] b -> of(b);
+            case Instant i -> of(i);
+            case List<?> l -> {
+                List<Document> values = new ArrayList<>(l.size());
+                for (var v : l) {
+                    values.add(ofObject(v));
+                }
+                yield of(values);
             }
-            return of(values);
-        } else if (o instanceof Map<?, ?> m) {
-            Map<String, Document> values = new LinkedHashMap<>(m.size());
-            for (var entry : m.entrySet()) {
-                var key = ofObject(entry.getKey());
-                values.put(key.asString(), ofObject(entry.getValue()));
+            case Map<?, ?> m -> {
+                Map<String, Document> values = new LinkedHashMap<>(m.size());
+                for (var entry : m.entrySet()) {
+                    var key = Objects.requireNonNull(ofObject(entry.getKey()));
+                    values.put(key.asString(), ofObject(entry.getValue()));
+                }
+                yield of(values);
             }
-            return of(values);
-        } else if (o == null) {
-            return null;
-        } else {
-            throw new UnsupportedOperationException("Cannot convert " + o + " to a document");
-        }
+            case null -> null;
+            default -> throw new UnsupportedOperationException("Cannot convert " + o + " to a document");
+        };
     }
 
     /**
