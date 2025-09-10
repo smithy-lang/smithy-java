@@ -10,7 +10,7 @@ extra["displayName"] = "Smithy :: Java :: AWS :: Integrations :: Lambda Endpoint
 extra["moduleName"] = "software.amazon.smithy.java.aws.integrations.lambda"
 
 dependencies {
-    implementation("com.amazonaws:aws-lambda-java-core:1.3.0")
+    implementation("com.amazonaws:aws-lambda-java-core:1.4.0")
     implementation(project(":server:server-api"))
     implementation(project(":http:http-api"))
     implementation(project(":logging"))
