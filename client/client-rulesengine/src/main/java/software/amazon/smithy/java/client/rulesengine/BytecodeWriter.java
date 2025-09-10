@@ -297,35 +297,39 @@ final class BytecodeWriter {
     }
 
     private void writeConstantValue(DataOutputStream dos, Object value) throws IOException {
-        if (value == null) {
-            dos.writeByte(Bytecode.CONST_NULL);
-        } else if (value instanceof String s) {
-            dos.writeByte(Bytecode.CONST_STRING);
-            writeUTF(dos, s);
-        } else if (value instanceof Integer i) {
-            dos.writeByte(Bytecode.CONST_INTEGER);
-            dos.writeInt(i);
-        } else if (value instanceof Boolean b) {
-            dos.writeByte(Bytecode.CONST_BOOLEAN);
-            dos.writeByte(b ? 1 : 0);
-        } else if (value instanceof List<?> list) {
-            dos.writeByte(Bytecode.CONST_LIST);
-            dos.writeShort(list.size());
-            for (Object element : list) {
-                writeConstantValue(dos, element);
+        switch (value) {
+            case null -> dos.writeByte(Bytecode.CONST_NULL);
+            case String s -> {
+                dos.writeByte(Bytecode.CONST_STRING);
+                writeUTF(dos, s);
             }
-        } else if (value instanceof Map<?, ?> map) {
-            dos.writeByte(Bytecode.CONST_MAP);
-            dos.writeShort(map.size());
-            for (Map.Entry<?, ?> entry : map.entrySet()) {
-                if (!(entry.getKey() instanceof String)) {
-                    throw new IOException("Map keys must be strings, found: " + entry.getKey().getClass());
+            case Integer i -> {
+                dos.writeByte(Bytecode.CONST_INTEGER);
+                dos.writeInt(i);
+            }
+            case Boolean b -> {
+                dos.writeByte(Bytecode.CONST_BOOLEAN);
+                dos.writeByte(b ? 1 : 0);
+            }
+            case List<?> list -> {
+                dos.writeByte(Bytecode.CONST_LIST);
+                dos.writeShort(list.size());
+                for (Object element : list) {
+                    writeConstantValue(dos, element);
                 }
-                writeUTF(dos, (String) entry.getKey());
-                writeConstantValue(dos, entry.getValue());
             }
-        } else {
-            throw new IOException("Unsupported constant type: " + value.getClass());
+            case Map<?, ?> map -> {
+                dos.writeByte(Bytecode.CONST_MAP);
+                dos.writeShort(map.size());
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    if (!(entry.getKey() instanceof String)) {
+                        throw new IOException("Map keys must be strings, found: " + entry.getKey().getClass());
+                    }
+                    writeUTF(dos, (String) entry.getKey());
+                    writeConstantValue(dos, entry.getValue());
+                }
+            }
+            default -> throw new IOException("Unsupported constant type: " + value.getClass());
         }
     }
 

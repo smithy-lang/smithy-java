@@ -90,17 +90,17 @@ final class BytecodeCompiler {
         // Compile all results
         for (Rule result : bdd.getResults()) {
             writer.markResultStart();
-            if (result == null || result instanceof NoMatchRule) {
-                // No match: push null and return
-                writer.writeByte(Opcodes.LOAD_CONST);
-                writer.writeByte(writer.getConstantIndex(null));
-                writer.writeByte(Opcodes.RETURN_VALUE);
-            } else if (result instanceof EndpointRule e) {
-                compileEndpointRule(e);
-            } else if (result instanceof ErrorRule e) {
-                compileErrorRule(e);
-            } else {
-                throw new UnsupportedOperationException("Unexpected result type: " + result.getClass());
+            result = result == null ? NoMatchRule.INSTANCE : result;
+            switch (result) {
+                case NoMatchRule nr -> {
+                    // No match: push null and return
+                    writer.writeByte(Opcodes.LOAD_CONST);
+                    writer.writeByte(writer.getConstantIndex(null));
+                    writer.writeByte(Opcodes.RETURN_VALUE);
+                }
+                case EndpointRule e -> compileEndpointRule(e);
+                case ErrorRule e -> compileErrorRule(e);
+                default -> throw new UnsupportedOperationException("Unexpected result type: " + result);
             }
         }
 
@@ -375,47 +375,49 @@ final class BytecodeCompiler {
     }
 
     private void compileLiteral(Literal literal) {
-        if (literal instanceof StringLiteral s) {
-            var template = s.value();
-            var parts = template.getParts();
+        switch (literal) {
+            case StringLiteral s -> {
+                var template = s.value();
+                var parts = template.getParts();
 
-            if (parts.size() == 1 && parts.get(0) instanceof Template.Literal) {
-                // Simple string with no interpolation
-                addLoadConst(parts.get(0).toString());
-            } else if (parts.size() == 1 && parts.get(0) instanceof Template.Dynamic dynamic) {
-                // Single dynamic expression, so just evaluate it
-                compileExpression(dynamic.toExpression());
-            } else {
-                // Multiple parts - need to concatenate
-                int expressionCount = 0;
-                for (var part : parts) {
-                    if (part instanceof Template.Dynamic d) {
-                        compileExpression(d.toExpression());
-                    } else {
-                        addLoadConst(part.toString());
+                if (parts.size() == 1 && parts.get(0) instanceof Template.Literal) {
+                    // Simple string with no interpolation
+                    addLoadConst(parts.get(0).toString());
+                } else if (parts.size() == 1 && parts.get(0) instanceof Template.Dynamic dynamic) {
+                    // Single dynamic expression, so just evaluate it
+                    compileExpression(dynamic.toExpression());
+                } else {
+                    // Multiple parts - need to concatenate
+                    int expressionCount = 0;
+                    for (var part : parts) {
+                        if (part instanceof Template.Dynamic d) {
+                            compileExpression(d.toExpression());
+                        } else {
+                            addLoadConst(part.toString());
+                        }
+                        expressionCount++;
                     }
-                    expressionCount++;
+                    writer.writeByte(Opcodes.RESOLVE_TEMPLATE);
+                    writer.writeByte(expressionCount);
                 }
-                writer.writeByte(Opcodes.RESOLVE_TEMPLATE);
-                writer.writeByte(expressionCount);
             }
-        } else if (literal instanceof TupleLiteral t) {
-            for (var e : t.members()) {
-                compileLiteral(e);
+            case TupleLiteral t -> {
+                for (var e : t.members()) {
+                    compileLiteral(e);
+                }
+                compileListCreation(t.members().size());
             }
-            compileListCreation(t.members().size());
-        } else if (literal instanceof RecordLiteral r) {
-            for (var e : r.members().entrySet()) {
-                compileLiteral(e.getValue()); // value then key to make popping ordered
-                addLoadConst(e.getKey().toString());
+            case RecordLiteral r -> {
+                for (var e : r.members().entrySet()) {
+                    compileLiteral(e.getValue()); // value then key to make popping ordered
+                    addLoadConst(e.getKey().toString());
+                }
+                compileMapCreation(r.members().size());
             }
-            compileMapCreation(r.members().size());
-        } else if (literal instanceof BooleanLiteral b) {
-            addLoadConst(b.value().getValue());
-        } else if (literal instanceof IntegerLiteral i) {
-            addLoadConst(i.toNode().expectNumberNode().getValue());
-        } else {
-            throw new UnsupportedOperationException("Unexpected rules engine Literal type: " + literal);
+            case BooleanLiteral b -> addLoadConst(b.value().getValue());
+            case IntegerLiteral i -> addLoadConst(i.toNode().expectNumberNode().getValue());
+            case null, default ->
+                throw new UnsupportedOperationException("Unexpected rules engine Literal type: " + literal);
         }
     }
 
