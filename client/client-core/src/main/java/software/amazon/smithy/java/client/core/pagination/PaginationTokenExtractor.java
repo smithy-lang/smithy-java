@@ -46,12 +46,12 @@ final class PaginationTokenExtractor {
         var items = getValueForPath(itemsPathSchemas, outputShape);
         int totalItems = 0;
         if (items != null) {
-            if (items instanceof Collection<?> ic) {
-                totalItems = ic.size();
-            } else if (items instanceof Map<?, ?> im) {
-                totalItems = im.size();
-            } else if (items instanceof Document doc) {
-                totalItems = doc.size();
+            switch (items) {
+                case Collection<?> ic -> totalItems = ic.size();
+                case Map<?, ?> im -> totalItems = im.size();
+                case Document doc -> totalItems = doc.size();
+                default -> {
+                }
             }
         }
         return new Result(token, totalItems);

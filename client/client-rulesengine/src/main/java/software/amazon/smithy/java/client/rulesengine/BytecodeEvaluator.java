@@ -400,10 +400,9 @@ final class BytecodeEvaluator implements ConditionEvaluator {
 
     // Get a property from a map or URI, or return null.
     private Object getProperty(Object target, String propertyName) {
-        if (target instanceof Map<?, ?> m) {
-            return m.get(propertyName);
-        } else if (target instanceof URI u) {
-            return switch (propertyName) {
+        return switch (target) {
+            case Map<?, ?> m -> m.get(propertyName);
+            case URI u -> switch (propertyName) {
                 case "scheme" -> u.getScheme();
                 case "path" -> u.getRawPath();
                 case "normalizedPath" -> ParseUrl.normalizePath(u.getRawPath());
@@ -411,8 +410,8 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                 case "isIp" -> ParseUrl.isIpAddr(u.getHost());
                 default -> null;
             };
-        }
-        return null;
+            case null, default -> null;
+        };
     }
 
     // Get a value by index from an object. If not an array, returns null.
