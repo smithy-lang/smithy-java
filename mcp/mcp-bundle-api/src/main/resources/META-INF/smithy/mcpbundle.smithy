@@ -28,6 +28,8 @@ structure BundleMetadata {
     description: String
 
     version: String
+
+    additionalInfo: Document
 }
 
 structure GenericBundle with [CommonBundleConfig] {
