@@ -84,6 +84,7 @@ public final class McpServer implements Server {
     private final CountDownLatch done = new CountDownLatch(1);
     private final AtomicReference<JsonRpcRequest> initializeRequest = new AtomicReference<>();
     private final ToolFilter toolFilter;
+    private volatile ProtocolVersion protocolVersion;
 
     McpServer(McpServerBuilder builder) {
         this.services = builder.services;
@@ -127,9 +128,19 @@ public final class McpServer implements Server {
             switch (req.getMethod()) {
                 case "initialize" -> {
                     this.initializeRequest.set(req);
+                    var maybeVersion = req.getParams().getMember("protocolVersion");
+                    String pv = null;
+                    if (maybeVersion != null) {
+                        protocolVersion = ProtocolVersion.version(maybeVersion.asString());
+                        if (!(protocolVersion instanceof ProtocolVersion.UnknownVersion)) {
+                            pv = protocolVersion.identifier();
+                        }
+                    }
+
                     proxies.values().forEach(this::initialize);
                     writeResponse(req.getId(),
                             InitializeResult.builder()
+                                    .protocolVersion(pv)
                                     .capabilities(Capabilities.builder()
                                             .tools(Tools.builder().listChanged(true).build())
                                             .prompts(Prompts.builder().listChanged(true).build())
@@ -158,14 +169,18 @@ public final class McpServer implements Server {
                     var result = promptProcessor.buildPromptResult(prompt, promptArguments);
                     writeResponse(req.getId(), result);
                 }
-                case "tools/list" -> writeResponse(req.getId(),
-                        ListToolsResult.builder()
-                                .tools(tools.values()
-                                        .stream()
-                                        .filter(t -> toolFilter.allowTool(t.serverId(), t.toolInfo().getName()))
-                                        .map(Tool::toolInfo)
-                                        .toList())
-                                .build());
+                case "tools/list" -> {
+                    boolean supportsOutputSchema = protocolVersion != null
+                            && protocolVersion.compareTo(ProtocolVersion.v2025_06_18.INSTANCE) >= 0;
+                    writeResponse(req.getId(),
+                            ListToolsResult.builder()
+                                    .tools(tools.values()
+                                            .stream()
+                                            .filter(t -> toolFilter.allowTool(t.serverId(), t.toolInfo().getName()))
+                                            .map(tool -> extractToolInfo(tool, supportsOutputSchema))
+                                            .toList())
+                                    .build());
+                }
                 case "tools/call" -> {
                     var operationName = req.getParams().getMember("name").asString();
                     var tool = tools.get(operationName);
@@ -223,6 +238,16 @@ public final class McpServer implements Server {
         } catch (Exception e) {
             internalError(req, e);
         }
+    }
+
+    private ToolInfo extractToolInfo(Tool tool, boolean supportsOutput) {
+        var toolInfo = tool.toolInfo();
+        if (supportsOutput || toolInfo.getOutputSchema() == null) {
+            return toolInfo;
+        }
+        return toolInfo.toBuilder()
+                .outputSchema(null)
+                .build();
     }
 
     private void validate(JsonRpcRequest req) {

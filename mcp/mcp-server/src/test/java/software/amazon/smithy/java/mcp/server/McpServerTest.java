@@ -8,11 +8,14 @@ package software.amazon.smithy.java.mcp.server;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -59,9 +62,16 @@ public class McpServerTest {
         }
     }
 
+    private void initializeWithProtocolVersion(ProtocolVersion protocolVersion) {
+        write("initialize", Document.of(Map.of("protocolVersion", Document.of(protocolVersion.identifier()))));
+        var pv = read().getResult().getMember("protocolVersion").asString();
+        assertEquals(protocolVersion.identifier(), pv);
+    }
+
     @Test
-    public void validateToolsList() {
+    public void noOutputSchemaWithUnsupportedProtocolVersion() {
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -74,6 +84,39 @@ public class McpServerTest {
 
         server.start();
 
+        initializeWithProtocolVersion(ProtocolVersion.v2025_03_26.INSTANCE);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("NoInputOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertEquals("NoInputOperation", tool.get("name").asString());
+        assertNotNull(tool.get("inputSchema"));
+        assertNull(tool.get("outputSchema"));
+    }
+
+    @Test
+    public void validateToolsList() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(ProtocolVersion.v2025_06_18.INSTANCE);
         write("tools/list", Document.of(Map.of()));
         var response = read();
         var result = response.getResult().asStringMap();
@@ -94,6 +137,7 @@ public class McpServerTest {
     @Test
     public void validateNoIOOperationTool() {
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -106,6 +150,7 @@ public class McpServerTest {
 
         server.start();
 
+        initializeWithProtocolVersion(ProtocolVersion.v2025_06_18.INSTANCE);
         write("tools/list", Document.of(Map.of()));
         var response = read();
         var tools = response.getResult().asStringMap().get("tools").asList();
@@ -126,6 +171,7 @@ public class McpServerTest {
     @Test
     public void validateNoOutputOperationTool() {
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -138,6 +184,7 @@ public class McpServerTest {
 
         server.start();
 
+        initializeWithProtocolVersion(ProtocolVersion.v2025_06_18.INSTANCE);
         write("tools/list", Document.of(Map.of()));
         var response = read();
         var tools = response.getResult().asStringMap().get("tools").asList();
@@ -167,6 +214,7 @@ public class McpServerTest {
     @Test
     public void validateNoInputOperationTool() {
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -179,6 +227,7 @@ public class McpServerTest {
 
         server.start();
 
+        initializeWithProtocolVersion(ProtocolVersion.v2025_06_18.INSTANCE);
         write("tools/list", Document.of(Map.of()));
         var response = read();
         var tools = response.getResult().asStringMap().get("tools").asList();
@@ -208,6 +257,7 @@ public class McpServerTest {
     @Test
     public void validateTestOperationTool() {
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -220,6 +270,7 @@ public class McpServerTest {
 
         server.start();
 
+        initializeWithProtocolVersion(ProtocolVersion.v2025_06_18.INSTANCE);
         write("tools/list", Document.of(Map.of()));
         var response = read();
         var tools = response.getResult().asStringMap().get("tools").asList();
@@ -240,6 +291,7 @@ public class McpServerTest {
     @Test
     void testNumberAndStringIds() {
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -285,6 +337,7 @@ public class McpServerTest {
     @Test
     void testInvalidIds() {
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -327,6 +380,7 @@ public class McpServerTest {
     @Test
     void testRequestsRequireIds() {
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -350,6 +404,7 @@ public class McpServerTest {
     void testInputAdaptation() {
         AtomicReference<StructDocument> capturedInput = new AtomicReference<>();
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -456,6 +511,7 @@ public class McpServerTest {
     @Test
     void testNotificationsDoNotRequireRequestId() {
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -485,6 +541,7 @@ public class McpServerTest {
     @Test
     void testPromptsList() {
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -528,6 +585,7 @@ public class McpServerTest {
     @Test
     void testPromptsGetWithValidPrompt() {
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -561,6 +619,7 @@ public class McpServerTest {
     @Test
     void testPromptsGetWithDifferentCasing() {
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -631,6 +690,7 @@ public class McpServerTest {
     @Test
     void testPromptsGetWithInvalidPrompt() {
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -670,6 +730,7 @@ public class McpServerTest {
                 .unwrap();
 
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -711,6 +772,7 @@ public class McpServerTest {
                 .unwrap();
 
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -748,6 +810,7 @@ public class McpServerTest {
                 .unwrap();
 
         server = McpServer.builder()
+                .name("smithy-mcp-server")
                 .input(input)
                 .output(output)
                 .addService("test-mcp",
@@ -942,7 +1005,7 @@ public class McpServerTest {
     }
 
     private JsonRpcResponse read() {
-        var line = output.read();
+        var line = assertTimeoutPreemptively(Duration.ofSeconds(1), output::read, "No response within one second");
         return CODEC.deserializeShape(line, JsonRpcResponse.builder());
     }
 
