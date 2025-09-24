@@ -14,7 +14,7 @@ dependencies {
     testImplementation("org.hamcrest:hamcrest:3.0")
     testImplementation("org.junit.jupiter:junit-jupiter:5.13.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testImplementation("org.assertj:assertj-core:3.27.4")
+    testImplementation("org.assertj:assertj-core:3.27.6")
 }
 
 afterEvaluate {
