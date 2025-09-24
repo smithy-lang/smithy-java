@@ -74,7 +74,7 @@ public final class SchemaFieldOrder {
                 computedPartitions.add(curParition);
             }
             var shapeFieldName = toSchemaName(shape);
-            if (curFieldNames.contains(shapeFieldName)) {
+            if (curFieldNames.contains(shapeFieldName) || shape.getId().getName().equals(shapeFieldName)) {
                 shapeFieldName = toFullQualifiedSchemaName(shape);
             }
             boolean isShapeRecursive = CodegenUtils.recursiveShape(directive.model(), shape);

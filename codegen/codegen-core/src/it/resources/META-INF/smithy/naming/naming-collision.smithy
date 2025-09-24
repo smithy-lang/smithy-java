@@ -21,6 +21,8 @@ operation Naming {
         serializer: String
 
         innerDeserializer: ShapeSerializer
+
+        abc: ABC
     }
     errors: [
         IllegalArgumentException
@@ -60,3 +62,8 @@ structure ShapeSerializer {
 @private
 @error("client")
 structure IllegalArgumentException {}
+
+@private
+structure ABC {
+
+}
