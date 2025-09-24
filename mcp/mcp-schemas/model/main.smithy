@@ -103,6 +103,8 @@ structure ToolInfo {
     description: String
 
     inputSchema: JsonObjectSchema
+
+    outputSchema: JsonObjectSchema
 }
 
 list ToolInfoList {

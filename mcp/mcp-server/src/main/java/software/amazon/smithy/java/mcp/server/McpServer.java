@@ -339,6 +339,8 @@ public final class McpServer implements Server {
                                 operationName,
                                 schema))
                         .inputSchema(createJsonObjectSchema(operation.getApiOperation().inputSchema(), new HashSet<>()))
+                        .outputSchema(
+                                createJsonObjectSchema(operation.getApiOperation().outputSchema(), new HashSet<>()))
                         .build();
                 tools.put(operationName, new Tool(toolInfo, id, operation));
             }

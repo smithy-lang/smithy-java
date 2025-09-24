@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.mcp.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -59,7 +60,39 @@ public class McpServerTest {
     }
 
     @Test
-    public void validateToolStructure() {
+    public void validateToolsList() {
+        server = McpServer.builder()
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var result = response.getResult().asStringMap();
+        var tools = result.get("tools").asList();
+
+        assertEquals(4, tools.size());
+
+        var toolNames = tools.stream()
+                .map(tool -> tool.asStringMap().get("name").asString())
+                .toList();
+
+        assertTrue(toolNames.contains("NoIOOperation"));
+        assertTrue(toolNames.contains("NoOutputOperation"));
+        assertTrue(toolNames.contains("TestOperation"));
+        assertTrue(toolNames.contains("NoInputOperation"));
+    }
+
+    @Test
+    public void validateNoIOOperationTool() {
         server = McpServer.builder()
                 .input(input)
                 .output(output)
@@ -77,46 +110,131 @@ public class McpServerTest {
         var response = read();
         var tools = response.getResult().asStringMap().get("tools").asList();
 
-        var tool = tools.get(0).asStringMap();
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("NoIOOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertEquals("NoIOOperation", tool.get("name").asString());
+        assertEquals("This tool invokes NoIOOperation API of TestService.", tool.get("description").asString());
+
+        validateEmptySchema(tool.get("inputSchema").asStringMap());
+        validateEmptySchema(tool.get("outputSchema").asStringMap());
+    }
+
+    @Test
+    public void validateNoOutputOperationTool() {
+        server = McpServer.builder()
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("NoOutputOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertEquals("NoOutputOperation", tool.get("name").asString());
+        assertEquals("This tool invokes NoOutputOperation API of TestService.", tool.get("description").asString());
+
         var inputSchema = tool.get("inputSchema").asStringMap();
+        assertEquals("object", inputSchema.get("type").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", inputSchema.get("$schema").asString());
+        assertTrue(inputSchema.get("required").asList().isEmpty());
+
         var properties = inputSchema.get("properties").asStringMap();
+        assertTrue(properties.containsKey("inputStr"));
+        var inputStr = properties.get("inputStr").asStringMap();
+        assertEquals("string", inputStr.get("type").asString());
+
+        validateEmptySchema(tool.get("outputSchema").asStringMap());
+    }
+
+    @Test
+    public void validateNoInputOperationTool() {
+        server = McpServer.builder()
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("NoInputOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertEquals("NoInputOperation", tool.get("name").asString());
+        assertEquals("This tool invokes NoInputOperation API of TestService.", tool.get("description").asString());
+
+        validateEmptySchema(tool.get("inputSchema").asStringMap());
+
+        var outputSchema = tool.get("outputSchema").asStringMap();
+        assertEquals("object", outputSchema.get("type").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", outputSchema.get("$schema").asString());
+        assertTrue(outputSchema.get("required").asList().isEmpty());
+
+        var properties = outputSchema.get("properties").asStringMap();
+        assertTrue(properties.containsKey("outputStr"));
+        var outputStr = properties.get("outputStr").asStringMap();
+        assertEquals("string", outputStr.get("type").asString());
+    }
+
+    @Test
+    public void validateTestOperationTool() {
+        server = McpServer.builder()
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("TestOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
 
         assertEquals("TestOperation", tool.get("name").asString());
         assertEquals("A TestOperation", tool.get("description").asString());
-        assertEquals("object", inputSchema.get("type").asString());
-        assertEquals("An input for TestOperation with a nested member",
-                inputSchema.get("description").asString());
 
-        var str = properties.get("str").asStringMap();
-        assertEquals("string", str.get("type").asString());
-        assertEquals("It's a string", str.get("description").asString());
-
-        var list = properties.get("list").asStringMap();
-        assertEquals("array", list.get("type").asString());
-
-        var bigDecimal = properties.get("bigDecimalField").asStringMap();
-        assertEquals("string", bigDecimal.get("type").asString());
-
-        var listItems = list.get("items").asStringMap();
-        assertEquals("object", listItems.get("type").asString());
-        var listItemProperties = listItems.get("properties").asStringMap();
-        validateNestedStructure(listItemProperties);
-
-        var nested = properties.get("nested").asStringMap();
-        assertEquals("object", nested.get("type").asString());
-        var nestedProperties = nested.get("properties").asStringMap();
-        validateNestedStructure(nestedProperties);
-
-        var doubleNestedList = properties.get("doubleNestedList").asStringMap();
-        assertEquals("array", doubleNestedList.get("type").asString());
-
-        var doubleNestedListItems = doubleNestedList.get("items").asStringMap();
-        assertEquals("array", doubleNestedListItems.get("type").asString());
-
-        var doubleNestedListItemsItems = doubleNestedListItems.get("items").asStringMap();
-        assertEquals("object", doubleNestedListItemsItems.get("type").asString());
-        var doubleNestedProperties = doubleNestedListItemsItems.get("properties").asStringMap();
-        validateNestedStructure(doubleNestedProperties);
+        validateTestInputSchema(tool.get("inputSchema").asStringMap());
+        validateTestInputSchema(tool.get("outputSchema").asStringMap());
     }
 
     @Test
@@ -695,22 +813,117 @@ public class McpServerTest {
         assertEquals("Hello {{name}}, how are you?", content.get("text").asString());
     }
 
-    private void validateNestedStructure(Map<String, Document> properties) {
+    private void validateEmptySchema(Map<String, Document> schema) {
+        assertEquals("object", schema.get("type").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", schema.get("$schema").asString());
+        assertTrue(schema.get("properties").asStringMap().isEmpty());
+        assertTrue(schema.get("required").asList().isEmpty());
+    }
+
+    private void validateTestInputSchema(Map<String, Document> schema) {
+        assertEquals("object", schema.get("type").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", schema.get("$schema").asString());
+        assertEquals("An input for TestOperation with a nested member", schema.get("description").asString());
+        assertTrue(schema.get("required").asList().isEmpty());
+
+        var properties = schema.get("properties").asStringMap();
+
+        var str = properties.get("str").asStringMap();
+        assertEquals("string", str.get("type").asString());
+        assertEquals("It's a string", str.get("description").asString());
+
+        var blobField = properties.get("blobField").asStringMap();
+        assertEquals("string", blobField.get("type").asString());
+
+        var bigIntegerField = properties.get("bigIntegerField").asStringMap();
+        assertEquals("string", bigIntegerField.get("type").asString());
+
+        var bigDecimalField = properties.get("bigDecimalField").asStringMap();
+        assertEquals("string", bigDecimalField.get("type").asString());
+
+        validateNestedWithBigNumbers(properties.get("nestedWithBigNumbers").asStringMap());
+        validateNestedStructure(properties.get("nested").asStringMap());
+        validateNestedList(properties.get("list").asStringMap());
+        validateDoubleNestedList(properties.get("doubleNestedList").asStringMap());
+    }
+
+    private void validateNestedWithBigNumbers(Map<String, Document> nestedSchema) {
+        assertEquals("object", nestedSchema.get("type").asString());
+        assertEquals("A structure containing big number types", nestedSchema.get("description").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", nestedSchema.get("$schema").asString());
+        assertTrue(nestedSchema.get("required").asList().isEmpty());
+
+        var properties = nestedSchema.get("properties").asStringMap();
+
+        var nestedBigDecimal = properties.get("nestedBigDecimal").asStringMap();
+        assertEquals("string", nestedBigDecimal.get("type").asString());
+        assertEquals("A nested BigDecimal", nestedBigDecimal.get("description").asString());
+
+        var nestedBigInteger = properties.get("nestedBigInteger").asStringMap();
+        assertEquals("string", nestedBigInteger.get("type").asString());
+        assertEquals("A nested BigInteger", nestedBigInteger.get("description").asString());
+
+        var nestedBlob = properties.get("nestedBlob").asStringMap();
+        assertEquals("string", nestedBlob.get("type").asString());
+        assertEquals("A nested Blob", nestedBlob.get("description").asString());
+
+        var bigDecimalList = properties.get("bigDecimalList").asStringMap();
+        assertEquals("array", bigDecimalList.get("type").asString());
+        assertFalse(bigDecimalList.get("uniqueItems").asBoolean());
+        var listItems = bigDecimalList.get("items").asStringMap();
+        assertEquals("string", listItems.get("type").asString());
+    }
+
+    private void validateNestedList(Map<String, Document> listSchema) {
+        assertEquals("array", listSchema.get("type").asString());
+        assertFalse(listSchema.get("uniqueItems").asBoolean());
+
+        var listItems = listSchema.get("items").asStringMap();
+        validateNestedStructure(listItems);
+    }
+
+    private void validateDoubleNestedList(Map<String, Document> doubleListSchema) {
+        assertEquals("array", doubleListSchema.get("type").asString());
+        assertFalse(doubleListSchema.get("uniqueItems").asBoolean());
+
+        var outerItems = doubleListSchema.get("items").asStringMap();
+        assertEquals("array", outerItems.get("type").asString());
+        assertFalse(outerItems.get("uniqueItems").asBoolean());
+
+        var innerItems = outerItems.get("items").asStringMap();
+        validateNestedStructure(innerItems);
+    }
+
+    private void validateNestedStructure(Map<String, Document> nestedSchema) {
+        assertEquals("object", nestedSchema.get("type").asString());
+        assertEquals("A structure that can be nested", nestedSchema.get("description").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", nestedSchema.get("$schema").asString());
+        assertTrue(nestedSchema.get("required").asList().isEmpty());
+
+        var properties = nestedSchema.get("properties").asStringMap();
+
         var nestedStr = properties.get("nestedStr").asStringMap();
         assertEquals("string", nestedStr.get("type").asString());
         assertEquals("A string that's nested", nestedStr.get("description").asString());
 
         var nestedDocument = properties.get("nestedDocument").asStringMap();
+        assertEquals("object", nestedDocument.get("type").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", nestedDocument.get("$schema").asString());
         assertTrue(nestedDocument.get("additionalProperties").asBoolean());
         assertTrue(nestedDocument.get("properties").asStringMap().isEmpty());
         assertTrue(nestedDocument.get("required").asList().isEmpty());
 
         var recursive = properties.get("recursive").asStringMap();
         assertEquals("object", recursive.get("type").asString());
-        assertEquals("A structure that references itself recursively",
-                recursive.get("description").asString());
+        assertEquals("A structure that references itself recursively", recursive.get("description").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", recursive.get("$schema").asString());
+        assertTrue(recursive.get("required").asList().isEmpty());
+
         var recursiveProperties = recursive.get("properties").asStringMap();
         assertTrue(recursiveProperties.containsKey("nested"));
+        var nestedRecursive = recursiveProperties.get("nested").asStringMap();
+        assertEquals("object", nestedRecursive.get("type").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", nestedRecursive.get("$schema").asString());
     }
 
     private void write(String method, Document document) {
@@ -757,8 +970,22 @@ public class McpServerTest {
                         search_users: { description: "Test Template", template: "Search for if many results expected." }
                     })
                     service TestService {
-                        operations: [TestOperation]
+                        operations: [TestOperation, NoInputOperation, NoOutputOperation, NoIOOperation]
                     }
+
+                    operation NoOutputOperation {
+                        input := {
+                            inputStr: String
+                        }
+                    }
+
+                    operation NoInputOperation {
+                        output := {
+                            outputStr: String
+                        }
+                    }
+
+                    operation NoIOOperation {}
 
                     /// A TestOperation
                     @prompts({
