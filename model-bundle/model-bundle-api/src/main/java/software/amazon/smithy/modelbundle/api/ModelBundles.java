@@ -25,7 +25,7 @@ public final class ModelBundles {
     private static final PluginProviders PLUGIN_PROVIDERS = PluginProviders.builder().build();
 
     public static Service getService(SmithyBundle smithyBundle) {
-        var model = getModel(smithyBundle);
+        var model = prepareModelForBundling(smithyBundle);
         var plugin = PLUGIN_PROVIDERS.getPlugin(smithyBundle.getConfigType(), smithyBundle.getConfig());
         return ProxyService.builder()
                 .model(model)
@@ -35,7 +35,8 @@ public final class ModelBundles {
                 .build();
     }
 
-    private static Model getModel(SmithyBundle bundle) {
+    // visible for testing
+    static Model prepareModelForBundling(SmithyBundle bundle) {
         // TODO: model the type in the returned bundle
         var suffix = bundle.getModel().startsWith("$version") ? "smithy" : "json";
         var modelAssemble = new ModelAssembler().putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
@@ -49,7 +50,6 @@ public final class ModelBundles {
             model = modelAssemble.assemble().unwrap();
             additionalInputShape =
                     model.expectShape(ShapeId.from(additionalInput.getIdentifier())).asStructureShape().get();
-
         } else {
             model = modelAssemble.assemble().unwrap();
         }
@@ -116,7 +116,14 @@ public final class ModelBundles {
         var input = op.getInput();
         StructureShape finalInput;
         if (op.getInput().isEmpty()) {
-            finalInput = additionalInput;
+            var containerId = syntheticContainerForInput(additionalInput);
+            var container = builder.getCurrentShapes().get(containerId);
+            if (container == null) {
+                finalInput = createSyntheticInput(containerId, additionalInput);
+                builder.addShape(finalInput);
+            } else {
+                finalInput = (StructureShape) container;
+            }
         } else {
             var inputBuilder = model.expectShape(input.get(), StructureShape.class).toBuilder();
             inputBuilder.addMember(MemberShape.builder()
@@ -124,8 +131,9 @@ public final class ModelBundles {
                     .target(additionalInput.getId())
                     .build());
             finalInput = inputBuilder.id(ShapeId.from(inputBuilder.getId().toString()) + "Proxy").build();
+            builder.addShape(finalInput);
         }
-        builder.addShape(finalInput);
+
         var newOperation = op.toBuilder()
                 .id(ShapeId.from(op.getId().toString() + "Proxy"))
                 .input(finalInput)
@@ -134,5 +142,19 @@ public final class ModelBundles {
                 .build();
         builder.addShape(newOperation);
         serviceBuilder.addOperation(newOperation).build();
+    }
+
+    private static ShapeId syntheticContainerForInput(StructureShape additionalInput) {
+        return ShapeId.from("smithy.mcp#AdditionalInputFor" + additionalInput.getId().getName());
+    }
+
+    private static StructureShape createSyntheticInput(ShapeId containerId, StructureShape additionalInput) {
+        return StructureShape.builder()
+                .id(containerId)
+                .addMember(MemberShape.builder()
+                        .id(containerId.toString() + "$additionalInput")
+                        .target(additionalInput.getId())
+                        .build())
+                .build();
     }
 }
