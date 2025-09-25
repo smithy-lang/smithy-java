@@ -1,5 +1,6 @@
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 name: Update Gradle Wrapper
 # Needed because dependabot doesn't support updating the gradle wrapper
 # see: https://github.com/dependabot/dependabot-core/issues/2223
@@ -7,6 +8,7 @@ name: Update Gradle Wrapper
 on:
   schedule:
     - cron: "0 14 * * 1" # 2PM UTC (7AM PST) every Monday.
+  workflow_dispatch:
 
 jobs:
   update-gradle-wrapper:
