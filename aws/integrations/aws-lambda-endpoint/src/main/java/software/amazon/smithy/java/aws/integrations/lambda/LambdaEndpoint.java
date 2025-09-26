@@ -98,7 +98,7 @@ public final class LambdaEndpoint implements RequestHandler<ProxyRequest, ProxyR
         if (proxyRequest.getMultiValueHeaders() != null && !proxyRequest.getMultiValueHeaders().isEmpty()) {
             // TODO: handle single-value headers?
             // -- APIGW puts the actual headers in both, but only the latest header per key
-            headers.putHeaders(proxyRequest.getMultiValueHeaders());
+            headers.addHeaders(proxyRequest.getMultiValueHeaders());
         }
         URI uri;
         if (proxyRequest.getMultiValueQueryStringParameters() != null && !proxyRequest

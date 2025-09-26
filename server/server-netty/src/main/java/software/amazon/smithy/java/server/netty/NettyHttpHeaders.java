@@ -38,13 +38,23 @@ final class NettyHttpHeaders implements ModifiableHttpHeaders {
     }
 
     @Override
-    public void putHeader(String name, String value) {
+    public void addHeader(String name, String value) {
         nettyHeaders.add(name, value);
     }
 
     @Override
-    public void putHeader(String name, List<String> values) {
+    public void addHeader(String name, List<String> values) {
         nettyHeaders.add(name, values);
+    }
+
+    @Override
+    public void setHeader(String name, String value) {
+        nettyHeaders.set(name, value);
+    }
+
+    @Override
+    public void setHeader(String name, List<String> values) {
+        nettyHeaders.set(name, values);
     }
 
     @Override

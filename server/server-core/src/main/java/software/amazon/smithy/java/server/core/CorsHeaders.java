@@ -35,8 +35,8 @@ public final class CorsHeaders {
             return;
         }
 
-        job.response().headers().putHeaders(BASE_CORS_HEADERS);
-        job.response().headers().putHeader("Access-Control-Allow-Origin", List.of(requestOrigin));
+        job.response().headers().addHeaders(BASE_CORS_HEADERS);
+        job.response().headers().addHeader("Access-Control-Allow-Origin", List.of(requestOrigin));
     }
 
     private static boolean shouldAddCorsHeaders(HttpJob job) {

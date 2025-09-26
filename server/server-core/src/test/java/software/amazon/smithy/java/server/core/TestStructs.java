@@ -140,12 +140,12 @@ public class TestStructs {
         Map<String, List<String>> headers = new HashMap<>();
 
         @Override
-        public void putHeader(String name, String value) {
+        public void addHeader(String name, String value) {
             headers.put(name, List.of(value));
         }
 
         @Override
-        public void putHeader(String name, List<String> values) {
+        public void addHeader(String name, List<String> values) {
             headers.put(name, values);
         }
 

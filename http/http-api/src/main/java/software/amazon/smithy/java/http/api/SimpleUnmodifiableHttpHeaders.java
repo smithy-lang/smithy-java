@@ -80,7 +80,7 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
         for (var entry : headers.entrySet()) {
             copy.put(entry.getKey(), new ArrayList<>(entry.getValue()));
         }
-        mod.putHeaders(copy);
+        mod.addHeaders(copy);
         return mod;
     }
 
