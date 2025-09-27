@@ -201,7 +201,7 @@ class BytecodeCompilerTest {
 
     @Test
     void testCompileEndpointRule() {
-        EndpointRule rule = EndpointRule.builder()
+        Rule rule = EndpointRule.builder()
                 .endpoint(Endpoint.builder()
                         .url(Literal.stringLiteral(Template.fromString("https://example.com")))
                         .build());
@@ -221,7 +221,7 @@ class BytecodeCompilerTest {
         Map<String, List<Expression>> headers = new HashMap<>();
         headers.put("X-Custom", List.of(Literal.stringLiteral(Template.fromString("value"))));
 
-        EndpointRule rule = EndpointRule.builder()
+        Rule rule = EndpointRule.builder()
                 .endpoint(Endpoint.builder()
                         .url(Literal.stringLiteral(Template.fromString("https://example.com")))
                         .headers(headers)
@@ -243,7 +243,7 @@ class BytecodeCompilerTest {
         properties.put(Identifier.of("authSchemes"),
                 Literal.tupleLiteral(List.of(Literal.stringLiteral(Template.fromString("sigv4")))));
 
-        EndpointRule rule = EndpointRule.builder()
+        Rule rule = EndpointRule.builder()
                 .endpoint(Endpoint.builder()
                         .url(Literal.stringLiteral(Template.fromString("https://example.com")))
                         .properties(properties)
@@ -260,7 +260,7 @@ class BytecodeCompilerTest {
 
     @Test
     void testCompileErrorRule() {
-        ErrorRule rule = ErrorRule.builder().error(Literal.stringLiteral(Template.fromString("Invalid input")));
+        Rule rule = ErrorRule.builder().error(Literal.stringLiteral(Template.fromString("Invalid input")));
 
         List<Rule> results = List.of(NoMatchRule.INSTANCE, rule);
         EndpointBddTrait bdd = createBddWithResults(results);

@@ -42,6 +42,7 @@ import software.amazon.smithy.rulesengine.language.syntax.parameters.Parameters;
 import software.amazon.smithy.rulesengine.language.syntax.rule.Condition;
 import software.amazon.smithy.rulesengine.language.syntax.rule.EndpointRule;
 import software.amazon.smithy.rulesengine.language.syntax.rule.ErrorRule;
+import software.amazon.smithy.rulesengine.language.syntax.rule.Rule;
 import software.amazon.smithy.rulesengine.language.syntax.rule.TreeRule;
 
 public class DecisionTreeEndpointResolverTest {
@@ -87,7 +88,7 @@ public class DecisionTreeEndpointResolverTest {
                 .defaultValue(Value.stringValue("us-east-1"))
                 .build();
 
-        EndpointRule endpointRule = EndpointRule.builder()
+        Rule endpointRule = EndpointRule.builder()
                 .endpoint(Endpoint.builder().url(Expression.getReference(Identifier.of("region"))).build());
 
         EndpointRuleSet ruleSet = EndpointRuleSet.builder()
@@ -145,7 +146,7 @@ public class DecisionTreeEndpointResolverTest {
                 .fn(IsSet.ofExpressions(Expression.getReference(Identifier.of("endpoint"))))
                 .build();
 
-        EndpointRule endpointRule = EndpointRule.builder()
+        Rule endpointRule = EndpointRule.builder()
                 .conditions(List.of(isSetCondition))
                 .endpoint(Endpoint.builder().url(Expression.getReference(Identifier.of("endpoint"))).build());
 
@@ -174,7 +175,7 @@ public class DecisionTreeEndpointResolverTest {
                 .defaultValue(Value.stringValue("https://default.com"))
                 .build();
 
-        EndpointRule endpointRule = EndpointRule.builder()
+        Rule endpointRule = EndpointRule.builder()
                 .endpoint(Endpoint.builder().url(Expression.getReference(Identifier.of("endpoint"))).build());
 
         EndpointRuleSet ruleSet = EndpointRuleSet.builder()
@@ -241,10 +242,10 @@ public class DecisionTreeEndpointResolverTest {
 
     @Test
     void testErrorRuleEvaluation() {
-        ErrorRule errorRule = ErrorRule.builder().error(Expression.of("Invalid configuration"));
+        Rule errorRule = ErrorRule.builder().error(Expression.of("Invalid configuration"));
 
         // Add a fallback endpoint rule that won't be reached
-        EndpointRule fallbackRule = EndpointRule.builder()
+        Rule fallbackRule = EndpointRule.builder()
                 .endpoint(Endpoint.builder().url(Expression.of("https://fallback.com")).build());
 
         // Use TreeRule to test error within a condition
@@ -278,7 +279,7 @@ public class DecisionTreeEndpointResolverTest {
                 .builtIn("AWS::Region")
                 .build();
 
-        EndpointRule endpointRule = EndpointRule.builder()
+        Rule endpointRule = EndpointRule.builder()
                 .endpoint(Endpoint.builder().url(Expression.getReference(Identifier.of("region"))).build());
 
         EndpointRuleSet ruleSet = EndpointRuleSet.builder()
@@ -307,7 +308,7 @@ public class DecisionTreeEndpointResolverTest {
                 .type(ParameterType.STRING_ARRAY)
                 .build();
 
-        EndpointRule endpointRule = EndpointRule.builder()
+        Rule endpointRule = EndpointRule.builder()
                 .endpoint(Endpoint.builder().url(Expression.of(("https://multi-region.example.com"))).build());
 
         EndpointRuleSet ruleSet = EndpointRuleSet.builder()
