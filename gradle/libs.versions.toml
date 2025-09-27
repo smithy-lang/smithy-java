@@ -1,7 +1,7 @@
 [versions]
 junit5 = "5.13.4"
 hamcrest = "3.0"
-smithy = "1.61.0"
+smithy = "1.62.0"
 jmh = "0.7.3"
 test-logger-plugin = "4.0.0"
 spotbugs = "6.0.22"
@@ -11,13 +11,13 @@ assertj = "3.27.6"
 jackson = "2.20.0"
 netty = "4.2.6.Final"
 dep-analysis = "3.0.4"
-aws-sdk = "2.34.2"
+aws-sdk = "2.34.5"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 jreleaser = "1.20.0"
 picocli = "4.7.7"
 jline = "3.30.6"
-graalvm-native = "0.11.0"
+graalvm-native = "0.11.1"
 shadow = "8.3.9"
 
 [libraries]
