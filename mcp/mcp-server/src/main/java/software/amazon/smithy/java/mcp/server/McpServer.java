@@ -170,8 +170,7 @@ public final class McpServer implements Server {
                     writeResponse(req.getId(), result);
                 }
                 case "tools/list" -> {
-                    boolean supportsOutputSchema = protocolVersion != null
-                            && protocolVersion.compareTo(ProtocolVersion.v2025_06_18.INSTANCE) >= 0;
+                    var supportsOutputSchema = supportsOutputSchema();
                     writeResponse(req.getId(),
                             ListToolsResult.builder()
                                     .tools(tools.values()
@@ -223,11 +222,7 @@ public final class McpServer implements Server {
                         var adaptedDoc = adaptDocument(argumentsDoc, operation.getApiOperation().inputSchema());
                         var input = adaptedDoc.asShape(operation.getApiOperation().inputBuilder());
                         var output = operation.function().apply(input, null);
-                        var result = CallToolResult.builder()
-                                .content(List.of(TextContent.builder()
-                                        .text(CODEC.serializeToString((SerializableShape) output))
-                                        .build()))
-                                .build();
+                        var result = formatStructuredContent(tool, (SerializableShape) output);
                         writeResponse(req.getId(), result);
                     }
                 }
@@ -238,6 +233,26 @@ public final class McpServer implements Server {
         } catch (Exception e) {
             internalError(req, e);
         }
+    }
+
+    private boolean supportsOutputSchema() {
+        return protocolVersion != null && protocolVersion.compareTo(ProtocolVersion.v2025_06_18.INSTANCE) >= 0;
+    }
+
+    private CallToolResult formatStructuredContent(Tool tool, SerializableShape output) {
+        var result = CallToolResult.builder()
+                .content(List.of(TextContent.builder()
+                        .text(CODEC.serializeToString(output))
+                        .build()));
+
+        if (supportsOutputSchema()) {
+            var outputSchema = tool.toolInfo().getOutputSchema();
+            if (outputSchema != null) {
+                result.structuredContent(Document.of(output));
+            }
+        }
+
+        return result.build();
     }
 
     private ToolInfo extractToolInfo(Tool tool, boolean supportsOutput) {
