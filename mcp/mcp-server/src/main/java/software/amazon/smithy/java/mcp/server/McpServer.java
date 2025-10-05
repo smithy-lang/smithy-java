@@ -136,11 +136,13 @@ public final class McpServer implements Server {
                             pv = protocolVersion.identifier();
                         }
                     }
-
                     proxies.values().forEach(this::initialize);
+                    var builder = InitializeResult.builder();
+                    if (pv != null) {
+                        builder.protocolVersion(pv);
+                    }
                     writeResponse(req.getId(),
-                            InitializeResult.builder()
-                                    .protocolVersion(pv)
+                            builder
                                     .capabilities(Capabilities.builder()
                                             .tools(Tools.builder().listChanged(true).build())
                                             .prompts(Prompts.builder().listChanged(true).build())
