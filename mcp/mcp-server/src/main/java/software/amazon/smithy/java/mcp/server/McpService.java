@@ -78,7 +78,6 @@ public final class McpService {
     private final Map<String, Service> services;
     private final AtomicReference<JsonRpcRequest> initializeRequest = new AtomicReference<>();
     private final ToolFilter toolFilter;
-    private volatile ProtocolVersion protocolVersion;
 
     McpService(Map<String, Service> services, List<McpServerProxy> proxyList, String name, ToolFilter toolFilter) {
         this.services = services;
@@ -97,17 +96,22 @@ public final class McpService {
      *
      * @param req The JSON-RPC request to handle
      * @param asyncResponseCallback Callback for async responses (used for proxy calls)
+     * @param protocolVersion The protocol version for this request (may be null)
      * @return The response for synchronous operations, or null for async operations
      */
-    public JsonRpcResponse handleRequest(JsonRpcRequest req, Consumer<JsonRpcResponse> asyncResponseCallback) {
+    public JsonRpcResponse handleRequest(
+            JsonRpcRequest req,
+            Consumer<JsonRpcResponse> asyncResponseCallback,
+            ProtocolVersion protocolVersion
+    ) {
         try {
             validate(req);
             return switch (req.getMethod()) {
                 case "initialize" -> handleInitialize(req);
                 case "prompts/list" -> handlePromptsList(req);
                 case "prompts/get" -> handlePromptsGet(req);
-                case "tools/list" -> handleToolsList(req);
-                case "tools/call" -> handleToolsCall(req, asyncResponseCallback);
+                case "tools/list" -> handleToolsList(req, protocolVersion);
+                case "tools/call" -> handleToolsCall(req, asyncResponseCallback, protocolVersion);
                 default -> null; // Notifications or unknown methods
             };
         } catch (Exception e) {
@@ -120,7 +124,7 @@ public final class McpService {
         var maybeVersion = req.getParams().getMember("protocolVersion");
         String pv = null;
         if (maybeVersion != null) {
-            protocolVersion = ProtocolVersion.version(maybeVersion.asString());
+            var protocolVersion = ProtocolVersion.version(maybeVersion.asString());
             if (!(protocolVersion instanceof ProtocolVersion.UnknownVersion)) {
                 pv = protocolVersion.identifier();
             }
@@ -166,8 +170,8 @@ public final class McpService {
         return createSuccessResponse(req.getId(), result);
     }
 
-    private JsonRpcResponse handleToolsList(JsonRpcRequest req) {
-        var supportsOutputSchema = supportsOutputSchema();
+    private JsonRpcResponse handleToolsList(JsonRpcRequest req, ProtocolVersion protocolVersion) {
+        var supportsOutputSchema = supportsOutputSchema(protocolVersion);
         var result = ListToolsResult.builder()
                 .tools(tools.values()
                         .stream()
@@ -178,7 +182,11 @@ public final class McpService {
         return createSuccessResponse(req.getId(), result);
     }
 
-    private JsonRpcResponse handleToolsCall(JsonRpcRequest req, Consumer<JsonRpcResponse> asyncResponseCallback) {
+    private JsonRpcResponse handleToolsCall(
+            JsonRpcRequest req,
+            Consumer<JsonRpcResponse> asyncResponseCallback,
+            ProtocolVersion protocolVersion
+    ) {
         var operationName = req.getParams().getMember("name").asString();
         var tool = tools.get(operationName);
 
@@ -209,7 +217,7 @@ public final class McpService {
             var adaptedDoc = adaptDocument(argumentsDoc, operation.getApiOperation().inputSchema());
             var input = adaptedDoc.asShape(operation.getApiOperation().inputBuilder());
             var output = operation.function().apply(input, null);
-            var result = formatStructuredContent(tool, (SerializableShape) output);
+            var result = formatStructuredContent(tool, (SerializableShape) output, protocolVersion);
             return createSuccessResponse(req.getId(), result);
         }
     }
@@ -283,17 +291,21 @@ public final class McpService {
         return proxies;
     }
 
-    private boolean supportsOutputSchema() {
+    private boolean supportsOutputSchema(ProtocolVersion protocolVersion) {
         return protocolVersion != null && protocolVersion.compareTo(ProtocolVersion.v2025_06_18.INSTANCE) >= 0;
     }
 
-    private CallToolResult formatStructuredContent(Tool tool, SerializableShape output) {
+    private CallToolResult formatStructuredContent(
+            Tool tool,
+            SerializableShape output,
+            ProtocolVersion protocolVersion
+    ) {
         var result = CallToolResult.builder()
                 .content(List.of(TextContent.builder()
                         .text(CODEC.serializeToString(output))
                         .build()));
 
-        if (supportsOutputSchema()) {
+        if (supportsOutputSchema(protocolVersion)) {
             var outputSchema = tool.toolInfo().getOutputSchema();
             if (outputSchema != null) {
                 result.structuredContent(Document.of(output));

@@ -62,10 +62,15 @@ public abstract sealed class ProtocolVersion implements Comparable<ProtocolVersi
 
     public static ProtocolVersion version(String identifier) {
         return switch (identifier) {
+            case null -> v2025_03_26.INSTANCE;
             case "2024-11-05" -> v2024_11_05.INSTANCE;
             case "2025-03-26" -> v2025_03_26.INSTANCE;
             case "2025-06-18" -> v2025_06_18.INSTANCE;
             default -> new UnknownVersion(identifier);
         };
+    }
+
+    public static ProtocolVersion defaultVersion() {
+        return v2025_03_26.INSTANCE;
     }
 }
