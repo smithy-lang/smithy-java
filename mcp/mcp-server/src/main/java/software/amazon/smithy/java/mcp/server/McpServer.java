@@ -37,6 +37,7 @@ public final class McpServer implements Server {
     private final InputStream is;
     private final OutputStream os;
     private final CountDownLatch done = new CountDownLatch(1);
+    private volatile ProtocolVersion protocolVersion;
 
     McpServer(McpServerBuilder builder) {
         this.mcpService = builder.mcpService;
@@ -69,7 +70,18 @@ public final class McpServer implements Server {
     }
 
     private void handleRequest(JsonRpcRequest req) {
-        var response = mcpService.handleRequest(req, this::writeResponse);
+        // For StdIO transport, protocol version is only sent in initialize request
+        // Extract and store it for future requests
+        if ("initialize".equals(req.getMethod())) {
+            var maybeVersion = req.getParams().getMember("protocolVersion");
+            if (maybeVersion == null) {
+                this.protocolVersion = ProtocolVersion.defaultVersion();
+            } else {
+                this.protocolVersion = ProtocolVersion.version(maybeVersion.asString());
+            }
+        }
+
+        var response = mcpService.handleRequest(req, this::writeResponse, protocolVersion);
         if (response != null) {
             writeResponse(response);
         }
