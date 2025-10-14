@@ -24,6 +24,7 @@ import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ArgGroup;
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.smithy.aws.traits.ServiceTrait;
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.java.aws.client.auth.scheme.sigv4.SigV4AuthScheme;
@@ -32,6 +33,7 @@ import software.amazon.smithy.java.aws.client.core.identity.EnvironmentVariableI
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.aws.client.restxml.RestXmlClientProtocol;
+import software.amazon.smithy.java.aws.sdkv2.auth.SdkCredentialsResolver;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.rpcv2.RpcV2CborProtocol;
@@ -95,6 +97,9 @@ final class SmithyCall implements Callable<Integer> {
 
         @Option(names = { "--aws-region" }, description = "AWS region for SigV4 authentication")
         private String awsRegion;
+
+        @Option(names = { "--aws-profile", "--profile"}, description = "AWS profile to use for authentication")
+        private String awsProfile;
     }
 
     @Override
@@ -272,8 +277,15 @@ final class SmithyCall implements Callable<Integer> {
                     LOGGER.fine("Configuring SigV4 authentication with service signing name detected in model: " + signingName);
                     builder.putConfig(RegionSetting.REGION, auth.awsRegion)
                             .putSupportedAuthSchemes(new SigV4AuthScheme(signingName))
-                            .authSchemeResolver(AuthSchemeResolver.DEFAULT)
-                            .addIdentityResolver(new EnvironmentVariableIdentityResolver());
+                            .authSchemeResolver(AuthSchemeResolver.DEFAULT);
+
+                    if (auth.awsProfile != null) {
+                        var profileBuilder = ProfileCredentialsProvider.builder()
+                                .profileName(auth.awsProfile);
+                        builder.addIdentityResolver(new SdkCredentialsResolver(profileBuilder.build()));
+                    } else {
+                        builder.addIdentityResolver(new EnvironmentVariableIdentityResolver());
+                    }
                     break;
                 case "none":
                     builder.authSchemeResolver(AuthSchemeResolver.NO_AUTH);
