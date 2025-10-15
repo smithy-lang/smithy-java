@@ -74,17 +74,25 @@ public final class McpService {
     private final Map<String, Prompt> prompts;
     private final PromptProcessor promptProcessor;
     private final String name;
+    private final String version;
     private final Map<String, McpServerProxy> proxies;
     private final Map<String, Service> services;
     private final AtomicReference<JsonRpcRequest> initializeRequest = new AtomicReference<>();
     private final ToolFilter toolFilter;
 
-    McpService(Map<String, Service> services, List<McpServerProxy> proxyList, String name, ToolFilter toolFilter) {
+    McpService(
+            Map<String, Service> services,
+            List<McpServerProxy> proxyList,
+            String name,
+            String version,
+            ToolFilter toolFilter
+    ) {
         this.services = services;
         this.tools = createTools(services);
         this.prompts = PromptLoader.loadPrompts(services.values());
         this.promptProcessor = new PromptProcessor();
         this.name = name;
+        this.version = version;
         this.proxies = proxyList.stream().collect(Collectors.toMap(McpServerProxy::name, p -> p));
         this.toolFilter = toolFilter;
     }
@@ -142,7 +150,7 @@ public final class McpService {
                         .build())
                 .serverInfo(ServerInfo.builder()
                         .name(name)
-                        .version("1.0.0")
+                        .version(version)
                         .build())
                 .build();
 
@@ -594,6 +602,7 @@ public final class McpService {
         private Map<String, Service> services = new HashMap<>();
         private List<McpServerProxy> proxyList = new ArrayList<>();
         private String name = "mcp-server";
+        private String version = "1.0.0";
         private ToolFilter toolFilter = (serverId, toolName) -> true;
 
         public Builder services(Map<String, Service> services) {
@@ -611,13 +620,18 @@ public final class McpService {
             return this;
         }
 
+        public Builder version(String version) {
+            this.version = version;
+            return this;
+        }
+
         public Builder toolFilter(ToolFilter toolFilter) {
             this.toolFilter = toolFilter;
             return this;
         }
 
         public McpService build() {
-            return new McpService(services, proxyList, name, toolFilter);
+            return new McpService(services, proxyList, name, version, toolFilter);
         }
     }
 }
