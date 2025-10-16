@@ -434,7 +434,7 @@ public final class McpServer implements Server {
         };
 
         return JsonPrimitiveSchema.builder()
-                .typeMember(type)
+                .type(type)
                 .description(memberDescription(member))
                 .build();
     }

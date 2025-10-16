@@ -23,6 +23,14 @@ operation Naming {
         innerDeserializer: ShapeSerializer
 
         abc: ABC
+
+        union: UnionWithTypeMember
+
+        map: Map
+
+        list: List
+
+        realList: RealList
     }
     errors: [
         IllegalArgumentException
@@ -66,4 +74,24 @@ structure IllegalArgumentException {}
 @private
 structure ABC {
 
+}
+
+@private
+union UnionWithTypeMember {
+    type: Type
+}
+
+@private
+structure Map {
+
+}
+
+@private
+structure List {
+
+}
+
+@private
+list RealList {
+    member: String
 }
