@@ -159,25 +159,17 @@ public interface TimestampFormatter {
             @Override
             public Instant readFromNumber(Number value) {
                 // The most common types for serialized epoch-seconds, double/integer/long, are checked first.
-                if (value instanceof Double f) {
-                    return Instant.ofEpochMilli((long) (f * 1000f));
-                } else if (value instanceof Integer i) {
-                    return Instant.ofEpochMilli(i * 1000L);
-                } else if (value instanceof Long l) {
-                    return Instant.ofEpochMilli(l * 1000L);
-                } else if (value instanceof Byte b) {
-                    return Instant.ofEpochMilli(b * 1000L);
-                } else if (value instanceof Short s) {
-                    return Instant.ofEpochMilli(s * 1000L);
-                } else if (value instanceof Float f) {
-                    return Instant.ofEpochMilli((long) (f * 1000f));
-                } else if (value instanceof BigInteger bi) {
-                    return Instant.ofEpochMilli(bi.longValue() * 1000);
-                } else if (value instanceof BigDecimal bd) {
-                    return Instant.ofEpochMilli(bd.longValue() * 1000);
-                } else {
-                    throw new TimestampSyntaxError(format(), ExpectedType.NUMBER, value);
-                }
+                return switch (value) {
+                    case Double f -> Instant.ofEpochMilli((long) (f * 1000f));
+                    case Integer i -> Instant.ofEpochMilli(i * 1000L);
+                    case Long l -> Instant.ofEpochMilli(l * 1000L);
+                    case Byte b -> Instant.ofEpochMilli(b * 1000L);
+                    case Short s -> Instant.ofEpochMilli(s * 1000L);
+                    case Float f -> Instant.ofEpochMilli((long) (f * 1000f));
+                    case BigInteger bi -> Instant.ofEpochMilli(bi.longValue() * 1000);
+                    case BigDecimal bd -> Instant.ofEpochMilli(bd.longValue() * 1000);
+                    case null, default -> throw new TimestampSyntaxError(format(), ExpectedType.NUMBER, value);
+                };
             }
 
             @Override

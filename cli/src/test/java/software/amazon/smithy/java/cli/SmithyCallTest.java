@@ -30,6 +30,7 @@ class SmithyCallTest {
     private final PrintStream originalErr = System.err;
     private static HttpServer MOCK_SERVER;
     private static int PORT;
+    private static volatile String lastAuthorizationHeader;
 
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
     private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
@@ -46,6 +47,9 @@ class SmithyCallTest {
         MOCK_SERVER.setExecutor(Executors.newFixedThreadPool(1));
 
         MOCK_SERVER.createContext("/", exchange -> {
+            // Capture Authorization header for tests that need it
+            lastAuthorizationHeader = exchange.getRequestHeaders().getFirst("Authorization");
+
             String requestBody;
             try (InputStream is = exchange.getRequestBody()) {
                 requestBody = new String(is.readAllBytes(), StandardCharsets.UTF_8);
@@ -92,6 +96,7 @@ class SmithyCallTest {
 
     @BeforeEach
     void setUp() {
+        lastAuthorizationHeader = null;  // Reset captured header for each test
         commandLine = new CommandLine(new SmithyCall())
             .setCaseInsensitiveEnumValuesAllowed(true);
         System.setOut(new PrintStream(outContent));
@@ -344,6 +349,82 @@ class SmithyCallTest {
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("SigV4 auth requires --aws-region to be set."));
+    }
+
+    @Test
+    void testWithAWSProfileOption() throws IOException {
+        // Create temporary AWS credentials file with test profile
+        Path awsDir = tempDir.resolve(".aws");
+        Files.createDirectories(awsDir);
+        Path credentialsFile = awsDir.resolve("credentials");
+        String credentialsContent = """
+            [test-profile]
+            aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+            aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+            """;
+        Files.writeString(credentialsFile, credentialsContent);
+
+        // Point AWS SDK to our temporary credentials file
+        String originalCredentialsFile = System.getProperty("aws.sharedCredentialsFile");
+        System.setProperty("aws.sharedCredentialsFile", credentialsFile.toString());
+
+        try {
+            Path modelFile = tempDir.resolve("sprockets-sigv4.smithy");
+            String modelContent = """
+                $version: "2"
+                namespace smithy.example
+
+                use aws.auth#sigv4
+
+                @aws.protocols#awsJson1_0
+                @sigv4(name: "execute-api")
+                service Sprockets {
+                    operations: [CreateSprocket]
+                }
+
+                operation CreateSprocket {
+                    input := {}
+                    output := {
+                        id: String
+                    }
+                }
+                """;
+            Files.writeString(modelFile, modelContent);
+
+            String[] args = {
+                    "smithy.example#Sprockets",
+                    "CreateSprocket",
+                    "--model-path", tempDir.toString(),
+                    "--url", "http://localhost:" + PORT,
+                    "--auth", "sigv4",
+                    "--aws-region", "us-west-2",
+                    "--aws-profile", "test-profile",
+                    "--protocol", "aws_json",
+                    "--input-json", "{}"
+            };
+
+            int exitCode = commandLine.execute(args);
+
+            String stdErr = errContent.toString();
+            String stdOut = outContent.toString();
+
+            // Verify that the request was signed with SigV4 using profile credentials
+            assertTrue(lastAuthorizationHeader != null && lastAuthorizationHeader.startsWith("AWS4-HMAC-SHA256"),
+                "Authorization header with AWS4-HMAC-SHA256 signature should be present when using --aws-profile. " +
+                "Captured header: " + lastAuthorizationHeader + ", Exit code: " + exitCode +
+                ", stderr: " + stdErr + ", stdout: " + stdOut);
+
+            assertEquals(0, exitCode, "Command should succeed. stderr: " + stdErr);
+            String output = stdOut.trim();
+            assertTrue(output.contains("sprocket-123"));
+        } finally {
+            // Restore original system property
+            if (originalCredentialsFile != null) {
+                System.setProperty("aws.sharedCredentialsFile", originalCredentialsFile);
+            } else {
+                System.clearProperty("aws.sharedCredentialsFile");
+            }
+        }
     }
 
     @Test

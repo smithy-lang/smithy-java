@@ -34,8 +34,7 @@ public class EndpointResolverTest {
                 EndpointResolverParams.builder()
                         .operation(new TestOperationTemplatePrefix())
                         .inputValue(new EndpointInput("name", "bar", "baz"))
-                        .build())
-                .join();
+                        .build());
 
         MatcherAssert.assertThat(
                 endpoint.uri().toString(),
@@ -49,8 +48,7 @@ public class EndpointResolverTest {
                 EndpointResolverParams.builder()
                         .operation(new TestOperationStaticPrefix())
                         .inputValue(new EndpointInput("name", "bar", "baz"))
-                        .build())
-                .join();
+                        .build());
 
         MatcherAssert.assertThat(
                 endpoint.uri().toString(),
@@ -64,8 +62,7 @@ public class EndpointResolverTest {
                 EndpointResolverParams.builder()
                         .operation(new TestOperationTemplatePrefix())
                         .inputValue(new EndpointInput("name", "bar", "baz"))
-                        .build())
-                .join();
+                        .build());
 
         MatcherAssert.assertThat(
                 endpoint.uri().toString(),

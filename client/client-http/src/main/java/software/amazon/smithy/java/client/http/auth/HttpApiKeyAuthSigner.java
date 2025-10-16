@@ -7,7 +7,6 @@ package software.amazon.smithy.java.client.http.auth;
 
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.ApiKeyIdentity;
 import software.amazon.smithy.java.context.Context;
@@ -24,11 +23,7 @@ final class HttpApiKeyAuthSigner implements Signer<HttpRequest, ApiKeyIdentity> 
     private HttpApiKeyAuthSigner() {}
 
     @Override
-    public CompletableFuture<HttpRequest> sign(
-            HttpRequest request,
-            ApiKeyIdentity identity,
-            Context properties
-    ) {
+    public HttpRequest sign(HttpRequest request, ApiKeyIdentity identity, Context properties) {
         var name = properties.expect(HttpApiKeyAuthScheme.NAME);
         return switch (properties.expect(HttpApiKeyAuthScheme.IN)) {
             case HEADER -> {
@@ -43,7 +38,7 @@ final class HttpApiKeyAuthSigner implements Signer<HttpRequest, ApiKeyIdentity> 
                 if (existing != null) {
                     LOGGER.debug("Replaced header value for {}", name);
                 }
-                yield CompletableFuture.completedFuture(request.toBuilder().headers(HttpHeaders.of(updated)).build());
+                yield request.toBuilder().headers(HttpHeaders.of(updated)).build();
             }
             case QUERY -> {
                 var uriBuilder = URIBuilder.of(request.uri());
@@ -53,8 +48,7 @@ final class HttpApiKeyAuthSigner implements Signer<HttpRequest, ApiKeyIdentity> 
                 var existingQuery = request.uri().getQuery();
                 addExistingQueryParams(stringBuilder, existingQuery, name);
                 queryBuilder.write(stringBuilder);
-                yield CompletableFuture.completedFuture(
-                        request.toBuilder().uri(uriBuilder.query(stringBuilder.toString()).build()).build());
+                yield request.toBuilder().uri(uriBuilder.query(stringBuilder.toString()).build()).build();
             }
         };
     }

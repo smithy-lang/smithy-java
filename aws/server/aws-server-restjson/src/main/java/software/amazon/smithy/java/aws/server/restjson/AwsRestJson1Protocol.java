@@ -144,7 +144,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
                 .payloadMediaType("application/json");
 
         try {
-            deser.deserialize().get();
+            deser.deserialize();
         } catch (Exception e) {
             //TODO do exception translation.
             return CompletableFuture.failedFuture(e);
@@ -168,7 +168,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         HttpResponse response = serializer.serializeResponse();
         httpJob.response().setSerializedValue(response.body());
         httpJob.response().setStatusCode(response.statusCode());
-        httpJob.response().headers().putHeaders(response.headers().map());
+        httpJob.response().headers().addHeaders(response.headers().map());
         return CompletableFuture.completedFuture(null);
     }
 }

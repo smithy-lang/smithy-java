@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.concurrent.CompletableFuture;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import software.amazon.smithy.java.auth.api.Signer;
@@ -98,11 +97,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     }
 
     @Override
-    public CompletableFuture<HttpRequest> sign(
-            HttpRequest request,
-            AwsCredentialsIdentity identity,
-            Context properties
-    ) {
+    public HttpRequest sign(HttpRequest request, AwsCredentialsIdentity identity, Context properties) {
         var region = properties.expect(SigV4Settings.REGION);
         var name = properties.expect(SigV4Settings.SIGNING_NAME);
         var clock = properties.getOrDefault(SigV4Settings.CLOCK, Clock.systemUTC());
@@ -111,32 +106,31 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         // TODO: Support chunk encoding
         // TODO: support UNSIGNED
 
-        return getPayloadHash(request.body()).thenApply(payloadHash -> {
-            var signedHeaders = createSignedHeaders(
-                    request.method(),
-                    request.uri(),
-                    request.headers(),
-                    payloadHash,
-                    region,
-                    name,
-                    clock.instant(),
-                    identity.accessKeyId(),
-                    identity.secretAccessKey(),
-                    identity.sessionToken(),
-                    !request.body().hasKnownLength());
-            // Don't let the cached buffers grow too large.
-            var sb = signingResources.sb;
-            if (sb.length() > BUFFER_SIZE) {
-                sb.setLength(BUFFER_SIZE);
-                sb.trimToSize();
-            }
-            sb.setLength(0);
-            return request.toBuilder().headers(HttpHeaders.of(signedHeaders)).build();
-        });
+        var payloadHash = getPayloadHash(request.body());
+        var signedHeaders = createSignedHeaders(
+                request.method(),
+                request.uri(),
+                request.headers(),
+                payloadHash,
+                region,
+                name,
+                clock.instant(),
+                identity.accessKeyId(),
+                identity.secretAccessKey(),
+                identity.sessionToken(),
+                !request.body().hasKnownLength());
+        // Don't let the cached buffers grow too large.
+        var sb = signingResources.sb;
+        if (sb.length() > BUFFER_SIZE) {
+            sb.setLength(BUFFER_SIZE);
+            sb.trimToSize();
+        }
+        sb.setLength(0);
+        return request.toBuilder().headers(HttpHeaders.of(signedHeaders)).build();
     }
 
-    private CompletableFuture<String> getPayloadHash(DataStream dataStream) {
-        return dataStream.asByteBuffer().thenApply(this::hexHash);
+    private String getPayloadHash(DataStream dataStream) {
+        return hexHash(dataStream.waitForByteBuffer());
     }
 
     private String hexHash(ByteBuffer bytes) {

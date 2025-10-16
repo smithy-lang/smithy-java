@@ -25,7 +25,9 @@ public final class McpServerBuilder {
     Map<String, Service> services = new HashMap<>();
     List<McpServerProxy> proxyList = new ArrayList<>();
     String name;
+    String version;
     ToolFilter toolFilter = (server, tool) -> true;
+    McpService mcpService;
 
     McpServerBuilder() {}
 
@@ -50,8 +52,25 @@ public final class McpServerBuilder {
         return this;
     }
 
+    public McpServerBuilder version(String version) {
+        this.version = version;
+        return this;
+    }
+
     public Server build() {
         validate();
+        // Create McpService before building McpServer
+        var builder = McpService.builder()
+                .services(services)
+                .proxyList(proxyList)
+                .name(name != null ? name : "mcp-server")
+                .toolFilter(toolFilter);
+
+        if (version != null) {
+            builder.version(version);
+        }
+
+        this.mcpService = builder.build();
         return new McpServer(this);
     }
 

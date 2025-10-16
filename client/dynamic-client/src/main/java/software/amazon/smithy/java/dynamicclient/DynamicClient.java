@@ -13,11 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.ServiceLoader;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.function.Function;
 import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
@@ -83,7 +80,7 @@ public final class DynamicClient extends Client {
 
         // Build and register service-wide errors.
         var registryBuilder = TypeRegistry.builder();
-        for (var e : service.getErrors()) {
+        for (var e : service.getErrorsSet()) {
             registerError(e, registryBuilder);
         }
         this.serviceErrorRegistry = registryBuilder.build();
@@ -136,50 +133,19 @@ public final class DynamicClient extends Client {
      * @return the output of the operation.
      */
     public Document call(String operation, Document input, RequestOverrideConfig overrideConfig) {
-        try {
-            return callAsync(operation, input, overrideConfig).join();
-        } catch (CompletionException e) {
-            throw unwrapAndThrow(e);
-        }
-    }
-
-    /**
-     * Call an operation, passing no input.
-     *
-     * @param operation Operation name to call.
-     * @return the output of the operation.
-     */
-    public CompletableFuture<Document> callAsync(String operation) {
-        return callAsync(operation, Document.of(Map.of()));
-    }
-
-    /**
-     * Call an operation with input.
-     *
-     * @param operation Operation name to call.
-     * @param input Operation input as a document.
-     * @return the output of the operation.
-     */
-    public CompletableFuture<Document> callAsync(String operation, Document input) {
-        return callAsync(operation, input, null);
-    }
-
-    /**
-     * Call an operation with input and custom request override configuration.
-     *
-     * @param operation Operation name to call.
-     * @param input Operation input as a document.
-     * @param overrideConfig Override configuration for the request.
-     * @return the output of the operation.
-     */
-    public CompletableFuture<Document> callAsync(
-            String operation,
-            Document input,
-            RequestOverrideConfig overrideConfig
-    ) {
         var apiOperation = getApiOperation(operation);
         var inputStruct = StructDocument.of(apiOperation.inputSchema(), input, service.getId());
-        return call(inputStruct, apiOperation, overrideConfig).thenApply(Function.identity());
+        return call(inputStruct, apiOperation, overrideConfig);
+    }
+
+    /**
+     * Get an ApiOperation by name.
+     *
+     * @param name Name of the operation to get.
+     * @return the operation.
+     */
+    public ApiOperation<StructDocument, StructDocument> getOperation(String name) {
+        return getApiOperation(name);
     }
 
     /**
@@ -220,9 +186,9 @@ public final class DynamicClient extends Client {
 
             var errorSchemas = new HashSet<Schema>();
             // Create a type registry that is able to deserialize errors using schemas.
-            if (!shape.getErrors().isEmpty()) {
+            if (!shape.getErrorsSet().isEmpty()) {
                 var registryBuilder = TypeRegistry.builder();
-                for (var e : shape.getErrors()) {
+                for (var e : shape.getErrorsSet()) {
                     registerError(e, registryBuilder);
                     errorSchemas.add(schemaConverter.getSchema(model.expectShape(e)));
                 }

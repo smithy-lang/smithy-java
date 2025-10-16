@@ -35,7 +35,7 @@ public class SdkCredentialsResolverTest {
 
         var resolver = new SdkCredentialsResolver(credentialsProvider);
 
-        var result = resolver.resolveIdentity(authProperties).get();
+        var result = resolver.resolveIdentity(authProperties);
 
         assertNotNull(result);
         AwsCredentialsIdentity identity = result.identity();
@@ -58,7 +58,7 @@ public class SdkCredentialsResolverTest {
 
         var resolver = new SdkCredentialsResolver(credentialsProvider);
 
-        IdentityResult<AwsCredentialsIdentity> result = resolver.resolveIdentity(authProperties).get();
+        IdentityResult<AwsCredentialsIdentity> result = resolver.resolveIdentity(authProperties);
 
         assertNotNull(result);
         var identity = result.identity();
@@ -76,7 +76,7 @@ public class SdkCredentialsResolverTest {
 
         var resolver = new SdkCredentialsResolver(credentialsProvider);
 
-        IdentityResult<AwsCredentialsIdentity> result = resolver.resolveIdentity(authProperties).get();
+        IdentityResult<AwsCredentialsIdentity> result = resolver.resolveIdentity(authProperties);
 
         assertNotNull(result);
         AwsCredentialsIdentity identity = result.identity();

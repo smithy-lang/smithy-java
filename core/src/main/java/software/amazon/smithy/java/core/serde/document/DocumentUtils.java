@@ -157,16 +157,18 @@ public final class DocumentUtils {
     @SuppressWarnings("unchecked")
     @SmithyInternalApi
     public static <T> T getMemberValue(Document container, Schema containerSchema, Schema member) {
+        // Make sure it's part of the schema.
+        var value = SchemaUtils.validateMemberInSchema(containerSchema,
+                member,
+                container.getMember(member.memberName()));
+        if (value == null) {
+            return null;
+        }
+
         try {
-            // Make sure it's part of the schema.
-            var value = SchemaUtils.validateMemberInSchema(
-                    containerSchema,
-                    member,
-                    container.getMember(member.memberName()));
-            // If it's a document, unwrap it.
             // This should work for most use cases of DynamicClient, but this won't perfectly interoperate with all
             // use-cases or be a stand-in when an actual type is expected.
-            return (T) (value != null ? value.asObject() : null);
+            return (T) value.asObject();
         } catch (ClassCastException e) {
             throw new ClassCastException(
                     "Unable to cast document member `" + member.id() + "` from document with schema `" + containerSchema

@@ -15,7 +15,7 @@ import java.util.function.UnaryOperator;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
-import software.amazon.smithy.java.client.core.CallContext;
+import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
@@ -70,7 +70,7 @@ public final class ProxyService implements Service {
             clientBuilder.endpointResolver(EndpointResolver.staticEndpoint(builder.proxyEndpoint));
         }
         if (builder.userAgentAppId != null) {
-            clientBuilder.putConfig(CallContext.APPLICATION_ID, builder.userAgentAppId);
+            clientBuilder.putConfig(ClientContext.APPLICATION_ID, builder.userAgentAppId);
         }
         if (builder.clientConfigurator != null) {
             clientBuilder = builder.clientConfigurator.apply(clientBuilder);

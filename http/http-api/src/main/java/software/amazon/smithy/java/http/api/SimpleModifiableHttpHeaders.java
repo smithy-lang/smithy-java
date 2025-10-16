@@ -19,13 +19,45 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
     private final Map<String, List<String>> headers = new ConcurrentHashMap<>();
 
     @Override
-    public void putHeader(String name, String value) {
+    public void addHeader(String name, String value) {
         headers.computeIfAbsent(formatPutKey(name), k -> new ArrayList<>()).add(value);
     }
 
     @Override
-    public void putHeader(String name, List<String> values) {
+    public void addHeader(String name, List<String> values) {
         headers.computeIfAbsent(formatPutKey(name), k -> new ArrayList<>()).addAll(values);
+    }
+
+    @Override
+    public void setHeader(String name, String value) {
+        var key = formatPutKey(name);
+        var list = headers.get(formatPutKey(name));
+        if (list == null) {
+            list = new ArrayList<>(1);
+            headers.put(key, list);
+        } else {
+            list.clear();
+        }
+
+        list.add(value);
+    }
+
+    @Override
+    public void setHeader(String name, List<String> values) {
+        var key = formatPutKey(name);
+        var list = headers.get(formatPutKey(name));
+        if (list == null) {
+            list = new ArrayList<>(values.size());
+            headers.put(key, list);
+        } else {
+            list.clear();
+        }
+
+        // believe it or not, this is more efficient than the bulk constructor
+        // https://bugs.openjdk.org/browse/JDK-8368292
+        for (var element : values) {
+            list.add(element);
+        }
     }
 
     private static String formatPutKey(String name) {

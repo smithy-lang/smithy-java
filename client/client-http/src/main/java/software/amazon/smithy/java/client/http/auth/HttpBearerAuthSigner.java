@@ -7,7 +7,6 @@ package software.amazon.smithy.java.client.http.auth;
 
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.TokenIdentity;
 import software.amazon.smithy.java.context.Context;
@@ -24,16 +23,12 @@ final class HttpBearerAuthSigner implements Signer<HttpRequest, TokenIdentity> {
     private HttpBearerAuthSigner() {}
 
     @Override
-    public CompletableFuture<HttpRequest> sign(
-            HttpRequest request,
-            TokenIdentity identity,
-            Context properties
-    ) {
+    public HttpRequest sign(HttpRequest request, TokenIdentity identity, Context properties) {
         var headers = new LinkedHashMap<>(request.headers().map());
         var existing = headers.put(AUTHORIZATION_HEADER, List.of(SCHEME + " " + identity.token()));
         if (existing != null) {
             LOGGER.debug("Replaced existing Authorization header value.");
         }
-        return CompletableFuture.completedFuture(request.toBuilder().headers(HttpHeaders.of(headers)).build());
+        return request.toBuilder().headers(HttpHeaders.of(headers)).build();
     }
 }

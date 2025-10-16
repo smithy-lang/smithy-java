@@ -171,6 +171,8 @@ structure CallToolResult {
     // TODO add others
     content: TextContentList
 
+    structuredContent: Document
+
     @default(false)
     isError: Boolean
 }

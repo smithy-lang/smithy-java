@@ -20,13 +20,9 @@ record WaiterClientInterfaceMethodInterceptor(SymbolProvider symbolProvider, Jav
 
     @Override
     public void prepend(JavaWriter writer, ClientInterfaceAdditionalMethodsSection section) {
-        // TODO: Support Async waiters
-        if (section.async()) {
-            return;
-        }
         var clientSymbol = symbolProvider.toSymbol(section.client());
         writer.pushState();
-        writer.putContext("container", WaiterCodegenUtils.getWaiterSymbol(clientSymbol, settings, section.async()));
+        writer.putContext("container", WaiterCodegenUtils.getWaiterSymbol(clientSymbol, settings));
         writer.write("""
                 /**
                  * Create a new {@link CoffeeShopWaiter} instance that uses this client for polling.

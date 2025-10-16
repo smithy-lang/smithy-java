@@ -7,7 +7,6 @@ package software.amazon.smithy.java.client.core.endpoint;
 
 import java.net.URI;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Resolves an endpoint for an operation.
@@ -18,9 +17,9 @@ public interface EndpointResolver {
      * Resolves an endpoint using the provided parameters.
      *
      * @param params The parameters used during endpoint resolution.
-     * @return a CompletableFuture for the resolved endpoint.
+     * @return a resolved endpoint.
      */
-    CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params);
+    Endpoint resolveEndpoint(EndpointResolverParams params);
 
     /**
      * Create a default endpoint resolver that always returns the same endpoint with prefixes added if relevant.
@@ -72,7 +71,7 @@ public interface EndpointResolver {
      */
     static EndpointResolver staticHost(Endpoint endpoint) {
         Objects.requireNonNull(endpoint);
-        return params -> CompletableFuture.completedFuture(endpoint);
+        return new StaticHostResolver(endpoint);
     }
 
     /**
@@ -83,8 +82,7 @@ public interface EndpointResolver {
      */
     static EndpointResolver staticHost(String endpoint) {
         Objects.requireNonNull(endpoint);
-        var ep = Endpoint.builder().uri(endpoint).build();
-        return params -> CompletableFuture.completedFuture(ep);
+        return staticHost(Endpoint.builder().uri(endpoint).build());
     }
 
     /**
@@ -95,7 +93,6 @@ public interface EndpointResolver {
      */
     static EndpointResolver staticHost(URI endpoint) {
         Objects.requireNonNull(endpoint);
-        var ep = Endpoint.builder().uri(endpoint).build();
-        return params -> CompletableFuture.completedFuture(ep);
+        return staticHost(Endpoint.builder().uri(endpoint).build());
     }
 }

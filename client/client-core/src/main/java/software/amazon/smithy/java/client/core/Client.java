@@ -7,12 +7,12 @@ package software.amazon.smithy.java.client.core;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
+import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.CallHook;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
@@ -71,7 +71,7 @@ public abstract class Client {
      * @param <O>         Output shape.
      * @return Returns the deserialized output.
      */
-    protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
+    protected <I extends SerializableStruct, O extends SerializableStruct> O call(
             I input,
             ApiOperation<I, O> operation,
             RequestOverrideConfig overrideConfig
@@ -93,7 +93,6 @@ public abstract class Client {
             } else {
                 callConfig = afterInterceptionConfig;
             }
-
         }
 
         // Rebuild the pipeline, resolvers, etc if the config changed.
@@ -230,6 +229,34 @@ public abstract class Client {
         @SuppressWarnings("unchecked")
         public B endpointResolver(EndpointResolver endpointResolver) {
             this.configBuilder.endpointResolver(endpointResolver);
+            return (B) this;
+        }
+
+        /**
+         * Set a custom endpoint for the client to use.
+         *
+         * <p>Note that things like "hostLabel" traits may still cause the endpoint to change. For a completely
+         * static endpoint that never changes, use {@link EndpointResolver#staticHost}.
+         *
+         * @param customEndpoint Endpoint to use with the client.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B endpoint(Endpoint customEndpoint) {
+            putConfig(ClientContext.CUSTOM_ENDPOINT, customEndpoint);
+            return (B) this;
+        }
+
+        /**
+         * Set a custom endpoint for the client to use.
+         *
+         * @param customEndpoint Endpoint to use with the client.
+         * @return the builder.
+         * @see #endpoint(Endpoint)
+         */
+        @SuppressWarnings("unchecked")
+        public B endpoint(String customEndpoint) {
+            putConfig(ClientContext.CUSTOM_ENDPOINT, Endpoint.builder().uri(customEndpoint).build());
             return (B) this;
         }
 

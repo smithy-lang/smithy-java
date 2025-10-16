@@ -99,7 +99,7 @@ final class RpcV2CborProtocol extends ServerProtocol {
         } else {
             statusCode = 200;
         }
-        httpJob.response().headers().putHeader("smithy-protocol", "rpc-v2-cbor");
+        httpJob.response().headers().setHeader("smithy-protocol", "rpc-v2-cbor");
         httpJob.response().setStatusCode(statusCode);
         return CompletableFuture.completedFuture(null);
     }

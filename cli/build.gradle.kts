@@ -8,6 +8,7 @@ dependencies {
     implementation(libs.picocli)
     annotationProcessor(libs.picocli.codegen)
 
+    implementation(libs.aws.sdk.auth)
     implementation(libs.smithy.aws.traits)
     implementation(libs.smithy.waiters)
 
@@ -22,6 +23,7 @@ dependencies {
     implementation(project(":client:client-http"))
     implementation(project(":aws:client:aws-client-core"))
     implementation(project(":aws:aws-sigv4"))
+    implementation(project(":aws:sdkv2:aws-sdkv2-auth"))
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter.api)

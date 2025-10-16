@@ -8,7 +8,6 @@ package software.amazon.smithy.java.auth.api.identity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.context.Context;
 
 final class IdentityResolverChain<IdentityT extends Identity> implements IdentityResolver<IdentityT> {
@@ -29,35 +28,15 @@ final class IdentityResolverChain<IdentityT extends Identity> implements Identit
     }
 
     @Override
-    public CompletableFuture<IdentityResult<IdentityT>> resolveIdentity(Context requestProperties) {
+    public IdentityResult<IdentityT> resolveIdentity(Context requestProperties) {
         List<IdentityResult<?>> errors = new ArrayList<>();
-        return executeChain(resolvers.get(0), requestProperties, errors, 0);
-    }
-
-    private CompletableFuture<IdentityResult<IdentityT>> executeChain(
-            IdentityResolver<IdentityT> resolver,
-            Context requestProperties,
-            List<IdentityResult<?>> errors,
-            int idx
-    ) {
-        var result = resolver.resolveIdentity(requestProperties);
-        if (idx + 1 < resolvers.size()) {
-            var nextResolver = resolvers.get(idx + 1);
-            return result.thenCompose(ir -> {
-                if (ir.error() != null) {
-                    errors.add(ir);
-                    return executeChain(nextResolver, requestProperties, errors, idx + 1);
-                }
-                return CompletableFuture.completedFuture(ir);
-            });
-        }
-
-        return result.thenApply(ir -> {
-            if (ir.error() != null) {
-                errors.add(ir);
-                return IdentityResult.ofError(IdentityResolverChain.class, "Attempted resolvers: " + errors);
+        for (IdentityResolver<IdentityT> resolver : resolvers) {
+            IdentityResult<IdentityT> result = resolver.resolveIdentity(requestProperties);
+            if (result.error() == null) {
+                return result;
             }
-            return ir;
-        });
+            errors.add(result);
+        }
+        return IdentityResult.ofError(IdentityResolverChain.class, "Attempted resolvers: " + errors);
     }
 }

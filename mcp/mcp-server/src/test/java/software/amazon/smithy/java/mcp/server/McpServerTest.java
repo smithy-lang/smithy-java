@@ -63,9 +63,18 @@ public class McpServerTest {
     }
 
     private void initializeWithProtocolVersion(ProtocolVersion protocolVersion) {
-        write("initialize", Document.of(Map.of("protocolVersion", Document.of(protocolVersion.identifier()))));
+        final Document pvDoc;
+        final String expectedPv;
+        if (protocolVersion == null) {
+            pvDoc = Document.of(Map.of());
+            expectedPv = ProtocolVersion.v2024_11_05.INSTANCE.identifier();
+        } else {
+            pvDoc = Document.of(Map.of("protocolVersion", Document.of(protocolVersion.identifier())));
+            expectedPv = protocolVersion.identifier();
+        }
+        write("initialize", pvDoc);
         var pv = read().getResult().getMember("protocolVersion").asString();
-        assertEquals(protocolVersion.identifier(), pv);
+        assertEquals(expectedPv, pv);
     }
 
     @Test
@@ -116,7 +125,7 @@ public class McpServerTest {
 
         server.start();
 
-        initializeWithProtocolVersion(ProtocolVersion.v2025_06_18.INSTANCE);
+        initializeWithProtocolVersion(null);
         write("tools/list", Document.of(Map.of()));
         var response = read();
         var result = response.getResult().asStringMap();

@@ -209,17 +209,14 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
     }
 
     private static Symbol getTypeSymbol(Object type, char formatChar) {
-        if (type instanceof Symbol s) {
-            return s;
-        } else if (type instanceof Class<?> c) {
-            return CodegenUtils.fromClass(c);
-        } else if (type instanceof SymbolReference r) {
-            return r.getSymbol();
-        } else {
-            throw new IllegalArgumentException(
+        return switch (type) {
+            case Symbol s -> s;
+            case Class<?> c -> CodegenUtils.fromClass(c);
+            case SymbolReference r -> r.getSymbol();
+            case null, default -> throw new IllegalArgumentException(
                     "Invalid type provided for " + formatChar + ". Expected a Symbol or Class"
                             + " but found: `" + type + "`.");
-        }
+        };
     }
 
     /**

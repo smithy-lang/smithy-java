@@ -7,8 +7,6 @@ package software.amazon.smithy.java.protocoltests.harness;
 
 import java.net.URI;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientTransport;
@@ -52,20 +50,22 @@ final class MockClient extends Client {
             RequestOverrideConfig overrideConfig
     ) {
         try {
-            return call(input, operation, overrideConfig).exceptionallyCompose(exc -> {
-                if (exc instanceof CompletionException ce
-                        && ce.getCause() instanceof CallException apiException
-                        && apiException.getFault().equals(ErrorFault.SERVER)
-                        && exc.getMessage().contains(SYNTHETIC_ERROR_SEARCH)) {
-                    LOGGER.debug("Ignoring expected exception", apiException);
-                    return CompletableFuture.completedFuture(null);
+            return call(input, operation, overrideConfig);
+        } catch (CallException apiException) {
+            if (apiException.getFault().equals(ErrorFault.SERVER)) {
+                String message = apiException.getMessage();
+                if (message != null) {
+                    if (message.contains(SYNTHETIC_ERROR_SEARCH)) {
+                        LOGGER.debug("Ignoring expected exception", apiException);
+                        return null;
+                    }
                 } else {
-                    LOGGER.error("Encountered Unexpected exception", exc);
-                    return CompletableFuture.failedFuture(exc);
+                    apiException.printStackTrace();
                 }
-            }).join();
-        } catch (CompletionException e) {
-            throw unwrapAndThrow(e);
+            }
+
+            LOGGER.error("Encountered Unexpected exception", apiException);
+            throw apiException;
         }
     }
 
@@ -117,7 +117,7 @@ final class MockClient extends Client {
         }
 
         @Override
-        public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
+        public <I extends SerializableStruct, O extends SerializableStruct> O deserializeResponse(
                 ApiOperation<I, O> operation,
                 Context context,
                 TypeRegistry typeRegistry,
@@ -149,7 +149,7 @@ final class MockClient extends Client {
         }
 
         @Override
-        public CompletableFuture<Res> send(Context context, Req request) {
+        public Res send(Context context, Req request) {
             return getTransport().send(context, request);
         }
 

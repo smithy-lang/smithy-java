@@ -11,7 +11,6 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -132,13 +131,12 @@ public class DynamicClientTest {
             }
 
             @Override
-            public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
-                return CompletableFuture.completedFuture(
-                        HttpResponse.builder()
-                                .httpVersion(HttpVersion.HTTP_1_1)
-                                .statusCode(200)
-                                .body(DataStream.ofString("{\"id\":\"1\"}"))
-                                .build());
+            public HttpResponse send(Context context, HttpRequest request) {
+                return HttpResponse.builder()
+                        .httpVersion(HttpVersion.HTTP_1_1)
+                        .statusCode(200)
+                        .body(DataStream.ofString("{\"id\":\"1\"}"))
+                        .build();
             }
         };
     }
@@ -162,7 +160,7 @@ public class DynamicClientTest {
                 })
                 .build();
 
-        var result = client.callAsync("GetSprocket", Document.ofObject(Map.of("id", "1"))).get();
+        var result = client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
         assertThat(result.type(), is(ShapeType.STRUCTURE));
         assertThat(result.getMember("id").asString(), equalTo("1"));
     }
@@ -237,13 +235,12 @@ public class DynamicClientTest {
             }
 
             @Override
-            public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
-                return CompletableFuture.completedFuture(
-                        HttpResponse.builder()
-                                .httpVersion(HttpVersion.HTTP_1_1)
-                                .statusCode(400)
-                                .body(DataStream.ofString(payload))
-                                .build());
+            public HttpResponse send(Context context, HttpRequest request) {
+                return HttpResponse.builder()
+                        .httpVersion(HttpVersion.HTTP_1_1)
+                        .statusCode(400)
+                        .body(DataStream.ofString(payload))
+                        .build();
             }
         };
     }

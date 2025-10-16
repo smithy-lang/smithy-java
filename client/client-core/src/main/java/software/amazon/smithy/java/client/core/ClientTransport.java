@@ -9,7 +9,6 @@ import java.net.ConnectException;
 import java.net.ProtocolException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.SSLException;
 import software.amazon.smithy.java.client.core.error.ConnectTimeoutException;
 import software.amazon.smithy.java.client.core.error.TlsException;
@@ -43,9 +42,9 @@ public interface ClientTransport<RequestT, ResponseT> extends ClientPlugin {
      *
      * @param context Call context.
      * @param request Request to send.
-     * @return a CompletableFuture that is completed with the response.
+     * @return the response.
      */
-    CompletableFuture<ResponseT> send(Context context, RequestT request);
+    ResponseT send(Context context, RequestT request);
 
     /**
      * Get the message exchange.
@@ -69,21 +68,15 @@ public interface ClientTransport<RequestT, ResponseT> extends ClientPlugin {
      * @return the remapped exception. A given {@code CallException} or {@code TransportException} is returned as-is.
      */
     static CallException remapExceptions(Throwable e) {
-        if (e instanceof CallException ce) {
-            return ce; // rethrow CallException and TransportException as-is.
-        } else if (e instanceof ConnectException) {
-            return new ConnectTimeoutException(e);
-        } else if (e instanceof SocketTimeoutException) {
-            return new TransportSocketTimeout(e);
-        } else if (e instanceof SocketException) {
-            return new TransportSocketException(e);
-        } else if (e instanceof SSLException) {
-            return new TlsException(e);
-        } else if (e instanceof ProtocolException) {
-            return new TransportProtocolException(e);
-        } else {
+        return switch (e) {
+            case CallException ce -> ce; // rethrow CallException and TransportException as-is.
+            case ConnectException connectException -> new ConnectTimeoutException(e);
+            case SocketTimeoutException socketTimeoutException -> new TransportSocketTimeout(e);
+            case SocketException socketException -> new TransportSocketException(e);
+            case SSLException sslException -> new TlsException(e);
+            case ProtocolException protocolException -> new TransportProtocolException(e);
             // Wrap all other exceptions as a TransportException.
-            return new TransportException(e);
-        }
+            case null, default -> new TransportException(e);
+        };
     }
 }

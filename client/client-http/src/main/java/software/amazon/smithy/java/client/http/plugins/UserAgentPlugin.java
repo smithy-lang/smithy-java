@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
@@ -36,7 +37,7 @@ public final class UserAgentPlugin implements ClientPlugin {
     /**
      * Adds a default User-Agent header if none is set.
      *
-     * <p>The agent is in the form of {@code smithy-java/0.1 ua/2.1 os/macos#14.6.1Lang/java#17.0.12 m/a,b}, where
+     * <p>The agent is in the form of {@code smithy-java/0.1 ua/2.1 os/macos#14.6.1Lang/java#21.0.12 m/a,b}, where
      * "m/a,b" are feature IDs set via {@link CallContext#FEATURE_IDS}.
      *
      * <p>A pair of "app/{id}" is added if {@link CallContext#APPLICATION_ID} is set, or a value is set in the
@@ -109,7 +110,7 @@ public final class UserAgentPlugin implements ClientPlugin {
         }
 
         private static String resolveAppId(Context context) {
-            var appId = context.get(CallContext.APPLICATION_ID);
+            var appId = context.get(ClientContext.APPLICATION_ID);
             if (appId == null) {
                 appId = System.getenv(SYSTEM_APP_ID);
             }
