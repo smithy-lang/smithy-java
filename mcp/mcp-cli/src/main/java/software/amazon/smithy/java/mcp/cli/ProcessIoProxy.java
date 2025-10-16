@@ -222,6 +222,21 @@ public final class ProcessIoProxy {
                         running);
             }
 
+            // Thread to monitor process exit and signal completion
+            Thread.ofVirtual()
+                    .name("process-exit-monitor")
+                    .start(() -> {
+                        try {
+                            process.waitFor();
+                        } catch (InterruptedException e) {
+                            LOG.error("Process exit monitor interrupted", e);
+                            Thread.currentThread().interrupt();
+                        } finally {
+                            running.set(false);
+                            done.countDown();
+                        }
+                    });
+
         } catch (IOException e) {
             running.set(false);
             throw new RuntimeException("Failed to start process: " + e.getMessage(), e);
