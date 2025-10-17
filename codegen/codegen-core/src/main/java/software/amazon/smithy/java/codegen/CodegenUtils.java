@@ -338,6 +338,8 @@ public final class CodegenUtils {
      */
     public static Symbol getInnerTypeEnumSymbol(Symbol symbol) {
         return symbol.toBuilder()
+                .namespace(symbol.getFullName(), ".")
+                .putProperty(SymbolProperties.IS_LOCALLY_DEFINED, true)
                 .name("Type")
                 .build();
     }

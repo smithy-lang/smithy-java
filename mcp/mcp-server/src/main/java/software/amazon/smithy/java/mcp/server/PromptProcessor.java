@@ -46,7 +46,7 @@ public final class PromptProcessor {
                             PromptMessage.builder()
                                     .role(PromptRole.ASSISTANT.getValue())
                                     .content(PromptMessageContent.builder()
-                                            .typeMember(PromptMessageContentType.TEXT)
+                                            .type(PromptMessageContentType.TEXT)
                                             .text("Template is required for the prompt:"
                                                     + prompt.promptInfo().getName())
                                             .build())
@@ -62,7 +62,7 @@ public final class PromptProcessor {
                     .messages(List.of(PromptMessage.builder()
                             .role(PromptRole.USER.getValue())
                             .content(PromptMessageContent.builder()
-                                    .typeMember(PromptMessageContentType.TEXT)
+                                    .type(PromptMessageContentType.TEXT)
                                     .text("Tell user that there are missing arguments for the prompt : "
                                             + requiredArguments)
                                     .build())
@@ -78,7 +78,7 @@ public final class PromptProcessor {
                         PromptMessage.builder()
                                 .role(PromptRole.USER.getValue())
                                 .content(PromptMessageContent.builder()
-                                        .typeMember(PromptMessageContentType.TEXT)
+                                        .type(PromptMessageContentType.TEXT)
                                         .text(processedText)
                                         .build())
                                 .build()))

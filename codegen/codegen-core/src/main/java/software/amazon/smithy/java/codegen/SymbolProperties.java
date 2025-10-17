@@ -33,6 +33,11 @@ public final class SymbolProperties {
     public static final Property<Boolean> IS_JAVA_ARRAY = Property.named("is-java-array");
 
     /**
+     * Indicates if a symbol represents an inner class.
+     */
+    public static final Property<Boolean> IS_LOCALLY_DEFINED = Property.named("is-locally-defined");
+
+    /**
      * Method on {@link java.util.Collection} to use to create an immutable copy of the collection type
      * a symbol represents.
      */

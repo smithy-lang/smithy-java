@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.writer;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.function.BiFunction;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -33,6 +34,7 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
     private final String packageNamespace;
     private final JavaCodegenSettings settings;
     private final String filename;
+    private final Set<String> locallyDefinedNames = new HashSet<>();
 
     public JavaWriter(JavaCodegenSettings settings, String packageNamespace, String filename) {
         super(new JavaImportContainer(packageNamespace));
@@ -87,26 +89,54 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
     private void putNameContext() {
         // Add any implicit usages from classes in the same package
         var packageSymbols = settings.getGeneratedSymbolsPackage(packageNamespace);
-        packageSymbols.forEach(this::addToSymbolTable);
-        for (final Set<Symbol> duplicates : symbolTable.values()) {
+        Set<String> packageDefinedNames = new HashSet<>();
+        for (Symbol packageSymbol : packageSymbols) {
+            packageDefinedNames.add(packageSymbol.getName());
+        }
+        for (Set<Symbol> duplicates : symbolTable.values()) {
             // If the duplicates list has more than one entry
             // then duplicates are present, and we need to de-duplicate the names
             if (duplicates.size() > 1) {
                 duplicates.forEach(dupe -> putContext(dupe.getFullName(), deduplicate(dupe)));
             } else {
                 Symbol symbol = duplicates.iterator().next();
-                putContext(symbol.getFullName().replace("[]", "Array"), symbol.getName());
+                // Use fully qualified names for java.lang.* if there is duplicate names
+                // defined under the same package.
+                String symbolName = symbol.getName();
+                if (packageDefinedNames.contains(symbol.getName()) && symbol.getNamespace().equals("java.lang")) {
+                    symbolName = symbol.getFullName();
+                }
+                putContext(symbol.getFullName(), symbolName);
             }
         }
     }
 
     private String deduplicate(Symbol dupe) {
-        // If we are in the namespace of a Symbol, use its
-        // short name, otherwise use the full name
-        if (dupe.getNamespace().equals(packageNamespace)) {
+        if (useSimpleName(dupe)) {
             return dupe.getName();
         }
         return dupe.getFullName();
+    }
+
+    private boolean useSimpleName(Symbol dupe) {
+        // Only locally defined symbols and those symbols with non-conflicting names
+        // under the same namespace can use short name.
+        if (locallyDefinedNames.contains(dupe.getName())) {
+            return dupe.getProperty(SymbolProperties.IS_LOCALLY_DEFINED).isPresent();
+        }
+        return dupe.getNamespace().equals(packageNamespace);
+    }
+
+    /**
+     * Records the local name defined within the current file, e.g., the name of an inner class.
+     * The writer will use this information to decide if it should use a fully qualified
+     * name when referencing types with the same name in its scope.
+     *
+     * @param symbol the symbol reserved in this file.
+     */
+    public void addLocallyDefinedSymbol(Symbol symbol) {
+        locallyDefinedNames.add(symbol.getName());
+        symbolTable.computeIfAbsent(symbol.getName(), k -> new HashSet<>()).add(symbol);
     }
 
     /**

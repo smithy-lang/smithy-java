@@ -466,7 +466,7 @@ public final class McpService {
         };
 
         return JsonPrimitiveSchema.builder()
-                .typeMember(type)
+                .type(type)
                 .description(memberDescription(member))
                 .build();
     }
