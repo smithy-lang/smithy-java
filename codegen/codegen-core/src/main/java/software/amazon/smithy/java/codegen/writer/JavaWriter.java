@@ -34,7 +34,7 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
     private final String packageNamespace;
     private final JavaCodegenSettings settings;
     private final String filename;
-    private final Set<String> localDefinedSymbol = new HashSet<>();
+    private final Set<String> locallyDefinedNames = new HashSet<>();
 
     public JavaWriter(JavaCodegenSettings settings, String packageNamespace, String filename) {
         super(new JavaImportContainer(packageNamespace));
@@ -102,25 +102,27 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
                 Symbol symbol = duplicates.iterator().next();
                 // Use fully qualified names for java.lang.* if there is duplicate names
                 // defined under the same package.
-                String symbolName = packageDefinedNames.contains(symbol.getName())
-                        && symbol.getNamespace().equals("java.lang") ? symbol.getFullName() : symbol.getName();
-                putContext(symbol.getFullName().replace("[]", "Array"), symbolName);
+                String symbolName = symbol.getName();
+                if (packageDefinedNames.contains(symbol.getName()) && symbol.getNamespace().equals("java.lang")) {
+                    symbolName = symbol.getFullName();
+                }
+                putContext(symbol.getFullName(), symbolName);
             }
         }
     }
 
     private String deduplicate(Symbol dupe) {
-        if (useShortName(dupe)) {
+        if (useSimpleName(dupe)) {
             return dupe.getName();
         }
         return dupe.getFullName();
     }
 
-    private boolean useShortName(Symbol dupe) {
-        // Only inner class symbol and those symbols with non-conflicting names
+    private boolean useSimpleName(Symbol dupe) {
+        // Only locally defined symbols and those symbols with non-conflicting names
         // under the same namespace can use short name.
-        if (localDefinedSymbol.contains(dupe.getName())) {
-            return dupe.getProperty("IS_INNER_CLASS").isPresent();
+        if (locallyDefinedNames.contains(dupe.getName())) {
+            return dupe.getProperty(SymbolProperties.IS_LOCALLY_DEFINED).isPresent();
         }
         return dupe.getNamespace().equals(packageNamespace);
     }
@@ -132,8 +134,8 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
      *
      * @param symbol the symbol reserved in this file.
      */
-    public void addLocalDefinedSymbol(Symbol symbol) {
-        localDefinedSymbol.add(symbol.getName());
+    public void addLocallyDefinedSymbol(Symbol symbol) {
+        locallyDefinedNames.add(symbol.getName());
         symbolTable.computeIfAbsent(symbol.getName(), k -> new HashSet<>()).add(symbol);
     }
 

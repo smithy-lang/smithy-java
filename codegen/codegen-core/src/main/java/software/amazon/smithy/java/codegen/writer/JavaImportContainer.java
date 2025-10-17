@@ -29,7 +29,7 @@ final class JavaImportContainer implements ImportContainer {
         // Do not import primitive types, java.lang standard library imports or inner classes.
         if (symbol.expectProperty(SymbolProperties.IS_PRIMITIVE)
                 || symbol.getNamespace().startsWith("java.lang")
-                || symbol.getProperty("IS_INNER_CLASS").isPresent()) {
+                || symbol.getProperty(SymbolProperties.IS_LOCALLY_DEFINED).isPresent()) {
             return;
         }
         Set<Symbol> duplicates = imports.computeIfAbsent(symbol.getName(), sn -> new HashSet<>());

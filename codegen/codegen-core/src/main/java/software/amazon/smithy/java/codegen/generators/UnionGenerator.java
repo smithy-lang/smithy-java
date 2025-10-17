@@ -9,7 +9,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
-import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.ContextualDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateUnionDirective;
@@ -43,8 +42,8 @@ public final class UnionGenerator
         }
         var shape = directive.shape();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
-            Symbol innerTypeEnumSymbol = CodegenUtils.getInnerTypeEnumSymbol(directive.symbol());
-            writer.addLocalDefinedSymbol(innerTypeEnumSymbol);
+            var innerTypeEnumSymbol = CodegenUtils.getInnerTypeEnumSymbol(directive.symbol());
+            writer.addLocallyDefinedSymbol(innerTypeEnumSymbol);
             writer.pushState(new ClassSection(shape));
             var template = """
                     public abstract class ${shape:T} implements ${serializableStruct:T} {
