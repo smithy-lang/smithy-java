@@ -36,8 +36,6 @@ structure Builder {}
 
 structure Type {}
 
-// All of the members of this structure would override
-// Object.class method's unless escaped.
 structure Object {
     class: String
     getClass: String
@@ -50,13 +48,10 @@ structure Object {
     finalize: String
 }
 
-@private
 union UnionWithTypeMember {
     type: Type
 }
 
-@private
 structure Map {}
 
-@private
 structure List {}
