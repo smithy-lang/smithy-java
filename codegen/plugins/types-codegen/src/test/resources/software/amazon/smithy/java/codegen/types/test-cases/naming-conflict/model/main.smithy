@@ -17,17 +17,27 @@ structure NamingStruct {
     map: Map
 
     list: List
+
+    listOfList: ListOfList
+
+    mapOfMap: MapOfMap
 }
 
-@private
+list ListOfList{
+    member:List
+}
+
+map MapOfMap {
+    key: String
+    value: Map
+}
+
 structure Builder {}
 
-@private
 structure Type {}
 
 // All of the members of this structure would override
 // Object.class method's unless escaped.
-@private
 structure Object {
     class: String
     getClass: String
