@@ -545,4 +545,8 @@ public class ConfigUtils {
             addToClientConfigs(config, id, clientConfigs, newClientConfig);
         }
     }
+
+    public static Path getConfigDir() {
+        return CONFIG_DIR;
+    }
 }
