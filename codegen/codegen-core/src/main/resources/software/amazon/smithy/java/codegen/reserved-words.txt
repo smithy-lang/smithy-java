@@ -25,6 +25,7 @@ double
 else
 enum
 extends
+false
 final
 finally
 float
@@ -33,13 +34,13 @@ goto
 if
 implements
 import
-type
 instanceof
 int
 interface
 long
 native
 new
+null
 object
 package
 private
@@ -57,9 +58,7 @@ throw
 throws
 transient
 try
+true
 void
 volatile
 while
-true
-false
-null
