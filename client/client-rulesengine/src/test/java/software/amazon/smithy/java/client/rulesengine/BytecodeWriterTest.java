@@ -11,11 +11,19 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class BytecodeWriterTest {
+
+    private byte[] getInstructionBytes(Bytecode bytecode) {
+        ByteBuffer instructions = bytecode.getInstructions();
+        byte[] bytes = new byte[instructions.remaining()];
+        instructions.get(bytes);
+        return bytes;
+    }
 
     @Test
     void testBasicBytecodeWriting() {
@@ -31,7 +39,7 @@ class BytecodeWriterTest {
                 new int[0],
                 0);
 
-        byte[] bytes = bytecode.getBytecode();
+        byte[] bytes = getInstructionBytes(bytecode);
         assertEquals(3, bytes.length);
         assertEquals(Opcodes.LOAD_CONST, bytes[0]);
         assertEquals(0, bytes[1]);
@@ -51,7 +59,7 @@ class BytecodeWriterTest {
                 new int[0],
                 0);
 
-        byte[] bytes = bytecode.getBytecode();
+        byte[] bytes = getInstructionBytes(bytecode);
         assertEquals(3, bytes.length);
         assertEquals(Opcodes.LOAD_CONST_W, bytes[0]);
         assertEquals(0x12, bytes[1] & 0xFF);
@@ -117,9 +125,12 @@ class BytecodeWriterTest {
         assertEquals(2, bytecode.getConditionCount());
         assertEquals(1, bytecode.getResultCount());
 
-        assertEquals(0, bytecode.getConditionStartOffset(0));
-        assertEquals(3, bytecode.getConditionStartOffset(1));
-        assertEquals(6, bytecode.getResultOffset(0));
+        int offset0 = bytecode.getConditionStartOffset(0);
+        int offset1 = bytecode.getConditionStartOffset(1);
+        int offset2 = bytecode.getResultOffset(0);
+
+        assertEquals(3, offset1 - offset0); // Second condition is 3 bytes after first
+        assertEquals(6, offset2 - offset0); // Result is 6 bytes after first condition
     }
 
     @Test
@@ -211,7 +222,7 @@ class BytecodeWriterTest {
 
         Bytecode bytecode = writer.build(new RegisterDefinition[0], new RulesFunction[0], new int[0], 0);
 
-        byte[] bytes = bytecode.getBytecode();
+        byte[] bytes = getInstructionBytes(bytecode);
 
         // Verify structure
         assertEquals(Opcodes.LOAD_CONST, bytes[0]);
@@ -258,7 +269,7 @@ class BytecodeWriterTest {
 
         Bytecode bytecode = writer.build(new RegisterDefinition[0], new RulesFunction[0], new int[0], 0);
 
-        byte[] bytes = bytecode.getBytecode();
+        byte[] bytes = getInstructionBytes(bytecode);
 
         // Layout:
         // 0: JNN_OR_POP
@@ -295,7 +306,7 @@ class BytecodeWriterTest {
 
         Bytecode bytecode = writer.build(new RegisterDefinition[0], new RulesFunction[0], new int[0], 0);
 
-        byte[] bytes = bytecode.getBytecode();
+        byte[] bytes = getInstructionBytes(bytecode);
 
         // Jump offset should be 0 (no bytes to skip)
         int jumpOffset = ((bytes[1] & 0xFF) << 8) | (bytes[2] & 0xFF);

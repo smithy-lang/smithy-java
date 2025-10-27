@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -507,7 +508,7 @@ class BytecodeCompilerTest {
         Bytecode bytecode = compiler.compile();
 
         OpcodeWithValue result = findOpcodeWithValue(bytecode, Opcodes.LISTN);
-        assertTrue(result.found());
+        assertTrue(result.found(), "LISTN opcode not found in bytecode");
         assertEquals(5, result.value());
     }
 
@@ -527,17 +528,16 @@ class BytecodeCompilerTest {
         assertOpcodePresent(bytecode, Opcodes.MAPN);
     }
 
-    private void assertOpcodePresent(Bytecode bytecode, byte expectedOpcode) {
-        BytecodeWalker walker = new BytecodeWalker(bytecode.getBytecode());
-        boolean found = false;
+    private void assertOpcodePresent(Bytecode bytecode, int expectedOpcode) {
+        ByteBuffer instructions = bytecode.getInstructions();
+        byte[] instructionBytes = new byte[instructions.remaining()];
+        instructions.get(instructionBytes);
 
-        while (walker.hasNext()) {
-            if (walker.currentOpcode() == expectedOpcode) {
+        boolean found = false;
+        for (byte b : instructionBytes) {
+            if ((b & 0xFF) == expectedOpcode) {
                 found = true;
                 break;
-            }
-            if (!walker.advance()) {
-                break; // Unknown opcode encountered
             }
         }
 
@@ -556,22 +556,42 @@ class BytecodeCompilerTest {
     }
 
     private OpcodeWithValue findOpcodeWithValue(Bytecode bytecode, byte expectedOpcode) {
-        BytecodeWalker walker = new BytecodeWalker(bytecode.getBytecode());
+        // Search conditions
+        for (int i = 0; i < bytecode.getConditionCount(); i++) {
+            OpcodeWithValue result = findInSection(bytecode, bytecode.getConditionStartOffset(i), expectedOpcode);
+            if (result.found()) {
+                return result;
+            }
+        }
+
+        // Search results
+        for (int i = 0; i < bytecode.getResultCount(); i++) {
+            OpcodeWithValue result = findInSection(bytecode, bytecode.getResultOffset(i), expectedOpcode);
+            if (result.found()) {
+                return result;
+            }
+        }
+
+        return new OpcodeWithValue(false, 0);
+    }
+
+    private OpcodeWithValue findInSection(Bytecode bytecode, int offset, byte expectedOpcode) {
+        BytecodeWalker walker = new BytecodeWalker(bytecode.getInstructions(), offset);
 
         while (walker.hasNext()) {
             if (walker.currentOpcode() == expectedOpcode) {
                 try {
-                    int value = walker.getOperand(0);
-                    return new OpcodeWithValue(true, value);
+                    return new OpcodeWithValue(true, walker.getOperand(0));
                 } catch (IllegalArgumentException e) {
                     // Opcode doesn't have operands
                     return new OpcodeWithValue(true, 0);
                 }
             }
-            if (!walker.advance()) {
+            if (walker.isReturnOpcode() || !walker.advance()) {
                 break;
             }
         }
+
         return new OpcodeWithValue(false, 0);
     }
 

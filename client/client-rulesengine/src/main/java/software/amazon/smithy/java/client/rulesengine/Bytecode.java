@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.client.rulesengine;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -54,7 +55,7 @@ import software.amazon.smithy.rulesengine.logic.bdd.BddNodeConsumer;
  *   <li><b>Register Definitions</b> - Array of parameter/register metadata (immediately after result table)</li>
  *   <li><b>Function Table</b> - Array of function names</li>
  *   <li><b>BDD Table</b> - Array of BDD nodes (3 ints per node)</li>
- *   <li><b>Bytecode Section</b> - Compiled instructions for conditions and results</li>
+ *   <li><b>Instruction Section</b> - Compiled instructions for conditions and results</li>
  *   <li><b>Constant Pool</b> - All constants referenced by the bytecode</li>
  * </ol>
  *
@@ -112,7 +113,7 @@ import software.amazon.smithy.rulesengine.logic.bdd.BddNodeConsumer;
  *   <li>100_000_000+: Result terminals (100_000_000 + resultIndex)</li>
  * </ul>
  *
- * <h3>Bytecode Section</h3>
+ * <h3>Instruction Section</h3>
  * <p>Contains the compiled bytecode instructions for all conditions and results.
  * The condition/result tables contain absolute offsets from the start of the file that point into this section.
  * Instructions use a stack-based virtual machine with opcodes defined in {@link Opcodes}. This section may include
@@ -316,12 +317,27 @@ public final class Bytecode {
     }
 
     /**
-     * Get the raw bytecode.
+     * Get the entire raw bytecode, including headers and the instructions.
      *
      * @return the bytecode.
      */
     public byte[] getBytecode() {
         return bytecode;
+    }
+
+    /**
+     * Gets a read-only view of the instruction section from the bytecode.
+     *
+     * <p>This section contains the compiled opcodes for all conditions and results.
+     *
+     * @return a ByteBuffer view of the instruction bytes
+     */
+    public ByteBuffer getInstructions() {
+        BytecodeReader reader = new BytecodeReader(bytecode, 0);
+        reader.skipToBytecodeSection();
+        int start = reader.offset;
+        int end = reader.getBytecodeEndPosition();
+        return ByteBuffer.wrap(bytecode, start, end - start).asReadOnlyBuffer();
     }
 
     /**

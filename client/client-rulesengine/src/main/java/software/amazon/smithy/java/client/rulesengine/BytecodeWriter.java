@@ -139,16 +139,17 @@ final class BytecodeWriter {
             writeBddTable(dos, bddNodes);
 
             // Apply jump patches to get the final bytecode
-            byte[] originalBytecode = bytecodeStream.toByteArray();
-            byte[] bytecode = originalBytecode;
-            if (!jumpPatches.isEmpty()) {
+            if (jumpPatches.isEmpty()) {
+                // If no jumps, the just copy directly
+                bytecodeStream.writeTo(dos);
+            } else {
+                byte[] originalBytecode = bytecodeStream.toByteArray();
                 ByteArrayOutputStream patchedStream = new ByteArrayOutputStream();
                 DataOutputStream patchedDos = new DataOutputStream(patchedStream);
                 writePatchedBytecode(patchedDos, originalBytecode);
                 patchedDos.flush();
-                bytecode = patchedStream.toByteArray();
+                dos.write(patchedStream.toByteArray());
             }
-            dos.write(bytecode);
 
             int constantPoolOffset = complete.size();
             writeConstantPool(dos);
@@ -162,9 +163,14 @@ final class BytecodeWriter {
             patchInt(data, 40, bddTableOffset);
 
             return new Bytecode(
-                    bytecode,
-                    conditionOffsets.stream().mapToInt(Integer::intValue).toArray(),
-                    resultOffsets.stream().mapToInt(Integer::intValue).toArray(),
+                    data,
+                    // Convert to absolute offsets for the Bytecode object
+                    conditionOffsets.stream()
+                            .mapToInt(offset -> bytecodeOffset + offset)
+                            .toArray(),
+                    resultOffsets.stream()
+                            .mapToInt(offset -> bytecodeOffset + offset)
+                            .toArray(),
                     registerDefinitions,
                     constants.toArray(),
                     functions,

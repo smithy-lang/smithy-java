@@ -331,7 +331,6 @@ final class BytecodeDisassembler {
                 }
             }
             case JUMP_OFFSET -> {
-                int offset = walker.getOperand(0);
                 s.append("-> ").append(walker.getJumpTarget());
             }
         }

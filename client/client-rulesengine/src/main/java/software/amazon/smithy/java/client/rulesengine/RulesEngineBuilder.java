@@ -200,11 +200,11 @@ public final class RulesEngineBuilder {
         }
 
         // Load function names and resolve them using this builder's functions
+        // This advances reader.offset to the end of the function table
         reader.offset = functionTableOffset;
         RulesFunction[] resolvedFunctions = loadFunctions(reader, functionCount);
 
-        // Load register definitions (after result table)
-        reader.offset = resultTableOffset + (resultCount * 4);
+        // Load register definitions
         RegisterDefinition[] registers = reader.readRegisterDefinitions(registerCount);
 
         // Load BDD nodes as flat array
@@ -217,36 +217,10 @@ public final class RulesEngineBuilder {
             bddNodes[baseIdx + 2] = reader.readInt(); // low
         }
 
-        // Find bytecode start and length
-        int bytecodeStart = bddTableOffset + (bddNodeCount * 12);
-        int bytecodeLength = constantPoolOffset - bytecodeStart;
-
-        if (bytecodeLength < 0) {
-            throw new IllegalArgumentException("Invalid bytecode section length");
-        }
-
-        // Extract bytecode section (with relative offsets)
-        byte[] bytecode = new byte[bytecodeLength];
-        System.arraycopy(data, bytecodeStart, bytecode, 0, bytecodeLength);
-
-        // Adjust offsets to be relative to bytecode start
-        for (int i = 0; i < conditionCount; i++) {
-            conditionOffsets[i] -= bytecodeStart;
-            if (conditionOffsets[i] < 0 || conditionOffsets[i] >= bytecodeLength) {
-                throw new IllegalArgumentException("Invalid condition offset at index " + i);
-            }
-        }
-
-        for (int i = 0; i < resultCount; i++) {
-            resultOffsets[i] -= bytecodeStart;
-            if (resultOffsets[i] < 0 || resultOffsets[i] >= bytecodeLength) {
-                throw new IllegalArgumentException("Invalid result offset at index " + i);
-            }
-        }
-
         Object[] constantPool = loadConstantPool(data, constantPoolOffset, constantCount);
+
         return new Bytecode(
-                bytecode,
+                data,
                 conditionOffsets,
                 resultOffsets,
                 registers,
