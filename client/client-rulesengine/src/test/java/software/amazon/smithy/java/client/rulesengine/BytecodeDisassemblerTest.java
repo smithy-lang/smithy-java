@@ -5,7 +5,8 @@
 
 package software.amazon.smithy.java.client.rulesengine;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 
 import java.util.List;
 import java.util.Map;
@@ -50,11 +51,11 @@ class BytecodeDisassemblerTest {
         String result = disassembler.disassemble();
 
         // Verify header information is present
-        assertContains(result, "=== Bytecode Program ===");
-        assertContains(result, "Conditions: 1");
-        assertContains(result, "Results: 1");
-        assertContains(result, "Registers: 1");
-        assertContains(result, "Functions: 1");
+        assertThat(result, containsString("=== Bytecode Program ==="));
+        assertThat(result, containsString("Conditions: 1"));
+        assertThat(result, containsString("Results: 1"));
+        assertThat(result, containsString("Registers: 1"));
+        assertThat(result, containsString("Functions: 1"));
     }
 
     @Test
@@ -86,12 +87,12 @@ class BytecodeDisassemblerTest {
         String result = new BytecodeDisassembler(bytecode).disassemble();
 
         // Verify instruction disassembly
-        assertContains(result, "LOAD_REGISTER");
-        assertContains(result, "SET_REGISTER");
-        assertContains(result, "FN1");
-        assertContains(result, "param1");
-        assertContains(result, "temp1");
-        assertContains(result, "parseUrl");
+        assertThat(result, containsString("LOAD_REGISTER"));
+        assertThat(result, containsString("SET_REGISTER"));
+        assertThat(result, containsString("FN1"));
+        assertThat(result, containsString("param1"));
+        assertThat(result, containsString("temp1"));
+        assertThat(result, containsString("parseUrl"));
     }
 
     @Test
@@ -100,10 +101,10 @@ class BytecodeDisassemblerTest {
 
         // Add various constant types
         int stringConst = writer.getConstantIndex("test string");
-        int intConst = writer.getConstantIndex(42);
-        int boolConst = writer.getConstantIndex(true);
-        int listConst = writer.getConstantIndex(List.of("a", "b"));
-        int mapConst = writer.getConstantIndex(Map.of("key", "value"));
+        writer.getConstantIndex(42);
+        writer.getConstantIndex(true);
+        writer.getConstantIndex(List.of("a", "b"));
+        writer.getConstantIndex(Map.of("key", "value"));
 
         writer.markConditionStart();
         writer.writeByte(Opcodes.LOAD_CONST);
@@ -119,12 +120,12 @@ class BytecodeDisassemblerTest {
         String result = new BytecodeDisassembler(bytecode).disassemble();
 
         // Verify constant pool section
-        assertContains(result, "=== Constant Pool ===");
-        assertContains(result, "\"test string\"");
-        assertContains(result, "Integer[42]");
-        assertContains(result, "Boolean[true]");
-        assertContains(result, "List[2 items]");
-        assertContains(result, "Map[1 entries]");
+        assertThat(result, containsString("=== Constant Pool ==="));
+        assertThat(result, containsString("\"test string\""));
+        assertThat(result, containsString("Integer[42]"));
+        assertThat(result, containsString("Boolean[true]"));
+        assertThat(result, containsString("List[2 items]"));
+        assertThat(result, containsString("Map[1 entries]"));
     }
 
     @Test
@@ -144,15 +145,15 @@ class BytecodeDisassemblerTest {
         String result = new BytecodeDisassembler(bytecode).disassemble();
 
         // Verify register information
-        assertContains(result, "=== Registers ===");
-        assertContains(result, "required");
-        assertContains(result, "[required]");
-        assertContains(result, "withDefault");
-        assertContains(result, "default=\"default\"");
-        assertContains(result, "withBuiltin");
-        assertContains(result, "builtin=SDK::Endpoint");
-        assertContains(result, "temp");
-        assertContains(result, "[temp]");
+        assertThat(result, containsString("=== Registers ==="));
+        assertThat(result, containsString("required"));
+        assertThat(result, containsString("[required]"));
+        assertThat(result, containsString("withDefault"));
+        assertThat(result, containsString("default=\"default\""));
+        assertThat(result, containsString("withBuiltin"));
+        assertThat(result, containsString("builtin=SDK::Endpoint"));
+        assertThat(result, containsString("temp"));
+        assertThat(result, containsString("[temp]"));
     }
 
     @Test
@@ -181,11 +182,11 @@ class BytecodeDisassemblerTest {
 
         String result = new BytecodeDisassembler(bytecode).disassemble();
 
-        assertContains(result, "=== BDD Structure ===");
-        assertContains(result, "Bdd {");
-        assertContains(result, "conditions:");
-        assertContains(result, "results:");
-        assertContains(result, "root:");
+        assertThat(result, containsString("=== BDD Structure ==="));
+        assertThat(result, containsString("Bdd {"));
+        assertThat(result, containsString("conditions:"));
+        assertThat(result, containsString("results:"));
+        assertThat(result, containsString("root:"));
     }
 
     @Test
@@ -195,15 +196,11 @@ class BytecodeDisassemblerTest {
 
         String result = new BytecodeDisassembler(bytecode).disassemble();
 
-        assertContains(result, "=== Bytecode Program ===");
-        assertContains(result, "Conditions: 0");
-        assertContains(result, "Results: 0");
-        assertContains(result, "Registers: 0");
-        assertContains(result, "Functions: 0");
-    }
-
-    private void assertContains(String actual, String expected) {
-        assertTrue(actual.contains(expected), "Expected to find '" + expected + "' in:\n" + actual);
+        assertThat(result, containsString("=== Bytecode Program ==="));
+        assertThat(result, containsString("Conditions: 0"));
+        assertThat(result, containsString("Results: 0"));
+        assertThat(result, containsString("Registers: 0"));
+        assertThat(result, containsString("Functions: 0"));
     }
 
     private record TestFunction(String name, int argCount) implements RulesFunction {

@@ -99,6 +99,24 @@ final class BytecodeReader {
         };
     }
 
+    void skipToBytecodeSection() {
+        int bddNodeCount = readIntAtSpecificPosition(16);
+        int bddTableOffset = readIntAtSpecificPosition(40);
+        this.offset = bddTableOffset + (bddNodeCount * 12);
+    }
+
+    private int readIntAtSpecificPosition(int position) {
+        int savedOffset = this.offset;
+        this.offset = position;
+        int value = readInt();
+        this.offset = savedOffset;
+        return value;
+    }
+
+    int getBytecodeEndPosition() {
+        return readIntAtSpecificPosition(36); // constantPoolOffset
+    }
+
     RegisterDefinition[] readRegisterDefinitions(int count) {
         RegisterDefinition[] registers = new RegisterDefinition[count];
 

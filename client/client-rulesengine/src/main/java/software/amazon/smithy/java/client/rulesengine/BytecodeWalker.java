@@ -5,25 +5,35 @@
 
 package software.amazon.smithy.java.client.rulesengine;
 
+import java.nio.ByteBuffer;
+
 /**
  * Utility for walking through bytecode instructions, understanding instruction boundaries
  * and operand sizes. This prevents misinterpreting operands as opcodes.
  */
 final class BytecodeWalker {
-    private final byte[] code;
+    private final ByteBuffer code;
     private int pc;
 
     public BytecodeWalker(byte[] code) {
-        this(code, 0);
+        this(ByteBuffer.wrap(code));
     }
 
     public BytecodeWalker(byte[] code, int startOffset) {
-        this.code = code;
+        this(ByteBuffer.wrap(code), startOffset);
+    }
+
+    public BytecodeWalker(ByteBuffer code) {
+        this(code, 0);
+    }
+
+    public BytecodeWalker(ByteBuffer code, int startOffset) {
+        this.code = code.duplicate();
         this.pc = startOffset;
     }
 
     public boolean hasNext() {
-        return pc < code.length;
+        return pc < code.limit();
     }
 
     public int getPosition() {
@@ -34,7 +44,7 @@ final class BytecodeWalker {
         if (!hasNext()) {
             throw new IllegalStateException("No more instructions");
         }
-        return code[pc];
+        return code.get(pc);
     }
 
     public boolean advance() {
@@ -53,7 +63,7 @@ final class BytecodeWalker {
         if (!hasNext()) {
             return -1;
         }
-        return getInstructionLength(code[pc]);
+        return getInstructionLength(code.get(pc));
     }
 
     public int getOperandCount() {
@@ -98,7 +108,7 @@ final class BytecodeWalker {
             case Opcodes.TEST_REGISTER_IS_FALSE:
             case Opcodes.RETURN_ENDPOINT:
                 if (index == 0) {
-                    return code[pc + 1] & 0xFF;
+                    return code.get(pc + 1) & 0xFF;
                 }
                 break;
 
@@ -107,38 +117,38 @@ final class BytecodeWalker {
             case Opcodes.GET_PROPERTY:
             case Opcodes.JNN_OR_POP:
                 if (index == 0) {
-                    return ((code[pc + 1] & 0xFF) << 8) | (code[pc + 2] & 0xFF);
+                    return ((code.get(pc + 1) & 0xFF) << 8) | (code.get(pc + 2) & 0xFF);
                 }
                 break;
 
             // Mixed operand instructions
             case Opcodes.GET_PROPERTY_REG:
                 if (index == 0) {
-                    return code[pc + 1] & 0xFF; // register
+                    return code.get(pc + 1) & 0xFF; // register
                 } else if (index == 1) {
-                    return ((code[pc + 2] & 0xFF) << 8) | (code[pc + 3] & 0xFF); // property index
+                    return ((code.get(pc + 2) & 0xFF) << 8) | (code.get(pc + 3) & 0xFF); // property index
                 }
                 break;
 
             case Opcodes.GET_INDEX_REG:
                 if (index == 0) {
-                    return code[pc + 1] & 0xFF; // register
+                    return code.get(pc + 1) & 0xFF; // register
                 } else if (index == 1) {
-                    return code[pc + 2] & 0xFF; // index
+                    return code.get(pc + 2) & 0xFF; // index
                 }
                 break;
 
             case Opcodes.RESOLVE_TEMPLATE:
                 if (index == 0) {
-                    return code[pc + 1] & 0xFF; // arg count
+                    return code.get(pc + 1) & 0xFF; // arg count
                 } else if (index == 1) {
-                    return ((code[pc + 2] & 0xFF) << 8) | (code[pc + 3] & 0xFF); // template index
+                    return ((code.get(pc + 2) & 0xFF) << 8) | (code.get(pc + 3) & 0xFF); // template index
                 }
                 break;
 
             case Opcodes.SUBSTRING:
                 if (index >= 0 && index < 3) {
-                    return code[pc + 1 + index] & 0xFF;
+                    return code.get(pc + 1 + index) & 0xFF;
                 }
                 break;
         }
