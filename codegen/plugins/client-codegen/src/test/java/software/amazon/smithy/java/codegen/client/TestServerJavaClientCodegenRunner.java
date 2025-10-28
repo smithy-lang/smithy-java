@@ -46,5 +46,25 @@ public final class TestServerJavaClientCodegenRunner {
                 .model(model)
                 .build();
         plugin.execute(context);
+
+        PluginContext bddContext = PluginContext.builder()
+                .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
+                .settings(
+                        ObjectNode.builder()
+                                .withMember("service", "smithy.java.codegen.server.test#BddService")
+                                .withMember("namespace", "smithy.java.codegen.server.bddTest")
+                                .withMember(
+                                        "transport",
+                                        ObjectNode.builder()
+                                                .withMember("http-java", ObjectNode.builder().build())
+                                                .build())
+                                .withMember("defaultPlugins",
+                                        ArrayNode.fromStrings(TestClientPlugin.class.getCanonicalName()))
+                                .withMember("defaultSettings",
+                                        ArrayNode.fromStrings(TestSettings.class.getCanonicalName()))
+                                .build())
+                .model(model)
+                .build();
+        plugin.execute(bddContext);
     }
 }
