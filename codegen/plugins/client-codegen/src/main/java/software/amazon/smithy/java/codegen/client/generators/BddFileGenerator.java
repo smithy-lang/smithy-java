@@ -5,32 +5,50 @@
 
 package software.amazon.smithy.java.codegen.client.generators;
 
+import static java.lang.String.format;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
+import software.amazon.smithy.java.client.rulesengine.Bytecode;
 import software.amazon.smithy.java.client.rulesengine.RulesEngineBuilder;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.rulesengine.logic.cfg.Cfg;
 import software.amazon.smithy.rulesengine.traits.EndpointBddTrait;
+import software.amazon.smithy.rulesengine.traits.EndpointRuleSetTrait;
 
-public class BddInfoGenerator
+public class BddFileGenerator
         implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
     @Override
     public void accept(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         try {
             var baseDir = directive.fileManifest().getBaseDir();
-            var fileDir = baseDir.resolve("resources/META-INF/endpoints/bdd-info.bin");
+            var serviceName = directive.service().toShapeId().getName();
+            var fileDir = baseDir.resolve(format("resources/META-INF/endpoints/%s.bdd", serviceName));
             var parentDir = fileDir.getParent();
             if (parentDir != null) {
                 Files.createDirectories(parentDir);
             }
-            var engineBuilder = new RulesEngineBuilder();
-            var bddTrait = directive.service().expectTrait(EndpointBddTrait.class);
-            var bytecode = engineBuilder.compile(bddTrait);
+            var bytecode = compileBytecode(directive.service());
             Files.write(fileDir, bytecode.getBytecode());
         } catch (IOException e) {
             throw new RuntimeException("Failed to write BDD bytecode binary file", e);
         }
+    }
+
+    private Bytecode compileBytecode(ServiceShape serviceShape) {
+        EndpointBddTrait bddTrait;
+        if (serviceShape.hasTrait(EndpointBddTrait.ID)) {
+            bddTrait = serviceShape.expectTrait(EndpointBddTrait.class);
+        } else {
+            var endpointRuleSet = serviceShape.expectTrait(EndpointRuleSetTrait.class).getEndpointRuleSet();
+            var cfg = Cfg.from(endpointRuleSet);
+            bddTrait = EndpointBddTrait.from(cfg);
+        }
+        var engineBuilder = new RulesEngineBuilder();
+        return engineBuilder.compile(bddTrait);
     }
 }
