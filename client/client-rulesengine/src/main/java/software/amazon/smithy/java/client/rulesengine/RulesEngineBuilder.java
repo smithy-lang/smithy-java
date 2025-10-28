@@ -17,6 +17,10 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.rulesengine.language.EndpointRuleSet;
+import software.amazon.smithy.rulesengine.logic.bdd.NodeReversal;
+import software.amazon.smithy.rulesengine.logic.bdd.SiftingOptimization;
+import software.amazon.smithy.rulesengine.logic.cfg.Cfg;
 import software.amazon.smithy.rulesengine.traits.EndpointBddTrait;
 
 /**
@@ -106,6 +110,20 @@ public final class RulesEngineBuilder {
      */
     public Bytecode compile(EndpointBddTrait bdd) {
         return new BytecodeCompiler(extensions, bdd, functions, builtinProviders).compile();
+    }
+
+    /**
+     * Compile BDD rules into a {@link Bytecode}.
+     *
+     * @param rules Endpoint Rules to compile.
+     * @return the compiled program.
+     */
+    public Bytecode compile(EndpointRuleSet rules) {
+        var cfg = Cfg.from(rules);
+        var originalTrait = EndpointBddTrait.from(cfg);
+        var optimizedTrait = SiftingOptimization.builder().cfg(cfg).build().apply(originalTrait);
+        var reversedTrait = new NodeReversal().apply(optimizedTrait);
+        return compile(reversedTrait);
     }
 
     /**
