@@ -51,20 +51,22 @@ public final class TestServerJavaClientCodegenRunner {
                 .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
                 .settings(
                         ObjectNode.builder()
-                                .withMember("service", "smithy.java.codegen.server.test#BddService")
+                                .withMember("service", "smithy.java.codegen.server.test#ServiceWithEndpointBdd")
                                 .withMember("namespace", "smithy.java.codegen.server.bddTest")
-                                .withMember(
-                                        "transport",
-                                        ObjectNode.builder()
-                                                .withMember("http-java", ObjectNode.builder().build())
-                                                .build())
-                                .withMember("defaultPlugins",
-                                        ArrayNode.fromStrings(TestClientPlugin.class.getCanonicalName()))
-                                .withMember("defaultSettings",
-                                        ArrayNode.fromStrings(TestSettings.class.getCanonicalName()))
                                 .build())
                 .model(model)
                 .build();
         plugin.execute(bddContext);
+
+        PluginContext serviceWithEndpointRuleSetContext = PluginContext.builder()
+                .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
+                .settings(
+                        ObjectNode.builder()
+                                .withMember("service", "smithy.java.codegen.server.test#ServiceWithEndpointRuleSet")
+                                .withMember("namespace", "smithy.java.codegen.server.bddTest")
+                                .build())
+                .model(model)
+                .build();
+        plugin.execute(serviceWithEndpointRuleSetContext);
     }
 }

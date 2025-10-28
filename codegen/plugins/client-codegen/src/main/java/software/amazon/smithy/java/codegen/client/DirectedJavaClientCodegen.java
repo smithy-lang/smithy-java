@@ -10,7 +10,7 @@ import software.amazon.smithy.codegen.core.directed.*;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
-import software.amazon.smithy.java.codegen.client.generators.BddInfoGenerator;
+import software.amazon.smithy.java.codegen.client.generators.BddFileGenerator;
 import software.amazon.smithy.java.codegen.client.generators.ClientImplementationGenerator;
 import software.amazon.smithy.java.codegen.client.generators.ClientInterfaceGenerator;
 import software.amazon.smithy.java.codegen.generators.ApiServiceGenerator;
@@ -26,6 +26,7 @@ import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.java.codegen.generators.UnionGenerator;
 import software.amazon.smithy.rulesengine.traits.EndpointBddTrait;
+import software.amazon.smithy.rulesengine.traits.EndpointRuleSetTrait;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
@@ -118,8 +119,9 @@ final class DirectedJavaClientCodegen
             new ServiceExceptionGenerator<>().accept(directive);
         }
 
-        if (directive.service().hasTrait(EndpointBddTrait.ID)) {
-            new BddInfoGenerator().accept(directive);
+        var service = directive.service();
+        if (service.hasTrait(EndpointBddTrait.ID) || service.hasTrait(EndpointRuleSetTrait.ID)) {
+            new BddFileGenerator().accept(directive);
         }
     }
 

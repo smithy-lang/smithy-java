@@ -60,6 +60,7 @@ import software.amazon.smithy.model.shapes.ToShapeId;
 import software.amazon.smithy.model.traits.PaginatedTrait;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.rulesengine.traits.EndpointBddTrait;
+import software.amazon.smithy.rulesengine.traits.EndpointRuleSetTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
@@ -180,8 +181,11 @@ public final class ClientInterfaceGenerator
                     writer.putContext("interface", symbol);
                     writer.putContext("impl", symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL));
                     writer.putContext("hasDefaultTransport", settings.transport() != null);
-                    writer.putContext("hasBdd", directive.service().hasTrait(EndpointBddTrait.ID));
-                    writer.putContext("loadBddInfo", new LoadBddInfoGenerator(writer));
+                    writer.putContext("hasBdd",
+                            directive.service().hasTrait(EndpointBddTrait.ID)
+                                    || directive.service().hasTrait(EndpointRuleSetTrait.ID));
+                    writer.putContext("loadBddInfo",
+                            new LoadBddInfoGenerator(writer, directive.service().toShapeId().getName()));
                     var hasTransportSettings = settings.transportSettings() != null && !settings.transportSettings()
                             .isEmpty();
                     writer.putContext("hasTransportSettings", hasTransportSettings);
@@ -566,19 +570,18 @@ public final class ClientInterfaceGenerator
         return result;
     }
 
-    private record LoadBddInfoGenerator(JavaWriter writer) implements Runnable {
+    private record LoadBddInfoGenerator(JavaWriter writer, String serviceName) implements Runnable {
         @Override
         public void run() {
             writer.write("""
-                    try (var stream = getClass().getResourceAsStream("/META-INF/endpoints/bdd-info.bin")) {
-                        if (stream != null) {
-                            var bytecode = new $T().load(stream.readAllBytes());
-                            configBuilder().applyPlugin($T.from(bytecode));
-                        }
+                    try (var stream = getClass().getResourceAsStream("/META-INF/endpoints/$L.bdd")) {
+                        var bytecode = new $T().load(stream.readAllBytes());
+                        configBuilder().applyPlugin($T.from(bytecode));
                     } catch ($T e) {
                         throw new $T("Failed to load BDD bytecode binary file", e);
                     }
                     """,
+                    serviceName,
                     RulesEngineBuilder.class,
                     EndpointRulesPlugin.class,
                     IOException.class,

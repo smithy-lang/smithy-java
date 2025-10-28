@@ -12,10 +12,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import smithy.java.codegen.server.bddTest.client.BddServiceClient;
+import smithy.java.codegen.server.bddTest.client.ServiceWithEndpointBddClient;
+import smithy.java.codegen.server.bddTest.client.ServiceWithEndpointRuleSetClient;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
-import software.amazon.smithy.java.client.core.endpoint.Endpoint;
-import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolverParams;
 import software.amazon.smithy.java.client.rulesengine.EndpointRulesPlugin;
 import software.amazon.smithy.java.context.Context;
@@ -31,22 +30,36 @@ import software.amazon.smithy.model.shapes.ShapeId;
 
 public class BddTest {
     @Test
-    public void testBddEndpointResolution() {
-        BddServiceClient client = BddServiceClient.builder()
+    public void testServiceWithEndpointBddResolution() {
+        var client = ServiceWithEndpointBddClient.builder()
                 .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
                 .build();
 
-        EndpointResolver resolver = client.config().endpointResolver();
+        var resolver = client.config().endpointResolver();
 
-        EndpointResolverParams params1 = createParams("us-east-1", false);
-        Endpoint endpoint1 = resolver.resolveEndpoint(params1);
+        var params1 = createParams("us-east-1", false);
+        var endpoint1 = resolver.resolveEndpoint(params1);
         assertNotNull(endpoint1);
         assertEquals("https://service.us-east-1.amazonaws.com", endpoint1.uri().toString());
 
-        EndpointResolverParams params2 = createParams("us-east-2", true);
-        Endpoint endpoint2 = resolver.resolveEndpoint(params2);
+        var params2 = createParams("us-east-2", true);
+        var endpoint2 = resolver.resolveEndpoint(params2);
         assertNotNull(endpoint2);
         assertEquals("https://service-fips.us-east-2.amazonaws.com", endpoint2.uri().toString());
+    }
+
+    @Test
+    public void testEndpointRuleSetResolution() {
+        var client = ServiceWithEndpointRuleSetClient.builder()
+                .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
+                .build();
+
+        var resolver = client.config().endpointResolver();
+
+        var params = createParams("us-east-1", false);
+        var endpoint = resolver.resolveEndpoint(params);
+        assertNotNull(endpoint);
+        assertEquals("https://us-east-1.amazonaws.com", endpoint.uri().toString());
     }
 
     private EndpointResolverParams createParams(String Region, Boolean UseFips) {

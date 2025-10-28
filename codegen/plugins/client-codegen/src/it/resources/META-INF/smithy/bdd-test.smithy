@@ -5,6 +5,7 @@ namespace smithy.java.codegen.server.test
 use aws.protocols#restJson1
 use smithy.rules#clientContextParams
 use smithy.rules#endpointBdd
+use smithy.rules#endpointRuleSet
 
 @clientContextParams(
     Region: {type: "string", documentation: "docs"}
@@ -61,9 +62,36 @@ use smithy.rules#endpointBdd
     "nodes": "/////wAAAAH/////AAAAAAX14QEF9eEC"
 })
 @restJson1
-service BddService {
+service ServiceWithEndpointBdd {
     version: "2022-01-01"
     operations:[
         Echo
     ]
 }
+
+@clientContextParams(
+    Region: {type: "string", documentation: "docs"}
+)
+@endpointRuleSet({
+    "version": "1.1",
+    "parameters": {
+        "Region": {
+            "required": true,
+            "type": "String",
+            "documentation": "docs"
+        }
+    },
+    "rules": [
+        {
+            "conditions": [],
+            "documentation": "base rule",
+            "endpoint": {
+                "url": "https://{Region}.amazonaws.com",
+                "properties": {},
+                "headers": {}
+            },
+            "type": "endpoint"
+        }
+    ]
+})
+service ServiceWithEndpointRuleSet {}
