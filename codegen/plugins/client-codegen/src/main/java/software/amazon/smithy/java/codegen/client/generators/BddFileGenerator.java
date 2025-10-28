@@ -16,7 +16,6 @@ import software.amazon.smithy.java.client.rulesengine.RulesEngineBuilder;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.model.shapes.ServiceShape;
-import software.amazon.smithy.rulesengine.logic.cfg.Cfg;
 import software.amazon.smithy.rulesengine.traits.EndpointBddTrait;
 import software.amazon.smithy.rulesengine.traits.EndpointRuleSetTrait;
 
@@ -40,15 +39,11 @@ public class BddFileGenerator
     }
 
     private Bytecode compileBytecode(ServiceShape serviceShape) {
-        EndpointBddTrait bddTrait;
-        if (serviceShape.hasTrait(EndpointBddTrait.ID)) {
-            bddTrait = serviceShape.expectTrait(EndpointBddTrait.class);
-        } else {
-            var endpointRuleSet = serviceShape.expectTrait(EndpointRuleSetTrait.class).getEndpointRuleSet();
-            var cfg = Cfg.from(endpointRuleSet);
-            bddTrait = EndpointBddTrait.from(cfg);
-        }
         var engineBuilder = new RulesEngineBuilder();
-        return engineBuilder.compile(bddTrait);
+        if (serviceShape.hasTrait(EndpointBddTrait.ID)) {
+            return engineBuilder.compile(serviceShape.expectTrait(EndpointBddTrait.class));
+        } else {
+            return engineBuilder.compile(serviceShape.expectTrait(EndpointRuleSetTrait.class).getEndpointRuleSet());
+        }
     }
 }
