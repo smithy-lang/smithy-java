@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.client.generators;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -28,6 +29,8 @@ import software.amazon.smithy.java.client.core.ProtocolSettings;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeFactory;
 import software.amazon.smithy.java.client.core.pagination.Paginator;
+import software.amazon.smithy.java.client.rulesengine.EndpointRulesPlugin;
+import software.amazon.smithy.java.client.rulesengine.RulesEngineBuilder;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
@@ -56,6 +59,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ToShapeId;
 import software.amazon.smithy.model.traits.PaginatedTrait;
 import software.amazon.smithy.model.traits.Trait;
+import software.amazon.smithy.rulesengine.traits.EndpointBddTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
@@ -145,6 +149,7 @@ public final class ClientInterfaceGenerator
                                                 ${/hasDefaultProtocol}${?hasDefaultTransport}if (configBuilder().transport() == null) {
                                                     configBuilder().transport(${transportFactory:C}.createTransport(${?hasTransportSettings}transportSettings${/hasTransportSettings}));
                                                 }${/hasDefaultTransport}
+                                                ${?hasBdd}${loadBddInfo:C|}${/hasBdd}
                                                 return new ${impl:T}(this);
                                             }
                                         }
@@ -175,6 +180,8 @@ public final class ClientInterfaceGenerator
                     writer.putContext("interface", symbol);
                     writer.putContext("impl", symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL));
                     writer.putContext("hasDefaultTransport", settings.transport() != null);
+                    writer.putContext("hasBdd", directive.service().hasTrait(EndpointBddTrait.ID));
+                    writer.putContext("loadBddInfo", new LoadBddInfoGenerator(writer));
                     var hasTransportSettings = settings.transportSettings() != null && !settings.transportSettings()
                             .isEmpty();
                     writer.putContext("hasTransportSettings", hasTransportSettings);
@@ -557,5 +564,25 @@ public final class ClientInterfaceGenerator
             result.add(clazz);
         }
         return result;
+    }
+
+    private record LoadBddInfoGenerator(JavaWriter writer) implements Runnable {
+        @Override
+        public void run() {
+            writer.write("""
+                    try (var stream = getClass().getResourceAsStream("/META-INF/endpoints/bdd-info.bin")) {
+                        if (stream != null) {
+                            var bytecode = new $T().load(stream.readAllBytes());
+                            configBuilder().applyPlugin($T.from(bytecode));
+                        }
+                    } catch ($T e) {
+                        throw new $T("Failed to load BDD bytecode binary file", e);
+                    }
+                    """,
+                    RulesEngineBuilder.class,
+                    EndpointRulesPlugin.class,
+                    IOException.class,
+                    RuntimeException.class);
+        }
     }
 }
