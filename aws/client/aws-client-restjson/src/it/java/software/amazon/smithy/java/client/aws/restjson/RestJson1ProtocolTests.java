@@ -35,8 +35,6 @@ public class RestJson1ProtocolTests {
     @HttpClientRequestTests
     @ProtocolTestFilter(
             skipTests = {
-                    // TODO: support checksums in requests
-                    "RestJsonHttpChecksumRequired",
                     // TODO: These tests require a payload even when the httpPayload member is null. Should it?
                     "RestJsonHttpWithHeadersButNoPayload",
                     "RestJsonHttpWithEmptyStructurePayload",
