@@ -143,7 +143,8 @@ public final class ResponseSerializer {
                 payloadMediaType,
                 bindingCache.computeIfAbsent(schema, BindingMatcher::responseMatcher),
                 omitEmptyPayload,
-                isFailure);
+                isFailure,
+                false);
         shapeValue.serialize(serializer);
         serializer.flush();
 

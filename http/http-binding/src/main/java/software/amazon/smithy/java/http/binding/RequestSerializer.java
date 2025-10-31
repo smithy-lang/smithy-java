@@ -34,6 +34,7 @@ public final class RequestSerializer {
     private SerializableShape shapeValue;
     private EventEncoderFactory<?> eventStreamEncodingFactory;
     private boolean omitEmptyPayload = false;
+    private boolean allowEmptyStructPayload = false;
     private final ConcurrentMap<Schema, BindingMatcher> bindingCache;
 
     RequestSerializer(ConcurrentMap<Schema, BindingMatcher> bindingCache) {
@@ -119,6 +120,11 @@ public final class RequestSerializer {
         return this;
     }
 
+    public RequestSerializer allowEmptyStructPayload(boolean allowEmptyStructPayload) {
+        this.allowEmptyStructPayload = allowEmptyStructPayload;
+        return this;
+    }
+
     /**
      * Finishes setting up the serializer and creates an HTTP request.
      *
@@ -129,7 +135,6 @@ public final class RequestSerializer {
         Objects.requireNonNull(operation, "operation is not set");
         Objects.requireNonNull(payloadCodec, "payloadCodec is not set");
         Objects.requireNonNull(endpoint, "endpoint is not set");
-        Objects.requireNonNull(shapeValue, "value is not set");
         Objects.requireNonNull(payloadMediaType, "payloadMediaType is not set");
 
         var matcher = bindingCache.computeIfAbsent(operation.inputSchema(), BindingMatcher::requestMatcher);
@@ -140,7 +145,8 @@ public final class RequestSerializer {
                 payloadMediaType,
                 matcher,
                 omitEmptyPayload,
-                false);
+                false,
+                allowEmptyStructPayload);
         shapeValue.serialize(serializer);
         serializer.flush();
 
