@@ -69,13 +69,13 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
             Context context,
             URI endpoint
     ) {
-        HttpRequest request = super.createRequest(operation, input, context, endpoint);
+        var request = super.createRequest(operation, input, context, endpoint);
 
         if (request.body().contentLength() == 0) {
             var members = input.schema().members();
             for (var member : members) {
-                if (member.hasTrait(TraitKey.HTTP_PAYLOAD_TRAIT)
-                        && member.type().equals(ShapeType.STRUCTURE)) {
+                if (member.type().equals(ShapeType.STRUCTURE)
+                        && member.hasTrait(TraitKey.HTTP_PAYLOAD_TRAIT)) {
                     return request.toBuilder()
                             .body(DataStream.ofString("{}"))
                             .withAddedHeader("Content-Type", "application/json")
