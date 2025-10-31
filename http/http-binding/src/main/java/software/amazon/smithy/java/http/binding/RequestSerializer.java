@@ -129,7 +129,6 @@ public final class RequestSerializer {
         Objects.requireNonNull(operation, "operation is not set");
         Objects.requireNonNull(payloadCodec, "payloadCodec is not set");
         Objects.requireNonNull(endpoint, "endpoint is not set");
-        Objects.requireNonNull(shapeValue, "value is not set");
         Objects.requireNonNull(payloadMediaType, "payloadMediaType is not set");
 
         var matcher = bindingCache.computeIfAbsent(operation.inputSchema(), BindingMatcher::requestMatcher);
