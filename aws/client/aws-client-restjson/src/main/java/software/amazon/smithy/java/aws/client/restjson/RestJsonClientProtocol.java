@@ -28,7 +28,7 @@ import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.http.binding.RequestSerializer;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -69,22 +69,20 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
             Context context,
             URI endpoint
     ) {
-        var request = super.createRequest(operation, input, context, endpoint);
+        RequestSerializer serializer = httpBinding().requestSerializer()
+                .operation(operation)
+                .payloadCodec(payloadCodec())
+                .payloadMediaType(payloadMediaType())
+                .shapeValue(input)
+                .endpoint(endpoint)
+                .omitEmptyPayload(omitEmptyPayload())
+                .allowEmptyStructPayload(hasStructPayload(input));
 
-        if (request.body().contentLength() == 0) {
-            var members = input.schema().members();
-            for (var member : members) {
-                if (member.type().equals(ShapeType.STRUCTURE)
-                        && member.hasTrait(TraitKey.HTTP_PAYLOAD_TRAIT)) {
-                    return request.toBuilder()
-                            .body(DataStream.ofString("{}"))
-                            .withAddedHeader("Content-Type", "application/json")
-                            .build();
-                }
-            }
+        if (operation instanceof InputEventStreamingApiOperation<?, ?, ?> i) {
+            serializer.eventEncoderFactory(getEventEncoderFactory(i));
         }
 
-        return request;
+        return serializer.serializeRequest();
     }
 
     @Override
@@ -124,6 +122,17 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
             OutputEventStreamingApiOperation<?, ?, ?> outputOperation
     ) {
         return AwsEventDecoderFactory.forOutputStream(outputOperation, payloadCodec(), f -> f);
+    }
+
+    private <I extends SerializableStruct> boolean hasStructPayload(I input) {
+        var members = input.schema().members();
+        for (var member : members) {
+            if (member.type().equals(ShapeType.STRUCTURE)
+                    && member.hasTrait(TraitKey.HTTP_PAYLOAD_TRAIT)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static final class Factory implements ClientProtocolFactory<RestJson1Trait> {
