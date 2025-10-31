@@ -35,8 +35,6 @@ public class RestJson1ProtocolTests {
     @HttpClientRequestTests
     @ProtocolTestFilter(
             skipTests = {
-                    // TODO: support checksums in requests
-                    "RestJsonHttpChecksumRequired",
                     "RestJsonHttpEmptyPrefixHeadersRequestClient" //FIXME https://github.com/smithy-lang/smithy-java/issues/647
             })
     public void requestTest(DataStream expected, DataStream actual) {

@@ -84,7 +84,6 @@ include(":aws:aws-auth-api")
 include(":aws:aws-service-bundle")
 include(":aws:aws-service-bundler")
 include(":aws:aws-mcp-types")
-include(":aws:aws-mcp-cli-commands")
 
 // AWS SDK V2 shims
 include(":aws:sdkv2:aws-sdkv2-retries")
@@ -107,8 +106,6 @@ include(":examples:mcp-traits-example")
 include(":mcp")
 include(":mcp:mcp-schemas")
 include(":mcp:mcp-server")
-include(":mcp:mcp-cli")
-include(":mcp:mcp-cli-api")
 include(":mcp:mcp-bundle-api")
 
 include(":model-bundle")
