@@ -32,6 +32,7 @@ import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.client.http.mock.MockPlugin;
 import software.amazon.smithy.java.client.http.mock.MockQueue;
 import software.amazon.smithy.java.client.http.plugins.ApplyHttpRetryInfoPlugin;
+import software.amazon.smithy.java.client.http.plugins.HttpChecksumPlugin;
 import software.amazon.smithy.java.client.http.plugins.UserAgentPlugin;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
@@ -95,6 +96,7 @@ public class ClientTest {
                         // And HttpMessageExchange applies the UserAgentPlugin and ApplyHttpRetryInfoPlugin.
                         UserAgentPlugin.class,
                         ApplyHttpRetryInfoPlugin.class,
+                        HttpChecksumPlugin.class,
                         // User plugins are applied last.
                         FooPlugin.class));
     }
