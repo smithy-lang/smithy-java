@@ -98,7 +98,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             responseStatus = bindingMatcher.responseStatus();
         }
 
-        if (bindingMatcher.writeBody(omitEmptyPayload) || allowEmptyStructPayload) {
+        if (allowEmptyStructPayload || bindingMatcher.writeBody(omitEmptyPayload)) {
             shapeBodyOutput = new ByteArrayOutputStream();
             shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
             // Serialize only the body members to the codec.
