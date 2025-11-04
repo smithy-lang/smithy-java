@@ -33,10 +33,6 @@ public class RestJson1ProtocolTests {
     private static final String EMPTY_BODY = "";
 
     @HttpClientRequestTests
-    @ProtocolTestFilter(
-            skipTests = {
-                    "RestJsonHttpEmptyPrefixHeadersRequestClient" //FIXME https://github.com/smithy-lang/smithy-java/issues/647
-            })
     public void requestTest(DataStream expected, DataStream actual) {
         assertThat(expected.hasKnownLength())
                 .isTrue()

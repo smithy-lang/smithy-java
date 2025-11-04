@@ -38,7 +38,6 @@ public class RestXmlProtocolTests {
             skipTests = {
                     "SDKAppliedContentEncoding_restXml",
                     "SDKAppendedGzipAfterProvidedEncoding_restXml",
-                    "HttpEmptyPrefixHeadersRequestClient" //FIXME https://github.com/smithy-lang/smithy-java/issues/647
             })
     public void requestTest(DataStream expected, DataStream actual) {
         if (expected.contentLength() != 0) {
