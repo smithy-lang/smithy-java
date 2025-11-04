@@ -52,6 +52,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private final String payloadMediaType;
     private final boolean omitEmptyPayload;
     private final boolean isFailure;
+    private final boolean allowEmptyStructPayload;
 
     private final Map<String, String> labels = new LinkedHashMap<>();
     private final Map<String, List<String>> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
@@ -75,7 +76,8 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             String payloadMediaType,
             BindingMatcher bindingMatcher,
             boolean omitEmptyPayload,
-            boolean isFailure
+            boolean isFailure,
+            boolean allowEmptyStructPayload
     ) {
         uriPattern = httpTrait.getUri();
         responseStatus = httpTrait.getCode();
@@ -84,6 +86,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         this.payloadMediaType = payloadMediaType;
         this.omitEmptyPayload = omitEmptyPayload;
         this.isFailure = isFailure;
+        this.allowEmptyStructPayload = allowEmptyStructPayload;
         headerSerializer = new HttpHeaderSerializer(headerConsumer);
         querySerializer = new HttpQuerySerializer(queryStringParams::add);
         labelSerializer = new HttpLabelSerializer(labels::put);
@@ -95,7 +98,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             responseStatus = bindingMatcher.responseStatus();
         }
 
-        if (bindingMatcher.writeBody(omitEmptyPayload)) {
+        if (allowEmptyStructPayload || bindingMatcher.writeBody(omitEmptyPayload)) {
             shapeBodyOutput = new ByteArrayOutputStream();
             shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
             // Serialize only the body members to the codec.
