@@ -32,7 +32,9 @@ final class HttpPrefixHeadersDeserializer extends SpecificShapeDeserializer {
         var prefix = trait.getValue().toLowerCase(Locale.ENGLISH);
         for (var entry : headers) {
             var name = entry.getKey();
-            if (PrefixConstants.OMITTED_HEADER_NAMES.contains(name) || !name.startsWith(prefix)) {
+            var lowerCaseName = name.toLowerCase(Locale.ENGLISH);
+            if (PrefixConstants.OMITTED_HEADER_NAMES.contains(lowerCaseName)
+                    || !lowerCaseName.startsWith(prefix)) {
                 continue;
             }
             consumer.accept(state, name.substring(prefix.length()), new HeaderValueDeserializer(name));

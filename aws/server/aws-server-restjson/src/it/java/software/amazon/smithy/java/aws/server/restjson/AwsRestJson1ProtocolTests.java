@@ -45,7 +45,6 @@ public class AwsRestJson1ProtocolTests {
 
                     // Header splitting needs work.
                     "RestJsonInputAndOutputWithQuotedStringHeaders",
-                    "RestJsonHttpEmptyPrefixHeadersRequestServer" //FIXME https://github.com/smithy-lang/smithy-java/issues/647
             },
             skipOperations = {
                     "aws.protocoltests.restjson#DocumentType",
@@ -80,8 +79,6 @@ public class AwsRestJson1ProtocolTests {
                     "RestJsonEmptyComplexErrorWithNoMessage",
                     //TODO this breaks because of Validation and errorCorrection doesn't handle that.
                     "RestJsonServerPopulatesNestedDefaultValuesWhenMissingInInResponseParams",
-                    "RestJsonHttpEmptyPrefixHeadersResponseServer" //FIXME https://github.com/smithy-lang/smithy-java/issues/647
-
             })
     public void responseTest(DataStream expected, DataStream actual) {
         assertThat(expected.hasKnownLength())

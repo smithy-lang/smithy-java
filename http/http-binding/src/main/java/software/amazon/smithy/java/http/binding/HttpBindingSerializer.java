@@ -7,9 +7,11 @@ package software.amazon.smithy.java.http.binding;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.concurrent.Flow;
@@ -57,6 +59,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private final Map<String, String> labels = new LinkedHashMap<>();
     private final Map<String, List<String>> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     private final QueryStringBuilder queryStringParams = new QueryStringBuilder();
+    private final Set<String> namesFromHttpHeader = new HashSet<>();
 
     private ShapeSerializer shapeBodySerializer;
     private ByteArrayOutputStream shapeBodyOutput;
@@ -96,6 +99,13 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     public void writeStruct(Schema schema, SerializableStruct struct) {
         if (bindingMatcher.responseStatus() != -1) {
             responseStatus = bindingMatcher.responseStatus();
+        }
+
+        // Prescanning names from @httpHeader for @httpPrefixHeaders
+        for (var member : schema.members()) {
+            if (member.hasTrait(TraitKey.HTTP_HEADER_TRAIT)) {
+                namesFromHttpHeader.add(member.expectTrait(TraitKey.HTTP_HEADER_TRAIT).getValue());
+            }
         }
 
         if (allowEmptyStructPayload || bindingMatcher.writeBody(omitEmptyPayload)) {
@@ -236,7 +246,8 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
                 case STATUS -> new ResponseStatusSerializer(i -> serializer.responseStatus = i);
                 case PREFIX_HEADERS -> new HttpPrefixHeadersSerializer(
                         schema.expectTrait(TraitKey.HTTP_PREFIX_HEADERS_TRAIT).getValue(),
-                        serializer.headerConsumer);
+                        serializer.headerConsumer,
+                        serializer.namesFromHttpHeader);
                 case QUERY_PARAMS -> new HttpQueryParamsSerializer(serializer.queryStringParams::add);
                 case BODY -> ShapeSerializer.nullSerializer(); // handled in HttpBindingSerializer#writeStruct.
                 case PAYLOAD -> {

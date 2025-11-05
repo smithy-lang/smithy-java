@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.http.binding;
 
+import java.util.Set;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.MapSerializer;
@@ -21,8 +22,12 @@ final class HttpPrefixHeadersSerializer extends SpecificShapeSerializer {
 
     private final PrefixHeadersMapSerializer prefixHeadersMapSerializer;
 
-    HttpPrefixHeadersSerializer(String prefix, BiConsumer<String, String> headerConsumer) {
-        prefixHeadersMapSerializer = new PrefixHeadersMapSerializer(prefix, headerConsumer);
+    HttpPrefixHeadersSerializer(
+            String prefix,
+            BiConsumer<String, String> headerConsumer,
+            Set<String> namesFromHttpHeader
+    ) {
+        prefixHeadersMapSerializer = new PrefixHeadersMapSerializer(prefix, headerConsumer, namesFromHttpHeader);
     }
 
     @Override
@@ -30,8 +35,10 @@ final class HttpPrefixHeadersSerializer extends SpecificShapeSerializer {
         consumer.accept(mapState, prefixHeadersMapSerializer);
     }
 
-    private record PrefixHeadersMapSerializer(String prefix, BiConsumer<String, String> headerConsumer) implements
-            MapSerializer {
+    private record PrefixHeadersMapSerializer(
+            String prefix,
+            BiConsumer<String, String> headerConsumer,
+            Set<String> namesFromHttpHeader) implements MapSerializer {
         @Override
         public <K> void writeEntry(
                 Schema keySchema,
@@ -42,7 +49,12 @@ final class HttpPrefixHeadersSerializer extends SpecificShapeSerializer {
             valueSerializer.accept(keyState, new SpecificShapeSerializer() {
                 @Override
                 public void writeString(Schema schema, String value) {
-                    headerConsumer.accept(prefix + key, value);
+                    var headerName = prefix + key;
+                    // HttpHeader takes precedence if prefixHeader's value is empty.
+                    // Smithy's validator will complain if prefixHeader's value is not empty and duplicate found
+                    if (!namesFromHttpHeader.contains(headerName)) {
+                        headerConsumer.accept(headerName, value);
+                    }
                 }
             });
         }
