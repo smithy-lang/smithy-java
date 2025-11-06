@@ -138,7 +138,7 @@ public final class HttpErrorDeserializer {
                 ShapeBuilder<ModeledException> builder
         ) {
             try {
-                ByteBuffer bytes = createDataStream(response).waitForByteBuffer();
+                ByteBuffer bytes = createDataStream(response).asByteBuffer();
                 return codec.deserializeShape(bytes, builder);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to deserialize error", e);
@@ -248,7 +248,7 @@ public final class HttpErrorDeserializer {
         try {
             // Read the payload into a JSON document so we can efficiently find __type and then directly
             // deserialize the document into the identified builder.
-            ByteBuffer buffer = content.waitForByteBuffer();
+            ByteBuffer buffer = content.asByteBuffer();
 
             if (buffer.remaining() > 0) {
                 var document = codec.createDeserializer(buffer).readDocument();

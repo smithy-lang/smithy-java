@@ -26,7 +26,7 @@ final class PayloadDeserializer implements ShapeDeserializer {
     }
 
     private ByteBuffer resolveBodyBytes() {
-        return body.waitForByteBuffer();
+        return body.asByteBuffer();
     }
 
     private ShapeDeserializer createDeserializer() {
@@ -119,7 +119,7 @@ final class PayloadDeserializer implements ShapeDeserializer {
             return null;
         }
 
-        var buffer = body.waitForByteBuffer();
+        var buffer = body.asByteBuffer();
         int pos = buffer.arrayOffset() + buffer.position();
         int len = buffer.remaining();
         return new String(buffer.array(), pos, len, StandardCharsets.UTF_8);

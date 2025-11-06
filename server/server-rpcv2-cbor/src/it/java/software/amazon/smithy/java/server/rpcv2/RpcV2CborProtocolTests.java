@@ -51,7 +51,7 @@ public class RpcV2CborProtocolTests {
         assertThat(expected.hasKnownLength())
                 .isTrue()
                 .isSameAs(actual.hasKnownLength());
-        CborComparator.assertEquals(expected.waitForByteBuffer(), actual.waitForByteBuffer());
+        CborComparator.assertEquals(expected.asByteBuffer(), actual.asByteBuffer());
     }
 
 }

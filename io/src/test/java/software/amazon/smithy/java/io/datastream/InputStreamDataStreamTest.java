@@ -14,6 +14,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class InputStreamDataStreamTest {
@@ -23,7 +24,7 @@ public class InputStreamDataStreamTest {
 
         assertThat(ds.contentLength(), equalTo(-1L));
         assertThat(ds.contentType(), nullValue());
-        assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+        assertThat(ds.asByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
         assertThat(ds.isReplayable(), is(false));
     }
 
@@ -36,7 +37,7 @@ public class InputStreamDataStreamTest {
 
         assertThat(ds.contentLength(), equalTo(6L));
         assertThat(ds.contentType(), equalTo("text/plain"));
-        assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+        assertThat(ds.asByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
     }
 
     @Test
@@ -46,7 +47,7 @@ public class InputStreamDataStreamTest {
                 "text/plain",
                 6);
 
-        assertThat(ds.asInputStream().get().readAllBytes(), equalTo("Hello!".getBytes(StandardCharsets.UTF_8)));
+        assertThat(ds.asInputStream().readAllBytes(), equalTo("Hello!".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -56,6 +57,17 @@ public class InputStreamDataStreamTest {
                 "text/plain",
                 6);
 
-        assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+        assertThat(ds.asByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+    }
+
+    @Test
+    public void cannotReadDataStreamTwice() throws Exception {
+        var ds = DataStream.ofInputStream(
+                Files.newInputStream(Paths.get(getClass().getResource("test.txt").toURI())),
+                "text/plain",
+                6);
+
+        Assertions.assertDoesNotThrow(ds::asInputStream);
+        Assertions.assertThrows(IllegalStateException.class, ds::asInputStream);
     }
 }

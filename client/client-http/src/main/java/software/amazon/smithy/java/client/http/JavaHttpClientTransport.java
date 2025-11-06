@@ -5,6 +5,9 @@
 
 package software.amazon.smithy.java.client.http;
 
+import static java.net.http.HttpRequest.BodyPublishers;
+import static java.net.http.HttpResponse.BodyHandlers;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -110,16 +113,15 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
         java.net.http.HttpRequest.BodyPublisher bodyPublisher;
         if (request.body().hasKnownLength()) {
             if (request.body().contentLength() == 0) {
-                bodyPublisher = java.net.http.HttpRequest.BodyPublishers.noBody();
+                bodyPublisher = BodyPublishers.noBody();
             } else {
-                bodyPublisher = java.net.http.HttpRequest.BodyPublishers.ofByteArray(
-                        ByteBufferUtils.getBytes(request.body().waitForByteBuffer()));
+                bodyPublisher = BodyPublishers.ofByteArray(ByteBufferUtils.getBytes(request.body().asByteBuffer()));
             }
         } else {
-            bodyPublisher = java.net.http.HttpRequest.BodyPublishers.fromPublisher(request.body());
+            bodyPublisher = BodyPublishers.fromPublisher(request.body());
         }
 
-        java.net.http.HttpRequest.Builder httpRequestBuilder = java.net.http.HttpRequest.newBuilder()
+        var httpRequestBuilder = java.net.http.HttpRequest.newBuilder()
                 .version(smithyToHttpVersion(request.httpVersion()))
                 .method(request.method(), bodyPublisher)
                 .uri(request.uri());
@@ -141,13 +143,24 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
     }
 
     private HttpResponse sendRequest(java.net.http.HttpRequest request) {
+        java.net.http.HttpResponse<InputStream> res = null;
         try {
-            var res = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofInputStream());
+            res = client.send(request, BodyHandlers.ofInputStream());
             return createSmithyResponse(res);
         } catch (IOException | InterruptedException | RuntimeException e) {
+            // Close the response body stream if we got a response but failed to process it
+            if (res != null) {
+                try {
+                    res.body().close();
+                } catch (IOException closeException) {
+                    LOGGER.trace("Failed to close response body after error", closeException);
+                }
+            }
+
             if (e instanceof HttpConnectTimeoutException) {
                 throw new ConnectTimeoutException(e);
             }
+
             // The client pipeline also does this remapping, but to adhere to the required contract of
             // ClientTransport, we remap here too if needed.
             throw ClientTransport.remapExceptions(e);

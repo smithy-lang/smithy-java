@@ -39,7 +39,7 @@ public class ClientErrorCorrectionTest {
         assertEquals(corrected.getShort(), (short) 0);
         assertEquals(corrected.getBlob(), ByteBuffer.allocate(0));
         assertEquals(corrected.getStreamingBlob().contentLength(), 0);
-        assertEquals(0, corrected.getStreamingBlob().waitForByteBuffer().remaining());
+        assertEquals(0, corrected.getStreamingBlob().asByteBuffer().remaining());
         assertNull(corrected.getDocument());
         assertEquals(corrected.getList(), List.of());
         assertEquals(corrected.getMap(), Map.of());

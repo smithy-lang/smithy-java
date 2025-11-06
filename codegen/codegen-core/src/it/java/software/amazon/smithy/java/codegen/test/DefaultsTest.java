@@ -37,7 +37,7 @@ public class DefaultsTest {
         assertEquals(defaults.getLong(), 1);
         assertEquals(defaults.getShort(), (short) 1);
         assertEquals(defaults.getBlob(), ByteBuffer.wrap(Base64.getDecoder().decode("YmxvYg==")));
-        assertEquals(defaults.getStreamingBlob().waitForByteBuffer(),
+        assertEquals(defaults.getStreamingBlob().asByteBuffer(),
                 ByteBuffer.wrap(Base64.getDecoder().decode("c3RyZWFtaW5n")));
         assertEquals(defaults.getBoolDoc(), Document.of(true));
         assertEquals(defaults.getStringDoc(), Document.of("string"));

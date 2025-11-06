@@ -85,9 +85,9 @@ public class AwsRestJson1ProtocolTests {
                 .isTrue()
                 .isSameAs(actual.hasKnownLength());
 
-        String actualJson = new String(ByteBufferUtils.getBytes(actual.waitForByteBuffer()), StandardCharsets.UTF_8);
+        String actualJson = new String(ByteBufferUtils.getBytes(actual.asByteBuffer()), StandardCharsets.UTF_8);
         String expectedJson = new String(
-                ByteBufferUtils.getBytes(expected.waitForByteBuffer()),
+                ByteBufferUtils.getBytes(expected.asByteBuffer()),
                 StandardCharsets.UTF_8);
         if (expected.contentLength() == 0) {
             assertThat(actualJson).isIn("", "{}");

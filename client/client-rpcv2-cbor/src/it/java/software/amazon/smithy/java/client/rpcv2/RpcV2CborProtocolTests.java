@@ -29,7 +29,7 @@ public class RpcV2CborProtocolTests {
                     "RpcV2CborClientUsesExplicitlyProvidedMemberValuesOverDefaults",
             })
     public void requestTest(DataStream expected, DataStream actual) {
-        CborComparator.assertEquals(expected.waitForByteBuffer(), actual.waitForByteBuffer());
+        CborComparator.assertEquals(expected.asByteBuffer(), actual.asByteBuffer());
     }
 
     @HttpClientResponseTests

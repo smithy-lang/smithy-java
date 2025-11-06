@@ -157,7 +157,7 @@ public final class LambdaEndpoint implements RequestHandler<ProxyRequest, ProxyR
 
         DataStream val = httpResponse.getSerializedValue();
         if (val != null) {
-            ByteBuffer buf = val.waitForByteBuffer();
+            ByteBuffer buf = val.asByteBuffer();
             String body;
             // TODO: handle base64 encoding better
             if (shouldBase64Encode) {

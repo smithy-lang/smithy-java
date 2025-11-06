@@ -41,7 +41,7 @@ public class RestJson1ProtocolTests {
         var actualStr = new StringBuildingSubscriber(actual).getResult();
         if (expected.contentLength() != 0) {
             var expectedStr = new String(
-                    ByteBufferUtils.getBytes(expected.waitForByteBuffer()),
+                    ByteBufferUtils.getBytes(expected.asByteBuffer()),
                     StandardCharsets.UTF_8);
             if ("application/json".equals(expected.contentType())) {
                 var expectedNode = Node.parse(expectedStr);

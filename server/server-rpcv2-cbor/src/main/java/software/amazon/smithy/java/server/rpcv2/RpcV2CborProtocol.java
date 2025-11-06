@@ -76,13 +76,10 @@ final class RpcV2CborProtocol extends ServerProtocol {
         if (dataStream.contentLength() > 0 && !"application/cbor".equals(dataStream.contentType())) {
             throw MalformedRequestException.builder().message("Invalid content type").build();
         }
-        return dataStream.asByteBuffer().thenApply(b -> {
-            var input = codec.deserializeShape(
-                    dataStream.waitForByteBuffer(),
-                    job.operation().getApiOperation().inputBuilder());
-            job.request().setDeserializedValue(input);
-            return null;
-        });
+
+        var input = codec.deserializeShape(dataStream.asByteBuffer(), job.operation().getApiOperation().inputBuilder());
+        job.request().setDeserializedValue(input);
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override

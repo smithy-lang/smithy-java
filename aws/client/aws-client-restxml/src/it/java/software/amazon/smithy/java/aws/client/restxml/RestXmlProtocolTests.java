@@ -41,8 +41,8 @@ public class RestXmlProtocolTests {
             })
     public void requestTest(DataStream expected, DataStream actual) {
         if (expected.contentLength() != 0) {
-            var a = new String(ByteBufferUtils.getBytes(actual.waitForByteBuffer()), StandardCharsets.UTF_8);
-            var b = new String(ByteBufferUtils.getBytes(expected.waitForByteBuffer()), StandardCharsets.UTF_8);
+            var a = new String(ByteBufferUtils.getBytes(actual.asByteBuffer()), StandardCharsets.UTF_8);
+            var b = new String(ByteBufferUtils.getBytes(expected.asByteBuffer()), StandardCharsets.UTF_8);
             if ("application/xml".equals(expected.contentType())) {
                 if (!XMLComparator.compareXMLStrings(a, b)) {
                     // Do this comparison to see what is different.
