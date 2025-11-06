@@ -39,7 +39,7 @@ public class AwsJson1ProtocolTests {
         if (expected.contentLength() != 0) {
             // Use the node parser to strip out white space.
             expectedJson = Node.printJson(
-                    Node.parse(new String(ByteBufferUtils.getBytes(expected.waitForByteBuffer()),
+                    Node.parse(new String(ByteBufferUtils.getBytes(expected.asByteBuffer()),
                             StandardCharsets.UTF_8)));
         }
         assertEquals(expectedJson, new StringBuildingSubscriber(actual).getResult());

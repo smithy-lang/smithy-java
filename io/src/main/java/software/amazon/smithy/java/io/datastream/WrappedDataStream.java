@@ -7,7 +7,6 @@ package software.amazon.smithy.java.io.datastream;
 
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 
 final class WrappedDataStream implements DataStream {
@@ -25,12 +24,12 @@ final class WrappedDataStream implements DataStream {
     }
 
     @Override
-    public CompletableFuture<ByteBuffer> asByteBuffer() {
+    public ByteBuffer asByteBuffer() {
         return delegate.asByteBuffer();
     }
 
     @Override
-    public CompletableFuture<InputStream> asInputStream() {
+    public InputStream asInputStream() {
         return delegate.asInputStream();
     }
 
@@ -42,16 +41,6 @@ final class WrappedDataStream implements DataStream {
     @Override
     public String contentType() {
         return contentType;
-    }
-
-    @Override
-    public ByteBuffer waitForByteBuffer() {
-        return delegate.waitForByteBuffer();
-    }
-
-    @Override
-    public boolean hasByteBuffer() {
-        return delegate.hasByteBuffer();
     }
 
     @Override

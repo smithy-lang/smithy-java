@@ -8,7 +8,6 @@ package software.amazon.smithy.java.io.datastream;
 import java.io.InputStream;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 
@@ -17,7 +16,6 @@ final class ByteBufferDataStream implements DataStream {
     private final ByteBuffer buffer;
     private final String contentType;
     private final long contentLength;
-    private Flow.Publisher<ByteBuffer> publisher;
 
     ByteBufferDataStream(ByteBuffer buffer, String contentType) {
         if (!buffer.hasArray()) {
@@ -29,28 +27,18 @@ final class ByteBufferDataStream implements DataStream {
     }
 
     @Override
-    public boolean hasByteBuffer() {
-        return true;
-    }
-
-    @Override
-    public ByteBuffer waitForByteBuffer() {
-        return buffer.duplicate();
-    }
-
-    @Override
     public boolean isReplayable() {
         return true;
     }
 
     @Override
-    public CompletableFuture<ByteBuffer> asByteBuffer() {
-        return CompletableFuture.completedFuture(buffer.duplicate());
+    public ByteBuffer asByteBuffer() {
+        return buffer.duplicate();
     }
 
     @Override
-    public CompletableFuture<InputStream> asInputStream() {
-        return CompletableFuture.completedFuture(ByteBufferUtils.byteBufferInputStream(buffer));
+    public InputStream asInputStream() {
+        return ByteBufferUtils.byteBufferInputStream(buffer);
     }
 
     @Override
@@ -70,11 +58,8 @@ final class ByteBufferDataStream implements DataStream {
 
     @Override
     public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
-        var p = publisher;
-        if (p == null) {
-            publisher = p = HttpRequest.BodyPublishers
-                    .ofByteArray(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());
-        }
-        p.subscribe(subscriber);
+        HttpRequest.BodyPublishers
+                .ofByteArray(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining())
+                .subscribe(subscriber);
     }
 }

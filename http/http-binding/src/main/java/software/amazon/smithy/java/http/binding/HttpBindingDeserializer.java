@@ -162,7 +162,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
 
     // TODO: Should there be a configurable limit on the client/server for how much can be read in memory?
     private ByteBuffer bodyAsByteBuffer() {
-        return body.waitForByteBuffer();
+        return body.asByteBuffer();
     }
 
     private void validateMediaType() {

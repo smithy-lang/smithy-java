@@ -111,7 +111,7 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
             return builder.build();
         }
 
-        var bytes = content.waitForByteBuffer();
+        var bytes = content.asByteBuffer();
         return CBOR_CODEC.deserializeShape(bytes, builder);
     }
 

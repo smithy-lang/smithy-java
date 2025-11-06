@@ -12,7 +12,6 @@ import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 
 final class FileDataStream implements DataStream {
@@ -34,7 +33,7 @@ final class FileDataStream implements DataStream {
     }
 
     @Override
-    public ByteBuffer waitForByteBuffer() {
+    public ByteBuffer asByteBuffer() {
         try {
             return ByteBuffer.wrap(Files.readAllBytes(file));
         } catch (IOException e) {
@@ -48,12 +47,11 @@ final class FileDataStream implements DataStream {
     }
 
     @Override
-    public CompletableFuture<InputStream> asInputStream() {
+    public InputStream asInputStream() {
         try {
-            return CompletableFuture.completedFuture(Files.newInputStream(file));
+            return Files.newInputStream(file);
         } catch (IOException e) {
-            // To match what happens in the publisher.
-            return CompletableFuture.failedFuture(new UncheckedIOException(e));
+            throw new UncheckedIOException(e);
         }
     }
 

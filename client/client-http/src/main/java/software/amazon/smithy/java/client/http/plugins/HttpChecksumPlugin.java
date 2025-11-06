@@ -50,7 +50,7 @@ public final class HttpChecksumPlugin implements ClientPlugin {
         static HttpRequest addContentMd5Header(HttpRequest request) {
             var body = request.body();
             if (body != null) {
-                var buffer = body.waitForByteBuffer();
+                var buffer = body.asByteBuffer();
                 var bytes = ByteBufferUtils.getBytes(buffer);
                 try {
                     byte[] hash = MessageDigest.getInstance("MD5").digest(bytes);

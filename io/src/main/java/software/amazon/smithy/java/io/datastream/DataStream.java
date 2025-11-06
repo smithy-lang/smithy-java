@@ -8,14 +8,12 @@ package software.amazon.smithy.java.io.datastream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.net.http.HttpResponse;
+import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 
 /**
@@ -48,32 +46,6 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     String contentType();
 
     /**
-     * Converts the data stream to an in-memory ByteBuffer, blocking if necessary.
-     *
-     * <p>A value is returned immediately and no blocking occurs if {@link #hasByteBuffer()} returns true.
-     *
-     * @return a ByteBuffer.
-     * @throws RuntimeException if an error occurs while blocking.
-     */
-    default ByteBuffer waitForByteBuffer() {
-        try {
-            return asByteBuffer().get();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Checks if the DataStream has a readily available ByteBuffer that can be returned from
-     * {@link #waitForByteBuffer()} without blocking.
-     *
-     * @return true if there is a readily available ByteBuffer.
-     */
-    default boolean hasByteBuffer() {
-        return false;
-    }
-
-    /**
      * Check if the DataStream can be restarted from the beginning when new subscribers are added or when getting
      * the data as an InputStream or ByteBuffer.
      *
@@ -86,25 +58,6 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     boolean isReplayable();
 
     /**
-     * Read the contents of the stream into a ByteBuffer.
-     *
-     * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,
-     * {@link #contentLength()} can be used to know if it is safe.
-     *
-     * @return the future that contains the read ByteBuffer.
-     */
-    default CompletableFuture<ByteBuffer> asByteBuffer() {
-        if (hasByteBuffer()) {
-            return CompletableFuture.completedFuture(waitForByteBuffer());
-        }
-
-        var subscriber = HttpResponse.BodySubscribers.ofByteArray();
-        var delegate = new HttpBodySubscriberAdapter<>(subscriber);
-        subscribe(delegate);
-        return subscriber.getBody().thenApply(ByteBuffer::wrap).toCompletableFuture();
-    }
-
-    /**
      * Convert the stream into a blocking {@link InputStream}.
      *
      * @apiNote To ensure that all resources associated with the corresponding exchange are properly released, the
@@ -114,11 +67,27 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      *
      * @return Returns the future that contains the blocking {@code InputStream}.
      */
-    default CompletableFuture<InputStream> asInputStream() {
-        var subscriber = HttpResponse.BodySubscribers.ofInputStream();
-        var delegate = new HttpBodySubscriberAdapter<>(subscriber);
-        subscribe(delegate);
-        return subscriber.getBody().toCompletableFuture();
+    InputStream asInputStream();
+
+    /**
+     * Read the contents of the stream into a ByteBuffer by reading all bytes from {@link #asInputStream()}.
+     *
+     * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,
+     * {@link #contentLength()} can be used to know if it is safe.
+     *
+     * @return the future that contains the read ByteBuffer.
+     */
+    default ByteBuffer asByteBuffer() {
+        try (var is = asInputStream()) {
+            return ByteBuffer.wrap(is.readAllBytes());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    default void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
+        HttpRequest.BodyPublishers.ofInputStream(this::asInputStream).subscribe(subscriber);
     }
 
     /**

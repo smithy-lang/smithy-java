@@ -101,7 +101,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
             return codec.deserializeShape(EMPTY_PAYLOAD, builder);
         }
 
-        var bytes = content.waitForByteBuffer();
+        var bytes = content.asByteBuffer();
         return codec.deserializeShape(bytes, builder);
     }
 }

@@ -130,7 +130,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     }
 
     private String getPayloadHash(DataStream dataStream) {
-        return hexHash(dataStream.waitForByteBuffer());
+        return hexHash(dataStream.asByteBuffer());
     }
 
     private String hexHash(ByteBuffer bytes) {

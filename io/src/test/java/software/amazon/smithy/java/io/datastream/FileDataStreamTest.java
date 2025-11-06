@@ -21,7 +21,7 @@ public class FileDataStreamTest {
 
         assertThat(ds.contentLength(), equalTo(6L));
         assertThat(ds.contentType(), equalTo("text/plain"));
-        assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+        assertThat(ds.asByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
         assertThat(ds.isReplayable(), is(true));
     }
 
@@ -31,20 +31,20 @@ public class FileDataStreamTest {
 
         assertThat(ds.contentLength(), equalTo(6L));
         assertThat(ds.contentType(), equalTo("text/foo"));
-        assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+        assertThat(ds.asByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
     }
 
     @Test
     public void convertsFileStreamToInputStream() throws Exception {
         var ds = DataStream.ofFile(Paths.get(getClass().getResource("test.txt").toURI()), "text/foo");
 
-        assertThat(ds.asInputStream().get().readAllBytes(), equalTo("Hello!".getBytes(StandardCharsets.UTF_8)));
+        assertThat(ds.asInputStream().readAllBytes(), equalTo("Hello!".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
     public void readsDataToByteBuffer() throws Exception {
         var ds = DataStream.ofFile(Paths.get(getClass().getResource("test.txt").toURI()));
 
-        assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+        assertThat(ds.asByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
     }
 }
