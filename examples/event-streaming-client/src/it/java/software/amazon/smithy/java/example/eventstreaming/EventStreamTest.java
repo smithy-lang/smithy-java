@@ -26,10 +26,13 @@ import software.amazon.smithy.java.example.eventstreaming.model.FizzBuzzStream;
 import software.amazon.smithy.java.example.eventstreaming.model.FizzEvent;
 import software.amazon.smithy.java.example.eventstreaming.model.Value;
 import software.amazon.smithy.java.example.eventstreaming.model.ValueStream;
+import software.amazon.smithy.java.logging.InternalLogger;
 
 // TODO: Update the test to create and run the server in setup before the test
 @Disabled("This test requires manually running a server locally and then verifies client behavior against it.")
 public class EventStreamTest {
+
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(EventStreamTest.class);
 
     @Test
     public void fizzBuzz() throws InterruptedException {
@@ -42,8 +45,9 @@ public class EventStreamTest {
         FizzBuzzInput input = FizzBuzzInput.builder()
                 .stream(new ValueStreamPublisher(range))
                 .build();
+        LOGGER.info("Sending fizz buzz request");
         FizzBuzzOutput output = client.fizzBuzz(input);
-
+        LOGGER.info("Fizz buzz request sent");
         System.out.println("Initial messages done");
 
         AtomicLong receivedEvents = new AtomicLong();
@@ -66,7 +70,7 @@ public class EventStreamTest {
                 switch (item.type()) {
                     case fizz:
                         value = item.<FizzEvent>getValue().getValue();
-                        System.out.println("received fizz: " + value);
+                        LOGGER.trace("received fizz: {}", value);
                         assertEquals(0, value % 3);
                         if (value % 5 == 0) {
                             assertTrue(unbuzzed.add(value), "Fizz already received for " + value);
@@ -74,7 +78,7 @@ public class EventStreamTest {
                         break;
                     case buzz:
                         value = item.<BuzzEvent>getValue().getValue();
-                        System.out.println("received buzz: " + value);
+                        LOGGER.trace("received buzz: {}", value);
                         assertEquals(0, value % 5);
                         if (value % 3 == 0) {
                             assertTrue(unbuzzed.remove(value), "No fizz for " + value);
@@ -98,7 +102,7 @@ public class EventStreamTest {
         });
 
         // wait to receive events in the response stream
-        var waits = 10;
+        var waits = 30;
         do {
             Thread.sleep(100);
             if (--waits <= 0) {
@@ -135,9 +139,10 @@ public class EventStreamTest {
                         ValueStream value = ValueStream.builder()
                                 .value(Value.builder().value(count).build())
                                 .build();
-                        System.out.println("sent: " + value);
+                        LOGGER.trace("sent: {}", value);
                         subscriber.onNext(value);
                     } else {
+                        LOGGER.debug("sent done");
                         subscriber.onComplete();
                     }
                 }
