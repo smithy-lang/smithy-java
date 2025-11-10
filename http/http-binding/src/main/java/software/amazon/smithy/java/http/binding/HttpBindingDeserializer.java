@@ -166,14 +166,49 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     private void validateMediaType() {
-        var contentType = headers.contentType();
-        if (payloadMediaType != null && contentType != null) {
-            // Validate the media-type matches the codec.
-            if (!contentType.equals(payloadMediaType)) {
-                throw new SerializationException(
-                        "Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec);
+        if (compareMediaType(headers.contentType(), payloadMediaType) == -1) {
+            throw new SerializationException(
+                    "Unexpected Content-Type '" + headers.contentType() + "' for protocol " + payloadCodec);
+        }
+    }
+
+    /**
+     * Compares an actual media type against an expected media type.
+     *
+     * <p>Media type comparison is case-insensitive. The actual media type is considered a match if it
+     * starts with the expected media type and is either an exact match or is followed by a semicolon
+     * (parameter separator) or whitespace.
+     *
+     * @param actual the actual media type received (e.g., from a Content-Type header), or null
+     * @param expected the expected media type, or null to skip validation
+     * @return 1 if the media types match or no validation is needed because `expected` is null,
+     *         0 if actual is null but expected is not (missing Content-Type),
+     *         -1 if the media types do not match
+     */
+    static int compareMediaType(String actual, String expected) {
+        if (expected == null) {
+            return 1; // No validation needed
+        } else if (actual == null) {
+            return 0; // Expected something, got nothing. Accepts by default in HttpBindingDeserializer.
+        }
+
+        // Check if actual media type starts with expected, optionally followed by parameters
+        // Media types are essentially ASCII (RFC 6838#section-4.2), so locale-dependent case folding with
+        // regionMatches is safe.
+        int len = expected.length();
+        if (actual.regionMatches(true, 0, expected, 0, len)) {
+            int actualLen = actual.length();
+            if (actualLen == len) {
+                return 1;
+            }
+            // Check if followed by parameter separator or whitespace
+            char next = actual.charAt(len);
+            if (next == ';' || Character.isWhitespace(next)) {
+                return 1;
             }
         }
+
+        return -1;
     }
 
     static final class Builder implements SmithyBuilder<HttpBindingDeserializer> {
