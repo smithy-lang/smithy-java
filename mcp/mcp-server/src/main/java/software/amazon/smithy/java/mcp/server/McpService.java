@@ -198,6 +198,10 @@ public final class McpService {
         var operationName = req.getParams().getMember("name").asString();
         var tool = tools.get(operationName);
 
+        if (tool == null) {
+            return createErrorResponse(req, "No such tool: " + operationName);
+        }
+
         // Check if this tool should be dispatched to a proxy
         if (tool.proxy() != null) {
             // Forward the request to the proxy
@@ -360,16 +364,27 @@ public final class McpService {
     }
 
     private JsonRpcResponse createErrorResponse(JsonRpcRequest req, Exception exception) {
-        String s;
-        try (var sw = new StringWriter();
-                var pw = new PrintWriter(sw)) {
-            exception.printStackTrace(pw);
-            s = sw.toString().replace("\n", "| ");
-        } catch (Exception e) {
-            LOG.error("Error encoding response", e);
-            throw new RuntimeException(e);
-        }
+        return createErrorResponse(req, exception, true); //TODO change the default to false.
+    }
 
+    private JsonRpcResponse createErrorResponse(JsonRpcRequest req, Exception exception, boolean sendStackTrace) {
+        String s;
+        if (sendStackTrace) {
+            try (var sw = new StringWriter();
+                    var pw = new PrintWriter(sw)) {
+                exception.printStackTrace(pw);
+                s = sw.toString().replace("\n", "| ");
+            } catch (Exception e) {
+                LOG.error("Error encoding response", e);
+                throw new RuntimeException(e);
+            }
+        } else {
+            s = exception.getMessage();
+        }
+        return createErrorResponse(req, s);
+    }
+
+    private JsonRpcResponse createErrorResponse(JsonRpcRequest req, String s) {
         var error = JsonRpcErrorResponse.builder()
                 .code(500)
                 .message(s)
