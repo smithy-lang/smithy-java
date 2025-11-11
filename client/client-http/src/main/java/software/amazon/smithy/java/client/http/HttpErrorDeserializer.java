@@ -19,6 +19,7 @@ import software.amazon.smithy.java.core.serde.document.DiscriminatorException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.xml.XmlCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -210,6 +211,41 @@ public final class HttpErrorDeserializer {
                     typeRegistry,
                     response,
                     content);
+        }
+    }
+
+    /**
+     * Create the error from response for restXml Protocol specifically.
+     *
+     * @param context      Context for the request.
+     * @param operation    Operation to create request for.
+     * @param typeRegistry TypeRegistry that can be used to create shapes.
+     * @param response     Response to deserialize.
+     * @return the deserialized error response.
+     */
+    public CallException createErrorForXml(
+            Context context,
+            ShapeId operation,
+            TypeRegistry typeRegistry,
+            HttpResponse response
+    ) {
+        var hasErrorHeader = headerErrorExtractor.hasHeader(response);
+        if (hasErrorHeader) {
+            return makeErrorFromHeader(context, operation, typeRegistry, response);
+        }
+        var buffer = createDataStream(response).asByteBuffer();
+        if (!buffer.hasRemaining()) {
+            return createErrorFromHints(operation, response, unknownErrorFactory);
+        } else {
+            var xmlCodec = (XmlCodec) codec;
+            String code = xmlCodec.parseCodeName(buffer);
+            var nameSpace = operation.getNamespace();
+            var id = ShapeId.fromParts(nameSpace, code);
+            var builder = typeRegistry.createBuilder(id, ModeledException.class);
+            if (builder == null) {
+                return createErrorFromHints(operation, response, unknownErrorFactory);
+            }
+            return knownErrorFactory.createError(context, codec, response, builder);
         }
     }
 
