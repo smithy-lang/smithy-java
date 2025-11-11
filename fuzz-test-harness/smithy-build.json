@@ -1,0 +1,9 @@
+{
+  "version": "1.0",
+  "plugins": {
+    "java-type-codegen": {
+      "namespace": "software.smithy.fuzz.test",
+      "useExternalTypes": true
+    }
+  }
+}

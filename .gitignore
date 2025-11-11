@@ -19,3 +19,8 @@ build
 .settings
 
 smithy-java-core/out
+
+.cifuzz-corpus
+crash-*
+
+mise.toml
