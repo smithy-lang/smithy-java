@@ -7,6 +7,7 @@ package software.amazon.smithy.java.aws.events.model;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -32,5 +33,10 @@ public final class GeneratedSchemaIndex extends SchemaIndex {
     @Override
     public Schema getSchema(ShapeId id) {
         return SCHEMA_MAP.get(id);
+    }
+
+    @Override
+    public void visit(Consumer<Schema> visitor) {
+        SCHEMA_MAP.values().forEach(visitor);
     }
 }

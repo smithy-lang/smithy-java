@@ -71,6 +71,11 @@ public final class SchemaIndexGenerator
                     public ${schema:T} getSchema(${shapeId:T} id) {
                         return SCHEMA_MAP.get(id);
                     }
+
+                    @Override
+                    public void visit(${consumer:T}<${schema:T}> visitor) {
+                        SCHEMA_MAP.values().forEach(visitor);
+                    }
                 }
                 """;
 
@@ -79,6 +84,7 @@ public final class SchemaIndexGenerator
         writer.putContext("schemaIndex", SchemaIndex.class);
         writer.putContext("schema", Schema.class);
         writer.putContext("shapeId", ShapeId.class);
+        writer.putContext("consumer", Consumer.class);
         writer.putContext("schemaInitializers", new SchemaInitializersGenerator(writer, directive));
         writer.write(template);
         writer.popState();
