@@ -20,6 +20,9 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  */
 public interface ShapeDeserializer extends AutoCloseable {
 
+    int CONTAINER_PRE_ALLOCATION_LIMIT =
+            Integer.parseInt(System.getProperty("smithy.java.serde.container-pre-allocation-limit", "10000"));
+
     @Override
     default void close() {}
 
@@ -153,6 +156,46 @@ public interface ShapeDeserializer extends AutoCloseable {
      */
     default int containerSize() {
         return -1;
+    }
+
+    /**
+     * Returns the maximum number of elements to pre-allocate when deserializing container types (lists and maps).
+     *
+     * <p>This method provides a safety limit to prevent memory exhaustion attacks when deserializing untrusted data.
+     * When a deserializer encounters a container (list or map) that reports its size via {@link #containerSize()},
+     * the deserialization logic may attempt to pre-allocate space for all elements to improve performance. However,
+     * if the reported size is maliciously large (e.g., a serialized value claims to contain billions of elements),
+     * pre-allocating that much memory could cause an {@link OutOfMemoryError} or severe performance degradation.
+     *
+     * <p>This limit acts as a safeguard by capping the maximum pre-allocation size. If {@link #containerSize()}
+     * returns a value greater than this limit, deserialization implementations should fall back to dynamic allocation
+     * strategies (e.g., adding elements one at a time to a growable collection) rather than pre-allocating space
+     * for the full reported size.
+     *
+     *
+     * <p><b>Security Implications:</b>
+     * Setting this limit too high may expose the application to denial-of-service attacks through memory exhaustion.
+     * Setting it too low may reduce deserialization performance for legitimate large datasets. The default value
+     * of 10,000 elements provides a reasonable balance for most use cases.
+     *
+     * <p><b>Configuration:</b>
+     * The default implementation returns the value of {@link #CONTAINER_PRE_ALLOCATION_LIMIT}, which is controlled
+     * by the {@code smithy.java.serde.container-pre-allocation-limit} system property (default: 10000). Implementations
+     * may override this method to provide custom limits based on specific deserialization contexts or security requirements.
+     *
+     * <p><b>Relationship to {@link #containerSize()}:</b>
+     * This method should be used in conjunction with {@link #containerSize()} when determining how much memory to
+     * pre-allocate. While {@code containerSize()} reports the claimed size from the serialized data, this method
+     * provides the trusted upper bound for pre-allocation decisions.
+     *
+     * @return the maximum number of elements to pre-allocate for container deserialization, must be non-negative.
+     *         A value of 0 indicates that pre-allocation should never be performed, forcing all containers to use
+     *         dynamic allocation strategies.
+     * @see #containerSize()
+     * @see #CONTAINER_PRE_ALLOCATION_LIMIT
+     */
+    default int containerPreAllocationLimit() {
+        return CONTAINER_PRE_ALLOCATION_LIMIT;
     }
 
     /**

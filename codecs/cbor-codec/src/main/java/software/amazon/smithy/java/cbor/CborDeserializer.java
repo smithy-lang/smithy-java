@@ -445,7 +445,7 @@ final class CborDeserializer implements ShapeDeserializer {
 
     @Override
     public int containerSize() {
-        return -1; //parser.collectionSize(); FIXME : Renable once we have some bounds checking, otherwise a small payload can trigger a huge allocation
+        return parser.collectionSize();
     }
 
     @Override

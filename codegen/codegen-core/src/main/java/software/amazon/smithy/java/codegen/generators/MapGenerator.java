@@ -82,7 +82,7 @@ public final class MapGenerator
                                             }
 
                                             static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
-                                                var size = deserializer.containerSize();
+                                                var size = Math.min(deserializer.containerSize(), deserializer.containerPreAllocationLimit());
                                                 ${shape:T} result = size == -1 ? new ${collectionImpl:T}<>() : new ${collectionImpl:T}<>(size);
                                                 deserializer.readStringMap(schema, result, ${name:U}$$ValueDeserializer.INSTANCE);
                                                 return result;
