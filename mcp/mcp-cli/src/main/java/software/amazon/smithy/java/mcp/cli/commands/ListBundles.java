@@ -7,7 +7,10 @@ package software.amazon.smithy.java.mcp.cli.commands;
 
 import static picocli.CommandLine.Command;
 
+import java.io.IOException;
 import java.util.Map;
+
+import org.jline.terminal.Attributes;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import picocli.CommandLine;
@@ -94,7 +97,6 @@ public class ListBundles extends SmithyMcpCommand {
 
         while (registryIterator.hasNext()) {
             if (displayedCount > 0 && displayedCount % pageSize == 0) {
-                System.out.println("Press down arrow for more...");
                 if (!waitForDownArrow()) {
                     break;
                 }
@@ -144,23 +146,37 @@ public class ListBundles extends SmithyMcpCommand {
     }
 
     private boolean waitForDownArrow() {
-        try (Terminal terminal = TerminalBuilder.builder()
-                .system(true)
-                .dumb(true)
-                .build()) {
-            terminal.enterRawMode();
-            int ch = terminal.reader().read();
-
-            if (ch == 27) {
-                int bracket = terminal.reader().read();
-                if (bracket == 91) {
-                    int arrow = terminal.reader().read();
-                    return arrow == 66;
-                }
-            }
-            return false;
-        } catch (Exception e) {
-            return false;
+        TerminalBuilder builder = TerminalBuilder.builder();
+        if ("dumb".equals(System.getenv("TERM"))) {
+            builder.dumb(true);
+        } else {
+            builder.system(true);
         }
+        try (Terminal terminal = builder.build()) {
+            if (terminal.getType().equals(Terminal.TYPE_DUMB)) {
+                return true;
+            } else {
+                System.err.println("Press down arrow for more...");
+            }
+            try {
+                Attributes originalAttributes = terminal.enterRawMode();
+                int ch = terminal.reader().read();
+
+                if (ch == 27) {
+                    int bracket = terminal.reader().read();
+                    if (bracket == 91) {
+                        int arrow = terminal.reader().read();
+                        return arrow == 66;
+                    }
+                }
+                terminal.setAttributes(originalAttributes);
+                return false;
+            } catch (Exception e) {
+                return false;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return true;
     }
 }
