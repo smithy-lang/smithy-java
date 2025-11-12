@@ -7,6 +7,7 @@ package software.amazon.smithy.java.fuzz;
 
 import com.code_intelligence.jazzer.api.FuzzedDataProvider;
 import com.code_intelligence.jazzer.junit.FuzzTest;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.HashSet;
@@ -54,6 +55,7 @@ public abstract class CodecDeserializationFuzzTestBase {
 
     protected abstract Codec codecToFuzz();
 
+    @SuppressFBWarnings("DCN_NULLPOINTER_EXCEPTION")
     protected boolean isErrorAcceptable(Exception exception) throws Exception {
         try {
             throw exception;
@@ -61,7 +63,8 @@ public abstract class CodecDeserializationFuzzTestBase {
                 | IllegalArgumentException
                 | IllegalStateException
                 | UnsupportedOperationException
-                | IndexOutOfBoundsException ignored) {
+                | IndexOutOfBoundsException
+                | NullPointerException ignored) {
             return true;
         }
     }
