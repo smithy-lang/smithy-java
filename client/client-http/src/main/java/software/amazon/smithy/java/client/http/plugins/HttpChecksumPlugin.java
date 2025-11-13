@@ -8,10 +8,11 @@ package software.amazon.smithy.java.client.http.plugins;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+import software.amazon.smithy.java.client.core.AutoClientPlugin;
 import software.amazon.smithy.java.client.core.ClientConfig;
-import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.ByteBufferUtils;
@@ -23,11 +24,13 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  * Plugin that adds Content-MD5 header for operations with @httpChecksumRequired trait.
  */
 @SmithyInternalApi
-public final class HttpChecksumPlugin implements ClientPlugin {
-
+public final class HttpChecksumPlugin implements AutoClientPlugin {
     @Override
     public void configureClient(ClientConfig.Builder config) {
-        config.addInterceptor(HttpChecksumInterceptor.INSTANCE);
+        // We can conditionally add the interceptor here because client transport can't change after construction.
+        if (config.isUsingMessageExchange(HttpMessageExchange.INSTANCE)) {
+            config.addInterceptor(HttpChecksumInterceptor.INSTANCE);
+        }
     }
 
     static final class HttpChecksumInterceptor implements ClientInterceptor {

@@ -111,6 +111,20 @@ public final class DynamicOperation implements ApiOperation<StructDocument, Stru
             TypeRegistry serviceErrorRegistry,
             BiConsumer<ShapeId, TypeRegistry.Builder> registerErrorCallback
     ) {
+        var serviceSchema = schemaConverter.getSchema(service);
+        ApiService apiService = () -> serviceSchema;
+        return create(apiService, shape, schemaConverter, model, service, serviceErrorRegistry, registerErrorCallback);
+    }
+
+    public static DynamicOperation create(
+            ApiService apiService,
+            OperationShape shape,
+            SchemaConverter schemaConverter,
+            Model model,
+            ServiceShape service,
+            TypeRegistry serviceErrorRegistry,
+            BiConsumer<ShapeId, TypeRegistry.Builder> registerErrorCallback
+    ) {
         var operationSchema = schemaConverter.getSchema(shape);
 
         List<ShapeId> authSchemes = new ArrayList<>();
@@ -126,9 +140,9 @@ public final class DynamicOperation implements ApiOperation<StructDocument, Stru
 
         var errorSchemas = new HashSet<Schema>();
         // Create a type registry that is able to deserialize errors using schemas.
-        if (!shape.getErrors().isEmpty()) {
+        if (!shape.getErrorsSet().isEmpty()) {
             var registryBuilder = TypeRegistry.builder();
-            for (var e : shape.getErrors()) {
+            for (var e : shape.getErrorsSet()) {
                 registerErrorCallback.accept(e, registryBuilder);
                 errorSchemas.add(schemaConverter.getSchema(model.expectShape(e)));
             }
@@ -136,13 +150,6 @@ public final class DynamicOperation implements ApiOperation<StructDocument, Stru
             registry = TypeRegistry.compose(registryBuilder.build(), serviceErrorRegistry);
         }
 
-        var serviceSchema = schemaConverter.getSchema(service);
-        var apiService = new ApiService() {
-            @Override
-            public Schema schema() {
-                return serviceSchema;
-            }
-        };
         return new DynamicOperation(
                 apiService,
                 operationSchema,

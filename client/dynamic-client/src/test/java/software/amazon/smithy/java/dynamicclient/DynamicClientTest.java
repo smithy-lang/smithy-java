@@ -20,6 +20,7 @@ import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.client.core.endpoint.EndpointResolverParams;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
@@ -39,7 +40,7 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public class DynamicClientTest {
 
     private static Model model;
-    private static ShapeId service = ShapeId.from("smithy.example#Sprockets");
+    private static final ShapeId SERVICE = ShapeId.from("smithy.example#Sprockets");
 
     @BeforeAll
     public static void setup() {
@@ -49,6 +50,21 @@ public class DynamicClientTest {
                         namespace smithy.example
 
                         @aws.protocols#awsJson1_0
+                        @smithy.rules#endpointRuleSet(
+                            version: "1.0",
+                            serviceId: "what",
+                            parameters: {},
+                            rules: [
+                                {
+                                    "documentation": "Static endpoint",
+                                    "type": "endpoint",
+                                    "conditions": [],
+                                    "endpoint": {
+                                        "url": "https://example.com"
+                                    }
+                                }
+                            ]
+                        )
                         service Sprockets {
                             operations: [CreateSprocket, GetSprocket]
                             errors: [ServiceFooError]
@@ -95,24 +111,24 @@ public class DynamicClientTest {
     @Test
     public void createsServiceSchema() throws Exception {
         var client = DynamicClient.builder()
-                .service(service)
+                .serviceId(SERVICE)
                 .model(model)
-                .protocol(new AwsJson1Protocol(service))
+                .protocol(new AwsJson1Protocol(SERVICE))
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
                 .transport(mockTransport())
                 .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
                 .build();
 
-        assertThat(client.config().service().schema().id(), equalTo(service));
+        assertThat(client.config().service().schema().id(), equalTo(SERVICE));
         assertThat(client.config().service().schema().hasTrait(TraitKey.get(AwsJson1_0Trait.class)), is(true));
     }
 
     @Test
     public void sendsRequestWithNoInput() throws Exception {
         var client = DynamicClient.builder()
-                .service(service)
+                .serviceId(SERVICE)
                 .model(model)
-                .protocol(new AwsJson1Protocol(service))
+                .protocol(new AwsJson1Protocol(SERVICE))
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
                 .transport(mockTransport())
                 .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
@@ -144,9 +160,9 @@ public class DynamicClientTest {
     @Test
     public void sendsRequestWithInput() throws Exception {
         var client = DynamicClient.builder()
-                .service(service)
+                .serviceId(SERVICE)
                 .model(model)
-                .protocol(new AwsJson1Protocol(service))
+                .protocol(new AwsJson1Protocol(SERVICE))
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
                 .transport(mockTransport())
                 .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
@@ -218,9 +234,9 @@ public class DynamicClientTest {
 
     private static DynamicClient createErrorClient(String payload) {
         return DynamicClient.builder()
-                .service(service)
+                .serviceId(SERVICE)
                 .model(model)
-                .protocol(new AwsJson1Protocol(service))
+                .protocol(new AwsJson1Protocol(SERVICE))
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
                 .transport(createErrorTransport(payload))
                 .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
@@ -248,12 +264,46 @@ public class DynamicClientTest {
     @Test
     public void detectsClientProtocol() {
         var client = DynamicClient.builder()
-                .service(service)
+                .serviceId(SERVICE)
                 .model(model)
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
                 .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
                 .build();
 
         assertThat(client.config().protocol(), instanceOf(AwsJson1Protocol.class));
+    }
+
+    @Test
+    public void detectsService() {
+        var client = DynamicClient.builder()
+                .model(model)
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
+                .build();
+
+        assertThat(client.config().service().schema().id(), equalTo(SERVICE));
+        assertThat(client.config().protocol(), instanceOf(AwsJson1Protocol.class));
+    }
+
+    @Test
+    public void detectsEndpointResolver() {
+        var client = DynamicClient.builder()
+                .model(model)
+                //                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .build();
+
+        assertThat(client.config().service().schema().id(), equalTo(SERVICE));
+        assertThat(client.config().protocol(), instanceOf(AwsJson1Protocol.class));
+
+        var ep = client.config()
+                .endpointResolver()
+                .resolveEndpoint(EndpointResolverParams
+                        .builder()
+                        .operation(client.getOperation("GetSprocket"))
+                        .inputValue(client.createStruct(ShapeId.from("smithy.example#GetSprocketInput"),
+                                Document.of(Map.of())))
+                        .build());
+
+        assertThat(ep.uri().toString(), equalTo("https://example.com"));
     }
 }

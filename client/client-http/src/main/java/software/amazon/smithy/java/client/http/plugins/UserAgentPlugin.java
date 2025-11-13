@@ -7,10 +7,10 @@ package software.amazon.smithy.java.client.http.plugins;
 
 import java.util.List;
 import java.util.Locale;
+import software.amazon.smithy.java.client.core.AutoClientPlugin;
 import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientContext;
-import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
@@ -27,11 +27,13 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  * default.
  */
 @SmithyInternalApi
-public final class UserAgentPlugin implements ClientPlugin {
-
+public final class UserAgentPlugin implements AutoClientPlugin {
     @Override
     public void configureClient(ClientConfig.Builder config) {
-        config.addInterceptor(UserAgentInterceptor.INSTANCE);
+        // We can conditionally add the interceptor here because client transport can't change after construction.
+        if (config.isUsingMessageExchange(HttpMessageExchange.INSTANCE)) {
+            config.addInterceptor(UserAgentInterceptor.INSTANCE);
+        }
     }
 
     /**
@@ -40,7 +42,7 @@ public final class UserAgentPlugin implements ClientPlugin {
      * <p>The agent is in the form of {@code smithy-java/0.1 ua/2.1 os/macos#14.6.1Lang/java#21.0.12 m/a,b}, where
      * "m/a,b" are feature IDs set via {@link CallContext#FEATURE_IDS}.
      *
-     * <p>A pair of "app/{id}" is added if {@link CallContext#APPLICATION_ID} is set, or a value is set in the
+     * <p>A pair of "app/{id}" is added if {@link ClientContext#APPLICATION_ID} is set, or a value is set in the
      * "aws.userAgentAppId" system property, or the value set in the "AWS_SDK_UA_APP_ID" environment variable.
      * See <a href="https://docs.aws.amazon.com/sdkref/latest/guide/feature-appid.html">Application ID</a> for more
      * information.

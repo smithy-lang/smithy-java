@@ -24,15 +24,8 @@ import software.amazon.smithy.java.core.error.CallException;
  *
  * @implNote To be discoverable by dynamic clients and client code generators,
  * ClientTransport's should implement a {@link ClientTransportFactory} service provider.
- *
- * @implNote ClientTransports can modify a ClientBuilder to configure default functionality like adding a
- * user-agent header for HTTP requests. By default, the {@link ClientTransport#configureClient} calls the
- * ClientTransport calls the {@link MessageExchange#configureClient(ClientConfig.Builder)} method.
- * When overriding this method of a ClientTransport, you need to also call the {@code configureClient}
- * method of the {@link MessageExchange} manually, if you want it to take effect. This allows for
- * transports to override or even completely remove MessageExchange-wide functionality.
  */
-public interface ClientTransport<RequestT, ResponseT> extends ClientPlugin {
+public interface ClientTransport<RequestT, ResponseT> {
     /**
      * Send a prepared request.
      *
@@ -52,11 +45,6 @@ public interface ClientTransport<RequestT, ResponseT> extends ClientPlugin {
      * @return the message exchange.
      */
     MessageExchange<RequestT, ResponseT> messageExchange();
-
-    @Override
-    default void configureClient(ClientConfig.Builder config) {
-        config.applyPlugin(messageExchange());
-    }
 
     /**
      * Remaps a thrown exception to an appropriate {@link TransportException} or {@link CallException}.
