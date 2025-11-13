@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.client.http.netty.h2;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;

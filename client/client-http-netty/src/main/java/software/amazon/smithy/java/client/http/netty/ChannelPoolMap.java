@@ -5,16 +5,6 @@
 
 package software.amazon.smithy.java.client.http.netty;
 
-import java.io.Closeable;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.AdaptiveRecvByteBufAllocator;
 import io.netty.channel.Channel;
@@ -34,11 +24,20 @@ import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
+import java.io.Closeable;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import javax.net.ssl.SSLException;
 import software.amazon.smithy.java.client.core.error.TlsException;
 import software.amazon.smithy.java.client.http.netty.h2.NettyHttp2Utils;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.logging.InternalLogger;
-import javax.net.ssl.SSLException;
 
 /**
  * Provides access to a channel promises for a given URI.

@@ -1,4 +1,14 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.client.http.netty;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -11,14 +21,8 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.http.netty.mocks.MockChannel;
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NettyDataStreamTest {
 
@@ -216,7 +220,6 @@ class NettyDataStreamTest {
         }
     }
 
-
     static class ProducerSubscription implements Flow.Subscription {
         private final ProducerWorker producerWorker;
 
@@ -291,7 +294,6 @@ class NettyDataStreamTest {
             return error != null;
         }
     }
-
 
     private static List<ByteBuffer> createData(
             int chunkMinSize,

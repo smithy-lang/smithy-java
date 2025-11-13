@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.client.http.netty;
 
+import io.netty.channel.Channel;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Objects;
@@ -14,8 +15,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-
-import io.netty.channel.Channel;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
