@@ -174,6 +174,9 @@ class Http2MultiplexedConnectionPoolTest {
         // assert stream attributes
         var idx = 0;
         for (var mockStreamPromise : Arrays.asList(firstStream, secondStream)) {
+            assertTrue(mockStreamPromise.await(1_000));
+            assertTrue(mockStreamPromise.isSuccess(),
+                    "Mock stream promise " + idx + " failed with " + mockStreamPromise.cause());
             var mockStreamResult = mockStreamPromise.get();
             assertInstanceOf(MockChannel.Stream.class, mockStreamResult);
             var mockStream = (MockChannel.Stream) mockStreamResult;
