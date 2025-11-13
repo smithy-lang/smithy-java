@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Consumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaBuilder;
 import software.amazon.smithy.java.core.schema.SchemaIndex;
@@ -200,6 +201,11 @@ public final class SchemaConverter {
             @Override
             public Schema getSchema(ShapeId id) {
                 return SchemaConverter.this.getSchema(model.expectShape(id));
+            }
+
+            @Override
+            public void visit(Consumer<Schema> visitor) {
+                SchemaConverter.this.schemas.values().forEach(visitor);
             }
         };
     }

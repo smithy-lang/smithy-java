@@ -67,6 +67,7 @@ include(":codegen:test-utils")
 // Utilities
 include(":jmespath")
 include(":protocol-test-harness")
+include(":fuzz-test-harness")
 
 // AWS specific
 include(":aws:aws-event-streams")

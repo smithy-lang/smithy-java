@@ -19,6 +19,7 @@ picocli = "4.7.7"
 jline = "3.30.6"
 graalvm-native = "0.11.2"
 shadow = "8.3.9"
+jazzer = "0.26.0"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -67,6 +68,8 @@ junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 hamcrest = { module = "org.hamcrest:hamcrest", version.ref = "hamcrest" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj"}
+jazzer-junit = { module = "com.code-intelligence:jazzer-junit", version.ref = "jazzer" }
+jazzer-api = { module = "com.code-intelligence:jazzer-api", version.ref = "jazzer" }
 
 # plugin artifacts for buildsrc plugins
 test-logger-plugin = { module = "com.adarshr:gradle-test-logger-plugin", version.ref = "test-logger-plugin" }
