@@ -78,7 +78,7 @@ public class MockPluginTest {
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()
-                .service(SERVICE)
+                .serviceId(SERVICE)
                 .model(MODEL)
                 .addPlugin(mock)
                 .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
@@ -109,7 +109,7 @@ public class MockPluginTest {
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()
-                .service(SERVICE)
+                .serviceId(SERVICE)
                 .model(MODEL)
                 .addPlugin(mock)
                 .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
@@ -129,7 +129,7 @@ public class MockPluginTest {
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()
-                .service(SERVICE)
+                .serviceId(SERVICE)
                 .model(MODEL)
                 .addPlugin(mock)
                 .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
@@ -149,7 +149,7 @@ public class MockPluginTest {
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()
-                .service(SERVICE)
+                .serviceId(SERVICE)
                 .model(MODEL)
                 .addPlugin(mock)
                 .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
@@ -201,7 +201,7 @@ public class MockPluginTest {
                 .build();
 
         var client = DynamicClient.builder()
-                .service(SERVICE)
+                .serviceId(SERVICE)
                 .model(MODEL)
                 .addPlugin(mock)
                 .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))

@@ -79,7 +79,7 @@ public class ClientPipelineTest {
     public void canShortCircuitRequests() {
         var service = ShapeId.from("smithy.example#Sprockets");
         var client = DynamicClient.builder()
-                .service(service)
+                .serviceId(service)
                 .model(MODEL)
                 .protocol(new RestJsonClientProtocol(service))
                 .transport(new JavaHttpClientTransport())
@@ -137,7 +137,7 @@ public class ClientPipelineTest {
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()
-                .service(service)
+                .serviceId(service)
                 .model(MODEL)
                 .addPlugin(mock)
                 .endpointResolver(EndpointResolver.staticEndpoint("https://localhost:8081"))

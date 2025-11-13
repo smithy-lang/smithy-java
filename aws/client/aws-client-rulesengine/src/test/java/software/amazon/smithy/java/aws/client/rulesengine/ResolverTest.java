@@ -28,6 +28,7 @@ import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.rulesengine.EndpointRulesPlugin;
 import software.amazon.smithy.java.client.rulesengine.EndpointUtils;
 import software.amazon.smithy.java.client.rulesengine.RulesEngineBuilder;
+import software.amazon.smithy.java.client.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.java.client.rulesengine.RulesEvaluationError;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
@@ -82,11 +83,12 @@ public class ResolverTest {
         model = customizeS3Model(model);
         service = model.expectShape(ShapeId.from("com.amazonaws.s3#AmazonS3"), ServiceShape.class);
         var engine = new RulesEngineBuilder();
-        plugin = EndpointRulesPlugin.create(engine);
+        plugin = new EndpointRulesPlugin();
         client = DynamicClient.builder()
                 .model(model)
-                .service(service.getId())
+                .serviceId(service.getId())
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .putConfig(RulesEngineSettings.RULES_ENGINE_BUILDER, engine)
                 .addPlugin(plugin)
                 .build();
     }

@@ -5,9 +5,9 @@
 
 package software.amazon.smithy.java.client.core;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletionException;
+import java.util.function.Predicate;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
@@ -16,7 +16,7 @@ import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.CallHook;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.client.core.plugins.DefaultPlugin;
+import software.amazon.smithy.java.client.core.plugins.AutoPlugin;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -38,15 +38,6 @@ public abstract class Client {
 
     protected Client(Builder<?, ?> builder) {
         ClientConfig.Builder configBuilder = builder.configBuilder();
-
-        // Resolve the transport and apply it as a plugin before user-defined plugins, allowing user-defined plugins
-        // to supersede and functionality of plugins applied by transports.
-        configBuilder.resolveTransport();
-
-        for (ClientPlugin plugin : builder.plugins) {
-            configBuilder.applyPlugin(plugin);
-        }
-
         this.config = configBuilder.build();
         this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
         this.interceptor = ClientInterceptor.chain(config.interceptors());
@@ -145,13 +136,6 @@ public abstract class Client {
     public abstract static class Builder<I, B extends Builder<I, B>> implements ClientSetting<B> {
 
         private final ClientConfig.Builder configBuilder = ClientConfig.builder();
-        private final List<ClientPlugin> plugins = new ArrayList<>();
-
-        public Builder() {
-            // Apply the default plugin by default, and do it before user-controlled plugins.
-            // Applying this first allows user-defined plugins to make changes that potentially supersede defaults.
-            configBuilder.applyPlugin(DefaultPlugin.INSTANCE);
-        }
 
         /**
          * A ClientConfig.Builder available to subclasses to initialize in their constructors with any default
@@ -349,15 +333,60 @@ public abstract class Client {
         }
 
         /**
-         * Add a plugin to the client.
+         * Add a plugin and its child plugins to the client.
          *
+         * <p>Plugins are applied when the client is built. Duplicate plugins are applied only once, based on the
+         * plugin class. Plugins are applied in a sorted {@link ClientPlugin.Phase} and insertion order.
+         *
+         * @see ClientConfig.Builder#pluginPredicate()
+         * @see ClientConfig.Builder#addPlugin(ClientPlugin) 
          * @param plugin Plugin to add.
          * @return the builder.
          */
         @SuppressWarnings("unchecked")
         public B addPlugin(ClientPlugin plugin) {
-            plugins.add(plugin);
+            configBuilder.addPlugin(plugin);
             return (B) this;
+        }
+
+        /**
+         * Sets a predicate function used to gate what plugins can be applied to the builder.
+         *
+         * @see ClientConfig.Builder#pluginPredicate()
+         * @param pluginPredicate Predicate function used to filter out plugins.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B pluginPredicate(Predicate<ClientPlugin> pluginPredicate) {
+            configBuilder.pluginPredicate(pluginPredicate);
+            return (B) this;
+        }
+
+        /**
+         * Adds a predicate function to any existing used to gate what plugins can be applied to the builder.
+         *
+         * @see ClientConfig.Builder#pluginPredicate()
+         * @param pluginPredicate Predicate function to add to the existing predicate functions.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B addPluginPredicate(Predicate<ClientPlugin> pluginPredicate) {
+            configBuilder.addPluginPredicate(pluginPredicate);
+            return (B) this;
+        }
+
+        /**
+         * Disables finding and applying {@link AutoClientPlugin} SPI-based plugins.
+         *
+         * @return the builder.
+         */
+        public B disableAutoPlugins() {
+            return pluginPredicate(new Predicate<ClientPlugin>() {
+                @Override
+                public boolean test(ClientPlugin plugin) {
+                    return AutoPlugin.INSTANCE != plugin;
+                }
+            }.and(configBuilder.pluginPredicate()));
         }
 
         /**

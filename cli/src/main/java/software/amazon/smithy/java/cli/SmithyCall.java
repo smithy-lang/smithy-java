@@ -250,7 +250,7 @@ final class SmithyCall implements Callable<Integer> {
         }
 
         DynamicClient.Builder builder = DynamicClient.builder()
-                .service(serviceInput)
+                .serviceId(serviceInput)
                 .model(model)
                 .endpointResolver(EndpointResolver.staticEndpoint(url));
 

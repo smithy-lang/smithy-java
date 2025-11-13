@@ -149,7 +149,7 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
     default <T> T expect(Key<T> key) {
         T value = get(key);
         if (value == null) {
-            throw new NullPointerException("Unknown context property: " + key);
+            throw new NullPointerException("Missing require context property: " + key);
         }
         return value;
     }

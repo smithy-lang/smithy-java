@@ -90,12 +90,12 @@ public class InjectIdempotencyTokenPluginTest {
                 .build();
 
         var client = DynamicClient.builder()
-                .service(SERVICE)
+                .serviceId(SERVICE)
                 .model(MODEL)
                 .addPlugin(mock)
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
                 .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
-                .addPlugin(new InjectIdempotencyTokenPlugin())
+                .addPlugin(InjectIdempotencyTokenPlugin.INSTANCE)
                 .addPlugin(mock)
                 .build();
 

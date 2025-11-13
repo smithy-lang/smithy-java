@@ -164,7 +164,7 @@ public class ClientConfigTest {
                 // Only things available in configBuilder to these default plugins would be things added to
                 // configBuilder above.
                 for (ClientPlugin plugin : defaultPlugins) {
-                    configBuilder.applyPlugin(plugin);
+                    plugin.configureClient(configBuilder);
                 }
             }
 

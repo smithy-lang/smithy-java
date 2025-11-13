@@ -71,12 +71,12 @@ final class AwsServiceBundle implements BundlePlugin {
         clientBuilder.putSupportedAuthSchemes(StaticAuthSchemeResolver.staticScheme(authScheme));
         if (clientBuilder instanceof DynamicClient.Builder dynamicBuilder) {
             var index = ServiceIndex.of(dynamicBuilder.model());
-            var protocols = index.getProtocols(dynamicBuilder.service());
+            var protocols = index.getProtocols(dynamicBuilder.serviceId());
             if (protocols.keySet().stream().noneMatch(GOOD_PROTOCOLS::contains)) {
                 // TODO: implement better protocol fallback behavior.
                 // If we don't have the service's supported protocol, let's just
                 // try AWS/JSON 1.0 and hope it works.
-                var settings = ProtocolSettings.builder().service(dynamicBuilder.service()).build();
+                var settings = ProtocolSettings.builder().service(dynamicBuilder.serviceId()).build();
                 dynamicBuilder.protocol(AWS_JSON_1.createProtocol(settings, null));
             }
         }

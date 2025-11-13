@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.client.core;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
@@ -14,7 +13,10 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
@@ -25,10 +27,10 @@ import software.amazon.smithy.java.client.core.interceptors.CallHook;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.client.core.plugins.ApplyModelRetryInfoPlugin;
+import software.amazon.smithy.java.client.core.plugins.AutoPlugin;
 import software.amazon.smithy.java.client.core.plugins.DefaultPlugin;
+import software.amazon.smithy.java.client.core.plugins.DiscoverTransportPlugin;
 import software.amazon.smithy.java.client.core.plugins.InjectIdempotencyTokenPlugin;
-import software.amazon.smithy.java.client.http.HttpMessageExchange;
-import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.client.http.mock.MockPlugin;
 import software.amazon.smithy.java.client.http.mock.MockQueue;
 import software.amazon.smithy.java.client.http.plugins.ApplyHttpRetryInfoPlugin;
@@ -36,6 +38,8 @@ import software.amazon.smithy.java.client.http.plugins.HttpChecksumPlugin;
 import software.amazon.smithy.java.client.http.plugins.UserAgentPlugin;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
+import software.amazon.smithy.java.dynamicclient.plugins.DetectProtocolPlugin;
+import software.amazon.smithy.java.dynamicclient.plugins.SimpleAuthDetectionPlugin;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -68,40 +72,112 @@ public class ClientTest {
 
     private static final ShapeId SERVICE = ShapeId.from("smithy.example#Sprockets");
 
+    // TODO: this requires updates each time we add new auto or default plugins, but it's a useful test.
+    private static final List<Class<?>> EXPECTED_PLUGIN_CLASSES = Arrays.asList(
+            DetectProtocolPlugin.class,
+            DefaultPlugin.class,
+            DiscoverTransportPlugin.class,
+            ApplyModelRetryInfoPlugin.class,
+            InjectIdempotencyTokenPlugin.class,
+            AutoPlugin.class,
+            SimpleAuthDetectionPlugin.class,
+            UserAgentPlugin.class,
+            ApplyHttpRetryInfoPlugin.class,
+            HttpChecksumPlugin.class,
+            FooPlugin.class);
+
     @Test
-    public void tracksPlugins() throws URISyntaxException {
-        DynamicClient c = DynamicClient.builder()
+    public void pluginIntegrationTest() {
+        List<Class<?>> applied = new ArrayList<>();
+        DynamicClient.builder()
                 .model(MODEL)
-                .service(SERVICE)
+                .serviceId(SERVICE)
                 .protocol(new RestJsonClientProtocol(SERVICE))
                 .addPlugin(new FooPlugin())
-                .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
+                .endpointResolver(EndpointResolver.staticEndpoint("http://localhost"))
+                .pluginPredicate(p -> {
+                    applied.add(p.getClass());
+                    return true;
+                })
                 .build();
 
-        // Make sure that applied plugins round-trip.
-        assertThat(c.config().appliedPlugins(), equalTo(c.config().toBuilder().build().appliedPlugins()));
+        assertThat(applied, equalTo(EXPECTED_PLUGIN_CLASSES));
+    }
 
-        assertThat(
-                c.config().appliedPlugins(),
-                contains(
-                        // Default plugin always applied.
-                        DefaultPlugin.class,
-                        // DefaultPlugin applies these two:
-                        ApplyModelRetryInfoPlugin.class,
-                        InjectIdempotencyTokenPlugin.class,
-                        // The transport is applied as a plugin, before user plugins.
-                        JavaHttpClientTransport.class,
-                        // The transport automatically forwards plugin application to the HttpMessageExchange.
-                        HttpMessageExchange.class,
-                        // And HttpMessageExchange applies the UserAgentPlugin and ApplyHttpRetryInfoPlugin.
-                        UserAgentPlugin.class,
-                        ApplyHttpRetryInfoPlugin.class,
-                        HttpChecksumPlugin.class,
-                        // User plugins are applied last.
-                        FooPlugin.class));
+    @Test
+    public void canFilterPlugins() {
+        List<Class<?>> applied = new ArrayList<>();
+        DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(new FooPlugin())
+                .endpointResolver(EndpointResolver.staticEndpoint("http://localhost"))
+                .pluginPredicate(p -> {
+                    if (p.getClass() != FooPlugin.class) {
+                        applied.add(p.getClass());
+                        return true;
+                    }
+                    return false;
+                })
+                .build();
+
+        List<Class<?>> expected = new ArrayList<>(EXPECTED_PLUGIN_CLASSES);
+        expected.remove(FooPlugin.class);
+
+        assertThat(applied, equalTo(expected));
+    }
+
+    @Test
+    public void alsoFiltersRequestOverridePlugins() {
+        List<Class<?>> applied = new ArrayList<>();
+        DynamicClient c = DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(new FooPlugin())
+                .endpointResolver(EndpointResolver.staticEndpoint("http://localhost"))
+                .pluginPredicate(p -> {
+                    if (p.getClass() != BazPlugin.class) {
+                        applied.add(p.getClass());
+                        return true;
+                    }
+                    return false;
+                })
+                .build();
+
+        // Add a null placeholder to better demonstrate the overrides.
+        applied.add(null);
+
+        // Accepts BamPlugin, but not BazPlugin because of the predicate.
+        var override = RequestOverrideConfig.builder()
+                .addPlugin(new BazPlugin())
+                .addPlugin(new BamPlugin())
+                .build();
+        var overridden = c.config().withRequestOverride(override);
+
+        // Same interceptors in the same order.
+        assertThat(overridden.interceptors(), equalTo(c.config().interceptors()));
+
+        // Predicate should see the extra plugin, reject Baz and allow Bam.
+        List<Class<?>> expected = new ArrayList<>(EXPECTED_PLUGIN_CLASSES);
+        expected.add(null); // divider between runs
+        expected.add(BamPlugin.class);
+
+        assertThat(applied, equalTo(expected));
     }
 
     private static final class FooPlugin implements ClientPlugin {
+        @Override
+        public void configureClient(ClientConfig.Builder config) {}
+    }
+
+    private static final class BazPlugin implements ClientPlugin {
+        @Override
+        public void configureClient(ClientConfig.Builder config) {}
+    }
+
+    private static final class BamPlugin implements ClientPlugin {
         @Override
         public void configureClient(ClientConfig.Builder config) {}
     }
@@ -114,7 +190,7 @@ public class ClientTest {
 
         DynamicClient c = DynamicClient.builder()
                 .model(MODEL)
-                .service(SERVICE)
+                .serviceId(SERVICE)
                 .protocol(new RestJsonClientProtocol(SERVICE))
                 .addPlugin(MockPlugin.builder().addQueue(queue).build())
                 .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
@@ -133,7 +209,7 @@ public class ClientTest {
 
         DynamicClient c = DynamicClient.builder()
                 .model(MODEL)
-                .service(SERVICE)
+                .serviceId(SERVICE)
                 .protocol(new RestJsonClientProtocol(SERVICE))
                 .addPlugin(MockPlugin.builder().addQueue(queue).build())
                 .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
@@ -165,7 +241,7 @@ public class ClientTest {
 
         DynamicClient c = DynamicClient.builder()
                 .model(MODEL)
-                .service(SERVICE)
+                .serviceId(SERVICE)
                 .protocol(new RestJsonClientProtocol(SERVICE))
                 .addPlugin(MockPlugin.builder().addQueue(queue).build())
                 .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
@@ -206,7 +282,7 @@ public class ClientTest {
 
         DynamicClient c = DynamicClient.builder()
                 .model(MODEL)
-                .service(SERVICE)
+                .serviceId(SERVICE)
                 .protocol(new RestJsonClientProtocol(SERVICE))
                 .addPlugin(MockPlugin.builder().addQueue(queue).build())
                 .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
