@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.client.http.netty.h2;
 
+import static java.lang.Thread.sleep;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -94,7 +95,7 @@ class Http2MultiplexedConnectionPoolTest {
         assertNotNull(mockParentChannel.attr(HTTP2_MULTIPLEXED_CHANNEL).get());
 
         // assert parent was not closed
-        assertFalse(mockParentChannel.wasExplicitlyClosed());
+        assertFalse(mockParentChannel.isClosed());
 
         // assert stream pipeline
         var mockParentPipeline = mockParentChannel.mockPipeline();
@@ -165,7 +166,7 @@ class Http2MultiplexedConnectionPoolTest {
         assertNotNull(mockParentChannel.attr(HTTP2_MULTIPLEXED_CHANNEL).get());
 
         // assert parent was not closed
-        assertFalse(mockParentChannel.wasExplicitlyClosed());
+        assertFalse(mockParentChannel.isClosed());
 
         // assert stream pipeline
         var mockParentPipeline = mockParentChannel.mockPipeline();
@@ -193,6 +194,50 @@ class Http2MultiplexedConnectionPoolTest {
         }
         // assert the multiplexed channel was used for the enw stream
         assertEquals(1, connectionPool.parentCount(), "A single multiplexed channel is in the pool");
+        assertTrue(connectionPool.isAcquireSemaphoreReleased(), "The acquire semaphore was not released");
+    }
+
+    @Test
+    public void releasesAcquireSemaphoreOnException() throws Exception {
+        // --- Arrange
+
+        // Set up the mock base channel pool
+        var mockParentChannel = setupValidMockChannel();
+        var basePool = MockChannelPool.builder()
+                .eventLoopGroup(eventLoopGroup)
+                .onAcquire(p -> {
+                    throw new RuntimeException("boom");
+                })
+                .build();
+
+        // Set up the stream bootstrap
+        Http2StreamBootstrap bootstrap = (ch) -> {
+            var mockStream = MockChannel.builder()
+                    .parent(mockParentChannel)
+                    .buildStream();
+            return eventLoopGroup.next().newSucceededFuture(mockStream);
+        };
+
+        // Set up the connection pool
+        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
+                eventLoopGroup,
+                bootstrap,
+                MultiplexedChannel::new);
+
+        // Set up first promise
+        var firstStream = eventLoopGroup.next().<Channel>newPromise();
+
+        // -- Act
+        connectionPool.acquire(firstStream);
+
+        // --- Assert
+
+        assertTrue(firstStream.await(1_000));
+        assertFalse(firstStream.isSuccess());
+
+        // assert the no multiplexed channel was added
+        assertEquals(0, connectionPool.parentCount(), "A single multiplexed channel is in the pool");
+        assertTrue(connectionPool.isAcquireSemaphoreReleased(), "The acquire semaphore was not released");
     }
 
     @Test
@@ -232,7 +277,7 @@ class Http2MultiplexedConnectionPoolTest {
         // -- Assert
 
         // assert that the stream was closed.
-        assertTrue(mockStream.wasExplicitlyClosed());
+        assertTrue(mockStream.isClosed());
         // assert that the multiplexed channel is still present in the cache
         assertEquals(1, connectionPool.parentCount(), "The multiplexed channel is still present in the pool");
     }
@@ -281,7 +326,7 @@ class Http2MultiplexedConnectionPoolTest {
         // -- Assert
 
         // assert that the stream was closed.
-        assertTrue(mockStream.wasExplicitlyClosed());
+        assertTrue(mockStream.isClosed());
 
         // assert that the multiplexed channel was removed
         assertEquals(0, connectionPool.parentCount(), "A multiplexed channel was removed from the pool");
@@ -327,11 +372,51 @@ class Http2MultiplexedConnectionPoolTest {
         assertThrows(AssertionError.class, () -> connectionPool.release(mockParentChannel));
 
         // assert that the channel was closed.
-        assertTrue(mockParentChannel.wasExplicitlyClosed());
+        assertTrue(mockParentChannel.isClosed());
     }
 
     @Test
     public void closesButDoesNotReleaseStreamWithoutMultiplexedChannel() throws Exception {
+        // --- Arrange
+
+        // Set up the mock base channel pool
+        var mockParentChannel = setupValidMockChannel();
+        var basePool = MockChannelPool.builder()
+                .eventLoopGroup(eventLoopGroup)
+                .onAcquireSucceed(mockParentChannel)
+                .build();
+
+        // Set up the stream bootstrap
+        var mockStream = MockChannel.builder()
+                .parent(mockParentChannel)
+                .buildStream();
+        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
+
+        // Set up the connection pool
+        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
+                eventLoopGroup,
+                ch -> streamFuture,
+                MultiplexedChannel::new);
+
+        // Set up result promise
+        var resultPromise = connectionPool.acquire();;
+        resultPromise.await(1_000);
+
+        // Make sure that the result is successful
+        assertTrue(resultPromise.isSuccess());
+
+        // -- Act & assert
+
+        // A stream channel without a multiplexed channel attached cannot be released to this pool
+        mockParentChannel.attr(HTTP2_MULTIPLEXED_CHANNEL).set(null);
+        assertThrows(AssertionError.class, () -> connectionPool.release(mockStream));
+
+        // assert that the channel was closed.
+        assertTrue(mockStream.isClosed());
+    }
+
+    @Test
+    public void closesStreamWhenAttemptingToCloseAndReleaseParent() throws Exception {
         // --- Arrange
 
         // Set up the mock base channel pool
@@ -363,12 +448,123 @@ class Http2MultiplexedConnectionPoolTest {
 
         // -- Act & assert
 
-        // A stream channel without a multiplexed channel attached cannot be released to this pool
-        mockParentChannel.attr(HTTP2_MULTIPLEXED_CHANNEL).set(null);
-        assertThrows(AssertionError.class, () -> connectionPool.release(mockStream));
+        // Channel is not a parent channel. It will be closed, but cannot be released within this pool
+        assertThrows(AssertionError.class, () -> connectionPool.closeAndReleaseParent(mockStream, null));
 
         // assert that the channel was closed.
-        assertTrue(mockStream.wasExplicitlyClosed());
+        assertTrue(mockStream.isClosed());
+    }
+
+    @Test
+    public void closingPoolClosesAllStreamsParentsAndBasePool() throws Exception {
+        // --- Arrange
+
+        // Set up the mock base channel pool
+        var mockParentChannel = setupValidMockChannel();
+        var basePool = MockChannelPool.builder()
+                .eventLoopGroup(eventLoopGroup)
+                .onAcquireSucceed(mockParentChannel)
+                .build();
+
+        // Set up the stream bootstrap
+        var mockStream = MockChannel.builder()
+                .parent(mockParentChannel)
+                .buildStream();
+        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
+
+        // Set up the connection pool
+        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
+                eventLoopGroup,
+                ch -> streamFuture,
+                MultiplexedChannel::new);
+
+        // Set up result promise
+        var resultPromise = connectionPool.acquire();;
+        resultPromise.await(1_000);
+
+        // Make sure that the result is successful
+        assertTrue(resultPromise.isSuccess());
+
+        // -- Act
+        connectionPool.close();
+
+        // -- Assert
+        var multiplexedChannel = mockParentChannel.attr(HTTP2_MULTIPLEXED_CHANNEL).get();
+        assertNotNull(multiplexedChannel);
+        assertTrue(multiplexedChannel.isClosed());
+        assertTrue(mockStream.isClosed());
+        assertTrue(basePool.isClosed());
+    }
+
+    @Test
+    public void acquireFailsInClosedChannelPool() throws Exception {
+        // --- Arrange
+
+        // Set up the mock base channel pool
+        var mockParentChannel = setupValidMockChannel();
+        var basePool = MockChannelPool.builder()
+                .eventLoopGroup(eventLoopGroup)
+                .onAcquireSucceed(mockParentChannel)
+                .build();
+
+        // Set up the stream bootstrap
+        var mockStream = MockChannel.builder()
+                .parent(mockParentChannel)
+                .buildStream();
+        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
+
+        // Set up the connection pool
+        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
+                eventLoopGroup,
+                ch -> streamFuture,
+                MultiplexedChannel::new);
+
+        // Set up result promise
+
+        // -- Act
+        connectionPool.close();
+        var resultPromise = connectionPool.acquire();
+        resultPromise.await(1_000);
+
+        // -- Assert
+        assertFalse(resultPromise.isSuccess());
+    }
+
+    @Test
+    public void acquireFailsWhenThePoolIsClosedWhileSettingUp() throws Exception {
+        // --- Arrange
+
+        // Set up the mock base channel pool
+        var mockParentChannel = setupValidMockChannel();
+        var basePool = MockChannelPool.builder()
+                .eventLoopGroup(eventLoopGroup)
+                .onAcquireSucceed(mockParentChannel)
+                .build();
+
+        // Set up the stream bootstrap
+        var mockStream = MockChannel.builder()
+                .parent(mockParentChannel)
+                .buildStream();
+        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
+
+        // Set up the connection pool
+        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
+                eventLoopGroup,
+                ch -> {
+                    sleep(100);
+                    return streamFuture;
+                },
+                MultiplexedChannel::new);
+
+        // Set up result promise
+
+        // -- Act
+        var resultPromise = connectionPool.acquire();
+        connectionPool.close();
+        resultPromise.await(1_000);
+
+        // -- Assert
+        assertFalse(resultPromise.isSuccess());
     }
 
     @Test
@@ -418,7 +614,7 @@ class Http2MultiplexedConnectionPoolTest {
         assertNotNull(mockParentChannel.attr(HTTP2_MULTIPLEXED_CHANNEL).get());
 
         // assert parent was not closed
-        assertFalse(mockParentChannel.wasExplicitlyClosed());
+        assertFalse(mockParentChannel.isClosed());
 
         // assert stream pipeline
         var mockParentPipeline = mockParentChannel.mockPipeline();
@@ -476,7 +672,7 @@ class Http2MultiplexedConnectionPoolTest {
         var throwable = resultPromise.cause();
         assertNotNull(throwable);
         assertTrue(throwable.getMessage().contains("HTTP/1.1"));
-        assertTrue(mockParentChannel.wasExplicitlyClosed(), "The parent channel was explicitly closed");
+        assertTrue(mockParentChannel.isClosed(), "The parent channel was explicitly closed");
         assertEquals(0, connectionPool.parentCount(), "A multiplexed channel was NOT added to the pool");
     }
 
@@ -517,7 +713,7 @@ class Http2MultiplexedConnectionPoolTest {
         var throwable = resultPromise.cause();
         assertNotNull(throwable);
         assertEquals("boom", throwable.getMessage());
-        assertTrue(mockParentChannel.wasExplicitlyClosed(), "The parent channel was explicitly closed");
+        assertTrue(mockParentChannel.isClosed(), "The parent channel was explicitly closed");
         assertEquals(0, connectionPool.parentCount(), "A multiplexed channel was NOT added to the pool");
     }
 
@@ -556,7 +752,7 @@ class Http2MultiplexedConnectionPoolTest {
         assertNotNull(throwable);
         assertEquals("boom", throwable.getMessage());
         assertInstanceOf(IOException.class, throwable);
-        assertTrue(mockParentChannel.wasExplicitlyClosed(), "The parent channel was explicitly closed");
+        assertTrue(mockParentChannel.isClosed(), "The parent channel was explicitly closed");
         assertEquals(0, connectionPool.parentCount(), "A multiplexed channel was NOT added to the pool");
     }
 
@@ -641,6 +837,15 @@ class Http2MultiplexedConnectionPoolTest {
         assertEquals("parent failed", throwable.getMessage());
         assertInstanceOf(IOException.class, throwable);
         assertEquals(0, connectionPool.parentCount(), "A multiplexed channel was NOT added to the pool");
+    }
+
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        }
     }
 
     private static MockChannel setupValidMockChannel() {

@@ -232,7 +232,7 @@ final class Http2MultiplexedConnectionPool implements ChannelPool {
 
     /**
      * Called when there's an issue with the parent channel. This call closes all streams on the channel and then
-     * closes the channel itself and releases it to its channel pool/
+     * closes the channel itself and releases it to its channel pool.
      *
      * @param parentChannel The parent channel to close
      * @param cause         An optional exception used to notify and close its streams
@@ -269,10 +269,17 @@ final class Http2MultiplexedConnectionPool implements ChannelPool {
     }
 
     /**
-     * Returns the count of parent channels in this pool.
+     * Returns the count of parent channels in this pool. Used for testing.
      */
     int parentCount() {
         return channels.size();
+    }
+
+    /**
+     * Returns true if the acquire semaphore is released. Used for testing.
+     */
+    boolean isAcquireSemaphoreReleased() {
+        return initSemaphore.availablePermits() == 1;
     }
 
     /**

@@ -147,7 +147,7 @@ public class MockChannel implements Channel {
         return 0;
     }
 
-    public boolean wasExplicitlyClosed() {
+    public boolean isClosed() {
         return wasClosed;
     }
 

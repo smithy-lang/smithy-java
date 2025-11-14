@@ -78,7 +78,10 @@ public class MockChannelPool implements ChannelPool {
     public static class Builder {
         private EventLoopGroup eventLoopGroup;
         private Function<Promise<Channel>, Future<Channel>> onAcquire;
-        private BiFunction<Channel, Promise<Void>, Future<Void>> onRelease = (c, p) -> p;
+        private BiFunction<Channel, Promise<Void>, Future<Void>> onRelease = (c, p) -> {
+            p.setSuccess(null);
+            return p;
+        };
 
         public Builder eventLoopGroup(EventLoopGroup eventLoopGroup) {
             this.eventLoopGroup = eventLoopGroup;
