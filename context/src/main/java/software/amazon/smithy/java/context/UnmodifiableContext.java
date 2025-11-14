@@ -9,7 +9,7 @@ import java.util.function.Function;
 
 final class UnmodifiableContext implements Context {
 
-    static final Context EMPTY = new UnmodifiableContext(new MapStorageContext());
+    static final Context EMPTY = new UnmodifiableContext(new ChunkedArrayStorageContext());
 
     private final Context delegate;
 
