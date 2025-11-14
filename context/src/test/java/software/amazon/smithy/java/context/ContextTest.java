@@ -10,31 +10,27 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.lessThan;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 public class ContextTest {
 
     static final Context.Key<String> FOO = Context.key("Foo");
-    static final Context.Key<Integer> BAR = Context.key("Foo");
-    static final Context.Key<Boolean> BAZ = Context.key("Foo");
+    static final Context.Key<Integer> BAR = Context.key("Bar");
+    static final Context.Key<Boolean> BAZ = Context.key("Baz");
 
     static final Context.Key<Set<String>> SAD_SET = Context.key("Sad set");
     static final Context.Key<Set<String>> HAPPY_SET = Context.key("Happy set", HashSet::new);
 
     @Test
     public void getTypedValue() {
-        // Force the use of an array storage here to test it out.
-        var context = new ArrayStorageContext();
+        var context = Context.create();
         context.put(FOO, "Hi");
         context.put(BAR, 1);
 
@@ -160,8 +156,8 @@ public class ContextTest {
         context.put(BAR, 1);
 
         var overrides = Context.create();
-        context.put(FOO, "bye");
-        context.put(BAZ, true);
+        overrides.put(FOO, "bye");
+        overrides.put(BAZ, true);
 
         overrides.copyTo(context);
 
@@ -177,8 +173,8 @@ public class ContextTest {
         context.put(BAR, 1);
 
         var overrides = Context.create();
-        context.put(FOO, "bye");
-        context.put(BAZ, true);
+        overrides.put(FOO, "bye");
+        overrides.put(BAZ, true);
 
         var unmodifiableOverrides = Context.unmodifiableView(overrides);
         unmodifiableOverrides.copyTo(context);
@@ -189,12 +185,12 @@ public class ContextTest {
     }
 
     @Test
-    public void resizingCopiesOldItems() {
+    public void dynamicKeyAddition() {
         var context = Context.create();
         context.put(FOO, "hi");
 
-        // Create a new key.
-        Context.Key<Integer> key = Context.key("foo");
+        // Create a new key dynamically.
+        Context.Key<Integer> key = Context.key("dynamic-key");
         context.put(key, 10);
 
         assertThat(context.get(FOO), equalTo("hi"));
@@ -213,35 +209,9 @@ public class ContextTest {
     }
 
     @Test
-    public void migratesToMapStorage() {
-        // Doing the thing you should never do in real code.
-        var current = Context.Key.COUNTER.get();
-        assertThat(current, lessThan(Context.Key.MAX_ARRAY_KEY_SPACE));
-
-        var arrayContext = Context.create();
-        // Put a key that is in the array key space.
-        arrayContext.put(FOO, "hi");
-        assertThat(arrayContext, instanceOf(ArrayStorageContext.class));
-
-        List<Context.Key<Integer>> keys = new ArrayList<>();
-        for (var i = current; i < Context.Key.MAX_ARRAY_KEY_SPACE + 1; i++) {
-            Context.Key<Integer> key = Context.key("foo " + i);
-            arrayContext.put(key, i);
-            keys.add(key);
-        }
-
-        var mapContext = Context.create();
-        assertThat(mapContext, instanceOf(MapStorageContext.class));
-
-        arrayContext.copyTo(mapContext);
-
-        // Array keyspace keys were copied.
-        assertThat(mapContext.get(FOO), equalTo("hi"));
-
-        for (var k : keys) {
-            // Keys outside the array keyspace were copied.
-            assertThat(mapContext.get(k), not(nullValue()));
-        }
+    public void usesChunkedArrayStorage() {
+        var context = Context.create();
+        assertThat(context, instanceOf(ChunkedArrayStorageContext.class));
     }
 
     @Test
@@ -259,11 +229,11 @@ public class ContextTest {
 
         // Sad set wasn't copied, so a mutation to the copied context affected the original.
         assertThat(ctx.get(SAD_SET), containsInAnyOrder("a", "b"));
-        // Happy set was modified, so it maintained its independence.
+        // Happy set was copied, so it maintained its independence.
         assertThat(ctx.get(HAPPY_SET), containsInAnyOrder("a"));
 
         assertThat(copy.get(SAD_SET), containsInAnyOrder("a", "b"));
-        // happy set also copied the original values from sad set when the copy was made.
+        // happy set also copied the original values from ctx when the copy was made.
         assertThat(copy.get(HAPPY_SET), containsInAnyOrder("a", "b"));
     }
 }
