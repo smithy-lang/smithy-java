@@ -112,10 +112,26 @@ public final class HttpErrorDeserializer {
     }
 
     /**
-     * Extract error shape IDs from HTTP payload and create.
+     * To create an error, the {@link ShapeId} of the error is required to retrieve the corresponding {@link ShapeBuilder}.
+     * Different protocols need different parsers to extract the ShapeId given their different response structures.
+     * If no parser specified, {@link #DEFAULT_ERROR_PAYLOAD_PARSER} will be picked.
      */
     @FunctionalInterface
     public interface ErrorPayloadParser {
+        /**
+         * This method should parse the response payload and extract error's ShapeId,and
+         * create the corresponding error with the {@link KnownErrorFactory}.
+         *
+         * @param context Context of the call.
+         * @param codec Codec used to deserialize payloads.
+         * @param knownErrorFactory The knownErrorFactory to create error.
+         * @param serviceId The ShapeId of the service.
+         * @param typeRegistry The error typeRegistry to retrieve builder for the error.
+         * @param response Response to parse.
+         * @param buffer Bytebuffer of the payload.
+         *
+         * @return the created error.
+         */
         CallException parsePayload(
                 Context context,
                 Codec codec,
@@ -175,6 +191,8 @@ public final class HttpErrorDeserializer {
         }
     };
 
+    // This default parser should work for most protocols, but other  protocols
+    // that do not support document types will need a custom parser to extract error ShapeId.
     private static final ErrorPayloadParser DEFAULT_ERROR_PAYLOAD_PARSER = (
             Context context,
             Codec codec,
@@ -242,7 +260,6 @@ public final class HttpErrorDeserializer {
             // No error header, no __type: it's an unknown error.
             return createErrorFromHints(operation, response, unknownErrorFactory);
         } else {
-            // Look for __type or <Code> in the payload.
             return makeErrorFromPayload(
                     context,
                     codec,
@@ -413,7 +430,8 @@ public final class HttpErrorDeserializer {
         /**
          * The parser to parse the shapeId from the payload.
          *
-         * <p>By default, payload is parsed into a JSON document
+         * <p>The default parser implementation will parse the payload into a {@link Document} and
+         * use {@link Document#discriminator()} to extract its {@code __type} field as ShapeId
          *
          * @param errorPayloadParser Parser used to parse the payload.
          * @return the builder.

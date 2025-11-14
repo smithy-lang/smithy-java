@@ -10,7 +10,6 @@ extra["moduleName"] = "software.amazon.smithy.java.client.http"
 dependencies {
     api(project(":client:client-core"))
     api(project(":http:http-api"))
-    api(project(":codecs:xml-codec"))
     implementation(project(":logging"))
 
     testImplementation(project(":codecs:json-codec", configuration = "shadow"))

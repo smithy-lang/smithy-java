@@ -136,7 +136,9 @@ final class XmlDeserializer implements ShapeDeserializer {
                     if (reader.getText() == null) {
                         throw new SerializationException("Expected shape name inside <Code>");
                     }
-                    return reader.getText();
+                    var code = reader.getText();
+                    reader.closeElement();
+                    return code;
                 }
                 reader.closeElement();
             }

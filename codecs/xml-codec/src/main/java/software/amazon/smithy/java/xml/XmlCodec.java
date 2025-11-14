@@ -12,7 +12,6 @@ import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import software.amazon.smithy.java.core.serde.Codec;
-import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.io.ByteBufferUtils;
@@ -66,15 +65,6 @@ public final class XmlCodec implements Codec {
         }
     }
 
-    private XmlDeserializer createXmlDeserializer(ByteBuffer source) {
-        try {
-            var reader = xmlInputFactory.createXMLStreamReader(ByteBufferUtils.byteBufferInputStream(source));
-            return XmlDeserializer.topLevel(xmlInfo, eventFactory, new XmlReader.StreamReader(reader, xmlInputFactory));
-        } catch (XMLStreamException e) {
-            throw new SerializationException(e);
-        }
-    }
-
     /**
      * Retrieve the Code element value from the error response.
      *
@@ -82,7 +72,7 @@ public final class XmlCodec implements Codec {
      * @return String value of the Code element if found
      */
     public String parseCodeName(ByteBuffer source) {
-        try (var deserializer = createXmlDeserializer(source)) {
+        try (var deserializer = (XmlDeserializer) createDeserializer(source)) {
             return deserializer.parseCodeName();
         }
     }
