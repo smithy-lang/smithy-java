@@ -38,8 +38,7 @@ import java.util.List;
  * <p>When using {@link ClientConfig#toBuilder()}, the returned builder remembers what plugin classes
  * were already applied. Calling {@code build()} on this builder will not re-apply those plugins,
  * preventing duplicate configuration. This enables a kind of config template pattern:
- *
- * <pre>{@code
+ * {@snippet lang="java" :
  * var baseConfig = ClientConfig.builder()
  *     .addPlugin(new MyPlugin())
  *     .build();
@@ -47,7 +46,7 @@ import java.util.List;
  * var derivedConfig = baseConfig.toBuilder()
  *     .addPlugin(new AnotherPlugin())  // Only AnotherPlugin applies
  *     .build();
- * }</pre>
+ * }
  *
  * <h2>Request Overrides</h2>
  * <p>When applying plugins via {@link ClientConfig#withRequestOverride(RequestOverrideConfig)},
@@ -62,7 +61,7 @@ import java.util.List;
  * accept it.
  *
  * <h2>Example Usage</h2>
- * <pre>{@code
+ * {@snippet lang="java" :
  * public class MyPlugin implements ClientPlugin {
  *     @Override
  *     public void configureClient(ClientConfig.Builder config) {
@@ -75,7 +74,7 @@ import java.util.List;
  *     .addPlugin(new MyPlugin())
  *     .addPlugin(new MyPlugin())  // Skipped because it's already applied
  *     .build();
- * }</pre>
+ * }
  *
  * @see ClientConfig.Builder#addPlugin(ClientPlugin)
  * @see Client.Builder#addPlugin(ClientPlugin)
