@@ -618,8 +618,7 @@ public final class ClientConfig {
          * <p><strong>Important:</strong> Only plugins that pass the predicate are tracked as "applied".
          * This means if a plugin is rejected in one config, it can be applied in a derived config if
          * the predicate changes to accept it:
-         *
-         * <pre>{@code
+         * {@snippet lang="java" :
          * var config1 = ClientConfig.builder()
          *     .pluginPredicate(p -> !(p instanceof MyPlugin))  // Reject MyPlugin
          *     .addPlugin(new MyPlugin())
@@ -628,7 +627,7 @@ public final class ClientConfig {
          * var config2 = config1.toBuilder()
          *     .pluginPredicate(p -> true)  // Accept everything
          *     .build();  // MyPlugin WILL apply now
-         * }</pre>
+         * }
          *
          * @param pluginPredicate Predicate to apply. Plugins that don't satisfy the predicate are not applied.
          * @return the builder.
