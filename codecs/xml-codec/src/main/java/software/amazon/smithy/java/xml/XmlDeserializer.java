@@ -66,6 +66,16 @@ final class XmlDeserializer implements ShapeDeserializer {
 
     // The first deserialization of XML expects a containing XML element for the shape.
     // The inner deserializer deserializes members and doesn't have this expectation.
+    // If the name is ErrorResponse or Error, it means we are deserializing an ErrorResponse like:
+    // <ErrorResponse>
+    //   <Error>
+    //     <Type>Sender</Type>
+    //     <Code>InvalidInput</Code>
+    //     <Message>Invalid input</Message>
+    //   </Error>
+    // </ErrorResponse>
+    // We should skip all the way to the Code element to deserialize the rest of the fields and
+    // return early to skip the name comparison.
     private void enter(Schema schema) {
         try {
             if (!isTopLevel) {
@@ -117,7 +127,7 @@ final class XmlDeserializer implements ShapeDeserializer {
         }
     }
 
-    String parseCodeName() {
+    String parseErrorCodeName() {
         try {
             var element = reader.nextMemberElement();
             if (element == null || (!element.equals("ErrorResponse") && !element.equals("Error"))) {

@@ -28,6 +28,7 @@ import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.xml.XmlCodec;
+import software.amazon.smithy.java.xml.XmlUtil;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -102,8 +103,8 @@ public final class RestXmlClientProtocol extends HttpBindingClientProtocol<AwsEv
             TypeRegistry typeRegistry,
             HttpResponse response,
             ByteBuffer buffer) -> {
-        var xmlCodec = (XmlCodec) codec;
-        String code = xmlCodec.parseCodeName(buffer);
+        var deserializer = codec.createDeserializer(buffer);
+        String code = XmlUtil.parseErrorCodeName(deserializer);
         var nameSpace = serviceId.getNamespace();
         var id = ShapeId.fromOptionalNamespace(nameSpace, code);
         var builder = typeRegistry.createBuilder(id, ModeledException.class);
