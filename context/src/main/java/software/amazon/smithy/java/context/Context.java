@@ -5,9 +5,9 @@
 
 package software.amazon.smithy.java.context;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 /**
@@ -26,9 +26,13 @@ public sealed interface Context permits ChunkedArrayStorageContext, Unmodifiable
      */
     final class Key<T> {
 
-        // Global registry of all keys for copyTo operations
+        // Global registry of all keys for copyTo operations (CopyOnWriteArrayList for thread safety).
         @SuppressWarnings("rawtypes")
-        static final List<Key> KEYS = new ArrayList<>();
+        static final List<Key> KEYS = new CopyOnWriteArrayList<>();
+
+        // We still need a lock to atomically insert an ID into KEYS and get the ID.
+        // Spotbugs warns against Synchronizing on KEYS, so using a dedicated lock.
+        private static final Object KEYS_LOCK = new Object();
 
         private final String name;
         final int id;
@@ -40,7 +44,9 @@ public sealed interface Context permits ChunkedArrayStorageContext, Unmodifiable
         private Key(String name, Function<T, T> copyFunction) {
             this.name = Objects.requireNonNull(name);
             this.copyFunction = Objects.requireNonNull(copyFunction);
-            synchronized (KEYS) {
+
+            // Atomically assign our slot in the KEYS array.
+            synchronized (KEYS_LOCK) {
                 this.id = KEYS.size();
                 KEYS.add(this);
             }

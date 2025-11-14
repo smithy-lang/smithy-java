@@ -34,28 +34,37 @@ final class ChunkedArrayStorageContext implements Context {
         int id = key.id;
         int chunkIdx = id >> CHUNK_SHIFT;
 
-        // Grow chunks array if needed
         if (chunkIdx >= chunks.length) {
-            int newSize = Math.max(chunks.length * 2, chunkIdx + 1);
-            Object[][] newChunks = new Object[newSize][];
-            System.arraycopy(chunks, 0, newChunks, 0, chunks.length);
-            chunks = newChunks;
+            growChunksArray(chunkIdx);
         }
 
-        // Allocate chunk if needed
+        Object[] chunk = getChunk(chunkIdx);
+        chunk[id & CHUNK_MASK] = value;
+        return this;
+    }
+
+    private void growChunksArray(int chunkIdx) {
+        int newSize = Math.max(chunks.length * 2, chunkIdx + 1);
+        Object[][] newChunks = new Object[newSize][];
+        System.arraycopy(chunks, 0, newChunks, 0, chunks.length);
+        chunks = newChunks;
+    }
+
+    private Object[] getChunk(int chunkIdx) {
         Object[] chunk = chunks[chunkIdx];
-        if (chunk == null) {
-            chunk = new Object[CHUNK_SIZE];
-            chunks[chunkIdx] = chunk;
-        }
+        return chunk != null ? chunk : createChunk(chunkIdx);
+    }
+
+    private Object[] createChunk(int chunkIdx) {
+        Object[] chunk = new Object[CHUNK_SIZE];
+        chunks[chunkIdx] = chunk;
 
         // Update numChunks to track highest allocated chunk
         if (chunkIdx >= numChunks) {
             numChunks = chunkIdx + 1;
         }
 
-        chunk[id & CHUNK_MASK] = value;
-        return this;
+        return chunk;
     }
 
     @Override
