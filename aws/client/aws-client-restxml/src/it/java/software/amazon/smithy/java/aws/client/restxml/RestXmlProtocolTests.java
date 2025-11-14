@@ -57,10 +57,6 @@ public class RestXmlProtocolTests {
     }
 
     @HttpClientResponseTests
-    @ProtocolTestFilter(skipTests = {
-            "InvalidGreetingError",
-            "ComplexError"
-    })
     public void responseTest(Runnable test) {
         test.run();
     }
