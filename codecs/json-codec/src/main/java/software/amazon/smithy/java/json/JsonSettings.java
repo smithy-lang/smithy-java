@@ -7,6 +7,7 @@ package software.amazon.smithy.java.json;
 
 import java.util.Objects;
 import java.util.ServiceLoader;
+import java.util.function.Function;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 
 /**
@@ -45,6 +46,7 @@ public final class JsonSettings {
     private final JsonSerdeProvider provider;
     private final boolean serializeTypeInDocuments;
     private final boolean prettyPrint;
+    private final Function<String, String> errorTypeSanitizer;
 
     private JsonSettings(Builder builder) {
         this.timestampResolver = builder.useTimestampFormat
@@ -58,6 +60,7 @@ public final class JsonSettings {
         this.provider = builder.provider;
         this.serializeTypeInDocuments = builder.serializeTypeInDocuments;
         this.prettyPrint = builder.prettyPrint;
+        this.errorTypeSanitizer = builder.errorTypeSanitizer;
     }
 
     /**
@@ -116,6 +119,15 @@ public final class JsonSettings {
     }
 
     /**
+     * The error type sanitizer to use for {@code __type}. Default is null
+     *
+     * @return the sanitizer used or null
+     */
+    public Function<String, String> errorTypeSanitizer() {
+        return errorTypeSanitizer;
+    }
+
+    /**
      * Whether to format the JSON output with pretty printing (indentation and line breaks).
      *
      * @return true if pretty printing is enabled
@@ -165,6 +177,7 @@ public final class JsonSettings {
         private JsonSerdeProvider provider = PROVIDER;
         private boolean serializeTypeInDocuments = true;
         private boolean prettyPrint = false;
+        private Function<String, String> errorTypeSanitizer;
 
         private Builder() {}
 
@@ -273,6 +286,17 @@ public final class JsonSettings {
          */
         Builder overrideSerdeProvider(JsonSerdeProvider provider) {
             this.provider = Objects.requireNonNull(provider);
+            return this;
+        }
+
+        /**
+         * Uses a custom error type sanitizer for error type
+         *
+         * @param errorTypeSanitizer the sanitizer to use for error type.
+         * @return the builder.
+         */
+        Builder errorTypeSanitizer(Function<String, String> errorTypeSanitizer) {
+            this.errorTypeSanitizer = errorTypeSanitizer;
             return this;
         }
     }
