@@ -250,6 +250,9 @@ public final class JsonDocuments {
             if (member != null && member.type() == ShapeType.STRING) {
                 discriminator = member.asString();
             }
+            if (settings.errorTypeSanitizer() != null) {
+                discriminator = settings.errorTypeSanitizer().apply(discriminator);
+            }
             return DocumentDeserializer.parseDiscriminator(discriminator, settings.defaultNamespace());
         }
 

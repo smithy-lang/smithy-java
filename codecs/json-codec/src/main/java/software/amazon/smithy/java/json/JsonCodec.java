@@ -7,6 +7,7 @@ package software.amazon.smithy.java.json;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.function.Function;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -172,6 +173,17 @@ public final class JsonCodec implements Codec {
          */
         Builder overrideSerdeProvider(JsonSerdeProvider provider) {
             settingsBuilder.overrideSerdeProvider(provider);
+            return this;
+        }
+
+        /**
+         * Uses a custom error type sanitizer to process the {@code __type} field.
+         *
+         * @param errorTypeSanitizer the type sanitizer to use.
+         * @return the builder.
+         */
+        public Builder errorTypeSanitizer(Function<String, String> errorTypeSanitizer) {
+            settingsBuilder.errorTypeSanitizer(errorTypeSanitizer);
             return this;
         }
     }
