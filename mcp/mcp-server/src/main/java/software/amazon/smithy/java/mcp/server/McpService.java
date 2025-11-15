@@ -79,13 +79,15 @@ public final class McpService {
     private final Map<String, Service> services;
     private final AtomicReference<JsonRpcRequest> initializeRequest = new AtomicReference<>();
     private final ToolFilter toolFilter;
+    private final McpMetricsObserver metricsObserver;
 
     McpService(
             Map<String, Service> services,
             List<McpServerProxy> proxyList,
             String name,
             String version,
-            ToolFilter toolFilter
+            ToolFilter toolFilter,
+            McpMetricsObserver metricsObserver
     ) {
         this.services = services;
         this.tools = createTools(services);
@@ -95,6 +97,7 @@ public final class McpService {
         this.version = version;
         this.proxies = proxyList.stream().collect(Collectors.toMap(McpServerProxy::name, p -> p));
         this.toolFilter = toolFilter;
+        this.metricsObserver = metricsObserver;
     }
 
     /**
@@ -112,6 +115,45 @@ public final class McpService {
             Consumer<JsonRpcResponse> asyncResponseCallback,
             ProtocolVersion protocolVersion
     ) {
+        if (metricsObserver != null) {
+            try {
+                var params = req.getParams();
+                var clientInfo = params.getMember("clientInfo");
+                var capabilities = params.getMember("capabilities");
+
+                String extractedProtocolVersion = params.getMember("protocolVersion") != null
+                        ? params.getMember("protocolVersion").asString()
+                        : null;
+
+                boolean rootsListChanged = capabilities != null
+                        && capabilities.getMember("roots") != null
+                        && capabilities.getMember("roots").getMember("listChanged") != null
+                        && capabilities.getMember("roots").getMember("listChanged").asBoolean();
+
+                boolean sampling = capabilities != null && capabilities.getMember("sampling") != null;
+
+                boolean elicitation = capabilities != null && capabilities.getMember("elicitation") != null;
+
+                String clientName = clientInfo != null && clientInfo.getMember("name") != null
+                        ? clientInfo.getMember("name").asString()
+                        : null;
+
+                String clientTitle = clientInfo != null && clientInfo.getMember("title") != null
+                        ? clientInfo.getMember("title").asString()
+                        : null;
+
+                metricsObserver.onClientRequest(req.getMethod(),
+                        extractedProtocolVersion,
+                        rootsListChanged,
+                        sampling,
+                        elicitation,
+                        clientName,
+                        clientTitle);
+            } catch (Exception e) {
+                LOG.error("Error in metrics observer", e);
+            }
+        }
+
         try {
             validate(req);
             return switch (req.getMethod()) {
@@ -213,10 +255,13 @@ public final class McpService {
                     .build();
 
             // Get response asynchronously and invoke callback
-            tool.proxy().rpc(proxyRequest).thenAccept(asyncResponseCallback).exceptionally(ex -> {
+            tool.proxy().rpc(proxyRequest).thenAccept(response -> {
+                asyncResponseCallback.accept(response);
+            }).exceptionally(ex -> {
                 LOG.error("Error from proxy RPC", ex);
-                asyncResponseCallback
-                        .accept(createErrorResponse(req, new RuntimeException("Proxy error: " + ex.getMessage(), ex)));
+                JsonRpcResponse errorResponse =
+                        createErrorResponse(req, new RuntimeException("Proxy error: " + ex.getMessage(), ex));
+                asyncResponseCallback.accept(errorResponse);
                 return null;
             });
 
@@ -619,6 +664,7 @@ public final class McpService {
         private String name = "mcp-server";
         private String version = "1.0.0";
         private ToolFilter toolFilter = (serverId, toolName) -> true;
+        private McpMetricsObserver metricsObserver;
 
         public Builder services(Map<String, Service> services) {
             this.services = services;
@@ -645,8 +691,13 @@ public final class McpService {
             return this;
         }
 
+        public Builder metricsObserver(McpMetricsObserver metricsObserver) {
+            this.metricsObserver = metricsObserver;
+            return this;
+        }
+
         public McpService build() {
-            return new McpService(services, proxyList, name, version, toolFilter);
+            return new McpService(services, proxyList, name, version, toolFilter, metricsObserver);
         }
     }
 }
