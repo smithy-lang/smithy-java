@@ -36,13 +36,14 @@ public class EndpointRulesPluginTest {
         Cfg cfg = Cfg.from(EndpointRuleSet.fromNode(Node.parse(contents)));
         EndpointBddTrait bdd = EndpointBddTrait.from(cfg);
         var program = new RulesEngineBuilder().compile(bdd);
-        var plugin = EndpointRulesPlugin.from(program);
+        var plugin = new EndpointRulesPlugin();
         var builder = ClientConfig.builder();
+        builder.context().put(RulesEngineSettings.BYTECODE, program);
         plugin.configureClient(builder);
 
         assertThat(builder.endpointResolver(), instanceOf(BytecodeEndpointResolver.class));
-        assertThat(plugin.getBytecode(), notNullValue());
-        assertThat(plugin.getBytecode(), sameInstance(program));
+        assertThat(builder.context().get(RulesEngineSettings.BYTECODE), notNullValue());
+        assertThat(builder.context().get(RulesEngineSettings.BYTECODE), sameInstance(program));
     }
 
     @Test
@@ -51,8 +52,9 @@ public class EndpointRulesPluginTest {
         Cfg cfg = Cfg.from(EndpointRuleSet.fromNode(Node.parse(contents)));
         EndpointBddTrait bdd = EndpointBddTrait.from(cfg);
         var program = new RulesEngineBuilder().compile(bdd);
-        var plugin = EndpointRulesPlugin.from(program);
+        var plugin = new EndpointRulesPlugin();
         var builder = ClientConfig.builder().endpointResolver(EndpointResolver.staticHost("foo.com"));
+        builder.context().put(RulesEngineSettings.BYTECODE, program);
         plugin.configureClient(builder);
 
         assertThat(builder.endpointResolver(), not(instanceOf(BytecodeEndpointResolver.class)));
@@ -65,10 +67,11 @@ public class EndpointRulesPluginTest {
         Cfg cfg = Cfg.from(EndpointRuleSet.fromNode(Node.parse(contents)));
         EndpointBddTrait bdd = EndpointBddTrait.from(cfg);
         var program = new RulesEngineBuilder().compile(bdd);
-        var plugin = EndpointRulesPlugin.from(program);
+        var plugin = new EndpointRulesPlugin();
         var builder = ClientConfig.builder()
                 .endpointResolver(EndpointResolver.staticHost("foo.com"))
-                .putConfig(ClientContext.CUSTOM_ENDPOINT, Endpoint.builder().uri("https://example.com").build());
+                .putConfig(ClientContext.CUSTOM_ENDPOINT, Endpoint.builder().uri("https://example.com").build())
+                .putConfig(RulesEngineSettings.BYTECODE, program);
         plugin.configureClient(builder);
 
         assertThat(builder.endpointResolver(), instanceOf(BytecodeEndpointResolver.class));
@@ -80,9 +83,10 @@ public class EndpointRulesPluginTest {
         Cfg cfg = Cfg.from(EndpointRuleSet.fromNode(Node.parse(contents)));
         EndpointBddTrait bdd = EndpointBddTrait.from(cfg);
         var program = new RulesEngineBuilder().compile(bdd);
-        var plugin = EndpointRulesPlugin.from(program);
+        var plugin = new EndpointRulesPlugin();
         var builder = ClientConfig.builder()
-                .putConfig(ClientContext.CUSTOM_ENDPOINT, Endpoint.builder().uri("https://example.com").build());
+                .putConfig(ClientContext.CUSTOM_ENDPOINT, Endpoint.builder().uri("https://example.com").build())
+                .putConfig(RulesEngineSettings.BYTECODE, program);
 
         assertThat(builder.endpointResolver(), nullValue());
 
@@ -116,16 +120,16 @@ public class EndpointRulesPluginTest {
         var schema = Schema.createService(service.getId(), traits);
         ApiService api = () -> schema;
 
-        var plugin = EndpointRulesPlugin.create();
+        var plugin = new EndpointRulesPlugin();
         var builder = ClientConfig.builder().service(api);
 
         assertThat(builder.endpointResolver(), nullValue());
 
-        builder.applyPlugin(plugin);
+        plugin.configureClient(builder);
 
         // remains null since no traits were found
         assertThat(builder.endpointResolver(), nullValue());
-        assertThat(plugin.getBytecode(), nullValue());
+        assertThat(builder.context().get(RulesEngineSettings.BYTECODE), nullValue());
     }
 
     @Test
@@ -147,11 +151,11 @@ public class EndpointRulesPluginTest {
         ApiService api = () -> schema;
 
         // Create the plugin from the service schema.
-        var plugin = EndpointRulesPlugin.create();
+        var plugin = new EndpointRulesPlugin();
         var builder = ClientConfig.builder().service(api);
-        builder.applyPlugin(plugin);
+        plugin.configureClient(builder);
 
         assertThat(builder.endpointResolver(), instanceOf(DecisionTreeEndpointResolver.class));
-        assertThat(plugin.getBytecode(), nullValue());
+        assertThat(builder.context().get(RulesEngineSettings.BYTECODE), nullValue());
     }
 }

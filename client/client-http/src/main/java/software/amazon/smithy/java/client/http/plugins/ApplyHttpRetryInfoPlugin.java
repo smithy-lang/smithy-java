@@ -10,9 +10,9 @@ import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import software.amazon.smithy.java.client.core.AutoClientPlugin;
 import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.ClientConfig;
-import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.OutputHook;
 import software.amazon.smithy.java.client.core.settings.ClockSetting;
@@ -31,10 +31,13 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  * <p>This plugin is applied automatically when using an HTTP protocol via {@link HttpMessageExchange}.
  */
 @SmithyInternalApi
-public final class ApplyHttpRetryInfoPlugin implements ClientPlugin {
+public final class ApplyHttpRetryInfoPlugin implements AutoClientPlugin {
     @Override
     public void configureClient(ClientConfig.Builder config) {
-        config.addInterceptor(Interceptor.INSTANCE);
+        // We can conditionally add the interceptor here because client transport can't change after construction.
+        if (config.isUsingMessageExchange(HttpMessageExchange.INSTANCE)) {
+            config.addInterceptor(Interceptor.INSTANCE);
+        }
     }
 
     private static final class Interceptor implements ClientInterceptor {

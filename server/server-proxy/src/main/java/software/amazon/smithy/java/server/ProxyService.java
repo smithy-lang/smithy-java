@@ -55,7 +55,7 @@ public final class ProxyService implements Service {
     private ProxyService(Builder builder) {
         var model = builder.model;
         DynamicClient.Builder clientBuilder = DynamicClient.builder()
-                .service(builder.service)
+                .serviceId(builder.service)
                 .model(builder.model);
         if (builder.identityResolver != null) {
             clientBuilder.addIdentityResolver(builder.identityResolver);

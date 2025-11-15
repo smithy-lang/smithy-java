@@ -45,7 +45,7 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
  *     .build();
  * }</pre>
  */
-public final class ExceptionMapper implements ClientPlugin {
+public final class ExceptionMapperPlugin implements ClientPlugin {
 
     private final Map<Class<? extends RuntimeException>,
             Function<RuntimeException, RuntimeException>> mappers = new HashMap<>();
@@ -53,7 +53,7 @@ public final class ExceptionMapper implements ClientPlugin {
     private final Function<CallException, ? extends CallException> baseApiExceptionMapper;
     private final Function<RuntimeException, ? extends RuntimeException> rootExceptionMapper;
 
-    private ExceptionMapper(Builder builder) {
+    private ExceptionMapperPlugin(Builder builder) {
         this.mappers.putAll(builder.mappers);
         this.baseApiExceptionType = builder.baseApiExceptionType;
         this.baseApiExceptionMapper = builder.baseApiExceptionMapper;
@@ -100,8 +100,8 @@ public final class ExceptionMapper implements ClientPlugin {
         private Function<CallException, ? extends CallException> baseApiExceptionMapper;
         private Function<RuntimeException, ? extends RuntimeException> rootExceptionMapper = Function.identity();
 
-        public ExceptionMapper build() {
-            return new ExceptionMapper(this);
+        public ExceptionMapperPlugin build() {
+            return new ExceptionMapperPlugin(this);
         }
 
         /**

@@ -20,6 +20,7 @@ import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolverParams;
 import software.amazon.smithy.java.client.rulesengine.EndpointRulesPlugin;
 import software.amazon.smithy.java.client.rulesengine.RulesEngineBuilder;
+import software.amazon.smithy.java.client.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
@@ -55,13 +56,12 @@ public class Bench {
         model = customizeS3Model(model);
         service = model.expectShape(ShapeId.from("com.amazonaws.s3#AmazonS3"), ServiceShape.class);
 
-        var plugin = EndpointRulesPlugin.create(engine);
-
         client = DynamicClient.builder()
                 .model(model)
-                .service(service.getId())
+                .serviceId(service.getId())
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-                .addPlugin(plugin)
+                .addPlugin(new EndpointRulesPlugin())
+                .putConfig(RulesEngineSettings.RULES_ENGINE_BUILDER, engine)
                 .build();
         endpointResolver = client.config().endpointResolver();
 

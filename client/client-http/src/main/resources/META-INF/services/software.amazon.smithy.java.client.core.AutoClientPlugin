@@ -1,0 +1,3 @@
+software.amazon.smithy.java.client.http.plugins.UserAgentPlugin
+software.amazon.smithy.java.client.http.plugins.ApplyHttpRetryInfoPlugin
+software.amazon.smithy.java.client.http.plugins.HttpChecksumPlugin
