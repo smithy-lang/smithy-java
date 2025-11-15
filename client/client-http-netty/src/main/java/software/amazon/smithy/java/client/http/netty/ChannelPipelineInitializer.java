@@ -20,7 +20,6 @@ import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
-import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -32,17 +31,17 @@ import software.amazon.smithy.java.http.api.HttpVersion;
 final class ChannelPipelineInitializer extends AbstractChannelPoolHandler {
     private final NettyHttpClientTransport.Configuration config;
     private final SslContext sslContext;
-    private final URI uri;
+    private final ChannelPoolMap.ChannelPoolKey poolKey;
     private final AtomicReference<ChannelPool> channelPoolRef;
 
     ChannelPipelineInitializer(
             NettyHttpClientTransport.Configuration config,
-            URI uri,
+            ChannelPoolMap.ChannelPoolKey poolKey,
             SslContext sslContext,
             AtomicReference<ChannelPool> channelPoolRef
     ) {
         this.config = config;
-        this.uri = uri;
+        this.poolKey = poolKey;
         this.sslContext = sslContext;
         this.channelPoolRef = channelPoolRef;
     }
@@ -50,12 +49,10 @@ final class ChannelPipelineInitializer extends AbstractChannelPoolHandler {
     @Override
     public void channelCreated(Channel channel) {
         channel.attr(HTTP_VERSION_FUTURE).set(new CompletableFuture<>());
-        var host = uri.getHost();
-        var isHttps = uri.getScheme().equalsIgnoreCase("https");
-        var port = uri.getPort() == -1 ? (isHttps ? 443 : 80) : uri.getPort();
+        var host = poolKey.host();
         var pipeline = channel.pipeline();
-        if (isHttps) {
-            pipeline.addLast(SSL, sslContext.newHandler(channel.alloc(), host, port));
+        if (poolKey.isHttps()) {
+            pipeline.addLast(SSL, sslContext.newHandler(channel.alloc(), host, poolKey.port()));
             pipeline.addLast(SSL_HANDSHAKE, new NettySslHandshakeHandler(config.httpVersion()));
             pipeline.addLast(SSL_CLOSE_COMPLETE, new NettySslCloseCompletionHandler());
             if (config.httpVersion() == HttpVersion.HTTP_2) {

@@ -46,7 +46,7 @@ final class ChannelPoolMap implements Closeable {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ChannelPoolMap.class);
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final NettyHttpClientTransport.Configuration config;
-    private final ConcurrentMap<URI, ChannelPool> uriToChannelPool = new ConcurrentHashMap<>();
+    private final ConcurrentMap<ChannelPoolKey, ChannelPool> uriToChannelPool = new ConcurrentHashMap<>();
     private final Bootstrap baseBootstrap;
     private final EventLoopGroup eventLoopGroup;
 
@@ -54,45 +54,6 @@ final class ChannelPoolMap implements Closeable {
         this.config = config;
         this.eventLoopGroup = createEventLoopGroup(config);
         this.baseBootstrap = createBaseBootstrap(this.eventLoopGroup, this.config);
-    }
-
-    private static Bootstrap createBaseBootstrap(
-            EventLoopGroup eventLoopGroup,
-            NettyHttpClientTransport.Configuration config
-    ) {
-        var bootstrap = new Bootstrap();
-        bootstrap.group(eventLoopGroup);
-        bootstrap.channel(getChannelClass(config));
-        bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, fromLong(config.connectTimeout().toMillis()));
-        bootstrap.option(ChannelOption.SO_KEEPALIVE, true);
-        bootstrap.option(ChannelOption.TCP_NODELAY, true);
-        bootstrap.option(ChannelOption.AUTO_READ, false);
-        bootstrap.option(ChannelOption.RECVBUF_ALLOCATOR,
-                new AdaptiveRecvByteBufAllocator(4096, 16384, 65536));
-        bootstrap.option(ChannelOption.SO_RCVBUF, 1048576);
-
-        return bootstrap;
-    }
-
-    static EventLoopGroup createEventLoopGroup(NettyHttpClientTransport.Configuration configuration) {
-        ThreadFactory threadFactory = new DefaultThreadFactory("smithy-java-netty", true);
-        return new MultiThreadIoEventLoopGroup(configuration.eventLoopGroupThreads(),
-                threadFactory,
-                NioIoHandler.newFactory());
-    }
-
-    static Class<? extends Channel> getChannelClass(NettyHttpClientTransport.Configuration configuration) {
-        return NioSocketChannel.class;
-    }
-
-    static int fromLong(long i) {
-        if (i > Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE;
-        }
-        if (i < Integer.MIN_VALUE) {
-            return Integer.MIN_VALUE;
-        }
-        return (int) i;
     }
 
     /**
@@ -128,18 +89,21 @@ final class ChannelPoolMap implements Closeable {
             throw new IllegalStateException("closed");
         }
         Objects.requireNonNull(uri, "uri");
-        return uriToChannelPool.computeIfAbsent(uri, this::newChannelPool);
+        var key = fromUri(uri);
+        // TODO if we key on the uri we create different entries for
+        // `http://localhost` and `http://localhost/foo/bar`
+        return uriToChannelPool.computeIfAbsent(key, this::newChannelPool);
     }
 
-    private ChannelPool newChannelPool(URI uri) {
+    private ChannelPool newChannelPool(ChannelPoolKey poolKey) {
         var bootstrap = baseBootstrap.clone();
-        bootstrap.remoteAddress(InetSocketAddress.createUnresolved(uri.getHost(), uri.getPort()));
+        bootstrap.remoteAddress(InetSocketAddress.createUnresolved(poolKey.host, poolKey.port()));
         var channelPoolRef = new AtomicReference<ChannelPool>();
         SslContext sslContext = null;
-        if (isHttps(uri)) {
+        if (poolKey.isHttps()) {
             sslContext = createSslContext();
         }
-        var initializer = new ChannelPipelineInitializer(config, uri, sslContext, channelPoolRef);
+        var initializer = new ChannelPipelineInitializer(config, poolKey, sslContext, channelPoolRef);
         var pool = createChannelPool(bootstrap, initializer);
         channelPoolRef.set(pool);
         return pool;
@@ -194,5 +158,98 @@ final class ChannelPoolMap implements Closeable {
                         ApplicationProtocolNames.HTTP_2));
         config.sslContextModifier().accept(builder);
         return builder;
+    }
+
+    private static Bootstrap createBaseBootstrap(
+            EventLoopGroup eventLoopGroup,
+            NettyHttpClientTransport.Configuration config
+    ) {
+        var bootstrap = new Bootstrap();
+        bootstrap.group(eventLoopGroup);
+        bootstrap.channel(getChannelClass(config));
+        bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, fromLong(config.connectTimeout().toMillis()));
+        bootstrap.option(ChannelOption.SO_KEEPALIVE, true);
+        bootstrap.option(ChannelOption.TCP_NODELAY, true);
+        bootstrap.option(ChannelOption.AUTO_READ, false);
+        bootstrap.option(ChannelOption.RECVBUF_ALLOCATOR,
+                new AdaptiveRecvByteBufAllocator(4096, 16384, 65536));
+        bootstrap.option(ChannelOption.SO_RCVBUF, 1048576);
+
+        return bootstrap;
+    }
+
+    private static EventLoopGroup createEventLoopGroup(NettyHttpClientTransport.Configuration configuration) {
+        ThreadFactory threadFactory = new DefaultThreadFactory("smithy-java-netty", true);
+        return new MultiThreadIoEventLoopGroup(configuration.eventLoopGroupThreads(),
+                threadFactory,
+                NioIoHandler.newFactory());
+    }
+
+    private static Class<? extends Channel> getChannelClass(NettyHttpClientTransport.Configuration configuration) {
+        return NioSocketChannel.class;
+    }
+
+    private static int fromLong(long i) {
+        if (i > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        if (i < Integer.MIN_VALUE) {
+            return Integer.MIN_VALUE;
+        }
+        return (int) i;
+    }
+
+    private static ChannelPoolKey fromUri(URI uri) {
+        var https = uri.getScheme().equalsIgnoreCase("https");
+        var port = uri.getPort();
+        if (port == -1) {
+            if (https) {
+                port = 443;
+            } else {
+                port = 80;
+            }
+        }
+        return new ChannelPoolKey(https, uri.getHost(), port);
+    }
+
+    static class ChannelPoolKey {
+        private final boolean https;
+        private final String host;
+        private final int port;
+
+        ChannelPoolKey(boolean https, String host, int port) {
+            this.https = https;
+            this.host = host;
+            this.port = port;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass())
+                return false;
+
+            ChannelPoolKey that = (ChannelPoolKey) o;
+            return https == that.https && port == that.port && host.equals(that.host);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Boolean.hashCode(https);
+            result = 31 * result + host.hashCode();
+            result = 31 * result + port;
+            return result;
+        }
+
+        public boolean isHttps() {
+            return https;
+        }
+
+        public String host() {
+            return host;
+        }
+
+        public int port() {
+            return port;
+        }
     }
 }
