@@ -10,6 +10,8 @@ dependencies {
     smithyBuild("software.amazon.smithy.java:plugins:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:client-core:$smithyJavaVersion")
+    implementation("software.amazon.smithy.java:client-http-netty:$smithyJavaVersion")
+    implementation("org.slf4j:slf4j-simple:2.0.17")
 
     // Test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.1")
