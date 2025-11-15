@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.http.netty;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.http.FullHttpMessage;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponse;
@@ -48,13 +49,30 @@ final class NettyHttpResponseHandler extends SimpleChannelInboundHandler<Object>
             producerSubscriber.onSubscribe(new ContentSubscription());
             var smithyResponse = toSmithyHttpResponse(response, dataStream);
             responseFuture.complete(smithyResponse);
-            LOGGER.debug(ctx.channel(), "Completed response future with streaming body, status: {}", statusCode);
-        } else if (msg instanceof LastHttpContent) {
-            LOGGER.trace(ctx.channel(), "Last content received");
+            LOGGER.trace(ctx.channel(),
+                    "Completed response future with streaming body, status: {}, headers: {}",
+                    statusCode,
+                    smithyResponse.headers());
+        } else if (msg instanceof FullHttpMessage content) {
+            var readableBytes = content.content().readableBytes();
+            LOGGER.trace(ctx.channel(), "Full http message received. Readable bytes {}", readableBytes);
+            if (content.content().readableBytes() > 0) {
+                producerSubscriber.onNext(toByteBuffer(content));
+            }
+            producerSubscriber.onComplete();
+        } else if (msg instanceof LastHttpContent content) {
+            var readableBytes = content.content().readableBytes();
+            LOGGER.trace(ctx.channel(), "Last content received. Readable bytes {}", readableBytes);
+            if (readableBytes > 0) {
+                producerSubscriber.onNext(toByteBuffer(content));
+            }
             producerSubscriber.onComplete();
         } else if (msg instanceof HttpContent content) {
-            LOGGER.trace(ctx.channel(), "Content received");
+            var readableBytes = content.content().readableBytes();
+            LOGGER.trace(ctx.channel(), "Content received. Readable bytes {}", readableBytes);
             producerSubscriber.onNext(toByteBuffer(content));
+        } else {
+            LOGGER.warn(ctx.channel(), "Received message of unknown type: {}", msg);
         }
     }
 

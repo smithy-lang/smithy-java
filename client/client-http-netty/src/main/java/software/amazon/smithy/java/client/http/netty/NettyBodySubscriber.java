@@ -59,7 +59,7 @@ final class NettyBodySubscriber implements Flow.Subscriber<ByteBuffer> {
 
     @Override
     public void onError(Throwable throwable) {
-        LOGGER.error(channel, "Error in streaming body", throwable);
+        LOGGER.warn(channel, "Error in streaming body", throwable);
         responseFuture.completeExceptionally(ClientTransport.remapExceptions(throwable));
         channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
     }

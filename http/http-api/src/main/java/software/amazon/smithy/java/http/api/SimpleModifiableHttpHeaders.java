@@ -109,4 +109,29 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
     public int hashCode() {
         return headers.hashCode();
     }
+
+    @Override
+    public String toString() {
+        var buf = new StringBuilder();
+        buf.append(this.getClass().getSimpleName());
+        buf.append('{');
+        if (!headers.isEmpty()) {
+            for (var kvp : headers.entrySet()) {
+                buf.append(kvp.getKey()).append(": [");
+                var value = kvp.getValue();
+                var size = value.size();
+                if (size == 1) {
+                    buf.append(value.getFirst());
+                } else if (size > 1) {
+                    for (var v : value) {
+                        buf.append(v).append(", ");
+                    }
+                    buf.setLength(buf.length() - 2);
+                }
+                buf.append("], ");
+            }
+            buf.setLength(buf.length() - 2);
+        }
+        return buf.append('}').toString();
+    }
 }

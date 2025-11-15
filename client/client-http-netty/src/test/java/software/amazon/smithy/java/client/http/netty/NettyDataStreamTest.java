@@ -105,6 +105,26 @@ class NettyDataStreamTest {
     }
 
     @Test
+    public void randomizedProducedContentEqualsConsumedUsingInputStream() throws Exception {
+        // -- Arrange
+        var dataStream = new NettyDataStream("text/plain", -1, MockChannel.builder().build());
+        var data = createData(53, 97, 101);
+        var producerSubscriber = dataStream.producerSubscriber();
+        var producerWorker = new ProducerWorker(producerSubscriber, data);
+        producerSubscriber.onSubscribe(new ProducerSubscription(producerWorker));
+        var inputStream = dataStream.asInputStream();
+
+        // -- Act
+        var producerFuture = CompletableFuture.runAsync(producerWorker);
+        producerFuture.get(2, TimeUnit.SECONDS);
+
+        // -- Assert
+        var expectedBytes = expectedBytes(data);
+        var actualBytes = inputStream.readAllBytes();
+        assertArrayEquals(expectedBytes, actualBytes);
+    }
+
+    @Test
     public void cancellingConsumerCancelsProducer() throws Exception {
         // -- Arrange
         var dataStream = new NettyDataStream("text/plain", -1, MockChannel.builder().build());

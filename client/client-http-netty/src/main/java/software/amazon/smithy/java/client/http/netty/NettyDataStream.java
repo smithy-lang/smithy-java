@@ -202,7 +202,7 @@ final class NettyDataStream implements DataStream {
 
         // If after delivery we still have pending items or the queue falls below our min size threshold
         // we request more from the producer making sure that we don't over-request.
-        if (pending.get() > 0 || queue.size() < QUEUE_MIN_SIZE) {
+        if (!producerCompleted && (pending.get() > 0 || queue.size() < QUEUE_MIN_SIZE)) {
             // `readRequested` flag is reset after getting a new item in the `ProducerSubscriber#onNext` .
             if (!readRequested) {
                 readRequested = true;

@@ -84,6 +84,7 @@ final class NettyHttpClient implements Closeable {
         if (content.readableBytes() > 0) {
             nettyRequest.headers().set("Content-Length", content.readableBytes());
         }
+        LOGGER.trace(channel, "Sending full HTTP request to {}, headers: {}", request.uri(), nettyRequest.headers());
         channel.writeAndFlush(nettyRequest).addListener(new FullRequestWriteListener(channel, request, responseFuture));
     }
 
@@ -224,11 +225,11 @@ final class NettyHttpClient implements Closeable {
         public void operationComplete(Future<? super Void> writeFuture) {
             if (!writeFuture.isSuccess()) {
                 var cause = writeFuture.cause();
-                LOGGER.warn(channel, "Request write failed", cause);
+                LOGGER.warn(channel, "Full request write failed", cause);
                 responseFuture.completeExceptionally(
                         ClientTransport.remapExceptions(cause));
             } else {
-                LOGGER.trace(channel, "Write succeeded");
+                LOGGER.trace(channel, "Full request write succeeded");
                 channel.read();
             }
         }
@@ -253,12 +254,12 @@ final class NettyHttpClient implements Closeable {
         public void operationComplete(Future<? super Void> writeFuture) {
             if (!writeFuture.isSuccess()) {
                 var cause = writeFuture.cause();
-                LOGGER.warn(channel, "Request write failed", cause);
+                LOGGER.warn(channel, "Streaming request preface write failed", cause);
                 responseFuture.completeExceptionally(
                         ClientTransport.remapExceptions(cause));
             } else {
                 // Request sent, Now stream the body data
-                LOGGER.trace(channel, "Write succeeded");
+                LOGGER.trace(channel, "Streaming request preface write succeeded");
                 request.body().subscribe(new NettyBodySubscriber(channel, responseFuture));
 
                 channel.read();
