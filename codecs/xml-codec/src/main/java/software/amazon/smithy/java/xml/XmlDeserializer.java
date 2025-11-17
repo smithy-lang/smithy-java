@@ -132,7 +132,7 @@ final class XmlDeserializer implements ShapeDeserializer {
             var element = reader.nextMemberElement();
             if (element == null || (!element.equals("ErrorResponse") && !element.equals("Error"))) {
                 throw new SerializationException(
-                        "Expected element <ErrorResponse> or <Error> for restXml error response");
+                        "Expected element <ErrorResponse> or <Error> for XML error response");
             }
             if (element.equals("ErrorResponse")) {
                 element = reader.nextMemberElement();

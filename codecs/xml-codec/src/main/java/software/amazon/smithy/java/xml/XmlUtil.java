@@ -12,7 +12,7 @@ import software.amazon.smithy.java.core.serde.ShapeDeserializer;
  */
 public final class XmlUtil {
     /**
-     * Retrieve the Code element value from the error response.
+     * Parse the Code element value from error response for both AWS restXml and AWS Query protocols.
      *
      * @param deserializer the deserializer for the error response
      * @return String value of the Code element if found
