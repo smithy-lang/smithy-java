@@ -12,6 +12,7 @@ import static software.amazon.smithy.java.client.http.netty.NettyConstants.HTTP_
 import static software.amazon.smithy.java.client.http.netty.NettyConstants.SSL;
 import static software.amazon.smithy.java.client.http.netty.NettyConstants.SSL_CLOSE_COMPLETE;
 import static software.amazon.smithy.java.client.http.netty.NettyConstants.SSL_HANDSHAKE;
+import static software.amazon.smithy.java.client.http.netty.h2.NettyHttp2Utils.configureHttp2Pipeline;
 
 import io.netty.channel.Channel;
 import io.netty.channel.pool.AbstractChannelPoolHandler;
@@ -48,23 +49,59 @@ final class ChannelPipelineInitializer extends AbstractChannelPoolHandler {
 
     @Override
     public void channelCreated(Channel channel) {
-        channel.attr(HTTP_VERSION_FUTURE).set(new CompletableFuture<>());
-        var host = poolKey.host();
+        configureAttributes(channel);
         var pipeline = channel.pipeline();
         if (poolKey.isHttps()) {
-            pipeline.addLast(SSL, sslContext.newHandler(channel.alloc(), host, poolKey.port()));
-            pipeline.addLast(SSL_HANDSHAKE, new NettySslHandshakeHandler(config.httpVersion()));
-            pipeline.addLast(SSL_CLOSE_COMPLETE, new NettySslCloseCompletionHandler());
-            if (config.httpVersion() == HttpVersion.HTTP_2) {
-                pipeline.addLast(ALPN, new NettyProtocolNegotiationHandler(config, channelPoolRef));
-            } else {
-                channel.attr(CHANNEL_POOL).set(channelPoolRef.get());
-            }
+            configureSsl(channel);
+        }
+        if (config.httpVersion() == HttpVersion.HTTP_2) {
+            configureHttp2(channel);
         } else {
-            pipeline.addLast(HTTP11_CODEC, new HttpClientCodec());
-            channel.attr(HTTP_VERSION_FUTURE).get().complete(HttpVersion.HTTP_1_1);
-            channel.attr(CHANNEL_POOL).set(channelPoolRef.get());
+            configureHttp11(channel);
         }
         pipeline.addLast(new LoggingHandler(LogLevel.TRACE));
+    }
+
+    private void configureAttributes(Channel channel) {
+        channel.attr(HTTP_VERSION_FUTURE).set(new CompletableFuture<>());
+    }
+
+    private void configureSsl(Channel channel) {
+        var pipeline = channel.pipeline();
+        var host = poolKey.host();
+        pipeline.addLast(SSL, sslContext.newHandler(channel.alloc(), host, poolKey.port()));
+        pipeline.addLast(SSL_HANDSHAKE, new NettySslHandshakeHandler(config.httpVersion()));
+        pipeline.addLast(SSL_CLOSE_COMPLETE, new NettySslCloseCompletionHandler());
+    }
+
+    private void configureHttp11(Channel channel) {
+        var pipeline = channel.pipeline();
+        pipeline.addLast(HTTP11_CODEC, new HttpClientCodec());
+        channel.attr(HTTP_VERSION_FUTURE).get().complete(HttpVersion.HTTP_1_1);
+        channel.attr(CHANNEL_POOL).set(channelPoolRef.get());
+    }
+
+    private void configureHttp2(Channel channel) {
+        var pipeline = channel.pipeline();
+        var connectionMode = config.h2Configuration().connectionMode();
+        if (connectionMode == NettyHttpClientTransport.H2ConnectionMode.AUTO) {
+            if (poolKey.isHttps()) {
+                connectionMode = NettyHttpClientTransport.H2ConnectionMode.ALPN;
+            } else {
+                connectionMode = NettyHttpClientTransport.H2ConnectionMode.PRIOR_KNOWLEDGE;
+            }
+        }
+        if (connectionMode == NettyHttpClientTransport.H2ConnectionMode.ALPN) {
+            if (!poolKey.isHttps()) {
+                var message = "Only HTTPS connections are supported when using ALPN connection mode";
+                NettyUtils.Asserts.shouldNotBeReached(channel, message);
+                channel.pipeline().fireExceptionCaught(new IllegalStateException(message));
+                return;
+            }
+            pipeline.addLast(ALPN, new NettyProtocolNegotiationHandler(config, channelPoolRef));
+        } else {
+            configureHttp2Pipeline(channel, pipeline, config, channelPoolRef);
+            channel.attr(CHANNEL_POOL).set(channelPoolRef.get());
+        }
     }
 }

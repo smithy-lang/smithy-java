@@ -25,7 +25,7 @@ final class Http2SettingsAckFrameHandler extends SimpleChannelInboundHandler<Htt
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, Http2SettingsAckFrame msg) throws Exception {
+    protected void channelRead0(ChannelHandlerContext ctx, Http2SettingsAckFrame msg) {
         // ignored
     }
 }

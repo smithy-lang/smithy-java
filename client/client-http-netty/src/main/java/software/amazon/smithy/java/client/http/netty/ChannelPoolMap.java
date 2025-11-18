@@ -90,8 +90,6 @@ final class ChannelPoolMap implements Closeable {
         }
         Objects.requireNonNull(uri, "uri");
         var key = fromUri(uri);
-        // TODO if we key on the uri we create different entries for
-        // `http://localhost` and `http://localhost/foo/bar`
         return uriToChannelPool.computeIfAbsent(key, this::newChannelPool);
     }
 

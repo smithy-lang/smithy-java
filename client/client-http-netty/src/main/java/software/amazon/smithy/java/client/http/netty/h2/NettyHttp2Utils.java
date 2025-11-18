@@ -16,6 +16,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.pool.ChannelPool;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
@@ -45,6 +46,7 @@ public final class NettyHttp2Utils {
 
     /**
      * Configures the channel handler context with handlers for HTTP/2 .
+     * Configures the channel with handlers for HTTP/2 .
      *
      * @param handlerContext The handler context to configure
      * @param config         The configuration settings for H2
@@ -55,6 +57,23 @@ public final class NettyHttp2Utils {
             NettyHttpClientTransport.Configuration config,
             AtomicReference<ChannelPool> channelPoolRef
     ) {
+        configureHttp2Pipeline(handlerContext.channel(), handlerContext.pipeline(), config, channelPoolRef);
+    }
+
+    /**
+     * Configures the channel with handlers for HTTP/2 .
+     *
+     * @param channel        The channel to configure
+     * @param pipeline       The channel pipeline to configure
+     * @param config         The configuration settings for H2
+     * @param channelPoolRef A reference to the channel pool that will pool the channel
+     */
+    public static void configureHttp2Pipeline(
+            Channel channel,
+            ChannelPipeline pipeline,
+            NettyHttpClientTransport.Configuration config,
+            AtomicReference<ChannelPool> channelPoolRef
+    ) {
         var settings = createHttp2Settings(config);
         var codec = Http2FrameCodecBuilder.forClient()
                 .initialSettings(settings)
@@ -62,15 +81,13 @@ public final class NettyHttp2Utils {
                 .frameLogger(new Http2FrameLogger(LogLevel.TRACE))
                 .build();
 
-        var channel = handlerContext.channel();
         codec.connection().addListener(new Http2GoAwayEventListener(channel));
         channel.attr(HTTP2_CONNECTION).set(codec.connection());
         channel.attr(HTTP2_INITIAL_WINDOW_SIZE).set(settings.initialWindowSize());
-        var pipeline = handlerContext.pipeline();
         pipeline.addLast(HTTP2_FRAME_CODEC, codec);
         pipeline.addLast(HTTP2_MULTIPLEX, new Http2MultiplexHandler(NoOpChannelInitializer.getInstance()));
         pipeline.addLast(HTTP2_SETTINGS,
-                new Http2SettingsFrameHandler(handlerContext.channel(), config.h2Configuration(), channelPoolRef));
+                new Http2SettingsFrameHandler(channel, config.h2Configuration(), channelPoolRef));
         pipeline.addLast(HTTP2_ACK_SETTINGS, Http2SettingsAckFrameHandler.getInstance());
     }
 
@@ -94,6 +111,6 @@ public final class NettyHttp2Utils {
         }
 
         @Override
-        protected void initChannel(Channel ch) {}
+        protected void initChannel(Channel channel) {}
     }
 }

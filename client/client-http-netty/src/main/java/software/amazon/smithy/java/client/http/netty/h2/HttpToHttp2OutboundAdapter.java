@@ -105,8 +105,8 @@ final class HttpToHttp2OutboundAdapter extends ChannelOutboundHandlerAdapter {
         private Throwable lastFailure;
         private boolean doneAllocating;
 
-        SimpleChannelPromiseAggregator(ChannelPromise promise, Channel c, EventExecutor e) {
-            super(c, e);
+        SimpleChannelPromiseAggregator(ChannelPromise promise, Channel channel, EventExecutor e) {
+            super(channel, e);
             assert promise != null && !promise.isDone();
             this.promise = promise;
         }

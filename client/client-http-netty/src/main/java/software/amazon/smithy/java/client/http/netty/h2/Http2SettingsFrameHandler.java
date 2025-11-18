@@ -82,15 +82,15 @@ final class Http2SettingsFrameHandler extends SimpleChannelInboundHandler<Http2S
         return actualMaxConcurrentStreams;
     }
 
-    private void channelError(Throwable cause, Channel ch, ChannelHandlerContext ctx) {
-        ch.attr(HTTP_VERSION_FUTURE).get().completeExceptionally(cause);
+    private void channelError(Throwable cause, Channel channel, ChannelHandlerContext ctx) {
+        channel.attr(HTTP_VERSION_FUTURE).get().completeExceptionally(cause);
         ctx.fireExceptionCaught(cause);
         try {
-            if (ch.isActive()) {
-                ch.close();
+            if (channel.isActive()) {
+                channel.close();
             }
         } finally {
-            channelPoolRef.get().release(ch);
+            channelPoolRef.get().release(channel);
         }
     }
 }

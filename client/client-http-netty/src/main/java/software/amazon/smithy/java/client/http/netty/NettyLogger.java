@@ -32,454 +32,455 @@ public final class NettyLogger {
 
     /**
      * Logs a message for the given channel with the TRACE level.
+     * <p>
+     * `     * @param channel   channel
      *
-     * @param ch      channel
      * @param message message
      */
-    public void trace(Channel ch, String message) {
+    public void trace(Channel channel, String message) {
         if (logger.isTraceEnabled()) {
-            logger.trace(addChannelIdToMessage(message, ch));
+            logger.trace(addChannelIdToMessage(message, channel));
         }
     }
 
     /**
      * Logs a message for the given channel with the TRACE level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      */
-    public void trace(Channel ch, String message, Object p0) {
+    public void trace(Channel channel, String message, Object p0) {
         if (logger.isTraceEnabled()) {
-            logger.trace(addChannelIdToMessage(message, ch), p0);
+            logger.trace(addChannelIdToMessage(message, channel), p0);
         }
     }
 
     /**
      * Logs a message for the given channel with the TRACE level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      */
-    public void trace(Channel ch, String message, Object p0, Object p1) {
+    public void trace(Channel channel, String message, Object p0, Object p1) {
         if (logger.isTraceEnabled()) {
-            logger.trace(addChannelIdToMessage(message, ch), p0, p1);
+            logger.trace(addChannelIdToMessage(message, channel), p0, p1);
         }
     }
 
     /**
      * Logs a message for the given channel with the TRACE level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      * @param p2      param two
      */
-    public void trace(Channel ch, String message, Object p0, Object p1, Object p2) {
+    public void trace(Channel channel, String message, Object p0, Object p1, Object p2) {
         if (logger.isTraceEnabled()) {
-            logger.trace(addChannelIdToMessage(message, ch), p0, p1, p2);
+            logger.trace(addChannelIdToMessage(message, channel), p0, p1, p2);
         }
     }
 
     /**
      * Logs a message for the given channel with the TRACE level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      * @param p2      param two
      * @param p3      param three
      */
-    public void trace(Channel ch, String message, Object p0, Object p1, Object p2, Object p3) {
+    public void trace(Channel channel, String message, Object p0, Object p1, Object p2, Object p3) {
         if (logger.isTraceEnabled()) {
-            logger.trace(addChannelIdToMessage(message, ch), p0, p1, p2, p3);
+            logger.trace(addChannelIdToMessage(message, channel), p0, p1, p2, p3);
         }
     }
 
     /**
      * Logs a message for the given channel with the TRACE level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param args    format args
      */
-    public void trace(Channel ch, String message, Object... args) {
+    public void trace(Channel channel, String message, Object... args) {
         if (logger.isTraceEnabled()) {
-            logger.trace(addChannelIdToMessage(message, ch), args);
+            logger.trace(addChannelIdToMessage(message, channel), args);
         }
     }
 
     /**
      * Logs a message for the given channel with the DEBUG level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message
      */
-    public void debug(Channel ch, String message) {
+    public void debug(Channel channel, String message) {
         if (logger.isDebugEnabled()) {
-            logger.debug(addChannelIdToMessage(message, ch));
+            logger.debug(addChannelIdToMessage(message, channel));
         }
     }
 
     /**
      * Logs a message for the given channel with the DEBUG level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      */
-    public void debug(Channel ch, String message, Object p0) {
+    public void debug(Channel channel, String message, Object p0) {
         if (logger.isDebugEnabled()) {
-            logger.debug(addChannelIdToMessage(message, ch), p0);
+            logger.debug(addChannelIdToMessage(message, channel), p0);
         }
     }
 
     /**
      * Logs a message for the given channel with the DEBUG level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      */
-    public void debug(Channel ch, String message, Object p0, Object p1) {
+    public void debug(Channel channel, String message, Object p0, Object p1) {
         if (logger.isDebugEnabled()) {
-            logger.debug(addChannelIdToMessage(message, ch), p0, p1);
+            logger.debug(addChannelIdToMessage(message, channel), p0, p1);
         }
     }
 
     /**
      * Logs a message for the given channel with the DEBUG level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      * @param p2      param two
      */
-    public void debug(Channel ch, String message, Object p0, Object p1, Object p2) {
+    public void debug(Channel channel, String message, Object p0, Object p1, Object p2) {
         if (logger.isDebugEnabled()) {
-            logger.debug(addChannelIdToMessage(message, ch), p0, p1, p2);
+            logger.debug(addChannelIdToMessage(message, channel), p0, p1, p2);
         }
     }
 
     /**
      * Logs a message for the given channel with the DEBUG level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      * @param p2      param two
      * @param p3      param three
      */
-    public void debug(Channel ch, String message, Object p0, Object p1, Object p2, Object p3) {
+    public void debug(Channel channel, String message, Object p0, Object p1, Object p2, Object p3) {
         if (logger.isDebugEnabled()) {
-            logger.debug(addChannelIdToMessage(message, ch), p0, p1, p2, p3);
+            logger.debug(addChannelIdToMessage(message, channel), p0, p1, p2, p3);
         }
     }
 
     /**
      * Logs a message for the given channel with the DEBUG level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param args    format args
      */
-    public void debug(Channel ch, String message, Object... args) {
+    public void debug(Channel channel, String message, Object... args) {
         if (logger.isDebugEnabled()) {
-            logger.debug(addChannelIdToMessage(message, ch), args);
+            logger.debug(addChannelIdToMessage(message, channel), args);
         }
     }
 
     /**
      * Logs a message for the given channel with the INFO level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message
      */
-    public void info(Channel ch, String message) {
+    public void info(Channel channel, String message) {
         if (logger.isInfoEnabled()) {
-            logger.info(addChannelIdToMessage(message, ch));
+            logger.info(addChannelIdToMessage(message, channel));
         }
     }
 
     /**
      * Logs a message for the given channel with the INFO level.
      *
-     * @param ch        channel
+     * @param channel   channel
      * @param message   message format
      * @param throwable throwable
      */
-    public void info(Channel ch, String message, Throwable throwable) {
+    public void info(Channel channel, String message, Throwable throwable) {
         if (logger.isInfoEnabled()) {
-            logger.warn(addChannelIdToMessage(message, ch), throwable);
+            logger.warn(addChannelIdToMessage(message, channel), throwable);
         }
     }
 
     /**
      * Logs a message for the given channel with the INFO level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      */
-    public void info(Channel ch, String message, Object p0) {
+    public void info(Channel channel, String message, Object p0) {
         if (logger.isInfoEnabled()) {
-            logger.info(addChannelIdToMessage(message, ch), p0);
+            logger.info(addChannelIdToMessage(message, channel), p0);
         }
     }
 
     /**
      * Logs a message for the given channel with the INFO level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      */
-    public void info(Channel ch, String message, Object p0, Object p1) {
+    public void info(Channel channel, String message, Object p0, Object p1) {
         if (logger.isInfoEnabled()) {
-            logger.info(addChannelIdToMessage(message, ch), p0, p1);
+            logger.info(addChannelIdToMessage(message, channel), p0, p1);
         }
     }
 
     /**
      * Logs a message for the given channel with the INFO level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      * @param p2      param two
      */
-    public void info(Channel ch, String message, Object p0, Object p1, Object p2) {
+    public void info(Channel channel, String message, Object p0, Object p1, Object p2) {
         if (logger.isInfoEnabled()) {
-            logger.info(addChannelIdToMessage(message, ch), p0, p1, p2);
+            logger.info(addChannelIdToMessage(message, channel), p0, p1, p2);
         }
     }
 
     /**
      * Logs a message for the given channel with the INFO level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      * @param p2      param two
      * @param p3      param three
      */
-    public void info(Channel ch, String message, Object p0, Object p1, Object p2, Object p3) {
+    public void info(Channel channel, String message, Object p0, Object p1, Object p2, Object p3) {
         if (logger.isInfoEnabled()) {
-            logger.info(addChannelIdToMessage(message, ch), p0, p1, p2, p3);
+            logger.info(addChannelIdToMessage(message, channel), p0, p1, p2, p3);
         }
     }
 
     /**
      * Logs a message for the given channel with the INFO level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param args    format args
      */
-    public void info(Channel ch, String message, Object... args) {
+    public void info(Channel channel, String message, Object... args) {
         if (logger.isInfoEnabled()) {
-            logger.info(addChannelIdToMessage(message, ch), args);
+            logger.info(addChannelIdToMessage(message, channel), args);
         }
     }
 
     /**
      * Logs a message for the given channel with the WARN level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message
      */
-    public void warn(Channel ch, String message) {
+    public void warn(Channel channel, String message) {
         if (logger.isWarnEnabled()) {
-            logger.warn(addChannelIdToMessage(message, ch));
+            logger.warn(addChannelIdToMessage(message, channel));
         }
     }
 
     /**
      * Logs a message for the given channel with the WARN level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      */
-    public void warn(Channel ch, String message, Object p0) {
+    public void warn(Channel channel, String message, Object p0) {
         if (logger.isWarnEnabled()) {
-            logger.warn(addChannelIdToMessage(message, ch), p0);
+            logger.warn(addChannelIdToMessage(message, channel), p0);
         }
     }
 
     /**
      * Logs a message for the given channel with the WARN level.
      *
-     * @param ch        channel
+     * @param channel   channel
      * @param message   message format
      * @param throwable throwable
      */
-    public void warn(Channel ch, String message, Throwable throwable) {
+    public void warn(Channel channel, String message, Throwable throwable) {
         if (logger.isWarnEnabled()) {
-            logger.warn(addChannelIdToMessage(message, ch), throwable);
+            logger.warn(addChannelIdToMessage(message, channel), throwable);
         }
     }
 
     /**
      * Logs a message for the given channel with the WARN level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      */
-    public void warn(Channel ch, String message, Object p0, Object p1) {
+    public void warn(Channel channel, String message, Object p0, Object p1) {
         if (logger.isWarnEnabled()) {
-            logger.warn(addChannelIdToMessage(message, ch), p0, p1);
+            logger.warn(addChannelIdToMessage(message, channel), p0, p1);
         }
     }
 
     /**
      * Logs a message for the given channel with the WARN level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      * @param p2      param two
      */
-    public void warn(Channel ch, String message, Object p0, Object p1, Object p2) {
+    public void warn(Channel channel, String message, Object p0, Object p1, Object p2) {
         if (logger.isWarnEnabled()) {
-            logger.warn(addChannelIdToMessage(message, ch), p0, p1, p2);
+            logger.warn(addChannelIdToMessage(message, channel), p0, p1, p2);
         }
     }
 
     /**
      * Logs a message for the given channel with the WARN level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      * @param p2      param two
      * @param p3      param three
      */
-    public void warn(Channel ch, String message, Object p0, Object p1, Object p2, Object p3) {
+    public void warn(Channel channel, String message, Object p0, Object p1, Object p2, Object p3) {
         if (logger.isWarnEnabled()) {
-            logger.warn(addChannelIdToMessage(message, ch), p0, p1, p2, p3);
+            logger.warn(addChannelIdToMessage(message, channel), p0, p1, p2, p3);
         }
     }
 
     /**
      * Logs a message for the given channel with the WARN level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param args    format args
      */
-    public void warn(Channel ch, String message, Object... args) {
+    public void warn(Channel channel, String message, Object... args) {
         if (logger.isWarnEnabled()) {
-            logger.warn(addChannelIdToMessage(message, ch), args);
+            logger.warn(addChannelIdToMessage(message, channel), args);
         }
     }
 
     /**
      * Logs a message for the given channel with the ERROR level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message
      */
-    public void error(Channel ch, String message) {
+    public void error(Channel channel, String message) {
         if (logger.isErrorEnabled()) {
-            logger.error(addChannelIdToMessage(message, ch));
+            logger.error(addChannelIdToMessage(message, channel));
         }
     }
 
     /**
      * Logs a message for the given channel with the ERROR level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      */
-    public void error(Channel ch, String message, Object p0) {
+    public void error(Channel channel, String message, Object p0) {
         if (logger.isErrorEnabled()) {
-            logger.error(addChannelIdToMessage(message, ch), p0);
+            logger.error(addChannelIdToMessage(message, channel), p0);
         }
     }
 
     /**
      * Logs a message for the given channel with the ERROR level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      */
-    public void error(Channel ch, String message, Object p0, Object p1) {
+    public void error(Channel channel, String message, Object p0, Object p1) {
         if (logger.isErrorEnabled()) {
-            logger.error(addChannelIdToMessage(message, ch), p0, p1);
+            logger.error(addChannelIdToMessage(message, channel), p0, p1);
         }
     }
 
     /**
      * Logs a message for the given channel with the ERROR level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      * @param p2      param two
      */
-    public void error(Channel ch, String message, Object p0, Object p1, Object p2) {
+    public void error(Channel channel, String message, Object p0, Object p1, Object p2) {
         if (logger.isErrorEnabled()) {
-            logger.error(addChannelIdToMessage(message, ch), p0, p1, p2);
+            logger.error(addChannelIdToMessage(message, channel), p0, p1, p2);
         }
     }
 
     /**
      * Logs a message for the given channel with the ERROR level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param p0      param zero
      * @param p1      param one
      * @param p2      param two
      * @param p3      param three
      */
-    public void error(Channel ch, String message, Object p0, Object p1, Object p2, Object p3) {
+    public void error(Channel channel, String message, Object p0, Object p1, Object p2, Object p3) {
         if (logger.isErrorEnabled()) {
-            logger.error(addChannelIdToMessage(message, ch), p0, p1, p2, p3);
+            logger.error(addChannelIdToMessage(message, channel), p0, p1, p2, p3);
         }
     }
 
     /**
      * Logs a message for the given channel with the ERROR level.
      *
-     * @param ch      channel
+     * @param channel channel
      * @param message message format
      * @param args    format args
      */
-    public void error(Channel ch, String message, Object... args) {
+    public void error(Channel channel, String message, Object... args) {
         if (logger.isErrorEnabled()) {
-            logger.error(addChannelIdToMessage(message, ch), args);
+            logger.error(addChannelIdToMessage(message, channel), args);
         }
     }
 
-    private String addChannelIdToMessage(String message, Channel ch) {
-        if (ch == null) {
+    private String addChannelIdToMessage(String message, Channel channel) {
+        if (channel == null) {
             return message;
         }
         String id;
         if (logger.isDebugEnabled()) {
-            id = ch.toString();
+            id = channel.toString();
         } else {
-            id = ch.id().asShortText();
+            id = channel.id().asShortText();
         }
         return String.format("[Channel: %s] %s", id, message);
     }

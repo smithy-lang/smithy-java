@@ -17,13 +17,13 @@ public final class NettyUtils {
          * This method is called at points where the control flow should no reached. This will log an ERROR
          * and assert false such that while testing an assertion exception will be thrown.
          */
-        public static void shouldNotBeReached(Channel ch, String message) {
+        public static void shouldNotBeReached(Channel channel, String message) {
             try {
                 // We throw here to capture and log the stack trace to know
                 // where this call was originated.
                 throw new RuntimeException(message);
             } catch (RuntimeException e) {
-                LOGGER.error(ch, message, e);
+                LOGGER.error(channel, message, e);
             }
 
             // This will throw whenever assertions are enabled for the JVM.

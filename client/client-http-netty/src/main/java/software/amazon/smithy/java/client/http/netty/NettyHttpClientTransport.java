@@ -375,11 +375,13 @@ public final class NettyHttpClientTransport implements Closeable, ClientTranspor
         private final long maxConcurrentStreams;
         private final int initialWindowSize;
         private final int maxFrameSize;
+        private final H2ConnectionMode connectionMode;
 
         private H2Configuration(H2ConfigurationBuilder builder) {
             this.maxConcurrentStreams = builder.maxConcurrentStreams;
             this.initialWindowSize = builder.initialWindowSize;
             this.maxFrameSize = builder.maxFrameSize;
+            this.connectionMode = builder.connectionMode;
         }
 
         /**
@@ -408,6 +410,15 @@ public final class NettyHttpClientTransport implements Closeable, ClientTranspor
         public int maxFrameSize() {
             return maxFrameSize;
         }
+
+        /**
+         * Gets the mode to establish HTTP/2 connections.
+         *
+         * @return the mode to establish HTTP/2 connections.
+         */
+        public H2ConnectionMode connectionMode() {
+            return connectionMode;
+        }
     }
 
     /**
@@ -430,6 +441,7 @@ public final class NettyHttpClientTransport implements Closeable, ClientTranspor
         private long maxConcurrentStreams = DEFAULT_MAX_CONCURRENT_STREAMS;
         private int initialWindowSize = DEFAULT_INITIAL_WINDOW_SIZE;
         private int maxFrameSize = DEFAULT_MAX_FRAME_SIZE;
+        private H2ConnectionMode connectionMode = H2ConnectionMode.AUTO;
 
         /**
          * Sets the maximum number of concurrent streams allowed on a single HTTP/2 connection.
@@ -498,8 +510,37 @@ public final class NettyHttpClientTransport implements Closeable, ClientTranspor
             return this;
         }
 
+        /**
+         * The mode to establish HTTP/2 connections.
+         *
+         * @param connectionMode  connection mode to establish HTTP/2 connections.
+         * @return this builder instance for method chaining
+         */
+        public H2ConfigurationBuilder connectionMode(H2ConnectionMode connectionMode) {
+            this.connectionMode = Objects.requireNonNull(connectionMode, "connectionMode");
+            return this;
+        }
+
         public H2Configuration build() {
             return new H2Configuration(this);
         }
+    }
+
+    /**
+     * The connection mode for establishing HTTP/2 connections.
+     */
+    enum H2ConnectionMode {
+        /**
+         * Uses ALPN over https and prior knowledge over http.
+         */
+        AUTO,
+        /**
+         * Negotiate using Application Layer Protocol Negotiation. This mode requires HTTPS.
+         */
+        ALPN,
+        /**
+         * Use prior knowledge.
+         */
+        PRIOR_KNOWLEDGE
     }
 }

@@ -40,6 +40,22 @@ final class NettyHttpClient implements Closeable {
         this.channelPoolMap = new ChannelPoolMap(config);
     }
 
+    /**
+     * Sends the HTTP request and returns a future with the HTTP response.
+     */
+    public CompletableFuture<HttpResponse> send(HttpRequest request) {
+        var responseFuture = new CompletableFuture<HttpResponse>();
+        var channelFuture = channelPoolMap.acquire(request.uri());
+        channelFuture.addListener(new ChannelAcquiredHandler(request, responseFuture, config));
+        LOGGER.debug(null, "Request scheduled, returning response");
+        return responseFuture;
+    }
+
+    @Override
+    public void close() {
+        channelPoolMap.close();
+    }
+
     private static void sendHttpRequest(
             Channel channel,
             HttpRequest request,
@@ -162,22 +178,6 @@ final class NettyHttpClient implements Closeable {
         return path;
     }
 
-    /**
-     * Sends the HTTP request and returns a future with the HTTP response.
-     */
-    public CompletableFuture<HttpResponse> send(HttpRequest request) {
-        var responseFuture = new CompletableFuture<HttpResponse>();
-        var channelFuture = channelPoolMap.acquire(request.uri());
-        channelFuture.addListener(new ChannelAcquiredHandler(request, responseFuture, config));
-        LOGGER.debug(null, "Request scheduled, returning response");
-        return responseFuture;
-    }
-
-    @Override
-    public void close() {
-        channelPoolMap.close();
-    }
-
     static class ChannelAcquiredHandler implements GenericFutureListener<Future<? super Channel>> {
         private final HttpRequest request;
         private final CompletableFuture<HttpResponse> responseFuture;
@@ -204,7 +204,6 @@ final class NettyHttpClient implements Closeable {
             var channel = (Channel) future.getNow();
             LOGGER.trace(channel, "Successfully acquired channel for URI {}", request.uri());
             var pipeline = channel.pipeline();
-
             pipeline.addLast(new NettyHttpResponseHandler(responseFuture, channel));
             sendHttpRequest(channel, request, config, responseFuture);
         }
