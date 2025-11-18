@@ -15,6 +15,7 @@ import io.netty.channel.DefaultChannelId;
 import io.netty.channel.DefaultChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http2.Http2FrameStream;
+import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
@@ -156,13 +157,32 @@ public class MockChannel implements Channel {
     }
 
     public static class Stream extends MockChannel implements Http2StreamChannel {
-
-        private Stream(Builder builder) {
+        private final MockHttp2FrameStream frameStream;
+        private Stream(Builder builder, int streamId) {
             super(builder);
+            this.frameStream = new MockHttp2FrameStream(streamId);
         }
 
         @Override
         public Http2FrameStream stream() {
+            return frameStream;
+        }
+    }
+
+    static class MockHttp2FrameStream implements Http2FrameStream {
+        private final int streamId;
+
+        MockHttp2FrameStream(int streamId) {
+            this.streamId = streamId;
+        }
+
+        @Override
+        public int id() {
+            return streamId;
+        }
+
+        @Override
+        public Http2Stream.State state() {
             throw new UnsupportedOperationException();
         }
     }
@@ -246,7 +266,17 @@ public class MockChannel implements Channel {
             if (pipeline == null) {
                 this.pipeline = new MockChannelPipeline();
             }
-            return new Stream(this);
+            return new Stream(this, 1);
+        }
+
+        public Stream buildStream(int streamId) {
+            if (channelId == null) {
+                this.channelId = DefaultChannelId.newInstance();
+            }
+            if (pipeline == null) {
+                this.pipeline = new MockChannelPipeline();
+            }
+            return new Stream(this, streamId);
         }
     }
 }

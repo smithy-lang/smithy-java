@@ -28,6 +28,7 @@ import java.util.Map;
  */
 public class MockChannelPipeline implements ChannelPipeline {
 
+    private final List<Object> userEventsTriggered = new ArrayList<>();
     private final LinkedHashMap<String, ChannelHandler> channelHandlers = new LinkedHashMap<>();
 
     @Override
@@ -225,6 +226,7 @@ public class MockChannelPipeline implements ChannelPipeline {
 
     @Override
     public ChannelPipeline fireUserEventTriggered(Object event) {
+        userEventsTriggered.add(event);
         return this;
     }
 
@@ -306,6 +308,10 @@ public class MockChannelPipeline implements ChannelPipeline {
     @Override
     public Iterator<Map.Entry<String, ChannelHandler>> iterator() {
         return channelHandlers.entrySet().iterator();
+    }
+
+    public List<Object> userEventsTriggered() {
+        return userEventsTriggered;
     }
 
     public boolean containsHandler(Class<? extends ChannelHandler> handlerType) {

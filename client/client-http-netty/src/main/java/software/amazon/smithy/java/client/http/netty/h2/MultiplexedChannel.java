@@ -144,7 +144,7 @@ final class MultiplexedChannel {
             return false;
         }
         // Cap the max retries when we fail to update acquiredStreams. This should only happen
-        // under high contention situations.
+        // under high contention.
         for (var attempt = 0; attempt < MAX_CAS_FAIL_RETRIES; ++attempt) {
             var streams = acquiredStreams.get();
             if (streams >= maxConcurrentStreams) {

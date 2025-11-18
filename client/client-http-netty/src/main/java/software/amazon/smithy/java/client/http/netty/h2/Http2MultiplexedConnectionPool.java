@@ -151,10 +151,12 @@ final class Http2MultiplexedConnectionPool implements ChannelPool {
 
                 // Create new parent channel
                 var newParent = channelPool.acquire();
-                newParent.addListener(new NewParentAcquiredListener(acquirePromise, this));
-
-                // Release semaphore when acquire completes (success or failure)
-                acquirePromise.addListener(new ReleaseSemaphore(initSemaphore));
+                // Release semaphore when acquire completes (success or failure). We create a new
+                // promise to ensure that we don't complete the result prior to releasing the
+                // semaphore.
+                Promise<Channel> completeAfterReleaseSemaphore = newPromise();
+                completeAfterReleaseSemaphore.addListener(new ReleaseSemaphore(acquirePromise, initSemaphore));
+                newParent.addListener(new NewParentAcquiredListener(completeAfterReleaseSemaphore, this));
                 return acquirePromise;
             } catch (InterruptedException e) {
                 // Acquiring the semaphore threw, the permit was not acquired.
@@ -279,7 +281,8 @@ final class Http2MultiplexedConnectionPool implements ChannelPool {
      * Returns true if the acquire semaphore is released. Used for testing.
      */
     boolean isAcquireSemaphoreReleased() {
-        return initSemaphore.availablePermits() == 1;
+        var permits = initSemaphore.availablePermits();
+        return permits == 1;
     }
 
     /**
@@ -521,15 +524,22 @@ final class Http2MultiplexedConnectionPool implements ChannelPool {
      * Releases the semaphore used to synchronize the creation of new parent channels.
      */
     static class ReleaseSemaphore implements GenericFutureListener<Future<? super Channel>> {
+        private final Promise<Channel> resultPromise;
         private final Semaphore semaphore;
 
-        ReleaseSemaphore(Semaphore semaphore) {
+        ReleaseSemaphore(Promise<Channel> resultPromise, Semaphore semaphore) {
+            this.resultPromise = resultPromise;
             this.semaphore = semaphore;
         }
 
         @Override
         public void operationComplete(Future<? super Channel> future) {
             semaphore.release();
+            if (future.isSuccess()) {
+                resultPromise.setSuccess((Channel) future.getNow());
+            } else {
+                resultPromise.setFailure(future.cause());
+            }
         }
     }
 

@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.client.http.netty.h2;
 
-import static java.lang.Thread.sleep;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -19,11 +18,17 @@ import static software.amazon.smithy.java.client.http.netty.h2.NettyHttp2Constan
 
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.handler.codec.http2.Http2StreamChannel;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.PromiseCombiner;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,7 +45,7 @@ class Http2MultiplexedConnectionPoolTest {
 
     @BeforeEach
     public void setup() {
-        eventLoopGroup = new NioEventLoopGroup(2);
+        eventLoopGroup = new MultiThreadIoEventLoopGroup(5, NioIoHandler.newFactory());
     }
 
     @AfterEach
@@ -50,35 +55,16 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void succeedsAndSetsAttributesAndHandlers() throws Exception {
-        // --- Arrange
-
-        // Set up the mock base channel pool
+        // -- Arrange
         var mockParentChannel = setupValidMockChannel();
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
-
-        // Set up the stream bootstrap
-        var mockStream = MockChannel.builder()
-                .parent(mockParentChannel)
-                .buildStream();
-        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
-
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                ch -> streamFuture,
-                MultiplexedChannel::new);
-
-        // Set up result promise
-        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
+        var mockStream = setupMockStream(mockParentChannel);
+        var connectionPool = createChannelPool(mockParentChannel, mockStream);
 
         // --- Act
+        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
         connectionPool.acquire(resultPromise);
 
         // --- Assert
-
         // assert that the promise completes successfully
         assertTrue(resultPromise.await(1_000));
         assertTrue(resultPromise.isSuccess());
@@ -117,30 +103,18 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void reusesExistingConnectionIfStreamsAreAvailable() throws Exception {
-        // --- Arrange
-
-        // Set up the mock base channel pool
+        // -- Arrange
         var mockParentChannel = setupValidMockChannel();
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
-
-        // Set up the stream bootstrap
+        var basePool = setupMockChannelPool(mockParentChannel);
         Http2StreamBootstrap bootstrap = (ch) -> {
-            var mockStream = MockChannel.builder()
-                    .parent(mockParentChannel)
-                    .buildStream();
+            // Ensure that we create a new stream everytime
+            // we are called.
+            var mockStream = setupMockStream(mockParentChannel);
             return eventLoopGroup.next().newSucceededFuture(mockStream);
         };
+        var connectionPool = createChannelPool(basePool, bootstrap);
 
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                bootstrap,
-                MultiplexedChannel::new);
-
-        // Set up first promise
+        // Set up the promises
         var firstStream = eventLoopGroup.next().<Channel>newPromise();
         var secondStream = eventLoopGroup.next().<Channel>newPromise();
 
@@ -165,14 +139,12 @@ class Http2MultiplexedConnectionPoolTest {
         assertEquals(connectionPool, mockParentChannel.attr(HTTP2_MULTIPLEXED_CONNECTION_POOL).get());
         assertNotNull(mockParentChannel.attr(HTTP2_MULTIPLEXED_CHANNEL).get());
 
-        // assert parent was not closed
+        // assert parent was NOT closed
         assertFalse(mockParentChannel.isClosed());
 
         // assert stream pipeline
         var mockParentPipeline = mockParentChannel.mockPipeline();
         assertTrue(mockParentPipeline.containsInOrder(ReleaseOnExceptionHandler.class));
-
-        // assert stream attributes
         var idx = 0;
         for (var mockStreamPromise : Arrays.asList(firstStream, secondStream)) {
             assertTrue(mockStreamPromise.await(1_000));
@@ -199,41 +171,30 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void releasesAcquireSemaphoreOnException() throws Exception {
-        // --- Arrange
-
-        // Set up the mock base channel pool
-        var mockParentChannel = setupValidMockChannel();
+        // -- Arrange
         var basePool = MockChannelPool.builder()
                 .eventLoopGroup(eventLoopGroup)
                 .onAcquire(p -> {
-                    throw new RuntimeException("boom");
+                    // The base pool will fail acquiring new connections.
+                    p.setFailure(new RuntimeException("boom"));
+                    return p;
                 })
                 .build();
 
-        // Set up the stream bootstrap
-        Http2StreamBootstrap bootstrap = (ch) -> {
-            var mockStream = MockChannel.builder()
-                    .parent(mockParentChannel)
-                    .buildStream();
-            return eventLoopGroup.next().newSucceededFuture(mockStream);
-        };
-
         // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                bootstrap,
-                MultiplexedChannel::new);
-
-        // Set up first promise
-        var firstStream = eventLoopGroup.next().<Channel>newPromise();
+        var connectionPool = createChannelPool(basePool, ch -> {
+            // The failure will happen acquiring from the base pool,
+            // requesting a new stream SHOULD NOT be reached.
+            throw new AssertionError("not reached");
+        });
 
         // -- Act
-        connectionPool.acquire(firstStream);
+        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
+        connectionPool.acquire(resultPromise);
 
         // --- Assert
-
-        assertTrue(firstStream.await(1_000));
-        assertFalse(firstStream.isSuccess());
+        assertTrue(resultPromise.await(1_000));
+        assertFalse(resultPromise.isSuccess());
 
         // assert the no multiplexed channel was added
         assertEquals(0, connectionPool.parentCount(), "A single multiplexed channel is in the pool");
@@ -242,28 +203,12 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void succeedsReleasingStream() throws Exception {
-        // --- Arrange
-
-        // Set up the mock base channel pool
+        // -- Arrange
         var mockParentChannel = setupValidMockChannel();
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
+        var mockStream = setupMockStream(mockParentChannel);
+        var connectionPool = createChannelPool(mockParentChannel, mockStream);
 
-        // Set up the stream bootstrap
-        var mockStream = MockChannel.builder()
-                .parent(mockParentChannel)
-                .buildStream();
-        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
-
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                ch -> streamFuture,
-                MultiplexedChannel::new);
-
-        // Set up result promise
+        // Acquire a new stream
         var resultPromise = eventLoopGroup.next().<Channel>newPromise();
         connectionPool.acquire(resultPromise);
         resultPromise.await(1_000);
@@ -275,7 +220,6 @@ class Http2MultiplexedConnectionPoolTest {
         connectionPool.release(resultPromise.get());
 
         // -- Assert
-
         // assert that the stream was closed.
         assertTrue(mockStream.isClosed());
         // assert that the multiplexed channel is still present in the cache
@@ -284,28 +228,12 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void closesAndRemovesAMultiplexedChannelWhenCanBe() throws Exception {
-        // --- Arrange
-
-        // Set up the mock base channel pool
+        // -- Arrange
         var mockParentChannel = setupValidMockChannel();
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
+        var mockStream = setupMockStream(mockParentChannel);
+        var connectionPool = createChannelPool(mockParentChannel, mockStream);
 
-        // Set up the stream bootstrap
-        var mockStream = MockChannel.builder()
-                .parent(mockParentChannel)
-                .buildStream();
-        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
-
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                ch -> streamFuture,
-                MultiplexedChannel::new);
-
-        // Set up result promise
+        // Acquire a new stream
         var resultPromise = eventLoopGroup.next().<Channel>newPromise();
         connectionPool.acquire(resultPromise);
         resultPromise.await(1_000);
@@ -313,52 +241,33 @@ class Http2MultiplexedConnectionPoolTest {
         // Make sure that the result is successful
         assertTrue(resultPromise.isSuccess());
 
-        // Set the multiplexed channel as ready to be released
         var multiplexedChannel = mockParentChannel.attr(HTTP2_MULTIPLEXED_CHANNEL).get();
-
         // validate that the multiplexed channel is still open.
         assertFalse(multiplexedChannel.isClosed());
 
         // -- Act
+        // Mark multiplexed channel as ready to be released
         multiplexedChannel.closeToNewStreams();
         connectionPool.release(resultPromise.get());
 
         // -- Assert
-
         // assert that the stream was closed.
         assertTrue(mockStream.isClosed());
-
         // assert that the multiplexed channel was removed
         assertEquals(0, connectionPool.parentCount(), "A multiplexed channel was removed from the pool");
-
         // assert that the multiplexed channel is closed.
         assertTrue(multiplexedChannel.isClosed());
+        assertTrue(mockParentChannel.isClosed());
     }
 
     @Test
     public void closesButDoesNotReleaseANonStreamChannel() throws Exception {
-        // --- Arrange
-
-        // Set up the mock base channel pool
+        // -- Arrange
         var mockParentChannel = setupValidMockChannel();
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
+        var mockStream = setupMockStream(mockParentChannel);
+        var connectionPool = createChannelPool(mockParentChannel, mockStream);
 
-        // Set up the stream bootstrap
-        var mockStream = MockChannel.builder()
-                .parent(mockParentChannel)
-                .buildStream();
-        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
-
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                ch -> streamFuture,
-                MultiplexedChannel::new);
-
-        // Set up result promise
+        // Acquire a new stream
         var resultPromise = eventLoopGroup.next().<Channel>newPromise();
         connectionPool.acquire(resultPromise);
         resultPromise.await(1_000);
@@ -377,29 +286,13 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void closesButDoesNotReleaseStreamWithoutMultiplexedChannel() throws Exception {
-        // --- Arrange
-
-        // Set up the mock base channel pool
+        // -- Arrange
         var mockParentChannel = setupValidMockChannel();
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
+        var mockStream = setupMockStream(mockParentChannel);
+        var connectionPool = createChannelPool(mockParentChannel, mockStream);
 
-        // Set up the stream bootstrap
-        var mockStream = MockChannel.builder()
-                .parent(mockParentChannel)
-                .buildStream();
-        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
-
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                ch -> streamFuture,
-                MultiplexedChannel::new);
-
-        // Set up result promise
-        var resultPromise = connectionPool.acquire();;
+        // Acquire a new stream
+        var resultPromise = connectionPool.acquire();
         resultPromise.await(1_000);
 
         // Make sure that the result is successful
@@ -417,28 +310,12 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void closesStreamWhenAttemptingToCloseAndReleaseParent() throws Exception {
-        // --- Arrange
-
-        // Set up the mock base channel pool
+        // -- Arrange
         var mockParentChannel = setupValidMockChannel();
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
+        var mockStream = setupMockStream(mockParentChannel);
+        var connectionPool = createChannelPool(mockParentChannel, mockStream);
 
-        // Set up the stream bootstrap
-        var mockStream = MockChannel.builder()
-                .parent(mockParentChannel)
-                .buildStream();
-        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
-
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                ch -> streamFuture,
-                MultiplexedChannel::new);
-
-        // Set up result promise
+        // Acquire a new stream
         var resultPromise = eventLoopGroup.next().<Channel>newPromise();
         connectionPool.acquire(resultPromise);
         resultPromise.await(1_000);
@@ -457,29 +334,14 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void closingPoolClosesAllStreamsParentsAndBasePool() throws Exception {
-        // --- Arrange
-
-        // Set up the mock base channel pool
+        // -- Arrange
         var mockParentChannel = setupValidMockChannel();
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
+        var basePool = setupMockChannelPool(mockParentChannel);
+        var mockStream = setupMockStream(mockParentChannel);
+        var connectionPool = createChannelPool(basePool, mockStream);
 
-        // Set up the stream bootstrap
-        var mockStream = MockChannel.builder()
-                .parent(mockParentChannel)
-                .buildStream();
-        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
-
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                ch -> streamFuture,
-                MultiplexedChannel::new);
-
-        // Set up result promise
-        var resultPromise = connectionPool.acquire();;
+        // Acquire a new stream
+        var resultPromise = connectionPool.acquire();
         resultPromise.await(1_000);
 
         // Make sure that the result is successful
@@ -498,28 +360,10 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void acquireFailsInClosedChannelPool() throws Exception {
-        // --- Arrange
-
-        // Set up the mock base channel pool
+        // -- Arrange
         var mockParentChannel = setupValidMockChannel();
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
-
-        // Set up the stream bootstrap
-        var mockStream = MockChannel.builder()
-                .parent(mockParentChannel)
-                .buildStream();
-        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
-
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                ch -> streamFuture,
-                MultiplexedChannel::new);
-
-        // Set up result promise
+        var mockStream = setupMockStream(mockParentChannel);
+        var connectionPool = createChannelPool(mockParentChannel, mockStream);
 
         // -- Act
         connectionPool.close();
@@ -532,31 +376,16 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void acquireFailsWhenThePoolIsClosedWhileSettingUp() throws Exception {
-        // --- Arrange
-
-        // Set up the mock base channel pool
+        // -- Arrange
         var mockParentChannel = setupValidMockChannel();
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
-
-        // Set up the stream bootstrap
-        var mockStream = MockChannel.builder()
-                .parent(mockParentChannel)
-                .buildStream();
+        var basePool = setupMockChannelPool(mockParentChannel);
+        var mockStream = setupMockStream(mockParentChannel);
         var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
-
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                ch -> {
-                    sleep(100);
-                    return streamFuture;
-                },
-                MultiplexedChannel::new);
-
-        // Set up result promise
+        var connectionPool = createChannelPool(basePool, ch -> {
+            // Sleep to allow the close to take effect.
+            sleep();
+            return streamFuture;
+        });
 
         // -- Act
         var resultPromise = connectionPool.acquire();
@@ -569,32 +398,16 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void succeedsWhenWindowSizeIncrementThrows() throws Exception {
-        // --- Arrange
+        // -- Arrange
 
         // Set up the mock base channel pool with a local flow controller that throws
         // when setting the initial window size.
         var mockParentChannel = setupMockChannel(HttpVersion.HTTP_2, null, true);
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
-
-        // Set up the stream bootstrap
-        var mockStream = MockChannel.builder()
-                .parent(mockParentChannel)
-                .buildStream();
-        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
-
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                ch -> streamFuture,
-                MultiplexedChannel::new);
-
-        // Set up result promise
-        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
+        var mockStream = setupMockStream(mockParentChannel);
+        var connectionPool = createChannelPool(mockParentChannel, mockStream);
 
         // --- Act
+        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
         connectionPool.acquire(resultPromise);
 
         // --- Assert
@@ -636,36 +449,19 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void failsWithNonH2VersionFuture() throws Exception {
-        // --- Arrange
+        // -- Arrange
 
         // Set up the mock base channel pool parent channel with a version future
         // completes to a non-supported HTTP version
         var mockParentChannel = setupMockChannel(HttpVersion.HTTP_1_1, null, false);
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
-
-        // Set up the stream bootstrap
-        var mockStream = MockChannel.builder()
-                .parent(mockParentChannel)
-                .buildStream();
-        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
-
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                ch -> streamFuture,
-                MultiplexedChannel::new);
-
-        // Set up result promise
-        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
+        var mockStream = setupMockStream(mockParentChannel);
+        var connectionPool = createChannelPool(mockParentChannel, mockStream);
 
         // --- Act
+        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
         connectionPool.acquire(resultPromise);
 
         // --- Assert
-
         // assert that the promise completes with a failure
         assertTrue(resultPromise.await(1_000));
         assertFalse(resultPromise.isSuccess());
@@ -678,35 +474,17 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void failsWhenTheVersionFutureFails() throws Exception {
-        // --- Arrange
-
+        // -- Arrange
         // Set up the mock base channel pool with a parent channel with a version future completed to a failed state.
         var mockParentChannel = setupMockChannel(null, new TransportException("boom"), false);
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
-
-        // Set up the stream bootstrap
-        var mockStream = MockChannel.builder()
-                .parent(mockParentChannel)
-                .buildStream();
-        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
-
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                ch -> streamFuture,
-                MultiplexedChannel::new);
-
-        // Set up result promise
-        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
+        var mockStream = setupMockStream(mockParentChannel);
+        var connectionPool = createChannelPool(mockParentChannel, mockStream);
 
         // --- Act
+        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
         connectionPool.acquire(resultPromise);
 
         // --- Assert
-
         // assert that the promise completes with a failure
         assertTrue(resultPromise.await(1_000));
         assertFalse(resultPromise.isSuccess());
@@ -719,14 +497,9 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void failsWhenTheStreamFails() throws Exception {
-        // --- Arrange
-
-        // Set up the mock base channel pool
+        // -- Arrange
         var mockParentChannel = setupValidMockChannel();
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
+        var basePool = setupMockChannelPool(mockParentChannel);
 
         // Set up the stream bootstrap to fail.
         var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newFailedFuture(new IOException("boom"));
@@ -737,14 +510,11 @@ class Http2MultiplexedConnectionPoolTest {
                 ch -> streamFuture,
                 MultiplexedChannel::new);
 
-        // Set up result promise
-        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
-
         // --- Act
+        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
         connectionPool.acquire(resultPromise);
 
         // --- Assert
-
         // assert that the promise completes with a failure
         assertTrue(resultPromise.await(1_000));
         assertFalse(resultPromise.isSuccess());
@@ -757,20 +527,11 @@ class Http2MultiplexedConnectionPoolTest {
     }
 
     @Test
-    public void ailsWhenTheStreamIsClosedBeforeFinishingSettingUp() throws Exception {
-        // --- Arrange
-
-        // Set up the mock base channel pool
+    public void failsWhenTheStreamIsClosedBeforeFinishingSettingUp() throws Exception {
+        // -- Arrange
         var mockParentChannel = setupValidMockChannel();
-        var basePool = MockChannelPool.builder()
-                .eventLoopGroup(eventLoopGroup)
-                .onAcquireSucceed(mockParentChannel)
-                .build();
-
-        // Set up the stream bootstrap
-        var mockStream = MockChannel.builder()
-                .parent(mockParentChannel)
-                .buildStream();
+        var basePool = setupMockChannelPool(mockParentChannel);
+        var mockStream = setupMockStream(mockParentChannel);
         var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
 
         // Set up the connection pool
@@ -784,14 +545,11 @@ class Http2MultiplexedConnectionPoolTest {
                     return multiplexedChannel;
                 });
 
-        // Set up result promise
-        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
-
         // --- Act
+        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
         connectionPool.acquire(resultPromise);
 
         // --- Assert
-
         // assert that the promise completes successfully
         assertTrue(resultPromise.await(1_000));
         assertFalse(resultPromise.isSuccess());
@@ -804,31 +562,21 @@ class Http2MultiplexedConnectionPoolTest {
 
     @Test
     public void failsWhenTheParentFails() throws Exception {
-        // --- Arrange
+        // -- Arrange
 
-        // Set up the mock base channel pool
+        // Set up the mock base channel pool that will return a failed promise on acquire.
         var basePool = MockChannelPool.builder()
                 .eventLoopGroup(eventLoopGroup)
                 .onAcquireFail(new IOException("parent failed"))
                 .build();
-
-        // Set up the stream bootstrap
         var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newFailedFuture(new IOException("stream failed"));
-
-        // Set up the connection pool
-        var connectionPool = new Http2MultiplexedConnectionPool(basePool,
-                eventLoopGroup,
-                ch -> streamFuture,
-                MultiplexedChannel::new);
-
-        // Set up result promise
-        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
+        var connectionPool = createChannelPool(basePool, streamFuture);
 
         // --- Act
+        var resultPromise = eventLoopGroup.next().<Channel>newPromise();
         connectionPool.acquire(resultPromise);
 
         // --- Assert
-
         // assert that the promise completes with a failure
         assertTrue(resultPromise.await(1_000));
         assertFalse(resultPromise.isSuccess());
@@ -839,13 +587,122 @@ class Http2MultiplexedConnectionPoolTest {
         assertEquals(0, connectionPool.parentCount(), "A multiplexed channel was NOT added to the pool");
     }
 
-    private static void sleep(long millis) {
+    @Test
+    public void handlesGoAwayDeliveringTheExpectedEvents() throws Exception {
+        // -- Arrange
+        var mockParentChannel = setupValidMockChannel();
+        var mockChannelPool = setupMockChannelPool(mockParentChannel);
+        var streamId = new AtomicInteger(-1);
+        var connectionPool = createChannelPool(mockChannelPool, (ch) -> {
+            var stream = MockChannel.builder()
+                    .parent(mockParentChannel)
+                    .buildStream(streamId.addAndGet(2));
+            return eventLoopGroup.next().newSucceededFuture(stream);
+        });
+
+        var promises = new ArrayList<Future<Channel>>();
+        var firstPromise = connectionPool.acquire();
+        promises.add(firstPromise);
+        firstPromise.await(1_000);
+        var eventExecutor = eventLoopGroup.next();
+        var combiner = new PromiseCombiner(eventExecutor);
+        var finishPromise = eventLoopGroup.next().<Void>newPromise();
+        eventExecutor.execute(() -> {
+            for (var idx = 0; idx < 5; ++idx) {
+                var future = connectionPool.acquire();
+                promises.add(future);
+                combiner.add(future);
+            }
+            combiner.finish(finishPromise);
+        });
+
+        // validate that we finish successfully
+        assertTrue(finishPromise.await(2_000));
+        assertTrue(finishPromise.isSuccess());
+        var multiplexedChannel = mockParentChannel.attr(HTTP2_MULTIPLEXED_CHANNEL).get();
+        assertNotNull(multiplexedChannel);
+
+        // --- Act
+        var lastStreamId = 5;
+        multiplexedChannel.handleGoAway(5, new GoAwayException(-1, "boom"));
+
+        // -- Assert
+        var idx = 0;
+        for (var promise : promises) {
+            var stream = (MockChannel.Stream) promise.getNow();
+            var events = stream.mockPipeline().userEventsTriggered();
+            if (stream.stream().id() > lastStreamId) {
+                assertEquals(1, events.size(), "The triggered events should have one event, promise " + idx);
+                assertInstanceOf(GoAwayException.class,
+                        events.getFirst(),
+                        "The triggered event should be an instance of `GoAwayException` , promise " + idx);
+            } else {
+                assertTrue(events.isEmpty(), "The triggered evens should be empty, promise " + idx);
+            }
+            ++idx;
+        }
+    }
+
+    private static void sleep() {
         try {
-            Thread.sleep(millis);
+            TimeUnit.MILLISECONDS.sleep(100);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         }
+    }
+
+    private Http2MultiplexedConnectionPool createChannelPool(
+            MockChannel mockParentChannel,
+            MockChannel.Stream mockStream
+    ) {
+        var basePool = setupMockChannelPool(mockParentChannel);
+        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
+        return new Http2MultiplexedConnectionPool(basePool,
+                eventLoopGroup,
+                ch -> streamFuture,
+                MultiplexedChannel::new);
+    }
+
+    private Http2MultiplexedConnectionPool createChannelPool(
+            MockChannelPool basePool,
+            MockChannel.Stream mockStream
+
+    ) {
+        var streamFuture = eventLoopGroup.next().<Http2StreamChannel>newSucceededFuture(mockStream);
+        return createChannelPool(basePool, streamFuture);
+    }
+
+    private Http2MultiplexedConnectionPool createChannelPool(
+            MockChannelPool basePool,
+            Future<Http2StreamChannel> streamFuture
+
+    ) {
+        return createChannelPool(basePool, ch -> streamFuture);
+    }
+
+    private Http2MultiplexedConnectionPool createChannelPool(
+            MockChannelPool basePool,
+            Http2StreamBootstrap bootstrap
+
+    ) {
+        return new Http2MultiplexedConnectionPool(basePool,
+                eventLoopGroup,
+                bootstrap,
+                MultiplexedChannel::new);
+    }
+
+    private MockChannelPool setupMockChannelPool(MockChannel onAcquireResult) {
+        return MockChannelPool.builder()
+                .eventLoopGroup(eventLoopGroup)
+                .onAcquireSucceed(onAcquireResult)
+                .build();
+    }
+
+    private static MockChannel.Stream setupMockStream(MockChannel mockParentChannel) {
+        return MockChannel.builder()
+                .parent(mockParentChannel)
+                .buildStream();
     }
 
     private static MockChannel setupValidMockChannel() {
