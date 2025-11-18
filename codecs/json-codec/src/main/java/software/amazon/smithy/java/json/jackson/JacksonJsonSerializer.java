@@ -135,18 +135,15 @@ final class JacksonJsonSerializer implements ShapeSerializer {
         try {
             if (Float.isFinite(value)) {
                 int intValue = (int) value;
-                if (value - intValue != 0) {
-                    // Avoid writing 1.0 and instead write 1.
-                    generator.writeNumber(value);
-                } else {
+                if (value == (float) intValue) {
                     generator.writeNumber(intValue);
+                } else {
+                    generator.writeNumber(value);
                 }
             } else if (Float.isNaN(value)) {
                 generator.writeString("NaN");
-            } else if (Float.POSITIVE_INFINITY == value) {
-                generator.writeString("Infinity");
             } else {
-                generator.writeString("-Infinity");
+                generator.writeString(value > 0 ? "Infinity" : "-Infinity");
             }
         } catch (Exception e) {
             throw new SerializationException(e);
@@ -157,19 +154,17 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     public void writeDouble(Schema schema, double value) {
         try {
             if (Double.isFinite(value)) {
+                // Avoid writing 1.0 and instead write 1.
                 long longValue = (long) value;
-                if (value - longValue != 0) {
-                    // Avoid writing 1.0 and instead write 1.
-                    generator.writeNumber(value);
-                } else {
+                if (value == (double) longValue) {
                     generator.writeNumber(longValue);
+                } else {
+                    generator.writeNumber(value);
                 }
             } else if (Double.isNaN(value)) {
                 generator.writeString("NaN");
-            } else if (Double.POSITIVE_INFINITY == value) {
-                generator.writeString("Infinity");
             } else {
-                generator.writeString("-Infinity");
+                generator.writeString(value > 0 ? "Infinity" : "-Infinity");
             }
         } catch (Exception e) {
             throw new SerializationException(e);
