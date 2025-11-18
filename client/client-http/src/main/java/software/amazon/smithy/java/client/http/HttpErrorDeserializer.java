@@ -111,6 +111,38 @@ public final class HttpErrorDeserializer {
         }
     }
 
+    /**
+     * To create an error, the {@link ShapeId} of the error is required to retrieve the corresponding {@link ShapeBuilder}.
+     * Different protocols need different parsers to extract the ShapeId given their different response structures.
+     * If no parser specified, {@link #DEFAULT_ERROR_PAYLOAD_PARSER} will be picked.
+     */
+    @FunctionalInterface
+    public interface ErrorPayloadParser {
+        /**
+         * This method should parse the response payload and extract error's ShapeId,and
+         * create the corresponding error with the {@link KnownErrorFactory}.
+         *
+         * @param context Context of the call.
+         * @param codec Codec used to deserialize payloads.
+         * @param knownErrorFactory The knownErrorFactory to create error.
+         * @param serviceId The ShapeId of the service.
+         * @param typeRegistry The error typeRegistry to retrieve builder for the error.
+         * @param response Response to parse.
+         * @param buffer Bytebuffer of the payload.
+         *
+         * @return the created error.
+         */
+        CallException parsePayload(
+                Context context,
+                Codec codec,
+                KnownErrorFactory knownErrorFactory,
+                ShapeId serviceId,
+                TypeRegistry typeRegistry,
+                HttpResponse response,
+                ByteBuffer buffer
+        ) throws SerializationException, DiscriminatorException;
+    }
+
     // Does not check for any error headers by default.
     private static final HeaderErrorExtractor DEFAULT_EXTRACTOR = new HeaderErrorExtractor() {
         @Override
@@ -159,24 +191,52 @@ public final class HttpErrorDeserializer {
         }
     };
 
+    // This default parser should work for most protocols, but other  protocols
+    // that do not support document types will need a custom parser to extract error ShapeId.
+    private static final ErrorPayloadParser DEFAULT_ERROR_PAYLOAD_PARSER = (
+            Context context,
+            Codec codec,
+            KnownErrorFactory knownErrorFactory,
+            ShapeId serviceId,
+            TypeRegistry typeRegistry,
+            HttpResponse response,
+            ByteBuffer buffer) -> {
+        var document = codec.createDeserializer(buffer).readDocument();
+        var id = document.discriminator();
+        var builder = typeRegistry.createBuilder(id, ModeledException.class);
+        if (builder != null) {
+            return knownErrorFactory.createErrorFromDocument(
+                    context,
+                    codec,
+                    response,
+                    buffer,
+                    document,
+                    builder);
+        }
+        return null;
+    };
+
     private final Codec codec;
     private final HeaderErrorExtractor headerErrorExtractor;
     private final ShapeId serviceId;
     private final UnknownErrorFactory unknownErrorFactory;
     private final KnownErrorFactory knownErrorFactory;
+    private final ErrorPayloadParser errorPayloadParser;
 
     private HttpErrorDeserializer(
             Codec codec,
             HeaderErrorExtractor headerErrorExtractor,
             ShapeId serviceId,
             UnknownErrorFactory unknownErrorFactory,
-            KnownErrorFactory knownErrorFactory
+            KnownErrorFactory knownErrorFactory,
+            ErrorPayloadParser errorPayloadParser
     ) {
         this.codec = Objects.requireNonNull(codec, "Missing codec");
         this.serviceId = Objects.requireNonNull(serviceId, "Missing serviceId");
         this.headerErrorExtractor = headerErrorExtractor;
         this.unknownErrorFactory = unknownErrorFactory;
         this.knownErrorFactory = knownErrorFactory;
+        this.errorPayloadParser = errorPayloadParser;
     }
 
     public static Builder builder() {
@@ -200,13 +260,14 @@ public final class HttpErrorDeserializer {
             // No error header, no __type: it's an unknown error.
             return createErrorFromHints(operation, response, unknownErrorFactory);
         } else {
-            // Look for __type in the payload.
             return makeErrorFromPayload(
                     context,
                     codec,
                     knownErrorFactory,
                     unknownErrorFactory,
+                    errorPayloadParser,
                     operation,
+                    serviceId,
                     typeRegistry,
                     response,
                     content);
@@ -240,7 +301,9 @@ public final class HttpErrorDeserializer {
             Codec codec,
             KnownErrorFactory knownErrorFactory,
             UnknownErrorFactory unknownErrorFactory,
+            ErrorPayloadParser errorPayloadParser,
             ShapeId operationId,
+            ShapeId serviceId,
             TypeRegistry typeRegistry,
             HttpResponse response,
             DataStream content
@@ -251,17 +314,16 @@ public final class HttpErrorDeserializer {
             ByteBuffer buffer = content.asByteBuffer();
 
             if (buffer.remaining() > 0) {
-                var document = codec.createDeserializer(buffer).readDocument();
-                var id = document.discriminator();
-                var builder = typeRegistry.createBuilder(id, ModeledException.class);
-                if (builder != null) {
-                    return knownErrorFactory.createErrorFromDocument(
-                            context,
-                            codec,
-                            response,
-                            buffer,
-                            document,
-                            builder);
+                var error = errorPayloadParser.parsePayload(
+                        context,
+                        codec,
+                        knownErrorFactory,
+                        serviceId,
+                        typeRegistry,
+                        response,
+                        buffer);
+                if (error != null) {
+                    return error;
                 }
             }
         } catch (SerializationException | DiscriminatorException ignored) {
@@ -291,6 +353,7 @@ public final class HttpErrorDeserializer {
         private ShapeId serviceId;
         private UnknownErrorFactory unknownErrorFactory = DEFAULT_UNKNOWN_FACTORY;
         private KnownErrorFactory knownErrorFactory = DEFAULT_KNOWN_FACTORY;
+        private ErrorPayloadParser errorPayloadParser = DEFAULT_ERROR_PAYLOAD_PARSER;
 
         private Builder() {}
 
@@ -300,7 +363,8 @@ public final class HttpErrorDeserializer {
                     headerErrorExtractor,
                     serviceId,
                     unknownErrorFactory,
-                    knownErrorFactory);
+                    knownErrorFactory,
+                    errorPayloadParser);
         }
 
         /**
@@ -360,6 +424,20 @@ public final class HttpErrorDeserializer {
          */
         public Builder unknownErrorFactory(UnknownErrorFactory unknownErrorFactory) {
             this.unknownErrorFactory = Objects.requireNonNull(unknownErrorFactory, "unknownErrorFactory is null");
+            return this;
+        }
+
+        /**
+         * The parser to parse the shapeId from the payload.
+         *
+         * <p>The default parser implementation will parse the payload into a {@link Document} and
+         * use {@link Document#discriminator()} to extract its {@code __type} field as ShapeId
+         *
+         * @param errorPayloadParser Parser used to parse the payload.
+         * @return the builder.
+         */
+        public Builder errorPayloadParser(ErrorPayloadParser errorPayloadParser) {
+            this.errorPayloadParser = Objects.requireNonNull(errorPayloadParser, "ErrorPayloadParser is null");
             return this;
         }
     }

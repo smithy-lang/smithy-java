@@ -66,6 +66,16 @@ final class XmlDeserializer implements ShapeDeserializer {
 
     // The first deserialization of XML expects a containing XML element for the shape.
     // The inner deserializer deserializes members and doesn't have this expectation.
+    // If the name is ErrorResponse or Error, it means we are deserializing an ErrorResponse like:
+    // <ErrorResponse>
+    //   <Error>
+    //     <Type>Sender</Type>
+    //     <Code>InvalidInput</Code>
+    //     <Message>Invalid input</Message>
+    //   </Error>
+    // </ErrorResponse>
+    // We should skip all the way to the Code element to deserialize the rest of the fields and
+    // return early to skip the name comparison.
     private void enter(Schema schema) {
         try {
             if (!isTopLevel) {
@@ -80,6 +90,9 @@ final class XmlDeserializer implements ShapeDeserializer {
                 expected = trait.getValue();
             } else if (schema.isMember()) {
                 expected = schema.memberTarget().id().getName();
+            } else if (name != null && (name.equals("ErrorResponse") || name.equals("Error"))) {
+                skipToCodeElement(name);
+                return;
             } else {
                 expected = schema.id().getName();
             }
@@ -95,6 +108,51 @@ final class XmlDeserializer implements ShapeDeserializer {
     private void exit() {
         try {
             reader.closeElement();
+        } catch (XMLStreamException e) {
+            throw new SerializationException(e);
+        }
+    }
+
+    private void skipToCodeElement(String name) throws XMLStreamException {
+        if (name.equals("ErrorResponse")) {
+            reader.nextMemberElement(); // Move to Error element
+        }
+        String element;
+        while ((element = reader.nextMemberElement()) != null) {
+            if (element.equals("Code")) {
+                reader.closeElement();
+                return;
+            }
+            reader.closeElement();
+        }
+    }
+
+    String parseErrorCodeName() {
+        try {
+            var element = reader.nextMemberElement();
+            if (element == null || (!element.equals("ErrorResponse") && !element.equals("Error"))) {
+                throw new SerializationException(
+                        "Expected element <ErrorResponse> or <Error> for XML error response");
+            }
+            if (element.equals("ErrorResponse")) {
+                element = reader.nextMemberElement();
+                if (element == null || !element.equals("Error")) {
+                    throw new SerializationException("Expected <Error> element inside <ErrorResponse>");
+                }
+            }
+            String childElement;
+            while ((childElement = reader.nextMemberElement()) != null) {
+                if (childElement.equals("Code")) {
+                    if (reader.getText() == null) {
+                        throw new SerializationException("Expected shape name inside <Code>");
+                    }
+                    var code = reader.getText();
+                    reader.closeElement();
+                    return code;
+                }
+                reader.closeElement();
+            }
+            throw new SerializationException("Expected <Code> element inside <Error>");
         } catch (XMLStreamException e) {
             throw new SerializationException(e);
         }
