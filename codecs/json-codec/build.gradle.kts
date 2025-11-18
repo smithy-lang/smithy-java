@@ -1,8 +1,7 @@
-
-
 plugins {
     id("smithy-java.module-conventions")
     id("smithy-java.fuzz-test")
+    id("me.champeau.jmh") version "0.7.3"
     alias(libs.plugins.shadow)
 }
 
@@ -54,4 +53,12 @@ afterEvaluate {
     shadowComponent.addVariantsFromConfiguration(configurations.javadocElements.get()) {
         mapToMavenScope("runtime")
     }
+}
+
+jmh {
+    warmupIterations = 3
+    iterations = 3
+    fork = 3
+    // profilers.add("async:output=flamegraph")
+    // profilers.add("gc")
 }

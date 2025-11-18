@@ -8,6 +8,7 @@ package software.amazon.smithy.java.json.jackson;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonFactoryBuilder;
 import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.core.StreamWriteFeature;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -27,6 +28,7 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
     static {
         var serBuilder = new JsonFactoryBuilder();
         serBuilder.disable(JsonFactory.Feature.INTERN_FIELD_NAMES);
+        serBuilder.enable(StreamWriteFeature.USE_FAST_DOUBLE_WRITER);
         serBuilder.enable(StreamReadFeature.USE_FAST_DOUBLE_PARSER);
         serBuilder.enable(StreamReadFeature.USE_FAST_BIG_NUMBER_PARSER);
         FACTORY = serBuilder.build();
