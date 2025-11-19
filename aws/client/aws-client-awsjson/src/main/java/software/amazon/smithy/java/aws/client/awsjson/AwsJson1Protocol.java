@@ -25,7 +25,7 @@ public final class AwsJson1Protocol extends AwsJsonProtocol {
      *                discriminator of documents that use relative shape IDs.
      */
     public AwsJson1Protocol(ShapeId service) {
-        super(TRAIT_ID, service, ErrorTypeSanitizer::REMOVE_URI);
+        super(TRAIT_ID, service, ErrorTypeSanitizer::removeUri);
     }
 
     @Override

@@ -295,7 +295,7 @@ public final class JsonSettings {
          * @param errorTypeSanitizer the sanitizer to use for error type.
          * @return the builder.
          */
-        Builder errorTypeSanitizer(Function<String, String> errorTypeSanitizer) {
+        public Builder errorTypeSanitizer(Function<String, String> errorTypeSanitizer) {
             this.errorTypeSanitizer = errorTypeSanitizer;
             return this;
         }
