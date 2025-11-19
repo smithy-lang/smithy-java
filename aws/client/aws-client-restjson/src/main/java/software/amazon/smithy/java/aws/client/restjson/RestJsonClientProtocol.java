@@ -53,7 +53,7 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
                 .useJsonName(true)
                 .useTimestampFormat(true)
                 .defaultNamespace(service.getNamespace())
-                .errorTypeSanitizer(ErrorTypeSanitizer::REMOVE_NAMESPACE_AND_URI)
+                .errorTypeSanitizer(ErrorTypeSanitizer::removeNamespaceAndUri)
                 .build();
 
         this.errorDeserializer = HttpErrorDeserializer.builder()
