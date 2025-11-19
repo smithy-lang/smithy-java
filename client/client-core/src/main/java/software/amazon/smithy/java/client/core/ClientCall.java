@@ -9,8 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
@@ -45,7 +43,6 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
     final AuthSchemeResolver authSchemeResolver;
     final Map<ShapeId, AuthScheme<?, ?>> supportedAuthSchemes;
     final IdentityResolvers identityResolvers;
-    final ExecutorService executor;
 
     final RetryStrategy retryStrategy;
     final String retryScope;
@@ -70,9 +67,6 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
         retryStrategy = Objects.requireNonNull(builder.retryStrategy, "retryStrategy is null");
         retryScope = Objects.requireNonNullElse(builder.retryScope, "");
         context.put(CallContext.RETRY_MAX, retryStrategy.maxAttempts());
-
-        //TODO fix this to not use a cached thread pool.
-        executor = builder.executor == null ? Executors.newCachedThreadPool() : builder.executor;
     }
 
     /**
@@ -106,7 +100,6 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
         AuthSchemeResolver authSchemeResolver;
         final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
         IdentityResolvers identityResolvers;
-        ExecutorService executor;
         RetryStrategy retryStrategy;
         String retryScope = "";
 
