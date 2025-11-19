@@ -13,7 +13,7 @@ package software.amazon.smithy.java.json;
  * sanitizers to remove trailing URIs or leading namespaces from {@code __type}.
  */
 public class ErrorTypeSanitizer {
-    public static String REMOVE_URI(String text) {
+    public static String removeUri(String text) {
         if (text == null) {
             return null;
         }
@@ -24,7 +24,7 @@ public class ErrorTypeSanitizer {
         return text;
     }
 
-    public static String REMOVE_NAMESPACE_AND_URI(String text) {
+    public static String removeNamespaceAndUri(String text) {
         if (text == null) {
             return null;
         }
@@ -32,6 +32,6 @@ public class ErrorTypeSanitizer {
         if (hash > 0) {
             text = text.substring(hash + 1);
         }
-        return REMOVE_URI(text);
+        return removeUri(text);
     }
 }
