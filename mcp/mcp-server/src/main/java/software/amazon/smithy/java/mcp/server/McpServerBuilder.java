@@ -27,6 +27,7 @@ public final class McpServerBuilder {
     String name;
     String version;
     ToolFilter toolFilter = (server, tool) -> true;
+    McpMetricsObserver metricsObserver;
     McpService mcpService;
 
     McpServerBuilder() {}
@@ -64,7 +65,8 @@ public final class McpServerBuilder {
                 .services(services)
                 .proxyList(proxyList)
                 .name(name != null ? name : "mcp-server")
-                .toolFilter(toolFilter);
+                .toolFilter(toolFilter)
+                .metricsObserver(metricsObserver);
 
         if (version != null) {
             builder.version(version);
@@ -91,6 +93,11 @@ public final class McpServerBuilder {
 
     public McpServerBuilder toolFilter(ToolFilter filter) {
         this.toolFilter = filter;
+        return this;
+    }
+
+    public McpServerBuilder metricsObserver(McpMetricsObserver observer) {
+        this.metricsObserver = observer;
         return this;
     }
 
