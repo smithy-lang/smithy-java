@@ -156,6 +156,22 @@ public class DynamicClientTest {
         assertThat(result.getMember("id").asString(), equalTo("1"));
     }
 
+    @Test
+    public void sendOperationsWithMap() {
+        var client = DynamicClient.builder()
+                .serviceId(SERVICE)
+                .model(model)
+                .protocol(new AwsJson1Protocol(SERVICE))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .transport(mockTransport())
+                .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
+                .build();
+
+        var result = client.call("GetSprocket", Map.of("id", "1"));
+        assertThat(result.type(), is(ShapeType.STRUCTURE));
+        assertThat(result.getMember("id").asString(), equalTo("1"));
+    }
+
     private ClientTransport<HttpRequest, HttpResponse> mockTransport() {
         return new ClientTransport<>() {
             @Override
@@ -304,10 +320,7 @@ public class DynamicClientTest {
 
     @Test
     public void detectsEndpointResolver() {
-        var client = DynamicClient.builder()
-                .model(model)
-                //                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-                .build();
+        var client = DynamicClient.builder().model(model).build();
 
         assertThat(client.config().service().schema().id(), equalTo(SERVICE));
         assertThat(client.config().protocol(), instanceOf(AwsJson1Protocol.class));
