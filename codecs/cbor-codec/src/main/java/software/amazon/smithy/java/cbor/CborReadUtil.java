@@ -106,6 +106,7 @@ public final class CborReadUtil {
         }
         final byte[] buff;
         if (len >= 0) {
+            checkInvalidLength(buffer, off, len);
             final int desOff;
             if (buffer[off] >= 0) {
                 buff = new byte[len];
@@ -313,6 +314,12 @@ public final class CborReadUtil {
 
     private static byte getMinor(byte b) {
         return (byte) (b & MINOR_TYPE_MASK);
+    }
+
+    private static void checkInvalidLength(byte[] buf, int off, int len) {
+        if (len > buf.length - off) {
+            throw new BadCborException("Invalid length");
+        }
     }
 
     private CborReadUtil() {}

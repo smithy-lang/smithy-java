@@ -5,14 +5,15 @@
 
 package software.amazon.smithy.java.context;
 
+import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 /**
  * A typed context map.
  */
-public sealed interface Context permits ArrayStorageContext, MapStorageContext, UnmodifiableContext {
+public sealed interface Context permits ChunkedArrayStorageContext, UnmodifiableContext {
 
     /**
      * A {@code Key} provides an identity-based, immutable token.
@@ -25,16 +26,13 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
      */
     final class Key<T> {
 
-        static final int MAX_ARRAY_KEY_SPACE = 64;
-
-        // Hold onto keys because they're needed when putting the contents of an array context into a map context.
-        // This could happen if the array context was created before the keyspace grew beyond MAX_ARRAY_KEY_SIZE,
-        // but a map context was created after.
+        // Global registry of all keys for copyTo operations (CopyOnWriteArrayList for thread safety).
         @SuppressWarnings("rawtypes")
-        static final Key[] KEYS = new Key[MAX_ARRAY_KEY_SPACE];
+        static final List<Key> KEYS = new CopyOnWriteArrayList<>();
 
-        // Each created key will get an assigned ID used to index into an array of possible keys.
-        static final AtomicInteger COUNTER = new AtomicInteger();
+        // We still need a lock to atomically insert an ID into KEYS and get the ID.
+        // Spotbugs warns against Synchronizing on KEYS, so using a dedicated lock.
+        private static final Object KEYS_LOCK = new Object();
 
         private final String name;
         final int id;
@@ -45,8 +43,13 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
          */
         private Key(String name, Function<T, T> copyFunction) {
             this.name = Objects.requireNonNull(name);
-            this.id = COUNTER.getAndIncrement();
             this.copyFunction = Objects.requireNonNull(copyFunction);
+
+            // Atomically assign our slot in the KEYS array.
+            synchronized (KEYS_LOCK) {
+                this.id = KEYS.size();
+                KEYS.add(this);
+            }
         }
 
         @Override
@@ -86,11 +89,7 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
      * @param <T> Value type associated with the key.
      */
     static <T> Key<T> key(String name, Function<T, T> copyFunction) {
-        Key<T> key = new Key<>(name, copyFunction);
-        if (key.id < Key.MAX_ARRAY_KEY_SPACE) {
-            Key.KEYS[key.id] = key;
-        }
-        return key;
+        return new Key<>(name, copyFunction);
     }
 
     /**
@@ -149,7 +148,7 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
     default <T> T expect(Key<T> key) {
         T value = get(key);
         if (value == null) {
-            throw new NullPointerException("Unknown context property: " + key);
+            throw new NullPointerException("Missing required context property: " + key);
         }
         return value;
     }
@@ -196,7 +195,7 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
     /**
      * Get an empty and unmodifiable Context.
      *
-     * @return the empty and umodifiable context.
+     * @return the empty and unmodifiable context.
      */
     static Context empty() {
         return UnmodifiableContext.EMPTY;
@@ -208,11 +207,7 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
      * @return the created context.
      */
     static Context create() {
-        if (Key.COUNTER.get() >= Key.MAX_ARRAY_KEY_SPACE) {
-            return new MapStorageContext();
-        } else {
-            return new ArrayStorageContext();
-        }
+        return new ChunkedArrayStorageContext();
     }
 
     /**

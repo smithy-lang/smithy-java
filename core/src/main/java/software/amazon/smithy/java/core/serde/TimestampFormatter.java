@@ -68,11 +68,25 @@ public interface TimestampFormatter {
      * @return the created formatter.
      */
     static TimestampFormatter of(TimestampFormatTrait.Format format) {
+        var result = match(format);
+        if (result == null) {
+            throw new SerializationException("Unknown timestamp format: " + format);
+        }
+        return result;
+    }
+
+    /**
+     * Attempts to create a TimestampFormatter from the given format, or returns null if unknown.
+     *
+     * @param format Format to create.
+     * @return the created formatter.
+     */
+    static TimestampFormatter match(TimestampFormatTrait.Format format) {
         return switch (format) {
             case DATE_TIME -> Prelude.DATE_TIME;
             case EPOCH_SECONDS -> Prelude.EPOCH_SECONDS;
             case HTTP_DATE -> Prelude.HTTP_DATE;
-            default -> throw new SerializationException("Unknown timestamp format: " + format);
+            case null, default -> null;
         };
     }
 
@@ -174,8 +188,7 @@ public interface TimestampFormatter {
 
             @Override
             public void writeToSerializer(Schema schema, Instant instant, ShapeSerializer serializer) {
-                double value = ((double) instant.toEpochMilli()) / 1000;
-                serializer.writeDouble(schema, value);
+                serializer.writeDouble(schema, instant.toEpochMilli() / 1000.0);
             }
         },
 

@@ -8,16 +8,20 @@ package software.amazon.smithy.java.client.core;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashSet;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.core.plugins.DefaultPlugin;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -29,14 +33,9 @@ import software.amazon.smithy.java.retries.api.RetryStrategy;
  * <p>It has well-defined configuration elements that every {@link Client} needs. For extensible parts of a
  * {@link Client} that may need additional configuration, type safe configuration can be included using
  * {@link Context.Key}.
- *
- * <p>When built, the ClientTransport resolved for the protocol will apply the {@link ClientTransport#configureClient}
- * method after other plugins are applied.
  */
 public final class ClientConfig {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientConfig.class);
-    private static final List<ClientTransportFactory<?, ?>> TRANSPORT_FACTORIES = ClientTransportFactory
-            .load(ClientConfig.class.getClassLoader());
     private static final AuthScheme<Object, Identity> NO_AUTH_AUTH_SCHEME = AuthScheme.noAuthAuthScheme();
 
     private final Builder originalBuilder;
@@ -48,26 +47,20 @@ public final class ClientConfig {
     private final AuthSchemeResolver authSchemeResolver;
     private final List<IdentityResolver<?>> identityResolvers;
     private final Context context;
-    private final Set<Class<? extends ClientPlugin>> appliedPlugins;
     private final ApiService service;
-
     private final RetryStrategy retryStrategy;
     private final String retryScope;
+    private final Set<Class<? extends ClientPlugin>> appliedPluginClasses;
 
     private ClientConfig(Builder builder) {
-        // Transports can change between builders to toBuilder. Transports can modify the builder when they're applied.
-        // To prevent a previous configuration meant for one transport to impact other configurations, we create a
-        // copy of the original builder. We also don't want to apply the transport modifications multiple times.
-        // This builder is used in toBuilder.
+        // Collect and apply plugins, updating builder.appliedPluginClasses as we go
+        builder.applyFlattenedPlugins(
+                collectPlugins(builder.plugins, builder.pluginPredicate, builder.appliedPluginClasses));
         this.originalBuilder = builder.copyBuilder();
+        this.appliedPluginClasses = Set.copyOf(builder.appliedPluginClasses);
 
-        // Ensure the transport was resolved and applied as a plugin.
-        // When using a Client, transport is applied before build is called to let user-defined plugins supersede
-        // transport-applied plugins. This is performed here in case configs are created manually.
-        builder.resolveTransport();
-
-        this.protocol = builder.protocol;
-        this.transport = builder.transport;
+        this.protocol = Objects.requireNonNull(builder.protocol, "protocol must not be null");
+        this.transport = Objects.requireNonNull(builder.transport, "transport must not be null");
         ClientPipeline.validateProtocolAndTransport(protocol, transport);
 
         // Use an explicitly given resolver if one was set.
@@ -77,10 +70,9 @@ public final class ClientConfig {
             // Use a custom endpoint and static endpoint resolver if a custom endpoint was given.
             // Things like the Smithy rules engine based resolver look for this property to know if a custom endpoint
             // was provided in this manner.
-            var customEndpoint = builder.context.get(ClientContext.CUSTOM_ENDPOINT);
-            if (customEndpoint == null) {
-                throw new NullPointerException("Both endpointResolver and ClientContext.CUSTOM_ENDPOINT are not set");
-            }
+            var customEndpoint = Objects.requireNonNull(
+                    builder.context.get(ClientContext.CUSTOM_ENDPOINT),
+                    "One of endpointResolver or ClientContext.CUSTOM_ENDPOINT must be set");
             this.endpointResolver = EndpointResolver.staticEndpoint(customEndpoint);
         }
 
@@ -99,33 +91,53 @@ public final class ClientConfig {
         this.retryScope = builder.retryScope;
 
         this.context = Context.unmodifiableCopy(builder.context);
-        this.appliedPlugins = Collections.unmodifiableSet(new LinkedHashSet<>(builder.appliedPlugins));
         this.service = Objects.requireNonNull(builder.service, "Missing required service schema");
     }
 
-    /**
-     * Search for a transport service provider that is compatible with the provided protocol.
-     */
-    private static ClientTransport<?, ?> discoverTransport(ClientProtocol<?, ?> protocol) {
-        for (var factory : TRANSPORT_FACTORIES) {
-            // Find the first applicable transport factory
-            if (factory.messageExchange().equals(protocol.messageExchange())) {
-                return factory.createTransport();
-            }
+    private static List<ClientPlugin> collectPlugins(
+            Map<Class<? extends ClientPlugin>, ClientPlugin> plugins,
+            Predicate<ClientPlugin> pluginPredicate,
+            Set<Class<? extends ClientPlugin>> appliedPluginClasses
+    ) {
+        // Flatten out plugins with children recursively, and sort plugins by phase and insertion order.
+        List<ClientPlugin> flattenedPlugins = new ArrayList<>();
+        for (var plugin : plugins.values()) {
+            collectPluginsRecursively(plugin, pluginPredicate, appliedPluginClasses, flattenedPlugins);
         }
-        throw new IllegalArgumentException(
-                "No compatible transport found for protocol '" + protocol + "'. "
-                        + "Add a compatible ClientTransportFactory Service provider to the classpath, "
-                        + "or add a compatible transport to the client builder.");
+        flattenedPlugins.sort(ClientConfig::compareByPhase);
+        return flattenedPlugins;
     }
 
-    /**
-     * Get the ordered set of plugins that were applied to the configuration.
-     *
-     * @return the applied plugins.
-     */
-    public Set<Class<? extends ClientPlugin>> appliedPlugins() {
-        return appliedPlugins;
+    // Collects plugins and applies the plugin predicate so that child plugins are only attempted to be added if
+    // the parent plugin is accepted. Also skips plugins whose class has already been applied.
+    // Mutates appliedPluginClasses as plugins are collected.
+    private static void collectPluginsRecursively(
+            ClientPlugin plugin,
+            Predicate<ClientPlugin> pluginPredicate,
+            Set<Class<? extends ClientPlugin>> appliedPluginClasses,
+            List<ClientPlugin> collector
+    ) {
+        Class<? extends ClientPlugin> pluginClass = plugin.getClass();
+
+        // Skip if this plugin class has already been applied
+        if (appliedPluginClasses.contains(pluginClass)) {
+            LOGGER.debug("Skipping already-applied plugin class: ", pluginClass);
+            return;
+        }
+
+        if (pluginPredicate.test(plugin)) {
+            collector.add(plugin);
+            appliedPluginClasses.add(pluginClass); // Mark as applied immediately
+            for (ClientPlugin child : plugin.getChildPlugins()) {
+                collectPluginsRecursively(child, pluginPredicate, appliedPluginClasses, collector);
+            }
+        } else {
+            LOGGER.debug("Plugin predicate prevented applying plugin to ClientBuilder: ", pluginClass);
+        }
+    }
+
+    private static int compareByPhase(ClientPlugin a, ClientPlugin b) {
+        return a.getPluginPhase().compareTo(b.getPluginPhase());
     }
 
     /**
@@ -220,7 +232,12 @@ public final class ClientConfig {
     }
 
     /**
-     * Create a copy of the ClientConfig after applying overrides.
+     * Create a copy of the ClientConfig that applies the given request overrides.
+     *
+     * <p>Plugins applied to a request override are still sorted and ordered by phase just like plugins applied when
+     * building up a client. However, override plugins are only ordered relative to other override plugins; that is,
+     * they aren't ordered relative to already applied plugins as those have already irreversibly been applied to the
+     * config.
      *
      * @param overrideConfig The overrides to apply.
      * @return copy of ClientConfig with overrides applied.
@@ -228,10 +245,22 @@ public final class ClientConfig {
     public ClientConfig withRequestOverride(RequestOverrideConfig overrideConfig) {
         Objects.requireNonNull(overrideConfig, "overrideConfig cannot be null");
         Builder builder = toBuilder();
+
         applyOverrides(builder, overrideConfig);
-        for (ClientPlugin plugin : overrideConfig.plugins()) {
-            builder.applyPlugin(plugin);
+
+        // Apply override plugins if present. Override plugins are only ordered relative to each other, not
+        // relative to constructor plugins that were already applied
+        if (!overrideConfig.plugins().isEmpty()) {
+            Map<Class<? extends ClientPlugin>, ClientPlugin> overridePlugins = new LinkedHashMap<>();
+            for (var p : overrideConfig.plugins()) {
+                overridePlugins.putIfAbsent(p.getClass(), p);
+            }
+            builder.applyFlattenedPlugins(collectPlugins(
+                    overridePlugins,
+                    builder.pluginPredicate,
+                    builder.appliedPluginClasses));
         }
+
         return builder.build();
     }
 
@@ -279,7 +308,14 @@ public final class ClientConfig {
         private final Context context = Context.create();
         private RetryStrategy retryStrategy;
         private String retryScope;
-        private final Set<Class<? extends ClientPlugin>> appliedPlugins = new LinkedHashSet<>();
+        private Predicate<ClientPlugin> pluginPredicate = p -> true;
+        private final Map<Class<? extends ClientPlugin>, ClientPlugin> plugins = new LinkedHashMap<>();
+        // Mutable set that tracks which plugin classes have been applied to this builder
+        private final Set<Class<? extends ClientPlugin>> appliedPluginClasses = new HashSet<>();
+
+        public Builder() {
+            plugins.put(DefaultPlugin.class, DefaultPlugin.INSTANCE);
+        }
 
         private Builder copyBuilder() {
             Builder builder = new Builder();
@@ -294,7 +330,9 @@ public final class ClientConfig {
             context.copyTo(builder.context);
             builder.retryStrategy = retryStrategy;
             builder.retryScope = retryScope;
-            builder.appliedPlugins.addAll(appliedPlugins);
+            builder.plugins.putAll(plugins);
+            builder.pluginPredicate = pluginPredicate;
+            builder.appliedPluginClasses.addAll(appliedPluginClasses);
             return builder;
         }
 
@@ -394,24 +432,17 @@ public final class ClientConfig {
          */
         public Builder transport(ClientTransport<?, ?> transport) {
             this.transport = transport;
-            applyPlugin(transport);
             return this;
         }
 
         /**
-         * If no transport was provided, then resolve a transport now based on the selected protocol, and apply the
-         * transport as a plugin if it has not yet been applied.
+         * Check if the message exchange of the transport is the same as the given message exchange.
          *
-         * @return the builder.
-         * @throws NullPointerException if not protocol is set.
-         * @throws IllegalArgumentException if no transport could be resolved.
+         * @param messageExchange Message exchange to check.
+         * @return true if the transport is set and it uses the given message exchange.
          */
-        public Builder resolveTransport() {
-            Objects.requireNonNull(protocol, "protocol must be set to resolve a transport");
-            if (transport == null) {
-                transport(discoverTransport(protocol));
-            }
-            return this;
+        public boolean isUsingMessageExchange(MessageExchange<?, ?> messageExchange) {
+            return transport != null && transport.messageExchange().equals(messageExchange);
         }
 
         /**
@@ -556,20 +587,82 @@ public final class ClientConfig {
         }
 
         /**
-         * Applies a plugin to the configuration and tracks the plugin class as applied.
+         * Add a plugin and its child plugins to the config.
          *
-         * @param plugin Plugin to apply.
-         * @return the updated builder.
+         * <p>Plugins are applied when the config is built. Duplicate plugins are applied only once, based on the
+         * plugin class. Plugins are applied in a sorted {@link ClientPlugin.Phase} and insertion order.
+         *
+         * <p><strong>Deduplication behavior:</strong> Plugins are deduplicated by class, not instance.
+         * This means {@code new MyPlugin()} called twice will only apply once. The first plugin added wins.
+         *
+         * <p><strong>Configuration reuse:</strong> When using {@code config.toBuilder().build()}, plugins
+         * that were already applied will not re-apply, making configs reusable as templates.
+         *
+         * @param plugin Plugin to add.
+         * @return the builder.
+         * @see ClientPlugin
+         * @see #pluginPredicate(Predicate)
          */
-        public Builder applyPlugin(ClientPlugin plugin) {
-            if (appliedPlugins.contains(plugin.getClass())) {
-                LOGGER.debug("Skipping already applied client plugin: {}", plugin.getClass());
-            } else {
-                LOGGER.debug("Applying client plugin: {}", plugin.getClass());
-                appliedPlugins.add(plugin.getClass());
+        public Builder addPlugin(ClientPlugin plugin) {
+            plugins.putIfAbsent(plugin.getClass(), plugin);
+            return this;
+        }
+
+        /**
+         * Adds a predicate that can be used to refuse the application of plugins.
+         *
+         * <p>A plugin is only applied to a client if the predicate returns true. Child plugins returned from
+         * {@link ClientPlugin#getChildPlugins()} are only applied if both the parent and child are accepted
+         * by the predicate.
+         *
+         * <p><strong>Important:</strong> Only plugins that pass the predicate are tracked as "applied".
+         * This means if a plugin is rejected in one config, it can be applied in a derived config if
+         * the predicate changes to accept it:
+         * {@snippet lang="java" :
+         * var config1 = ClientConfig.builder()
+         *     .pluginPredicate(p -> !(p instanceof MyPlugin))  // Reject MyPlugin
+         *     .addPlugin(new MyPlugin())
+         *     .build();  // MyPlugin NOT actually applied
+         *
+         * var config2 = config1.toBuilder()
+         *     .pluginPredicate(p -> true)  // Accept everything
+         *     .build();  // MyPlugin WILL apply now
+         * }
+         *
+         * @param pluginPredicate Predicate to apply. Plugins that don't satisfy the predicate are not applied.
+         * @return the builder.
+         * @see #addPluginPredicate(Predicate)
+         * @see Client.Builder#disableAutoPlugins()
+         */
+        public Builder pluginPredicate(Predicate<ClientPlugin> pluginPredicate) {
+            this.pluginPredicate = Objects.requireNonNull(pluginPredicate);
+            return this;
+        }
+
+        /**
+         * Add a plugin predicate to any already applied predicates.
+         *
+         * @param pluginPredicate Predicate to add.
+         * @return the builder.
+         */
+        public Builder addPluginPredicate(Predicate<ClientPlugin> pluginPredicate) {
+            return pluginPredicate(this.pluginPredicate.and(pluginPredicate));
+        }
+
+        /**
+         * Get the plugin predicate of the builder.
+         *
+         * @return the plugin predicate.
+         */
+        public Predicate<ClientPlugin> pluginPredicate() {
+            return pluginPredicate;
+        }
+
+        private void applyFlattenedPlugins(List<ClientPlugin> flattenedPlugins) {
+            for (ClientPlugin plugin : flattenedPlugins) {
+                LOGGER.debug("Applying plugin to ClientBuilder: ", plugin.getClass());
                 plugin.configureClient(this);
             }
-            return this;
         }
 
         /**

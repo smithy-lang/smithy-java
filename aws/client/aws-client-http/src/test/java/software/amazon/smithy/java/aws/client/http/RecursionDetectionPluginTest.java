@@ -53,7 +53,7 @@ public class RecursionDetectionPluginTest {
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var builder = DynamicClient.builder()
-                .service(TestHarness.SERVICE)
+                .serviceId(TestHarness.SERVICE)
                 .model(TestHarness.MODEL)
                 .protocol(new AwsJson1Protocol(TestHarness.SERVICE))
                 .addPlugin(mock)

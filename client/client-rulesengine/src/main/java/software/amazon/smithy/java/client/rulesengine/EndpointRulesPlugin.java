@@ -6,10 +6,9 @@
 package software.amazon.smithy.java.client.rulesengine;
 
 import java.util.Map;
-import java.util.Objects;
+import software.amazon.smithy.java.client.core.AutoClientPlugin;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientContext;
-import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -24,84 +23,25 @@ import software.amazon.smithy.rulesengine.traits.StaticContextParamsTrait;
  * Attempts to resolve endpoints using smithy.rules#bdd, smithy.rules#endpointRuleSet, or a precompiled
  * {@link Bytecode}.
  */
-public final class EndpointRulesPlugin implements ClientPlugin {
+public final class EndpointRulesPlugin implements AutoClientPlugin {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(EndpointRulesPlugin.class);
 
     public static final Context.Key<Map<String, Object>> ADDITIONAL_ENDPOINT_PARAMS = Context.key(
             "Additional endpoint parameters to pass to the rules engine");
 
-    public static final TraitKey<StaticContextParamsTrait> STATIC_CONTEXT_PARAMS_TRAIT =
-            TraitKey.get(StaticContextParamsTrait.class);
-
-    public static final TraitKey<OperationContextParamsTrait> OPERATION_CONTEXT_PARAMS_TRAIT =
-            TraitKey.get(OperationContextParamsTrait.class);
-
+    public static final TraitKey<StaticContextParamsTrait> STATIC_CONTEXT_PARAMS_TRAIT = TraitKey.get(
+            StaticContextParamsTrait.class);
+    public static final TraitKey<OperationContextParamsTrait> OPERATION_CONTEXT_PARAMS_TRAIT = TraitKey.get(
+            OperationContextParamsTrait.class);
     public static final TraitKey<ContextParamTrait> CONTEXT_PARAM_TRAIT = TraitKey.get(ContextParamTrait.class);
-
-    public static final TraitKey<EndpointRuleSetTrait> ENDPOINT_RULESET_TRAIT =
-            TraitKey.get(EndpointRuleSetTrait.class);
-
+    public static final TraitKey<EndpointRuleSetTrait> ENDPOINT_RULESET_TRAIT = TraitKey.get(
+            EndpointRuleSetTrait.class);
     public static final TraitKey<EndpointBddTrait> BDD_TRAIT = TraitKey.get(EndpointBddTrait.class);
 
-    private final Bytecode bytecode;
-    private RulesEngineBuilder engine;
-
-    private EndpointRulesPlugin(Bytecode bytecode, RulesEngineBuilder engine) {
-        this.bytecode = bytecode;
-        this.engine = engine;
-    }
-
-    /**
-     * Create a RulesEnginePlugin from a precompiled {@link Bytecode}.
-     *
-     * <p>This is typically used by code-generated clients.
-     *
-     * @param bytecode Bytecode used to resolve endpoint.
-     * @return the rules engine plugin.
-     */
-    public static EndpointRulesPlugin from(Bytecode bytecode) {
-        Objects.requireNonNull(bytecode, "RulesBytecode must not be null");
-        return new EndpointRulesPlugin(bytecode, null);
-    }
-
-    /**
-     * Creates an EndpointRulesPlugin that waits to create a program until configuring the client. It looks for the
-     * relevant Smithy traits, and if found, compiles them and sets up a resolver. If the traits can't be found, the
-     * resolver is not updated. If a resolver is already set, it is not changed.
-     *
-     * @return the plugin.
-     */
-    public static EndpointRulesPlugin create() {
-        return create(new RulesEngineBuilder());
-    }
-
-    /**
-     * Creates an EndpointRulesPlugin that waits to create a program until configuring the client. It looks for the
-     * relevant Smithy traits, and if found, compiles them and sets up a resolver. If the traits can't be found, the
-     * resolver is not updated. If a resolver is already set, it is not changed.
-     *
-     * @param engine RulesEngine to use when creating programs.
-     * @return the plugin.
-     */
-    public static EndpointRulesPlugin create(RulesEngineBuilder engine) {
-        return new EndpointRulesPlugin(null, engine);
-    }
-
-    /**
-     * Gets the endpoint rules bytecode that was compiled, or null if no rules were found on the service.
-     *
-     * @return the rules program or null.
-     */
-    public Bytecode getBytecode() {
-        return bytecode;
-    }
-
-    private RulesEngineBuilder getEngine() {
-        if (engine == null) {
-            engine = new RulesEngineBuilder();
-        }
-        return engine;
+    @Override
+    public Phase getPluginPhase() {
+        return Phase.DEFAULTS;
     }
 
     @Override
@@ -122,9 +62,16 @@ public final class EndpointRulesPlugin implements ClientPlugin {
             return;
         }
 
-        EndpointResolver resolver = null;
-        RulesEngineBuilder e = getEngine();
+        var context = config.context();
+        var e = context.get(RulesEngineSettings.RULES_ENGINE_BUILDER);
+        if (e == null) {
+            e = new RulesEngineBuilder();
+        }
 
+        var bytecode = context.get(RulesEngineSettings.BYTECODE);
+        EndpointResolver resolver = null;
+
+        // If bytecode wasn't explicitly given, then try to compile it from traits.
         if (bytecode != null) {
             LOGGER.debug("Using explicitly provided bytecode: {}", config.service());
             resolver = new BytecodeEndpointResolver(bytecode, e.getExtensions(), e.getBuiltinProviders());
@@ -132,8 +79,9 @@ public final class EndpointRulesPlugin implements ClientPlugin {
             var bddTrait = config.service().schema().getTrait(BDD_TRAIT);
             if (bddTrait != null) {
                 LOGGER.debug("Found endpoint BDD trait on service: {}", config.service());
-                var bytecode = e.compile(bddTrait);
+                bytecode = e.compile(bddTrait);
                 resolver = new BytecodeEndpointResolver(bytecode, e.getExtensions(), e.getBuiltinProviders());
+                context.put(RulesEngineSettings.BYTECODE, bytecode);
             } else {
                 var rs = config.service().schema().getTrait(ENDPOINT_RULESET_TRAIT);
                 if (rs != null) {

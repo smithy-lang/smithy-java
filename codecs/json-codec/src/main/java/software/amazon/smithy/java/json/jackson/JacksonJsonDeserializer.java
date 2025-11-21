@@ -26,7 +26,6 @@ import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonDocuments;
 import software.amazon.smithy.java.json.JsonSettings;
-import software.amazon.smithy.java.json.TimestampResolver;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JacksonJsonDeserializer implements ShapeDeserializer {
@@ -232,14 +231,11 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     public Instant readTimestamp(Schema schema) {
         try {
             var format = settings.timestampResolver().resolve(schema);
-            if (parser.getCurrentToken() == JsonToken.VALUE_NUMBER_FLOAT
-                    || parser.getCurrentToken() == JsonToken.VALUE_NUMBER_INT) {
-                return TimestampResolver.readTimestamp(parser.getNumberValue(), format);
-            } else if (parser.getCurrentToken() == JsonToken.VALUE_STRING) {
-                return TimestampResolver.readTimestamp(parser.getText(), format);
-            } else {
-                throw new SerializationException("Expected a timestamp, but found " + describeToken());
-            }
+            return switch (parser.getCurrentToken()) {
+                case VALUE_NUMBER_FLOAT, VALUE_NUMBER_INT -> format.readFromNumber(parser.getNumberValue());
+                case VALUE_STRING -> format.readFromString(parser.getText(), true);
+                default -> throw new SerializationException("Expected a timestamp, but found " + describeToken());
+            };
         } catch (Exception e) {
             throw new SerializationException(e);
         }

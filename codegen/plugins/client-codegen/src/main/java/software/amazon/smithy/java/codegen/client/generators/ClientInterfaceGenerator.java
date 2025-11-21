@@ -29,8 +29,8 @@ import software.amazon.smithy.java.client.core.ProtocolSettings;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeFactory;
 import software.amazon.smithy.java.client.core.pagination.Paginator;
-import software.amazon.smithy.java.client.rulesengine.EndpointRulesPlugin;
 import software.amazon.smithy.java.client.rulesengine.RulesEngineBuilder;
+import software.amazon.smithy.java.client.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
@@ -142,7 +142,7 @@ public final class ClientInterfaceGenerator
                                             @Override
                                             public ${interface:T} build() {
                                                 ${?hasDefaults}for (var plugin : defaultPlugins) {
-                                                    configBuilder().applyPlugin(plugin);
+                                                    addPlugin(plugin);
                                                 }
                                                 ${/hasDefaults}${?hasDefaultProtocol}if (configBuilder().protocol() == null) {
                                                     configBuilder().protocol(${protocolFactory:C}.createProtocol(protocolSettings, protocolTrait));
@@ -576,14 +576,14 @@ public final class ClientInterfaceGenerator
             writer.write("""
                     try (var stream = getClass().getResourceAsStream("/META-INF/endpoints/$L.bdd")) {
                         var bytecode = new $T().load(stream.readAllBytes());
-                        configBuilder().applyPlugin($T.from(bytecode));
+                        putConfig($T.BYTECODE, bytecode);
                     } catch ($T e) {
                         throw new $T("Failed to load BDD bytecode binary file", e);
                     }
                     """,
                     serviceName,
                     RulesEngineBuilder.class,
-                    EndpointRulesPlugin.class,
+                    RulesEngineSettings.class,
                     IOException.class,
                     RuntimeException.class);
         }
