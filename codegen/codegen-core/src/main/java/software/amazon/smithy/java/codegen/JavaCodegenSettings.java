@@ -93,7 +93,7 @@ public final class JavaCodegenSettings {
         this.defaultProtocol = builder.defaultProtocol;
         this.transportName = builder.transportName;
         this.transportSettings = builder.transportSettings;
-        this.defaultPlugins = Collections.unmodifiableList(builder.defaultPlugins);
+        this.defaultPlugins = new ArrayList<>(builder.defaultPlugins);
         this.defaultSettings = Collections.unmodifiableList(builder.defaultSettings);
         this.relativeDate = builder.relativeDate;
         this.relativeVersion = builder.relativeVersion;
@@ -166,7 +166,11 @@ public final class JavaCodegenSettings {
     }
 
     public List<String> defaultPlugins() {
-        return defaultPlugins;
+        return Collections.unmodifiableList(defaultPlugins);
+    }
+
+    public void addDefaultPlugin(String pluginClass) {
+        defaultPlugins.add(pluginClass);
     }
 
     public List<String> defaultSettings() {
