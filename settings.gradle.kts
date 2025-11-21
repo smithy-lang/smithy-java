@@ -66,6 +66,7 @@ include(":codegen:test-utils")
 // Utilities
 include(":jmespath")
 include(":protocol-test-harness")
+include(":fuzz-test-harness")
 
 // AWS specific
 include(":aws:aws-event-streams")
@@ -106,7 +107,6 @@ include(":examples:mcp-traits-example")
 include(":mcp")
 include(":mcp:mcp-schemas")
 include(":mcp:mcp-server")
-include(":mcp:mcp-bundle-api")
 
 include(":model-bundle")
 include(":model-bundle:model-bundle-api")

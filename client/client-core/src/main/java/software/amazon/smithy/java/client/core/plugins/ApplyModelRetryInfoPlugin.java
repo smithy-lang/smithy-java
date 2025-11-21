@@ -27,6 +27,8 @@ public final class ApplyModelRetryInfoPlugin implements ClientPlugin {
 
     public static final ApplyModelRetryInfoPlugin INSTANCE = new ApplyModelRetryInfoPlugin();
 
+    private ApplyModelRetryInfoPlugin() {}
+
     @Override
     public void configureClient(ClientConfig.Builder config) {
         config.addInterceptor(Interceptor.INSTANCE);

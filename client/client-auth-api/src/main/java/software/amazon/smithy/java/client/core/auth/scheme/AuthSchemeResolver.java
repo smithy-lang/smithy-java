@@ -24,6 +24,7 @@ public interface AuthSchemeResolver {
      * for more information on how the effective auth schemes for an operation are resolved.
      */
     AuthSchemeResolver DEFAULT = new DefaultAuthSchemeResolver();
+
     /**
      * Auth scheme resolver that returns only the {@code NoAuth} auth scheme.
      *

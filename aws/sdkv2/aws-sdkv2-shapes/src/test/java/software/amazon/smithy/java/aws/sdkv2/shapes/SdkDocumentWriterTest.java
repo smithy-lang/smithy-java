@@ -136,7 +136,7 @@ public class SdkDocumentWriterTest {
         return DynamicClient.builder()
                 .protocol(new RestJsonClientProtocol(SERVICE))
                 .model(MODEL)
-                .service(SERVICE)
+                .serviceId(SERVICE)
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
                 .endpointResolver(EndpointResolver.staticHost("localhost"))
                 .build();

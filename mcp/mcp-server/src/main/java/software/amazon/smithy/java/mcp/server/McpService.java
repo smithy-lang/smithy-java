@@ -80,13 +80,15 @@ public final class McpService {
     private final AtomicReference<JsonRpcRequest> initializeRequest = new AtomicReference<>();
     private final ToolFilter toolFilter;
     private volatile boolean proxiesInitialized = false;
+    private final McpMetricsObserver metricsObserver;
 
     McpService(
             Map<String, Service> services,
             List<McpServerProxy> proxyList,
             String name,
             String version,
-            ToolFilter toolFilter
+            ToolFilter toolFilter,
+            McpMetricsObserver metricsObserver
     ) {
         this.services = services;
         this.tools = createTools(services);
@@ -96,6 +98,7 @@ public final class McpService {
         this.version = version;
         this.proxies = proxyList.stream().collect(Collectors.toMap(McpServerProxy::name, p -> p));
         this.toolFilter = toolFilter;
+        this.metricsObserver = metricsObserver;
     }
 
     /**
@@ -129,6 +132,40 @@ public final class McpService {
     }
 
     private JsonRpcResponse handleInitialize(JsonRpcRequest req) {
+        if (metricsObserver != null) {
+            var params = req.getParams();
+            var clientInfo = params.getMember("clientInfo");
+            var capabilities = params.getMember("capabilities");
+
+            String extractedProtocolVersion = params.getMember("protocolVersion") != null
+                    ? params.getMember("protocolVersion").asString()
+                    : null;
+
+            String clientName = clientInfo != null && clientInfo.getMember("name") != null
+                    ? clientInfo.getMember("name").asString()
+                    : null;
+
+            String clientTitle = clientInfo != null && clientInfo.getMember("title") != null
+                    ? clientInfo.getMember("title").asString()
+                    : null;
+
+            boolean rootsListChanged = capabilities != null
+                    && capabilities.getMember("roots") != null
+                    && capabilities.getMember("roots").getMember("listChanged") != null
+                    && capabilities.getMember("roots").getMember("listChanged").asBoolean();
+
+            boolean sampling = capabilities != null && capabilities.getMember("sampling") != null;
+            boolean elicitation = capabilities != null && capabilities.getMember("elicitation") != null;
+
+            metricsObserver.onInitialize("initialize",
+                    extractedProtocolVersion,
+                    rootsListChanged,
+                    sampling,
+                    elicitation,
+                    clientName,
+                    clientTitle);
+        }
+
         this.initializeRequest.set(req);
 
         // Initialize proxies lazily after we have a real initialize request
@@ -205,6 +242,13 @@ public final class McpService {
             Consumer<JsonRpcResponse> asyncResponseCallback,
             ProtocolVersion protocolVersion
     ) {
+        if (metricsObserver != null) {
+            String toolName = req.getParams().getMember("name") != null
+                    ? req.getParams().getMember("name").asString()
+                    : null;
+            metricsObserver.onToolCall("tools/call", toolName);
+        }
+
         var operationName = req.getParams().getMember("name").asString();
         var tool = tools.get(operationName);
 
@@ -643,6 +687,7 @@ public final class McpService {
         private String name = "mcp-server";
         private String version = "1.0.0";
         private ToolFilter toolFilter = (serverId, toolName) -> true;
+        private McpMetricsObserver metricsObserver;
 
         public Builder services(Map<String, Service> services) {
             this.services = services;
@@ -669,8 +714,13 @@ public final class McpService {
             return this;
         }
 
+        public Builder metricsObserver(McpMetricsObserver metricsObserver) {
+            this.metricsObserver = metricsObserver;
+            return this;
+        }
+
         public McpService build() {
-            return new McpService(services, proxyList, name, version, toolFilter);
+            return new McpService(services, proxyList, name, version, toolFilter, metricsObserver);
         }
     }
 }

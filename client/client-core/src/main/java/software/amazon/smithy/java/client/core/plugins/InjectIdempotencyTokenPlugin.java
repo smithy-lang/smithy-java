@@ -28,6 +28,8 @@ public final class InjectIdempotencyTokenPlugin implements ClientPlugin {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(InjectIdempotencyTokenPlugin.class);
     private static final ClientInterceptor INTERCEPTOR = new Injector();
 
+    private InjectIdempotencyTokenPlugin() {}
+
     @Override
     public void configureClient(ClientConfig.Builder config) {
         config.addInterceptor(INTERCEPTOR);

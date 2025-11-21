@@ -7,6 +7,7 @@ package software.amazon.smithy.java.core.schema;
 
 import java.util.List;
 import java.util.ServiceLoader;
+import java.util.function.Consumer;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public abstract class SchemaIndex {
@@ -23,6 +24,8 @@ public abstract class SchemaIndex {
     }
 
     public abstract Schema getSchema(ShapeId id);
+
+    public abstract void visit(Consumer<Schema> visitor);
 
     private static final class CombinedSchemaIndex extends SchemaIndex {
 
@@ -41,6 +44,13 @@ public abstract class SchemaIndex {
                 }
             }
             throw new IllegalArgumentException("No schema found for id `" + id + "`");
+        }
+
+        @Override
+        public void visit(Consumer<Schema> visitor) {
+            for (var index : indexes) {
+                index.visit(visitor);
+            }
         }
     }
 

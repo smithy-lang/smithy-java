@@ -429,6 +429,106 @@ public class CborParserTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    public void bigIntegerWithExcessiveLength(boolean negative) {
+        // Create a CBOR payload with a bignum (tag 2 for positive, tag 3 for negative) followed by
+        // a byte string claiming to have a very large length (Integer.MAX_VALUE)
+        // but the actual buffer is much smaller.
+        // CBOR structure: tag(2/3) + byte_string(length=Integer.MAX_VALUE) + minimal data
+        //
+        // 0xC2 = tag 2 (positive bignum), 0xC3 = tag 3 (negative bignum)
+        // 0x5A = byte string with 4-byte length
+        // 0x7F 0xFF 0xFF 0xFF = Integer.MAX_VALUE
+        // followed by a few bytes (nowhere near enough for the claimed length)
+        byte[] payload = new byte[] {
+                (byte) (negative ? 0xC3 : 0xC2), // tag 2 or 3
+                (byte) 0x5A, // byte string with 4-byte length
+                (byte) 0x7F,
+                (byte) 0xFF, // length = Integer.MAX_VALUE
+                (byte) 0xFF,
+                (byte) 0xFF,
+                (byte) 0x01,
+                (byte) 0x02 // only 2 bytes of actual data
+        };
+
+        cbor = payload;
+        parser = new CborParser(cbor);
+        byte expectedToken = negative ? Token.NEG_BIGINT : Token.POS_BIGINT;
+        token(expectedToken);
+
+        // Should throw BadCborException instead of trying to allocate Integer.MAX_VALUE bytes
+        assertThrows(BadCborException.class,
+                () -> CborReadUtil
+                        .readBigInteger(cbor, expectedToken, parser.getPosition(), parser.getItemLength()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void bigIntegerWithIndefiniteLengthExcessiveChunk(boolean negative) {
+        // Test indefinite length byte string with a chunk claiming excessive length
+        // CBOR structure: tag(2/3) + indefinite_byte_string + chunk_with_large_length + break
+        //
+        // 0xC2 = tag 2 (positive bignum), 0xC3 = tag 3 (negative bignum)
+        // 0x5F = indefinite length byte string marker
+        // 0x5A = definite byte string chunk with 4-byte length
+        // 0x7F 0xFF 0xFF 0xFF = Integer.MAX_VALUE (chunk length)
+        // followed by minimal data (nowhere near the claimed chunk length)
+        byte[] payload = new byte[] {
+                (byte) (negative ? 0xC3 : 0xC2), // tag 2 or 3
+                (byte) 0x5F, // indefinite length byte string
+                (byte) 0x5A, // chunk: byte string with 4-byte length
+                (byte) 0x7F,
+                (byte) 0xFF, // chunk length = Integer.MAX_VALUE
+                (byte) 0xFF,
+                (byte) 0xFF,
+                (byte) 0x01,
+                (byte) 0x02 // only 2 bytes of actual data
+        };
+
+        cbor = payload;
+        parser = new CborParser(cbor);
+        byte expectedToken = negative ? Token.NEG_BIGINT : Token.POS_BIGINT;
+
+        // TODO Fix this so that we don't throw AIOBE
+        assertThrows(ArrayIndexOutOfBoundsException.class,
+                () -> token(expectedToken));
+    }
+
+    @Test
+    public void bigIntegerWithIndefiniteLengthExcessiveTotalSize() {
+        // Test indefinite length byte string where total claimed size across chunks is excessive
+        // Even though individual chunks are small, their sum should trigger protection
+        //
+        // 0xC2 = tag 2 (positive bignum)
+        // 0x5F = indefinite length byte string marker
+        // Multiple chunks each claiming 500MB (0x1DCD6500 bytes)
+        byte[] payload = new byte[] {
+                (byte) 0xC2, // tag 2 (positive bignum)
+                (byte) 0x5F, // indefinite length byte string
+                (byte) 0x5A, // chunk 1: byte string with 4-byte length
+                (byte) 0x1D,
+                (byte) 0xCD, // 500MB
+                (byte) 0x65,
+                (byte) 0x00,
+                (byte) 0x01,
+                (byte) 0x02, // only 2 bytes of actual data
+                (byte) 0x5A, // chunk 2: byte string with 4-byte length
+                (byte) 0x1D,
+                (byte) 0xCD, // another 500MB
+                (byte) 0x65,
+                (byte) 0x00,
+                (byte) 0x03,
+                (byte) 0x04 // only 2 bytes of actual data
+        };
+
+        cbor = payload;
+        parser = new CborParser(cbor);
+
+        // Should throw BadCborException instead of trying to process 1GB worth of chunks
+        assertThrows(BadCborException.class, () -> token(Token.POS_BIGINT));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     public void incompleteCollection(boolean map) {
         cbor = write(os -> {
             if (map) {

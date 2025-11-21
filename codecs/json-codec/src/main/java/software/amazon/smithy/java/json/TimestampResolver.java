@@ -7,7 +7,6 @@ package software.amazon.smithy.java.json;
 
 import java.time.Instant;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.SerializationException;
@@ -75,7 +74,6 @@ public sealed interface TimestampResolver {
      * Uses the timestampFormat trait if present, otherwise uses a configurable default format.
      */
     final class UseTimestampFormatTrait implements TimestampResolver {
-        private final ConcurrentHashMap<Schema, TimestampFormatter> cache = new ConcurrentHashMap<>();
         private final TimestampFormatter defaultFormat;
 
         UseTimestampFormatTrait(TimestampFormatter defaultFormat) {
@@ -89,14 +87,14 @@ public sealed interface TimestampResolver {
 
         @Override
         public TimestampFormatter resolve(Schema schema) {
-            var result = cache.get(schema);
-            if (result == null) {
-                var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
-                var fresh = trait != null ? TimestampFormatter.of(trait) : defaultFormat;
-                var previous = cache.putIfAbsent(schema, fresh);
-                result = previous == null ? fresh : previous;
+            var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
+            if (trait != null) {
+                var formatter = TimestampFormatter.match(trait.getFormat());
+                if (formatter != null) {
+                    return formatter;
+                }
             }
-            return result;
+            return defaultFormat;
         }
 
         @Override

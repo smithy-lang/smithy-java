@@ -11,6 +11,7 @@ dependencies {
     api(project(":dynamic-schemas"))
     api(project(":client:client-core"))
 
+    testImplementation(project(":client:client-rulesengine"))
     testImplementation(project(":aws:client:aws-client-restjson"))
     testImplementation(project(":aws:client:aws-client-awsjson"))
     testImplementation(project(":aws:aws-sigv4"))
