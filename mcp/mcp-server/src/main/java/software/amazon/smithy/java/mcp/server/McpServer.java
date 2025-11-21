@@ -131,7 +131,7 @@ public final class McpServer implements Server {
     @Override
     public void start() {
         // Initialize proxies
-        mcpService.initializeProxies(this::writeResponse);
+        mcpService.startProxies();
 
         // Start the listener thread
         listener.start();
