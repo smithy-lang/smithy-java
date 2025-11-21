@@ -61,7 +61,6 @@ public class RestJson1ProtocolTests {
                     "RestJsonFooErrorUsingCode",
                     "RestJsonFooErrorUsingCodeAndNamespace",
                     "RestJsonFooErrorUsingCodeUriAndNamespace",
-                    "RestJsonFooErrorWithDunderTypeUriAndNamespace"
             })
     public void responseTest(Runnable test) {
         test.run();
