@@ -59,11 +59,9 @@ class HttpMcpProxyTest {
 
     @Test
     void testBuilderValidation() {
-        assertThrows(IllegalArgumentException.class, () -> 
-            HttpMcpProxy.builder().build());
-        
-        assertThrows(IllegalArgumentException.class, () -> 
-            HttpMcpProxy.builder().url("").build());
+        assertThrows(IllegalArgumentException.class, () -> HttpMcpProxy.builder().build());
+
+        assertThrows(IllegalArgumentException.class, () -> HttpMcpProxy.builder().url("").build());
     }
 
     @Test
@@ -72,7 +70,7 @@ class HttpMcpProxyTest {
                 .url(serverUrl)
                 .name("Custom Name")
                 .build();
-        
+
         assertEquals("Custom Name", customProxy.name());
         customProxy.shutdown().join();
     }
@@ -84,7 +82,7 @@ class HttpMcpProxyTest {
                 .url(serverUrl)
                 .headers(headers)
                 .build();
-        
+
         assertNotNull(proxyWithHeaders);
         proxyWithHeaders.shutdown().join();
     }
@@ -94,7 +92,7 @@ class HttpMcpProxyTest {
         HttpMcpProxy defaultProxy = HttpMcpProxy.builder()
                 .url(serverUrl)
                 .build();
-        
+
         assertTrue(defaultProxy.name().startsWith("HTTP-"));
         defaultProxy.shutdown().join();
     }
@@ -119,7 +117,7 @@ class HttpMcpProxyTest {
     @Test
     void testRpcWithNullRequest() {
         CompletableFuture<JsonRpcResponse> future = proxy.rpc(null);
-        
+
         ExecutionException exception = assertThrows(ExecutionException.class, future::get);
         assertTrue(exception.getCause() instanceof RuntimeException);
         assertTrue(exception.getCause().getMessage().contains("JsonRpcRequest cannot be null"));
@@ -140,7 +138,7 @@ class HttpMcpProxyTest {
                 .build();
 
         CompletableFuture<JsonRpcResponse> future = proxy.rpc(request);
-        
+
         ExecutionException exception = assertThrows(ExecutionException.class, future::get);
         assertTrue(exception.getCause() instanceof RuntimeException);
         assertTrue(exception.getCause().getMessage().contains("HTTP error 500"));
@@ -166,7 +164,7 @@ class HttpMcpProxyTest {
                 .build();
 
         CompletableFuture<JsonRpcResponse> future = proxy.rpc(request);
-        
+
         ExecutionException exception = assertThrows(ExecutionException.class, future::get);
         assertTrue(exception.getCause() instanceof RuntimeException);
         assertTrue(exception.getCause().getMessage().contains("Failed to parse JSON-RPC response"));
