@@ -9,6 +9,7 @@ package software.amazon.smithy.java.http.api;
  * Enumeration of the HTTP protocol versions.
  */
 public enum HttpVersion {
+    HTTP_1_0,
     HTTP_1_1,
     HTTP_2;
 
@@ -20,8 +21,9 @@ public enum HttpVersion {
      */
     public static HttpVersion from(String version) {
         return switch (version) {
-            case "HTTP/1.1" -> HTTP_1_1;
-            case "HTTP/2.0" -> HTTP_2;
+            case "HTTP/1.0", "http/1.0" -> HTTP_1_0;
+            case "HTTP/1.1", "http/1.1" -> HTTP_1_1;
+            case "HTTP/2.0", "h2" -> HTTP_2;
             default -> throw new UnsupportedOperationException("Unsupported HTTP version: " + version);
         };
     }
@@ -29,6 +31,7 @@ public enum HttpVersion {
     @Override
     public String toString() {
         return switch (this) {
+            case HTTP_1_0 -> "HTTP/1.0";
             case HTTP_1_1 -> "HTTP/1.1";
             case HTTP_2 -> "HTTP/2.0";
         };
