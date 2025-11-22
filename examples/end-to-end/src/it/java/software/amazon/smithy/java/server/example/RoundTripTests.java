@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.Socket;
 import java.net.URI;
+import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -19,7 +20,13 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.example.etoe.client.CoffeeShopClient;
 import software.amazon.smithy.java.example.etoe.model.CoffeeType;
 import software.amazon.smithy.java.example.etoe.model.CreateOrderInput;
@@ -27,10 +34,10 @@ import software.amazon.smithy.java.example.etoe.model.GetMenuInput;
 import software.amazon.smithy.java.example.etoe.model.GetOrderInput;
 import software.amazon.smithy.java.example.etoe.model.OrderNotFound;
 import software.amazon.smithy.java.example.etoe.model.OrderStatus;
+import software.amazon.smithy.model.node.ObjectNode;
 
 public class RoundTripTests {
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
-    private CoffeeShopClient client;
 
     @BeforeAll
     public static void setup() throws InterruptedException {
@@ -38,7 +45,7 @@ public class RoundTripTests {
         executor.execute(server);
         // Wait for server to start
         while (!serverListening(BasicServerExample.endpoint)) {
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(100);
         }
     }
 
@@ -50,17 +57,33 @@ public class RoundTripTests {
         }
     }
 
-    @BeforeEach
-    void setupClient() {
-        client = CoffeeShopClient.builder()
+    CoffeeShopClient setupClient(String name) {
+        System.out.println("creating coffee shop client using " + name);
+        ClientTransport<?,?> transport;
+        if ("java".equals(name)) {
+            transport = new JavaHttpClientTransport.Factory()
+                    .createTransport(Document.of(Collections.emptyMap()));
+        } else if ("netty".equals(name)) {
+            transport = new NettyHttpClientTransport.Factory()
+                    .createTransport(Document.of(Collections.emptyMap()));
+        } else {
+            throw new IllegalArgumentException("Unknown HTTP transport " + name);
+        }
+        return CoffeeShopClient.builder()
                 .endpointResolver(EndpointResolver.staticEndpoint(BasicServerExample.endpoint))
+                .transport(transport)
                 .build();
     }
 
-    @Test
-    void executesCorrectly() throws InterruptedException {
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "java", "netty"
+    })
+    void executesCorrectly(String name) {
+        var client = setupClient(name);
         var menu = client.getMenu(GetMenuInput.builder().build());
-        var hasEspresso = menu.getItems().stream().anyMatch(item -> item.getType().equals(CoffeeType.ESPRESSO));
+        var menuItems = menu.getItems();
+        var hasEspresso = menuItems.stream().anyMatch(item -> item.getType().equals(CoffeeType.ESPRESSO));
         assertTrue(hasEspresso);
 
         var createRequest = CreateOrderInput.builder().coffeeType(CoffeeType.COLD_BREW).build();
@@ -80,8 +103,12 @@ public class RoundTripTests {
         System.out.println("Completed Order :" + getResponse2);
     }
 
-    @Test
-    void errorsOutIfOrderDoesNotExist() throws InterruptedException {
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "java", "netty"
+    })
+    void errorsOutIfOrderDoesNotExist(String name) {
+        var client = setupClient(name);
         var getRequest = GetOrderInput.builder().id(UUID.randomUUID().toString()).build();
         var orderNotFound = assertThrows(OrderNotFound.class, () -> client.getOrder(getRequest));
         assertEquals(orderNotFound.getOrderId(), getRequest.getId());
