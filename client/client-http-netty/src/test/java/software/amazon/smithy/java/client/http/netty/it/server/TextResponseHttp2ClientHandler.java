@@ -28,12 +28,14 @@ public class TextResponseHttp2ClientHandler implements Http2ClientHandler {
         responseHeaders.set("content-type", "text/plain");
         ctx.write(new DefaultHttp2HeadersFrame(responseHeaders, false));
         var content = Unpooled.copiedBuffer(message, CharsetUtil.UTF_8);
-        ctx.writeAndFlush(new DefaultHttp2DataFrame(content, true));
+        ctx.writeAndFlush(new DefaultHttp2DataFrame(content, false));
     }
 
     @Override
     public void onDataFrame(ChannelHandlerContext ctx, Http2DataFrame frame) {
-
+        if (frame.isEndStream()) {
+            ctx.writeAndFlush(new DefaultHttp2DataFrame(true));
+        }
     }
 
     @Override

@@ -5,14 +5,24 @@
 
 package software.amazon.smithy.java.client.http.netty.it;
 
+import io.netty.handler.ssl.SslContextBuilder;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.Flow;
+import software.amazon.smithy.java.client.http.netty.it.server.TestCertificateGenerator;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 public class TestUtils {
+    static final List<String> IPSUM_LOREM = getIpsumLorem();
+
     private TestUtils() {}
 
     public static HttpRequest plainTextHttp11Request(String uri, String contents) {
@@ -24,19 +34,99 @@ public class TestUtils {
     }
 
     public static HttpRequest plainTextRequest(HttpVersion version, String uri, String contents) {
+        return request(version, uri, DataStream.ofString(contents));
+    }
+
+    public static DataStream streamingBody(Iterable<String> values) {
+        return DataStream.ofPublisher(new StreamingPublisher(values), "text/plain", -1);
+    }
+
+    public static HttpRequest request(HttpVersion version, String uri, DataStream body) {
         try {
             var headers = HttpHeaders.ofModifiable();
             headers.addHeader("content-type", "text/plain");
-            headers.addHeader("content-length", Long.toString(contents.length()));
+            if (body.contentLength() >= 0) {
+                headers.addHeader("content-length", Long.toString(body.contentLength()));
+            }
             return HttpRequest.builder()
                     .httpVersion(version)
                     .uri(new URI(uri))
                     .headers(headers)
-                    .method("GET")
-                    .body(DataStream.ofString(contents))
+                    .method("POST")
+                    .body(body)
                     .build();
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    public static SslContextBuilder createServerSslContextBuilder(
+            TestCertificateGenerator.CertificateBundle bundle
+    ) throws Exception {
+        return SslContextBuilder
+                .forServer(bundle.serverPrivateKey, bundle.serverCertificate);
+    }
+
+    private static List<String> getIpsumLorem() {
+        return Arrays.asList(
+                "Lorem ipsum dolor sit amet, ",
+                "consectetur adipiscing elit, sed do ",
+                "eiusmod tempor incididunt ut ",
+                "labore et dolore magna aliqua. ",
+                "Ut enim ad minim veniam, quis ",
+                "nostrud exercitation ullamco laboris ",
+                "nisi ut ",
+                "aliquip ex ea commodo consequat. ",
+                "Duis aute irure dolor in ",
+                "reprehenderit in voluptate velit esse ",
+                "cillum dolore eu fugiat nulla ",
+                "pariatur. Excepteur sint occaecat ",
+                "cupidatat non proident, sunt in ",
+                "culpa qui officia deserunt mollit ",
+                "anim id est laborum.");
+    }
+
+    static class StreamingPublisher implements Flow.Publisher<ByteBuffer> {
+        private final Iterable<String> values;
+
+        StreamingPublisher(Iterable<String> values) {
+            this.values = values;
+        }
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
+            subscriber.onSubscribe(new StreamingSubscription(values, subscriber));
+        }
+    }
+
+    static class StreamingSubscription implements Flow.Subscription {
+        private final Iterator<String> values;
+        private final Flow.Subscriber<? super ByteBuffer> subscriber;
+        private boolean completed = false;
+
+        StreamingSubscription(Iterable<String> values, Flow.Subscriber<? super ByteBuffer> subscriber) {
+            this.values = values.iterator();
+            this.subscriber = subscriber;
+        }
+
+        @Override
+        public void request(long n) {
+            if (completed) {
+                return;
+            }
+            for (var idx = 0; idx < n && values.hasNext(); idx++) {
+                var value = ByteBuffer.wrap(values.next().getBytes(StandardCharsets.UTF_8));
+                subscriber.onNext(value);
+            }
+            if (!values.hasNext()) {
+                completed = true;
+                subscriber.onComplete();
+            }
+        }
+
+        @Override
+        public void cancel() {
+            subscriber.onComplete();
         }
     }
 }

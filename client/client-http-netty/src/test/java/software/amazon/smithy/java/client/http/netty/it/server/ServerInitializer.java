@@ -14,9 +14,13 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
+import io.netty.handler.ssl.ApplicationProtocolConfig;
+import io.netty.handler.ssl.ApplicationProtocolNames;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.net.ssl.SSLException;
+import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
 import software.amazon.smithy.java.http.api.HttpVersion;
 
 public class ServerInitializer extends ChannelInitializer<SocketChannel> {
@@ -40,9 +44,20 @@ public class ServerInitializer extends ChannelInitializer<SocketChannel> {
     @Override
     protected void initChannel(SocketChannel ch) {
         var pipeline = ch.pipeline();
-        var sslContext = config.sslContext();
-        if (sslContext != null) {
-            pipeline.addLast(sslContext.newHandler(ch.alloc()));
+        var sslContextBuilder = config.sslContextBuilder();
+        if (sslContextBuilder != null) {
+            try {
+                if (config.h2ConnectionMode() == NettyHttpClientTransport.H2ConnectionMode.ALPN) {
+                    sslContextBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
+                            ApplicationProtocolConfig.Protocol.ALPN,
+                            ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                            ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                            ApplicationProtocolNames.HTTP_2));
+                }
+                pipeline.addLast(sslContextBuilder.build().newHandler(ch.alloc()));
+            } catch (SSLException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         if (config.httpVersion() == HttpVersion.HTTP_2) {

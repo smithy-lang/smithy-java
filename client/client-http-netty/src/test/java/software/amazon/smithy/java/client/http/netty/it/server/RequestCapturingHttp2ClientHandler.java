@@ -14,8 +14,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 public class RequestCapturingHttp2ClientHandler implements Http2ClientHandler {
+    private final CompletableFuture<Boolean> streamCompleted = new CompletableFuture<>();
     private Throwable cause;
     private final Map<String, List<String>> capturedHeaders = new HashMap<>();
     private final ByteArrayOutputStream capturedBody = new ByteArrayOutputStream();
@@ -37,6 +39,9 @@ public class RequestCapturingHttp2ClientHandler implements Http2ClientHandler {
             var bytes = new byte[content.readableBytes()];
             content.readBytes(bytes);
             capturedBody.write(bytes);
+            if (frame.isEndStream()) {
+                streamCompleted.complete(true);
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -45,6 +50,7 @@ public class RequestCapturingHttp2ClientHandler implements Http2ClientHandler {
     @Override
     public void onException(ChannelHandlerContext ctx, Throwable cause) {
         this.cause = cause;
+        streamCompleted.completeExceptionally(cause);
     }
 
     public Throwable cause() {
@@ -57,5 +63,9 @@ public class RequestCapturingHttp2ClientHandler implements Http2ClientHandler {
 
     public ByteArrayOutputStream capturedBody() {
         return capturedBody;
+    }
+
+    public CompletableFuture<Boolean> streamCompleted() {
+        return streamCompleted;
     }
 }

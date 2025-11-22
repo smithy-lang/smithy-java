@@ -6,23 +6,33 @@
 package software.amazon.smithy.java.client.http.netty.it;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static software.amazon.smithy.java.client.http.netty.it.TestUtils.IPSUM_LOREM;
+import static software.amazon.smithy.java.client.http.netty.it.TestUtils.createServerSslContextBuilder;
+import static software.amazon.smithy.java.client.http.netty.it.TestUtils.streamingBody;
 
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
 import software.amazon.smithy.java.client.http.netty.it.server.MultiplexingHttp2ClientHandler;
 import software.amazon.smithy.java.client.http.netty.it.server.NettyTestServer;
 import software.amazon.smithy.java.client.http.netty.it.server.RequestCapturingHttp2ClientHandler;
+import software.amazon.smithy.java.client.http.netty.it.server.TestCertificateGenerator;
 import software.amazon.smithy.java.client.http.netty.it.server.TextResponseHttp2ClientHandler;
 import software.amazon.smithy.java.http.api.HttpVersion;
 
-public class Http2ClearTest {
+public class RequestStreamingHttp2WithAlpnTest {
     private static final String RESPONSE_CONTENTS = "Response sent from Http2ClearTest";
-    private static final String REQUEST_CONTENTS = "Request sent from Http2ClearTest";
+    private static TestCertificateGenerator.CertificateBundle bundle;
     private RequestCapturingHttp2ClientHandler requestCapturingHandler;
     private NettyTestServer server;
+
+    @BeforeAll
+    static void beforeAll() throws Exception {
+        bundle = TestCertificateGenerator.generateCertificates();
+    }
 
     @BeforeEach
     void setUp() throws Exception {
@@ -31,8 +41,9 @@ public class Http2ClearTest {
                 new TextResponseHttp2ClientHandler(RESPONSE_CONTENTS));
         server = NettyTestServer.builder()
                 .httpVersion(HttpVersion.HTTP_2)
-                .h2ConnectionMode(NettyHttpClientTransport.H2ConnectionMode.PRIOR_KNOWLEDGE)
+                .h2ConnectionMode(NettyHttpClientTransport.H2ConnectionMode.ALPN)
                 .http2HandlerFactory((ctx) -> multiplexer)
+                .sslContextBuilder(createServerSslContextBuilder(bundle))
                 .build();
         server.start();
     }
@@ -43,16 +54,20 @@ public class Http2ClearTest {
     }
 
     @Test
-    void canSendRequestAndReadResponse() throws Exception {
+    void canSendRequestAndReadResponse() {
         // -- Arrange
         var client = NettyHttpClientTransport.builder()
                 .httpVersion(HttpVersion.HTTP_2)
-                .configureH2Settings(c -> c.connectionMode(NettyHttpClientTransport.H2ConnectionMode.PRIOR_KNOWLEDGE))
+                .configureH2Settings(c -> c.connectionMode(NettyHttpClientTransport.H2ConnectionMode.ALPN))
+                .sslContextModifier(b -> b.trustManager(bundle.caCertificate))
                 .build();
-        var request = TestUtils.plainTextHttp2Request("http://localhost:" + server.getPort(), REQUEST_CONTENTS);
+        var request = TestUtils.request(HttpVersion.HTTP_2,
+                "https://localhost:" + server.getPort(),
+                streamingBody(IPSUM_LOREM));
 
         // -- Act
         var response = client.send(null, request);
+        requestCapturingHandler.streamCompleted().join();
         var bodyByteBuf = response.body().asByteBuffer();
         var bytes = new byte[bodyByteBuf.remaining()];
         bodyByteBuf.get(bytes);
@@ -61,7 +76,7 @@ public class Http2ClearTest {
 
         // -- Assert
         var capturedRequestBody = requestCapturingHandler.capturedBody().toString(StandardCharsets.UTF_8);
-        assertEquals(REQUEST_CONTENTS, capturedRequestBody);
+        assertEquals(String.join("", IPSUM_LOREM), capturedRequestBody);
         assertEquals(RESPONSE_CONTENTS, responseBody);
     }
 }

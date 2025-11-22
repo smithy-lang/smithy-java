@@ -25,6 +25,7 @@ final class NettyBodySubscriber implements Flow.Subscriber<ByteBuffer> {
     private final Channel channel;
     private final CompletableFuture<HttpResponse> responseFuture;
     private Flow.Subscription subscription;
+    private volatile boolean completed = false;
 
     NettyBodySubscriber(Channel channel, CompletableFuture<HttpResponse> responseFuture) {
         this.channel = channel;
@@ -48,11 +49,15 @@ final class NettyBodySubscriber implements Flow.Subscriber<ByteBuffer> {
                 channel.writeAndFlush(content)
                         .addListener(new ContentWriteListener(channel, subscription, responseFuture));
             } else {
-                subscription.request(1);
+                if (!completed) {
+                    subscription.request(1);
+                }
             }
         } catch (Exception e) {
             LOGGER.error(channel, "Error processing chunk", e);
-            responseFuture.completeExceptionally(ClientTransport.remapExceptions(e));
+            if (!responseFuture.isDone()) {
+                responseFuture.completeExceptionally(ClientTransport.remapExceptions(e));
+            }
             subscription.cancel();
         }
     }
@@ -60,14 +65,20 @@ final class NettyBodySubscriber implements Flow.Subscriber<ByteBuffer> {
     @Override
     public void onError(Throwable throwable) {
         LOGGER.warn(channel, "Error in streaming body", throwable);
-        responseFuture.completeExceptionally(ClientTransport.remapExceptions(throwable));
+        if (!responseFuture.isDone()) {
+            responseFuture.completeExceptionally(ClientTransport.remapExceptions(throwable));
+        }
         channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
     }
 
     @Override
     public void onComplete() {
+        if (completed) {
+            return;
+        }
+        completed = true;
+        LOGGER.trace(channel, "onComplete");
         // Send the final chunk to indicate end of stream
-        LOGGER.debug(channel, "onComplete");
         channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT)
                 .addListener(new LastContentWriteListener(channel, responseFuture));
     }

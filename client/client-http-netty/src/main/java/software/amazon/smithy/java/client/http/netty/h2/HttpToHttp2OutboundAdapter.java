@@ -59,7 +59,7 @@ final class HttpToHttp2OutboundAdapter extends ChannelOutboundHandlerAdapter {
                 ctx.write(new DefaultHttp2HeadersFrame(http2Headers), promiseAggregator.newPromise());
             }
 
-            if (!endStream && msg instanceof HttpContent) {
+            if (!endStream && msg instanceof HttpContent httpContent) {
                 var isLastContent = false;
                 HttpHeaders trailers = EmptyHttpHeaders.INSTANCE;
                 Http2Headers http2Trailers = EmptyHttp2Headers.INSTANCE;
@@ -72,7 +72,7 @@ final class HttpToHttp2OutboundAdapter extends ChannelOutboundHandlerAdapter {
                 }
 
                 // Write the data
-                var content = ((HttpContent) msg).content();
+                var content = httpContent.content();
                 endStream = isLastContent && trailers.isEmpty();
                 release = false;
                 ctx.write(new DefaultHttp2DataFrame(content, endStream), promiseAggregator.newPromise());
@@ -80,7 +80,6 @@ final class HttpToHttp2OutboundAdapter extends ChannelOutboundHandlerAdapter {
                 if (!trailers.isEmpty()) {
                     // Write trailing headers.
                     ctx.write(new DefaultHttp2HeadersFrame(http2Trailers, true), promiseAggregator.newPromise());
-
                 }
                 ctx.flush();
             }

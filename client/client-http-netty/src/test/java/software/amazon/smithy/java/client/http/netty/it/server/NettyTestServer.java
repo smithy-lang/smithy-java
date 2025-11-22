@@ -11,7 +11,7 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import java.net.InetSocketAddress;
 import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
@@ -77,13 +77,13 @@ public class NettyTestServer {
         private final int port;
         private final HttpVersion httpVersion;
         private final NettyHttpClientTransport.H2ConnectionMode h2ConnectionMode;
-        private final SslContext sslContext;
+        private final SslContextBuilder sslContextBuilder;
         private final Http2ClientHandlerFactory http2HandlerFactory;
         private final Http11ClientHandlerFactory http11HandlerFactory;
 
         public Config(Builder builder) {
             this.h2ConnectionMode = builder.h2ConnectionMode;
-            this.sslContext = builder.sslContext;
+            this.sslContextBuilder = builder.sslContextBuilder;
             this.httpVersion = builder.httpVersion;
             this.port = builder.port;
             this.http2HandlerFactory = builder.http2HandlerFactory;
@@ -102,8 +102,8 @@ public class NettyTestServer {
             return this.h2ConnectionMode;
         }
 
-        public SslContext sslContext() {
-            return this.sslContext;
+        public SslContextBuilder sslContextBuilder() {
+            return this.sslContextBuilder;
         }
 
         public Http2ClientHandlerFactory http2HandlerFactory() {
@@ -120,7 +120,7 @@ public class NettyTestServer {
         private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
         private NettyHttpClientTransport.H2ConnectionMode h2ConnectionMode =
                 NettyHttpClientTransport.H2ConnectionMode.AUTO;
-        private SslContext sslContext;
+        private SslContextBuilder sslContextBuilder;
         private Http2ClientHandlerFactory http2HandlerFactory;
         private Http11ClientHandlerFactory http11HandlerFactory;
 
@@ -139,8 +139,8 @@ public class NettyTestServer {
             return this;
         }
 
-        public Builder sslContext(SslContext sslContext) {
-            this.sslContext = sslContext;
+        public Builder sslContextBuilder(SslContextBuilder sslContextBuilder) {
+            this.sslContextBuilder = sslContextBuilder;
             return this;
         }
 

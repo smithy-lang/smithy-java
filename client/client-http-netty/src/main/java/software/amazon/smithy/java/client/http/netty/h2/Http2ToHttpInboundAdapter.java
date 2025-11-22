@@ -32,8 +32,8 @@ final class Http2ToHttpInboundAdapter extends SimpleChannelInboundHandler<Http2F
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Http2Frame frame) throws Exception {
         switch (frame) {
-            case Http2DataFrame dataFrame -> onDataRead(dataFrame, ctx);
             case Http2HeadersFrame headersFrame -> onHeadersRead(headersFrame, ctx);
+            case Http2DataFrame dataFrame -> onDataRead(dataFrame, ctx);
             case Http2ResetFrame resetFrame -> onRstStreamRead(resetFrame, ctx);
             default -> ctx.channel().parent().read();
         }
