@@ -115,7 +115,18 @@ public final class DynamicClient extends Client {
     }
 
     /**
-     * Call an operation with input.
+     * Call an operation with a map input, using {@link Document#ofObject(Object)} to create a document.
+     *
+     * @param operation Operation name to call.
+     * @param input Operation input as a document.
+     * @return the output of the operation.
+     */
+    public Document call(String operation, Map<String, Object> input) {
+        return call(operation, Document.ofObject(input));
+    }
+
+    /**
+     * Call an operation with a document input.
      *
      * @param operation Operation name to call.
      * @param input Operation input as a document.
