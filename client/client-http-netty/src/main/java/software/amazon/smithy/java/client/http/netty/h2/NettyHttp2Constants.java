@@ -11,7 +11,7 @@ import io.netty.util.AttributeKey;
 /**
  * Constant values used in the Netty HTTP/2 client.
  */
-final class NettyHttp2Constants {
+public final class NettyHttp2Constants {
 
     // Handler names
     /**
@@ -62,7 +62,7 @@ final class NettyHttp2Constants {
     /**
      * Key to identify the configured maximum amount of concurrent streams for a single channel.
      */
-    static final AttributeKey<Long> HTTP2_MAX_CONCURRENT_STREAMS =
+    static final AttributeKey<Integer> HTTP2_MAX_CONCURRENT_STREAMS =
             AttributeKey.valueOf("smithy-java.netty.max-concurrent-streams");
 
     private NettyHttp2Constants() {}

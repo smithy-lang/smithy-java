@@ -96,7 +96,7 @@ final class NettyHttpClient implements Closeable {
                 method,
                 path,
                 content);
-        setHeaders(nettyRequest, request);
+        setHeaders(httpVersion, nettyRequest, request);
         if (content.readableBytes() > 0) {
             nettyRequest.headers().set("Content-Length", content.readableBytes());
         }
@@ -117,10 +117,12 @@ final class NettyHttpClient implements Closeable {
         // ultimately be sent over HTTP2. Conversion to H2 is handled at a
         // later stage if necessary; see HttpToHttp2OutboundAdapter.
         var nettyRequest = new DefaultHttpRequest(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, method, path);
-        setHeaders(nettyRequest, request);
+        setHeaders(httpVersion, nettyRequest, request);
         // We are streaming, set the transfer encoding accordingly.
+        // XXX This should be given in the request instead pushed here.
         nettyRequest.headers()
                 .set("Transfer-Encoding", "chunked");
+
         if (httpVersion == HttpVersion.HTTP_2) {
             // Set scheme for HTTP/2 conversion
             nettyRequest.headers()
@@ -133,7 +135,11 @@ final class NettyHttpClient implements Closeable {
                 .addListener(new StreamingRequestWriteListener(channel, request, responseFuture));
     }
 
-    private static void setHeaders(io.netty.handler.codec.http.HttpRequest nettyRequest, HttpRequest request) {
+    private static void setHeaders(
+            HttpVersion httpVersion,
+            io.netty.handler.codec.http.HttpRequest nettyRequest,
+            HttpRequest request
+    ) {
         // Set headers
         var nettyHeaders = nettyRequest.headers();
         for (var entry : request.headers().map().entrySet()) {
@@ -151,6 +157,14 @@ final class NettyHttpClient implements Closeable {
             }
             nettyHeaders.set("Host", host);
         }
+
+        if (httpVersion == software.amazon.smithy.java.http.api.HttpVersion.HTTP_2) {
+            // Set scheme for HTTP/2 conversion
+            nettyRequest.headers()
+                    .set(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(),
+                            request.uri().getScheme());
+        }
+
     }
 
     private static HttpVersion getHttpVersion(Channel ch) {

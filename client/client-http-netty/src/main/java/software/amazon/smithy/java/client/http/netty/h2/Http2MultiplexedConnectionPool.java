@@ -85,22 +85,6 @@ final class Http2MultiplexedConnectionPool implements ChannelPool {
     }
 
     /**
-     * This is called to request the expansion of the window size published by this endpoint.
-     */
-    private static void tryExpandConnectionWindow(Channel channel) {
-        var http2Connection = channel.attr(HTTP2_CONNECTION).get();
-        var initialWindowSize = channel.attr(HTTP2_INITIAL_WINDOW_SIZE).get();
-        var connectionStream = http2Connection.connectionStream();
-        LOGGER.debug(channel, "Expanding connection window of size {}", initialWindowSize);
-        try {
-            var localFlowController = http2Connection.local().flowController();
-            localFlowController.incrementWindowSize(connectionStream, initialWindowSize);
-        } catch (Http2Exception e) {
-            LOGGER.warn(channel, "Failed to expand window of size {}", initialWindowSize, e);
-        }
-    }
-
-    /**
      * Acquires a channel from the pool, reusing existing multiplexed connections when possible.
      *
      * @return A future that is notified once the acquire is successful and failed otherwise.
@@ -318,7 +302,9 @@ final class Http2MultiplexedConnectionPool implements ChannelPool {
      * Fails the promise using the given exception and then closes and releases the parent channel.
      */
     private void failPromiseAndCloseParent(Promise<Channel> promise, Throwable throwable, Channel parentChannel) {
-        LOGGER.warn(parentChannel, "Channel acquisition failed, closing connection", throwable);
+        LOGGER.warn(parentChannel,
+                "Channel acquisition failed, closing connection: " + throwable.getMessage(),
+                throwable);
         closeAndReleaseParent(parentChannel, null);
         promise.setFailure(throwable);
     }
@@ -341,6 +327,43 @@ final class Http2MultiplexedConnectionPool implements ChannelPool {
         }
         channels.add(multiplexedChannel);
         promise.setSuccess(stream);
+    }
+
+    /**
+     * This is called to request the expansion of the window size published by this endpoint.
+     */
+    private static void tryExpandConnectionWindow(Channel channel) {
+        channel.eventLoop().execute(new ExpandConnectionWindowTask(channel));
+    }
+
+    /**
+     * Task to increment the window size for the local flow controller, this has to run in the
+     * channel event loop.
+     */
+    static class ExpandConnectionWindowTask implements Runnable {
+        private final Channel channel;
+
+        ExpandConnectionWindowTask(Channel channel) {
+            this.channel = Objects.requireNonNull(channel);
+        }
+
+        @Override
+        public void run() {
+            var http2Connection = channel.attr(HTTP2_CONNECTION).get();
+            var initialWindowSize = channel.attr(HTTP2_INITIAL_WINDOW_SIZE).get();
+            var connectionStream = http2Connection.connectionStream();
+            LOGGER.trace(channel, "Expanding connection window of size {}", initialWindowSize);
+            try {
+                var localFlowController = http2Connection.local().flowController();
+                localFlowController.incrementWindowSize(connectionStream, initialWindowSize);
+            } catch (Http2Exception e) {
+                LOGGER.info(channel, "Failed to expand window of size " + initialWindowSize, e);
+            } catch (Throwable t) {
+                LOGGER.warn(channel,
+                        "Unexpected throwable attempting to expand window of size " + initialWindowSize,
+                        t);
+            }
+        }
     }
 
     /**

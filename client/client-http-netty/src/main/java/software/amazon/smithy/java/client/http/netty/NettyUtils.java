@@ -12,6 +12,19 @@ public final class NettyUtils {
 
     private NettyUtils() {}
 
+    /**
+     * Caps the value of the long to fit into an int.
+     */
+    public static int toCappedInt(long value) {
+        if (value < Integer.MIN_VALUE) {
+            return Integer.MIN_VALUE;
+        }
+        if (value > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return (int) value;
+    }
+
     public static class Asserts {
         /**
          * This method is called at points where the control flow should no reached. This will log an ERROR

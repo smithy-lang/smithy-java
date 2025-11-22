@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import software.amazon.smithy.java.client.core.error.TransportException;
 import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
 import software.amazon.smithy.java.client.http.netty.NettyLogger;
+import software.amazon.smithy.java.client.http.netty.NettyUtils;
 import software.amazon.smithy.java.http.api.HttpVersion;
 
 /**
@@ -26,8 +27,9 @@ import software.amazon.smithy.java.http.api.HttpVersion;
 final class Http2SettingsFrameHandler extends SimpleChannelInboundHandler<Http2SettingsFrame> {
     private static final NettyLogger LOGGER =
             NettyLogger.getLogger(Http2SettingsFrameHandler.class);
-    // Unsigned 32-bit int max value, 2^32 -1
-    private static final long MAX_STREAMS_ALLOWED = (1L << 32) - 1;
+    // Theoretically the max value is an unsigned 32-bit int max value, 2^32 -1
+    // we cap it to Integer.MAX_VALUE since streams ids are int.
+    private static final int MAX_STREAMS_ALLOWED = Integer.MAX_VALUE;
 
     private final Channel channel;
     private final NettyHttpClientTransport.H2Configuration config;
@@ -66,13 +68,16 @@ final class Http2SettingsFrameHandler extends SimpleChannelInboundHandler<Http2S
         channelError(cause, channel, ctx);
     }
 
-    private long maxConcurrentStreams(Http2Settings settings) {
-        var maxConcurrentStreams = settings.maxConcurrentStreams();
-        if (maxConcurrentStreams == null) {
+    private int maxConcurrentStreams(Http2Settings settings) {
+        var maxConcurrentStreamsFromSettings = settings.maxConcurrentStreams();
+        int maxConcurrentStreams;
+        if (maxConcurrentStreamsFromSettings == null) {
             maxConcurrentStreams = MAX_STREAMS_ALLOWED;
+        } else {
+            maxConcurrentStreams = NettyUtils.toCappedInt(maxConcurrentStreamsFromSettings);
         }
         var actualMaxConcurrentStreams = Math.min(config.maxConcurrentStreams(), maxConcurrentStreams);
-        LOGGER.debug(channel,
+        LOGGER.trace(channel,
                 "Received settings frame, maxConcurrentStreams: {}, initialWindowSize: {}," +
                         " maxFrameSize: {}. Using maxConcurrentStreams: {}",
                 settings.maxConcurrentStreams(),

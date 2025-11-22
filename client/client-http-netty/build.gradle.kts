@@ -21,7 +21,7 @@ dependencies {
     implementation(libs.netty.codec.http)
     implementation(libs.netty.codec.http2)
 
-    testImplementation(project(":codecs:json-codec", configuration = "shadow"))
-    testImplementation(project(":aws:client:aws-client-awsjson"))
-    testImplementation(project(":client:dynamic-client"))
+    testImplementation("org.slf4j:slf4j-simple:2.0.17")
+    testImplementation("org.bouncycastle:bcprov-jdk18on:1.78")
+    testImplementation("org.bouncycastle:bcpkix-jdk18on:1.78")
 }

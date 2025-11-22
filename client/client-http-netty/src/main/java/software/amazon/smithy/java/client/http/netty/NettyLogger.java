@@ -12,11 +12,11 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * An specialized {@link InternalLogger} to provide extra information to identify the channel that
  * creates the log events.
  */
-public final class NettyLogger {
+public class NettyLogger {
 
     private final InternalLogger logger;
 
-    private NettyLogger(InternalLogger logger) {
+    protected NettyLogger(InternalLogger logger) {
         this.logger = logger;
     }
 
@@ -44,6 +44,20 @@ public final class NettyLogger {
     }
 
     /**
+     * Logs a message for the given channel with the INFO level.
+     *
+     * @param channel   channel
+     * @param message   message format
+     * @param throwable throwable
+     */
+    public void trace(Channel channel, String message, Throwable throwable) {
+        if (logger.isTraceEnabled()) {
+            logger.trace(addChannelIdToMessage(message, channel), throwable);
+        }
+    }
+
+    /**
+     * Logs a message for the given channel with the TRACE level.
      * Logs a message for the given channel with the TRACE level.
      *
      * @param channel channel
@@ -218,7 +232,7 @@ public final class NettyLogger {
      */
     public void info(Channel channel, String message, Throwable throwable) {
         if (logger.isInfoEnabled()) {
-            logger.warn(addChannelIdToMessage(message, channel), throwable);
+            logger.info(addChannelIdToMessage(message, channel), throwable);
         }
     }
 
@@ -472,7 +486,7 @@ public final class NettyLogger {
         }
     }
 
-    private String addChannelIdToMessage(String message, Channel channel) {
+    protected String addChannelIdToMessage(String message, Channel channel) {
         if (channel == null) {
             return message;
         }

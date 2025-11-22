@@ -60,6 +60,34 @@ public final class NettyHttpClientTransport implements Closeable, ClientTranspor
     }
 
     /**
+     * Factory for creating an HTTP transport based on Netty.
+     */
+    public static final class Factory implements ClientTransportFactory<HttpRequest, HttpResponse> {
+        @Override
+        public String name() {
+            return "http-netty";
+        }
+
+        @Override
+        public NettyHttpClientTransport createTransport(Document node) {
+            var builder = new Builder();
+            if (node != null) {
+                var versionNode = node.asStringMap().get("version");
+                if (versionNode != null) {
+                    var version = software.amazon.smithy.java.http.api.HttpVersion.from(versionNode.asString());
+                    builder.httpVersion(version);
+                }
+            }
+            return builder.build();
+        }
+
+        @Override
+        public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
+            return HttpMessageExchange.INSTANCE;
+        }
+    }
+
+    /**
      * Configuration presets for different H2 usage scenarios. Each setting can set by using a
      * {@link H2ConfigurationBuilder},
      */
@@ -106,34 +134,6 @@ public final class NettyHttpClientTransport implements Closeable, ClientTranspor
         };
 
         public abstract void configure(H2ConfigurationBuilder builder);
-    }
-
-    /**
-     * Factory for creating an HTTP transport based on Netty.
-     */
-    public static final class Factory implements ClientTransportFactory<HttpRequest, HttpResponse> {
-        @Override
-        public String name() {
-            return "http-netty";
-        }
-
-        @Override
-        public NettyHttpClientTransport createTransport(Document node) {
-            var builder = new Builder();
-            if (node != null) {
-                var versionNode = node.asStringMap().get("version");
-                if (versionNode != null) {
-                    var version = software.amazon.smithy.java.http.api.HttpVersion.from(versionNode.asString());
-                    builder.httpVersion(version);
-                }
-            }
-            return builder.build();
-        }
-
-        @Override
-        public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
-            return HttpMessageExchange.INSTANCE;
-        }
     }
 
     /**
@@ -372,7 +372,7 @@ public final class NettyHttpClientTransport implements Closeable, ClientTranspor
             DEFAULT = builder.build();
         }
 
-        private final long maxConcurrentStreams;
+        private final int maxConcurrentStreams;
         private final int initialWindowSize;
         private final int maxFrameSize;
         private final H2ConnectionMode connectionMode;
@@ -389,7 +389,7 @@ public final class NettyHttpClientTransport implements Closeable, ClientTranspor
          *
          * @return the maximum number of concurrent streams allowed on a single HTTP/2 connection.
          */
-        public long maxConcurrentStreams() {
+        public int maxConcurrentStreams() {
             return maxConcurrentStreams;
         }
 
@@ -426,9 +426,10 @@ public final class NettyHttpClientTransport implements Closeable, ClientTranspor
      */
     public static class H2ConfigurationBuilder {
         /**
-         * H2 default for max concurrent streams is 2^32 - 1 (max unsigned 32-bit integer).
+         * Max concurrent streams is capped to 2^31 - 1 to fit a singed int, which is smaller than the H2 default of
+         * 2^32 - 1 (max unsigned 32-bit integer).
          */
-        public static final long DEFAULT_MAX_CONCURRENT_STREAMS = (1L << 32) - 1;
+        public static final int DEFAULT_MAX_CONCURRENT_STREAMS = Integer.MAX_VALUE;
         /**
          * H2 default for initial window size is 64 KB
          */
@@ -438,7 +439,7 @@ public final class NettyHttpClientTransport implements Closeable, ClientTranspor
          */
         public static final int DEFAULT_MAX_FRAME_SIZE = 16 * 1024;
 
-        private long maxConcurrentStreams = DEFAULT_MAX_CONCURRENT_STREAMS;
+        private int maxConcurrentStreams = DEFAULT_MAX_CONCURRENT_STREAMS;
         private int initialWindowSize = DEFAULT_INITIAL_WINDOW_SIZE;
         private int maxFrameSize = DEFAULT_MAX_FRAME_SIZE;
         private H2ConnectionMode connectionMode = H2ConnectionMode.AUTO;
@@ -449,18 +450,17 @@ public final class NettyHttpClientTransport implements Closeable, ClientTranspor
          * <p> This limit prevents resource exhaustion by controlling how many simultaneous requests can be
          * processed. Higher values enable better connection utilization but increase memory and CPU overhead. Lower
          * values reduce resource usage but may limit throughput for clients making many parallel requests. Default is
-         * unlimited (2^32-1), but production systems typically set values between 25-500 based on expected load and
+         * unlimited (2^31-1), but production systems typically set values between 25-500 based on expected load and
          * available resources.
          *
          * @param maxConcurrentStreams the maximum concurrent streams, must be positive
          * @return this builder instance for method chaining
          */
-        public H2ConfigurationBuilder maxConcurrentStreams(long maxConcurrentStreams) {
+        public H2ConfigurationBuilder maxConcurrentStreams(int maxConcurrentStreams) {
             if (maxConcurrentStreams <= 0) {
                 throw new IllegalArgumentException(
                         "maxStreamsPerConnection cannot be negative or zero, got: " + maxConcurrentStreams);
             }
-
             this.maxConcurrentStreams = maxConcurrentStreams;
             return this;
         }
@@ -529,7 +529,7 @@ public final class NettyHttpClientTransport implements Closeable, ClientTranspor
     /**
      * The connection mode for establishing HTTP/2 connections.
      */
-    enum H2ConnectionMode {
+    public enum H2ConnectionMode {
         /**
          * Uses ALPN over https and prior knowledge over http.
          */

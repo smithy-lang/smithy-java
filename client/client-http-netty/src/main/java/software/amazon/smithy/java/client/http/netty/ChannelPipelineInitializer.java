@@ -30,6 +30,7 @@ import software.amazon.smithy.java.http.api.HttpVersion;
  * configuration and the URI.
  */
 final class ChannelPipelineInitializer extends AbstractChannelPoolHandler {
+    private static final NettyLogger LOGGER = NettyLogger.getLogger(ChannelPipelineInitializer.class);
     private final NettyHttpClientTransport.Configuration config;
     private final SslContext sslContext;
     private final ChannelPoolMap.ChannelPoolKey poolKey;
@@ -49,6 +50,7 @@ final class ChannelPipelineInitializer extends AbstractChannelPoolHandler {
 
     @Override
     public void channelCreated(Channel channel) {
+        LOGGER.trace(channel, "Channel created, isHttps: {}, httpVersion: {}", poolKey.isHttps(), config.httpVersion());
         configureAttributes(channel);
         var pipeline = channel.pipeline();
         if (poolKey.isHttps()) {
@@ -91,8 +93,10 @@ final class ChannelPipelineInitializer extends AbstractChannelPoolHandler {
                 connectionMode = NettyHttpClientTransport.H2ConnectionMode.PRIOR_KNOWLEDGE;
             }
         }
+        LOGGER.trace(channel, "Configuring HTTP/2 pipeline, with H2 connection mode {}", connectionMode);
         if (connectionMode == NettyHttpClientTransport.H2ConnectionMode.ALPN) {
             if (!poolKey.isHttps()) {
+                // FIXME, validate this upstream to avoid failing at this point.
                 var message = "Only HTTPS connections are supported when using ALPN connection mode";
                 NettyUtils.Asserts.shouldNotBeReached(channel, message);
                 channel.pipeline().fireExceptionCaught(new IllegalStateException(message));
@@ -101,6 +105,7 @@ final class ChannelPipelineInitializer extends AbstractChannelPoolHandler {
             pipeline.addLast(ALPN, new NettyProtocolNegotiationHandler(config, channelPoolRef));
         } else {
             configureHttp2Pipeline(channel, pipeline, config, channelPoolRef);
+            channel.read();
             channel.attr(CHANNEL_POOL).set(channelPoolRef.get());
         }
     }

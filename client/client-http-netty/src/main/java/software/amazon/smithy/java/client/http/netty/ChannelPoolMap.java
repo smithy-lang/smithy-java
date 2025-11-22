@@ -30,7 +30,6 @@ import java.net.URI;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLException;
@@ -94,6 +93,7 @@ final class ChannelPoolMap implements Closeable {
     }
 
     private ChannelPool newChannelPool(ChannelPoolKey poolKey) {
+        LOGGER.trace("Creating new channel pool for: {}", poolKey);
         var bootstrap = baseBootstrap.clone();
         bootstrap.remoteAddress(InetSocketAddress.createUnresolved(poolKey.host, poolKey.port()));
         var channelPoolRef = new AtomicReference<ChannelPool>();
@@ -113,10 +113,6 @@ final class ChannelPoolMap implements Closeable {
             return NettyHttp2Utils.createChannelPool(basePool, this.eventLoopGroup);
         }
         return basePool;
-    }
-
-    private boolean isHttps(URI uri) {
-        return uri.getScheme().equalsIgnoreCase("https");
     }
 
     private SslContext createSslContext() throws TlsException {
@@ -165,7 +161,8 @@ final class ChannelPoolMap implements Closeable {
         var bootstrap = new Bootstrap();
         bootstrap.group(eventLoopGroup);
         bootstrap.channel(getChannelClass(config));
-        bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, fromLong(config.connectTimeout().toMillis()));
+        bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS,
+                NettyUtils.toCappedInt(config.connectTimeout().toMillis()));
         bootstrap.option(ChannelOption.SO_KEEPALIVE, true);
         bootstrap.option(ChannelOption.TCP_NODELAY, true);
         bootstrap.option(ChannelOption.AUTO_READ, false);
@@ -177,7 +174,7 @@ final class ChannelPoolMap implements Closeable {
     }
 
     private static EventLoopGroup createEventLoopGroup(NettyHttpClientTransport.Configuration configuration) {
-        ThreadFactory threadFactory = new DefaultThreadFactory("smithy-java-netty", true);
+        var threadFactory = new DefaultThreadFactory("smithy-java-netty", true);
         return new MultiThreadIoEventLoopGroup(configuration.eventLoopGroupThreads(),
                 threadFactory,
                 NioIoHandler.newFactory());
@@ -185,16 +182,6 @@ final class ChannelPoolMap implements Closeable {
 
     private static Class<? extends Channel> getChannelClass(NettyHttpClientTransport.Configuration configuration) {
         return NioSocketChannel.class;
-    }
-
-    private static int fromLong(long i) {
-        if (i > Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE;
-        }
-        if (i < Integer.MIN_VALUE) {
-            return Integer.MIN_VALUE;
-        }
-        return (int) i;
     }
 
     private static ChannelPoolKey fromUri(URI uri) {
@@ -248,6 +235,15 @@ final class ChannelPoolMap implements Closeable {
 
         public int port() {
             return port;
+        }
+
+        @Override
+        public String toString() {
+            return "ChannelPoolKey{" +
+                    "https=" + https +
+                    ", host='" + host + '\'' +
+                    ", port=" + port +
+                    '}';
         }
     }
 }

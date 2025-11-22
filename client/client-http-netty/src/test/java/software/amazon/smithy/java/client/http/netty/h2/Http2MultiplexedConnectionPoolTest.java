@@ -699,17 +699,17 @@ class Http2MultiplexedConnectionPoolTest {
                 .build();
     }
 
-    private static MockChannel.Stream setupMockStream(MockChannel mockParentChannel) {
+    private MockChannel.Stream setupMockStream(MockChannel mockParentChannel) {
         return MockChannel.builder()
                 .parent(mockParentChannel)
                 .buildStream();
     }
 
-    private static MockChannel setupValidMockChannel() {
+    private MockChannel setupValidMockChannel() {
         return setupMockChannel(HttpVersion.HTTP_2, null, false);
     }
 
-    private static MockChannel setupMockChannel(
+    private MockChannel setupMockChannel(
             HttpVersion version,
             Throwable cause,
             boolean incrementWindowSizeThrows
@@ -726,11 +726,13 @@ class Http2MultiplexedConnectionPoolTest {
         } else {
             versionFuture = CompletableFuture.failedFuture(cause);
         }
-        var mockParentChannel = MockChannel.builder().build();
+        var mockParentChannel = MockChannel.builder()
+                .eventLoop(eventLoopGroup.next())
+                .build();
         var http2Connection = new MockHttp2Connection(incrementWindowSizeThrows);
         mockParentChannel.attr(NettyHttp2Constants.HTTP2_INITIAL_WINDOW_SIZE).set(EXPECTED_INITIAL_WINDOW_SIZE);
         mockParentChannel.attr(NettyConstants.HTTP_VERSION_FUTURE).set(versionFuture);
-        mockParentChannel.attr(NettyHttp2Constants.HTTP2_MAX_CONCURRENT_STREAMS).set(11L);
+        mockParentChannel.attr(NettyHttp2Constants.HTTP2_MAX_CONCURRENT_STREAMS).set(11);
         mockParentChannel.attr(NettyHttp2Constants.HTTP2_CONNECTION).set(http2Connection);
         return mockParentChannel;
     }

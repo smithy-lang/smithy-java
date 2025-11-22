@@ -12,6 +12,7 @@ import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import java.nio.channels.ClosedChannelException;
+import software.amazon.smithy.java.client.http.netty.NettyLogger;
 
 /**
  * Handler to handle exceptions. It will close the parent channel to new streams if
@@ -20,6 +21,7 @@ import java.nio.channels.ClosedChannelException;
  */
 @ChannelHandler.Sharable
 final class ReleaseOnExceptionHandler extends ChannelDuplexHandler {
+    private static final NettyLogger LOGGER = NettyLogger.getLogger(ReleaseOnExceptionHandler.class);
     private static final ClosedChannelException CLOSED_CHANNEL_EXCEPTION = new ClosedChannelException();
     private static final ReleaseOnExceptionHandler INSTANCE = new ReleaseOnExceptionHandler();
 
@@ -36,6 +38,7 @@ final class ReleaseOnExceptionHandler extends ChannelDuplexHandler {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        LOGGER.trace(ctx.channel(), "Exception caught", cause);
         if (cause instanceof Http2ConnectionTerminatingException e) {
             closeConnectionToNewStreams(ctx, e);
         } else {
