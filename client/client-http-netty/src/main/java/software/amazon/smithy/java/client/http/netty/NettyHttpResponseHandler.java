@@ -22,8 +22,7 @@ import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
- * Netty channel handler that processes HTTP responses. Streams responses only when
- * transfer-encoding is chunked or content-length is unknown, otherwise buffers the complete response.
+ * Netty channel handler that processes HTTP responses.
  */
 final class NettyHttpResponseHandler extends SimpleChannelInboundHandler<Object> {
     private static final NettyLogger LOGGER = NettyLogger.getLogger(NettyHttpResponseHandler.class);
@@ -85,6 +84,7 @@ final class NettyHttpResponseHandler extends SimpleChannelInboundHandler<Object>
         if (!responseFuture.isDone()) {
             responseFuture.completeExceptionally(cause);
         }
+        ctx.fireExceptionCaught(cause);
     }
 
     private software.amazon.smithy.java.http.api.HttpResponse toSmithyHttpResponse(
@@ -133,12 +133,12 @@ final class NettyHttpResponseHandler extends SimpleChannelInboundHandler<Object>
     }
 
     private long getContentLength(HttpResponse response) {
-        var contentLength = response.headers().get(HttpHeaderNames.CONTENT_LENGTH.toString());
+        var contentLength = response.headers().get(HttpHeaderNames.CONTENT_LENGTH);
         if (contentLength != null) {
             try {
                 return Long.parseLong(contentLength);
             } catch (NumberFormatException e) {
-                LOGGER.warn(null, "Failed to parse content length header '{}'", contentLength);
+                LOGGER.info(null, "Failed to parse content length header '{}'", contentLength);
             }
         }
         return -1;

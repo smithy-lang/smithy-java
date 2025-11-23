@@ -13,6 +13,7 @@ import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http2.HttpConversionUtil;
+import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -66,15 +67,16 @@ final class NettyHttpClient implements Closeable {
         pipeline.addFirst(new WriteTimeoutHandler(config.writeTimeout().toMillis(), TimeUnit.MILLISECONDS));
         if (request.body().hasKnownLength()) {
             // Known length - send as FullHttpRequest
-            sendFullHttpRequest(channel, request, responseFuture);
+            sendFullHttpRequest(config, channel, request, responseFuture);
         } else {
             // Unknown length - send as streaming request
-            sendStreamedHttpRequest(channel, request, responseFuture);
+            sendStreamedHttpRequest(config, channel, request, responseFuture);
         }
         LOGGER.trace(channel, "HTTP request sent scheduled for {}", request.uri());
     }
 
     private static void sendFullHttpRequest(
+            NettyHttpClientTransport.Configuration config,
             Channel channel,
             HttpRequest request,
             CompletableFuture<HttpResponse> responseFuture
@@ -101,10 +103,12 @@ final class NettyHttpClient implements Closeable {
             nettyRequest.headers().set("Content-Length", content.readableBytes());
         }
         LOGGER.trace(channel, "Sending full HTTP request to {}, headers: {}", request.uri(), nettyRequest.headers());
-        channel.writeAndFlush(nettyRequest).addListener(new FullRequestWriteListener(channel, request, responseFuture));
+        channel.writeAndFlush(nettyRequest)
+                .addListener(new FullRequestWriteListener(config, channel, request, responseFuture));
     }
 
     private static void sendStreamedHttpRequest(
+            NettyHttpClientTransport.Configuration config,
             Channel channel,
             HttpRequest request,
             CompletableFuture<HttpResponse> responseFuture
@@ -132,7 +136,7 @@ final class NettyHttpClient implements Closeable {
 
         // Send the initial request to create the stream (without closing it)
         channel.writeAndFlush(nettyRequest)
-                .addListener(new StreamingRequestWriteListener(channel, request, responseFuture));
+                .addListener(new StreamingRequestWriteListener(config, channel, request, responseFuture));
     }
 
     private static void setHeaders(
@@ -224,11 +228,18 @@ final class NettyHttpClient implements Closeable {
     }
 
     static class FullRequestWriteListener implements GenericFutureListener<Future<? super Void>> {
+        private final NettyHttpClientTransport.Configuration config;
         private final Channel channel;
         private final HttpRequest request;
         private final CompletableFuture<HttpResponse> responseFuture;
 
-        FullRequestWriteListener(Channel channel, HttpRequest request, CompletableFuture<HttpResponse> responseFuture) {
+        FullRequestWriteListener(
+                NettyHttpClientTransport.Configuration config,
+                Channel channel,
+                HttpRequest request,
+                CompletableFuture<HttpResponse> responseFuture
+        ) {
+            this.config = config;
             this.channel = channel;
             this.request = request;
             this.responseFuture = responseFuture;
@@ -243,21 +254,26 @@ final class NettyHttpClient implements Closeable {
                         ClientTransport.remapExceptions(cause));
             } else {
                 LOGGER.trace(channel, "Full request write succeeded");
+                channel.pipeline()
+                        .addLast(new ReadTimeoutHandler(config.readTimeout().toMillis(), TimeUnit.MILLISECONDS));
                 channel.read();
             }
         }
     }
 
     static class StreamingRequestWriteListener implements GenericFutureListener<Future<? super Void>> {
+        private final NettyHttpClientTransport.Configuration config;
         private final Channel channel;
         private final HttpRequest request;
         private final CompletableFuture<HttpResponse> responseFuture;
 
         StreamingRequestWriteListener(
+                NettyHttpClientTransport.Configuration config,
                 Channel channel,
                 HttpRequest request,
                 CompletableFuture<HttpResponse> responseFuture
         ) {
+            this.config = config;
             this.channel = channel;
             this.request = request;
             this.responseFuture = responseFuture;
@@ -274,7 +290,8 @@ final class NettyHttpClient implements Closeable {
                 // Request sent, Now stream the body data
                 LOGGER.trace(channel, "Streaming request preface write succeeded");
                 request.body().subscribe(new NettyBodySubscriber(channel, responseFuture));
-
+                channel.pipeline()
+                        .addLast(new ReadTimeoutHandler(config.readTimeout().toMillis(), TimeUnit.MILLISECONDS));
                 channel.read();
             }
         }
