@@ -101,6 +101,13 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             responseStatus = bindingMatcher.responseStatus();
         }
 
+        // Add fixed query string parameters from @http trait's uri field
+        if (!uriPattern.getQueryLiterals().isEmpty()) {
+            for (var entry : uriPattern.getQueryLiterals().entrySet()) {
+                queryStringParams.add(entry.getKey(), entry.getValue());
+            }
+        }
+
         // Prescanning names from @httpHeader for @httpPrefixHeaders
         for (var member : schema.members()) {
             if (member.hasTrait(TraitKey.HTTP_HEADER_TRAIT)) {
@@ -248,7 +255,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
                         schema.expectTrait(TraitKey.HTTP_PREFIX_HEADERS_TRAIT).getValue(),
                         serializer.headerConsumer,
                         serializer.namesFromHttpHeader);
-                case QUERY_PARAMS -> new HttpQueryParamsSerializer(serializer.queryStringParams::add);
+                case QUERY_PARAMS -> new HttpQueryParamsSerializer(serializer.queryStringParams::addForQueryParams);
                 case BODY -> ShapeSerializer.nullSerializer(); // handled in HttpBindingSerializer#writeStruct.
                 case PAYLOAD -> {
                     payloadSerializer = new PayloadSerializer(serializer, serializer.payloadCodec);

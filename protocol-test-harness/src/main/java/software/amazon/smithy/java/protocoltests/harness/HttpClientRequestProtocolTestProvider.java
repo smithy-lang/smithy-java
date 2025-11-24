@@ -21,6 +21,7 @@ import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.client.core.plugins.InjectIdempotencyTokenPlugin;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
@@ -89,6 +90,13 @@ final class HttpClientRequestProtocolTestProvider extends
                                     new ProtocolTestDocument(testCase.getParams(),
                                             testCase.getBodyMediaType().orElse(null))
                                             .deserializeInto(inputBuilder);
+
+                                    // Add fixed idempotency token provider for protocol tests.
+                                    if (operation.operationModel().idempotencyTokenMember() != null) {
+                                        overrideBuilder.putConfig(
+                                                InjectIdempotencyTokenPlugin.IDEMPOTENCY_TOKEN_PROVIDER,
+                                                "00000000-0000-4000-8000-000000000000");
+                                    }
 
                                     return new RequestTestInvocationContext(
                                             testCase,
@@ -159,7 +167,7 @@ final class HttpClientRequestProtocolTestProvider extends
                         ) throws ParameterResolutionException {
                             mockClient.clientRequest(input, apiOperation, overrideConfig);
                             var request = requestSupplier.get();
-                            Assertions.assertUriEquals(request.uri(), testCase.getUri());
+                            Assertions.assertUriEquals(testCase, request.uri());
                             testCase.getResolvedHost()
                                     .ifPresent(resolvedHost -> Assertions.assertHostEquals(request, resolvedHost));
                             Assertions.assertHeadersEqual(request, testCase.getHeaders());
