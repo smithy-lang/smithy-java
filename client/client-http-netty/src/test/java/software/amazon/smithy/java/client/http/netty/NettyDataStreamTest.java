@@ -327,8 +327,8 @@ class NettyDataStreamTest {
             var buf = new byte[size];
             for (var i = 0; i < size; i++) {
                 buf[i] = (byte) random.nextInt(-128, 128);
-                result.add(ByteBuffer.wrap(buf));
             }
+            result.add(ByteBuffer.wrap(buf));
         }
         return result;
     }
