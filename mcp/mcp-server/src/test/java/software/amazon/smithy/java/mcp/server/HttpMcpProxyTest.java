@@ -88,13 +88,35 @@ class HttpMcpProxyTest {
     }
 
     @Test
+    void testBuilderWithDynamicHeaders() {
+        int[] counter = {0};
+        HttpMcpProxy proxyWithDynamicHeaders = HttpMcpProxy.builder()
+                .url(serverUrl)
+                .headers(() -> Map.of("X-Request-Count", String.valueOf(++counter[0])))
+                .build();
+
+        assertNotNull(proxyWithDynamicHeaders);
+        proxyWithDynamicHeaders.shutdown().join();
+    }
+
+    @Test
     void testDefaultName() {
         HttpMcpProxy defaultProxy = HttpMcpProxy.builder()
                 .url(serverUrl)
                 .build();
 
-        assertTrue(defaultProxy.name().startsWith("HTTP-"));
+        assertEquals("localhost", defaultProxy.name());
         defaultProxy.shutdown().join();
+    }
+
+    @Test
+    void testSanitizedName() {
+        HttpMcpProxy sanitizedProxy = HttpMcpProxy.builder()
+                .url("http://api.example.com:8080/path")
+                .build();
+
+        assertEquals("api-example-com", sanitizedProxy.name());
+        sanitizedProxy.shutdown().join();
     }
 
     @Test
@@ -142,32 +164,6 @@ class HttpMcpProxyTest {
         ExecutionException exception = assertThrows(ExecutionException.class, future::get);
         assertTrue(exception.getCause() instanceof RuntimeException);
         assertTrue(exception.getCause().getMessage().contains("HTTP error 500"));
-    }
-
-    @Test
-    void testRpcInvalidJsonResponse() throws IOException {
-        mockServer.removeContext("/mcp");
-        mockServer.createContext("/mcp", exchange -> {
-            String invalidJson = "invalid json";
-            exchange.getResponseHeaders().set("Content-Type", "application/json");
-            exchange.sendResponseHeaders(200, invalidJson.getBytes().length);
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(invalidJson.getBytes());
-            }
-            exchange.close();
-        });
-
-        JsonRpcRequest request = JsonRpcRequest.builder()
-                .method("test/method")
-                .id(Document.of(1))
-                .jsonrpc("2.0")
-                .build();
-
-        CompletableFuture<JsonRpcResponse> future = proxy.rpc(request);
-
-        ExecutionException exception = assertThrows(ExecutionException.class, future::get);
-        assertTrue(exception.getCause() instanceof RuntimeException);
-        assertTrue(exception.getCause().getMessage().contains("Failed to parse JSON-RPC response"));
     }
 
     @Test

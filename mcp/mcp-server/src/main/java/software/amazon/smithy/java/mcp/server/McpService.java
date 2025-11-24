@@ -226,15 +226,15 @@ public final class McpService {
     }
 
     private JsonRpcResponse handleToolsList(JsonRpcRequest req, ProtocolVersion protocolVersion) {
-        boolean supportsOutputSchema = supportsOutputSchema(protocolVersion);
-        List<ToolInfo> filteredTools = tools.values()
-                .stream()
-                .filter(tool -> toolFilter.allowTool(tool.serverId(), tool.toolInfo().getName()))
-                .map(tool -> extractToolInfo(tool, supportsOutputSchema))
-                .toList();
-
-        return createSuccessResponse(req.getId(),
-                ListToolsResult.builder().tools(filteredTools).build());
+        var supportsOutputSchema = supportsOutputSchema(protocolVersion);
+        var result = ListToolsResult.builder()
+                .tools(tools.values()
+                        .stream()
+                        .filter(t -> toolFilter.allowTool(t.serverId(), t.toolInfo().getName()))
+                        .map(tool -> extractToolInfo(tool, supportsOutputSchema))
+                        .toList())
+                .build();
+        return createSuccessResponse(req.getId(), result);
     }
 
     private JsonRpcResponse handleToolsCall(
@@ -311,8 +311,10 @@ public final class McpService {
             return;
         }
 
+        System.out.println("DEBUG: Initializing " + proxies.size() + " proxies");
         for (McpServerProxy proxy : proxies.values()) {
             try {
+                System.out.println("DEBUG: Initializing proxy: " + proxy.name());
                 proxy.initialize(responseWriter, initRequest);
 
                 List<ToolInfo> proxyTools = proxy.listTools();

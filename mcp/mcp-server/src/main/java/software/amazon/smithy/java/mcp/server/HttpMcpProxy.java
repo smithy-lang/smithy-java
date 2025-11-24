@@ -6,13 +6,18 @@
 package software.amazon.smithy.java.mcp.server;
 
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+import software.amazon.smithy.java.client.core.ClientTransport;
+import software.amazon.smithy.java.client.http.HttpContext;
+import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -28,24 +33,33 @@ public final class HttpMcpProxy extends McpServerProxy {
                     .build())
             .build();
 
-    private final HttpClient client;
+    private final ClientTransport<HttpRequest, HttpResponse> transport;
     private final URI endpoint;
     private final String name;
-    private final Map<String, String> headers;
+    private final Supplier<Map<String, String>> headersSupplier;
+    private final Duration timeout;
 
     private HttpMcpProxy(Builder builder) {
-        this.client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(30))
-                .build();
+        this.transport = builder.transport != null ? builder.transport : new JavaHttpClientTransport();
         this.endpoint = URI.create(builder.url);
-        this.name = builder.name != null ? builder.name : "HTTP-" + endpoint.getHost();
-        this.headers = builder.headers != null ? Map.copyOf(builder.headers) : Map.of();
+        this.name = builder.name != null ? builder.name : sanitizeName(endpoint.getHost());
+        this.headersSupplier = builder.headersSupplier != null ? builder.headersSupplier : Map::of;
+        this.timeout = builder.timeout != null ? builder.timeout : Duration.ofSeconds(60);
+    }
+
+    private static String sanitizeName(String host) {
+        if (host == null) {
+            return "http-proxy-mcp";
+        }
+        return host.replaceAll("[^a-zA-Z0-9-]", "-");
     }
 
     public static class Builder {
         private String url;
         private String name;
-        private Map<String, String> headers;
+        private Supplier<Map<String, String>> headersSupplier;
+        private ClientTransport<HttpRequest, HttpResponse> transport;
+        private Duration timeout;
 
         public Builder url(String url) {
             this.url = url;
@@ -57,8 +71,23 @@ public final class HttpMcpProxy extends McpServerProxy {
             return this;
         }
 
+        public Builder headers(Supplier<Map<String, String>> headersSupplier) {
+            this.headersSupplier = headersSupplier;
+            return this;
+        }
+
         public Builder headers(Map<String, String> headers) {
-            this.headers = headers;
+            this.headersSupplier = () -> headers;
+            return this;
+        }
+
+        public Builder transport(ClientTransport<HttpRequest, HttpResponse> transport) {
+            this.transport = transport;
+            return this;
+        }
+
+        public Builder timeout(Duration timeout) {
+            this.timeout = timeout;
             return this;
         }
 
@@ -76,52 +105,44 @@ public final class HttpMcpProxy extends McpServerProxy {
 
     @Override
     public CompletableFuture<JsonRpcResponse> rpc(JsonRpcRequest request) {
-        try {
-            if (request == null) {
-                throw new IllegalArgumentException("JsonRpcRequest cannot be null");
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                if (request == null) {
+                    throw new IllegalArgumentException("JsonRpcRequest cannot be null");
+                }
+
+                byte[] body = JSON_CODEC.serializeToString(request).getBytes(StandardCharsets.UTF_8);
+                LOG.trace("Sending HTTP request to {}", endpoint);
+
+                HttpRequest.Builder requestBuilder = HttpRequest.builder()
+                        .uri(endpoint)
+                        .method("POST")
+                        .withAddedHeader("Content-Type", "application/json")
+                        .body(DataStream.ofBytes(body, "application/json"));
+
+                Map<String, String> headers = headersSupplier.get();
+                for (Map.Entry<String, String> header : headers.entrySet()) {
+                    requestBuilder.withAddedHeader(header.getKey(), header.getValue());
+                }
+
+                Context context = Context.create();
+                context.put(HttpContext.HTTP_REQUEST_TIMEOUT, timeout);
+
+                HttpResponse response = transport.send(context, requestBuilder.build());
+                LOG.trace("Received HTTP response with status: {}", response.statusCode());
+
+                if (response.statusCode() != 200) {
+                    throw new RuntimeException("HTTP error " + response.statusCode());
+                }
+
+                return JsonRpcResponse.builder()
+                        .deserialize(JSON_CODEC.createDeserializer(response.body().asByteBuffer()))
+                        .build();
+            } catch (Exception e) {
+                LOG.error("HTTP request failed", e);
+                throw new RuntimeException("HTTP request failed: " + e.getMessage(), e);
             }
-            String body = JSON_CODEC.serializeToString(request);
-            LOG.debug("Sending HTTP request to {}", endpoint);
-
-            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                    .uri(endpoint)
-                    .header("Content-Type", "application/json")
-                    .timeout(Duration.ofSeconds(60))
-                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
-
-            // Add custom headers
-            for (Map.Entry<String, String> header : headers.entrySet()) {
-                requestBuilder.header(header.getKey(), header.getValue());
-            }
-
-            HttpRequest httpRequest = requestBuilder.build();
-
-            return client.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-                    .thenApply(response -> {
-                        LOG.debug("Received HTTP response with status: {}", response.statusCode());
-
-                        if (response.statusCode() != 200) {
-                            throw new RuntimeException("HTTP error " + response.statusCode() + ": " + response.body());
-                        }
-
-                        try {
-                            return JsonRpcResponse.builder()
-                                    .deserialize(JSON_CODEC.createDeserializer(
-                                            response.body().getBytes(StandardCharsets.UTF_8)))
-                                    .build();
-                        } catch (Exception e) {
-                            throw new RuntimeException("Failed to parse JSON-RPC response: " + e.getMessage(), e);
-                        }
-                    })
-                    .exceptionally(throwable -> {
-                        LOG.error("HTTP request failed", throwable);
-                        throw new RuntimeException("HTTP request failed: " + throwable.getMessage(), throwable);
-                    });
-        } catch (Exception e) {
-            LOG.error("Failed to serialize request", e);
-            return CompletableFuture.failedFuture(
-                    new RuntimeException("Failed to serialize request: " + e.getMessage(), e));
-        }
+        });
     }
 
     @Override
