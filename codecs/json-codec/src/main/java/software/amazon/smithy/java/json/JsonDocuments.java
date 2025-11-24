@@ -246,9 +246,14 @@ public final class JsonDocuments {
         @Override
         public ShapeId discriminator() {
             String discriminator = null;
-            var member = values.get("__type");
-            if (member != null && member.type() == ShapeType.STRING) {
-                discriminator = member.asString();
+            var typeMember = values.get("__type");
+            if (typeMember != null && typeMember.type() == ShapeType.STRING) {
+                discriminator = typeMember.asString();
+            } else {
+                var codeMember = values.get("code");
+                if (codeMember != null && codeMember.type() == ShapeType.STRING) {
+                    discriminator = codeMember.asString();
+                }
             }
             if (settings.errorTypeSanitizer() != null) {
                 discriminator = settings.errorTypeSanitizer().apply(discriminator);

@@ -35,12 +35,6 @@ public class AwsJson11ProtocolTests {
     }
 
     @HttpClientResponseTests
-    @ProtocolTestFilter(
-            skipTests = {
-                    "AwsJson11FooErrorUsingCode",
-                    "AwsJson11FooErrorUsingCodeAndNamespace",
-                    "AwsJson11FooErrorUsingCodeUriAndNamespace",
-            })
     public void responseTest(Runnable test) {
         test.run();
     }
