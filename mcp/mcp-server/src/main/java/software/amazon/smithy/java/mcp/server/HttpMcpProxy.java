@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.mcp.server;
 
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
@@ -17,6 +16,7 @@ import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
@@ -24,14 +24,13 @@ import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.model.JsonRpcErrorResponse;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
+import software.amazon.smithy.utils.SmithyUnstableApi;
 
+@SmithyUnstableApi
 public final class HttpMcpProxy extends McpServerProxy {
     private static final InternalLogger LOG = InternalLogger.getLogger(HttpMcpProxy.class);
     private static final JsonCodec JSON_CODEC = JsonCodec.builder()
-            .settings(JsonSettings.builder()
-                    .serializeTypeInDocuments(false)
-                    .useJsonName(true)
-                    .build())
+            .settings(JsonSettings.builder().serializeTypeInDocuments(false).build())
             .build();
 
     private final ClientTransport<HttpRequest, HttpResponse> transport;
@@ -55,7 +54,7 @@ public final class HttpMcpProxy extends McpServerProxy {
         return host.replaceAll("[^a-zA-Z0-9-]", "-");
     }
 
-    public static class Builder {
+    public static final class Builder {
         private String endpoint;
         private String name;
         private Signer<HttpRequest, ?> signer;
@@ -101,73 +100,69 @@ public final class HttpMcpProxy extends McpServerProxy {
 
     @Override
     public CompletableFuture<JsonRpcResponse> rpc(JsonRpcRequest request) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                if (request == null) {
-                    throw new IllegalArgumentException("JsonRpcRequest cannot be null");
-                }
+        try {
+            byte[] body = JSON_CODEC.serializeToString(request).getBytes(StandardCharsets.UTF_8);
+            LOG.trace("Sending HTTP request to {}", endpoint);
 
-                byte[] body = JSON_CODEC.serializeToString(request).getBytes(StandardCharsets.UTF_8);
-                LOG.trace("Sending HTTP request to {}", endpoint);
+            HttpRequest httpRequest = HttpRequest.builder()
+                    .uri(endpoint)
+                    .method("POST")
+                    .withAddedHeader("Content-Type", "application/json")
+                    .withAddedHeader("Accept", "application/json, text/event-stream")
+                    .body(DataStream.ofBytes(body, "application/json"))
+                    .build();
 
-                HttpRequest httpRequest = HttpRequest.builder()
-                        .uri(endpoint)
-                        .method("POST")
-                        .withAddedHeader("Content-Type", "application/json")
-                        .withAddedHeader("Accept", "application/json, text/event-stream")
-                        .body(DataStream.ofBytes(body, "application/json"))
-                        .build();
+            Context context = Context.create();
+            context.put(HttpContext.HTTP_REQUEST_TIMEOUT, timeout);
 
-                if (signer != null) {
-                    httpRequest = signer.sign(httpRequest, null, Context.create());
-                }
-
-                Context context = Context.create();
-                context.put(HttpContext.HTTP_REQUEST_TIMEOUT, timeout);
-
-                HttpResponse response = transport.send(context, httpRequest);
-                LOG.trace("Received HTTP response with status: {}", response.statusCode());
-
-                if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                    ByteBuffer bodyBuffer = response.body().asByteBuffer();
-                    byte[] bodyBytes = new byte[bodyBuffer.remaining()];
-                    bodyBuffer.get(bodyBytes);
-
-                    if (bodyBytes.length > 0) {
-                        var contentTypeHeader = response.headers().allValues("Content-Type");
-                        String contentType = !contentTypeHeader.isEmpty() ? contentTypeHeader.get(0) : "";
-
-                        if (contentType.contains("application/json")) {
-                            try {
-                                bodyBuffer.rewind();
-                                return JsonRpcResponse.builder()
-                                        .deserialize(JSON_CODEC.createDeserializer(bodyBuffer))
-                                        .build();
-                            } catch (Exception e) {
-                                LOG.warn("Failed to deserialize JSON error response", e);
-                            }
-                        }
-                    }
-
-                    String errorBody = bodyBytes.length > 0
-                            ? new String(bodyBytes, 0, Math.min(200, bodyBytes.length), StandardCharsets.UTF_8)
-                            : "";
-                    return JsonRpcResponse.builder()
-                            .jsonrpc("2.0")
-                            .error(JsonRpcErrorResponse.builder()
-                                    .code(response.statusCode())
-                                    .message("HTTP " + response.statusCode() + ": " + errorBody)
-                                    .build())
-                            .build();
-                }
-
-                return JsonRpcResponse.builder()
-                        .deserialize(JSON_CODEC.createDeserializer(response.body().asByteBuffer()))
-                        .build();
-            } catch (Exception e) {
-                throw new RuntimeException("HTTP request failed: " + e.getMessage(), e);
+            if (signer != null) {
+                httpRequest = signer.sign(httpRequest, null, context);
             }
-        });
+
+            HttpResponse response = transport.send(context, httpRequest);
+            LOG.trace("Received HTTP response with status: {}", response.statusCode());
+
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                return CompletableFuture.completedFuture(handleErrorResponse(response));
+            }
+
+            return CompletableFuture.completedFuture(JsonRpcResponse.builder()
+                    .deserialize(JSON_CODEC.createDeserializer(response.body().asByteBuffer()))
+                    .build());
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    private JsonRpcResponse handleErrorResponse(HttpResponse response) {
+        long contentLength = response.body().contentLength();
+        String errorMessage = "HTTP " + response.statusCode();
+
+        if (contentLength > 0) {
+            String contentType = response.body().contentType();
+            byte[] bodyBytes = ByteBufferUtils.getBytes(response.body().asByteBuffer());
+
+            if (contentType != null && contentType.contains("application/json")) {
+                try {
+                    return JsonRpcResponse.builder()
+                            .deserialize(JSON_CODEC.createDeserializer(bodyBytes))
+                            .build();
+                } catch (Exception e) {
+                    LOG.warn("Failed to deserialize JSON error response", e);
+                }
+            }
+
+            String errorBody = new String(bodyBytes, 0, Math.min(200, bodyBytes.length), StandardCharsets.UTF_8);
+            errorMessage = errorMessage + ": " + errorBody;
+        }
+
+        return JsonRpcResponse.builder()
+                .jsonrpc("2.0")
+                .error(JsonRpcErrorResponse.builder()
+                        .code(response.statusCode())
+                        .message(errorMessage)
+                        .build())
+                .build();
     }
 
     @Override

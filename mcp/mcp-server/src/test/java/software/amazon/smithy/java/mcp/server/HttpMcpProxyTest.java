@@ -153,8 +153,7 @@ class HttpMcpProxyTest {
         CompletableFuture<JsonRpcResponse> future = proxy.rpc(null);
 
         ExecutionException exception = assertThrows(ExecutionException.class, future::get);
-        assertTrue(exception.getCause() instanceof RuntimeException);
-        assertTrue(exception.getCause().getMessage().contains("JsonRpcRequest cannot be null"));
+        assertTrue(exception.getCause() instanceof NullPointerException);
     }
 
     @Test
