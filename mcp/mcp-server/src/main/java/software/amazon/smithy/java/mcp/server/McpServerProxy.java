@@ -23,6 +23,7 @@ public abstract class McpServerProxy {
     private static final AtomicInteger ID_GENERATOR = new AtomicInteger(0);
 
     protected Consumer<JsonRpcResponse> notificationConsumer;
+    protected String protocolVersion;
 
     public List<ToolInfo> listTools() {
         JsonRpcRequest request = JsonRpcRequest.builder()
@@ -43,13 +44,18 @@ public abstract class McpServerProxy {
         }).join();
     }
 
-    public void initialize(Consumer<JsonRpcResponse> notificationConsumer, JsonRpcRequest initializeRequest) {
+    public void initialize(
+            Consumer<JsonRpcResponse> notificationConsumer,
+            JsonRpcRequest initializeRequest,
+            String protocolVersion
+    ) {
 
         var result = Objects.requireNonNull(rpc(initializeRequest).join());
         if (result.getError() != null) {
             throw new RuntimeException("Error during initialization: " + result.getError().getMessage());
         }
         this.notificationConsumer = notificationConsumer;
+        this.protocolVersion = protocolVersion;
     }
 
     abstract CompletableFuture<JsonRpcResponse> rpc(JsonRpcRequest request);

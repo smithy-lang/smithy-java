@@ -30,7 +30,7 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 public final class HttpMcpProxy extends McpServerProxy {
     private static final InternalLogger LOG = InternalLogger.getLogger(HttpMcpProxy.class);
     private static final JsonCodec JSON_CODEC = JsonCodec.builder()
-            .settings(JsonSettings.builder().serializeTypeInDocuments(false).build())
+            .settings(JsonSettings.builder().serializeTypeInDocuments(false).useJsonName(true).build())
             .build();
 
     private final ClientTransport<HttpRequest, HttpResponse> transport;
@@ -104,11 +104,16 @@ public final class HttpMcpProxy extends McpServerProxy {
             byte[] body = JSON_CODEC.serializeToString(request).getBytes(StandardCharsets.UTF_8);
             LOG.trace("Sending HTTP request to {}", endpoint);
 
+            String protocolVersionHeader = protocolVersion != null
+                    ? protocolVersion
+                    : ProtocolVersion.defaultVersion().identifier();
+
             HttpRequest httpRequest = HttpRequest.builder()
                     .uri(endpoint)
                     .method("POST")
                     .withAddedHeader("Content-Type", "application/json")
                     .withAddedHeader("Accept", "application/json, text/event-stream")
+                    .withAddedHeader("MCP-Protocol-Version", protocolVersionHeader)
                     .body(DataStream.ofBytes(body, "application/json"))
                     .build();
 
@@ -142,18 +147,26 @@ public final class HttpMcpProxy extends McpServerProxy {
             String contentType = response.body().contentType();
             byte[] bodyBytes = ByteBufferUtils.getBytes(response.body().asByteBuffer());
 
-            if (contentType != null && contentType.contains("application/json")) {
+            if ("application/json".equals(contentType)) {
                 try {
                     return JsonRpcResponse.builder()
                             .deserialize(JSON_CODEC.createDeserializer(bodyBytes))
                             .build();
                 } catch (Exception e) {
                     LOG.warn("Failed to deserialize JSON error response", e);
+                    return JsonRpcResponse.builder()
+                            .jsonrpc("2.0")
+                            .error(JsonRpcErrorResponse.builder()
+                                    .code(response.statusCode())
+                                    .message("HTTP " + response.statusCode() + ": Invalid JSON response")
+                                    .build())
+                            .build();
                 }
+            } else {
+                int length = Math.min(200, bodyBytes.length);
+                String errorBody = new String(bodyBytes, 0, length, StandardCharsets.UTF_8);
+                errorMessage = errorMessage + ": " + errorBody + (length != bodyBytes.length ? " (truncated)" : "");
             }
-
-            String errorBody = new String(bodyBytes, 0, Math.min(200, bodyBytes.length), StandardCharsets.UTF_8);
-            errorMessage = errorMessage + ": " + errorBody;
         }
 
         return JsonRpcResponse.builder()

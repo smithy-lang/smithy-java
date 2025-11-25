@@ -311,9 +311,18 @@ public final class McpService {
             return;
         }
 
+        String protocolVersion = null;
+        var maybeVersion = initRequest.getParams().getMember("protocolVersion");
+        if (maybeVersion != null) {
+            var version = ProtocolVersion.version(maybeVersion.asString());
+            if (!(version instanceof ProtocolVersion.UnknownVersion)) {
+                protocolVersion = version.identifier();
+            }
+        }
+
         for (McpServerProxy proxy : proxies.values()) {
             try {
-                proxy.initialize(responseWriter, initRequest);
+                proxy.initialize(responseWriter, initRequest, protocolVersion);
 
                 List<ToolInfo> proxyTools = proxy.listTools();
                 for (var toolInfo : proxyTools) {
