@@ -23,7 +23,7 @@ public abstract class McpServerProxy {
     private static final AtomicInteger ID_GENERATOR = new AtomicInteger(0);
 
     protected Consumer<JsonRpcResponse> notificationConsumer;
-    protected String protocolVersion;
+    protected volatile String protocolVersion;
 
     public List<ToolInfo> listTools() {
         JsonRpcRequest request = JsonRpcRequest.builder()
