@@ -6,11 +6,11 @@
 package software.amazon.smithy.java.mcp.server;
 
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
+import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.http.HttpContext;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
@@ -21,6 +21,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.logging.InternalLogger;
+import software.amazon.smithy.java.mcp.model.JsonRpcErrorResponse;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
 
@@ -36,14 +37,14 @@ public final class HttpMcpProxy extends McpServerProxy {
     private final ClientTransport<HttpRequest, HttpResponse> transport;
     private final URI endpoint;
     private final String name;
-    private final Supplier<Map<String, String>> headersSupplier;
+    private final Signer<HttpRequest, ?> signer;
     private final Duration timeout;
 
     private HttpMcpProxy(Builder builder) {
         this.transport = builder.transport != null ? builder.transport : new JavaHttpClientTransport();
         this.endpoint = URI.create(builder.url);
         this.name = builder.name != null ? builder.name : sanitizeName(endpoint.getHost());
-        this.headersSupplier = builder.headersSupplier != null ? builder.headersSupplier : Map::of;
+        this.signer = builder.signer;
         this.timeout = builder.timeout != null ? builder.timeout : Duration.ofSeconds(60);
     }
 
@@ -57,7 +58,7 @@ public final class HttpMcpProxy extends McpServerProxy {
     public static class Builder {
         private String url;
         private String name;
-        private Supplier<Map<String, String>> headersSupplier;
+        private Signer<HttpRequest, ?> signer;
         private ClientTransport<HttpRequest, HttpResponse> transport;
         private Duration timeout;
 
@@ -71,13 +72,8 @@ public final class HttpMcpProxy extends McpServerProxy {
             return this;
         }
 
-        public Builder headers(Supplier<Map<String, String>> headersSupplier) {
-            this.headersSupplier = headersSupplier;
-            return this;
-        }
-
-        public Builder headers(Map<String, String> headers) {
-            this.headersSupplier = () -> headers;
+        public Builder signer(Signer<HttpRequest, ?> signer) {
+            this.signer = signer;
             return this;
         }
 
@@ -114,32 +110,61 @@ public final class HttpMcpProxy extends McpServerProxy {
                 byte[] body = JSON_CODEC.serializeToString(request).getBytes(StandardCharsets.UTF_8);
                 LOG.trace("Sending HTTP request to {}", endpoint);
 
-                HttpRequest.Builder requestBuilder = HttpRequest.builder()
+                HttpRequest httpRequest = HttpRequest.builder()
                         .uri(endpoint)
                         .method("POST")
                         .withAddedHeader("Content-Type", "application/json")
-                        .body(DataStream.ofBytes(body, "application/json"));
+                        .withAddedHeader("Accept", "application/json, text/event-stream")
+                        .body(DataStream.ofBytes(body, "application/json"))
+                        .build();
 
-                Map<String, String> headers = headersSupplier.get();
-                for (Map.Entry<String, String> header : headers.entrySet()) {
-                    requestBuilder.withAddedHeader(header.getKey(), header.getValue());
+                if (signer != null) {
+                    httpRequest = signer.sign(httpRequest, null, Context.create());
                 }
 
                 Context context = Context.create();
                 context.put(HttpContext.HTTP_REQUEST_TIMEOUT, timeout);
 
-                HttpResponse response = transport.send(context, requestBuilder.build());
+                HttpResponse response = transport.send(context, httpRequest);
                 LOG.trace("Received HTTP response with status: {}", response.statusCode());
 
-                if (response.statusCode() != 200) {
-                    throw new RuntimeException("HTTP error " + response.statusCode());
+                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                    ByteBuffer bodyBuffer = response.body().asByteBuffer();
+                    byte[] bodyBytes = new byte[bodyBuffer.remaining()];
+                    bodyBuffer.get(bodyBytes);
+
+                    if (bodyBytes.length > 0) {
+                        var contentTypeHeader = response.headers().allValues("Content-Type");
+                        String contentType = !contentTypeHeader.isEmpty() ? contentTypeHeader.get(0) : "";
+
+                        if (contentType.contains("application/json")) {
+                            try {
+                                bodyBuffer.rewind();
+                                return JsonRpcResponse.builder()
+                                        .deserialize(JSON_CODEC.createDeserializer(bodyBuffer))
+                                        .build();
+                            } catch (Exception e) {
+                                LOG.warn("Failed to deserialize JSON error response", e);
+                            }
+                        }
+                    }
+
+                    String errorBody = bodyBytes.length > 0
+                            ? new String(bodyBytes, 0, Math.min(200, bodyBytes.length), StandardCharsets.UTF_8)
+                            : "";
+                    return JsonRpcResponse.builder()
+                            .jsonrpc("2.0")
+                            .error(JsonRpcErrorResponse.builder()
+                                    .code(response.statusCode())
+                                    .message("HTTP " + response.statusCode() + ": " + errorBody)
+                                    .build())
+                            .build();
                 }
 
                 return JsonRpcResponse.builder()
                         .deserialize(JSON_CODEC.createDeserializer(response.body().asByteBuffer()))
                         .build();
             } catch (Exception e) {
-                LOG.error("HTTP request failed", e);
                 throw new RuntimeException("HTTP request failed: " + e.getMessage(), e);
             }
         });

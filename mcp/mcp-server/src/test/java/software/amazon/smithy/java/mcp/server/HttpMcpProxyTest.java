@@ -80,7 +80,13 @@ class HttpMcpProxyTest {
         Map<String, String> headers = Map.of("Authorization", "Bearer token");
         HttpMcpProxy proxyWithHeaders = HttpMcpProxy.builder()
                 .url(serverUrl)
-                .headers(headers)
+                .signer((request, identity, context) -> {
+                    var r = request.toModifiable();
+                    var h = r.headers().toModifiable();
+                    headers.forEach(h::setHeader);
+                    r.setHeaders(h);
+                    return r;
+                })
                 .build();
 
         assertNotNull(proxyWithHeaders);
@@ -92,7 +98,13 @@ class HttpMcpProxyTest {
         int[] counter = {0};
         HttpMcpProxy proxyWithDynamicHeaders = HttpMcpProxy.builder()
                 .url(serverUrl)
-                .headers(() -> Map.of("X-Request-Count", String.valueOf(++counter[0])))
+                .signer((request, identity, context) -> {
+                    var r = request.toModifiable();
+                    var h = r.headers().toModifiable();
+                    h.setHeader("X-Request-Count", String.valueOf(++counter[0]));
+                    r.setHeaders(h);
+                    return r;
+                })
                 .build();
 
         assertNotNull(proxyWithDynamicHeaders);
@@ -160,10 +172,12 @@ class HttpMcpProxyTest {
                 .build();
 
         CompletableFuture<JsonRpcResponse> future = proxy.rpc(request);
+        JsonRpcResponse response = future.join();
 
-        ExecutionException exception = assertThrows(ExecutionException.class, future::get);
-        assertTrue(exception.getCause() instanceof RuntimeException);
-        assertTrue(exception.getCause().getMessage().contains("HTTP error 500"));
+        assertNotNull(response);
+        assertNotNull(response.getError());
+        assertEquals(500, response.getError().getCode());
+        assertTrue(response.getError().getMessage().contains("HTTP 500"));
     }
 
     @Test
