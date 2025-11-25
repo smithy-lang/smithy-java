@@ -42,7 +42,7 @@ public final class HttpMcpProxy extends McpServerProxy {
 
     private HttpMcpProxy(Builder builder) {
         this.transport = builder.transport != null ? builder.transport : new JavaHttpClientTransport();
-        this.endpoint = URI.create(builder.url);
+        this.endpoint = URI.create(builder.endpoint);
         this.name = builder.name != null ? builder.name : sanitizeName(endpoint.getHost());
         this.signer = builder.signer;
         this.timeout = builder.timeout != null ? builder.timeout : Duration.ofSeconds(60);
@@ -56,14 +56,14 @@ public final class HttpMcpProxy extends McpServerProxy {
     }
 
     public static class Builder {
-        private String url;
+        private String endpoint;
         private String name;
         private Signer<HttpRequest, ?> signer;
         private ClientTransport<HttpRequest, HttpResponse> transport;
         private Duration timeout;
 
-        public Builder url(String url) {
-            this.url = url;
+        public Builder endpoint(String endpoint) {
+            this.endpoint = endpoint;
             return this;
         }
 
@@ -88,8 +88,8 @@ public final class HttpMcpProxy extends McpServerProxy {
         }
 
         public HttpMcpProxy build() {
-            if (url == null || url.isEmpty()) {
-                throw new IllegalArgumentException("URL must be provided");
+            if (endpoint == null || endpoint.isEmpty()) {
+                throw new IllegalArgumentException("Endpoint must be provided");
             }
             return new HttpMcpProxy(this);
         }

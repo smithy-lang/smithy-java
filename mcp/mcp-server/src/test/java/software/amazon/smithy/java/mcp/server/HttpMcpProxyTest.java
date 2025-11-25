@@ -42,7 +42,7 @@ class HttpMcpProxyTest {
         mockServer.start();
 
         proxy = HttpMcpProxy.builder()
-                .url(serverUrl)
+                .endpoint(serverUrl)
                 .name("Test MCP")
                 .build();
     }
@@ -61,13 +61,13 @@ class HttpMcpProxyTest {
     void testBuilderValidation() {
         assertThrows(IllegalArgumentException.class, () -> HttpMcpProxy.builder().build());
 
-        assertThrows(IllegalArgumentException.class, () -> HttpMcpProxy.builder().url("").build());
+        assertThrows(IllegalArgumentException.class, () -> HttpMcpProxy.builder().endpoint("").build());
     }
 
     @Test
     void testBuilderWithCustomName() {
         HttpMcpProxy customProxy = HttpMcpProxy.builder()
-                .url(serverUrl)
+                .endpoint(serverUrl)
                 .name("Custom Name")
                 .build();
 
@@ -79,7 +79,7 @@ class HttpMcpProxyTest {
     void testBuilderWithHeaders() {
         Map<String, String> headers = Map.of("Authorization", "Bearer token");
         HttpMcpProxy proxyWithHeaders = HttpMcpProxy.builder()
-                .url(serverUrl)
+                .endpoint(serverUrl)
                 .signer((request, identity, context) -> {
                     var r = request.toModifiable();
                     var h = r.headers().toModifiable();
@@ -97,7 +97,7 @@ class HttpMcpProxyTest {
     void testBuilderWithDynamicHeaders() {
         int[] counter = {0};
         HttpMcpProxy proxyWithDynamicHeaders = HttpMcpProxy.builder()
-                .url(serverUrl)
+                .endpoint(serverUrl)
                 .signer((request, identity, context) -> {
                     var r = request.toModifiable();
                     var h = r.headers().toModifiable();
@@ -114,7 +114,7 @@ class HttpMcpProxyTest {
     @Test
     void testDefaultName() {
         HttpMcpProxy defaultProxy = HttpMcpProxy.builder()
-                .url(serverUrl)
+                .endpoint(serverUrl)
                 .build();
 
         assertEquals("localhost", defaultProxy.name());
@@ -124,7 +124,7 @@ class HttpMcpProxyTest {
     @Test
     void testSanitizedName() {
         HttpMcpProxy sanitizedProxy = HttpMcpProxy.builder()
-                .url("http://api.example.com:8080/path")
+                .endpoint("http://api.example.com:8080/path")
                 .build();
 
         assertEquals("api-example-com", sanitizedProxy.name());

@@ -311,10 +311,8 @@ public final class McpService {
             return;
         }
 
-        System.out.println("DEBUG: Initializing " + proxies.size() + " proxies");
         for (McpServerProxy proxy : proxies.values()) {
             try {
-                System.out.println("DEBUG: Initializing proxy: " + proxy.name());
                 proxy.initialize(responseWriter, initRequest);
 
                 List<ToolInfo> proxyTools = proxy.listTools();
