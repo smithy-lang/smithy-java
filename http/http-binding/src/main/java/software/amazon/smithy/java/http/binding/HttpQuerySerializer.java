@@ -7,7 +7,6 @@ package software.amazon.smithy.java.http.binding;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -15,7 +14,6 @@ import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
-import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.model.traits.HttpQueryTrait;
 
 final class HttpQuerySerializer extends SpecificShapeSerializer {
@@ -116,14 +114,6 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public void writeBlob(Schema schema, ByteBuffer value) {
-        var queryTrait = schema.getTrait(TraitKey.HTTP_QUERY_TRAIT);
-        if (queryTrait != null) {
-            writeQuery(queryTrait, ByteBufferUtils.base64Encode(value));
-        }
-    }
-
-    @Override
     public void writeTimestamp(Schema schema, Instant value) {
         var queryTrait = schema.getTrait(TraitKey.HTTP_QUERY_TRAIT);
         if (queryTrait != null) {
@@ -137,6 +127,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     private class ListElementSerializer extends SpecificShapeSerializer {
         private final HttpQueryTrait parentTrait;
+
         ListElementSerializer(HttpQueryTrait trait) {
             this.parentTrait = trait;
         }
@@ -189,11 +180,6 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
         @Override
         public void writeString(Schema schema, String value) {
             writeQuery(parentTrait, value);
-        }
-
-        @Override
-        public void writeBlob(Schema schema, ByteBuffer value) {
-            writeQuery(parentTrait, ByteBufferUtils.base64Encode(value));
         }
 
         @Override
