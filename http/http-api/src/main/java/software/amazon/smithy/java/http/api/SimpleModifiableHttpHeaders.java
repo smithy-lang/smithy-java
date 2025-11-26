@@ -7,31 +7,48 @@ package software.amazon.smithy.java.http.api;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Simple mutable HTTP headers implementation.
+ *
+ * <p><b>Thread Safety:</b> This class is <b>not</b> thread-safe. If multiple threads
+ * access an instance concurrently, and at least one thread modifies the headers,
+ * external synchronization is required.
+ */
 final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
 
-    private final Map<String, List<String>> headers = new ConcurrentHashMap<>();
+    private final Map<String, List<String>> headers = new HashMap<>();
 
     @Override
     public void addHeader(String name, String value) {
-        headers.computeIfAbsent(formatPutKey(name), k -> new ArrayList<>()).add(value);
+        getOrCreateValues(name).add(value);
     }
 
     @Override
     public void addHeader(String name, List<String> values) {
-        headers.computeIfAbsent(formatPutKey(name), k -> new ArrayList<>()).addAll(values);
+        getOrCreateValues(name).addAll(values);
+    }
+
+    private List<String> getOrCreateValues(String name) {
+        var key = formatPutKey(name);
+        var values = headers.get(key);
+        if (values == null) {
+            values = new ArrayList<>();
+            headers.put(key, values);
+        }
+        return values;
     }
 
     @Override
     public void setHeader(String name, String value) {
         var key = formatPutKey(name);
-        var list = headers.get(formatPutKey(name));
+        var list = headers.get(name);
         if (list == null) {
             list = new ArrayList<>(1);
             headers.put(key, list);
@@ -45,7 +62,7 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
     @Override
     public void setHeader(String name, List<String> values) {
         var key = formatPutKey(name);
-        var list = headers.get(formatPutKey(name));
+        var list = headers.get(name);
         if (list == null) {
             list = new ArrayList<>(values.size());
             headers.put(key, list);
@@ -67,6 +84,11 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
     @Override
     public void removeHeader(String name) {
         headers.remove(name.toLowerCase(Locale.ENGLISH));
+    }
+
+    @Override
+    public void clear() {
+        headers.clear();
     }
 
     @Override

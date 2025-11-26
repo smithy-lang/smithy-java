@@ -63,6 +63,11 @@ final class NettyHttpHeaders implements ModifiableHttpHeaders {
     }
 
     @Override
+    public void clear() {
+        nettyHeaders.clear();
+    }
+
+    @Override
     public boolean isEmpty() {
         return nettyHeaders.isEmpty();
     }

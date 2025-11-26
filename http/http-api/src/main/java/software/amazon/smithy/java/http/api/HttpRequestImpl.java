@@ -98,6 +98,7 @@ record HttpRequestImpl(
             Objects.requireNonNull(method, "Method cannot be null");
             Objects.requireNonNull(uri, "URI cannot be null");
             body = Objects.requireNonNullElse(body, DataStream.ofEmpty());
+            mutatedHeaders = null; // decouple from built request
         }
 
         @Override
