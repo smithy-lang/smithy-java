@@ -155,6 +155,11 @@ public class TestStructs {
         }
 
         @Override
+        public void clear() {
+            headers.clear();
+        }
+
+        @Override
         public List<String> allValues(String name) {
             return headers.getOrDefault(name, List.of());
         }

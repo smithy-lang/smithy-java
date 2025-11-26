@@ -10,6 +10,10 @@ import java.util.Map;
 
 /**
  * A modifiable version of {@link HttpHeaders}.
+ *
+ * <p><b>Thread Safety:</b> Implementations are <b>not</b> guaranteed to be thread-safe.
+ * If multiple threads access an instance concurrently, and at least one thread modifies
+ * the headers, external synchronization is required.
  */
 public interface ModifiableHttpHeaders extends HttpHeaders {
     /**
@@ -96,6 +100,11 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
      * @param name Case-insensitive name of the header to remove.
      */
     void removeHeader(String name);
+
+    /**
+     * Removes all headers.
+     */
+    void clear();
 
     @Override
     default ModifiableHttpHeaders toModifiable() {

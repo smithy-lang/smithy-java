@@ -87,6 +87,7 @@ record HttpResponseImpl(
             }
             Objects.requireNonNull(httpVersion);
             body = Objects.requireNonNullElse(body, DataStream.ofEmpty());
+            mutatedHeaders = null; // decouple from built response
         }
 
         @Override
