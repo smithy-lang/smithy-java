@@ -202,6 +202,7 @@ public final class OperationGenerator
                                     shape,
                                     ServiceIndex.AuthSchemeMode.NO_AUTH_AWARE));
 
+                    var inputShape = directive.model().expectShape(shape.getInputShape());
                     eventStreamIndex.getInputInfo(shape).ifPresentOrElse(info -> {
                         writer.putContext("supplier", Supplier.class);
                         writer.putContext("hasInputEventStream", true);
@@ -210,7 +211,7 @@ public final class OperationGenerator
                                 "inputEventType",
                                 directive.symbolProvider().toSymbol(info.getEventStreamTarget()));
                     }, () -> {
-                        for (var member : shape.members()) {
+                        for (var member : inputShape.members()) {
                             if (directive.model().expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
                                 writer.putContext("inputStreamMember", member.getMemberName());
                                 break;
@@ -226,7 +227,7 @@ public final class OperationGenerator
                                 "outputEventType",
                                 directive.symbolProvider().toSymbol(info.getEventStreamTarget()));
                     }, () -> {
-                        for (var member : shape.members()) {
+                        for (var member : directive.model().expectShape(shape.getOutputShape()).members()) {
                             if (directive.model().expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
                                 writer.putContext("outputStreamMember", member.getMemberName());
                                 break;
@@ -235,7 +236,7 @@ public final class OperationGenerator
                     });
 
                     // Add the idempotency token member.
-                    for (var member : shape.members()) {
+                    for (var member : inputShape.members()) {
                         if (member.hasTrait(IdempotencyTokenTrait.class)) {
                             writer.putContext("idempotencyTokenMember", member.getMemberName());
                             break;

@@ -7,7 +7,6 @@ package software.amazon.smithy.java.http.binding;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -15,7 +14,6 @@ import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
-import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.model.traits.HttpQueryTrait;
 
 final class HttpQuerySerializer extends SpecificShapeSerializer {
@@ -28,7 +26,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
-        consumer.accept(listState, this);
+        consumer.accept(listState, new ListElementSerializer(schema.getTrait(TraitKey.HTTP_QUERY_TRAIT)));
     }
 
     private void writeQuery(HttpQueryTrait trait, String value) {
@@ -116,14 +114,6 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public void writeBlob(Schema schema, ByteBuffer value) {
-        var queryTrait = schema.getTrait(TraitKey.HTTP_QUERY_TRAIT);
-        if (queryTrait != null) {
-            writeQuery(queryTrait, ByteBufferUtils.base64Encode(value));
-        }
-    }
-
-    @Override
     public void writeTimestamp(Schema schema, Instant value) {
         var queryTrait = schema.getTrait(TraitKey.HTTP_QUERY_TRAIT);
         if (queryTrait != null) {
@@ -132,6 +122,73 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
                     ? TimestampFormatter.of(trait)
                     : TimestampFormatter.Prelude.DATE_TIME;
             writeQuery(queryTrait, formatter.writeString(value));
+        }
+    }
+
+    private class ListElementSerializer extends SpecificShapeSerializer {
+        private final HttpQueryTrait parentTrait;
+
+        ListElementSerializer(HttpQueryTrait trait) {
+            this.parentTrait = trait;
+        }
+
+        @Override
+        public void writeBoolean(Schema schema, boolean value) {
+            writeQuery(parentTrait, Boolean.toString(value));
+        }
+
+        @Override
+        public void writeShort(Schema schema, short value) {
+            writeQuery(parentTrait, Short.toString(value));
+        }
+
+        @Override
+        public void writeByte(Schema schema, byte value) {
+            writeQuery(parentTrait, Byte.toString(value));
+        }
+
+        @Override
+        public void writeInteger(Schema schema, int value) {
+            writeQuery(parentTrait, Integer.toString(value));
+        }
+
+        @Override
+        public void writeLong(Schema schema, long value) {
+            writeQuery(parentTrait, Long.toString(value));
+        }
+
+        @Override
+        public void writeFloat(Schema schema, float value) {
+            writeQuery(parentTrait, Float.toString(value));
+        }
+
+        @Override
+        public void writeDouble(Schema schema, double value) {
+            writeQuery(parentTrait, Double.toString(value));
+        }
+
+        @Override
+        public void writeBigInteger(Schema schema, BigInteger value) {
+            writeQuery(parentTrait, value.toString());
+        }
+
+        @Override
+        public void writeBigDecimal(Schema schema, BigDecimal value) {
+            writeQuery(parentTrait, value.toString());
+        }
+
+        @Override
+        public void writeString(Schema schema, String value) {
+            writeQuery(parentTrait, value);
+        }
+
+        @Override
+        public void writeTimestamp(Schema schema, Instant value) {
+            var timestampFormatTrait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
+            TimestampFormatter formatter = timestampFormatTrait != null
+                    ? TimestampFormatter.of(timestampFormatTrait)
+                    : TimestampFormatter.Prelude.DATE_TIME;
+            writeQuery(parentTrait, formatter.writeString(value));
         }
     }
 }

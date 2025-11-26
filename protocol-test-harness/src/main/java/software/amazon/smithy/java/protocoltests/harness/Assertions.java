@@ -9,12 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.net.URI;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.http.api.HttpMessage;
 import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 
 /**
  * Provides a number of testing utilities for validating protocol test results.
@@ -41,8 +43,37 @@ final class Assertions {
             '{',
             '}');
 
-    static void assertUriEquals(URI uri, String expected) {
-        assertEquals(expected, uri.getRawPath());
+    static void assertUriEquals(HttpRequestTestCase testCase, URI uri) {
+        assertEquals(testCase.getUri(), uri.getRawPath());
+        // Only evaluate query params when params are expected in test case.
+        if (!testCase.getQueryParams().isEmpty()) {
+            assertQueryParamsEquals(testCase.getQueryParams(), uri.getRawQuery());
+        }
+    }
+
+    private static void assertQueryParamsEquals(List<String> expectedParams, String actualQuery) {
+        var expectedSet = paserQueryParamsList(expectedParams);
+        var actualSet = parseQueryParamsString(actualQuery);
+        assertEquals(expectedSet, actualSet, "Query parameters mismatch");
+    }
+
+    private static Set<String> parseQueryParamsString(String query) {
+        Set<String> result = new HashSet<>();
+        // Raw query string is in format "param1=value1&param2=value2&param3=value3"
+        for (String paramPair : query.split("&")) {
+            var pair = paramPair.split("=", 2);
+            result.add(pair[0] + "=" + (pair.length == 2 ? pair[1] : ""));
+        }
+        return result;
+    }
+
+    private static Set<String> paserQueryParamsList(List<String> params) {
+        Set<String> result = new HashSet<>();
+        for (String paramPair : params) {
+            var pair = paramPair.split("=", 2);
+            result.add(pair[0] + "=" + (pair.length == 2 ? pair[1] : ""));
+        }
+        return result;
     }
 
     static void assertHostEquals(HttpRequest request, String expected) {

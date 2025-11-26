@@ -6,8 +6,10 @@
 package software.amazon.smithy.java.io.uri;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Used to build a query string from key value pair parameters.
@@ -15,6 +17,7 @@ import java.util.Map;
 public final class QueryStringBuilder {
 
     private final List<String> values = new ArrayList<>();
+    private final Set<String> keysFromHttpQuery = new HashSet<>();
 
     /**
      * Clears the contents of the query string builder.
@@ -34,7 +37,25 @@ public final class QueryStringBuilder {
      */
     public void add(String key, String value) {
         values.add(key);
+        keysFromHttpQuery.add(key);
         values.add(value);
+    }
+
+    /**
+     * Add a query string parameter and value to the query string comes from httpQueryParams trait.
+     * <p>
+     * The given key and value will be percent-encoded. If the value is already percent-encoded, it will be
+     * double percent-encoded. Query string parameters from httpQuery should take precedence if there are
+     * duplicate keys from @httpQuery.
+     *
+     * @param key   Key of the parameter.
+     * @param value Value of the parameter (or null).
+     */
+    public void addForQueryParams(String key, String value) {
+        if (!keysFromHttpQuery.contains(key)) {
+            values.add(key);
+            values.add(value);
+        }
     }
 
     /**
