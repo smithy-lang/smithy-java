@@ -63,16 +63,13 @@ public class NonNullAnnotationTest extends AbstractCodegenFileTest {
     @Test
     void nonNullAnnotationAddedForUnionVariant() {
         var fileStr = getFileStringForClass("TestUnion");
-        var expectedGetterBoxed = "public @TestNonNullAnnotation String getBoxedVariant() {";
-        var expectedGetterPrimitive = "public @TestNonNullAnnotation String getPrimitiveVariant() {";
-        var expectedToString = "public @TestNonNullAnnotation String toString() {";
-        var expectedTypeGetter = "public @TestNonNullAnnotation Type type() {";
+        var expectedRecordFieldBoxed = "record BoxedVariantMember(@TestNonNullAnnotation String boxedVariant)";
+        var expectedRecordFieldPrimitive =
+                "record PrimitiveVariantMember(@TestNonNullAnnotation String primitiveVariant)";
 
-        assertTrue(fileStr.contains(expectedGetterBoxed));
-        assertTrue(fileStr.contains(expectedGetterPrimitive));
-        assertTrue(fileStr.contains(expectedToString));
-        System.out.println(fileStr);
-        assertTrue(fileStr.contains(expectedTypeGetter));
+        assertTrue(fileStr.contains(expectedRecordFieldBoxed));
+        assertTrue(fileStr.contains(expectedRecordFieldPrimitive));
+        // Type enum has been removed - sealed interfaces use pattern matching instead
     }
 
     @Test

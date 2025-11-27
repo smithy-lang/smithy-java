@@ -22,8 +22,8 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.UnionShape;
@@ -42,81 +42,45 @@ public final class UnionGenerator
         }
         var shape = directive.shape();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
-            var innerTypeEnumSymbol = CodegenUtils.getInnerTypeEnumSymbol(directive.symbol());
-            writer.addLocallyDefinedSymbol(innerTypeEnumSymbol);
             writer.pushState(new ClassSection(shape));
             var template = """
-                    public abstract class ${shape:T} implements ${serializableStruct:T} {
+                    public sealed interface ${shape:T} extends ${serializableStruct:T} {
                         ${schemas:C|}
 
                         ${id:C|}
 
-                        private final ${type:N} type;
-
-                        private ${shape:T}(${type:T} type) {
-                            this.type = type;
-                        }
-
-                        public ${type:N} type() {
-                            return type;
-                        }
-
-                        ${memberEnum:C|}
-
-                        ${toString:C|}
+                        <T> T getValue();
 
                         @Override
-                        public ${schemaClass:N} schema() {
+                        default ${schemaClass:N} schema() {
                             return $$SCHEMA;
                         }
 
                         @Override
-                        public <T> T getMemberValue(${sdkSchema:N} member) {
+                        default <T> T getMemberValue(${sdkSchema:N} member) {
                             return ${schemaUtils:N}.validateMemberInSchema($$SCHEMA, member, getValue());
                         }
 
-                        public abstract <T> T getValue();
-
                         ${valueClasses:C|}
-
-                        @Override
-                        public int hashCode() {
-                            return ${objects:T}.hash(type, getValue());
-                        }
-
-                        @Override
-                        public boolean equals(${object:T} other) {
-                            if (other == this) {
-                                return true;
-                            }
-                            if (other == null || getClass() != other.getClass()) {
-                                return false;
-                            }
-                            return ${objects:T}.equals(getValue(), ((${shape:T}) other).getValue());
-                        }
 
                         ${builder:C|}
                     }
                     """;
             writer.putContext("shape", directive.symbol());
-            writer.putContext("type", innerTypeEnumSymbol);
             writer.putContext("serializableStruct", SerializableStruct.class);
             writer.putContext("shapeSerializer", ShapeSerializer.class);
             writer.putContext("schemaClass", Schema.class);
             writer.putContext("object", Object.class);
             writer.putContext("objects", Objects.class);
-            writer.putContext("document", Document.class);
             writer.putContext("sdkSchema", Schema.class);
             writer.putContext("schemaUtils", SchemaUtils.class);
-            writer.putContext("id", new IdStringGenerator(writer, shape));
+            writer.putContext("id", new IdStringGenerator(writer, shape, true));
             writer.putContext(
                     "schemas",
                     new SchemaFieldGenerator(
                             directive,
                             writer,
                             shape));
-            writer.putContext("memberEnum", new TypeEnumGenerator(writer, shape, directive.symbolProvider()));
-            writer.putContext("toString", new ToStringGenerator(writer));
             writer.putContext(
                     "valueClasses",
                     new ValueClassGenerator(
@@ -155,52 +119,57 @@ public final class UnionGenerator
             for (var member : shape.members()) {
                 writer.pushState();
                 writer.injectSection(new ClassSection(member));
+                var target = model.expectShape(member.getTarget());
+                var isUnit = target.hasTrait(UnitTypeTrait.class);
+
+                // Use memberName as the record field name so the accessor is auto-generated
+                // Use :N formatter for the type to add @NonNull annotation when applicable
                 var template =
                         """
-                                public static final class ${memberName:U}Member extends ${shape:T} {
-                                    ${^unit}private final transient ${member:T} value;${/unit}
-
-                                    public ${memberName:U}Member(${^unit}${member:N} value${/unit}) {
-                                        super(Type.${memberName:L});${^unit}
-                                        this.value = ${?col}${collections:T}.${wrap:L}(${/col}${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "Union value cannot be null")${/primitive}${?col})${/col};${/unit}
+                                record ${memberName:U}Member(${^unit}${member:N} ${memberName:L}${/unit}) implements ${shape:T} {
+                                    private static final ${schemaClass:T} ${memberSchema:L} = $$SCHEMA.member(${memberSchemaName:S});
+                                    ${?needsConstructor}
+                                    public ${memberName:U}Member {
+                                        ${?col}${memberName:L} = ${collections:T}.${wrap:L}(${/col}${^primitive}${objects:T}.requireNonNull(${/primitive}${memberName:L}${^primitive}, "Union value cannot be null")${/primitive}${?col})${/col};
                                     }
-
+                                    ${/needsConstructor}
                                     @Override
                                     public void serializeMembers(${shapeSerializer:N} serializer) {
                                         ${serializeMember:C};
-                                    }${^unit}
-
-                                    public ${member:N} ${getterName:L}() {
-                                        return value;
-                                    }${/unit}
+                                    }
 
                                     @Override
                                     @SuppressWarnings("unchecked")
                                     public <T> T getValue() {
-                                        return (T)${?hasBoxed}(${member:B})${/hasBoxed} ${^unit}value${/unit}${?unit}null${/unit};
+                                        return (T)${?hasBoxed}(${member:B})${/hasBoxed} ${^unit}${memberName:L}${/unit}${?unit}null${/unit};
                                     }
+
+                                    ${toString:C|}
                                 }
                                 """;
                 var memberSymbol = symbolProvider.toSymbol(member);
-                var target = model.expectShape(member.getTarget());
                 var memberName = symbolProvider.toMemberName(member);
-                var getterName = CodegenUtils.toGetterName(member, model);
-                if (getterName.equals("getValue")) {
-                    getterName += "Member";
-                }
+                boolean isPrimitive = memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE);
+                boolean isCol = target.isMapShape() || target.isListShape();
+                boolean needsConstructor = !isUnit && (isCol || !isPrimitive);
                 writer.putContext("hasBoxed", memberSymbol.getProperty(SymbolProperties.BOXED_TYPE).isPresent());
                 writer.putContext("member", memberSymbol);
                 writer.putContext("memberName", memberName);
-                writer.putContext("getterName", getterName);
+                writer.putContext("memberSchemaName", member.getMemberName());
+                writer.putContext("memberSchema", CodegenUtils.toMemberSchemaName(memberName));
+                writer.putContext("schemaClass", Schema.class);
+                writer.putContext("toString", new ToStringGenerator(writer));
+                // Use memberName as the field name for serialization
                 writer.putContext(
                         "serializeMember",
-                        new SerializerMemberGenerator(directive, writer, member, "value"));
-                writer.putContext("primitive", memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE));
+                        new SerializerMemberGenerator(directive, writer, member, memberName));
+                writer.putContext("primitive", isPrimitive);
                 writer.putContext(
                         "wrap",
                         memberSymbol.getProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER).orElse(null));
-                writer.putContext("unit", target.hasTrait(UnitTypeTrait.class));
-                writer.putContext("col", target.isMapShape() || target.isListShape());
+                writer.putContext("unit", isUnit);
+                writer.putContext("col", isCol);
+                writer.putContext("needsConstructor", needsConstructor);
                 writer.write(template);
                 writer.popState();
             }
@@ -212,18 +181,7 @@ public final class UnionGenerator
             writer.pushState();
             var template =
                     """
-                            public static final class $$UnknownMember extends ${shape:T} {
-                                private final ${string:T} memberName;
-
-                                public $$UnknownMember(${string:T} memberName) {
-                                    super(Type.$$UNKNOWN);
-                                    this.memberName = memberName;
-                                }
-
-                                public ${string:T} memberName() {
-                                    return memberName;
-                                }
-
+                            record $$Unknown(${string:T} memberName) implements ${shape:T} {
                                 @Override
                                 public void serialize(${shapeSerializer:T} serializer) {
                                     throw new ${unsupportedOperation:T}("Cannot serialize union with unknown member " + this.memberName);
@@ -236,6 +194,17 @@ public final class UnionGenerator
                                 @SuppressWarnings("unchecked")
                                 public <T> T getValue() {
                                     return (T) memberName;
+                                }
+
+                                private record $$Hidden() implements ${shape:T} {
+                                    @Override
+                                    public void serializeMembers(${shapeSerializer:T} serializer) {}
+
+                                    @Override
+                                    @SuppressWarnings("unchecked")
+                                    public <T> T getValue() {
+                                        return null;
+                                    }
                                 }
                             }
                             """;
@@ -281,7 +250,7 @@ public final class UnionGenerator
 
             writer.write("""
                     public BuildStage $$unknownMember(String memberName) {
-                        return setValue(new $$UnknownMember(memberName));
+                        return setValue(new $$Unknown(memberName));
                     }
                     """);
 
@@ -290,9 +259,6 @@ public final class UnionGenerator
             writer.write("""
                     private BuildStage setValue(${shape:T} value) {
                         if (this.value != null) {
-                            if (this.value.type() == Type.$$UNKNOWN) {
-                                throw new ${illegalArgument:T}("Cannot change union from unknown to known variant");
-                            }
                             throw new ${illegalArgument:T}("Only one value may be set for unions");
                         }
                         this.value = value;
@@ -309,9 +275,14 @@ public final class UnionGenerator
         }
 
         @Override
+        protected boolean inInterface() {
+            return true;
+        }
+
+        @Override
         protected void generateStages(JavaWriter writer) {
             writer.write("""
-                    public interface BuildStage {
+                    interface BuildStage {
                         ${shape:T} build();
                     }
                     """);
@@ -325,6 +296,12 @@ public final class UnionGenerator
                         return ${objects:T}.requireNonNull(value, "no union value set");
                     }
                     """);
+        }
+
+        @Override
+        protected String getMemberSchemaName(MemberShape member) {
+            return writer.format("${memberName:U}Member") + "." + super.getMemberSchemaName(member);
+
         }
     }
 }

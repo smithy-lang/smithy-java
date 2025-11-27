@@ -90,11 +90,9 @@ public final class SchemaFieldGenerator extends ShapeVisitor.Default<Void> imple
     public Void unionShape(UnionShape shape) {
         writer.pushState();
         writer.putContext("name", schemaFieldOrder.getSchemaFieldName(shape, writer));
-        writer.write("public static final ${schemaClass:T} $$SCHEMA = ${name:L};");
-
-        for (var member : shape.members()) {
-            writeMemberProperty(member);
-        }
+        // Unions are sealed interfaces, so $SCHEMA is implicitly public static final
+        // Member schemas are generated inside each record variant, not at the interface level
+        writer.write("${schemaClass:T} $$SCHEMA = ${name:L};");
 
         writer.popState();
         return null;

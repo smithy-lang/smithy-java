@@ -16,13 +16,18 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  * @param shape Shape to write ID for
  */
 @SmithyInternalApi
-public record IdStringGenerator(JavaWriter writer, Shape shape) implements Runnable {
+public record IdStringGenerator(JavaWriter writer, Shape shape, boolean isInterface) implements Runnable {
+
+    public IdStringGenerator(JavaWriter writer, Shape shape) {
+        this(writer, shape, false);
+    }
 
     @Override
     public void run() {
         writer.pushState();
         writer.putContext("shapeId", ShapeId.class);
-        writer.write("public static final ${shapeId:T} $$ID = $$SCHEMA.id();");
+        var qualifiers = isInterface ? "" : "public static final ";
+        writer.write(qualifiers + "${shapeId:T} $$ID = $$SCHEMA.id();");
         writer.popState();
     }
 }

@@ -106,7 +106,7 @@ public class RecursionTests {
         var output = builder.build();
         assertEquals(recursive.hashCode(), output.hashCode());
         assertEquals(recursive, output);
-        assertNotEquals(AttributeValue.Type.$UNKNOWN, output.type());
+        assertNotEquals(AttributeValue.$Unknown.class, output.getClass());
     }
 
     @Test

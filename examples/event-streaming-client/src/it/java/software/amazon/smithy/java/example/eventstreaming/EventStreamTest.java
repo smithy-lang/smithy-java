@@ -63,17 +63,17 @@ public class EventStreamTest {
             public void onNext(FizzBuzzStream item) {
                 receivedEvents.incrementAndGet();
                 long value;
-                switch (item.type()) {
-                    case fizz:
-                        value = item.<FizzEvent>getValue().getValue();
+                switch (item) {
+                    case FizzBuzzStream.FizzMember(var fizz):
+                        value = fizz.getValue();
                         System.out.println("received fizz: " + value);
                         assertEquals(0, value % 3);
                         if (value % 5 == 0) {
                             assertTrue(unbuzzed.add(value), "Fizz already received for " + value);
                         }
                         break;
-                    case buzz:
-                        value = item.<BuzzEvent>getValue().getValue();
+                    case FizzBuzzStream.BuzzMember(var buzz):
+                        value = buzz.getValue();
                         System.out.println("received buzz: " + value);
                         assertEquals(0, value % 5);
                         if (value % 3 == 0) {
@@ -81,7 +81,7 @@ public class EventStreamTest {
                         }
                         break;
                     default:
-                        fail("Unexpected event: " + item.type());
+                        fail("Unexpected event: " + item.getClass());
                         break;
                 }
                 subscription.request(1L);
