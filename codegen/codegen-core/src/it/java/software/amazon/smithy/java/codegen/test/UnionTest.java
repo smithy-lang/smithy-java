@@ -6,6 +6,8 @@
 package software.amazon.smithy.java.codegen.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
@@ -25,14 +27,13 @@ import software.amazon.smithy.java.codegen.test.model.NestedIntEnum;
 import software.amazon.smithy.java.codegen.test.model.NestedStruct;
 import software.amazon.smithy.java.codegen.test.model.NestedUnion;
 import software.amazon.smithy.java.codegen.test.model.UnionType;
-import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 public class UnionTest {
 
-    static Stream<SerializableShape> unionTypes() {
+    static Stream<UnionType> unionTypes() {
         return Stream.of(
                 new UnionType.BooleanValueMember(true),
                 new UnionType.ListValueMember(List.of("a", "b")),
@@ -103,7 +104,11 @@ public class UnionTest {
         document.deserializeInto(builder);
         var output = builder.build();
 
-        assertEquals(UnionType.Type.$UNKNOWN, output.type());
+        if (output instanceof UnionType.$Unknown(String memberName)) {
+            assertEquals("UNKNOWN!!!", memberName);
+        } else {
+            throw new AssertionError("Expected $Unknown variant");
+        }
         assertEquals("UNKNOWN!!!", output.getValue());
     }
 
@@ -111,5 +116,20 @@ public class UnionTest {
     void unknownUnionSerFails() {
         var union = UnionType.builder().$unknownMember("foo").build();
         assertThrows(UnsupportedOperationException.class, () -> Document.of(union));
+    }
+
+    @Test
+    void showExhaustiveMatchRequired() {
+        var union = getNestedUnion();
+        switch (union) {
+            case NestedUnion.AMember(var a) -> assertNotNull(a);
+            case NestedUnion.BMember(var b) -> assertNotEquals(0, b);
+            case NestedUnion.$Unknown(var memberName) -> assertNotNull(memberName);
+            default -> throw new IllegalArgumentException("Unexpected member: " + union);
+        }
+    }
+
+    private static NestedUnion getNestedUnion() {
+        return NestedUnion.builder().a("a").build();
     }
 }

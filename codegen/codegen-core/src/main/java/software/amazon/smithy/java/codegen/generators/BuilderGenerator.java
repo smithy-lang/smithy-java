@@ -13,6 +13,7 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -21,7 +22,7 @@ import software.amazon.smithy.model.shapes.ShapeType;
  * Generates a static nested {@code Builder} class for a Java class.
  */
 abstract class BuilderGenerator implements Runnable {
-    private final JavaWriter writer;
+    protected final JavaWriter writer;
     protected final Shape shape;
     protected final SymbolProvider symbolProvider;
     protected final Model model;
@@ -53,14 +54,14 @@ abstract class BuilderGenerator implements Runnable {
                         /**
                          * @return returns a new Builder.
                          */
-                        public static Builder builder() {
+                        ${^inInterface}public ${/inInterface}static Builder builder() {
                             return new Builder();
                         }
 
                         /**
                          * Builder for {@link ${shape:T}}.
                          */
-                        public static final class Builder implements ${sdkShapeBuilder:T}<${shape:T}>${?isStaged}, ${#stages}${value:L}${^key.last}, ${/key.last}${/stages}${/isStaged} {
+                        ${^inInterface}public static ${/inInterface}final class Builder implements ${sdkShapeBuilder:T}<${shape:T}>${?isStaged}, ${#stages}${value:L}${^key.last}, ${/key.last}${/stages}${/isStaged} {
                             ${builderProperties:C|}
 
                             ${builderConstructor:C|}
@@ -91,6 +92,7 @@ abstract class BuilderGenerator implements Runnable {
         writer.putContext("setMemberValue", writer.consumer(this::generateSetMemberValue));
         boolean isStaged = !this.stageInterfaces().isEmpty();
         writer.putContext("isStaged", isStaged);
+        writer.putContext("inInterface", inInterface());
         if (isStaged) {
             writer.putContext("stages", this.stageInterfaces());
             writer.putContext("stageGen", writer.consumer(this::generateStages));
@@ -130,6 +132,14 @@ abstract class BuilderGenerator implements Runnable {
         return List.of();
     }
 
+    protected boolean inInterface() {
+        return false;
+    }
+
+    protected String getMemberSchemaName(MemberShape member) {
+        return CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member));
+    }
+
     protected void generateSetMemberValue(JavaWriter writer) {
         // Don't override the default implementation that throws if there are no members.
         if (shape.members().isEmpty() || (shape.getType() == ShapeType.ENUM || shape.getType() == ShapeType.INT_ENUM)) {
@@ -157,7 +167,7 @@ abstract class BuilderGenerator implements Runnable {
             writer.pushState();
             writer.putContext("memberName", symbolProvider.toMemberName(member));
             writer.putContext("type", symbolProvider.toSymbol(member));
-            writer.putContext("memberSchema", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
+            writer.putContext("memberSchema", getMemberSchemaName(member));
             writer.putContext("schemaUtilsClass", SchemaUtils.class);
             writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
             writer.write(

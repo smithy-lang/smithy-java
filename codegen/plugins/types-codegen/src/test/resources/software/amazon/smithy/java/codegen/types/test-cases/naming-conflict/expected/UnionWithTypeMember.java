@@ -13,84 +13,48 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
 @SmithyGenerated
-public abstract class UnionWithTypeMember implements SerializableStruct {
-    public static final Schema $SCHEMA = Schemas.UNION_WITH_TYPE_MEMBER;
-    private static final Schema $SCHEMA_TYPE = $SCHEMA.member("type");
+public sealed interface UnionWithTypeMember extends SerializableStruct {
+    Schema $SCHEMA = Schemas.UNION_WITH_TYPE_MEMBER;
 
-    public static final ShapeId $ID = $SCHEMA.id();
+    ShapeId $ID = $SCHEMA.id();
 
-    private final Type type;
-
-    private UnionWithTypeMember(Type type) {
-        this.type = type;
-    }
-
-    public Type type() {
-        return type;
-    }
-
-    /**
-     * Enum representing the possible variants of {@link UnionWithTypeMember}.
-     */
-    public enum Type {
-        $UNKNOWN,
-        type
-    }
+    <T> T getValue();
 
     @Override
-    public String toString() {
-        return ToStringSerializer.serialize(this);
-    }
-
-    @Override
-    public Schema schema() {
+    default Schema schema() {
         return $SCHEMA;
     }
 
     @Override
-    public <T> T getMemberValue(Schema member) {
+    default <T> T getMemberValue(Schema member) {
         return SchemaUtils.validateMemberInSchema($SCHEMA, member, getValue());
     }
 
-    public abstract <T> T getValue();
-
     @SmithyGenerated
-    public static final class TypeMember extends UnionWithTypeMember {
-        private final transient software.amazon.smithy.java.example.standalone.model.Type value;
-
-        public TypeMember(software.amazon.smithy.java.example.standalone.model.Type value) {
-            super(Type.type);
-            this.value = Objects.requireNonNull(value, "Union value cannot be null");
+    record TypeMember(Type type) implements UnionWithTypeMember {
+        private static final Schema $SCHEMA_TYPE = $SCHEMA.member("type");
+        public TypeMember {
+            Objects.requireNonNull(type, "Union value cannot be null");
         }
-
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeStruct($SCHEMA_TYPE, value);
-        }
-
-        public software.amazon.smithy.java.example.standalone.model.Type getType() {
-            return value;
+            serializer.writeStruct($SCHEMA_TYPE, type);
         }
 
         @Override
         @SuppressWarnings("unchecked")
         public <T> T getValue() {
-            return (T) value;
+            return (T) type;
         }
+
+        @Override
+        public String toString() {
+            return ToStringSerializer.serialize(this);
+        }
+
     }
 
-    public static final class $UnknownMember extends UnionWithTypeMember {
-        private final String memberName;
-
-        public $UnknownMember(String memberName) {
-            super(Type.$UNKNOWN);
-            this.memberName = memberName;
-        }
-
-        public String memberName() {
-            return memberName;
-        }
-
+    record $Unknown(String memberName) implements UnionWithTypeMember {
         @Override
         public void serialize(ShapeSerializer serializer) {
             throw new UnsupportedOperationException("Cannot serialize union with unknown member " + this.memberName);
@@ -104,39 +68,34 @@ public abstract class UnionWithTypeMember implements SerializableStruct {
         public <T> T getValue() {
             return (T) memberName;
         }
-    }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(type, getValue());
-    }
+        private record $Hidden() implements UnionWithTypeMember {
+            @Override
+            public void serializeMembers(ShapeSerializer serializer) {}
 
-    @Override
-    public boolean equals(Object other) {
-        if (other == this) {
-            return true;
+            @Override
+            @SuppressWarnings("unchecked")
+            public <T> T getValue() {
+                return null;
+            }
         }
-        if (other == null || getClass() != other.getClass()) {
-            return false;
-        }
-        return Objects.equals(getValue(), ((UnionWithTypeMember) other).getValue());
     }
 
-    public interface BuildStage {
+    interface BuildStage {
         UnionWithTypeMember build();
     }
 
     /**
      * @return returns a new Builder.
      */
-    public static Builder builder() {
+    static Builder builder() {
         return new Builder();
     }
 
     /**
      * Builder for {@link UnionWithTypeMember}.
      */
-    public static final class Builder implements ShapeBuilder<UnionWithTypeMember>, BuildStage {
+    final class Builder implements ShapeBuilder<UnionWithTypeMember>, BuildStage {
         private UnionWithTypeMember value;
 
         private Builder() {}
@@ -146,19 +105,16 @@ public abstract class UnionWithTypeMember implements SerializableStruct {
             return $SCHEMA;
         }
 
-        public BuildStage type(software.amazon.smithy.java.example.standalone.model.Type value) {
+        public BuildStage type(Type value) {
             return setValue(new TypeMember(value));
         }
 
         public BuildStage $unknownMember(String memberName) {
-            return setValue(new $UnknownMember(memberName));
+            return setValue(new $Unknown(memberName));
         }
 
         private BuildStage setValue(UnionWithTypeMember value) {
             if (this.value != null) {
-                if (this.value.type() == Type.$UNKNOWN) {
-                    throw new IllegalArgumentException("Cannot change union from unknown to known variant");
-                }
                 throw new IllegalArgumentException("Only one value may be set for unions");
             }
             this.value = value;
@@ -174,7 +130,7 @@ public abstract class UnionWithTypeMember implements SerializableStruct {
         @SuppressWarnings("unchecked")
         public void setMemberValue(Schema member, Object value) {
             switch (member.memberIndex()) {
-                case 0 -> type((software.amazon.smithy.java.example.standalone.model.Type) SchemaUtils.validateSameMember($SCHEMA_TYPE, member, value));
+                case 0 -> type((Type) SchemaUtils.validateSameMember(TypeMember.$SCHEMA_TYPE, member, value));
                 default -> ShapeBuilder.super.setMemberValue(member, value);
             }
         }
@@ -197,7 +153,7 @@ public abstract class UnionWithTypeMember implements SerializableStruct {
             @Override
             public void accept(Builder builder, Schema member, ShapeDeserializer de) {
                 switch (member.memberIndex()) {
-                    case 0 -> builder.type(software.amazon.smithy.java.example.standalone.model.Type.builder().deserializeMember(de, member).build());
+                    case 0 -> builder.type(Type.builder().deserializeMember(de, member).build());
                     default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
                 }
             }
