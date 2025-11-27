@@ -14,6 +14,7 @@ dependencies {
     api(project(":aws:aws-event-streams"))
     api(libs.smithy.aws.traits)
 
+    implementation(project(":logging"))
     implementation(libs.smithy.protocol.traits)
 
     // Protocol test dependencies

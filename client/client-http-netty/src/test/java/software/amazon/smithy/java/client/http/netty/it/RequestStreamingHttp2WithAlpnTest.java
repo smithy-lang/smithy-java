@@ -1,0 +1,82 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.client.http.netty.it;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static software.amazon.smithy.java.client.http.netty.it.TestUtils.IPSUM_LOREM;
+import static software.amazon.smithy.java.client.http.netty.it.TestUtils.createServerSslContextBuilder;
+import static software.amazon.smithy.java.client.http.netty.it.TestUtils.streamingBody;
+
+import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
+import software.amazon.smithy.java.client.http.netty.it.server.MultiplexingHttp2ClientHandler;
+import software.amazon.smithy.java.client.http.netty.it.server.NettyTestServer;
+import software.amazon.smithy.java.client.http.netty.it.server.RequestCapturingHttp2ClientHandler;
+import software.amazon.smithy.java.client.http.netty.it.server.TestCertificateGenerator;
+import software.amazon.smithy.java.client.http.netty.it.server.TextResponseHttp2ClientHandler;
+import software.amazon.smithy.java.http.api.HttpVersion;
+
+public class RequestStreamingHttp2WithAlpnTest {
+    private static final String RESPONSE_CONTENTS = "Response sent from Http2ClearTest";
+    private static TestCertificateGenerator.CertificateBundle bundle;
+    private RequestCapturingHttp2ClientHandler requestCapturingHandler;
+    private NettyTestServer server;
+
+    @BeforeAll
+    static void beforeAll() throws Exception {
+        bundle = TestCertificateGenerator.generateCertificates();
+    }
+
+    @BeforeEach
+    void setUp() throws Exception {
+        requestCapturingHandler = new RequestCapturingHttp2ClientHandler();
+        var multiplexer = new MultiplexingHttp2ClientHandler(requestCapturingHandler,
+                new TextResponseHttp2ClientHandler(RESPONSE_CONTENTS));
+        server = NettyTestServer.builder()
+                .httpVersion(HttpVersion.HTTP_2)
+                .h2ConnectionMode(NettyHttpClientTransport.H2ConnectionMode.ALPN)
+                .http2HandlerFactory((ctx) -> multiplexer)
+                .sslContextBuilder(createServerSslContextBuilder(bundle))
+                .build();
+        server.start();
+    }
+
+    @AfterEach
+    void tearDown() {
+        server.stop();
+    }
+
+    @Test
+    void canSendRequestAndReadResponse() {
+        // -- Arrange
+        var client = NettyHttpClientTransport.builder()
+                .httpVersion(HttpVersion.HTTP_2)
+                .configureH2Settings(c -> c.connectionMode(NettyHttpClientTransport.H2ConnectionMode.ALPN))
+                .sslContextModifier(b -> b.trustManager(bundle.caCertificate))
+                .build();
+        var request = TestUtils.request(HttpVersion.HTTP_2,
+                "https://localhost:" + server.getPort(),
+                streamingBody(IPSUM_LOREM));
+
+        // -- Act
+        var response = client.send(null, request);
+        requestCapturingHandler.streamCompleted().join();
+        var bodyByteBuf = response.body().asByteBuffer();
+        var bytes = new byte[bodyByteBuf.remaining()];
+        bodyByteBuf.get(bytes);
+        var responseBody = new String(bytes, StandardCharsets.UTF_8);
+        client.close();
+
+        // -- Assert
+        var capturedRequestBody = requestCapturingHandler.capturedBody().toString(StandardCharsets.UTF_8);
+        assertEquals(String.join("", IPSUM_LOREM), capturedRequestBody);
+        assertEquals(RESPONSE_CONTENTS, responseBody);
+    }
+}
