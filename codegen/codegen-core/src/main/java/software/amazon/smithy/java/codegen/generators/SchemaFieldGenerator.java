@@ -135,8 +135,8 @@ public final class SchemaFieldGenerator extends ShapeVisitor.Default<Void> imple
         writer.putContext("variants", shape.members().stream().map(symbolProvider::toMemberName).toList());
         writer.putContext("set", Set.class);
         writer.write("""
-                public static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createEnum(${shapeId:T}.from(${id:S}),
-                    ${set:T}.of(${#variants}${value:L}.value${^key.last}, ${/key.last}${/variants})${traits:C}
+                ${schemaClass:T} ${name:L} = ${schemaClass:T}.createEnum(${shapeId:T}.from(${id:S}),
+                    ${set:T}.of(${#variants}${value:L}.getValue()${^key.last}, ${/key.last}${/variants})${traits:C}
                 );
                 """);
         writer.popState();
@@ -151,8 +151,8 @@ public final class SchemaFieldGenerator extends ShapeVisitor.Default<Void> imple
         writer.putContext("set", Set.class);
         writer.write(
                 """
-                        public static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createIntEnum(${shapeId:T}.from(${id:S}),
-                            ${set:T}.of(${#variants}${value:L}.value${^key.last}, ${/key.last}${/variants})${traits:C}
+                        ${schemaClass:T} ${name:L} = ${schemaClass:T}.createIntEnum(${shapeId:T}.from(${id:S}),
+                            ${set:T}.of(${#variants}${value:L}.getValue()${^key.last}, ${/key.last}${/variants})${traits:C}
                         );
                         """);
         writer.popState();

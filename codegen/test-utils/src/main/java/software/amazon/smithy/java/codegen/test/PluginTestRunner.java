@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import software.amazon.smithy.build.FileManifest;
@@ -33,18 +32,6 @@ import software.amazon.smithy.model.Model;
 public class PluginTestRunner {
 
     private PluginTestRunner() {}
-
-    public static Optional<String> findGotContent(Path found, TestCase test) {
-        for (var manifest : test.manifests) {
-            var fileInsideBaseDir =
-                    new File(found.toString().replace(manifest.getBaseDir().toString() + "/", "")).toPath();
-            var contents = manifest.getFileString(fileInsideBaseDir);
-            if (contents.isPresent()) {
-                return contents;
-            }
-        }
-        return Optional.empty();
-    }
 
     public static List<TestCase> addTestCasesFromUrl(URL url) {
         if (!"file".equals(url.getProtocol())) {
@@ -106,16 +93,15 @@ public class PluginTestRunner {
                 .name(dir.toPath().getFileName().toString())
                 .builder(builder)
                 .manifests(manifests)
-                .expectedToContents(expectedToContents)
+                .expectedContents(expectedToContents)
                 .build();
     }
 
     static Map<String, String> getExpectedContents(Path base, List<Path> paths) {
-        var prefix = base.toString();
         var result = new HashMap<String, String>();
         try {
             for (var path : paths) {
-                var relative = path.toString().replace(prefix, "");
+                var relative = base.relativize(path).toString();
                 var contents = Files.readString(path);
                 result.put(relative, contents);
             }
@@ -133,29 +119,36 @@ public class PluginTestRunner {
         private final String name;
         private final SmithyBuild builder;
         private final List<MockManifest> manifests;
-        private final Map<String, String> expectedToContents;
+        private final Map<String, String> expectedContent;
+        private Map<String, String> actualContent;
 
         TestCase(TestCaseBuilder builder) {
             this.name = Objects.requireNonNull(builder.name, "name");
             this.builder = Objects.requireNonNull(builder.builder, "builder");
             this.manifests = Objects.requireNonNull(builder.manifests, "manifest");
-            this.expectedToContents = Objects.requireNonNull(builder.expectedToContents, "expectedToContents");
+            this.expectedContent = Objects.requireNonNull(builder.expectedContents, "expected");
         }
 
         public String name() {
             return name;
         }
 
-        public SmithyBuild builder() {
-            return builder;
+        public Map<String, String> expectedContents() {
+            return expectedContent;
         }
 
-        public List<MockManifest> manifests() {
-            return manifests;
-        }
-
-        public Map<String, String> expectedToContents() {
-            return expectedToContents;
+        public String getActualContent(String name) {
+            if (actualContent == null) {
+                builder.build();
+                actualContent = new HashMap<>();
+                for (var manifest : manifests) {
+                    for (var path : manifest.getFiles()) {
+                        actualContent.put(path.toFile().getName(),
+                                manifest.expectFileString(manifest.getBaseDir().relativize(path)));
+                    }
+                }
+            }
+            return actualContent.get(name);
         }
 
         @Override
@@ -168,7 +161,7 @@ public class PluginTestRunner {
         private String name;
         private SmithyBuild builder;
         private List<MockManifest> manifests;
-        private Map<String, String> expectedToContents;
+        private Map<String, String> expectedContents;
 
         public TestCaseBuilder name(String name) {
             this.name = name;
@@ -185,8 +178,8 @@ public class PluginTestRunner {
             return this;
         }
 
-        public TestCaseBuilder expectedToContents(Map<String, String> expectedToContents) {
-            this.expectedToContents = expectedToContents;
+        public TestCaseBuilder expectedContents(Map<String, String> expected) {
+            this.expectedContents = expected;
             return this;
         }
 
@@ -203,7 +196,7 @@ public class PluginTestRunner {
         }
 
         @Override
-        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
             if (Files.isRegularFile(file)) {
                 expectedFiles.add(file);
             }
@@ -211,7 +204,7 @@ public class PluginTestRunner {
         }
 
         @Override
-        public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+        public FileVisitResult visitFileFailed(Path file, IOException exc) {
             // Handle the error and continue
             exc.printStackTrace();
             return FileVisitResult.CONTINUE;

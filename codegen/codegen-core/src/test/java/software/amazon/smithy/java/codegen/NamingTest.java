@@ -16,6 +16,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.codegen.utils.AbstractCodegenFileTest;
+import software.amazon.smithy.utils.CaseUtils;
 
 public class NamingTest extends AbstractCodegenFileTest {
     private static final URL TEST_FILE = Objects.requireNonNull(
@@ -144,7 +145,10 @@ public class NamingTest extends AbstractCodegenFileTest {
     @MethodSource("enumCaseArgs")
     void enumCasing(String updated, String original) {
         var fileStr = getFileStringForClass("EnumCasing");
-        // All variants should maintain the raw value for the value, but convert the type to expected string
-        assertTrue(fileStr.contains(String.format("new EnumCasing(Type.%s, \"%s\")", updated, original)));
+        // Enum field stays as UPPER_SNAKE_CASE (like CAMEL_CASE), but inner class uses PascalCase + Type suffix (like CamelCaseType)
+        // Sealed interface pattern: EnumCasing CAMEL_CASE = new CamelCaseType(); with getValue() returning "camelCase"
+        var className = CaseUtils.toPascalCase(updated) + "Type";
+        assertTrue(fileStr.contains(String.format("EnumCasing %s = new %s();", updated, className)));
+        assertTrue(fileStr.contains(String.format("return \"%s\";", original)));
     }
 }

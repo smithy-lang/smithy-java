@@ -192,6 +192,7 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
     @Test
     void addsToEnumVariants() {
         var fileContents = getFileStringForClass("EnumWithDocs");
+        // Sealed interface pattern - static fields (UPPER_SNAKE_CASE) instantiate inner classes (PascalCase + Type suffix)
         assertThat(
                 fileContents,
                 containsString(
@@ -200,12 +201,12 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
                                      * @deprecated As of the past.
                                      */
                                     @Deprecated(since = "the past")
-                                    public static final EnumWithDocs DOCUMENTED = new EnumWithDocs(Type.DOCUMENTED, "DOCUMENTED");
+                                    EnumWithDocs DOCUMENTED = new DocumentedType();
                                     /**
                                      * General Docs
                                      */
                                     @SmithyUnstableApi
-                                    public static final EnumWithDocs ALSO_DOCUMENTED = new EnumWithDocs(Type.ALSO_DOCUMENTED, "ALSO_DOCUMENTED");
+                                    EnumWithDocs ALSO_DOCUMENTED = new AlsoDocumentedType();
                                 """));
     }
 

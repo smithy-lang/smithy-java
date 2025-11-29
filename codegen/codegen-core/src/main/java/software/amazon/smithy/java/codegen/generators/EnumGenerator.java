@@ -11,12 +11,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
-import software.amazon.smithy.codegen.core.directed.ContextualDirective;
 import software.amazon.smithy.codegen.core.directed.ShapeDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
-import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
@@ -30,6 +27,7 @@ import software.amazon.smithy.model.shapes.EnumShape;
 import software.amazon.smithy.model.shapes.IntEnumShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.utils.CaseUtils;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -46,30 +44,23 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
             var template = """
-                    public final class ${shape:T} implements ${serializableShape:T} {
+                    public sealed interface ${shape:T} extends ${serializableShape:T} {
                         ${staticImpls:C|}
 
                         ${schema:C|}
 
                         ${id:C|}
 
-                        ${properties:C|}
+                        ${value:N} getValue();
 
-                        ${constructor:C|}
+                        @Override
+                        default void serialize(${shapeSerializer:T} serializer) {
+                            serializer.${writeMethod:L}($$SCHEMA, getValue());
+                        }
 
-                        ${innerEnum:C|}
+                        ${staticMethods:C|}
 
-                        ${getters:C|}
-
-                        ${serializer:C|}
-
-                        ${toString:C|}
-
-                        ${from:C|}
-
-                        ${equals:C|}
-
-                        ${hashCode:C|}
+                        ${variantClasses:C|}
 
                         ${builder:C|}
                     }
@@ -77,30 +68,26 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             var shapeSymbol = directive.symbolProvider().toSymbol(shape);
             writer.putContext("shape", shapeSymbol);
             writer.putContext("serializableShape", SerializableShape.class);
+            writer.putContext("shapeSerializer", ShapeSerializer.class);
             var valueSymbol = shapeSymbol.expectProperty(SymbolProperties.ENUM_VALUE_TYPE);
             writer.putContext("value", valueSymbol);
+            writer.putContext("string", shape.isEnumShape());
+            writer.putContext("writeMethod", shape.isEnumShape() ? "writeString" : "writeInteger");
 
-            writer.putContext("id", new IdStringGenerator(writer, shape));
+            writer.putContext("id", new IdStringGenerator(writer, shape, true));
             writer.putContext("staticImpls", new StaticImplGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext(
                     "schema",
                     new SchemaFieldGenerator(directive,
                             writer,
                             shape));
-            writer.putContext("properties", writer.consumer(EnumGenerator::writeProperties));
-            writer.putContext("constructor", new ConstructorGenerator(writer, valueSymbol));
-            writer.putContext("innerEnum", new TypeEnumGenerator(writer, shape, directive.symbolProvider()));
-            writer.putContext("getters", new GetterGenerator(writer, shape, directive.symbolProvider()));
+            writer.putContext("staticMethods", new StaticMethodsGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext(
-                    "serializer",
-                    new SerializerGenerator(
-                            directive,
+                    "variantClasses",
+                    new VariantClassGenerator(
                             writer,
-                            shape));
-            writer.putContext("toString", new ToStringGenerator(writer));
-            writer.putContext("from", new FromValueGenerator(writer, shape, directive.symbolProvider()));
-            writer.putContext("equals", new EqualsGenerator(writer, valueSymbol));
-            writer.putContext("hashCode", new HashCodeGenerator(writer, valueSymbol));
+                            shape,
+                            directive.symbolProvider()));
             writer.putContext(
                     "builder",
                     new EnumBuilderGenerator(
@@ -119,173 +106,135 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
         @Override
         public void run() {
             writer.pushState();
-            writer.putContext("string", shape.isEnumShape());
             List<String> types = new ArrayList<>();
-            var enumValues = getEnumValues(shape);
             for (var member : shape.members()) {
                 writer.pushState(new EnumVariantSection(member));
-                var name = symbolProvider.toMemberName(member);
-                types.add(name);
-                writer.putContext("var", name);
-                writer.putContext("val", enumValues.get(member.getMemberName()));
-                writer.write(
-                        "public static final ${shape:T} ${var:L} = new ${shape:T}(Type.${var:L}, ${?string}${val:S}${/string}${^string}${val:L}${/string});");
+                var fieldName = symbolProvider.toMemberName(member);
+                var className = toClassName(fieldName);
+                types.add(fieldName);
+                writer.putContext("fieldName", fieldName);
+                writer.putContext("className", className);
+                writer.write("${shape:T} ${fieldName:L} = new ${className:L}();");
                 writer.popState();
             }
             writer.putContext("types", types);
             writer.putContext("list", List.class);
             writer.write(
-                    "private static final ${list:T}<${shape:T}> $$TYPES = ${list:T}.of(${#types}${value:L}${^key.last}, ${/key.last}${/types});");
+                    "${list:T}<${shape:T}> $$TYPES = ${list:T}.of(${#types}${value:L}${^key.last}, ${/key.last}${/types});");
             writer.popState();
         }
     }
 
-    private static void writeProperties(JavaWriter writer) {
-        writer.write("""
-                private final ${value:N} value;
-                private final Type type;
-                """);
-    }
-
-    private record ConstructorGenerator(JavaWriter writer, Symbol value) implements
+    private record StaticMethodsGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements
             Runnable {
         @Override
         public void run() {
             writer.pushState();
-            writer.putContext("objects", Objects.class);
-            writer.putContext("primitive", value.expectProperty(SymbolProperties.IS_PRIMITIVE));
-            writer.write(
-                    """
-                            private ${shape:T}(Type type, ${value:T} value) {
-                                this.type = ${objects:T}.requireNonNull(type, "type cannot be null");
-                                this.value = ${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "value cannot be null")${/primitive};
-                            }
-                            """);
-            writer.popState();
-        }
-    }
-
-    private record GetterGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements Runnable {
-
-        @Override
-        public void run() {
-            writer.pushState();
+            writer.putContext("list", List.class);
+            writer.putContext("illegalArg", IllegalArgumentException.class);
             var template = """
                     /**
-                     * Value contained by this Enum.
-                     */
-                    public ${value:N} getValue() {
-                        return value;
-                    }
-
-                    /**
-                     * Type of this Enum variant.
-                     */
-                    public ${type:N} getType() {
-                        return type;
-                    }
-
-                    /**
-                     * Create an Enum of an {@link Type#$$UNKNOWN} type containing a value.
+                     * Create an unknown enum variant with the given value.
                      *
-                     * @param value value contained by unknown Enum.
+                     * @param value value for the unknown variant.
                      */
-                    public static ${shape:T} unknown(${value:T} value) {
-                        return new ${shape:T}(Type.$$UNKNOWN, value);
+                    static ${shape:T} unknown(${value:T} value) {
+                        return new $$Unknown(value);
                     }
 
                     /**
                      * Returns an unmodifiable list containing the constants of this enum type, in the order declared.
                      */
-                    public static ${list:T}<${shape:T}> values() {
+                    static ${list:T}<${shape:T}> values() {
                         return $$TYPES;
                     }
-                    """;
-            writer.putContext("list", List.class);
-            writer.putContext("type", CodegenUtils.getInnerTypeEnumSymbol(symbolProvider.toSymbol(shape)));
-            writer.write(template);
-            writer.popState();
-        }
-    }
 
-    private record SerializerGenerator(
-            ContextualDirective<CodeGenerationContext, ?> directive,
-            JavaWriter writer,
-            Shape shape) implements Runnable {
-        @Override
-        public void run() {
-            writer.pushState();
-            writer.putContext("shapeSerializer", ShapeSerializer.class);
-            writer.putContext(
-                    "serializerBody",
-                    new SerializerMemberGenerator(directive, writer, shape, "this"));
-            writer.write("""
-                    @Override
-                    public void serialize(${shapeSerializer:N} serializer) {
-                        ${serializerBody:C|};
-                    }
-                    """);
-            writer.popState();
-        }
-    }
-
-    private record FromValueGenerator(JavaWriter writer, Shape shape, SymbolProvider provider) implements Runnable {
-        @Override
-        public void run() {
-            writer.pushState();
-            writer.putContext("illegalArg", IllegalArgumentException.class);
-            writer.write("""
                     /**
                      * Returns a {@link ${shape:T}} constant with the specified value.
                      *
                      * @param value value to create {@code ${shape:T}} from.
                      * @throws ${illegalArg:T} if value does not match a known value.
                      */
-                    public static ${shape:T} from(${value:T} value) {
+                    static ${shape:T} from(${value:T} value) {
                         return switch (value) {
-                            ${C|}
+                            ${fromCases:C|}
                             default -> throw new ${illegalArg:T}("Unknown value: " + value);
                         };
                     }
-                    """, writer.consumer(w -> generateSwitchCases(w, shape, provider)));
+                    """;
+            writer.putContext("fromCases", writer.consumer(w -> generateSwitchCases(w, shape, symbolProvider)));
+            writer.write(template);
             writer.popState();
         }
     }
 
-    private record EqualsGenerator(JavaWriter writer, Symbol value) implements Runnable {
+    private record VariantClassGenerator(
+            JavaWriter writer,
+            Shape shape,
+            SymbolProvider symbolProvider) implements Runnable {
+
         @Override
         public void run() {
             writer.pushState();
-            writer.putContext("object", Object.class);
-            writer.putContext("primitive", value.expectProperty(SymbolProperties.IS_PRIMITIVE));
-            writer.write(
-                    """
+            var enumValues = getEnumValues(shape);
+
+            // Generate known enum variant classes
+            for (var member : shape.members()) {
+                writer.pushState();
+                var fieldName = symbolProvider.toMemberName(member);
+                var className = toClassName(fieldName);
+                var memberValue = enumValues.get(member.getMemberName());
+
+                var template = """
+                        final class ${className:L} implements ${shape:T} {
+                            private ${className:L}() {}
+
                             @Override
-                            public boolean equals(${object:T} other) {
-                                if (other == this) {
-                                    return true;
-                                }
-                                if (other == null || getClass() != other.getClass()) {
-                                    return false;
-                                }
-                                ${shape:T} that = (${shape:T}) other;
-                                return this.value${?primitive} == ${/primitive}${^primitive}.equals(${/primitive}that.value${^primitive})${/primitive};
-                            }""");
+                            public ${value:N} getValue() {
+                                return ${?string}${memberValue:S}${/string}${^string}${memberValue:L}${/string};
+                            }
+
+                            ${toString:C|}
+                        }
+                        """;
+                writer.putContext("className", className);
+                writer.putContext("memberValue", memberValue);
+                writer.putContext("toString", new ToStringGenerator(writer));
+                writer.write(template);
+                writer.popState();
+            }
+
+            // Generate $Unknown variant
+            generateUnknownVariant();
             writer.popState();
         }
-    }
 
-    private record HashCodeGenerator(JavaWriter writer, Symbol value) implements Runnable {
-        @Override
-        public void run() {
+        private void generateUnknownVariant() {
             writer.pushState();
-            writer.putContext("primitive", value.expectProperty(SymbolProperties.IS_PRIMITIVE));
-            writer.write("""
-                    @Override
-                    public int hashCode() {
-                        return ${?primitive}value${/primitive}${^primitive}value.hashCode()${/primitive};
+            writer.putContext("objects", Objects.class);
+            writer.putContext("toString", new ToStringGenerator(writer));
+            var template = """
+                    record $$Unknown(${value:N} value) implements ${shape:T} {${?string}
+                        public $$Unknown {
+                            ${objects:T}.requireNonNull(value, "Value cannot be null");
+                        }${/string}
+
+                        @Override
+                        public ${value:N} getValue() {
+                            return value;
+                        }
+
+                        ${toString:C|}
+
+                        private final class $$Hidden implements ${shape:T} {
+                            @Override
+                            public ${value:N} getValue() {
+                                return ${?string}null${/string}${^string}0${/string};
+                            }
+                        }
                     }
-                    """);
+                    """;
+            writer.write(template);
             writer.popState();
         }
     }
@@ -300,6 +249,11 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                 ServiceShape service
         ) {
             super(writer, shape, symbolProvider, model, service);
+        }
+
+        @Override
+        protected boolean inInterface() {
+            return true;
         }
 
         @Override
@@ -347,7 +301,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                     public ${shape:T} build() {
                         return switch (value) {
                             ${C|}
-                            default -> new ${shape:T}(Type.$$UNKNOWN, value);
+                            default -> new $$Unknown(value);
                         };
                     }
                     """, writer.consumer(w -> generateSwitchCases(w, shape, symbolProvider)));
@@ -378,5 +332,14 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
         } else {
             throw new IllegalArgumentException("Expected Int enum or enum");
         }
+    }
+
+    /**
+     * Converts an enum field name (typically UPPER_SNAKE_CASE like OPTION_ONE)
+     * to a class name (PascalCase like OptionOneType). The "Type" suffix avoids
+     * conflicts with java.lang types like String, Boolean, etc.
+     */
+    private static String toClassName(String fieldName) {
+        return CaseUtils.toPascalCase(fieldName) + "Type";
     }
 }

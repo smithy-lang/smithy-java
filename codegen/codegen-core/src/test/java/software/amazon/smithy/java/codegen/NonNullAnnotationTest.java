@@ -75,14 +75,12 @@ public class NonNullAnnotationTest extends AbstractCodegenFileTest {
     @Test
     void nonNullAnnotationAddedForEnumVariant() {
         var fileStr = getFileStringForClass("TestEnum");
-        var expectedValueGetter = "public @TestNonNullAnnotation String getValue() {";
-        var expectedValueField = "private final @TestNonNullAnnotation String value;";
+        var expectedValueGetter = "@TestNonNullAnnotation String getValue();";
         var expectedToString = "public @TestNonNullAnnotation String toString() {";
-        var expectedTypeGetter = "public @TestNonNullAnnotation Type getType() {";
+        var expectedUnknownValueField = "record $Unknown(@TestNonNullAnnotation String value)";
 
         assertTrue(fileStr.contains(expectedValueGetter));
-        assertTrue(fileStr.contains(expectedValueField));
         assertTrue(fileStr.contains(expectedToString));
-        assertTrue(fileStr.contains(expectedTypeGetter));
+        assertTrue(fileStr.contains(expectedUnknownValueField));
     }
 }
