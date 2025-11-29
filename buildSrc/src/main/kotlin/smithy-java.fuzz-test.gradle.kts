@@ -21,6 +21,9 @@ tasks.register<Test>("fuzz") {
     description = "Run fuzz tests using Jazzer"
     group = "verification"
 
+    // Never cache fuzz tests - they should always run when requested
+    outputs.upToDateWhen { false }
+
     val fuzzSourceSet = project.the<SourceSetContainer>()["fuzz"]
     testClassesDirs = fuzzSourceSet.output.classesDirs
     classpath = fuzzSourceSet.runtimeClasspath
