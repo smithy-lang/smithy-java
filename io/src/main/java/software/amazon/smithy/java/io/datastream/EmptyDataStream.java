@@ -32,6 +32,11 @@ final class EmptyDataStream implements DataStream {
     }
 
     @Override
+    public boolean isAvailable() {
+        return true;
+    }
+
+    @Override
     public long contentLength() {
         return 0;
     }

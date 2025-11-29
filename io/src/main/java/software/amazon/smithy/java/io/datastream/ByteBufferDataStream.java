@@ -32,6 +32,11 @@ final class ByteBufferDataStream implements DataStream {
     }
 
     @Override
+    public boolean isAvailable() {
+        return true;
+    }
+
+    @Override
     public ByteBuffer asByteBuffer() {
         return buffer.duplicate();
     }

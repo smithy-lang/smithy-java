@@ -47,4 +47,13 @@ public class FileDataStreamTest {
 
         assertThat(ds.asByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
     }
+
+    @Test
+    public void isAlwaysAvailable() throws Exception {
+        var ds = DataStream.ofFile(Paths.get(getClass().getResource("test.txt").toURI()));
+
+        assertThat(ds.isAvailable(), is(true));
+        ds.asByteBuffer();
+        assertThat(ds.isAvailable(), is(true));
+    }
 }

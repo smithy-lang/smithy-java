@@ -40,6 +40,11 @@ final class PublisherDataStream implements DataStream {
         return isReplayable;
     }
 
+    @Override
+    public boolean isAvailable() {
+        return isReplayable || !consumed;
+    }
+
     // Override to skip needing an intermediate InputStream for this.
     @Override
     public ByteBuffer asByteBuffer() {
