@@ -70,4 +70,21 @@ public class InputStreamDataStreamTest {
         Assertions.assertDoesNotThrow(ds::asInputStream);
         Assertions.assertThrows(IllegalStateException.class, ds::asInputStream);
     }
+
+    @Test
+    public void isAvailableBeforeConsumption() throws Exception {
+        var ds = DataStream.ofInputStream(
+                Files.newInputStream(Paths.get(getClass().getResource("test.txt").toURI())));
+
+        assertThat(ds.isAvailable(), is(true));
+    }
+
+    @Test
+    public void isNotAvailableAfterConsumption() throws Exception {
+        var ds = DataStream.ofInputStream(
+                Files.newInputStream(Paths.get(getClass().getResource("test.txt").toURI())));
+
+        ds.asInputStream();
+        assertThat(ds.isAvailable(), is(false));
+    }
 }

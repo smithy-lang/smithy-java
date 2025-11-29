@@ -58,6 +58,21 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     boolean isReplayable();
 
     /**
+     * Check if the DataStream is available for consumption.
+     *
+     * <p>A stream is available if it either hasn't been consumed yet, or if it is replayable. This is useful for
+     * interceptors that need to make decisions based on whether the stream data can be accessed without causing
+     * an error. In other worse, if this method returns {@code true}, then calling {@link #asInputStream()} will
+     * succeed.
+     *
+     * <p>Note: This method returning {@code true} does not guarantee that reading will succeed (e.g., I/O errors
+     * can still occur), only that the stream has not been previously consumed in a non-replayable manner.
+     *
+     * @return true if the stream can be consumed.
+     */
+    boolean isAvailable();
+
+    /**
      * Convert the stream into a blocking {@link InputStream}.
      *
      * @apiNote To ensure that all resources associated with the corresponding exchange are properly released, the

@@ -35,6 +35,11 @@ final class InputStreamDataStream implements DataStream {
     }
 
     @Override
+    public boolean isAvailable() {
+        return !consumed;
+    }
+
+    @Override
     public long contentLength() {
         return contentLength;
     }

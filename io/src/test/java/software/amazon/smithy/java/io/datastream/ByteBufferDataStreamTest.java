@@ -22,4 +22,13 @@ public class ByteBufferDataStreamTest {
         assertThat(ds.asByteBuffer(), equalTo(ByteBuffer.wrap("foo".getBytes(StandardCharsets.UTF_8))));
         assertThat(ds.isReplayable(), is(true));
     }
+
+    @Test
+    public void isAlwaysAvailable() {
+        var ds = DataStream.ofBytes("foo".getBytes(StandardCharsets.UTF_8));
+
+        assertThat(ds.isAvailable(), is(true));
+        ds.asByteBuffer();
+        assertThat(ds.isAvailable(), is(true));
+    }
 }

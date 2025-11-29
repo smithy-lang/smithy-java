@@ -47,6 +47,11 @@ final class FileDataStream implements DataStream {
     }
 
     @Override
+    public boolean isAvailable() {
+        return true;
+    }
+
+    @Override
     public InputStream asInputStream() {
         try {
             return Files.newInputStream(file);
