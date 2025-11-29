@@ -332,19 +332,6 @@ public final class CodegenUtils {
     }
 
     /**
-     * Gets a symbol representing a nested {@code Type} enum for the given root symbol.
-     *
-     * @return Symbol representing a nested {@code Type} enum
-     */
-    public static Symbol getInnerTypeEnumSymbol(Symbol symbol) {
-        return symbol.toBuilder()
-                .namespace(symbol.getFullName(), ".")
-                .putProperty(SymbolProperties.IS_LOCALLY_DEFINED, true)
-                .name("Type")
-                .build();
-    }
-
-    /**
      * Determines if a shape is recursive and should use a schema builder when defined as a Root- or Member-Schema.
      *
      * <p>A builder is only required for shapes that appear more than once in the recursive closure (i.e. shapes

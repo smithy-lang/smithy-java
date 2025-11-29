@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.codegen.test.model.EnumType;
@@ -19,6 +20,9 @@ public class EnumTest {
         try (var codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build()) {
             output = codec.deserializeShape("\"option-n\"", EnumType.builder());
         }
-        assertEquals(output.getType(), EnumType.Type.$UNKNOWN);
+        switch (output) {
+            case EnumType.$Unknown(String value) -> assertEquals("option-n", value);
+            default -> fail("Expected UnknownEnumType");
+        }
     }
 }

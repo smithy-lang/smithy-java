@@ -44,9 +44,9 @@ public class ClientErrorCorrectionTest {
         assertEquals(corrected.getList(), List.of());
         assertEquals(corrected.getMap(), Map.of());
         assertEquals(corrected.getTimestamp(), Instant.EPOCH);
-        assertEquals(corrected.getEnum().getType(), NestedEnum.Type.$UNKNOWN);
+        assertEquals(NestedEnum.$Unknown.class, corrected.getEnum().getClass());
         assertEquals(corrected.getEnum().getValue(), "");
-        assertEquals(corrected.getIntEnum().getType(), NestedIntEnum.Type.$UNKNOWN);
+        assertEquals(NestedIntEnum.$Unknown.class, corrected.getIntEnum().getClass());
         assertEquals(corrected.getIntEnum().getValue(), 0);
     }
 }
