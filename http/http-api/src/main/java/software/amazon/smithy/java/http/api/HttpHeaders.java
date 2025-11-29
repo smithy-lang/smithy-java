@@ -10,6 +10,8 @@ import java.util.Map;
 
 /**
  * Contains case-insensitive HTTP headers.
+ *
+ * <p>Implementations must always normalize header names to lowercase.
  */
 public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
 
@@ -109,4 +111,64 @@ public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
      * @return the created modifiable headers.
      */
     ModifiableHttpHeaders toModifiable();
+
+    /**
+     * Normalizes an HTTP header name by trimming whitespace and converting ASCII uppercase to lowercase.
+     *
+     * <p>Trimming behavior matches {@link String#trim()}, removing characters {@code <= 'u0020'}.
+     * Only ASCII uppercase letters (A-Z) are lowercased; non-ASCII characters pass through unchanged,
+     * which is correct per RFC 7230 (HTTP/1.1) and RFC 9110 (HTTP semantics) since header field names
+     * are defined as ASCII tokens.
+     *
+     * @param name the header name to normalize
+     * @return the normalized header name, or the original instance if already normalized
+     */
+    static String normalizeHeaderName(String name) {
+        int len = name.length();
+        int start = 0;
+        int end = len - 1;
+        boolean needsWork = false;
+
+        // Detect leading whitespace to trim if needed
+        while (start <= end && name.charAt(start) <= ' ') {
+            needsWork = true;
+            start++;
+        }
+
+        // Detect trailing whitespace to trim if needed
+        while (end >= start && name.charAt(end) <= ' ') {
+            needsWork = true;
+            end--;
+        }
+
+        // All whitespace
+        if (start > end) {
+            return "";
+        }
+
+        // Scan for ASCII uppercase
+        for (int i = start; i <= end; i++) {
+            char c = name.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                needsWork = true;
+                break;
+            }
+        }
+
+        if (!needsWork) {
+            return name;
+        }
+
+        int outLen = end - start + 1;
+        char[] chars = new char[outLen];
+        for (int src = start, dst = 0; src <= end; src++, dst++) {
+            char c = name.charAt(src);
+            if (c >= 'A' && c <= 'Z') {
+                c = (char) (c + 32);
+            }
+            chars[dst] = c;
+        }
+
+        return new String(chars);
+    }
 }

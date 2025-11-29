@@ -36,7 +36,7 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
     }
 
     private List<String> getOrCreateValues(String name) {
-        var key = formatPutKey(name);
+        var key = HttpHeaders.normalizeHeaderName(name);
         var values = headers.get(key);
         if (values == null) {
             values = new ArrayList<>();
@@ -47,8 +47,8 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
 
     @Override
     public void setHeader(String name, String value) {
-        var key = formatPutKey(name);
-        var list = headers.get(name);
+        var key = HttpHeaders.normalizeHeaderName(name);
+        var list = headers.get(key);
         if (list == null) {
             list = new ArrayList<>(1);
             headers.put(key, list);
@@ -61,8 +61,8 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
 
     @Override
     public void setHeader(String name, List<String> values) {
-        var key = formatPutKey(name);
-        var list = headers.get(name);
+        var key = HttpHeaders.normalizeHeaderName(name);
+        var list = headers.get(key);
         if (list == null) {
             list = new ArrayList<>(values.size());
             headers.put(key, list);
@@ -75,10 +75,6 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
         for (var element : values) {
             list.add(element);
         }
-    }
-
-    private static String formatPutKey(String name) {
-        return name.trim().toLowerCase(Locale.ENGLISH);
     }
 
     @Override

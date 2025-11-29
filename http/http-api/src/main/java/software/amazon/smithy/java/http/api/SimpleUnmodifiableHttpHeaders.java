@@ -32,7 +32,7 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
             // Single pass to normalize, trim, and make immutable in one go
             Map<String, List<String>> result = HashMap.newHashMap(input.size());
             for (var entry : input.entrySet()) {
-                var key = normalizeKey(entry.getKey());
+                var key = HttpHeaders.normalizeHeaderName(entry.getKey());
                 var values = entry.getValue();
                 var existing = result.get(key);
                 if (existing == null) {
@@ -47,10 +47,6 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
             }
             this.headers = result;
         }
-    }
-
-    private static String normalizeKey(String key) {
-        return key.trim().toLowerCase(Locale.ENGLISH);
     }
 
     private static List<String> copyAndTrimValuesMutable(List<String> source) {
@@ -145,7 +141,7 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
             mutatedHeaders = copyHeaders(original.map());
         }
         for (var entry : from.entrySet()) {
-            var key = normalizeKey(entry.getKey());
+            var key = HttpHeaders.normalizeHeaderName(entry.getKey());
             var list = mutatedHeaders.get(key);
             if (list == null) {
                 list = copyAndTrimValuesMutable(entry.getValue());
@@ -166,7 +162,7 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
         if (mutatedHeaders == null) {
             mutatedHeaders = copyHeaders(original.map());
         }
-        field = normalizeKey(field);
+        field = HttpHeaders.normalizeHeaderName(field);
         value = value.trim();
         var list = mutatedHeaders.get(field);
         if (list == null) {
@@ -183,7 +179,7 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
         }
         Map<String, List<String>> into = HashMap.newHashMap(from.size());
         for (var entry : from.entrySet()) {
-            into.put(normalizeKey(entry.getKey()), copyAndTrimValuesMutable(entry.getValue()));
+            into.put(HttpHeaders.normalizeHeaderName(entry.getKey()), copyAndTrimValuesMutable(entry.getValue()));
         }
         return into;
     }
@@ -197,7 +193,7 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
             mutated = copyHeaders(original.map());
         }
         for (var entry : replace.entrySet()) {
-            mutated.put(normalizeKey(entry.getKey()), copyAndTrimValuesMutable(entry.getValue()));
+            mutated.put(HttpHeaders.normalizeHeaderName(entry.getKey()), copyAndTrimValuesMutable(entry.getValue()));
         }
         return mutated;
     }
