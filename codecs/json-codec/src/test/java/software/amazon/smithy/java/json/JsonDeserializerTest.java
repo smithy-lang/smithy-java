@@ -224,6 +224,84 @@ public class JsonDeserializerTest {
     }
 
     @Test
+    public void deserializesEmptyList() {
+        try (var codec = JsonCodec.builder().build()) {
+            var de = codec.createDeserializer("[]".getBytes(StandardCharsets.UTF_8));
+            List<String> values = new ArrayList<>();
+
+            de.readList(PreludeSchemas.DOCUMENT, null, (ignore, listDe) -> {
+                values.add(listDe.readString(PreludeSchemas.STRING));
+            });
+
+            assertThat(values, hasSize(0));
+        }
+    }
+
+    @Test
+    public void throwsWhenReadListGetsObject() {
+        try (var codec = JsonCodec.builder().build()) {
+            var de = codec.createDeserializer("{\"foo\":\"bar\"}".getBytes(StandardCharsets.UTF_8));
+            List<String> values = new ArrayList<>();
+
+            var e = Assertions.assertThrows(SerializationException.class, () -> {
+                de.readList(PreludeSchemas.DOCUMENT, values, (list, listDe) -> {
+                    list.add(listDe.readString(PreludeSchemas.STRING));
+                });
+            });
+
+            assertThat(e.getMessage(), equalTo("Expected a list, but found Object value"));
+        }
+    }
+
+    @Test
+    public void throwsWhenReadListGetsString() {
+        try (var codec = JsonCodec.builder().build()) {
+            var de = codec.createDeserializer("\"not a list\"".getBytes(StandardCharsets.UTF_8));
+            List<String> values = new ArrayList<>();
+
+            var e = Assertions.assertThrows(SerializationException.class, () -> {
+                de.readList(PreludeSchemas.DOCUMENT, values, (list, listDe) -> {
+                    list.add(listDe.readString(PreludeSchemas.STRING));
+                });
+            });
+
+            assertThat(e.getMessage(), equalTo("Expected a list, but found String value"));
+        }
+    }
+
+    @Test
+    public void throwsWhenReadListGetsEmptyObject() {
+        try (var codec = JsonCodec.builder().build()) {
+            var de = codec.createDeserializer("{}".getBytes(StandardCharsets.UTF_8));
+            List<String> values = new ArrayList<>();
+
+            var e = Assertions.assertThrows(SerializationException.class, () -> {
+                de.readList(PreludeSchemas.DOCUMENT, values, (list, listDe) -> {
+                    list.add(listDe.readString(PreludeSchemas.STRING));
+                });
+            });
+
+            assertThat(e.getMessage(), equalTo("Expected a list, but found Object value"));
+        }
+    }
+
+    @Test
+    public void throwsOnUnfinishedList() {
+        try (var codec = JsonCodec.builder().build()) {
+            var de = codec.createDeserializer("[{}".getBytes(StandardCharsets.UTF_8));
+            List<String> values = new ArrayList<>();
+
+            var e = Assertions.assertThrows(SerializationException.class, () -> {
+                de.readList(PreludeSchemas.DOCUMENT, values, (list, listDe) -> {
+                    list.add(listDe.readString(PreludeSchemas.STRING));
+                });
+            });
+
+            assertThat(e.getMessage(), equalTo("Expected end of list, but found Object value"));
+        }
+    }
+
+    @Test
     public void deserializesMap() {
         try (var codec = JsonCodec.builder().build()) {
             var de = codec.createDeserializer("{\"foo\":\"bar\",\"baz\":\"bam\"}".getBytes(StandardCharsets.UTF_8));
