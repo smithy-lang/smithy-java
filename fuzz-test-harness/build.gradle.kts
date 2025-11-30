@@ -13,6 +13,7 @@ dependencies {
 
     implementation(project(":core"))
     implementation(project(":logging"))
+    implementation(project(":codecs:cbor-codec"))
 
     api(platform(libs.junit.bom))
     api(libs.junit.jupiter.api)

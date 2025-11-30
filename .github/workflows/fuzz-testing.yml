@@ -56,7 +56,7 @@ jobs:
 
       - name: Run all fuzz tests
         run: |
-          DURATION="${{ github.event.inputs.duration || '1h' }}"
+          DURATION="${{ github.event.inputs.duration || '5h' }}"
           ./gradlew fuzz -Pfuzz.maxDuration=$DURATION --stacktrace
 
       - name: Save fuzz corpus cache
@@ -73,7 +73,7 @@ jobs:
         if: always()
         with:
           name: fuzz-test-reports
-          path: '**/build/reports/jazzer/**'
+          path: '**/build/reports/fuzz-coverage/**'
 
       - name: Upload crash artifacts
         uses: actions/upload-artifact@v5
