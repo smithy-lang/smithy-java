@@ -17,7 +17,7 @@ dependencies {
 }
 
 // Create the fuzz test task
-tasks.register<Test>("fuzz") {
+val fuzz = tasks.register<Test>("fuzz") {
     description = "Run fuzz tests using Jazzer"
     group = "verification"
 
@@ -42,15 +42,34 @@ tasks.register<Test>("fuzz") {
 
     // Jazzer configuration
     systemProperty("jazzer.valueprofile", "1")
-    systemProperty("jazzer.coverage_report", "${project.layout.buildDirectory}/reports/jazzer")
 
     systemProperty("jazzer.instrumentation_includes", "software.amazon.smithy.java.**")
 
     val corpusDir = "${project.projectDir}/src/fuzz/resources/corpus"
+    var argIndex = 0;
     if (file(corpusDir).exists()) {
-        systemProperty("jazzer.internal.arg.0", corpusDir)
+        systemProperty("jazzer.internal.arg.${argIndex++}", corpusDir)
     }
 
     val maxDuration = project.findProperty("fuzz.maxDuration") ?: "1h"
     systemProperty("jazzer.max_duration", maxDuration)
+}
+
+// Generate JaCoCo coverage report for fuzz tests
+val fuzzReport = tasks.register<JacocoReport>("jacocoFuzzReport") {
+    description = "Generate JaCoCo coverage report for fuzz tests"
+    group = "verification"
+
+    dependsOn(fuzz)
+    executionData(layout.buildDirectory.files("jacoco/${fuzz.name}.exec"))
+    sourceSets(project.the<SourceSetContainer>()["main"])
+
+    reports {
+        xml.required.set(false)
+        csv.required.set(false)
+    }
+}
+
+fuzz {
+    finalizedBy(fuzzReport)
 }
