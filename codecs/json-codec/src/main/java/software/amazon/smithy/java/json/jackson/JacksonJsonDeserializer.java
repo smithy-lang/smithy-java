@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.json.jackson;
 
 import static com.fasterxml.jackson.core.JsonToken.END_ARRAY;
+import static com.fasterxml.jackson.core.JsonToken.END_OBJECT;
 import static com.fasterxml.jackson.core.JsonToken.VALUE_NULL;
 
 import com.fasterxml.jackson.core.Base64Variants;
@@ -274,8 +275,18 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     @Override
     public <T> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
         try {
-            for (var token = parser.nextToken(); token != END_ARRAY; token = parser.nextToken()) {
+            if (!parser.isExpectedStartArrayToken()) {
+                throw new SerializationException("Expected a list, but found " + describeToken());
+            }
+            boolean notEoa;
+            for (
+                    var token = parser.nextToken();
+                    (notEoa = (token != END_ARRAY)) && token != END_OBJECT && token != null;
+                    token = parser.nextToken()) {
                 listMemberConsumer.accept(state, this);
+            }
+            if (notEoa) {
+                throw new SerializationException("Expected end of list, but found " + describeToken());
             }
         } catch (Exception e) {
             throw new SerializationException(e);
