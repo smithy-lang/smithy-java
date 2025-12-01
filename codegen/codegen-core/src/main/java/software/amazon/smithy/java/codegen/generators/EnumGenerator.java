@@ -19,6 +19,8 @@ import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.sections.EnumVariantSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.core.schema.SmithyEnum;
+import software.amazon.smithy.java.core.schema.SmithyIntEnum;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -44,7 +46,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
             var template = """
-                    public sealed interface ${shape:T} extends ${serializableShape:T} {
+                    public sealed interface ${shape:T} extends ${enum:T}, ${serializableShape:T} {
                         ${staticImpls:C|}
 
                         ${schema:C|}
@@ -68,6 +70,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             var shapeSymbol = directive.symbolProvider().toSymbol(shape);
             writer.putContext("shape", shapeSymbol);
             writer.putContext("serializableShape", SerializableShape.class);
+            writer.putContext("enum", shape.isEnumShape() ? SmithyEnum.class : SmithyIntEnum.class);
             writer.putContext("shapeSerializer", ShapeSerializer.class);
             var valueSymbol = shapeSymbol.expectProperty(SymbolProperties.ENUM_VALUE_TYPE);
             writer.putContext("value", valueSymbol);
