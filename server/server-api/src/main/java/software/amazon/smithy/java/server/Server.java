@@ -22,11 +22,11 @@ public interface Server {
     private static ServerBuilder<?> findBuilder(String name) {
         ServerProvider selected = null;
         InternalLogger logger = InternalLogger.getLogger(Server.class);
-        List<ServerProvider> providers = ServiceLoader.load(ServerProvider.class)
-                .stream()
-                .map(ServiceLoader.Provider::get)
-                .peek(p -> logger.debug("Discovered server provider {}:{}", p.name(), p.getClass()))
-                .toList();
+        List<ServerProvider> providers = new ArrayList<>();
+        for (var provider : ServiceLoader.load(ServerProvider.class, ServerProvider.class.getClassLoader())) {
+            logger.debug("Discovered server provider {}:{}", provider.name(), provider.getClass());
+            providers.add(provider);
+        }
         for (var provider : providers) {
             if (provider.name().equals(name)) {
                 selected = provider;

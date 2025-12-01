@@ -14,7 +14,7 @@ public final class CborSettings {
     static {
         final String preferredName = System.getProperty("smithy-java.cbor-provider");
         CborSerdeProvider selected = null;
-        for (var provider : ServiceLoader.load(CborSerdeProvider.class)) {
+        for (var provider : ServiceLoader.load(CborSerdeProvider.class, CborSerdeProvider.class.getClassLoader())) {
             if (preferredName != null) {
                 if (provider.getName().equals(preferredName)) {
                     selected = provider;

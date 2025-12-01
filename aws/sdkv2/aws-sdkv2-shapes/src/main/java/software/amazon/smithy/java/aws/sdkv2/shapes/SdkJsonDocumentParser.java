@@ -40,7 +40,7 @@ final class SdkJsonDocumentParser implements ShapeSerializer {
     static final Map<ShapeId, DocumentConverter> CONVERTERS = new HashMap<>();
 
     static {
-        for (var impl : ServiceLoader.load(DocumentConverter.class)) {
+        for (var impl : ServiceLoader.load(DocumentConverter.class, DocumentConverter.class.getClassLoader())) {
             CONVERTERS.put(impl.protocol(), impl);
         }
     }
