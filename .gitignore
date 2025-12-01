@@ -24,3 +24,5 @@ smithy-java-core/out
 crash-*
 
 mise.toml
+
+.claude/settings.local.json
