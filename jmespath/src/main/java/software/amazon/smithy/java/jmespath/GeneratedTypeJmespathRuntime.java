@@ -1,8 +1,9 @@
 package software.amazon.smithy.java.jmespath;
 
+import software.amazon.smithy.java.core.schema.SmithyEnum;
+import software.amazon.smithy.java.core.schema.SmithyIntEnum;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
-import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.jmespath.RuntimeType;
 import software.amazon.smithy.jmespath.evaluation.EvaluationUtils;
@@ -11,22 +12,14 @@ import software.amazon.smithy.jmespath.evaluation.ListArrayBuilder;
 import software.amazon.smithy.jmespath.evaluation.MapObjectBuilder;
 import software.amazon.smithy.jmespath.evaluation.NumberType;
 import software.amazon.smithy.jmespath.evaluation.WrappingIterable;
-import software.amazon.smithy.model.shapes.ShapeType;
 
-import java.lang.invoke.SerializedLambda;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
-// TODO: still need to handle enums/intenum.
-// Requires tracking schema values from containers since the generated types
-// have no common supertype/or interface.
-public class SerializableStructJmespathRuntime implements JmespathRuntime<Object> {
+public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
 
     // Exact class matches for faster typeOf matching
     private static final Map<Class<?>, RuntimeType> typeForClass = new HashMap<>();
@@ -57,6 +50,10 @@ public class SerializableStructJmespathRuntime implements JmespathRuntime<Object
             return RuntimeType.ARRAY;
         } else if (value instanceof Map<?, ?> || value instanceof SerializableStruct) {
             return RuntimeType.OBJECT;
+        } else if (value instanceof SmithyEnum) {
+            return RuntimeType.STRING;
+        } else if (value instanceof SmithyIntEnum) {
+            return RuntimeType.NUMBER;
         } else {
             throw new IllegalArgumentException();
         }
@@ -84,7 +81,11 @@ public class SerializableStructJmespathRuntime implements JmespathRuntime<Object
 
     @Override
     public String toString(Object value) {
-        return (String)value;
+        if (value instanceof SmithyEnum enumValue) {
+            return enumValue.getValue();
+        } else {
+            return (String) value;
+        }
     }
 
     @Override
@@ -103,6 +104,8 @@ public class SerializableStructJmespathRuntime implements JmespathRuntime<Object
             return number;
         } else if (value instanceof Instant instant) {
             return JMESPathDocumentUtils.asBigDecimal(instant);
+        } else if (value instanceof SmithyIntEnum) {
+            return ((SmithyIntEnum)value).getValue();
         } else {
             throw new IllegalArgumentException();
         }
