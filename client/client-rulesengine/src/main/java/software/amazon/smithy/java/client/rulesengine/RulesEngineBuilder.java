@@ -33,7 +33,7 @@ public final class RulesEngineBuilder {
         // Always include the standard builtins.
         EXTENSIONS.add(new StdExtension());
 
-        for (var ext : ServiceLoader.load(RulesExtension.class)) {
+        for (var ext : ServiceLoader.load(RulesExtension.class, RulesExtension.class.getClassLoader())) {
             EXTENSIONS.add(ext);
         }
     }

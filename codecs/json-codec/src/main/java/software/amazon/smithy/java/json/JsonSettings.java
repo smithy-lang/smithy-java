@@ -19,7 +19,7 @@ public final class JsonSettings {
     static {
         final String preferredName = System.getProperty("smithy-java.json-provider");
         JsonSerdeProvider selected = null;
-        for (JsonSerdeProvider provider : ServiceLoader.load(JsonSerdeProvider.class)) {
+        for (var provider : ServiceLoader.load(JsonSerdeProvider.class, JsonSerdeProvider.class.getClassLoader())) {
             if (preferredName != null) {
                 if (provider.getName().equals(preferredName)) {
                     selected = provider;

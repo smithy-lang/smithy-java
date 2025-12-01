@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.core.schema;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.function.Consumer;
@@ -15,8 +16,11 @@ public abstract class SchemaIndex {
     private static final SchemaIndex COMBINED_SCHEMA_INDEX = createCombinedSchemaIndex();
 
     private static SchemaIndex createCombinedSchemaIndex() {
-        return new CombinedSchemaIndex(
-                ServiceLoader.load(SchemaIndex.class).stream().map(ServiceLoader.Provider::get).toList());
+        var schemaIndexes = new ArrayList<SchemaIndex>();
+        for (var schemaIndex : ServiceLoader.load(SchemaIndex.class, SchemaIndex.class.getClassLoader())) {
+            schemaIndexes.add(schemaIndex);
+        }
+        return new CombinedSchemaIndex(schemaIndexes);
     }
 
     public static SchemaIndex getCombinedSchemaIndex() {
