@@ -57,4 +57,9 @@ final class WrappedDataStream implements DataStream {
     public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
         delegate.subscribe(subscriber);
     }
+
+    @Override
+    public void close() {
+        delegate.close();
+    }
 }

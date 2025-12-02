@@ -19,7 +19,7 @@ import java.util.concurrent.Flow;
 /**
  * Abstraction for reading streams of data.
  */
-public interface DataStream extends Flow.Publisher<ByteBuffer> {
+public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
     /**
      * Length of the data stream, if known.
      *
@@ -103,6 +103,19 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     @Override
     default void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
         HttpRequest.BodyPublishers.ofInputStream(this::asInputStream).subscribe(subscriber);
+    }
+
+    /**
+     * Closes any underlying resources associated with this data stream.
+     *
+     * <p>The default implementation does nothing. Implementations that hold closeable resources (e.g., input streams)
+     * should override this method to release them.
+     *
+     * <p>It is safe to call this method multiple times.
+     */
+    @Override
+    default void close() {
+        // Default no-op. Implementations holding closeable resources should override.
     }
 
     /**
