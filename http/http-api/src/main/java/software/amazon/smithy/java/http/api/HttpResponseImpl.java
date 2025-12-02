@@ -7,7 +7,6 @@ package software.amazon.smithy.java.http.api;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 record HttpResponseImpl(
@@ -15,6 +14,15 @@ record HttpResponseImpl(
         int statusCode,
         HttpHeaders headers,
         DataStream body) implements HttpResponse {
+
+    HttpResponseImpl(ModifiableHttpResponse from) {
+        this(from.httpVersion(), from.statusCode(), from.headers().toUnmodifiable(), from.body());
+    }
+
+    @Override
+    public HttpResponse toUnmodifiable() {
+        return this;
+    }
 
     @Override
     public ModifiableHttpResponse toModifiable() {
@@ -27,84 +35,60 @@ record HttpResponseImpl(
     }
 
     static final class Builder implements HttpResponse.Builder {
-        int statusCode;
-        DataStream body;
-        HttpHeaders headers = SimpleUnmodifiableHttpHeaders.EMPTY;
-        HttpVersion httpVersion = HttpVersion.HTTP_1_1;
-        private Map<String, List<String>> mutatedHeaders;
+        ModifiableHttpResponseImpl modifiableResponse = new ModifiableHttpResponseImpl();
 
         Builder() {}
 
         @Override
         public Builder httpVersion(HttpVersion httpVersion) {
-            this.httpVersion = httpVersion;
+            modifiableResponse.setHttpVersion(httpVersion);
             return this;
         }
 
         @Override
         public Builder statusCode(int statusCode) {
-            this.statusCode = statusCode;
+            modifiableResponse.setStatusCode(statusCode);
             return this;
         }
 
         @Override
         public Builder body(DataStream body) {
-            this.body = body;
+            modifiableResponse.setBody(body);
             return this;
         }
 
         @Override
         public Builder headers(HttpHeaders headers) {
-            this.headers = Objects.requireNonNull(headers);
-            mutatedHeaders = null;
+            modifiableResponse.setHeaders(headers.toModifiable());
             return this;
         }
 
         @Override
         public Builder withAddedHeader(String name, String value) {
-            mutatedHeaders = SimpleUnmodifiableHttpHeaders.addHeader(this.headers, mutatedHeaders, name, value);
+            modifiableResponse.headers().addHeader(name, value);
             return this;
         }
 
         @Override
         public Builder withAddedHeaders(Map<String, List<String>> headers) {
-            mutatedHeaders = SimpleUnmodifiableHttpHeaders.addHeaders(this.headers, mutatedHeaders, headers);
+            modifiableResponse.headers().addHeaders(headers);
             return this;
         }
 
         @Override
         public Builder withReplacedHeaders(Map<String, List<String>> headers) {
-            mutatedHeaders = SimpleUnmodifiableHttpHeaders.replaceHeaders(this.headers, mutatedHeaders, headers);
+            modifiableResponse.headers().setHeaders(headers);
             return this;
-        }
-
-        private void beforeBuild() {
-            if (statusCode == 0) {
-                throw new IllegalStateException("No status code was set on response");
-            }
-            if (mutatedHeaders != null) {
-                headers = new SimpleUnmodifiableHttpHeaders(mutatedHeaders, false);
-            }
-            Objects.requireNonNull(httpVersion);
-            body = Objects.requireNonNullElse(body, DataStream.ofEmpty());
-            mutatedHeaders = null; // decouple from built response
         }
 
         @Override
         public HttpResponse build() {
-            beforeBuild();
-            return new HttpResponseImpl(httpVersion, statusCode, headers, body);
+            return modifiableResponse.toUnmodifiable();
         }
 
         @Override
         public ModifiableHttpResponse buildModifiable() {
-            beforeBuild();
-            var mod = new ModifiableHttpResponseImpl();
-            mod.setHttpVersion(httpVersion);
-            mod.setStatusCode(statusCode);
-            mod.setHeaders(headers.toModifiable());
-            mod.setBody(body);
-            return mod;
+            return modifiableResponse.copy();
         }
     }
 }

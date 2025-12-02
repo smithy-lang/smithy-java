@@ -110,7 +110,18 @@ public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
      *
      * @return the created modifiable headers.
      */
-    ModifiableHttpHeaders toModifiable();
+    default ModifiableHttpHeaders toModifiable() {
+        return SimpleModifiableHttpHeaders.of(this);
+    }
+
+    /**
+     * Get an unmodifiable version of the headers.
+     *
+     * @return the unmodifiable headers.
+     */
+    default HttpHeaders toUnmodifiable() {
+        return SimpleUnmodifiableHttpHeaders.of(this);
+    }
 
     /**
      * Normalizes an HTTP header name by trimming whitespace and converting ASCII uppercase to lowercase.

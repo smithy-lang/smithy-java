@@ -29,4 +29,11 @@ public interface ModifiableHttpRequest extends ModifiableHttpMessage, HttpReques
     default ModifiableHttpRequest toModifiable() {
         return this;
     }
+
+    /**
+     * Create a copy of the modifiable request.
+     *
+     * @return the standalone copy.
+     */
+    ModifiableHttpRequest copy();
 }

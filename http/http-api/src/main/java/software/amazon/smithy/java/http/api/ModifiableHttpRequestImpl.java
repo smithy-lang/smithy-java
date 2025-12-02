@@ -14,8 +14,18 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
     private URI uri;
     private String method;
     private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
-    private HttpHeaders headers = new SimpleModifiableHttpHeaders();
+    private ModifiableHttpHeaders headers = new SimpleModifiableHttpHeaders();
     private DataStream body = DataStream.ofEmpty();
+
+    ModifiableHttpRequestImpl() {}
+
+    ModifiableHttpRequestImpl(ModifiableHttpRequestImpl copy) {
+        this.httpVersion = copy.httpVersion;
+        this.method = copy.method;
+        this.uri = copy.uri;
+        this.headers = copy.headers.copy();
+        this.body = copy.body;
+    }
 
     @Override
     public String method() {
@@ -48,7 +58,7 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
     }
 
     @Override
-    public HttpHeaders headers() {
+    public ModifiableHttpHeaders headers() {
         return headers;
     }
 
@@ -64,7 +74,22 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
 
     @Override
     public void setBody(DataStream body) {
-        this.body = Objects.requireNonNull(body);
+        if (body == null) {
+            this.body = DataStream.ofEmpty();
+        } else {
+            this.body = body;
+            ModifiableHttpResponseImpl.addBodyHeaders(body, headers);
+        }
+    }
+
+    @Override
+    public HttpRequest toUnmodifiable() {
+        return new HttpRequestImpl(this);
+    }
+
+    @Override
+    public ModifiableHttpRequest copy() {
+        return new ModifiableHttpRequestImpl(this);
     }
 
     @Override
