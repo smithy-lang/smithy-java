@@ -68,6 +68,14 @@ public final class ByteBufferOutputStream extends OutputStream {
         return count;
     }
 
+    /**
+     * Resets the stream to empty, allowing buffer reuse.
+     * The internal buffer is retained, avoiding reallocation.
+     */
+    public void reset() {
+        count = 0;
+    }
+
     private void ensureCapacity(int minCapacity) {
         // overflow-conscious code
         int oldCapacity = buf.length;

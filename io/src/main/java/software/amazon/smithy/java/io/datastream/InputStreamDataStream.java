@@ -5,7 +5,9 @@
 
 package software.amazon.smithy.java.io.datastream;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 
 final class InputStreamDataStream implements DataStream {
 
@@ -13,6 +15,7 @@ final class InputStreamDataStream implements DataStream {
     private final String contentType;
     private final long contentLength;
     private boolean consumed;
+    private boolean closed;
 
     InputStreamDataStream(InputStream inputStream, String contentType, long contentLength) {
         this.inputStream = inputStream;
@@ -47,5 +50,17 @@ final class InputStreamDataStream implements DataStream {
     @Override
     public String contentType() {
         return contentType;
+    }
+
+    @Override
+    public void close() {
+        if (!closed) {
+            closed = true;
+            try {
+                inputStream.close();
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to close data stream", e);
+            }
+        }
     }
 }
