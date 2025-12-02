@@ -19,6 +19,15 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
 
     private final Map<String, List<String>> headers;
 
+    // A faster constructor that knows the keys are already grouped and normalized.
+    SimpleUnmodifiableHttpHeaders(HttpHeaders headers) {
+        var map = headers.map();
+        this.headers = new HashMap<>(map.size());
+        for (var e : map.entrySet()) {
+            this.headers.put(e.getKey(), List.copyOf(e.getValue()));
+        }
+    }
+
     SimpleUnmodifiableHttpHeaders(Map<String, List<String>> input) {
         this(input, true);
     }
@@ -49,14 +58,8 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
         }
     }
 
-    private static List<String> copyAndTrimValuesMutable(List<String> source) {
-        int size = source.size();
-        if (size == 0) {
-            return new ArrayList<>(4);
-        }
-        var result = new ArrayList<String>(size);
-        copyAndTrimValuesInto(source, result);
-        return result;
+    static HttpHeaders of(HttpHeaders headers) {
+        return headers instanceof SimpleUnmodifiableHttpHeaders ? headers : new SimpleUnmodifiableHttpHeaders(headers);
     }
 
     private static void copyAndTrimValuesInto(List<String> source, List<String> dest) {
@@ -92,17 +95,6 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
     }
 
     @Override
-    public ModifiableHttpHeaders toModifiable() {
-        var mod = new SimpleModifiableHttpHeaders();
-        Map<String, List<String>> copy = HashMap.newHashMap(headers.size());
-        for (var entry : headers.entrySet()) {
-            copy.put(entry.getKey(), new ArrayList<>(entry.getValue()));
-        }
-        mod.addHeaders(copy);
-        return mod;
-    }
-
-    @Override
     public boolean equals(Object obj) {
         if (obj == this) {
             return true;
@@ -121,80 +113,5 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
     @Override
     public String toString() {
         return "SimpleUnmodifiableHttpHeaders{" + headers + '}';
-    }
-
-    // Note: all of these methods must:
-    // 1. Lowercase header names and trim them
-    // 2. Copy header value lists and trim each value.
-    //
-    // Because of this, when creating HttpHeaders from the returned maps, there's no need to copy the map.
-
-    static Map<String, List<String>> addHeaders(
-            HttpHeaders original,
-            Map<String, List<String>> mutatedHeaders,
-            Map<String, List<String>> from
-    ) {
-        if (mutatedHeaders == null) {
-            if (original.isEmpty()) {
-                return copyHeaders(from);
-            }
-            mutatedHeaders = copyHeaders(original.map());
-        }
-        for (var entry : from.entrySet()) {
-            var key = HttpHeaders.normalizeHeaderName(entry.getKey());
-            var list = mutatedHeaders.get(key);
-            if (list == null) {
-                list = copyAndTrimValuesMutable(entry.getValue());
-                mutatedHeaders.put(key, list);
-            } else {
-                copyAndTrimValuesInto(entry.getValue(), list);
-            }
-        }
-        return mutatedHeaders;
-    }
-
-    static Map<String, List<String>> addHeader(
-            HttpHeaders original,
-            Map<String, List<String>> mutatedHeaders,
-            String field,
-            String value
-    ) {
-        if (mutatedHeaders == null) {
-            mutatedHeaders = copyHeaders(original.map());
-        }
-        field = HttpHeaders.normalizeHeaderName(field);
-        value = value.trim();
-        var list = mutatedHeaders.get(field);
-        if (list == null) {
-            list = new ArrayList<>(4);
-            mutatedHeaders.put(field, list);
-        }
-        list.add(value);
-        return mutatedHeaders;
-    }
-
-    static Map<String, List<String>> copyHeaders(Map<String, List<String>> from) {
-        if (from.isEmpty()) {
-            return new HashMap<>(8);
-        }
-        Map<String, List<String>> into = HashMap.newHashMap(from.size());
-        for (var entry : from.entrySet()) {
-            into.put(HttpHeaders.normalizeHeaderName(entry.getKey()), copyAndTrimValuesMutable(entry.getValue()));
-        }
-        return into;
-    }
-
-    static Map<String, List<String>> replaceHeaders(
-            HttpHeaders original,
-            Map<String, List<String>> mutated,
-            Map<String, List<String>> replace
-    ) {
-        if (mutated == null) {
-            mutated = copyHeaders(original.map());
-        }
-        for (var entry : replace.entrySet()) {
-            mutated.put(HttpHeaders.normalizeHeaderName(entry.getKey()), copyAndTrimValuesMutable(entry.getValue()));
-        }
-        return mutated;
     }
 }

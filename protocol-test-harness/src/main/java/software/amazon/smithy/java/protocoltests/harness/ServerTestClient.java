@@ -38,6 +38,7 @@ final class ServerTestClient {
                 .version(switch (request.httpVersion()) {
                     case HTTP_1_1 -> HttpClient.Version.HTTP_1_1;
                     case HTTP_2 -> HttpClient.Version.HTTP_2;
+                    default -> throw new UnsupportedOperationException(request.httpVersion() + " is not supported");
                 })
                 .method(request.method(), bodyPublisher)
                 .uri(request.uri());
