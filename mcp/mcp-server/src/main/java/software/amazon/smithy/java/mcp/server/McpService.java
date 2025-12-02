@@ -79,7 +79,7 @@ public final class McpService {
     private final Map<String, Service> services;
     private final AtomicReference<JsonRpcRequest> initializeRequest = new AtomicReference<>();
     private final ToolFilter toolFilter;
-    private volatile boolean proxiesInitialized = false;
+    private final AtomicReference<Boolean> proxiesInitialized = new AtomicReference<>(false);
     private final McpMetricsObserver metricsObserver;
 
     McpService(
@@ -118,13 +118,19 @@ public final class McpService {
     ) {
         try {
             validate(req);
-            return switch (req.getMethod()) {
+            var method = req.getMethod();
+            return switch (method) {
                 case "initialize" -> handleInitialize(req);
-                case "prompts/list" -> handlePromptsList(req);
-                case "prompts/get" -> handlePromptsGet(req);
-                case "tools/list" -> handleToolsList(req, protocolVersion);
-                case "tools/call" -> handleToolsCall(req, asyncResponseCallback, protocolVersion);
-                default -> null; // Notifications or unknown methods
+                default -> {
+                    initializeProxies(rpcResponse -> {});
+                    yield switch (method) {
+                        case "prompts/list" -> handlePromptsList(req);
+                        case "prompts/get" -> handlePromptsGet(req);
+                        case "tools/list" -> handleToolsList(req, protocolVersion);
+                        case "tools/call" -> handleToolsCall(req, asyncResponseCallback, protocolVersion);
+                        default -> null; // Notifications or unknown methods
+                    };
+                }
             };
         } catch (Exception e) {
             return createErrorResponse(req, e);
@@ -166,15 +172,9 @@ public final class McpService {
                     clientTitle);
         }
 
-        this.initializeRequest.set(req);
+        this.initializeRequest.compareAndSet(null, req);
 
-        // Initialize proxies lazily after we have a real initialize request
-        if (!proxiesInitialized) {
-            initializeProxies(response -> {
-                // Proxies are initialized, no additional response needed
-            });
-            proxiesInitialized = true;
-        }
+        initializeProxies(rpcResponse -> {});
 
         var maybeVersion = req.getParams().getMember("protocolVersion");
         String pv = null;
@@ -305,31 +305,32 @@ public final class McpService {
      * Initializes proxies with the actual initialize request.
      */
     public void initializeProxies(Consumer<JsonRpcResponse> responseWriter) {
-        JsonRpcRequest initRequest = initializeRequest.get();
-        if (initRequest == null) {
-            LOG.warn("Cannot initialize proxies: no initialize request received yet");
-            return;
-        }
-
-        String protocolVersion = null;
-        var maybeVersion = initRequest.getParams().getMember("protocolVersion");
-        if (maybeVersion != null) {
-            var version = ProtocolVersion.version(maybeVersion.asString());
-            if (!(version instanceof ProtocolVersion.UnknownVersion)) {
-                protocolVersion = version.identifier();
-            }
-        }
-
-        for (McpServerProxy proxy : proxies.values()) {
-            try {
-                proxy.initialize(responseWriter, initRequest, protocolVersion);
-
-                List<ToolInfo> proxyTools = proxy.listTools();
-                for (var toolInfo : proxyTools) {
-                    tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
+        if (proxiesInitialized.compareAndSet(false, true)) {
+            JsonRpcRequest initRequest = initializeRequest.get();
+            var protocolVersion = ProtocolVersion.defaultVersion();
+            if (initRequest != null) {
+                var maybeVersion = initRequest.getParams().getMember("protocolVersion");
+                if (maybeVersion != null) {
+                    var pv = ProtocolVersion.version(maybeVersion.asString());
+                    if (!(pv instanceof ProtocolVersion.UnknownVersion)) {
+                        protocolVersion = pv;
+                    }
                 }
-            } catch (Exception e) {
-                LOG.error("Failed to initialize proxy: " + proxy.name(), e);
+            }
+
+            for (McpServerProxy proxy : proxies.values()) {
+                try {
+                    if (initRequest != null) {
+                        proxy.initialize(responseWriter, initRequest, protocolVersion);
+                    }
+
+                    List<ToolInfo> proxyTools = proxy.listTools();
+                    for (var toolInfo : proxyTools) {
+                        tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
+                    }
+                } catch (Exception e) {
+                    LOG.error("Failed to initialize proxy: " + proxy.name(), e);
+                }
             }
         }
     }

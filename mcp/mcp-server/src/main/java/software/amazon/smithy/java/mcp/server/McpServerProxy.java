@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
@@ -22,8 +23,9 @@ public abstract class McpServerProxy {
 
     private static final AtomicInteger ID_GENERATOR = new AtomicInteger(0);
 
-    protected Consumer<JsonRpcResponse> notificationConsumer;
-    protected volatile String protocolVersion;
+    private final AtomicReference<Consumer<JsonRpcResponse>> notificationConsumer = new AtomicReference<>();
+    private final AtomicReference<ProtocolVersion> protocolVersion =
+            new AtomicReference<>(ProtocolVersion.defaultVersion());
 
     public List<ToolInfo> listTools() {
         JsonRpcRequest request = JsonRpcRequest.builder()
@@ -47,15 +49,19 @@ public abstract class McpServerProxy {
     public void initialize(
             Consumer<JsonRpcResponse> notificationConsumer,
             JsonRpcRequest initializeRequest,
-            String protocolVersion
+            ProtocolVersion protocolVersion
     ) {
 
         var result = Objects.requireNonNull(rpc(initializeRequest).join());
         if (result.getError() != null) {
             throw new RuntimeException("Error during initialization: " + result.getError().getMessage());
         }
-        this.notificationConsumer = notificationConsumer;
-        this.protocolVersion = protocolVersion;
+        this.notificationConsumer.set(notificationConsumer);
+        this.protocolVersion.set(protocolVersion);
+    }
+
+    protected final ProtocolVersion getProtocolVersion() {
+        return protocolVersion.get();
     }
 
     abstract CompletableFuture<JsonRpcResponse> rpc(JsonRpcRequest request);
@@ -85,7 +91,10 @@ public abstract class McpServerProxy {
     }
 
     protected void notify(JsonRpcResponse response) {
-        notificationConsumer.accept(response);
+        var nc = notificationConsumer.get();
+        if (nc != null) {
+            nc.accept(response);
+        }
     }
 
     public abstract String name();
