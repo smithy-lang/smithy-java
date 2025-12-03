@@ -37,7 +37,7 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
 
     @Override
     public void addHeader(String name, String value) {
-        getOrCreateValues(name).add(trim(value));
+        getOrCreateValues(name).add(HeaderUtils.normalizeValue(value));
     }
 
     @Override
@@ -45,13 +45,13 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
         if (!values.isEmpty()) {
             var line = getOrCreateValues(name);
             for (var v : values) {
-                line.add(trim(v));
+                line.add(HeaderUtils.normalizeValue(v));
             }
         }
     }
 
     private List<String> getOrCreateValues(String name) {
-        return getOrCreateValuesUnsafe(HttpHeaders.normalizeHeaderName(name));
+        return getOrCreateValuesUnsafe(HeaderUtils.normalizeName(name));
     }
 
     private List<String> getOrCreateValuesUnsafe(String key) {
@@ -65,7 +65,7 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
 
     @Override
     public void setHeader(String name, String value) {
-        var key = HttpHeaders.normalizeHeaderName(name);
+        var key = HeaderUtils.normalizeName(name);
         var list = headers.get(key);
         if (list == null) {
             list = new ArrayList<>(1);
@@ -74,25 +74,21 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
             list.clear();
         }
 
-        list.add(trim(value));
-    }
-
-    private String trim(String value) {
-        return value.trim();
+        list.add(HeaderUtils.normalizeValue(value));
     }
 
     @Override
     public void setHeader(String name, List<String> values) {
         List<String> copy = new ArrayList<>(values.size());
         for (var v : values) {
-            copy.add(trim(v));
+            copy.add(HeaderUtils.normalizeValue(v));
         }
-        headers.put(HttpHeaders.normalizeHeaderName(name), copy);
+        headers.put(HeaderUtils.normalizeName(name), copy);
     }
 
     @Override
     public void removeHeader(String name) {
-        headers.remove(name.toLowerCase(Locale.ENGLISH));
+        headers.remove(HeaderUtils.normalizeName(name));
     }
 
     @Override
@@ -102,7 +98,7 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
 
     @Override
     public List<String> allValues(String name) {
-        return headers.getOrDefault(name.toLowerCase(Locale.ENGLISH), Collections.emptyList());
+        return headers.getOrDefault(name.toLowerCase(Locale.ROOT), Collections.emptyList());
     }
 
     @Override
@@ -135,10 +131,10 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
 
     @Override
     public List<String> setHeaderIfAbsent(String name, List<String> values) {
-        return headers.computeIfAbsent(HttpHeaders.normalizeHeaderName(name), n -> {
+        return headers.computeIfAbsent(HeaderUtils.normalizeName(name), n -> {
             var trimmed = new ArrayList<String>(values.size());
             for (var v : values) {
-                trimmed.add(v.trim());
+                trimmed.add(HeaderUtils.normalizeValue(v));
             }
             return trimmed;
         });
@@ -146,7 +142,8 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
 
     @Override
     public List<String> setHeaderIfAbsent(String name, String value) {
-        return headers.computeIfAbsent(HttpHeaders.normalizeHeaderName(name), n -> List.of(value.trim()));
+        return headers.computeIfAbsent(HeaderUtils.normalizeName(name),
+                n -> List.of(HeaderUtils.normalizeValue(value)));
     }
 
     // Set header using a pre-formatted keys and already trimmed values.

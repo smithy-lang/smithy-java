@@ -41,7 +41,7 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
             // Single pass to normalize, trim, and make immutable in one go
             Map<String, List<String>> result = HashMap.newHashMap(input.size());
             for (var entry : input.entrySet()) {
-                var key = HttpHeaders.normalizeHeaderName(entry.getKey());
+                var key = HeaderUtils.normalizeName(entry.getKey());
                 var values = entry.getValue();
                 var existing = result.get(key);
                 if (existing == null) {
@@ -64,14 +64,13 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
 
     private static void copyAndTrimValuesInto(List<String> source, List<String> dest) {
         for (String s : source) {
-            dest.add(s.trim());
+            dest.add(HeaderUtils.normalizeValue(s));
         }
     }
 
     @Override
     public List<String> allValues(String name) {
-        var values = headers.get(name.toLowerCase(Locale.ENGLISH));
-        return values != null ? values : List.of();
+        return headers.getOrDefault(name.toLowerCase(Locale.ROOT), List.of());
     }
 
     @Override
