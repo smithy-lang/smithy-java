@@ -55,8 +55,8 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
     /**
      * Sets a header to the given value, overwriting old values if present.
      *
-     * <p>Any previously set values for this header are replaced as if {@link #removeHeader(String) and
-     * {@link #addHeader(String, String)}} were called in sequence. To add a new value to a
+     * <p>Any previously set values for this header are replaced as if {@link #removeHeader(String)} and
+     * {@link #addHeader(String, String)} were called in sequence. To add a new value to a
      * list of values, use {@link #addHeader(String, String)}.
      *
      * @param name Case-insensitive name of the header to set.
@@ -70,8 +70,8 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
     /**
      * Sets a header to the given value, overwriting old values if present.
      *
-     * <p>Any previously set values for this header are replaced as if {@link #removeHeader(String) and
-     * {@link #addHeader(String, String)}} were called in sequence. To add new values to a
+     * <p>Any previously set values for this header are replaced as if {@link #removeHeader(String)} and
+     * {@link #addHeader(String, String)} were called in sequence. To add new values to a
      * list of values, use {@link #addHeader(String, List)}.
      *
      * @param name Case-insensitive name of the header to set.
