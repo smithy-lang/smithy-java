@@ -119,7 +119,8 @@ public final class JsonSettings {
     }
 
     /**
-     * The error type sanitizer to use for {@code __type}. Default is null
+     * The error type sanitizer to use for {@code __type} or {@code code} when parsing the error discriminator.
+     * Default is null
      *
      * @return the sanitizer used or null
      */

@@ -202,7 +202,7 @@ public final class HttpErrorDeserializer {
             HttpResponse response,
             ByteBuffer buffer) -> {
         var document = codec.createDeserializer(buffer).readDocument();
-        var id = document.discriminator();
+        var id = document.parseErrorType();
         var builder = typeRegistry.createBuilder(id, ModeledException.class);
         if (builder != null) {
             return knownErrorFactory.createErrorFromDocument(
