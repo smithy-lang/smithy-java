@@ -13,12 +13,6 @@ plugins {
 // Workaround per: https://github.com/gradle/gradle/issues/15383
 val Project.libs get() = the<LibrariesForLibs>()
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
-    }
-}
-
 tasks.withType<JavaCompile>() {
     options.encoding = "UTF-8"
     options.release.set(21)

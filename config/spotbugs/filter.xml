@@ -86,4 +86,9 @@
         <Bug pattern="DCN_NULLPOINTER_EXCEPTION" />
     </Match>
 
+    <!-- JMH benchmark files - not production code -->
+    <Match>
+        <Class name="~.*\.http\.client\.VirtualThreadScalingBenchmark.*"/>
+    </Match>
+
 </FindBugsFilter>
