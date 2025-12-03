@@ -24,12 +24,12 @@ import software.amazon.smithy.java.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
+import software.amazon.smithy.java.core.serde.document.DocumentUtils;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.binding.RequestSerializer;
-import software.amazon.smithy.java.json.ErrorTypeSanitizer;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -53,7 +53,7 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
                 .useJsonName(true)
                 .useTimestampFormat(true)
                 .defaultNamespace(service.getNamespace())
-                .errorTypeSanitizer(ErrorTypeSanitizer::removeNamespaceAndUri)
+                .errorTypeSanitizer(DocumentUtils::removeNamespaceAndUri)
                 .build();
 
         this.errorDeserializer = HttpErrorDeserializer.builder()

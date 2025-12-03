@@ -246,19 +246,29 @@ public final class JsonDocuments {
         @Override
         public ShapeId discriminator() {
             String discriminator = null;
+            var member = values.get("__type");
+            if (member != null && member.type() == ShapeType.STRING) {
+                discriminator = member.asString();
+            }
+            return DocumentDeserializer.parseDiscriminator(discriminator, settings.defaultNamespace());
+        }
+
+        @Override
+        public ShapeId parseErrorType() {
+            String errorType = null;
             var typeMember = values.get("__type");
             if (typeMember != null && typeMember.type() == ShapeType.STRING) {
-                discriminator = typeMember.asString();
+                errorType = typeMember.asString();
             } else {
                 var codeMember = values.get("code");
                 if (codeMember != null && codeMember.type() == ShapeType.STRING) {
-                    discriminator = codeMember.asString();
+                    errorType = codeMember.asString();
                 }
             }
             if (settings.errorTypeSanitizer() != null) {
-                discriminator = settings.errorTypeSanitizer().apply(discriminator);
+                errorType = settings.errorTypeSanitizer().apply(errorType);
             }
-            return DocumentDeserializer.parseDiscriminator(discriminator, settings.defaultNamespace());
+            return DocumentDeserializer.parseDiscriminator(errorType, settings.defaultNamespace());
         }
 
         @Override
