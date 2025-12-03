@@ -27,6 +27,7 @@ include(":auth-api")
 include(":framework-errors")
 include(":http:http-api")
 include(":http:http-binding")
+include(":http:http-client")
 include(":retries-api")
 include(":tracing-api")
 
