@@ -13,7 +13,11 @@ import software.amazon.smithy.model.shapes.ShapeType;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+// TODO: default equal isn't correct, need to normalize number types
 public class DocumentJmespathRuntime implements JmespathRuntime<Document> {
+
+    public static final DocumentJmespathRuntime INSTANCE = new DocumentJmespathRuntime();
+
     @Override
     public RuntimeType typeOf(Document document) {
         if (document == null) {
@@ -45,7 +49,7 @@ public class DocumentJmespathRuntime implements JmespathRuntime<Document> {
     }
 
     @Override
-    public boolean toBoolean(Document document) {
+    public boolean asBoolean(Document document) {
         return document.asBoolean();
     }
 
@@ -55,7 +59,7 @@ public class DocumentJmespathRuntime implements JmespathRuntime<Document> {
     }
 
     @Override
-    public String toString(Document document) {
+    public String asString(Document document) {
         if (document.isType(ShapeType.BLOB)) {
             return JMESPathDocumentUtils.asString(document.asBlob());
         } else {
@@ -93,7 +97,7 @@ public class DocumentJmespathRuntime implements JmespathRuntime<Document> {
     }
 
     @Override
-    public Number toNumber(Document document) {
+    public Number asNumber(Document document) {
         if (document.isType(ShapeType.TIMESTAMP)) {
             return JMESPathDocumentUtils.asBigDecimal(document.asTimestamp());
         } else {
@@ -113,7 +117,7 @@ public class DocumentJmespathRuntime implements JmespathRuntime<Document> {
 
     @Override
     public Document element(Document document, Document index) {
-        return document.asList().get(toNumber(index).intValue());
+        return document.asList().get(asNumber(index).intValue());
     }
 
     @Override
@@ -132,7 +136,11 @@ public class DocumentJmespathRuntime implements JmespathRuntime<Document> {
 
     @Override
     public Document value(Document document, Document key) {
-        return document.getMember(key.asString());
+        if (typeOf(document) == RuntimeType.OBJECT) {
+            return document.getMember(key.asString());
+        } else {
+            return createNull();
+        }
     }
 
     @Override

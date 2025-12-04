@@ -10,4 +10,5 @@ extra["moduleName"] = "software.amazon.smithy.java.jmespath"
 dependencies {
     api(project(":core"))
     api(libs.smithy.jmespath)
+    testImplementation(libs.smithy.jmespath.tests)
 }

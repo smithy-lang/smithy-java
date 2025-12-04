@@ -8,8 +8,9 @@ package software.amazon.smithy.java.jmespath;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.jmespath.tests.ComplianceTestRunner;
 
-public class JMESPathComplianceTests {
+public class DocumentJmespathRuntimeComplianceTests {
     @ParameterizedTest(name = "{0}")
     @MethodSource("source")
     public void testRunner(String filename, Runnable callable) throws Exception {
@@ -17,6 +18,6 @@ public class JMESPathComplianceTests {
     }
 
     public static Stream<?> source() {
-        return ComplianceTestRunner.defaultParameterizedTestSource(JMESPathComplianceTests.class);
+        return ComplianceTestRunner.defaultParameterizedTestSource(DocumentJmespathRuntime.INSTANCE);
     }
 }
