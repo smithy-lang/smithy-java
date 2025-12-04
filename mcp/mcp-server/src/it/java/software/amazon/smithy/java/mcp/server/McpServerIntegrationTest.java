@@ -27,9 +27,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonCodec;
@@ -255,12 +259,18 @@ class McpServerIntegrationTest {
             assertEquals("array", echoProps.path("integerList").path("type").asText());
             assertEquals("array", echoProps.path("nestedList").path("type").asText());
 
-            // Nested structure, map, union, and document should be objects
+            // Nested structure, map, and union should be objects
             assertEquals("object", echoProps.path("nested").path("type").asText());
             assertEquals("object", echoProps.path("stringMap").path("type").asText());
             assertEquals("object", echoProps.path("nestedMap").path("type").asText());
             assertEquals("object", echoProps.path("unionValue").path("type").asText());
-            assertEquals("object", echoProps.path("documentValue").path("type").asText());
+
+            // Document should have type as array of all JSON types
+            var documentType = echoProps.path("documentValue").path("type");
+            assertTrue(documentType.isArray(), "Document type should be an array");
+            var types = new HashSet<String>();
+            documentType.forEach(node -> types.add(node.asText()));
+            assertEquals(Set.of("string", "number", "boolean", "object", "array", "null"), types);
         }
     }
 
@@ -528,6 +538,90 @@ class McpServerIntegrationTest {
         initializeLatestProtocol();
         var echo = echoSingleField("documentValue", Document.of("just a string"));
         assertEquals("just a string", echo.getMember("documentValue").asString());
+    }
+
+    static Stream<Arguments> documentSchemaValidationTestCases() {
+        return Stream.of(
+                // String document
+                Arguments.of("string document", Document.of("hello world")),
+                // Number document (integer)
+                Arguments.of("integer document", Document.of(42)),
+                // Number document (double)
+                Arguments.of("double document", Document.of(3.14159)),
+                // Boolean document (true)
+                Arguments.of("boolean true document", Document.of(true)),
+                // Boolean document (false)
+                Arguments.of("boolean false document", Document.of(false)),
+                // Array document
+                Arguments.of("array document",
+                        Document.of(List.of(
+                                Document.of("a"),
+                                Document.of(1),
+                                Document.of(true)))),
+                // Object document
+                Arguments.of("object document",
+                        Document.of(Map.of(
+                                "key",
+                                Document.of("value"),
+                                "number",
+                                Document.of(123)))),
+                // Nested object document
+                Arguments.of("nested object document",
+                        Document.of(Map.of(
+                                "outer",
+                                Document.of(Map.of(
+                                        "inner",
+                                        Document.of("deep value")))))),
+                // Mixed array document
+                Arguments.of("mixed array document",
+                        Document.of(List.of(
+                                Document.of("string"),
+                                Document.of(42),
+                                Document.of(true),
+                                Document.of(Map.of("nested", Document.of("value"))),
+                                Document.of(List.of(Document.of(1), Document.of(2)))))),
+                // Empty object document
+                Arguments.of("empty object document", Document.of(Map.of())));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("documentSchemaValidationTestCases")
+    void testDocumentValidatesAgainstSchema(String description, Document documentValue) throws Exception {
+        initializeLatestProtocol();
+
+        // Get output schema from raw JSON (using Jackson directly)
+        write("tools/list", Document.of(Map.of()));
+        var toolsResponseJson = readRawResponse();
+        var toolsResponseNode = OBJECT_MAPPER.readTree(toolsResponseJson);
+        var outputSchemaNode = toolsResponseNode
+                .path("result")
+                .path("tools")
+                .get(0)
+                .path("outputSchema");
+
+        // Create input with the document value
+        var echoData = new HashMap<String, Document>();
+        echoData.put("requiredField", Document.of("required"));
+        echoData.put("documentValue", documentValue);
+
+        // Call tool and get raw JSON response (using Jackson directly)
+        var params = Document.of(Map.of(
+                "name",
+                Document.of("McpEcho"),
+                "arguments",
+                createEchoInput(echoData)));
+        write("tools/call", params);
+        var callResponseJson = readRawResponse();
+        var callResponseNode = OBJECT_MAPPER.readTree(callResponseJson);
+        var structuredContentNode = callResponseNode.path("result").path("structuredContent");
+
+        assertNotNull(structuredContentNode, "Structured content should not be null for: " + description);
+
+        // Validate using Jackson-parsed JSON directly
+        JsonSchema schema = SCHEMA_FACTORY.getSchema(outputSchemaNode);
+        Set<ValidationMessage> errors = schema.validate(structuredContentNode);
+        assertTrue(errors.isEmpty(),
+                "Validation errors for " + description + ": " + errors);
     }
 
     // ========== Enum Tests ==========

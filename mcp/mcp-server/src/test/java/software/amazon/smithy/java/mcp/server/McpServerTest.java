@@ -984,11 +984,15 @@ public class McpServerTest {
         assertEquals("A string that's nested", nestedStr.get("description").asString());
 
         var nestedDocument = properties.get("nestedDocument").asStringMap();
-        assertEquals("object", nestedDocument.get("type").asString());
-        assertEquals("http://json-schema.org/draft-07/schema#", nestedDocument.get("$schema").asString());
-        assertTrue(nestedDocument.get("additionalProperties").asBoolean());
-        assertTrue(nestedDocument.get("properties").asStringMap().isEmpty());
-        assertTrue(nestedDocument.get("required").asList().isEmpty());
+        var documentTypesDocs = nestedDocument.get("type").asList();
+        var documentTypes = documentTypesDocs.stream().map(Document::asString).toList();
+        assertEquals(6, documentTypes.size());
+        assertTrue(documentTypes.contains("string"));
+        assertTrue(documentTypes.contains("number"));
+        assertTrue(documentTypes.contains("boolean"));
+        assertTrue(documentTypes.contains("object"));
+        assertTrue(documentTypes.contains("array"));
+        assertTrue(documentTypes.contains("null"));
 
         var recursive = properties.get("recursive").asStringMap();
         assertEquals("object", recursive.get("type").asString());
