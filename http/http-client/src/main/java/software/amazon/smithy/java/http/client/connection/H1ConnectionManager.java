@@ -37,7 +37,7 @@ final class H1ConnectionManager {
      * Try to acquire a pooled connection for the route.
      *
      * @param route the route
-     * @param maxConnections function to get max connections for route (called lazily)
+     * @param poolFactory
      * @return a valid pooled connection, or null if none available
      */
     PooledConnection tryAcquire(Route route, IntFunction<HostPool> poolFactory) {
@@ -184,7 +184,9 @@ final class H1ConnectionManager {
                             : CloseReason.UNEXPECTED_CLOSE;
                     try {
                         pc.connection.close();
-                    } catch (IOException ignored) {}
+                    } catch (IOException ignored) {
+                        // ignored
+                    }
                     onRemove.accept(pc.connection, reason);
                     iter.remove();
                     removed++;

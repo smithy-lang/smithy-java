@@ -17,6 +17,7 @@ import javax.net.ssl.SSLSocket;
 import software.amazon.smithy.java.http.client.ProxyConfiguration;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 import software.amazon.smithy.java.http.client.h1.H1Connection;
+import software.amazon.smithy.java.http.client.h1.ProxyTunnel;
 import software.amazon.smithy.java.http.client.h2.H2Connection;
 
 /**
@@ -222,16 +223,27 @@ final class HttpConnectionFactory {
         Socket proxySocket = socketFactory.newSocket(route, allProxyEndpoints);
 
         try {
-            proxySocket.connect(
-                    new InetSocketAddress(proxyAddress, proxy.port()),
-                    (int) connectTimeout.toMillis());
+            int timeoutMillis = (int) connectTimeout.toMillis();
+            proxySocket.connect(new InetSocketAddress(proxyAddress, proxy.port()), timeoutMillis);
 
-            if (proxy.type() == ProxyConfiguration.ProxyType.HTTPS) {
+            // Connect to the proxy over TLS if the scheme is https
+            if ("https".equalsIgnoreCase(proxy.proxyUri().getScheme())) {
                 proxySocket = performTlsHandshakeToProxy(proxySocket, proxy);
             }
 
             if (route.isSecure()) {
-                H1Connection.establishConnectTunnel(proxySocket, route.host(), route.port(), proxy);
+                var result = ProxyTunnel.establish(
+                        proxySocket,
+                        route.host(),
+                        route.port(),
+                        proxy.credentials(),
+                        readTimeout);
+
+                if (result.statusCode() != 200) {
+                    closeQuietly(proxySocket);
+                    throw new IOException("Proxy CONNECT failed: " + result.statusCode());
+                }
+
                 proxySocket = performTlsHandshake(proxySocket, route);
             }
 

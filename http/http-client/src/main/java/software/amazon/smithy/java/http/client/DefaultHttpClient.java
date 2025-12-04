@@ -7,6 +7,7 @@ package software.amazon.smithy.java.http.client;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -29,7 +30,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 final class DefaultHttpClient implements HttpClient {
 
     private final ConnectionPool connectionPool;
-    private final ProxyConfiguration proxyConfiguration;
+    private final ProxySelector proxySelector;
     private final List<HttpInterceptor> interceptors;
     private final Duration requestTimeout;
     private final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
@@ -37,7 +38,7 @@ final class DefaultHttpClient implements HttpClient {
     DefaultHttpClient(Builder builder) {
         this.connectionPool = builder.connectionPool;
         this.interceptors = List.copyOf(builder.interceptors);
-        this.proxyConfiguration = builder.proxyConfiguration;
+        this.proxySelector = builder.proxySelector;
         this.requestTimeout = builder.requestTimeout;
     }
 
@@ -123,7 +124,33 @@ final class DefaultHttpClient implements HttpClient {
             Context context,
             List<HttpInterceptor> resolvedInterceptors
     ) throws IOException {
-        Route route = Route.from(request.uri(), proxyConfiguration);
+        URI target = request.uri();
+        List<ProxyConfiguration> proxies = proxySelector.select(target, context);
+
+        if (proxies.isEmpty()) {
+            return createManagedExchangeForRoute(request, context, resolvedInterceptors, Route.from(target, null));
+        }
+
+        IOException last = null;
+        for (ProxyConfiguration proxy : proxies) {
+            Route route = Route.from(target, proxy);
+            try {
+                return createManagedExchangeForRoute(request, context, resolvedInterceptors, route);
+            } catch (IOException e) {
+                last = e;
+                proxySelector.connectFailed(target, context, proxy, e);
+            }
+        }
+
+        throw last;
+    }
+
+    private HttpExchange createManagedExchangeForRoute(
+            HttpRequest request,
+            Context context,
+            List<HttpInterceptor> resolvedInterceptors,
+            Route route
+    ) throws IOException {
         HttpConnection conn = connectionPool.acquire(route);
         try {
             HttpExchange baseExchange = conn.newExchange(request);

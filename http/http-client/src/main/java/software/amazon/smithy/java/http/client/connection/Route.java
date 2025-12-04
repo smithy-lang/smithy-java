@@ -30,10 +30,7 @@ import software.amazon.smithy.java.http.client.ProxyConfiguration;
  *
  * <p><b>Proxy routing:</b>
  * {@snippet :
- * ProxyConfiguration proxy = ProxyConfiguration.builder()
- *     .proxyUri("http://proxy.corp.com:8080")
- *     .type(ProxyType.HTTP)
- *     .build();
+ * ProxyConfiguration proxy = new ProxyConfiguration(URI.create("http://proxy.corp.com:8080"), ProxyType.HTTP);
  *
  * Route directRoute = Route.from(uri);
  * Route proxiedRoute = Route.from(uri, proxy);
@@ -202,11 +199,6 @@ public final class Route {
         if (port == -1) {
             // Use scheme default
             port = "https".equals(scheme) ? 443 : 80;
-        }
-
-        // Check if this host should bypass proxy
-        if (proxy != null && proxy.shouldBypass(host)) {
-            proxy = null;
         }
 
         return new Route(scheme, host, port, proxy);
