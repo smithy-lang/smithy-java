@@ -13,7 +13,6 @@ import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
-import software.amazon.smithy.java.core.serde.document.DocumentUtils;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -52,13 +51,11 @@ public final class CborDocuments {
 
         @Override
         public ShapeId discriminator() {
-            var discriminator = extractType();
-            return DocumentDeserializer.parseDiscriminator(discriminator, settings.defaultNamespace());
-        }
-
-        @Override
-        public ShapeId parseErrorType() {
-            var discriminator = DocumentUtils.removeUri(extractType());
+            String discriminator = null;
+            var member = values.get("__type");
+            if (member != null && member.type() == ShapeType.STRING) {
+                discriminator = member.asString();
+            }
             return DocumentDeserializer.parseDiscriminator(discriminator, settings.defaultNamespace());
         }
 
@@ -104,14 +101,6 @@ public final class CborDocuments {
         @Override
         public int hashCode() {
             return values.hashCode();
-        }
-
-        private String extractType() {
-            var member = values.get("__type");
-            if (member != null && member.type() == ShapeType.STRING) {
-                return member.asString();
-            }
-            return null;
         }
     }
 

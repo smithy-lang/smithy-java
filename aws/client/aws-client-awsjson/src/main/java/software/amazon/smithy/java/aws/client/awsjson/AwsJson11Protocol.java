@@ -10,7 +10,7 @@ import software.amazon.smithy.aws.traits.protocols.AwsJson1_1Trait;
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
-import software.amazon.smithy.java.core.serde.document.DocumentUtils;
+import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -25,7 +25,7 @@ public final class AwsJson11Protocol extends AwsJsonProtocol {
      *                discriminator of documents that use relative shape IDs.
      */
     public AwsJson11Protocol(ShapeId service) {
-        super(TRAIT_ID, service, DocumentUtils::removeNamespaceAndUri);
+        super(TRAIT_ID, service, new HttpErrorDeserializer.DocumentPayloadParser());
     }
 
     @Override

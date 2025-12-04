@@ -126,18 +126,6 @@ public interface Document extends SerializableShape {
     }
 
     /**
-     * Attempts to find and parse a sanitized shape ID from the document in the document's discriminator field.
-     *
-     * <p> The discriminator of an error can be represented by either the __type field or the code field
-     * based on the protocol.
-     *
-     * @return the parsed shape ID, or null if not found.
-     */
-    default ShapeId parseErrorType() {
-        return null;
-    }
-
-    /**
      * Serializes the Document as a document value in the Smithy data model.
      *
      * <p>All implementations of a document type are expected to follow the same behavior as this method when writing

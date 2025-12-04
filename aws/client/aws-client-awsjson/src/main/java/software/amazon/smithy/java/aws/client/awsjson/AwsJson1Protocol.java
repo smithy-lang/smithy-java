@@ -10,7 +10,10 @@ import software.amazon.smithy.aws.traits.protocols.AwsJson1_0Trait;
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
-import software.amazon.smithy.java.core.serde.document.DocumentUtils;
+import software.amazon.smithy.java.client.http.ErrorTypeUtils;
+import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
+import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -25,7 +28,16 @@ public final class AwsJson1Protocol extends AwsJsonProtocol {
      *                discriminator of documents that use relative shape IDs.
      */
     public AwsJson1Protocol(ShapeId service) {
-        super(TRAIT_ID, service, DocumentUtils::removeUri);
+        super(TRAIT_ID, service, new Json10Parser());
+    }
+
+    private static final class Json10Parser extends HttpErrorDeserializer.DocumentPayloadParser {
+        @Override
+        public ShapeId extractErrorType(Document document, String namespace) {
+            return DocumentDeserializer.parseDiscriminator(
+                    ErrorTypeUtils.removeUri(ErrorTypeUtils.readTypeAndCode(document)),
+                    namespace);
+        }
     }
 
     @Override
