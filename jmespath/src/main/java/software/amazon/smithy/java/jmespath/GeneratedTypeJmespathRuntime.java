@@ -7,12 +7,15 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.jmespath.RuntimeType;
 import software.amazon.smithy.jmespath.evaluation.EvaluationUtils;
+import software.amazon.smithy.jmespath.evaluation.InheritingClassMap;
 import software.amazon.smithy.jmespath.evaluation.JmespathRuntime;
 import software.amazon.smithy.jmespath.evaluation.ListArrayBuilder;
 import software.amazon.smithy.jmespath.evaluation.MapObjectBuilder;
 import software.amazon.smithy.jmespath.evaluation.NumberType;
 import software.amazon.smithy.jmespath.evaluation.WrappingIterable;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
@@ -21,16 +24,35 @@ import java.util.Map;
 
 public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
 
-    // Exact class matches for faster typeOf matching
-    private static final Map<Class<?>, RuntimeType> typeForClass = new HashMap<>();
-    static {
-        typeForClass.put(Boolean.class, RuntimeType.BOOLEAN);
-        typeForClass.put(String.class, RuntimeType.STRING);
-        for (Class<?> klass : EvaluationUtils.numberTypeForClass.keySet()) {
-            typeForClass.put(klass, RuntimeType.NUMBER);
-        }
-        typeForClass.put(Instant.class, RuntimeType.NUMBER);
-    }
+    private static final InheritingClassMap<RuntimeType> typeForClass = InheritingClassMap.<RuntimeType>builder()
+            .put(String.class, RuntimeType.STRING)
+            .put(Boolean.class, RuntimeType.BOOLEAN)
+            .put(Byte.class, RuntimeType.NUMBER)
+            .put(Short.class, RuntimeType.NUMBER)
+            .put(Integer.class, RuntimeType.NUMBER)
+            .put(Long.class, RuntimeType.NUMBER)
+            .put(Float.class, RuntimeType.NUMBER)
+            .put(Double.class, RuntimeType.NUMBER)
+            .put(BigInteger.class, RuntimeType.NUMBER)
+            .put(BigDecimal.class, RuntimeType.NUMBER)
+            .put(Instant.class, RuntimeType.NUMBER)
+            .put(SerializableStruct.class, RuntimeType.OBJECT)
+            .put(SmithyEnum.class, RuntimeType.STRING)
+            .put(SmithyIntEnum.class, RuntimeType.NUMBER)
+            .build();
+
+    private static final InheritingClassMap<NumberType> numberTypeForClass = InheritingClassMap.<NumberType>builder()
+            .put(Byte.class, NumberType.BYTE)
+            .put(Short.class, NumberType.SHORT)
+            .put(Integer.class, NumberType.INTEGER)
+            .put(Long.class, NumberType.LONG)
+            .put(Float.class, NumberType.FLOAT)
+            .put(Double.class, NumberType.DOUBLE)
+            .put(BigInteger.class, NumberType.BIG_INTEGER)
+            .put(BigDecimal.class, NumberType.BIG_DECIMAL)
+            .put(Instant.class, NumberType.BIG_DECIMAL)
+            .put(SmithyIntEnum.class, NumberType.INTEGER)
+            .build();
 
     @Override
     public RuntimeType typeOf(Object value) {
@@ -38,25 +60,12 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
             return RuntimeType.NULL;
         }
 
-        // Fast path: known exact class
         RuntimeType runtimeType = typeForClass.get(value.getClass());
         if (runtimeType != null) {
             return runtimeType;
         }
 
-        // Slower instanceof checks
-        // These could be cached and/or precalculated as well
-        if (value instanceof List<?>) {
-            return RuntimeType.ARRAY;
-        } else if (value instanceof Map<?, ?> || value instanceof SerializableStruct) {
-            return RuntimeType.OBJECT;
-        } else if (value instanceof SmithyEnum) {
-            return RuntimeType.STRING;
-        } else if (value instanceof SmithyIntEnum) {
-            return RuntimeType.NUMBER;
-        } else {
-            throw new IllegalArgumentException();
-        }
+        throw new IllegalArgumentException();
     }
 
     @Override
@@ -70,7 +79,7 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
     }
 
     @Override
-    public boolean toBoolean(Object value) {
+    public boolean asBoolean(Object value) {
         return (Boolean)value;
     }
 
@@ -80,7 +89,7 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
     }
 
     @Override
-    public String toString(Object value) {
+    public String asString(Object value) {
         if (value instanceof SmithyEnum enumValue) {
             return enumValue.getValue();
         } else {
@@ -94,12 +103,16 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
     }
 
     @Override
-    public NumberType numberType(Object object) {
-        return EvaluationUtils.numberType((Number)object);
+    public NumberType numberType(Object value) {
+        NumberType numberType = numberTypeForClass.get(value.getClass());
+        if (numberType != null) {
+            return numberType;
+        }
+        throw new IllegalArgumentException();
     }
 
     @Override
-    public Number toNumber(Object value) {
+    public Number asNumber(Object value) {
         if (value instanceof Number number) {
             return number;
         } else if (value instanceof Instant instant) {
@@ -126,7 +139,7 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
 
     @Override
     public Object element(Object value, Object index) {
-        return ((List<?>)value).get(toNumber(index).intValue());
+        return ((List<?>)value).get(asNumber(index).intValue());
     }
 
     @Override
@@ -136,6 +149,7 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
         } else if (value instanceof Map<?, ?> map) {
             return map.keySet();
         } else if (value instanceof SerializableStruct struct) {
+            // TODO: Should this be only present members?
             return new WrappingIterable<>(Schema::memberName, struct.schema().members());
         } else {
             throw new IllegalArgumentException("Unknown runtime type: " + value);
