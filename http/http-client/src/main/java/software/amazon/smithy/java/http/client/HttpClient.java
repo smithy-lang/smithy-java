@@ -118,7 +118,7 @@ public interface HttpClient extends AutoCloseable {
         ConnectionPool connectionPool;
         Duration requestTimeout;
         final Deque<HttpInterceptor> interceptors = new ArrayDeque<>();
-        ProxyConfiguration proxyConfiguration;
+        ProxySelector proxySelector = ProxySelector.direct();
 
         private Builder() {}
 
@@ -189,44 +189,33 @@ public interface HttpClient extends AutoCloseable {
         /**
          * Set proxy configuration for all connections made by this client.
          *
-         * <p>When configured, all HTTP requests will be routed through the proxy
-         * unless the target host matches one of the non-proxy hosts.
+         * <p>When configured, all HTTP requests will be routed through the proxy unless the target host matches
+         * one of the non-proxy hosts.
          *
-         * <p>For HTTPS requests, the client establishes a CONNECT tunnel through
-         * the proxy, then performs TLS handshake through the tunnel.
+         * <p>For HTTPS requests, the client establishes a CONNECT tunnel through the proxy, then performs TLS
+         * handshake through the tunnel.
          *
-         * <p>For HTTP requests, the client connects to the proxy and sends
-         * requests with absolute URIs.
+         * <p>For HTTP requests, the client connects to the proxy and sends requests with absolute URIs.
          *
          * @param proxy the proxy configuration, or null for direct connections
          * @return this builder
          * @see ProxyConfiguration
          */
         public Builder proxy(ProxyConfiguration proxy) {
-            this.proxyConfiguration = proxy;
-            return this;
+            return proxySelector(proxy != null ? ProxySelector.of(proxy) : ProxySelector.direct());
         }
 
         /**
-         * Set proxy configuration using a URI string.
+         * Set a custom proxy selector for dynamic proxy selection.
          *
-         * <p>Convenience method that creates an HTTP proxy configuration from
-         * a URI string. For more advanced configuration (authentication,
-         * bypass rules, SOCKS proxy), use {@link #proxy(ProxyConfiguration)}.
+         * <p>The selector is called for each request and can return multiple proxies to try in order.
+         * If a proxy fails, the next one is attempted.
          *
-         * @param proxyUri the proxy URI (e.g., {@code "http://proxy.example.com:8080"})
+         * @param selector the proxy selector to use
          * @return this builder
-         * @throws IllegalArgumentException if proxyUri is invalid
          */
-        public Builder proxy(String proxyUri) {
-            if (proxyUri == null) {
-                this.proxyConfiguration = null;
-            } else {
-                this.proxyConfiguration = ProxyConfiguration.builder()
-                        .proxyUri(proxyUri)
-                        .type(ProxyConfiguration.ProxyType.HTTP)
-                        .build();
-            }
+        public Builder proxySelector(ProxySelector selector) {
+            this.proxySelector = Objects.requireNonNull(selector, "proxySelector");
             return this;
         }
 
