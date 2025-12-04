@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -437,9 +438,12 @@ public class McpServerTest {
         var bigDecimalValue = BigDecimal.valueOf(Integer.MAX_VALUE).add(BigDecimal.TEN);
         var bigIntegerValue = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.valueOf(100));
         var blobValue = "Hello, World!";
+        var blobValueBase64 = Base64.getEncoder().encodeToString(blobValue.getBytes(StandardCharsets.UTF_8));
         var nestedBigDecimalValue = new BigDecimal("123.456");
         var nestedBigIntegerValue = new BigInteger("9876543210");
         var nestedBlobValue = "Nested blob content";
+        var nestedBlobValueBase64 =
+                Base64.getEncoder().encodeToString(nestedBlobValue.getBytes(StandardCharsets.UTF_8));
 
         write("tools/call",
                 Document.of(
@@ -452,7 +456,7 @@ public class McpServerTest {
                                         "bigIntegerField",
                                         Document.of(bigIntegerValue.toString()),
                                         "blobField",
-                                        Document.of(blobValue),
+                                        Document.of(blobValueBase64),
                                         "nestedWithBigNumbers",
                                         Document.of(Map.of(
                                                 "nestedBigDecimal",
@@ -460,7 +464,7 @@ public class McpServerTest {
                                                 "nestedBigInteger",
                                                 Document.of(nestedBigIntegerValue.toString()),
                                                 "nestedBlob",
-                                                Document.of(nestedBlobValue),
+                                                Document.of(nestedBlobValueBase64),
                                                 "bigDecimalList",
                                                 Document.of(List.of(
                                                         Document.of("100.25"),
@@ -481,6 +485,7 @@ public class McpServerTest {
         var blobField = inputDocument.getMember("blobField");
         assertNotNull(blobField);
         assertEquals(ShapeType.BLOB, blobField.type());
+        // Blob is sent as Base64 encoded string, decoded to bytes
         assertEquals(blobValue, new String(blobField.asBlob().array(), StandardCharsets.UTF_8));
 
         var nestedWithBigNumbers = inputDocument.getMember("nestedWithBigNumbers");

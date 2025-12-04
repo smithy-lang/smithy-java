@@ -5,14 +5,17 @@
 
 package software.amazon.smithy.java.mcp.server;
 
+import static software.amazon.smithy.java.core.serde.TimestampFormatter.Prelude.DATE_TIME;
+import static software.amazon.smithy.java.core.serde.TimestampFormatter.Prelude.EPOCH_SECONDS;
+import static software.amazon.smithy.java.core.serde.TimestampFormatter.Prelude.HTTP_DATE;
 import static software.amazon.smithy.java.mcp.server.PromptLoader.normalize;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -27,6 +30,7 @@ import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.framework.model.ValidationException;
+import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -51,6 +55,7 @@ import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
@@ -398,7 +403,15 @@ public final class McpService {
         if (supportsOutputSchema(protocolVersion)) {
             var outputSchema = tool.toolInfo().getOutputSchema();
             if (outputSchema != null) {
-                result.structuredContent(Document.of(output));
+                var operation = tool.operation();
+                if (operation != null) {
+                    var adaptedOutput = adaptOutputDocument(
+                            Document.of(output),
+                            operation.getApiOperation().outputSchema());
+                    result.structuredContent(adaptedOutput);
+                } else {
+                    result.structuredContent(Document.of(output));
+                }
             }
         }
 
@@ -553,7 +566,7 @@ public final class McpService {
         var type = switch (member.type()) {
             case BYTE, SHORT, INTEGER, INT_ENUM, LONG, FLOAT, DOUBLE -> JsonPrimitiveType.NUMBER;
             case ENUM, BLOB, STRING, BIG_DECIMAL, BIG_INTEGER -> JsonPrimitiveType.STRING;
-            case TIMESTAMP -> resolveTimestampType(member.memberTarget());
+            case TIMESTAMP -> resolveTimestampType(member);
             case BOOLEAN -> JsonPrimitiveType.BOOLEAN;
             default -> throw new RuntimeException(member + " is not a primitive type");
         };
@@ -590,7 +603,7 @@ public final class McpService {
         return switch (trait.getFormat()) {
             case EPOCH_SECONDS -> JsonPrimitiveType.NUMBER;
             case DATE_TIME, HTTP_DATE -> JsonPrimitiveType.STRING;
-            default -> throw new RuntimeException("unknown timestamp format: " + trait.getFormat());
+            case UNKNOWN -> throw new RuntimeException("unknown timestamp format: " + trait.getFormat());
         };
     }
 
@@ -647,10 +660,11 @@ public final class McpService {
                     default -> badType(fromType, toType);
                 };
             case BLOB -> switch (fromType) {
-                case STRING -> Document.of(doc.asString().getBytes(StandardCharsets.UTF_8));
+                case STRING -> Document.of(Base64.getDecoder().decode(doc.asString()));
                 case BLOB -> doc;
                 default -> badType(fromType, toType);
             };
+            case TIMESTAMP -> adaptTimestampInput(doc, schema);
             case STRUCTURE, UNION -> {
                 var convertedMembers = new HashMap<String, Document>();
                 var members = schema.members();
@@ -658,7 +672,7 @@ public final class McpService {
                     var memberName = member.memberName();
                     var memberDoc = doc.getMember(memberName);
                     if (memberDoc != null) {
-                        convertedMembers.put(memberName, adaptDocument(memberDoc, member.memberTarget()));
+                        convertedMembers.put(memberName, adaptDocument(memberDoc, member));
                     }
                 }
                 yield Document.of(convertedMembers);
@@ -667,7 +681,7 @@ public final class McpService {
                 var listMember = schema.listMember();
                 var convertedList = new ArrayList<Document>();
                 for (var item : doc.asList()) {
-                    convertedList.add(adaptDocument(item, listMember.memberTarget()));
+                    convertedList.add(adaptDocument(item, listMember));
                 }
                 yield Document.of(convertedList);
             }
@@ -675,16 +689,78 @@ public final class McpService {
                 var mapValue = schema.mapValueMember();
                 var convertedMap = new HashMap<String, Document>();
                 for (var entry : doc.asStringMap().entrySet()) {
-                    convertedMap.put(entry.getKey(), adaptDocument(entry.getValue(), mapValue.memberTarget()));
+                    convertedMap.put(entry.getKey(), adaptDocument(entry.getValue(), mapValue));
                 }
                 yield Document.of(convertedMap);
             }
+            case DOCUMENT -> doc; // Documents pass through unchanged
             default -> doc;
         };
     }
 
     private static Document badType(ShapeType from, ShapeType to) {
         throw new RuntimeException("Cannot convert from " + from + " to " + to);
+    }
+
+    private static Document adaptTimestampInput(Document doc, Schema schema) {
+        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
+        var format = getFormat(trait);
+        return switch (format) {
+            case EPOCH_SECONDS -> Document.of(EPOCH_SECONDS.readFromNumber(doc.asNumber()));
+            case DATE_TIME -> Document.of(DATE_TIME.readFromString(doc.asString(), false));
+            case HTTP_DATE -> Document.of(HTTP_DATE.readFromString(doc.asString(), false));
+            default -> doc;
+        };
+    }
+
+    private static Document adaptOutputDocument(Document doc, Schema schema) {
+        var toType = schema.type();
+        return switch (toType) {
+            case BIG_DECIMAL -> Document.of(doc.asBigDecimal().toString());
+            case BIG_INTEGER -> Document.of(doc.asBigInteger().toString());
+            case BLOB -> Document.of(Base64.getEncoder().encodeToString(ByteBufferUtils.getBytes(doc.asBlob())));
+            case TIMESTAMP -> adaptTimestampOutput(doc, schema);
+            case STRUCTURE, UNION -> {
+                var convertedMembers = new HashMap<String, Document>();
+                for (var member : schema.members()) {
+                    var memberName = member.memberName();
+                    var memberDoc = doc.getMember(memberName);
+                    if (memberDoc != null) {
+                        convertedMembers.put(memberName, adaptOutputDocument(memberDoc, member));
+                    }
+                }
+                yield Document.of(convertedMembers);
+            }
+            case LIST, SET -> {
+                var listMember = schema.listMember();
+                var convertedList = new ArrayList<Document>();
+                for (var item : doc.asList()) {
+                    convertedList.add(adaptOutputDocument(item, listMember));
+                }
+                yield Document.of(convertedList);
+            }
+            case MAP -> {
+                var mapValue = schema.mapValueMember();
+                var convertedMap = new HashMap<String, Document>();
+                for (var entry : doc.asStringMap().entrySet()) {
+                    convertedMap.put(entry.getKey(), adaptOutputDocument(entry.getValue(), mapValue));
+                }
+                yield Document.of(convertedMap);
+            }
+            case DOCUMENT -> doc; // Documents pass through unchanged
+            default -> doc;
+        };
+    }
+
+    private static Document adaptTimestampOutput(Document doc, Schema schema) {
+        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
+        var instant = doc.asTimestamp();
+        TimestampFormatTrait.Format format = getFormat(trait);
+        return switch (format) {
+            case DATE_TIME -> Document.of(DATE_TIME.writeString(instant));
+            case HTTP_DATE -> Document.of(HTTP_DATE.writeString(instant));
+            default -> Document.of(instant.toEpochMilli() / 1000.0);
+        };
     }
 
     public static Builder builder() {
@@ -731,6 +807,14 @@ public final class McpService {
 
         public McpService build() {
             return new McpService(services, proxyList, name, version, toolFilter, metricsObserver);
+        }
+    }
+
+    private static TimestampFormatTrait.Format getFormat(TimestampFormatTrait trait) {
+        if (trait == null) {
+            return TimestampFormatTrait.Format.DATE_TIME;
+        } else {
+            return trait.getFormat();
         }
     }
 }
