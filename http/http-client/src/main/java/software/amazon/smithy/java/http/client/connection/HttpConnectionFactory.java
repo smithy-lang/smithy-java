@@ -37,6 +37,7 @@ final class HttpConnectionFactory {
     private final Duration readTimeout;
     private final Duration writeTimeout;
     private final SSLContext sslContext;
+    private final SSLParameters sslParameters; // may be null
     private final HttpVersionPolicy versionPolicy;
     private final DnsResolver dnsResolver;
     private final HttpSocketFactory socketFactory;
@@ -47,6 +48,7 @@ final class HttpConnectionFactory {
             Duration readTimeout,
             Duration writeTimeout,
             SSLContext sslContext,
+            SSLParameters sslParameters,
             HttpVersionPolicy versionPolicy,
             DnsResolver dnsResolver,
             HttpSocketFactory socketFactory
@@ -56,6 +58,7 @@ final class HttpConnectionFactory {
         this.readTimeout = readTimeout;
         this.writeTimeout = writeTimeout;
         this.sslContext = sslContext;
+        this.sslParameters = sslParameters;
         this.versionPolicy = versionPolicy;
         this.dnsResolver = dnsResolver;
         this.socketFactory = socketFactory;
@@ -116,8 +119,12 @@ final class HttpConnectionFactory {
             SSLSocket sslSocket = (SSLSocket) sslContext.getSocketFactory()
                     .createSocket(socket, route.host(), route.port(), true);
 
-            SSLParameters params = sslSocket.getSSLParameters();
+            // Start with custom params if provided, otherwise use socket defaults
+            SSLParameters params = sslParameters != null
+                    ? copyParameters(sslParameters)
+                    : sslSocket.getSSLParameters();
             params.setEndpointIdentificationAlgorithm("HTTPS");
+            // ALPN is always set based on version policy (overrides any custom setting)
             params.setApplicationProtocols(versionPolicy.alpnProtocols());
             sslSocket.setSSLParameters(params);
 
@@ -134,6 +141,23 @@ final class HttpConnectionFactory {
             closeQuietly(socket);
             throw new IOException("TLS handshake failed for " + route.host(), e);
         }
+    }
+
+    private static SSLParameters copyParameters(SSLParameters src) {
+        SSLParameters dst = new SSLParameters();
+        dst.setCipherSuites(src.getCipherSuites());
+        dst.setProtocols(src.getProtocols());
+        dst.setWantClientAuth(src.getWantClientAuth());
+        dst.setNeedClientAuth(src.getNeedClientAuth());
+        dst.setAlgorithmConstraints(src.getAlgorithmConstraints());
+        dst.setEndpointIdentificationAlgorithm(src.getEndpointIdentificationAlgorithm());
+        dst.setServerNames(src.getServerNames());
+        dst.setSNIMatchers(src.getSNIMatchers());
+        dst.setUseCipherSuitesOrder(src.getUseCipherSuitesOrder());
+        dst.setEnableRetransmissions(src.getEnableRetransmissions());
+        dst.setMaximumPacketSize(src.getMaximumPacketSize());
+        dst.setApplicationProtocols(src.getApplicationProtocols());
+        return dst;
     }
 
     private HttpConnection createProtocolConnection(Socket socket, Route route) throws IOException {

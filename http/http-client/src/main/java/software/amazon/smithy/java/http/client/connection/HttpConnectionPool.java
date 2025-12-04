@@ -180,6 +180,7 @@ public final class HttpConnectionPool implements ConnectionPool {
                 builder.readTimeout,
                 builder.writeTimeout,
                 sslContext,
+                builder.sslParameters,
                 builder.versionPolicy,
                 dnsResolver,
                 builder.socketFactory);
