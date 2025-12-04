@@ -149,6 +149,13 @@ structure JsonPrimitiveSchema {
     description: String
 }
 
+structure JsonDocumentSchema {
+    @required
+    type: StringList
+
+    description: String
+}
+
 enum JsonPrimitiveType {
     NUMBER = "number"
     STRING = "string"
@@ -159,7 +166,7 @@ enum JsonPrimitiveType {
 map PropertiesMap {
     key: String
 
-    /// one of JsonObjectSchema | JsonArraySchema | JsonPrimitiveSchema
+    /// one of JsonObjectSchema | JsonArraySchema | JsonPrimitiveSchema | JsonDocumentSchema
     value: Document
 }
 

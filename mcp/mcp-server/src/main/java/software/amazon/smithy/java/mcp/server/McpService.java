@@ -38,6 +38,7 @@ import software.amazon.smithy.java.mcp.model.CallToolResult;
 import software.amazon.smithy.java.mcp.model.Capabilities;
 import software.amazon.smithy.java.mcp.model.InitializeResult;
 import software.amazon.smithy.java.mcp.model.JsonArraySchema;
+import software.amazon.smithy.java.mcp.model.JsonDocumentSchema;
 import software.amazon.smithy.java.mcp.model.JsonObjectSchema;
 import software.amazon.smithy.java.mcp.model.JsonPrimitiveSchema;
 import software.amazon.smithy.java.mcp.model.JsonPrimitiveType;
@@ -531,7 +532,8 @@ public final class McpService {
 
             var jsonSchema = switch (member.type()) {
                 case LIST, SET -> createJsonArraySchema(member.memberTarget(), visited);
-                case MAP, STRUCTURE, UNION, DOCUMENT -> createJsonObjectSchema(member.memberTarget(), visited);
+                case MAP, STRUCTURE, UNION -> createJsonObjectSchema(member.memberTarget(), visited);
+                case DOCUMENT -> createJsonDocumentSchema(member);
                 default -> createJsonPrimitiveSchema(member);
             };
 
@@ -539,21 +541,19 @@ public final class McpService {
         }
 
         visited.remove(targetId);
-        var builder = JsonObjectSchema.builder()
+        return JsonObjectSchema.builder()
                 .properties(properties)
                 .required(requiredProperties)
-                .description(memberDescription(schema));
-        if (type.isShapeType(ShapeType.DOCUMENT)) {
-            builder.additionalProperties(true);
-        }
-        return builder.build();
+                .description(memberDescription(schema))
+                .build();
     }
 
     private static JsonArraySchema createJsonArraySchema(Schema schema, Set<ShapeId> visited) {
         var listMember = schema.listMember();
         var items = switch (listMember.type()) {
             case LIST, SET -> createJsonArraySchema(listMember.memberTarget(), visited);
-            case MAP, STRUCTURE, UNION, DOCUMENT -> createJsonObjectSchema(listMember.memberTarget(), visited);
+            case MAP, STRUCTURE, UNION -> createJsonObjectSchema(listMember.memberTarget(), visited);
+            case DOCUMENT -> createJsonDocumentSchema(listMember);
             default -> createJsonPrimitiveSchema(listMember);
         };
         return JsonArraySchema.builder()
@@ -573,6 +573,21 @@ public final class McpService {
 
         return JsonPrimitiveSchema.builder()
                 .type(type)
+                .description(memberDescription(member))
+                .build();
+    }
+
+    private static final List<String> DOCUMENT_TYPES = List.of(
+            "string",
+            "number",
+            "boolean",
+            "object",
+            "array",
+            "null");
+
+    private static JsonDocumentSchema createJsonDocumentSchema(Schema member) {
+        return JsonDocumentSchema.builder()
+                .type(DOCUMENT_TYPES)
                 .description(memberDescription(member))
                 .build();
     }
