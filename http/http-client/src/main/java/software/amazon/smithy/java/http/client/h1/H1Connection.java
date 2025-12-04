@@ -5,22 +5,15 @@
 
 package software.amazon.smithy.java.http.client.h1;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpExchange;
-import software.amazon.smithy.java.http.client.ProxyConfiguration;
 import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
 import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
@@ -259,138 +252,5 @@ public final class H1Connection implements HttpConnection {
     void markInactive() {
         LOGGER.debug("Marking connection inactive to {}", route);
         this.active = false;
-    }
-
-    /**
-     * Establish an HTTP CONNECT tunnel through a proxy.
-     *
-     * <p>This is a static factory method that performs the proxy handshake
-     * and returns a connected socket ready for use. The CONNECT tunnel is
-     * only needed for HTTPS through an HTTP proxy.
-     *
-     * <p>For HTTP through a proxy, no tunnel is needed - requests are sent
-     * with absolute URIs directly to the proxy.
-     *
-     * <h3>CONNECT Protocol</h3>
-     * <pre>
-     * Client → Proxy:
-     *   CONNECT api.example.com:443 HTTP/1.1
-     *   Host: api.example.com:443
-     *   Proxy-Authorization: Basic dXNlcjpwYXNz  (if auth required)
-     *
-     * Proxy → Client:
-     *   HTTP/1.1 200 Connection Established
-     * </pre>
-     *
-     * <p>After receiving 200, the socket is connected through the tunnel
-     * and TLS handshake can proceed as if connecting directly.
-     *
-     * @param proxySocket socket connected to proxy server
-     * @param targetHost target host for CONNECT request
-     * @param targetPort target port for CONNECT request
-     * @param proxy proxy configuration (for authentication)
-     * @throws IOException if CONNECT tunnel establishment fails
-     */
-    public static void establishConnectTunnel(
-            Socket proxySocket,
-            String targetHost,
-            int targetPort,
-            ProxyConfiguration proxy
-    ) throws IOException {
-
-        try {
-            OutputStream out = proxySocket.getOutputStream();
-            InputStream in = proxySocket.getInputStream();
-
-            // Build CONNECT request
-            StringBuilder request = new StringBuilder();
-            request.append("CONNECT ")
-                    .append(targetHost)
-                    .append(":")
-                    .append(targetPort)
-                    .append(" HTTP/1.1\r\n");
-            request.append("Host: ")
-                    .append(targetHost)
-                    .append(":")
-                    .append(targetPort)
-                    .append("\r\n");
-
-            // Add proxy authentication if configured
-            if (proxy.requiresAuth()) {
-                String credentials = proxy.username() + ":" + proxy.password();
-                String encoded = Base64.getEncoder()
-                        .encodeToString(
-                                credentials.getBytes(StandardCharsets.UTF_8));
-                request.append("Proxy-Authorization: Basic ").append(encoded).append("\r\n");
-            }
-
-            // Keep proxy connection alive for reuse
-            request.append("Proxy-Connection: Keep-Alive\r\n");
-            request.append("\r\n");
-
-            // Send CONNECT request
-            out.write(request.toString().getBytes(StandardCharsets.US_ASCII));
-            out.flush();
-
-            // Read response status line
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(in, StandardCharsets.US_ASCII));
-            String statusLine = reader.readLine();
-
-            if (statusLine == null) {
-                throw new IOException("Proxy closed connection during CONNECT handshake");
-            }
-
-            // Parse status line: "HTTP/1.1 200 Connection Established"
-            String[] parts = statusLine.split("\\s+", 3);
-            if (parts.length < 2) {
-                throw new IOException("Invalid proxy response: " + statusLine);
-            }
-
-            int statusCode;
-            try {
-                statusCode = Integer.parseInt(parts[1]);
-            } catch (NumberFormatException e) {
-                throw new IOException("Invalid status code in proxy response: " + statusLine);
-            }
-
-            // Read and discard response headers until empty line
-            String line;
-            while ((line = reader.readLine()) != null && !line.isEmpty()) {
-                // Skip header lines
-            }
-
-            // Check status code
-            if (statusCode == 200) {
-                // Tunnel established successfully
-                return;
-            } else if (statusCode == 407) {
-                // Proxy authentication required
-                throw new IOException("Proxy authentication required (407). Check proxy credentials.");
-            } else if (statusCode >= 400 && statusCode < 500) {
-                // Client error
-                throw new IOException(
-                        "Proxy rejected CONNECT request: " + statusCode + " " +
-                                (parts.length > 2 ? parts[2] : ""));
-            } else if (statusCode >= 500) {
-                // Server error
-                throw new IOException(
-                        "Proxy server error during CONNECT: " + statusCode + " " +
-                                (parts.length > 2 ? parts[2] : ""));
-            } else {
-                // Unexpected status code
-                throw new IOException("Unexpected proxy response: " + statusLine);
-            }
-
-        } catch (IOException e) {
-            // Close socket on any error
-            try {
-                proxySocket.close();
-            } catch (IOException ignored) {}
-            throw new IOException(
-                    "Failed to establish CONNECT tunnel to " + targetHost + ":" + targetPort +
-                            " through proxy",
-                    e);
-        }
     }
 }
