@@ -1,5 +1,6 @@
 plugins {
     id("smithy-java.module-conventions")
+    id("smithy-java.codegen-plugin-conventions")
 }
 
 description =
@@ -21,18 +22,13 @@ dependencies {
     testRuntimeOnly(libs.smithy.aws.traits)
     testRuntimeOnly(project(":aws:client:aws-client-awsjson"))
     testImplementation(project(":server:server-proxy"))
-}
 
-java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
-}
-
-tasks {
-    compileJava {
-        options.release.set(21)
-    }
+    testImplementation(project(":codegen:plugins:server-codegen"))
+    testImplementation(libs.json.schema.validator)
 }
 
 spotbugs {
     ignoreFailures = true
 }
+
+addGenerateSrcsTask("software.amazon.smithy.java.mcp.server.utils.TestJavaCodegenRunner", null, null, "server")
