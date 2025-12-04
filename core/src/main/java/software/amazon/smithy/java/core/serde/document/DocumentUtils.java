@@ -175,44 +175,4 @@ public final class DocumentUtils {
                             .id() + "`: " + e.getMessage());
         }
     }
-
-    /**
-     * Removes the trailing URI in {@code __type} field or {@code code} field of the document
-     *
-     * <p>For example, given {@code __type = "aws.protocoltests.restjson#FooError:http://abc.com"},
-     * protocols like restJSON should ignore the trailing URI and keep the namespace of the error type.
-     *
-     * @param text The error type string.
-     * @return The error type string without the trailing URI.
-     */
-    public static String removeUri(String text) {
-        if (text == null) {
-            return null;
-        }
-        var colon = text.indexOf(':');
-        if (colon > 0) {
-            text = text.substring(0, colon);
-        }
-        return text;
-    }
-
-    /**
-     * Removes the namespace and trailing URI in {@code __type} field or {@code code} field of the document
-     *
-     * <p>For example, given {@code __type = "aws.protocoltests.restjson#FooError:http://abc.com"},
-     * protocols like awsJSON 1.1 should ignore the namespace and the trailing URI of the error type.
-     *
-     * @param text The error type string.
-     * @return The error type string without the trailing URI.
-     */
-    public static String removeNamespaceAndUri(String text) {
-        if (text == null) {
-            return null;
-        }
-        var hash = text.indexOf('#');
-        if (hash > 0) {
-            text = text.substring(hash + 1);
-        }
-        return removeUri(text);
-    }
 }

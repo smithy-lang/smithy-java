@@ -9,7 +9,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import software.amazon.smithy.java.client.http.AmznErrorHeaderExtractor;
 import software.amazon.smithy.java.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
@@ -40,18 +39,22 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
      * @param service The service ID used to make X-Amz-Target, and the namespace is used when finding the
      *                discriminator of documents that use relative shape IDs.
      */
-    public AwsJsonProtocol(ShapeId trait, ShapeId service, Function<String, String> errorTypeSanitizer) {
+    public AwsJsonProtocol(
+            ShapeId trait,
+            ShapeId service,
+            HttpErrorDeserializer.ErrorPayloadParser errorPayloadParser
+    ) {
         super(trait);
         this.service = service;
         this.codec = JsonCodec.builder()
                 .defaultNamespace(service.getNamespace())
-                .errorTypeSanitizer(errorTypeSanitizer)
                 .useTimestampFormat(true)
                 .build();
 
         this.errorDeserializer = HttpErrorDeserializer.builder()
                 .codec(codec)
                 .serviceId(service)
+                .errorPayloadParser(errorPayloadParser)
                 .headerErrorExtractor(new AmznErrorHeaderExtractor())
                 .build();
     }

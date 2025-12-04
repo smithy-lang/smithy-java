@@ -254,24 +254,6 @@ public final class JsonDocuments {
         }
 
         @Override
-        public ShapeId parseErrorType() {
-            String errorType = null;
-            var typeMember = values.get("__type");
-            if (typeMember != null && typeMember.type() == ShapeType.STRING) {
-                errorType = typeMember.asString();
-            } else {
-                var codeMember = values.get("code");
-                if (codeMember != null && codeMember.type() == ShapeType.STRING) {
-                    errorType = codeMember.asString();
-                }
-            }
-            if (settings.errorTypeSanitizer() != null) {
-                errorType = settings.errorTypeSanitizer().apply(errorType);
-            }
-            return DocumentDeserializer.parseDiscriminator(errorType, settings.defaultNamespace());
-        }
-
-        @Override
         public Map<String, Document> asStringMap() {
             return values;
         }
