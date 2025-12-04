@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 
 /**
@@ -30,6 +31,7 @@ public final class HttpConnectionPoolBuilder {
     Duration readTimeout = Duration.ofSeconds(30);
     Duration writeTimeout = Duration.ofSeconds(30);
     SSLContext sslContext;
+    SSLParameters sslParameters;
     HttpVersionPolicy versionPolicy = HttpVersionPolicy.AUTOMATIC;
     DnsResolver dnsResolver;
     HttpSocketFactory socketFactory = HttpSocketFactory::defaultSocketFactory;
@@ -286,6 +288,28 @@ public final class HttpConnectionPoolBuilder {
      */
     public HttpConnectionPoolBuilder sslContext(SSLContext context) {
         this.sslContext = context;
+        return this;
+    }
+
+    /**
+     * Set SSL parameters for HTTPS connections (default: derived from SSLContext).
+     *
+     * <p>Configure custom SSLParameters for:
+     * <ul>
+     *   <li>Specific TLS protocol versions (e.g., TLSv1.3 only)</li>
+     *   <li>Custom cipher suites</li>
+     *   <li>SNI configuration</li>
+     *   <li>Client authentication requirements</li>
+     * </ul>
+     *
+     * <p>Note: ALPN protocols are set automatically based on {@link #httpVersionPolicy}
+     * and will override any ALPN settings in the provided parameters.
+     *
+     * @param parameters the SSL parameters to use
+     * @return this builder
+     */
+    public HttpConnectionPoolBuilder sslParameters(SSLParameters parameters) {
+        this.sslParameters = parameters;
         return this;
     }
 
