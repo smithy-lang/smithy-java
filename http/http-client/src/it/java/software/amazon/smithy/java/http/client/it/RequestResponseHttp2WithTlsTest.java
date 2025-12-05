@@ -16,7 +16,6 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpClient;
@@ -29,7 +28,6 @@ import software.amazon.smithy.java.http.client.it.server.RequestCapturingHttp2Cl
 import software.amazon.smithy.java.http.client.it.server.TestCertificateGenerator;
 import software.amazon.smithy.java.http.client.it.server.TextResponseHttp2ClientHandler;
 
-@Disabled("The client doesn't support H2 with prior knowledge, let's find out if we should")
 public class RequestResponseHttp2WithTlsTest {
     private static final String RESPONSE_CONTENTS = "Response sent from Http2WithTls";
     private static final String REQUEST_CONTENTS = "Request sent from Http2WithTls";
