@@ -151,7 +151,7 @@ public final class H1Exchange implements HttpExchange {
                 parseStatusLineAndHeaders();
             }
             // For HTTP/1.1, request is already complete, so close exchange when response closes
-            responseIn = new DelegatedClosingInputStream(createResponseStream(), this::close);
+            responseIn = new DelegatedClosingInputStream(createResponseStream(), in -> close());
         }
         return responseIn;
     }
