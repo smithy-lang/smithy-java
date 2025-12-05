@@ -1,5 +1,11 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.http.client.it;
 
+import io.netty.handler.ssl.SslContextBuilder;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
@@ -11,22 +17,19 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Flow;
-
-import io.netty.handler.ssl.SslContextBuilder;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.it.server.TestCertificateGenerator;
 import software.amazon.smithy.java.io.datastream.DataStream;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
 
 public class TestUtils {
     static final List<String> IPSUM_LOREM = getIpsumLorem();
 
-    private TestUtils() {
-    }
+    private TestUtils() {}
 
     public static HttpRequest plainTextHttp11Request(String uri, String contents) {
         return plainTextRequest(HttpVersion.HTTP_1_1, uri, contents);
@@ -86,8 +89,7 @@ public class TestUtils {
 
         // Initialize TrustManagerFactory with the KeyStore
         TrustManagerFactory tmf = TrustManagerFactory.getInstance(
-                TrustManagerFactory.getDefaultAlgorithm()
-        );
+                TrustManagerFactory.getDefaultAlgorithm());
         tmf.init(keyStore);
 
         // Return the first TrustManager (typically there's only one)

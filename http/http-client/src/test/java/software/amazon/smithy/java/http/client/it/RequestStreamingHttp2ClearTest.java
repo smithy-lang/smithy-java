@@ -6,6 +6,8 @@
 package software.amazon.smithy.java.http.client.it;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static software.amazon.smithy.java.http.client.it.TestUtils.IPSUM_LOREM;
+import static software.amazon.smithy.java.http.client.it.TestUtils.streamingBody;
 
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
@@ -20,26 +22,26 @@ import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
-import software.amazon.smithy.java.http.client.it.server.MultiplexingHttp11ClientHandler;
+import software.amazon.smithy.java.http.client.it.server.MultiplexingHttp2ClientHandler;
 import software.amazon.smithy.java.http.client.it.server.NettyTestServer;
-import software.amazon.smithy.java.http.client.it.server.RequestCapturingHttp11ClientHandler;
-import software.amazon.smithy.java.http.client.it.server.TextResponseHttp11ClientHandler;
+import software.amazon.smithy.java.http.client.it.server.RequestCapturingHttp2ClientHandler;
+import software.amazon.smithy.java.http.client.it.server.TextResponseHttp2ClientHandler;
 
-public class RequestResponseHttp11ClearTest {
-    private static final String RESPONSE_CONTENTS = "Response sent from Http11ClearTest";
-    private static final String REQUEST_CONTENTS = "Request sent from Http11ClearTest";
-    private RequestCapturingHttp11ClientHandler requestCapturingHandler;
+public class RequestStreamingHttp2ClearTest {
+    private static final String RESPONSE_CONTENTS = "Response sent from Http2ClearTest";
+    private RequestCapturingHttp2ClientHandler requestCapturingHandler;
     private NettyTestServer server;
     private HttpClient client;
 
     @BeforeEach
     void setUp() throws Exception {
-        requestCapturingHandler = new RequestCapturingHttp11ClientHandler();
-        var multiplexer = new MultiplexingHttp11ClientHandler(requestCapturingHandler,
-                new TextResponseHttp11ClientHandler(RESPONSE_CONTENTS));
+        requestCapturingHandler = new RequestCapturingHttp2ClientHandler();
+        var multiplexer = new MultiplexingHttp2ClientHandler(requestCapturingHandler,
+                new TextResponseHttp2ClientHandler(RESPONSE_CONTENTS));
         server = NettyTestServer.builder()
-                .httpVersion(HttpVersion.HTTP_1_1)
-                .http11HandlerFactory((ctx) -> multiplexer)
+                .httpVersion(HttpVersion.HTTP_2)
+                .h2ConnectionMode(NettyTestServer.H2ConnectionMode.PRIOR_KNOWLEDGE)
+                .http2HandlerFactory((ctx) -> multiplexer)
                 .build();
         server.start();
 
@@ -51,33 +53,36 @@ public class RequestResponseHttp11ClearTest {
                         .maxConnectionsPerRoute(10)
                         .maxTotalConnections(10)
                         .maxIdleTime(Duration.ofMinutes(1))
-                        .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
+                        .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
                         .dnsResolver(staticDns)
                         .build())
                 .build();
     }
 
     @AfterEach
-    void tearDown() throws Exception {
+    void tearDown() {
         server.stop();
-        client.close();
     }
 
     @Test
     void canSendRequestAndReadResponse() throws Exception {
         // -- Arrange
-        var request = TestUtils.plainTextHttp11Request("http://localhost:" + server.getPort(), REQUEST_CONTENTS);
+        var request = TestUtils.request(HttpVersion.HTTP_2,
+                "http://localhost:" + server.getPort(),
+                streamingBody(IPSUM_LOREM));
 
         // -- Act
         var response = client.send(request);
+        requestCapturingHandler.streamCompleted().join();
         var bodyByteBuf = response.body().asByteBuffer();
         var bytes = new byte[bodyByteBuf.remaining()];
         bodyByteBuf.get(bytes);
         var responseBody = new String(bytes, StandardCharsets.UTF_8);
+        client.close();
 
         // -- Assert
         var capturedRequestBody = requestCapturingHandler.capturedBody().toString(StandardCharsets.UTF_8);
-        assertEquals(REQUEST_CONTENTS, capturedRequestBody);
+        assertEquals(String.join("", IPSUM_LOREM), capturedRequestBody);
         assertEquals(RESPONSE_CONTENTS, responseBody);
     }
 }
