@@ -26,7 +26,7 @@ dependencies {
     api(project(":logging"))
 
     // Netty for HTTP/2 integration tests
-    testImplementation("io.netty:netty-all:4.1.100.Final")
+    testImplementation("io.netty:netty-all:4.2.7.Final")
     testImplementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
 
     // Add Apache HttpClient for benchmarking comparison
@@ -37,10 +37,10 @@ dependencies {
     jmh("io.helidon.webclient:helidon-webclient-http2:4.1.6")
 
     // Netty for raw HTTP/2 benchmarking
-    jmh("io.netty:netty-all:4.1.100.Final")
+    jmh("io.netty:netty-all:4.2.7.Final")
 
     // Benchmark server dependencies (Netty runs in separate process)
-    jmhServerImplementation("io.netty:netty-all:4.1.100.Final")
+    jmhServerImplementation("io.netty:netty-all:4.2.7.Final")
     jmhServerImplementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
 }
 
