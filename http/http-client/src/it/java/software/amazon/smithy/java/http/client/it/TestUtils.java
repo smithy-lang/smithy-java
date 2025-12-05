@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.http.client.it;
 
+import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.SslContextBuilder;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -70,7 +71,12 @@ public class TestUtils {
             TestCertificateGenerator.CertificateBundle bundle
     ) throws Exception {
         return SslContextBuilder
-                .forServer(bundle.serverPrivateKey, bundle.serverCertificate);
+                .forServer(bundle.serverPrivateKey, bundle.serverCertificate)
+                .applicationProtocolConfig(new io.netty.handler.ssl.ApplicationProtocolConfig(
+                        ApplicationProtocolConfig.Protocol.ALPN,
+                        ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                        ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                        "h2", "http/1.1"));
     }
 
     public static SSLContext createClientSslContext(
