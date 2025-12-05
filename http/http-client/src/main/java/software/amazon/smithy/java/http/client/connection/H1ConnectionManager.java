@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
+import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * Manages HTTP/1.1 connection pooling.
@@ -22,6 +23,8 @@ import java.util.function.IntFunction;
  * validated before reuse and cleaned up when idle too long.
  */
 final class H1ConnectionManager {
+
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(H1ConnectionManager.class);
 
     // Skip expensive socket validation for connections idle < 1 second
     private static final long VALIDATION_THRESHOLD_NANOS = 1_000_000_000L;
@@ -46,10 +49,17 @@ final class H1ConnectionManager {
         PooledConnection pooled;
         while ((pooled = hostPool.poll()) != null) {
             if (validateConnection(pooled)) {
+                LOGGER.debug("Reusing pooled connection to {}", route);
                 return pooled;
             }
-            // Connection failed validation - caller should close and release permit
-            return new PooledConnection(pooled.connection, -1); // -1 signals invalid
+
+            // Connection failed validation - close it and try next
+            LOGGER.debug("Closing invalid pooled connection to {}", route);
+            try {
+                pooled.connection.close();
+            } catch (IOException e) {
+                LOGGER.debug("Error closing invalid connection to {}: {}", route, e.getMessage());
+            }
         }
         return null;
     }
@@ -68,6 +78,7 @@ final class H1ConnectionManager {
      */
     boolean release(Route route, HttpConnection connection, boolean poolClosed) {
         if (!connection.isActive() || poolClosed) {
+            LOGGER.debug("Not pooling inactive connection to {} (poolClosed={})", route, poolClosed);
             return false;
         }
 
@@ -77,10 +88,14 @@ final class H1ConnectionManager {
         }
 
         try {
-            return hostPool.offer(
-                    new PooledConnection(connection, System.nanoTime()),
-                    10,
-                    TimeUnit.MILLISECONDS);
+            var conn = new PooledConnection(connection, System.nanoTime());
+            boolean pooled = hostPool.offer(conn, 10, TimeUnit.MILLISECONDS);
+            if (pooled) {
+                LOGGER.debug("Released h1 connection to pool for {}", route);
+            } else {
+                LOGGER.debug("h1 pool full, not pooling connection to {}", route);
+            }
+            return pooled;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
@@ -141,11 +156,7 @@ final class H1ConnectionManager {
     /**
      * A pooled connection with idle timestamp.
      */
-    record PooledConnection(HttpConnection connection, long idleSinceNanos) {
-        boolean isValid() {
-            return idleSinceNanos >= 0;
-        }
-    }
+    record PooledConnection(HttpConnection connection, long idleSinceNanos) {}
 
     /**
      * Per-route connection pool using blocking deque (LIFO).
