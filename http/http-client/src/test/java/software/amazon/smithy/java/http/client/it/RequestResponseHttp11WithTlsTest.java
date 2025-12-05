@@ -1,11 +1,19 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.http.client.it;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static software.amazon.smithy.java.http.client.it.TestUtils.createClientSslContext;
+import static software.amazon.smithy.java.http.client.it.TestUtils.createServerSslContextBuilder;
 
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,10 +28,6 @@ import software.amazon.smithy.java.http.client.it.server.NettyTestServer;
 import software.amazon.smithy.java.http.client.it.server.RequestCapturingHttp11ClientHandler;
 import software.amazon.smithy.java.http.client.it.server.TestCertificateGenerator;
 import software.amazon.smithy.java.http.client.it.server.TextResponseHttp11ClientHandler;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static software.amazon.smithy.java.http.client.it.TestUtils.createClientSslContext;
-import static software.amazon.smithy.java.http.client.it.TestUtils.createServerSslContextBuilder;
 
 public class RequestResponseHttp11WithTlsTest {
     private static final String RESPONSE_CONTENTS = "Response sent from Http2WithTls";

@@ -1,3 +1,8 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.http.client.it;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -7,10 +12,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -19,7 +24,6 @@ import software.amazon.smithy.java.http.client.it.server.MultiplexingHttp2Client
 import software.amazon.smithy.java.http.client.it.server.NettyTestServer;
 import software.amazon.smithy.java.http.client.it.server.RequestCapturingHttp2ClientHandler;
 import software.amazon.smithy.java.http.client.it.server.TextResponseHttp2ClientHandler;
-import software.amazon.smithy.java.http.api.HttpVersion;
 
 public class RequestResponseHttp2ClearTest {
     private static final String RESPONSE_CONTENTS = "Response sent from Http2ClearTest";
@@ -41,7 +45,6 @@ public class RequestResponseHttp2ClearTest {
                 .port(8080)
                 .build();
         server.start();
-
 
         DnsResolver staticDns = DnsResolver.staticMapping(Map.of(
                 "localhost",
