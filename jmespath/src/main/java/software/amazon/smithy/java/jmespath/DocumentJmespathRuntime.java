@@ -1,6 +1,9 @@
 package software.amazon.smithy.java.jmespath;
 
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.jmespath.JmespathException;
+import software.amazon.smithy.jmespath.JmespathExceptionType;
 import software.amazon.smithy.jmespath.RuntimeType;
 import software.amazon.smithy.jmespath.evaluation.EvaluationUtils;
 import software.amazon.smithy.jmespath.evaluation.JmespathRuntime;
@@ -63,7 +66,11 @@ public class DocumentJmespathRuntime implements JmespathRuntime<Document> {
         if (document.isType(ShapeType.BLOB)) {
             return JMESPathDocumentUtils.asString(document.asBlob());
         } else {
-            return document.asString();
+            try {
+                return document.asString();
+            } catch (SerializationException e) {
+                throw new JmespathException(JmespathExceptionType.INVALID_TYPE, "Not a string: " + document, e);
+            }
         }
     }
 
@@ -101,7 +108,11 @@ public class DocumentJmespathRuntime implements JmespathRuntime<Document> {
         if (document.isType(ShapeType.TIMESTAMP)) {
             return JMESPathDocumentUtils.asBigDecimal(document.asTimestamp());
         } else {
-            return document.asNumber();
+            try {
+                return document.asNumber();
+            } catch (SerializationException e) {
+                throw new JmespathException(JmespathExceptionType.INVALID_TYPE, "Not a number: " + document, e);
+            }
         }
     }
 
