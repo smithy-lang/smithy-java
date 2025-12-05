@@ -24,13 +24,14 @@ public class TextResponseHttp2ClientHandler implements Http2ClientHandler {
 
     @Override
     public void onHeadersFrame(ChannelHandlerContext ctx, Http2HeadersFrame frame) {
-        LOGGER.info(ctx.channel(), "headers received, sending response");
         var responseHeaders = new DefaultHttp2Headers();
         responseHeaders.status("200");
         responseHeaders.set("content-type", "text/plain");
         ctx.write(new DefaultHttp2HeadersFrame(responseHeaders, false));
         var content = Unpooled.copiedBuffer(message, CharsetUtil.UTF_8);
-        ctx.writeAndFlush(new DefaultHttp2DataFrame(content, false));
+        var endStream = frame.isEndStream();
+        LOGGER.info(ctx.channel(), "headers received, sending response, end stream: {}", endStream);
+        ctx.writeAndFlush(new DefaultHttp2DataFrame(content, endStream));
     }
 
     @Override
