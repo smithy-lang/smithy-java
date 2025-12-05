@@ -78,4 +78,25 @@ class BoundedInputStreamTest {
             }
         });
     }
+
+    @Test
+    void throwsOnPrematureEofInBulkRead() {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2});
+        var stream = new BoundedInputStream(delegate, 5);
+
+        assertThrows(IOException.class, () -> {
+            byte[] buf = new byte[10];
+            while (stream.read(buf, 0, 10) != -1) {
+                // drain
+            }
+        });
+    }
+
+    @Test
+    void throwsOnPrematureEofDuringClose() {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2});
+        var stream = new BoundedInputStream(delegate, 5);
+
+        assertThrows(IOException.class, stream::close);
+    }
 }
