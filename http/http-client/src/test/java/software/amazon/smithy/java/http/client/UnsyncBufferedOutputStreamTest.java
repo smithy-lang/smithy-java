@@ -29,6 +29,33 @@ class UnsyncBufferedOutputStreamTest {
     }
 
     @Test
+    void singleByteWriteFlushesWhenBufferFull() throws IOException {
+        var delegate = new ByteArrayOutputStream();
+        var stream = new UnsyncBufferedOutputStream(delegate, 4);
+
+        stream.write(1);
+        stream.write(2);
+        stream.write(3);
+        stream.write(4);
+        // Buffer is now full, next write should flush
+        stream.write(5);
+        stream.flush();
+
+        assertArrayEquals(new byte[] {1, 2, 3, 4, 5}, delegate.toByteArray());
+    }
+
+    @Test
+    void zeroLengthWriteDoesNothing() throws IOException {
+        var delegate = new ByteArrayOutputStream();
+        var stream = new UnsyncBufferedOutputStream(delegate, 8);
+
+        stream.write(new byte[] {1, 2, 3}, 0, 0);
+        stream.flush();
+
+        assertEquals(0, delegate.size());
+    }
+
+    @Test
     void writesArray() throws IOException {
         var delegate = new ByteArrayOutputStream();
         var stream = new UnsyncBufferedOutputStream(delegate, 8);
@@ -51,6 +78,18 @@ class UnsyncBufferedOutputStreamTest {
     }
 
     @Test
+    void writeAsciiFlushesWhenBufferFills() throws IOException {
+        var delegate = new ByteArrayOutputStream();
+        var stream = new UnsyncBufferedOutputStream(delegate, 4);
+
+        // String longer than buffer forces mid-string flush
+        stream.writeAscii("HelloWorld");
+        stream.flush();
+
+        assertEquals("HelloWorld", delegate.toString());
+    }
+
+    @Test
     void flushesOnClose() throws IOException {
         var delegate = new ByteArrayOutputStream();
         var stream = new UnsyncBufferedOutputStream(delegate, 8);
@@ -68,6 +107,15 @@ class UnsyncBufferedOutputStreamTest {
         stream.close();
 
         assertThrows(IOException.class, () -> stream.write(1));
+    }
+
+    @Test
+    void flushThrowsAfterClose() throws IOException {
+        var delegate = new ByteArrayOutputStream();
+        var stream = new UnsyncBufferedOutputStream(delegate, 8);
+        stream.close();
+
+        assertThrows(IOException.class, stream::flush);
     }
 
     @Test
