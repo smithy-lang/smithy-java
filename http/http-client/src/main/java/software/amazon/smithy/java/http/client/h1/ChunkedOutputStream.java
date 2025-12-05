@@ -8,6 +8,7 @@ package software.amazon.smithy.java.http.client.h1;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import software.amazon.smithy.java.http.api.HttpHeaders;
 
 /**
  * OutputStream that writes HTTP/1.1 chunked transfer encoding format (RFC 7230 Section 4.1).
@@ -20,6 +21,7 @@ final class ChunkedOutputStream extends OutputStream {
     private final byte[] buffer;
     private int bufferPos = 0;
     private boolean closed = false;
+    private HttpHeaders trailers;
 
     // Default chunk size: 8KB
     private static final int DEFAULT_CHUNK_SIZE = 8192;
@@ -40,13 +42,23 @@ final class ChunkedOutputStream extends OutputStream {
     ChunkedOutputStream(OutputStream delegate, int chunkSize) {
         if (delegate == null) {
             throw new NullPointerException("delegate");
-        }
-        if (chunkSize <= 0) {
+        } else if (chunkSize <= 0) {
             throw new IllegalArgumentException("chunkSize must be positive: " + chunkSize);
         }
 
         this.delegate = delegate;
         this.buffer = new byte[chunkSize];
+    }
+
+    /**
+     * Set trailer headers to be sent after the final chunk.
+     *
+     * <p>Must be called before {@link #close()}.
+     *
+     * @param trailers the trailer headers to send
+     */
+    void setTrailers(HttpHeaders trailers) {
+        this.trailers = trailers;
     }
 
     @Override
@@ -71,15 +83,9 @@ final class ChunkedOutputStream extends OutputStream {
     public void write(byte[] b, int off, int len) throws IOException {
         if (closed) {
             throw new IOException("Stream closed");
-        }
-
-        if (b == null) {
-            throw new NullPointerException();
-        }
-        if (off < 0 || len < 0 || len > b.length - off) {
+        } else if (off < 0 || len < 0 || len > b.length - off) {
             throw new IndexOutOfBoundsException();
-        }
-        if (len == 0) {
+        } else if (len == 0) {
             return;
         }
 
@@ -170,17 +176,32 @@ final class ChunkedOutputStream extends OutputStream {
     }
 
     /**
-     * Write the final 0-sized chunk.
+     * Write the final 0-sized chunk with optional trailers.
      *
      * <p>Format:
      *   0\r\n
+     *   [trailer-name: trailer-value\r\n]*
      *   \r\n
      */
     private void writeFinalChunk() throws IOException {
-        // Write "0\r\n\r\n"
         delegate.write('0');
         delegate.write('\r');
         delegate.write('\n');
+
+        if (trailers != null) {
+            for (var entry : trailers) {
+                String name = entry.getKey();
+                for (String value : entry.getValue()) {
+                    delegate.write(name.getBytes(StandardCharsets.US_ASCII));
+                    delegate.write(':');
+                    delegate.write(' ');
+                    delegate.write(value.getBytes(StandardCharsets.US_ASCII));
+                    delegate.write('\r');
+                    delegate.write('\n');
+                }
+            }
+        }
+
         delegate.write('\r');
         delegate.write('\n');
     }

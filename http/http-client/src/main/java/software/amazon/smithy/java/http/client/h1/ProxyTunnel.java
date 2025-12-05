@@ -62,10 +62,12 @@ public final class ProxyTunnel {
         HttpResponse priorResponse = null;
 
         do {
+            // CONNECT uses authority-form request-target (host:port)
+            String authority = targetHost + ":" + targetPort;
             HttpRequest.Builder requestBuilder = HttpRequest.builder()
                     .method("CONNECT")
-                    .uri(URI.create("http://" + targetHost + ":" + targetPort))
-                    .withAddedHeader("Host", targetHost + ":" + targetPort)
+                    .uri(URI.create("http://" + authority))
+                    .withAddedHeader("Host", authority)
                     .withAddedHeader("Proxy-Connection", "Keep-Alive");
 
             if (credentials != null) {
