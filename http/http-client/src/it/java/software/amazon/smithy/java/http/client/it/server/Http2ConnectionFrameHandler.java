@@ -28,7 +28,7 @@ public class Http2ConnectionFrameHandler extends ChannelInboundHandlerAdapter {
                     "Received GOAWAY frame, error code: {}, last streamId: {}",
                     goAwayFrame.errorCode(),
                     goAwayFrame.lastStreamId());
-        } else if (msg instanceof Http2SettingsAckFrame ackFrame) {
+        } else if (msg instanceof Http2SettingsAckFrame) {
             LOGGER.info(ctx.channel(), "Received settings ack frame");
         } else {
             // Unknown connection-level frame

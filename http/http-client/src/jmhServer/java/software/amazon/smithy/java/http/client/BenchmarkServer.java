@@ -344,7 +344,10 @@ public final class BenchmarkServer {
 
         // Write port file
         File portFile = new File(portFilePath);
-        portFile.getParentFile().mkdirs();
+        File parentDir = portFile.getParentFile();
+        if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs()) {
+            throw new IOException("Failed to create directory: " + parentDir);
+        }
         server.writePortFile(portFile);
         System.out.println("Port file written to: " + portFile.getAbsolutePath());
 
