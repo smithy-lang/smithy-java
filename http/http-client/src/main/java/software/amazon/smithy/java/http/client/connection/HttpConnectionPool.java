@@ -221,13 +221,8 @@ public final class HttpConnectionPool implements ConnectionPool {
                 ignored -> new H1ConnectionManager.HostPool(maxConns));
 
         if (pooled != null) {
-            if (pooled.isValid()) {
-                notifyAcquire(pooled.connection(), true);
-                return pooled.connection();
-            }
-            // Connection failed validation: it's unhealthy or stale
-            closeConnection(pooled.connection());
-            connectionPermits.release();
+            notifyAcquire(pooled.connection(), true);
+            return pooled.connection();
         }
 
         // No valid pooled connection available, so block on global capacity with timeout.
