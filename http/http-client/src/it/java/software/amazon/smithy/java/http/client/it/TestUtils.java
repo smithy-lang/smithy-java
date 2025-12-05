@@ -76,7 +76,8 @@ public class TestUtils {
                         ApplicationProtocolConfig.Protocol.ALPN,
                         ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
                         ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
-                        "h2", "http/1.1"));
+                        "h2",
+                        "http/1.1"));
     }
 
     public static SSLContext createClientSslContext(

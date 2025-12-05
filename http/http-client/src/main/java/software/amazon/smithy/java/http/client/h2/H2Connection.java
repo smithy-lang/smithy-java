@@ -46,6 +46,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
+import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpExchange;
@@ -683,6 +684,36 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
                 throw ioe;
             }
             throw new IOException("Failed to write data", cause != null ? cause : e);
+        }
+    }
+
+    /**
+     * Queue trailer HEADERS frame for writing via the encoder/writer thread.
+     *
+     * <p>Trailers are sent as a HEADERS frame with END_STREAM flag after all DATA frames.
+     * Unlike request headers, trailers use an existing stream ID and must not contain
+     * pseudo-headers.
+     *
+     * @param streamId the stream ID
+     * @param trailers the trailer headers to send
+     * @throws IOException if the write fails
+     */
+    void queueTrailers(int streamId, HttpHeaders trailers) throws IOException {
+        CompletableFuture<Void> completion = new CompletableFuture<>();
+        if (!streamWriter.submitWork(
+                new H2StreamWriter.WorkItem.WriteTrailers(streamId, trailers, completion),
+                writeTimeout.toMillis())) {
+            throw new IOException("Write queue full - connection overloaded");
+        }
+
+        try {
+            completion.join();
+        } catch (Exception e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof IOException ioe) {
+                throw ioe;
+            }
+            throw new IOException("Failed to write trailers", cause != null ? cause : e);
         }
     }
 

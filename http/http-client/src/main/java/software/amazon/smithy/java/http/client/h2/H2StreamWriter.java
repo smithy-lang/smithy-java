@@ -23,6 +23,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.h2.hpack.HpackEncoder;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
@@ -69,6 +70,12 @@ final class H2StreamWriter implements AutoCloseable {
                 int offset,
                 int length,
                 int flags,
+                CompletableFuture<Void> completion) implements WorkItem {}
+
+        /** Encode and write trailer HEADERS frame with END_STREAM. */
+        record WriteTrailers(
+                int streamId,
+                HttpHeaders trailers,
                 CompletableFuture<Void> completion) implements WorkItem {}
 
         /** Write a RST_STREAM frame. */
@@ -278,6 +285,7 @@ final class H2StreamWriter implements AutoCloseable {
             case WorkItem.EncodeHeaders h -> processEncodeHeaders(h);
             case WorkItem.WriteData d ->
                 frameCodec.writeFrame(FRAME_TYPE_DATA, d.flags(), d.streamId(), d.data(), d.offset(), d.length());
+            case WorkItem.WriteTrailers t -> processWriteTrailers(t);
             case WorkItem.WriteRst r ->
                 frameCodec.writeRstStream(r.streamId(), r.errorCode());
             case WorkItem.WriteGoaway g ->
@@ -292,6 +300,47 @@ final class H2StreamWriter implements AutoCloseable {
                 // handled by caller
             }
         }
+    }
+
+    /**
+     * Process trailer headers: encode via HPACK and write HEADERS frame with END_STREAM.
+     *
+     * <p>Unlike request headers, trailers:
+     * <ul>
+     *   <li>Use an existing stream ID (no allocation)</li>
+     *   <li>Must NOT contain pseudo-headers</li>
+     *   <li>Always have END_STREAM flag set</li>
+     * </ul>
+     */
+    private void processWriteTrailers(WorkItem.WriteTrailers req) throws IOException {
+        byte[] headerBlock = encodeTrailers(req.trailers());
+        frameCodec.writeHeaders(req.streamId(), headerBlock, 0, headerBlock.length, true);
+    }
+
+    /**
+     * Encode trailer headers using HPACK.
+     *
+     * <p>Trailers must not contain pseudo-headers (names starting with ':').
+     */
+    private byte[] encodeTrailers(HttpHeaders trailers) throws IOException {
+        headerEncodeBuffer.reset();
+        hpackEncoder.beginHeaderBlock(headerEncodeBuffer);
+
+        for (var entry : trailers) {
+            String name = entry.getKey();
+            if (name.startsWith(":")) {
+                throw new IOException("Trailers must not contain pseudo-header: " + name);
+            }
+            boolean sensitive = SENSITIVE_HEADERS.contains(name);
+            for (String value : entry.getValue()) {
+                hpackEncoder.encodeHeader(headerEncodeBuffer, name, value, sensitive);
+            }
+        }
+
+        ByteBuffer buffer = headerEncodeBuffer.toByteBuffer();
+        byte[] result = new byte[buffer.remaining()];
+        buffer.get(result);
+        return result;
     }
 
     /**
@@ -369,6 +418,7 @@ final class H2StreamWriter implements AutoCloseable {
         CompletableFuture<Void> completion = switch (item) {
             case WorkItem.EncodeHeaders h -> h.writeComplete();
             case WorkItem.WriteData d -> d.completion();
+            case WorkItem.WriteTrailers t -> t.completion();
             case WorkItem.WriteRst r -> r.completion();
             case WorkItem.WriteGoaway g -> null;
             case WorkItem.WriteWindowUpdate w -> null;
