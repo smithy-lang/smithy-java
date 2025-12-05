@@ -28,6 +28,8 @@ dependencies {
     // Netty for HTTP/2 integration tests
     testImplementation("io.netty:netty-all:4.2.7.Final")
     testImplementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
+    // Jackson for HPACK test suite JSON parsing
+    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
 
     // Add Apache HttpClient for benchmarking comparison
     jmh("org.apache.httpcomponents.client5:httpclient5:5.3.1")
