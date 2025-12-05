@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.zip.GZIPInputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -32,6 +33,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  * This test class validates the HTTP client against real-world scenarios using httpbin.org,
  * a free HTTP testing service.
  */
+@Disabled("Integration test - requires external service")
 class HttpBinTest {
 
     private static final String HTTPBIN_URL = "https://httpbin.org";
