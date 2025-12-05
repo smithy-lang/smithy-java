@@ -47,7 +47,7 @@ class ManagedHttpExchangeTest {
 
         exchange.responseBody().close();
 
-        assertTrue(released.get());
+        assertTrue(released.get(), "Connection should be released on successful close");
     }
 
     @Test
@@ -70,7 +70,7 @@ class ManagedHttpExchangeTest {
             exchange.close();
         } catch (IOException ignored) {}
 
-        assertTrue(evicted.get());
+        assertTrue(evicted.get(), "Connection should be evicted on error");
     }
 
     @Test
@@ -86,7 +86,7 @@ class ManagedHttpExchangeTest {
 
         exchange.responseBody().close();
 
-        assertTrue(closed.get());
+        assertTrue(closed.get(), "Closing response body should close the exchange");
     }
 
     @Test
@@ -104,7 +104,7 @@ class ManagedHttpExchangeTest {
         exchange.close();
         exchange.close();
 
-        assertEquals(1, releaseCount.get());
+        assertEquals(1, releaseCount.get(), "Connection should only be released once");
     }
 
     @Test
@@ -125,8 +125,10 @@ class ManagedHttpExchangeTest {
         };
         var exchange = createExchange(new TestConnectionPool(), List.of(interceptor));
 
-        assertEquals(999, exchange.responseStatusCode());
-        assertEquals("intercepted", new String(exchange.responseBody().readAllBytes()));
+        assertEquals(999, exchange.responseStatusCode(), "Status code should be from intercepted response");
+        assertEquals("intercepted",
+                new String(exchange.responseBody().readAllBytes()),
+                "Body should be from intercepted response");
     }
 
     @Test
@@ -136,7 +138,7 @@ class ManagedHttpExchangeTest {
         var body1 = exchange.responseBody();
         var body2 = exchange.responseBody();
 
-        assertSame(body1, body2);
+        assertSame(body1, body2, "responseBody() should return the same stream instance");
     }
 
     @Test
@@ -303,6 +305,115 @@ class ManagedHttpExchangeTest {
         // Body should not be accessed since response was never read
         assertFalse(bodyAccessed.get(), "Response body should not be accessed if response never read");
         assertTrue(released.get(), "Connection should still be released");
+    }
+
+    @Test
+    void onErrorInterceptorCanRecoverFromException() throws IOException {
+        var interceptor = new HttpInterceptor() {
+            @Override
+            public HttpResponse interceptResponse(
+                    HttpClient client,
+                    HttpRequest request,
+                    Context context,
+                    HttpResponse response
+            ) throws IOException {
+                throw new IOException("interceptor failed");
+            }
+
+            @Override
+            public HttpResponse onError(
+                    HttpClient client,
+                    HttpRequest request,
+                    Context context,
+                    IOException error
+            ) {
+                return HttpResponse.builder()
+                        .statusCode(503)
+                        .body(DataStream.ofString("recovered"))
+                        .build();
+            }
+        };
+        var exchange = createExchange(new TestConnectionPool(), List.of(interceptor));
+
+        assertEquals(503, exchange.responseStatusCode(), "Status code should be from recovered response");
+        assertEquals("recovered",
+                new String(exchange.responseBody().readAllBytes()),
+                "Body should be from recovered response");
+    }
+
+    @Test
+    void responseVersionReturnsFromDelegate() throws IOException {
+        var delegate = new TestHttpExchange() {
+            @Override
+            public HttpVersion responseVersion() {
+                return HttpVersion.HTTP_2;
+            }
+        };
+        var exchange = createExchange(new TestConnectionPool(), List.of(), delegate);
+
+        assertEquals(HttpVersion.HTTP_2,
+                exchange.responseVersion(),
+                "Response version should come from delegate when no interceptor");
+    }
+
+    @Test
+    void responseVersionReturnsFromInterceptedResponse() throws IOException {
+        var interceptor = new HttpInterceptor() {
+            @Override
+            public HttpResponse interceptResponse(
+                    HttpClient client,
+                    HttpRequest request,
+                    Context context,
+                    HttpResponse response
+            ) {
+                return HttpResponse.builder()
+                        .statusCode(200)
+                        .httpVersion(HttpVersion.HTTP_2)
+                        .body(DataStream.ofString("intercepted"))
+                        .build();
+            }
+        };
+        var exchange = createExchange(new TestConnectionPool(), List.of(interceptor));
+
+        assertEquals(HttpVersion.HTTP_2,
+                exchange.responseVersion(),
+                "Response version should come from intercepted response");
+    }
+
+    @Test
+    void interceptorThatDoesNotReplaceUsesOriginalBody() throws IOException {
+        var originalBodyRead = new AtomicBoolean(false);
+        var delegate = new TestHttpExchange() {
+            @Override
+            public InputStream responseBody() {
+                return new ByteArrayInputStream("original-body".getBytes()) {
+                    @Override
+                    public int read(byte[] b, int off, int len) {
+                        originalBodyRead.set(true);
+                        return super.read(b, off, len);
+                    }
+                };
+            }
+        };
+
+        // Pass-through interceptor that returns null (no replacement)
+        var interceptor = new HttpInterceptor() {
+            @Override
+            public HttpResponse interceptResponse(
+                    HttpClient client,
+                    HttpRequest request,
+                    Context context,
+                    HttpResponse response
+            ) {
+                return null; // No replacement
+            }
+        };
+        var exchange = createExchange(new TestConnectionPool(), List.of(interceptor), delegate);
+
+        String body = new String(exchange.responseBody().readAllBytes());
+
+        assertEquals("original-body", body, "Body should be from original response");
+        assertTrue(originalBodyRead.get(), "Original body stream should be read");
     }
 
     private ManagedHttpExchange createExchange(ConnectionPool pool, List<HttpInterceptor> interceptors) {
