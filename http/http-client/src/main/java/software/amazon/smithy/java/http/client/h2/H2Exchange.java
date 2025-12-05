@@ -252,7 +252,10 @@ public final class H2Exchange implements HttpExchange {
             H2DataOutputStream rawOut = endStreamSent
                     ? new H2DataOutputStream(this, 0)
                     : new H2DataOutputStream(this, connection.getRemoteMaxFrameSize());
-            requestOut = new DelegatedClosingOutputStream(rawOut, this::onRequestStreamClosed);
+            requestOut = new DelegatedClosingOutputStream(rawOut, rw -> {
+                rw.close();  // Send END_STREAM
+                onRequestStreamClosed();
+            });
         }
         return requestOut;
     }
@@ -276,7 +279,7 @@ public final class H2Exchange implements HttpExchange {
         }
     }
 
-    private void onResponseStreamClosed() throws IOException {
+    private void onResponseStreamClosed(InputStream _ignored) throws IOException {
         if (closedStreamCount.incrementAndGet() == 2) {
             close();
         }

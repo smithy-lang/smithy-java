@@ -119,7 +119,7 @@ final class ManagedHttpExchange implements HttpExchange {
                 body = delegate.responseBody();
             }
             // Wrap so closing the response body releases the connection to the pool
-            responseIn = new DelegatedClosingInputStream(body, this::close);
+            responseIn = new DelegatedClosingInputStream(body, in -> close());
             return responseIn;
         } catch (IOException e) {
             errored = true;
