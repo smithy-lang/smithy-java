@@ -5,10 +5,9 @@
 
 package software.amazon.smithy.java.http.client.connection;
 
-import java.io.UncheckedIOException;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.net.SocketException;
 import java.util.List;
 
 /**
@@ -43,7 +42,7 @@ public interface HttpSocketFactory {
      * @param endpoints the resolved IP addresses for the route's host, in preference order
      * @return a new <strong>unconnected</strong> socket
      */
-    Socket newSocket(Route route, List<InetAddress> endpoints);
+    Socket newSocket(Route route, List<InetAddress> endpoints) throws IOException;
 
     /**
      * Default factory used to create sockets.
@@ -54,17 +53,13 @@ public interface HttpSocketFactory {
      * @param endpoints the resolved endpoints (unused in default implementation)
      * @return the created socket
      */
-    static Socket defaultSocketFactory(Route route, List<InetAddress> endpoints) {
-        try {
-            Socket socket = new Socket();
-            socket.setTcpNoDelay(true);
-            socket.setKeepAlive(true);
-            // Larger buffers for high throughput
-            socket.setSendBufferSize(64 * 1024);
-            socket.setReceiveBufferSize(64 * 1024);
-            return socket;
-        } catch (SocketException e) {
-            throw new UncheckedIOException(e);
-        }
+    static Socket defaultSocketFactory(Route route, List<InetAddress> endpoints) throws IOException {
+        Socket socket = new Socket();
+        socket.setTcpNoDelay(true);
+        socket.setKeepAlive(true);
+        // Larger buffers for high throughput
+        socket.setSendBufferSize(64 * 1024);
+        socket.setReceiveBufferSize(64 * 1024);
+        return socket;
     }
 }

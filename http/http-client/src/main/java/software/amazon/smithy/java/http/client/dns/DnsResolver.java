@@ -51,7 +51,9 @@ public interface DnsResolver {
      *
      * @param address the IP address that failed to connect
      */
-    default void reportFailure(InetAddress address) {}
+    default void reportFailure(InetAddress address) {
+        // nothing by default
+    }
 
     /**
      * Purges cached entries for a specific hostname.
