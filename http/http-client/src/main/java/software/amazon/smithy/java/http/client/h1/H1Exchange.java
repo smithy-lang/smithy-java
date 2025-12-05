@@ -157,8 +157,11 @@ public final class H1Exchange implements HttpExchange {
     }
 
     @Override
-    public boolean supportsBidirectionalStreaming() {
-        return false;
+    public void setRequestTrailers(HttpHeaders trailers) {
+        if (!(requestOut instanceof ChunkedOutputStream cos)) {
+            throw new IllegalStateException("Request trailers require chunked transfer encoding");
+        }
+        cos.setTrailers(trailers);
     }
 
     @Override
@@ -298,7 +301,15 @@ public final class H1Exchange implements HttpExchange {
         out.write(' ');
 
         URI uri = request.uri();
-        if (isHttpProxyWithoutTunnel()) {
+        if ("CONNECT".equals(request.method())) {
+            // CONNECT uses authority-form: host:port
+            out.writeAscii(uri.getHost());
+            int port = uri.getPort();
+            if (port != -1) {
+                out.write(':');
+                out.writeAscii(Integer.toString(port));
+            }
+        } else if (isHttpProxyWithoutTunnel()) {
             out.writeAscii(uri.toString());
         } else {
             String path = uri.getRawPath();
@@ -557,12 +568,9 @@ public final class H1Exchange implements HttpExchange {
     }
 
     /**
-     * Get default port for scheme (80 for http, 443 for https).
+     * Get default port for scheme (80 for http or unknown, 443 for https).
      */
     private static int defaultPort(String scheme) {
-        if ("https".equalsIgnoreCase(scheme)) {
-            return 443;
-        }
-        return 80; // http or unknown
+        return "https".equalsIgnoreCase(scheme) ? 443 : 80;
     }
 }

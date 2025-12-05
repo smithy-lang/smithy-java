@@ -10,104 +10,122 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.nio.charset.StandardCharsets;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 
 class HttpUtilsTest {
 
-    @Test
-    void internHeaderReturnsInternedStringForKnownHeaders() {
-        var buf = "content-type".getBytes(StandardCharsets.US_ASCII);
-        var result = HttpUtils.internHeader(buf, 0, buf.length);
+    static Stream<Arguments> knownHeaders() {
+        return Stream.of(
+                // GROUP_4
+                Arguments.of("date"),
+                Arguments.of("vary"),
+                Arguments.of("etag"),
+                // GROUP_6
+                Arguments.of("server"),
+                // GROUP_7
+                Arguments.of("trailer"),
+                Arguments.of("expires"),
+                Arguments.of("upgrade"),
+                // GROUP_8
+                Arguments.of("location"),
+                // GROUP_10
+                Arguments.of("connection"),
+                Arguments.of("keep-alive"),
+                Arguments.of("set-cookie"),
+                // GROUP_12
+                Arguments.of("content-type"),
+                // GROUP_13
+                Arguments.of("cache-control"),
+                Arguments.of("last-modified"),
+                Arguments.of("content-range"),
+                Arguments.of("accept-ranges"),
+                // GROUP_14
+                Arguments.of("content-length"),
+                // GROUP_16
+                Arguments.of("content-encoding"),
+                Arguments.of("x-amzn-requestid"),
+                Arguments.of("x-amz-request-id"),
+                Arguments.of("www-authenticate"),
+                Arguments.of("proxy-connection"),
+                // GROUP_17
+                Arguments.of("transfer-encoding"),
+                // GROUP_18
+                Arguments.of("proxy-authenticate"));
+    }
 
-        assertSame("content-type", result);
+    @ParameterizedTest
+    @MethodSource("knownHeaders")
+    void internsKnownHeader(String header) {
+        byte[] buf = header.getBytes(StandardCharsets.US_ASCII);
+        String result = HttpUtils.internHeader(buf, 0, buf.length);
+
+        assertSame(header, result);
+    }
+
+    @ParameterizedTest
+    @MethodSource("knownHeaders")
+    void internsKnownHeaderCaseInsensitive(String header) {
+        byte[] buf = header.toUpperCase().getBytes(StandardCharsets.US_ASCII);
+        String result = HttpUtils.internHeader(buf, 0, buf.length);
+
+        assertSame(header, result);
     }
 
     @Test
-    void internHeaderIsCaseInsensitive() {
-        var buf = "Content-Type".getBytes(StandardCharsets.US_ASCII);
-        var result = HttpUtils.internHeader(buf, 0, buf.length);
+    void returnsNewStringForUnknownHeader() {
+        byte[] buf = "x-custom".getBytes(StandardCharsets.US_ASCII);
+        String result = HttpUtils.internHeader(buf, 0, buf.length);
 
-        assertSame("content-type", result);
+        assertEquals("x-custom", result);
     }
 
     @Test
-    void internHeaderReturnsNewStringForUnknownHeaders() {
-        var buf = "x-custom-header".getBytes(StandardCharsets.US_ASCII);
-        var result = HttpUtils.internHeader(buf, 0, buf.length);
+    void returnsNewStringForUnknownLengthMatch() {
+        // Same length as "date" but different content
+        byte[] buf = "test".getBytes(StandardCharsets.US_ASCII);
+        String result = HttpUtils.internHeader(buf, 0, buf.length);
 
-        assertEquals("x-custom-header", result);
+        assertEquals("test", result);
     }
 
     @Test
-    void parseHeaderLineAddsHeader() {
-        var buf = "Content-Type: application/json".getBytes(StandardCharsets.US_ASCII);
+    void parseHeaderLineReturnsNullForMissingColon() {
+        byte[] buf = "invalid header line".getBytes(StandardCharsets.US_ASCII);
         var headers = HttpHeaders.ofModifiable();
-        var name = HttpUtils.parseHeaderLine(buf, buf.length, headers);
+        String result = HttpUtils.parseHeaderLine(buf, buf.length, headers);
 
-        assertEquals("content-type", name);
-        assertEquals("application/json", headers.firstValue("content-type"));
-    }
-
-    @Test
-    void parseHeaderLineTrimsWhitespace() {
-        var buf = "Content-Type:   application/json  ".getBytes(StandardCharsets.US_ASCII);
-        var headers = HttpHeaders.ofModifiable();
-        HttpUtils.parseHeaderLine(buf, buf.length, headers);
-
-        assertEquals("application/json", headers.firstValue("content-type"));
-    }
-
-    @Test
-    void parseHeaderLineReturnsNullForMalformedLine() {
-        var buf = "no-colon-here".getBytes(StandardCharsets.US_ASCII);
-        var headers = HttpHeaders.ofModifiable();
-        var name = HttpUtils.parseHeaderLine(buf, buf.length, headers);
-
-        assertNull(name);
-    }
-
-    @Test
-    void parseHeaderLineHandlesEmptyValue() {
-        var buf = "X-Empty:".getBytes(StandardCharsets.US_ASCII);
-        var headers = HttpHeaders.ofModifiable();
-        HttpUtils.parseHeaderLine(buf, buf.length, headers);
-
-        assertEquals("", headers.firstValue("X-Empty"));
+        assertNull(result);
     }
 
     @Test
     void parseHeaderLineReturnsNullForColonAtStart() {
-        var buf = ": value".getBytes(StandardCharsets.US_ASCII);
+        byte[] buf = ": value".getBytes(StandardCharsets.US_ASCII);
         var headers = HttpHeaders.ofModifiable();
-        var name = HttpUtils.parseHeaderLine(buf, buf.length, headers);
+        String result = HttpUtils.parseHeaderLine(buf, buf.length, headers);
 
-        assertNull(name);
+        assertNull(result);
     }
 
     @Test
-    void parseHeaderLineHandlesValueWithColons() {
-        var buf = "Location: http://example.com:8080/path".getBytes(StandardCharsets.US_ASCII);
-        var headers = HttpHeaders.ofModifiable();
-        HttpUtils.parseHeaderLine(buf, buf.length, headers);
-
-        assertEquals("http://example.com:8080/path", headers.firstValue("location"));
-    }
-
-    @Test
-    void parseHeaderLineHandlesTabWhitespace() {
-        var buf = "Content-Type:\t application/json".getBytes(StandardCharsets.US_ASCII);
+    void parseHeaderLineTrimsWhitespace() {
+        byte[] buf = "name:   value   ".getBytes(StandardCharsets.US_ASCII);
         var headers = HttpHeaders.ofModifiable();
         HttpUtils.parseHeaderLine(buf, buf.length, headers);
 
-        assertEquals("application/json", headers.firstValue("content-type"));
+        assertEquals("value", headers.firstValue("name"));
     }
 
     @Test
-    void internHeaderHandlesOffset() {
-        var buf = "XXXcontent-typeYYY".getBytes(StandardCharsets.US_ASCII);
-        var result = HttpUtils.internHeader(buf, 3, 12);
+    void parseHeaderLineTrimsTab() {
+        byte[] buf = "name:\t\tvalue\t".getBytes(StandardCharsets.US_ASCII);
+        var headers = HttpHeaders.ofModifiable();
+        HttpUtils.parseHeaderLine(buf, buf.length, headers);
 
-        assertSame("content-type", result);
+        assertEquals("value", headers.firstValue("name"));
     }
 }

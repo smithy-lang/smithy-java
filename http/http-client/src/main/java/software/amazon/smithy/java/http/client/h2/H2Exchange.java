@@ -111,6 +111,7 @@ public final class H2Exchange implements HttpExchange {
     // Request state
     private volatile boolean endStreamSent = false;
     private volatile OutputStream requestOut;
+    private volatile HttpHeaders requestTrailers;
 
     // Response body input stream
     private volatile InputStream responseIn;
@@ -309,6 +310,11 @@ public final class H2Exchange implements HttpExchange {
     @Override
     public boolean supportsBidirectionalStreaming() {
         return true;
+    }
+
+    @Override
+    public void setRequestTrailers(HttpHeaders trailers) {
+        this.requestTrailers = trailers;
     }
 
     @Override
@@ -608,6 +614,10 @@ public final class H2Exchange implements HttpExchange {
      * @throws SocketTimeoutException if write timeout expires waiting for flow control window
      */
     void writeData(byte[] data, int offset, int length, boolean endStream) throws IOException {
+        // If trailers are set and this is the last data, don't set END_STREAM on DATA frame
+        // - trailers will carry END_STREAM instead
+        boolean hasTrailers = requestTrailers != null;
+
         while (length > 0) {
             int toSend;
 
@@ -635,8 +645,9 @@ public final class H2Exchange implements HttpExchange {
                 flowControlLock.unlock();
             }
 
-            boolean isLast = endStream && (toSend == length);
-            int flags = isLast ? FLAG_END_STREAM : 0;
+            boolean isLastChunk = (toSend == length);
+            // Only set END_STREAM on DATA if this is the last chunk AND no trailers
+            int flags = (endStream && isLastChunk && !hasTrailers) ? FLAG_END_STREAM : 0;
 
             // Queue the write - writer thread handles I/O with batching
             connection.queueData(streamId, data, offset, toSend, flags);
@@ -647,6 +658,10 @@ public final class H2Exchange implements HttpExchange {
         }
 
         if (endStream) {
+            if (hasTrailers) {
+                // Send trailers with END_STREAM
+                connection.queueTrailers(streamId, requestTrailers);
+            }
             endStreamSent = true;
             // Update stream state
             if (streamState == StreamState.OPEN) {
@@ -658,11 +673,15 @@ public final class H2Exchange implements HttpExchange {
     }
 
     /**
-     * Send END_STREAM without data.
+     * Send END_STREAM without data, or send trailers if set.
      */
     void sendEndStream() throws IOException {
         if (!endStreamSent) {
-            connection.queueData(streamId, EMPTY_DATA, 0, 0, FLAG_END_STREAM);
+            if (requestTrailers != null) {
+                connection.queueTrailers(streamId, requestTrailers);
+            } else {
+                connection.queueData(streamId, EMPTY_DATA, 0, 0, FLAG_END_STREAM);
+            }
             endStreamSent = true;
             // Update stream state
             if (streamState == StreamState.OPEN) {

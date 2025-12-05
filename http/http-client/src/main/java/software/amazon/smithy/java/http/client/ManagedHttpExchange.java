@@ -166,6 +166,11 @@ final class ManagedHttpExchange implements HttpExchange {
     }
 
     @Override
+    public void setRequestTrailers(HttpHeaders trailers) {
+        delegate.setRequestTrailers(trailers);
+    }
+
+    @Override
     public void close() throws IOException {
         if (closed) {
             return;

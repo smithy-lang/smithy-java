@@ -7,6 +7,7 @@ package software.amazon.smithy.java.http.client.h1;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
@@ -68,7 +69,6 @@ final class ChunkedInputStream extends InputStream {
         if (b != -1) {
             chunkRemaining--;
         } else {
-            // Unexpected EOF
             throw new IOException("Unexpected end of stream in chunked encoding");
         }
 
@@ -79,8 +79,6 @@ final class ChunkedInputStream extends InputStream {
     public int read(byte[] b, int off, int len) throws IOException {
         if (closed || eof) {
             return -1;
-        } else if (b == null) {
-            throw new NullPointerException();
         } else if (off < 0 || len < 0 || len > b.length - off) {
             throw new IndexOutOfBoundsException();
         } else if (len == 0) {
@@ -148,17 +146,15 @@ final class ChunkedInputStream extends InputStream {
         if (closed) {
             return;
         }
-        closed = true;
 
-        // Drain remaining chunks to allow connection reuse
+        // Drain remaining chunks to allow connection reuse (before setting closed flag)
         if (!eof) {
-            byte[] drain = new byte[8192];
-            while (read(drain) != -1) {
-                // Discard
-            }
+            // use transferTo from delegate since it's optimized to not allocate
+            transferTo(OutputStream.nullOutputStream());
         }
 
-        // Don't close delegate - connection may be reused
+        closed = true;
+        // Note: we don't close the delegate since the connection may be reused
     }
 
     /**
