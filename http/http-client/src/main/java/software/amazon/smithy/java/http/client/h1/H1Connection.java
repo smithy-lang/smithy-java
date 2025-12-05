@@ -45,9 +45,8 @@ import software.amazon.smithy.java.logging.InternalLogger;
  */
 public final class H1Connection implements HttpConnection {
     /**
-     * The buffer used for parsing response start-line and each header line. This means that the path and query
-     * string can't exceed 8KB, and no one header can exceed 8KB (though we do impose a limit of 512 headers to guard
-     * against malformed responses). This per/line limit should be more than enough for well-formed response parsing.
+     * Buffer used for parsing the HTTP/1.x status line and each header line.
+     * This bounds any single response line to 8KB (status line or header line).
      */
     static final int RESPONSE_LINE_BUFFER_SIZE = 8192;
 
@@ -112,9 +111,8 @@ public final class H1Connection implements HttpConnection {
 
     @Override
     public boolean isActive() {
-        // Fast path: just check volatile flags (no syscalls)
-        // Full socket health check happens in validateForReuse() when connection
-        // is retrieved from pool after being idle
+        // Cheap check used by the pool on hot paths.
+        // Full socket state validation is done in validateForReuse().
         return active && keepAlive;
     }
 
@@ -250,7 +248,9 @@ public final class H1Connection implements HttpConnection {
      * <p>Called by {@link H1Exchange} when errors occur during I/O.
      */
     void markInactive() {
-        LOGGER.debug("Marking connection inactive to {}", route);
-        this.active = false;
+        if (active) {
+            LOGGER.debug("Marking connection inactive to {}", route);
+            this.active = false;
+        }
     }
 }
