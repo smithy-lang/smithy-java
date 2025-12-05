@@ -67,9 +67,13 @@ final class PublisherDataStream implements DataStream {
 
         consumed = true;
         var subscriber = HttpResponse.BodySubscribers.ofInputStream();
-        var delegate = new HttpBodySubscriberAdapter<>(subscriber);
-        subscribe(delegate);
+        innerSubscribe(new HttpBodySubscriberAdapter<>(subscriber));
         return subscriber.getBody().toCompletableFuture().join();
+    }
+
+    private void innerSubscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
+        consumed = true;
+        publisher.subscribe(subscriber);
     }
 
     @Override
@@ -78,7 +82,6 @@ final class PublisherDataStream implements DataStream {
             throw new IllegalStateException("DataStream is not replayable and has already been consumed");
         }
 
-        consumed = true;
-        publisher.subscribe(subscriber);
+        innerSubscribe(subscriber);
     }
 }
