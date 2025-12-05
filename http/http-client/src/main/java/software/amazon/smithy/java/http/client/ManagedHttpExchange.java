@@ -68,6 +68,7 @@ final class ManagedHttpExchange implements HttpExchange {
     private boolean intercepted;
     private HttpResponse interceptedResponse;
     private InputStream responseIn;
+    private InputStream originalResponseBody; // body stream from delegate, needs draining on close
 
     ManagedHttpExchange(
             HttpExchange delegate,
@@ -105,9 +106,18 @@ final class ManagedHttpExchange implements HttpExchange {
 
         try {
             ensureIntercepted();
-            InputStream body = interceptedResponse != null
-                    ? interceptedResponse.body().asInputStream()
-                    : delegate.responseBody();
+            InputStream body;
+            if (interceptedResponse != null) {
+                // Interceptor replaced response - use replacement body
+                body = interceptedResponse.body().asInputStream();
+            } else if (originalResponseBody != null) {
+                // Interceptors ran but didn't replace - use captured original
+                body = originalResponseBody;
+                originalResponseBody = null; // responseIn now owns it, will be drained via responseIn
+            } else {
+                // No interceptors - get body directly
+                body = delegate.responseBody();
+            }
             // Wrap so closing the response body releases the connection to the pool
             responseIn = new DelegatedClosingInputStream(body, this::close);
             return responseIn;
@@ -162,10 +172,15 @@ final class ManagedHttpExchange implements HttpExchange {
         }
         closed = true;
 
-        // Drain response body before releasing connection (required for HTTP/1.1 connection reuse)
+        // Drain response bodies before releasing connection (required for HTTP/1.1 connection reuse).
+        // Must drain both the caller's stream (responseIn) and the original delegate body if different.
+        // This handles the case where an interceptor replaces the response but doesn't read the original.
         try {
             if (responseIn != null) {
                 responseIn.transferTo(VERY_NULL_OUTPUT_STREAM);
+            }
+            if (originalResponseBody != null && originalResponseBody != responseIn) {
+                originalResponseBody.transferTo(VERY_NULL_OUTPUT_STREAM);
             }
         } catch (IOException ignored) {
             // Drain failed, so the connection cannot be reused safely
@@ -214,10 +229,13 @@ final class ManagedHttpExchange implements HttpExchange {
             return;
         }
 
+        // Capture original body stream - needs to be drained on close for connection reuse
+        originalResponseBody = delegate.responseBody();
+
         HttpResponse currentResponse = HttpResponse.builder()
                 .statusCode(delegate.responseStatusCode())
                 .headers(delegate.responseHeaders())
-                .body(DataStream.ofInputStream(delegate.responseBody()))
+                .body(DataStream.ofInputStream(originalResponseBody))
                 .build();
 
         HttpResponse replacement;

@@ -74,7 +74,6 @@ public interface ProxySelector {
      * @return the ProxySelector that does not use failover.
      */
     static ProxySelector noFailover(ProxySelector delegate) {
-        java.net.ProxySelector.getDefault();
         return new ProxySelector() {
             @Override
             public List<ProxyConfiguration> select(URI target, Context ctx) {
