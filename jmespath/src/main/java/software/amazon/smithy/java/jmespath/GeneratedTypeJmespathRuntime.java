@@ -8,7 +8,6 @@ package software.amazon.smithy.java.jmespath;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -101,7 +100,7 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
     public String asString(Object value) {
         if (value instanceof SmithyEnum enumValue) {
             return enumValue.getValue();
-        } else if (value instanceof String s){
+        } else if (value instanceof String s) {
             return s;
         } else {
             throw new JmespathException(JmespathExceptionType.INVALID_TYPE, "Incorrect runtime type: " + value);
@@ -147,7 +146,8 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
                     yield ((SerializableStruct) value).schema().members().size();
                 }
             }
-            default -> throw new JmespathException(JmespathExceptionType.INVALID_TYPE, "Incorrect runtime type: " + value);
+            default ->
+                throw new JmespathException(JmespathExceptionType.INVALID_TYPE, "Incorrect runtime type: " + value);
         };
     }
 
