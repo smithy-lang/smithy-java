@@ -127,10 +127,9 @@ import software.amazon.smithy.java.http.client.h2.H2Connection;
  * @see HttpVersionPolicy
  */
 public final class HttpConnectionPool implements ConnectionPool {
-    // Target streams per connection before creating a new one.
-    // Lower = more connections, better throughput under contention
-    // Higher = fewer connections, better multiplexing efficiency
-    private static final int STREAMS_PER_CONNECTION = 50;
+    // Soft limit on streams per connection before creating a new one.
+    // Server's MAX_CONCURRENT_STREAMS is the hard limit; this spreads load before hitting it.
+    private static final int STREAMS_PER_CONNECTION = 4096;
 
     private final int defaultMaxConnectionsPerRoute;
     private final Map<String, Integer> perHostLimits;
@@ -144,7 +143,7 @@ public final class HttpConnectionPool implements ConnectionPool {
     private final H1ConnectionManager h1Manager;
 
     // HTTP/2 connection manager (handles multiplexing)
-    private final H2ConnectionManager h2Manager = new H2ConnectionManager(STREAMS_PER_CONNECTION);
+    private final H2ConnectionManager h2Manager;
 
     // Semaphore to limit total connections - better contention than AtomicInteger CAS loop
     private final Semaphore connectionPermits;
@@ -188,6 +187,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         this.h1Manager = new H1ConnectionManager(maxIdleTimeNanos);
         this.connectionPermits = new Semaphore(builder.maxTotalConnections, false);
         this.listeners = List.copyOf(builder.listeners);
+        this.h2Manager = new H2ConnectionManager(STREAMS_PER_CONNECTION, listeners, this::onNewH2Connection);
         this.cleanupThread = Thread.ofVirtual().name("http-pool-cleanup").start(this::cleanupIdleConnections);
     }
 
@@ -206,7 +206,7 @@ public final class HttpConnectionPool implements ConnectionPool {
             throw new IllegalStateException("Connection pool is closed");
         } else if ((route.isSecure() && versionPolicy != HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 || (!route.isSecure() && versionPolicy.usesH2cForCleartext())) {
-            return acquireH2(route);
+            return h2Manager.acquire(route);
         } else {
             return acquireH1(route);
         }
@@ -240,51 +240,28 @@ public final class HttpConnectionPool implements ConnectionPool {
         }
     }
 
-    private HttpConnection acquireH2(Route route) throws IOException {
-        // Fast path: find an existing H2 connection with capacity
-        H2Connection reusable = h2Manager.tryAcquire(route);
-        if (reusable != null) {
-            notifyAcquire(reusable, true);
-            return reusable;
+    // Called by H2ConnectionManager when a new connection is needed.
+    private H2Connection onNewH2Connection(Route route) throws IOException {
+        // Clean up dead connections first
+        h2Manager.cleanupDead(route, this::closeAndReleasePermit);
+
+        // Block on global capacity
+        acquirePermit();
+
+        try {
+            HttpConnection conn = connectionFactory.create(route);
+            notifyConnected(conn);
+            if (conn instanceof H2Connection h2conn) {
+                return h2conn;
+            }
+            // ALPN negotiated HTTP/1.1 instead of H2 - shouldn't happen with H2C_PRIOR_KNOWLEDGE
+            closeConnection(conn);
+            connectionPermits.release();
+            throw new IOException("Expected H2 connection but got " + conn.httpVersion());
+        } catch (IOException | RuntimeException e) {
+            connectionPermits.release();
+            throw e;
         }
-
-        // Slow path: need to create a new H2 connection.
-        return h2Manager.newConnection(route, r -> {
-            // Double-check: another thread might have created while we waited.
-            H2Connection rechecked = h2Manager.tryAcquire(r);
-            if (rechecked != null) {
-                notifyAcquire(rechecked, true);
-                return rechecked;
-            }
-
-            // Clean up dead or unhealthy connections
-            h2Manager.cleanupDead(r, this::closeAndReleasePermit);
-
-            // Create new H2 connection - block on global capacity with timeout
-            acquirePermit();
-
-            HttpConnection conn = null;
-            try {
-                conn = connectionFactory.create(r);
-                notifyConnected(conn);
-                if (conn instanceof H2Connection newH2conn) {
-                    h2Manager.register(r, newH2conn);
-                    notifyAcquire(newH2conn, false);
-                    return newH2conn;
-                } else {
-                    // ALPN negotiated HTTP/1.1 instead of H2.
-                    h1Manager.ensurePool(r, getMaxConnectionsForRoute(r));
-                    notifyAcquire(conn, false);
-                    return conn;
-                }
-            } catch (IOException | RuntimeException e) {
-                if (conn != null) {
-                    closeConnection(conn);
-                }
-                connectionPermits.release();
-                throw e;
-            }
-        });
     }
 
     /**
