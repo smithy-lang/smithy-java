@@ -129,13 +129,13 @@ import software.amazon.smithy.java.http.client.h2.H2Connection;
 public final class HttpConnectionPool implements ConnectionPool {
     // Soft limit on streams per connection before creating a new one.
     // Server's MAX_CONCURRENT_STREAMS is the hard limit; this spreads load before hitting it.
-    private static final int STREAMS_PER_CONNECTION = 4096;
+    private static final int STREAMS_PER_CONNECTION = 1024;
 
     private final int defaultMaxConnectionsPerRoute;
     private final Map<String, Integer> perHostLimits;
     private final int maxTotalConnections;
-    private final long maxIdleTimeNanos; // Cached to avoid Duration.toNanos() in hot path
     private final long acquireTimeoutMs; // Timeout for acquiring a connection when pool is exhausted
+    private final long maxIdleTimeNanos; // Max idle time before closing connections
     private final HttpVersionPolicy versionPolicy;
     private final HttpConnectionFactory connectionFactory;
 
@@ -159,6 +159,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         this.defaultMaxConnectionsPerRoute = builder.maxConnectionsPerRoute;
         this.perHostLimits = Map.copyOf(builder.perHostLimits);
         this.maxTotalConnections = builder.maxTotalConnections;
+        // Cached to avoid Duration.toNanos() in hot path
         this.maxIdleTimeNanos = builder.maxIdleTime.toNanos();
         this.acquireTimeoutMs = builder.acquireTimeout.toMillis();
         this.versionPolicy = builder.versionPolicy;
@@ -184,7 +185,7 @@ public final class HttpConnectionPool implements ConnectionPool {
                 dnsResolver,
                 builder.socketFactory);
 
-        this.h1Manager = new H1ConnectionManager(maxIdleTimeNanos);
+        this.h1Manager = new H1ConnectionManager(this.maxIdleTimeNanos);
         this.connectionPermits = new Semaphore(builder.maxTotalConnections, false);
         this.listeners = List.copyOf(builder.listeners);
         this.h2Manager = new H2ConnectionManager(STREAMS_PER_CONNECTION, listeners, this::onNewH2Connection);
@@ -216,9 +217,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         int maxConns = getMaxConnectionsForRoute(route);
 
         // Quick check: try to reuse a pooled connection
-        H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(
-                route,
-                ignored -> new H1ConnectionManager.HostPool(maxConns));
+        H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(route, maxConns);
 
         if (pooled != null) {
             notifyAcquire(pooled.connection(), true);
@@ -229,38 +228,66 @@ public final class HttpConnectionPool implements ConnectionPool {
         acquirePermit();
 
         // Create new HTTP/1.1 connection
+        HttpConnection conn = null;
+        boolean success = false;
         try {
-            HttpConnection conn = connectionFactory.create(route);
+            conn = connectionFactory.create(route);
             notifyConnected(conn);
             notifyAcquire(conn, false);
+            success = true;
             return conn;
-        } catch (IOException | RuntimeException e) {
-            connectionPermits.release();
-            throw e;
+        } catch (Throwable e) {
+            if (e instanceof IOException) {
+                throw (IOException) e;
+            } else if (e instanceof RuntimeException) {
+                throw (RuntimeException) e;
+            } else {
+                throw new RuntimeException(e);
+            }
+        } finally {
+            if (!success) {
+                connectionPermits.release();
+                if (conn != null) {
+                    closeConnection(conn);
+                }
+            }
         }
     }
 
     // Called by H2ConnectionManager when a new connection is needed.
     private H2Connection onNewH2Connection(Route route) throws IOException {
-        // Clean up dead connections first
-        h2Manager.cleanupDead(route, this::closeAndReleasePermit);
+        // Note: cleanupDead was removed from here - it caused lock contention under load.
+        // Background cleanup thread handles dead connection removal every 30 seconds.
 
         // Block on global capacity
         acquirePermit();
 
+        HttpConnection conn = null;
+        boolean success = false;
         try {
-            HttpConnection conn = connectionFactory.create(route);
+            conn = connectionFactory.create(route);
             notifyConnected(conn);
             if (conn instanceof H2Connection h2conn) {
+                success = true;
                 return h2conn;
             }
             // ALPN negotiated HTTP/1.1 instead of H2 - shouldn't happen with H2C_PRIOR_KNOWLEDGE
-            closeConnection(conn);
-            connectionPermits.release();
             throw new IOException("Expected H2 connection but got " + conn.httpVersion());
-        } catch (IOException | RuntimeException e) {
-            connectionPermits.release();
-            throw e;
+        } catch (Throwable e) {
+            if (e instanceof IOException) {
+                throw (IOException) e;
+            } else if (e instanceof RuntimeException) {
+                throw (RuntimeException) e;
+            } else {
+                throw new RuntimeException(e);
+            }
+        } finally {
+            if (!success) {
+                connectionPermits.release();
+                if (conn != null) {
+                    closeConnection(conn);
+                }
+            }
         }
     }
 
@@ -396,21 +423,18 @@ public final class HttpConnectionPool implements ConnectionPool {
             return defaultMaxConnectionsPerRoute;
         }
 
-        String host = route.host();
+        Integer limit = perHostLimits.get(route.authority());
+        if (limit != null) {
+            return limit;
+        }
 
-        // Check with port first (more specific)
+        // For non-default ports, also check host-only limit as a fallback
+        // (e.g., api.example.com:8080 falls back to api.example.com limit)
         if (route.port() != 80 && route.port() != 443) {
-            String hostWithPort = host + ":" + route.port();
-            Integer limit = perHostLimits.get(hostWithPort);
+            limit = perHostLimits.get(route.host());
             if (limit != null) {
                 return limit;
             }
-        }
-
-        // Check without port (less specific)
-        Integer limit = perHostLimits.get(host);
-        if (limit != null) {
-            return limit;
         }
 
         // Use default
@@ -475,10 +499,8 @@ public final class HttpConnectionPool implements ConnectionPool {
      * <p>For HTTP/2 connections, removes connections that:
      * <ul>
      *   <li>Are no longer active or can't accept more streams</li>
+     *   <li>Have no active streams and have been idle longer than {@code maxIdleTime}</li>
      * </ul>
-     *
-     * <p>Note: {@code maxIdleTime} currently only applies to HTTP/1.1 connections.
-     * HTTP/2 connections remain open until they become unhealthy.
      *
      * <p>Runs on a virtual thread, so blocking is cheap.
      */
@@ -495,6 +517,10 @@ public final class HttpConnectionPool implements ConnectionPool {
 
                 // Clean up unhealthy HTTP/2 connections
                 h2Manager.cleanupAllDead(this::closeAndReleasePermit);
+
+                // Clean up idle HTTP/2 connections (no active streams and idle too long)
+                // Note: closeAndReleasePermit already releases the permit
+                h2Manager.cleanupIdle(maxIdleTimeNanos, this::closeAndReleasePermit);
 
             } catch (InterruptedException e) {
                 break;
