@@ -27,18 +27,21 @@ import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.Http2StreamFrame;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLContext;
@@ -104,7 +107,7 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
 @State(Scope.Benchmark)
 public class VirtualThreadScalingBenchmark {
 
-    @Param({"5000"})
+    @Param({"10000"})
     private int concurrency;
 
     // Server URL - use jmhWithServer task or set manually
@@ -128,10 +131,10 @@ public class VirtualThreadScalingBenchmark {
     private Http2Client helidonClientH2;
 
     // Netty HTTP/2 client (raw, no abstractions)
-    // Note: Netty performs better with 1 connection (606K) vs multiple (425K with 100 connections)
-    // This is because Netty's event-loop model multiplexes efficiently on a single connection
     private EventLoopGroup nettyEventLoopGroup;
-    private Channel nettyH2cChannel;
+    private Bootstrap nettyBootstrap;
+    private String nettyH2cHost;
+    private int nettyH2cPort;
 
     // Server URLs
     private String h1BaseUrl;
@@ -248,7 +251,7 @@ public class VirtualThreadScalingBenchmark {
 
         // ===== Netty HTTP/2 Client (raw, no abstractions) =====
         nettyEventLoopGroup = new NioEventLoopGroup();
-        Bootstrap nettyBootstrap = new Bootstrap();
+        nettyBootstrap = new Bootstrap();
         nettyBootstrap.group(nettyEventLoopGroup)
                 .channel(NioSocketChannel.class)
                 .option(ChannelOption.SO_KEEPALIVE, true)
@@ -274,10 +277,9 @@ public class VirtualThreadScalingBenchmark {
                     }
                 });
 
-        // Connect to h2c server (single connection - Netty performs better this way)
-        String h2cHost = h2cBaseUrl.replaceAll("https?://", "").replaceAll(":\\d+.*", "");
-        int h2cPort = 18081;
-        nettyH2cChannel = nettyBootstrap.connect(new InetSocketAddress(h2cHost, h2cPort)).sync().channel();
+        // Store host/port for connection during benchmark (not pre-connected)
+        nettyH2cHost = h2cBaseUrl.replaceAll("https?://", "").replaceAll(":\\d+.*", "");
+        nettyH2cPort = 18081;
     }
 
     private SSLContext createTrustAllSslContext() throws Exception {
@@ -327,10 +329,7 @@ public class VirtualThreadScalingBenchmark {
             helidonClientH2.closeResource();
         }
 
-        // Close Netty client
-        if (nettyH2cChannel != null) {
-            nettyH2cChannel.close().sync();
-        }
+        // Close Netty event loop group
         if (nettyEventLoopGroup != null) {
             nettyEventLoopGroup.shutdownGracefully().sync();
         }
@@ -495,7 +494,7 @@ public class VirtualThreadScalingBenchmark {
                     try {
                         while (running.get()) {
                             try (var res = smithyClientH2c.send(request)) {
-                                res.body().asInputStream().readAllBytes();
+                                res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
                                 requests.incrementAndGet();
                             }
                         }
@@ -567,103 +566,134 @@ public class VirtualThreadScalingBenchmark {
     }
 
     /**
-     * Raw Netty HTTP/2 client throughput.
-     *
-     * <p>Uses Netty's HTTP/2 multiplexing with a single connection and event-loop threads.
-     * Netty performs better with 1 connection (606K) vs multiple (425K with 100 connections)
-     * because its event-loop model multiplexes efficiently on a single connection.
+     * Raw Netty HTTP/2 client throughput with single connection.
      */
     @Benchmark
     @Threads(1)
     public void nettyH2c(RequestCounter counter) throws InterruptedException {
+        runNettyH2c(1, counter);
+    }
+
+    /**
+     * Raw Netty HTTP/2 client throughput with pooled connections.
+     */
+    @Benchmark
+    @Threads(1)
+    public void nettyH2cPooled(RequestCounter counter) throws InterruptedException {
+        runNettyH2c(3, counter);
+    }
+
+    private void runNettyH2c(int numConnections, RequestCounter counter) throws InterruptedException {
         var requests = new AtomicLong();
         var errors = new AtomicLong();
         var firstError = new AtomicReference<Throwable>();
         var running = new AtomicBoolean(true);
         var activeTasks = new AtomicLong(concurrency);
 
-        // Create stream bootstrap for multiplexing on single connection
-        Http2StreamChannelBootstrap streamBootstrap = new Http2StreamChannelBootstrap(nettyH2cChannel);
-
-        // Handler that opens a new stream, sends request, and repeats on response
-        Runnable[] makeRequest = new Runnable[1];
-        makeRequest[0] = () -> {
-            if (!running.get()) {
-                activeTasks.decrementAndGet();
-                return;
+        // Connect to h2c server during benchmark
+        List<Channel> channels = new ArrayList<>();
+        try {
+            for (int i = 0; i < numConnections; i++) {
+                channels.add(nettyBootstrap.connect(new InetSocketAddress(nettyH2cHost, nettyH2cPort)).sync().channel());
             }
+        } catch (Exception e) {
+            counter.errors = 1;
+            return;
+        }
 
-            streamBootstrap.open().addListener(future -> {
-                if (!future.isSuccess()) {
-                    errors.incrementAndGet();
-                    firstError.compareAndSet(null, future.cause());
-                    if (!running.get()) {
-                        activeTasks.decrementAndGet();
-                    } else {
-                        // Retry
-                        makeRequest[0].run();
-                    }
+        try {
+            // Create stream bootstraps for each connection
+            List<Http2StreamChannelBootstrap> streamBootstraps = channels.stream()
+                    .map(Http2StreamChannelBootstrap::new)
+                    .toList();
+
+            // Pre-create headers
+            DefaultHttp2Headers headers = new DefaultHttp2Headers();
+            headers.method("GET");
+            headers.path("/get");
+            headers.scheme("http");
+            headers.authority("localhost:18081");
+
+            // Handler that opens a new stream, sends request, and repeats on response
+            Runnable[] makeRequest = new Runnable[1];
+            var connectionIndex = new AtomicInteger(0);
+            makeRequest[0] = () -> {
+                if (!running.get()) {
+                    activeTasks.decrementAndGet();
                     return;
                 }
 
-                Http2StreamChannel streamChannel = (Http2StreamChannel) future.get();
-                streamChannel.pipeline().addLast(new SimpleChannelInboundHandler<Http2StreamFrame>() {
-                    @Override
-                    protected void channelRead0(ChannelHandlerContext ctx, Http2StreamFrame frame) {
-                        boolean endStream = false;
-                        if (frame instanceof Http2HeadersFrame headersFrame) {
-                            endStream = headersFrame.isEndStream();
-                        } else if (frame instanceof io.netty.handler.codec.http2.Http2DataFrame dataFrame) {
-                            endStream = dataFrame.isEndStream();
-                        }
+                // Round-robin across connections
+                int idx = connectionIndex.getAndIncrement() % streamBootstraps.size();
+                Http2StreamChannelBootstrap streamBootstrap = streamBootstraps.get(idx);
 
-                        if (endStream) {
-                            requests.incrementAndGet();
-                            ctx.close();
-                            // Start next request on new stream
+                streamBootstrap.open().addListener(future -> {
+                    if (!future.isSuccess()) {
+                        errors.incrementAndGet();
+                        firstError.compareAndSet(null, future.cause());
+                        if (!running.get()) {
+                            activeTasks.decrementAndGet();
+                        } else {
                             makeRequest[0].run();
                         }
+                        return;
                     }
 
-                    @Override
-                    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-                        errors.incrementAndGet();
-                        firstError.compareAndSet(null, cause);
-                        ctx.close();
-                        // Retry on new stream
-                        makeRequest[0].run();
-                    }
+                    Http2StreamChannel streamChannel = (Http2StreamChannel) future.get();
+                    streamChannel.pipeline().addLast(new SimpleChannelInboundHandler<Http2StreamFrame>() {
+                        @Override
+                        protected void channelRead0(ChannelHandlerContext ctx, Http2StreamFrame frame) {
+                            if (frame instanceof io.netty.handler.codec.http2.Http2DataFrame dataFrame) {
+                                dataFrame.content().readableBytes();
+                            }
+
+                            boolean endStream = false;
+                            if (frame instanceof Http2HeadersFrame headersFrame) {
+                                endStream = headersFrame.isEndStream();
+                            } else if (frame instanceof io.netty.handler.codec.http2.Http2DataFrame dataFrame) {
+                                endStream = dataFrame.isEndStream();
+                            }
+
+                            if (endStream) {
+                                requests.incrementAndGet();
+                                ctx.close();
+                                makeRequest[0].run();
+                            }
+                        }
+
+                        @Override
+                        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                            errors.incrementAndGet();
+                            firstError.compareAndSet(null, cause);
+                            ctx.close();
+                            makeRequest[0].run();
+                        }
+                    });
+
+                    streamChannel.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, true));
                 });
+            };
 
-                // Send request immediately after adding handler
-                DefaultHttp2Headers headers = new DefaultHttp2Headers();
-                headers.method("GET");
-                headers.path("/get");
-                headers.scheme("http");
-                headers.authority("localhost:18081");
-                streamChannel.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, true));
-            });
-        };
+            for (int i = 0; i < concurrency; i++) {
+                makeRequest[0].run();
+            }
 
-        // Start concurrent request loops
-        for (int i = 0; i < concurrency; i++) {
-            makeRequest[0].run();
-        }
+            Thread.sleep(1000);
+            running.set(false);
 
-        // Run for 1 second like other benchmarks
-        Thread.sleep(1000);
-        running.set(false);
-
-        // Wait for active tasks to complete
-        long deadline = System.currentTimeMillis() + 5000;
-        while (activeTasks.get() > 0 && System.currentTimeMillis() < deadline) {
-            Thread.sleep(10);
+            long deadline = System.currentTimeMillis() + 5000;
+            while (activeTasks.get() > 0 && System.currentTimeMillis() < deadline) {
+                Thread.sleep(10);
+            }
+        } finally {
+            for (Channel ch : channels) {
+                ch.close().sync();
+            }
         }
 
         counter.requests = requests.get();
         counter.errors = errors.get();
 
-        // Log first error for debugging
         if (firstError.get() != null) {
             System.err.println("Netty H2c errors: " + errors.get() + ", first error:");
             firstError.get().printStackTrace(System.err);

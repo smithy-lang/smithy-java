@@ -98,7 +98,8 @@ public final class BenchmarkServer {
         this.h2cPort = h2cPort;
 
         bossGroup = new NioEventLoopGroup(1);
-        workerGroup = new NioEventLoopGroup();
+        // Use more worker threads for high concurrency
+        workerGroup = new NioEventLoopGroup(Runtime.getRuntime().availableProcessors() * 2);
 
         // Start HTTP/1.1 server
         h1ServerChannel = startH1Server(h1Port);
@@ -197,13 +198,14 @@ public final class BenchmarkServer {
                     @Override
                     public void initChannel(SocketChannel ch) {
                         // h2c prior knowledge: HTTP/2 directly without TLS or upgrade
+                        // Large initial window size for high throughput
+                        var settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings()
+                                .maxConcurrentStreams(10000)
+                                .initialWindowSize(1048576);  // 1MB stream window
                         ch.pipeline()
                                 .addLast(
                                         Http2FrameCodecBuilder.forServer()
-                                                .initialSettings(
-                                                        io.netty.handler.codec.http2.Http2Settings.defaultSettings()
-                                                                .maxConcurrentStreams(10000)
-                                                                .initialWindowSize(1048576))
+                                                .initialSettings(settings)
                                                 .build(),
                                         Http2RequestHandler.INSTANCE);
                     }
@@ -264,12 +266,13 @@ public final class BenchmarkServer {
         @Override
         protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
+                var settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings()
+                        .maxConcurrentStreams(10000)
+                        .initialWindowSize(1048576);  // 1MB stream window
                 ctx.pipeline()
                         .addLast(
                                 Http2FrameCodecBuilder.forServer()
-                                        .initialSettings(io.netty.handler.codec.http2.Http2Settings.defaultSettings()
-                                                .maxConcurrentStreams(10000)
-                                                .initialWindowSize(1048576))
+                                        .initialSettings(settings)
                                         .build(),
                                 Http2RequestHandler.INSTANCE);
             } else {
