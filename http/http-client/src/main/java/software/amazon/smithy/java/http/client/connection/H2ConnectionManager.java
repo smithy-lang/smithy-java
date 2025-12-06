@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.http.client.connection;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -18,9 +19,53 @@ final class H2ConnectionManager {
     private final ConcurrentHashMap<Route, List<H2Connection>> connections = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Route, Object> locks = new ConcurrentHashMap<>();
     private final int streamsPerConnection;
+    private final List<ConnectionPoolListener> listeners;
+    private final ConnectionFactory connectionFactory;
 
-    H2ConnectionManager(int streamPerConnection) {
-        this.streamsPerConnection = streamPerConnection;
+    @FunctionalInterface
+    interface ConnectionFactory {
+        H2Connection create(Route route) throws IOException;
+    }
+
+    H2ConnectionManager(int streamsPerConnection, List<ConnectionPoolListener> listeners, ConnectionFactory connectionFactory) {
+        this.streamsPerConnection = streamsPerConnection;
+        this.listeners = listeners;
+        this.connectionFactory = connectionFactory;
+    }
+
+    /**
+     * Acquire an H2 connection for the route, creating one if needed.
+     */
+    H2Connection acquire(Route route) throws IOException {
+        // Fast path: find existing connection with capacity
+        H2Connection conn = tryAcquire(route);
+        if (conn != null) {
+            notifyAcquire(conn, true);
+            return conn;
+        }
+
+        // Slow path: need new connection, serialize per route
+        synchronized (locks.computeIfAbsent(route, k -> new Object())) {
+            // Double-check with strict limit
+            H2Connection rechecked = tryAcquireUnderLimit(route);
+            if (rechecked != null) {
+                notifyAcquire(rechecked, true);
+                return rechecked;
+            }
+
+            // Create new connection
+            System.out.println("Making new h2 connection");
+            H2Connection newConn = connectionFactory.create(route);
+            register(route, newConn);
+            notifyAcquire(newConn, false);
+            return newConn;
+        }
+    }
+
+    private void notifyAcquire(H2Connection conn, boolean reused) {
+        for (ConnectionPoolListener listener : listeners) {
+            listener.onAcquire(conn, reused);
+        }
     }
 
     /**
@@ -28,7 +73,7 @@ final class H2ConnectionManager {
      *
      * <p>Prefers connections with low stream count to spread load.
      */
-    H2Connection tryAcquire(Route route) {
+    private H2Connection tryAcquire(Route route) {
         List<H2Connection> conns = connections.get(route);
         if (conns == null) {
             return null;
@@ -54,18 +99,20 @@ final class H2ConnectionManager {
     }
 
     /**
-     * Execute an action while holding the lock for this route to make a new connection.
-     * Prevents duplicate connection creation to the same route.
+     * Find a connection under the soft limit, or null.
      */
-    <T, E extends Exception> T newConnection(Route route, ThrowingFunction<T, E> action) throws E {
-        synchronized (locks.computeIfAbsent(route, k -> new Object())) {
-            return action.apply(route);
+    private H2Connection tryAcquireUnderLimit(Route route) {
+        List<H2Connection> conns = connections.get(route);
+        if (conns != null) {
+            for (H2Connection conn : conns) {
+                if (conn.canAcceptMoreStreams()
+                        && conn.getActiveStreamCount() < streamsPerConnection
+                        && conn.validateForReuse()) {
+                    return conn;
+                }
+            }
         }
-    }
-
-    @FunctionalInterface
-    interface ThrowingFunction<T, E extends Exception> {
-        T apply(Route route) throws E;
+        return null;
     }
 
     /**
@@ -87,9 +134,6 @@ final class H2ConnectionManager {
 
     /**
      * Remove dead or exhausted connections for the route.
-     *
-     * @param route the route to clean up
-     * @param onRemove callback for each removed connection (conn, reason)
      */
     void cleanupDead(Route route, BiConsumer<H2Connection, CloseReason> onRemove) {
         List<H2Connection> conns = connections.get(route);
@@ -116,8 +160,6 @@ final class H2ConnectionManager {
 
     /**
      * Close all connections.
-     *
-     * @param onClose callback for each connection
      */
     void closeAll(BiConsumer<H2Connection, CloseReason> onClose) {
         for (List<H2Connection> conns : connections.values()) {
