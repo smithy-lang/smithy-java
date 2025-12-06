@@ -10,7 +10,7 @@ import software.amazon.smithy.jmespath.evaluation.JmespathRuntime;
 import software.amazon.smithy.jmespath.evaluation.ListArrayBuilder;
 import software.amazon.smithy.jmespath.evaluation.MapObjectBuilder;
 import software.amazon.smithy.jmespath.evaluation.NumberType;
-import software.amazon.smithy.jmespath.evaluation.WrappingIterable;
+import software.amazon.smithy.jmespath.evaluation.MappingIterable;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 import java.math.BigDecimal;
@@ -132,10 +132,10 @@ public class DocumentJmespathRuntime implements JmespathRuntime<Document> {
     }
 
     @Override
-    public Iterable<Document> toIterable(Document document) {
+    public Iterable<Document> asIterable(Document document) {
         return switch (typeOf(document)) {
             case ARRAY -> document.asList();
-            case OBJECT -> new WrappingIterable<>(Document::of, document.asStringMap().keySet());
+            case OBJECT -> new MappingIterable<>(Document::of, document.asStringMap().keySet());
             default -> throw new IllegalArgumentException("Not iterable: " + document);
         };
     }
