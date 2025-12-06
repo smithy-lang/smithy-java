@@ -696,6 +696,14 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
             throw new IOException("Failed to write headers", cause != null ? cause : e);
         }
 
+        // Check for write error after headers complete
+        IOException writeErr = streamWriter.getWriteError();
+        if (writeErr != null) {
+            activeStreams.remove(streamId);
+            activeStreamCount.decrementAndGet();
+            throw writeErr;
+        }
+
         return exchange;
     }
 
@@ -755,7 +763,11 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
      * Queue a DATA frame for writing via the encoder/writer thread.
      *
      * <p>Flow control must already be checked by the caller. This method
-     * queues the write and blocks until it completes.
+     * uses the "weaker but still synchronous" model:
+     * <ul>
+     *   <li>Middle frames: queue and check for errors, but don't block per-frame</li>
+     *   <li>END_STREAM frames: block until write completes ("fully sent" semantics)</li>
+     * </ul>
      *
      * @param streamId the stream ID
      * @param data the data buffer
@@ -765,21 +777,40 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
      * @throws IOException if the write fails
      */
     void queueData(int streamId, byte[] data, int offset, int length, int flags) throws IOException {
-        CompletableFuture<Void> completion = new CompletableFuture<>();
+        // Check for prior write error (fail fast)
+        IOException writeErr = streamWriter.getWriteError();
+        if (writeErr != null) {
+            throw writeErr;
+        }
+
+        boolean isEndStream = (flags & FLAG_END_STREAM) != 0;
+
+        // Only block on END_STREAM for "fully sent" semantics
+        CompletableFuture<Void> completion = isEndStream ? new CompletableFuture<>() : null;
+
         if (!streamWriter.submitWork(
                 new H2StreamWriter.WorkItem.WriteData(streamId, data, offset, length, flags, completion),
                 writeTimeout.toMillis())) {
             throw new IOException("Write queue full - connection overloaded");
         }
 
-        try {
-            completion.join();
-        } catch (Exception e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof IOException ioe) {
-                throw ioe;
+        // Check for write error after submission
+        writeErr = streamWriter.getWriteError();
+        if (writeErr != null) {
+            throw writeErr;
+        }
+
+        // Only block on END_STREAM
+        if (completion != null) {
+            try {
+                completion.join();
+            } catch (Exception e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof IOException ioe) {
+                    throw ioe;
+                }
+                throw new IOException("Failed to write data", cause != null ? cause : e);
             }
-            throw new IOException("Failed to write data", cause != null ? cause : e);
         }
     }
 
@@ -790,11 +821,19 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
      * Unlike request headers, trailers use an existing stream ID and must not contain
      * pseudo-headers.
      *
+     * <p>This method blocks until the trailers are written ("fully sent" semantics).
+     *
      * @param streamId the stream ID
      * @param trailers the trailer headers to send
      * @throws IOException if the write fails
      */
     void queueTrailers(int streamId, HttpHeaders trailers) throws IOException {
+        // Check for prior write error (fail fast)
+        IOException writeErr = streamWriter.getWriteError();
+        if (writeErr != null) {
+            throw writeErr;
+        }
+
         CompletableFuture<Void> completion = new CompletableFuture<>();
         if (!streamWriter.submitWork(
                 new H2StreamWriter.WorkItem.WriteTrailers(streamId, trailers, completion),
@@ -834,7 +873,14 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
 
     @Override
     public boolean isActive() {
-        return active;
+        if (!active) {
+            return false;
+        }
+        // Writer failure means connection is dead
+        if (streamWriter.getWriteError() != null) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -859,6 +905,14 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
     @Override
     public boolean validateForReuse() {
         if (!active) {
+            return false;
+        }
+
+        // Writer failure means connection is dead
+        if (streamWriter.getWriteError() != null) {
+            LOGGER.debug("Connection to {} has write error", route);
+            active = false;
+            state = State.CLOSED;
             return false;
         }
 
@@ -1055,9 +1109,9 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
      * @throws IOException if the write queue is full
      */
     void queueRst(int streamId, int errorCode) throws IOException {
-        // Fire-and-forget - no need to wait for completion
+        // Fire-and-forget - no completion signal needed
         if (!streamWriter.submitControlFrame(
-                new H2StreamWriter.WorkItem.WriteRst(streamId, errorCode, new CompletableFuture<>()))) {
+                new H2StreamWriter.WorkItem.WriteRst(streamId, errorCode))) {
             throw new IOException("Write queue full - cannot send RST_STREAM");
         }
     }

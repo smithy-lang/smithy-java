@@ -63,7 +63,12 @@ final class H2StreamWriter implements AutoCloseable {
                 CompletableFuture<Integer> streamIdFuture,
                 CompletableFuture<Void> writeComplete) implements WorkItem {}
 
-        /** Write a DATA frame. */
+        /**
+         * Write a DATA frame.
+         *
+         * <p>The completion future is optional - only provide it for the final DATA frame with END_STREAM if you
+         * need "fully sent" semantics. Middle frames should pass null for completion.
+         */
         record WriteData(
                 int streamId,
                 byte[] data,
@@ -79,10 +84,7 @@ final class H2StreamWriter implements AutoCloseable {
                 CompletableFuture<Void> completion) implements WorkItem {}
 
         /** Write a RST_STREAM frame. */
-        record WriteRst(
-                int streamId,
-                int errorCode,
-                CompletableFuture<Void> completion) implements WorkItem {}
+        record WriteRst(int streamId, int errorCode) implements WorkItem {}
 
         /** Write a GOAWAY frame (fire-and-forget). */
         record WriteGoaway(int lastStreamId, int errorCode, String debugData) implements WorkItem {}
@@ -153,6 +155,9 @@ final class H2StreamWriter implements AutoCloseable {
     private volatile boolean running = true;
     private volatile boolean accepting = true;
 
+    // Global write error: first error wins, signals connection death
+    private volatile IOException writeError;
+
     /**
      * Create a new combined encoder/writer.
      *
@@ -210,10 +215,48 @@ final class H2StreamWriter implements AutoCloseable {
     }
 
     /**
+     * Get the write error if one occurred.
+     *
+     * @return the write error, or null if no error has occurred
+     */
+    IOException getWriteError() {
+        return writeError;
+    }
+
+    /**
+     * Mark the writer as failed and drain any pending work items.
+     *
+     * <p>First error wins - subsequent calls are ignored.
+     *
+     * @param e the error that caused the failure
+     */
+    private void failWriter(IOException e) {
+        if (writeError == null) {
+            writeError = e;
+        }
+        accepting = false;
+        drainAndFailPending(writeError);
+    }
+
+    /**
+     * Drain the work queue and fail all pending items with the given error.
+     */
+    private void drainAndFailPending(IOException error) {
+        WorkItem item;
+        while ((item = workQueue.poll()) != null) {
+            if (item instanceof WorkItem.EncodeHeaders h) {
+                h.streamIdFuture().completeExceptionally(error);
+            }
+            completeItem(item, error);
+        }
+    }
+
+    /**
      * Main worker loop - processes work items with batching.
      */
     private void workerLoop() {
         var batch = new ArrayList<WorkItem>(64);
+        IOException failure = null;
 
         try {
             while (running) {
@@ -239,9 +282,20 @@ final class H2StreamWriter implements AutoCloseable {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            // Only treat as failure if we weren't asked to shut down
+            // (close/shutdownNow set running=false before interrupting)
+            if (running) {
+                failure = new IOException("Writer thread interrupted", e);
+            }
+        } catch (Throwable t) {
+            failure = new IOException("Writer thread crashed", t);
+        } finally {
+            if (failure != null) {
+                failWriter(failure);
+            } else {
+                drainAndFailPending(new IOException("Encoder shutting down"));
+            }
         }
-
-        failRemainingRequests();
     }
 
     /**
@@ -410,14 +464,17 @@ final class H2StreamWriter implements AutoCloseable {
     }
 
     /**
-     * Complete a work item's future.
+     * Complete a work item's future (if it has one).
+     *
+     * <p>Some work items don't have completion signals (fire-and-forget),
+     * and WriteData may have null completion for middle frames.
      */
     private void completeItem(WorkItem item, IOException error) {
         CompletableFuture<Void> completion = switch (item) {
             case WorkItem.EncodeHeaders h -> h.writeComplete();
-            case WorkItem.WriteData d -> d.completion();
+            case WorkItem.WriteData d -> d.completion(); // may be null for middle frames
             case WorkItem.WriteTrailers t -> t.completion();
-            case WorkItem.WriteRst r -> r.completion();
+            case WorkItem.WriteRst r -> null; // fire-and-forget
             case WorkItem.WriteGoaway g -> null;
             case WorkItem.WriteWindowUpdate w -> null;
             case WorkItem.WriteSettingsAck s -> null;
@@ -515,17 +572,6 @@ final class H2StreamWriter implements AutoCloseable {
         return path;
     }
 
-    private void failRemainingRequests() {
-        IOException shutdownError = new IOException("Encoder shutting down");
-        WorkItem item;
-        while ((item = workQueue.poll()) != null) {
-            if (item instanceof WorkItem.EncodeHeaders h) {
-                h.streamIdFuture().completeExceptionally(shutdownError);
-            }
-            completeItem(item, shutdownError);
-        }
-    }
-
     @Override
     public void close() {
         accepting = false;
@@ -552,7 +598,7 @@ final class H2StreamWriter implements AutoCloseable {
             }
         }
 
-        failRemainingRequests();
+        drainAndFailPending(new IOException("Encoder shutting down"));
     }
 
     void shutdownNow() {
@@ -563,6 +609,6 @@ final class H2StreamWriter implements AutoCloseable {
             workerThread.interrupt();
         }
 
-        failRemainingRequests();
+        drainAndFailPending(new IOException("Encoder shutting down"));
     }
 }
