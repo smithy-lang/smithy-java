@@ -131,7 +131,7 @@ val stopBenchmarkServer by tasks.registering {
 
 // Configure JMH
 jmh {
-    includes = listOf(".*nettyH2c.*")
+    includes = listOf(".*smithyH2c.*")
 
     warmupIterations = 2
     iterations = 3

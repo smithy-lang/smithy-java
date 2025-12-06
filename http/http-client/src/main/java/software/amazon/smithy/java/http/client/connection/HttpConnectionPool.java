@@ -129,12 +129,11 @@ import software.amazon.smithy.java.http.client.h2.H2Connection;
 public final class HttpConnectionPool implements ConnectionPool {
     // Soft limit on streams per connection before creating a new one.
     // Server's MAX_CONCURRENT_STREAMS is the hard limit; this spreads load before hitting it.
-    private static final int STREAMS_PER_CONNECTION = 4096;
+    private static final int STREAMS_PER_CONNECTION = 100;
 
     private final int defaultMaxConnectionsPerRoute;
     private final Map<String, Integer> perHostLimits;
     private final int maxTotalConnections;
-    private final long maxIdleTimeNanos; // Cached to avoid Duration.toNanos() in hot path
     private final long acquireTimeoutMs; // Timeout for acquiring a connection when pool is exhausted
     private final HttpVersionPolicy versionPolicy;
     private final HttpConnectionFactory connectionFactory;
@@ -159,7 +158,8 @@ public final class HttpConnectionPool implements ConnectionPool {
         this.defaultMaxConnectionsPerRoute = builder.maxConnectionsPerRoute;
         this.perHostLimits = Map.copyOf(builder.perHostLimits);
         this.maxTotalConnections = builder.maxTotalConnections;
-        this.maxIdleTimeNanos = builder.maxIdleTime.toNanos();
+        // Cached to avoid Duration.toNanos() in hot path
+        long maxIdleTimeNanos = builder.maxIdleTime.toNanos();
         this.acquireTimeoutMs = builder.acquireTimeout.toMillis();
         this.versionPolicy = builder.versionPolicy;
         DnsResolver dnsResolver = builder.dnsResolver != null ? builder.dnsResolver : DnsResolver.system();
@@ -216,9 +216,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         int maxConns = getMaxConnectionsForRoute(route);
 
         // Quick check: try to reuse a pooled connection
-        H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(
-                route,
-                ignored -> new H1ConnectionManager.HostPool(maxConns));
+        H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(route, maxConns);
 
         if (pooled != null) {
             notifyAcquire(pooled.connection(), true);

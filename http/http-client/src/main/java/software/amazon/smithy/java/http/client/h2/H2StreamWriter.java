@@ -18,9 +18,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import software.amazon.smithy.java.http.api.HttpHeaders;
@@ -135,8 +135,6 @@ final class H2StreamWriter implements AutoCloseable {
             "proxy-authorization",
             "set-cookie");
 
-    private static final int QUEUE_CAPACITY = 1024;
-
     private final StreamManager streamManager;
     private final H2FrameCodec frameCodec;
     private final BlockingQueue<WorkItem> workQueue;
@@ -166,7 +164,7 @@ final class H2StreamWriter implements AutoCloseable {
     H2StreamWriter(StreamManager streamManager, H2FrameCodec frameCodec, int initialTableSize, String threadName) {
         this.streamManager = streamManager;
         this.frameCodec = frameCodec;
-        this.workQueue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
+        this.workQueue = new ArrayBlockingQueue<>(H2Constants.WRITER_QUEUE_CAPACITY);
         this.hpackEncoder = new HpackEncoder(initialTableSize);
         this.headerEncodeBuffer = new ByteBufferOutputStream(512);
         this.workerThread = Thread.ofVirtual().name(threadName).start(this::workerLoop);

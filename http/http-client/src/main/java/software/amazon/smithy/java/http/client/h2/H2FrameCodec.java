@@ -584,6 +584,106 @@ final class H2FrameCodec {
     }
 
     /**
+     * Read payload bytes directly into a provided buffer.
+     *
+     * <p>This method is used by the reader thread to read DATA frame payloads
+     * directly into an exchange's buffer, avoiding an intermediate allocation.
+     *
+     * @param dest the destination buffer
+     * @param offset offset in the destination buffer
+     * @param length number of bytes to read
+     * @throws IOException if reading fails or EOF is reached before all bytes are read
+     */
+    void readPayloadInto(byte[] dest, int offset, int length) throws IOException {
+        int read = readFully(dest, offset, length);
+        if (read < length) {
+            throw new IOException("Incomplete payload: expected " + length + ", read " + read);
+        }
+    }
+
+    /**
+     * Read a single byte from the input stream.
+     *
+     * <p>Used for reading pad length in padded DATA frames without allocating.
+     *
+     * @return the byte value (0-255)
+     * @throws IOException if reading fails or EOF is reached
+     */
+    int readByte() throws IOException {
+        int b = in.read();
+        if (b < 0) {
+            throw new IOException("Unexpected EOF reading byte");
+        }
+        return b;
+    }
+
+    /**
+     * Read the frame header only, without reading the payload.
+     *
+     * <p>This is used for DATA frames where we want to read the payload directly
+     * into the exchange buffer, avoiding an intermediate allocation.
+     *
+     * @return a FrameHeader with type, flags, streamId, and payload length, or null if EOF
+     * @throws IOException if reading fails or frame is malformed
+     */
+    FrameHeader readFrameHeader() throws IOException {
+        // Read 9-byte header
+        int read = readFully(readHeaderBuf, 0, FRAME_HEADER_SIZE);
+        if (read < FRAME_HEADER_SIZE) {
+            if (read == 0) {
+                return null; // EOF
+            }
+            throw new IOException("Incomplete frame header: read " + read + " bytes");
+        }
+
+        // Parse header
+        int length = ((readHeaderBuf[0] & 0xFF) << 16) | ((readHeaderBuf[1] & 0xFF) << 8) | (readHeaderBuf[2] & 0xFF);
+        int type = readHeaderBuf[3] & 0xFF;
+        int flags = readHeaderBuf[4] & 0xFF;
+        int streamId = ((readHeaderBuf[5] & 0x7F) << 24) // Mask off reserved bit
+                | ((readHeaderBuf[6] & 0xFF) << 16)
+                | ((readHeaderBuf[7] & 0xFF) << 8)
+                | (readHeaderBuf[8] & 0xFF);
+
+        // Validate frame size
+        if (length > maxFrameSize) {
+            throw new H2Exception(ERROR_FRAME_SIZE_ERROR, "Frame size " + length + " exceeds " + maxFrameSize);
+        }
+
+        return new FrameHeader(type, flags, streamId, length);
+    }
+
+    /**
+     * Skip the specified number of bytes in the input stream.
+     *
+     * <p>Used to skip past padding bytes in DATA frames.
+     *
+     * @param length number of bytes to skip
+     * @throws IOException if skipping fails
+     */
+    void skipBytes(int length) throws IOException {
+        int remaining = length;
+        while (remaining > 0) {
+            // Use scratch buffer for skipping
+            int toRead = Math.min(remaining, CONTROL_FRAME_SCRATCH_SIZE);
+            int read = readFully(controlFrameScratch, 0, toRead);
+            if (read < toRead) {
+                throw new IOException("Unexpected EOF while skipping " + length + " bytes");
+            }
+            remaining -= toRead;
+        }
+    }
+
+    /**
+     * Frame header information for deferred payload reading.
+     */
+    record FrameHeader(int type, int flags, int streamId, int payloadLength) {
+        boolean hasFlag(int flag) {
+            return (flags & flag) != 0;
+        }
+    }
+
+    /**
      * Represents an HTTP/2 frame.
      *
      * <p><b>Note:</b> For control frames, the payload array may be a shared scratch buffer

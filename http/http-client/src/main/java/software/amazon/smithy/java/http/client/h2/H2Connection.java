@@ -5,6 +5,29 @@
 
 package software.amazon.smithy.java.http.client.h2;
 
+import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.http.client.BufferPool;
+import software.amazon.smithy.java.http.client.HttpExchange;
+import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
+import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
+import software.amazon.smithy.java.http.client.connection.HttpConnection;
+import software.amazon.smithy.java.http.client.connection.Route;
+import software.amazon.smithy.java.http.client.h2.hpack.HpackDecoder;
+import software.amazon.smithy.java.logging.InternalLogger;
+
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocket;
+import java.io.IOException;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static software.amazon.smithy.java.http.client.h2.H2Constants.CONNECTION_PREFACE;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.DEFAULT_HEADER_TABLE_SIZE;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.DEFAULT_INITIAL_WINDOW_SIZE;
@@ -19,6 +42,7 @@ import static software.amazon.smithy.java.http.client.h2.H2Constants.ERROR_SETTI
 import static software.amazon.smithy.java.http.client.h2.H2Constants.FLAG_ACK;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.FLAG_END_HEADERS;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.FLAG_END_STREAM;
+import static software.amazon.smithy.java.http.client.h2.H2Constants.FLAG_PADDED;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.FRAME_TYPE_DATA;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.FRAME_TYPE_GOAWAY;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.FRAME_TYPE_HEADERS;
@@ -35,27 +59,6 @@ import static software.amazon.smithy.java.http.client.h2.H2Constants.SETTINGS_IN
 import static software.amazon.smithy.java.http.client.h2.H2Constants.SETTINGS_MAX_CONCURRENT_STREAMS;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.SETTINGS_MAX_FRAME_SIZE;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.SETTINGS_MAX_HEADER_LIST_SIZE;
-
-import java.io.IOException;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
-import java.time.Duration;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.SSLSocket;
-import software.amazon.smithy.java.http.api.HttpHeaders;
-import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.api.HttpVersion;
-import software.amazon.smithy.java.http.client.HttpExchange;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
-import software.amazon.smithy.java.http.client.connection.HttpConnection;
-import software.amazon.smithy.java.http.client.connection.Route;
-import software.amazon.smithy.java.http.client.h2.hpack.HpackDecoder;
-import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * HTTP/2 connection implementation with full stream multiplexing.
@@ -115,9 +118,6 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
     private final AtomicInteger connectionSendWindow = new AtomicInteger(DEFAULT_INITIAL_WINDOW_SIZE);
     private volatile int connectionRecvWindow = DEFAULT_INITIAL_WINDOW_SIZE;
 
-    // Our limit for received header list size (not from server SETTINGS)
-    private static final int DEFAULT_MAX_HEADER_LIST_SIZE = 8192;
-
     // Stream management - multiplexed!
     private final ConcurrentHashMap<Integer, H2Exchange> activeStreams = new ConcurrentHashMap<>();
     private final AtomicInteger activeStreamCount = new AtomicInteger(0);
@@ -136,6 +136,10 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
     // Stream-level timeouts
     private final Duration readTimeout;
     private final Duration writeTimeout;
+
+    // Reusable buffer pool used between exchanges.
+    private final BufferPool bufferPool = new BufferPool(
+            32, DEFAULT_INITIAL_WINDOW_SIZE, DEFAULT_INITIAL_WINDOW_SIZE, 1024);
 
     /**
      * Create an HTTP/2 connection from a connected socket.
@@ -188,17 +192,29 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
 
     /**
      * Background reader loop - dispatches frames to streams.
+     *
+     * <p>For DATA frames, reads the payload directly into the exchange's buffer
+     * to avoid per-frame allocations. For other frames, uses the standard
+     * readFrame() method.
      */
     private void readerLoop() {
         try {
             while (state == State.CONNECTED) {
-                H2FrameCodec.Frame frame = frameCodec.readFrame();
-                if (frame == null) {
+                // Read frame header first
+                H2FrameCodec.FrameHeader header = frameCodec.readFrameHeader();
+                if (header == null) {
                     // EOF - connection closed by peer
                     break;
                 }
 
-                dispatchFrame(frame);
+                // For DATA frames, use zero-allocation path
+                if (header.type() == FRAME_TYPE_DATA) {
+                    handleDataFrame(header);
+                } else {
+                    // For non-DATA frames, read the full frame
+                    H2FrameCodec.Frame frame = readNonDataFrame(header);
+                    dispatchFrame(frame);
+                }
             }
         } catch (IOException e) {
             if (state == State.CONNECTED) {
@@ -228,6 +244,105 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
             }
         }
     }
+
+    /**
+     * Handle a DATA frame using the zero-allocation path.
+     *
+     * <p>Reads the payload directly into the exchange's buffer instead of
+     * allocating a new byte array for each frame.
+     */
+    private void handleDataFrame(H2FrameCodec.FrameHeader header) throws IOException {
+        int streamId = header.streamId();
+        int payloadLength = header.payloadLength();
+        boolean endStream = header.hasFlag(FLAG_END_STREAM);
+        boolean padded = header.hasFlag(FLAG_PADDED);
+
+        // Validate stream ID (DATA frames must have non-zero stream ID)
+        if (streamId == 0) {
+            throw new H2Exception(ERROR_PROTOCOL_ERROR, "DATA frame must have non-zero stream ID");
+        }
+
+        H2Exchange exchange = activeStreams.get(streamId);
+
+        // Handle padding
+        int padLength = 0;
+        int dataLength = payloadLength;
+        if (padded) {
+            if (payloadLength < 1) {
+                throw new H2Exception(ERROR_PROTOCOL_ERROR, "Padded DATA frame too short");
+            }
+            // Read pad length byte (no allocation)
+            padLength = frameCodec.readByte();
+            dataLength = payloadLength - 1 - padLength;
+            if (dataLength < 0) {
+                throw new H2Exception(ERROR_PROTOCOL_ERROR, "Pad length " + padLength + " exceeds payload");
+            }
+        }
+
+        if (exchange != null) {
+            // Zero-allocation path: read directly into exchange buffer
+            if (dataLength > 0) {
+                // Ensure buffer has space (lazy allocate or compact)
+                if (!exchange.ensureBufferSpace(dataLength)) {
+                    throw new H2Exception(ERROR_FLOW_CONTROL_ERROR,
+                            streamId,
+                            "Exchange buffer overflow - flow control failure");
+                }
+
+                // Read directly into exchange buffer (no allocation)
+                // Safe because reader thread is the only writer and ensureBufferSpace
+                // guarantees space is available at current writePos
+                frameCodec.readPayloadInto(exchange.getDataBuffer(), exchange.getWritePos(), dataLength);
+
+                // Commit the write
+                exchange.commitWrite(dataLength, endStream);
+
+                // Handle connection-level flow control
+                consumeConnectionRecvWindow(dataLength);
+            } else if (endStream) {
+                // Empty DATA with END_STREAM
+                exchange.commitWrite(0, true);
+            }
+        } else {
+            // Stream not found - consume payload for flow control and ignore
+            if (dataLength > 0) {
+                frameCodec.skipBytes(dataLength);
+                consumeConnectionRecvWindow(dataLength);
+            }
+            LOGGER.trace("Ignoring DATA frame for closed stream {}", streamId);
+        }
+
+        // Skip padding bytes
+        if (padLength > 0) {
+            frameCodec.skipBytes(padLength);
+        }
+    }
+
+    /**
+     * Read a non-DATA frame after the header has been read.
+     *
+     * <p>This method reads the payload and constructs a Frame object for
+     * dispatch. Used for all frame types except DATA.
+     */
+    private H2FrameCodec.Frame readNonDataFrame(H2FrameCodec.FrameHeader header) throws IOException {
+        int type = header.type();
+        int flags = header.flags();
+        int streamId = header.streamId();
+        int length = header.payloadLength();
+
+        // Read payload
+        byte[] payload;
+        if (length == 0) {
+            payload = EMPTY_PAYLOAD;
+        } else {
+            payload = new byte[length];
+            frameCodec.readPayloadInto(payload, 0, length);
+        }
+
+        return new H2FrameCodec.Frame(type, flags, streamId, payload, length);
+    }
+
+    private static final byte[] EMPTY_PAYLOAD = new byte[0];
 
     /**
      * Dispatch a frame to the appropriate handler.
@@ -298,7 +413,10 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
     }
 
     /**
-     * Dispatch a stream-level frame as a StreamEvent.
+     * Dispatch a stream-level frame to the exchange.
+     *
+     * <p>Note: DATA frames are handled separately via handleDataFrame() for
+     * zero-allocation reads. This method handles HEADERS, RST_STREAM, etc.
      */
     private void dispatchStreamFrame(H2Exchange exchange, H2FrameCodec.Frame frame, int streamId)
             throws IOException {
@@ -315,29 +433,7 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
                 }
 
                 boolean endStream = frame.hasFlag(FLAG_END_STREAM);
-                exchange.enqueueEvent(new StreamEvent.Headers(decoded, endStream));
-            }
-
-            case FRAME_TYPE_DATA -> {
-                byte[] payload = frame.payload();
-                boolean endStream = frame.hasFlag(FLAG_END_STREAM);
-
-                // Handle flow control: update connection receive window
-                if (payload != null && payload.length > 0) {
-                    consumeConnectionRecvWindow(payload.length);
-                }
-
-                // Create DataChunk event
-                StreamEvent.DataChunk chunk;
-                if (payload != null && payload.length > 0) {
-                    chunk = new StreamEvent.DataChunk(payload, 0, payload.length, endStream);
-                } else if (endStream) {
-                    chunk = StreamEvent.DataChunk.END;
-                } else {
-                    chunk = StreamEvent.DataChunk.EMPTY;
-                }
-
-                exchange.enqueueEvent(chunk);
+                exchange.deliverHeaders(decoded, endStream);
             }
 
             case FRAME_TYPE_RST_STREAM -> {
@@ -741,6 +837,25 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
         return active;
     }
 
+    /**
+     * Borrow a buffer from the connection's pool, or allocate a new one.
+     *
+     * @param minSize minimum buffer size needed
+     * @return a buffer of at least minSize bytes
+     */
+    byte[] borrowBuffer(int minSize) {
+        return bufferPool.borrow(minSize);
+    }
+
+    /**
+     * Return a buffer to the connection's pool for reuse.
+     *
+     * @param buffer the buffer to return (may be null)
+     */
+    void returnBuffer(byte[] buffer) {
+        bufferPool.release(buffer);
+    }
+
     @Override
     public boolean validateForReuse() {
         if (!active) {
@@ -841,7 +956,7 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
      */
     List<HpackDecoder.HeaderField> decodeHeaders(byte[] headerBlock) throws IOException {
         // Check encoded size first (quick rejection)
-        int maxHeaderListSize = DEFAULT_MAX_HEADER_LIST_SIZE;
+        int maxHeaderListSize = H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE;
         if (headerBlock.length > maxHeaderListSize) {
             throw new H2Exception(ERROR_ENHANCE_YOUR_CALM,
                     "Header block size " + headerBlock.length + " exceeds limit " + maxHeaderListSize);

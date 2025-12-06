@@ -594,7 +594,8 @@ public class VirtualThreadScalingBenchmark {
         List<Channel> channels = new ArrayList<>();
         try {
             for (int i = 0; i < numConnections; i++) {
-                channels.add(nettyBootstrap.connect(new InetSocketAddress(nettyH2cHost, nettyH2cPort)).sync().channel());
+                channels.add(
+                        nettyBootstrap.connect(new InetSocketAddress(nettyH2cHost, nettyH2cPort)).sync().channel());
             }
         } catch (Exception e) {
             counter.errors = 1;
@@ -670,7 +671,8 @@ public class VirtualThreadScalingBenchmark {
                         }
                     });
 
-                    streamChannel.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, true));
+                    streamChannel
+                            .writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, true));
                 });
             };
 
