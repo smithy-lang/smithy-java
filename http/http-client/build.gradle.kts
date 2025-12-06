@@ -131,12 +131,13 @@ val stopBenchmarkServer by tasks.registering {
 
 // Configure JMH
 jmh {
-    includes = listOf(".*nettyH2c.*")
+    includes = listOf(".*smithyH2c.*")
 
-    warmupIterations = 2
+    warmupIterations = 3
     iterations = 3
     fork = 1
-    profilers.add("async:output=flamegraph")
+//    profilers.add("async:output=flamegraph")
+//    profilers.add("async:output=collapsed")
     // profilers.add("gc")
 }
 

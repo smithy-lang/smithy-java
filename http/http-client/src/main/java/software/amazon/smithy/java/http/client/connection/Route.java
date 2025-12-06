@@ -45,6 +45,7 @@ public final class Route {
     private final int port;
     private final ProxyConfiguration proxy;
     private final int cachedHashCode;
+    private final String authority;
 
     /**
      * Create a new Route.
@@ -83,6 +84,10 @@ public final class Route {
         h = 31 * h + this.port;
         h = 31 * h + (this.proxy != null ? this.proxy.hashCode() : 0);
         this.cachedHashCode = h;
+
+        // Pre-compute authority to avoid string allocation in hot path
+        int defaultPort = "https".equals(scheme) ? 443 : 80;
+        this.authority = (port == defaultPort) ? this.host : this.host + ":" + port;
     }
 
     /**
@@ -104,6 +109,15 @@ public final class Route {
      */
     public int port() {
         return port;
+    }
+
+    /**
+     * Get the authority (host:port or just host for default ports).
+     *
+     * @return the authority string
+     */
+    public String authority() {
+        return authority;
     }
 
     /**
