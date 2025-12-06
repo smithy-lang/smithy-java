@@ -31,7 +31,7 @@ class H1ConnectionManagerTest {
     void tryAcquireReturnsNullWhenPoolEmpty() {
         var manager = new H1ConnectionManager(MAX_IDLE_NANOS);
 
-        var result = manager.tryAcquire(TEST_ROUTE, ignored -> new H1ConnectionManager.HostPool(10));
+        var result = manager.tryAcquire(TEST_ROUTE, 10);
 
         assertNull(result, "Should return null when pool is empty");
     }
@@ -46,7 +46,7 @@ class H1ConnectionManagerTest {
         manager.ensurePool(TEST_ROUTE, 10);
         manager.release(TEST_ROUTE, connection, false);
 
-        var result = manager.tryAcquire(TEST_ROUTE, ignored -> new H1ConnectionManager.HostPool(10));
+        var result = manager.tryAcquire(TEST_ROUTE, 10);
 
         assertNotNull(result, "Should return pooled connection");
         assertEquals(connection, result.connection(), "Should return the same connection");
@@ -68,7 +68,7 @@ class H1ConnectionManagerTest {
 
         Thread.sleep(50); // Wait longer than max idle time
 
-        var result = manager.tryAcquire(TEST_ROUTE, ignored -> new H1ConnectionManager.HostPool(10));
+        var result = manager.tryAcquire(TEST_ROUTE, 10);
 
         assertNull(result, "Should not return overly idle connection");
         assertTrue(closeCalled.get(), "Overly idle connection should be closed");
@@ -91,7 +91,7 @@ class H1ConnectionManagerTest {
 
         Thread.sleep(1100); // Wait > 1 second (VALIDATION_THRESHOLD_NANOS)
 
-        var result = manager.tryAcquire(TEST_ROUTE, ignored -> new H1ConnectionManager.HostPool(10));
+        var result = manager.tryAcquire(TEST_ROUTE, 10);
 
         assertNotNull(result, "Should return validated connection");
         assertTrue(validateCalled.get(), "validateForReuse should be called for connections idle > 1s");
@@ -113,7 +113,7 @@ class H1ConnectionManagerTest {
         manager.release(TEST_ROUTE, invalidConnection, false);
 
         // Should skip invalid and return valid (LIFO order, so invalid is tried first)
-        var result = manager.tryAcquire(TEST_ROUTE, ignored -> new H1ConnectionManager.HostPool(10));
+        var result = manager.tryAcquire(TEST_ROUTE, 10);
 
         assertNotNull(result, "Should return valid connection");
         assertEquals(validConnection, result.connection(), "Should skip invalid and return valid");
@@ -141,7 +141,7 @@ class H1ConnectionManagerTest {
         // Connection becomes inactive after being pooled
         active.set(false);
 
-        manager.tryAcquire(TEST_ROUTE, ignored -> new H1ConnectionManager.HostPool(10));
+        manager.tryAcquire(TEST_ROUTE, 10);
 
         assertTrue(closeCalled.get(), "Invalid connection should be closed");
     }
@@ -192,7 +192,7 @@ class H1ConnectionManagerTest {
         manager.release(TEST_ROUTE, connection, false);
         manager.remove(TEST_ROUTE, connection);
 
-        var result = manager.tryAcquire(TEST_ROUTE, ignored -> new H1ConnectionManager.HostPool(10));
+        var result = manager.tryAcquire(TEST_ROUTE, 10);
 
         assertNull(result, "Connection should be removed from pool");
     }

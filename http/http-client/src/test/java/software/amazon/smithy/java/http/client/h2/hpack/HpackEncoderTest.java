@@ -23,7 +23,7 @@ class HpackEncoderTest {
         encoder.encodeHeader(out, ":method", "GET", false);
 
         var decoder = new HpackDecoder(4096);
-        List<HpackDecoder.HeaderField> headers = decoder.decode(out.toByteArray());
+        List<HeaderField> headers = decoder.decode(out.toByteArray());
 
         assertEquals(1, headers.size());
         assertEquals(":method", headers.getFirst().name());
@@ -38,7 +38,7 @@ class HpackEncoderTest {
         encoder.encodeHeader(out, "x-custom", "value", false);
 
         var decoder = new HpackDecoder(4096);
-        List<HpackDecoder.HeaderField> headers = decoder.decode(out.toByteArray());
+        List<HeaderField> headers = decoder.decode(out.toByteArray());
 
         assertEquals(1, headers.size());
         assertEquals("x-custom", headers.getFirst().name());
@@ -55,7 +55,7 @@ class HpackEncoderTest {
         encoder.encodeHeader(out, ":scheme", "https", false);
 
         var decoder = new HpackDecoder(4096);
-        List<HpackDecoder.HeaderField> headers = decoder.decode(out.toByteArray());
+        List<HeaderField> headers = decoder.decode(out.toByteArray());
 
         assertEquals(3, headers.size());
         assertEquals(":method", headers.get(0).name());
@@ -82,7 +82,7 @@ class HpackEncoderTest {
         var out2 = new ByteArrayOutputStream();
         encoder.beginHeaderBlock(out2);
         encoder.encodeHeader(out2, "x-custom", "value", false);
-        List<HpackDecoder.HeaderField> headers = decoder.decode(out2.toByteArray());
+        List<HeaderField> headers = decoder.decode(out2.toByteArray());
         int secondSize = out2.size();
 
         assertEquals(1, headers.size());
@@ -107,7 +107,7 @@ class HpackEncoderTest {
         var out2 = new ByteArrayOutputStream();
         encoder.beginHeaderBlock(out2);
         encoder.encodeHeader(out2, "x-secret", "password", true);
-        List<HpackDecoder.HeaderField> headers = decoder.decode(out2.toByteArray());
+        List<HeaderField> headers = decoder.decode(out2.toByteArray());
 
         assertEquals(1, headers.size());
         assertEquals("x-secret", headers.getFirst().name());
@@ -130,7 +130,7 @@ class HpackEncoderTest {
         var out2 = new ByteArrayOutputStream();
         encoder.beginHeaderBlock(out2);
         encoder.encodeHeader(out2, "authorization", "Bearer token", false);
-        List<HpackDecoder.HeaderField> headers = decoder.decode(out2.toByteArray());
+        List<HeaderField> headers = decoder.decode(out2.toByteArray());
 
         assertEquals(1, headers.size());
         assertEquals("authorization", headers.getFirst().name());
@@ -146,7 +146,7 @@ class HpackEncoderTest {
         encoder.encodeHeader(out, "x-test", "hello", false);
 
         var decoder = new HpackDecoder(4096);
-        List<HpackDecoder.HeaderField> headers = decoder.decode(out.toByteArray());
+        List<HeaderField> headers = decoder.decode(out.toByteArray());
 
         assertEquals(1, headers.size());
         assertEquals("x-test", headers.getFirst().name());
@@ -166,7 +166,7 @@ class HpackEncoderTest {
         encoder.encodeHeader(out, ":method", "GET", false);
 
         // Decoder should handle the table size update
-        List<HpackDecoder.HeaderField> headers = decoder.decode(out.toByteArray());
+        List<HeaderField> headers = decoder.decode(out.toByteArray());
 
         assertEquals(1, headers.size());
         assertEquals(":method", headers.getFirst().name());
@@ -207,7 +207,7 @@ class HpackEncoderTest {
         encoder.encodeHeader(out, "x-long", longValue, false);
 
         var decoder = new HpackDecoder(4096);
-        List<HpackDecoder.HeaderField> headers = decoder.decode(out.toByteArray());
+        List<HeaderField> headers = decoder.decode(out.toByteArray());
 
         assertEquals(1, headers.size());
         assertEquals("x-long", headers.getFirst().name());
@@ -223,7 +223,7 @@ class HpackEncoderTest {
         encoder.encodeHeader(out, ":path", "/custom/path", false);
 
         var decoder = new HpackDecoder(4096);
-        List<HpackDecoder.HeaderField> headers = decoder.decode(out.toByteArray());
+        List<HeaderField> headers = decoder.decode(out.toByteArray());
 
         assertEquals(1, headers.size());
         assertEquals(":path", headers.getFirst().name());

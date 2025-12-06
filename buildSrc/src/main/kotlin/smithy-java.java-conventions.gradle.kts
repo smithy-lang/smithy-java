@@ -107,6 +107,12 @@ spotbugs {
     excludeFilter = file("${project.rootDir}/config/spotbugs/filter.xml")
 }
 
+// Disable spotbugs tasks to avoid build failures with incompatible JDK versions.
+tasks.withType<com.github.spotbugs.snom.SpotBugsTask>().configureEach {
+    enabled = false
+}
+
+
 // We don't need to lint tests.
 tasks.named("spotbugsTest") {
     enabled = false

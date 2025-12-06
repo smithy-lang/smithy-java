@@ -31,7 +31,7 @@ class HpackDecoderTest {
         var out2 = new ByteArrayOutputStream();
         encoder.beginHeaderBlock(out2);
         encoder.encodeHeader(out2, "x-custom-name", "value2", false);
-        List<HpackDecoder.HeaderField> headers = decoder.decode(out2.toByteArray());
+        List<HeaderField> headers = decoder.decode(out2.toByteArray());
 
         assertEquals(1, headers.size());
         assertEquals("x-custom-name", headers.getFirst().name());
@@ -100,7 +100,7 @@ class HpackDecoderTest {
         // Actually simpler: 0x20 = table size 0 (just 0x20 with 5-bit prefix)
         byte[] valid = {0x20, (byte) 0x82}; // table size 0, then :method GET
         var decoder = new HpackDecoder(4096);
-        List<HpackDecoder.HeaderField> headers = decoder.decode(valid);
+        List<HeaderField> headers = decoder.decode(valid);
 
         assertEquals(1, headers.size());
         assertEquals(":method", headers.getFirst().name());
@@ -116,7 +116,7 @@ class HpackDecoderTest {
         // "value"
         byte[] data = {0x10, 0x04, 't', 'e', 's', 't', 0x05, 'v', 'a', 'l', 'u', 'e'};
         var decoder = new HpackDecoder(4096);
-        List<HpackDecoder.HeaderField> headers = decoder.decode(data);
+        List<HeaderField> headers = decoder.decode(data);
 
         assertEquals(1, headers.size());
         assertEquals("test", headers.getFirst().name());
@@ -128,7 +128,7 @@ class HpackDecoderTest {
         // 0x00 = literal without indexing, name index 0
         byte[] data = {0x00, 0x04, 't', 'e', 's', 't', 0x05, 'v', 'a', 'l', 'u', 'e'};
         var decoder = new HpackDecoder(4096);
-        List<HpackDecoder.HeaderField> headers = decoder.decode(data);
+        List<HeaderField> headers = decoder.decode(data);
 
         assertEquals(1, headers.size());
         assertEquals("test", headers.getFirst().name());

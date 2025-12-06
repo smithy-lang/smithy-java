@@ -201,7 +201,7 @@ public final class BenchmarkServer {
                         // Large initial window size for high throughput
                         var settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings()
                                 .maxConcurrentStreams(10000)
-                                .initialWindowSize(1048576);  // 1MB stream window
+                                .initialWindowSize(1048576); // 1MB stream window
                         ch.pipeline()
                                 .addLast(
                                         Http2FrameCodecBuilder.forServer()
@@ -268,7 +268,7 @@ public final class BenchmarkServer {
             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                 var settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings()
                         .maxConcurrentStreams(10000)
-                        .initialWindowSize(1048576);  // 1MB stream window
+                        .initialWindowSize(1048576); // 1MB stream window
                 ctx.pipeline()
                         .addLast(
                                 Http2FrameCodecBuilder.forServer()
