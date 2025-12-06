@@ -1,9 +1,20 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.jmespath;
 
-import software.amazon.smithy.java.core.schema.SmithyEnum;
-import software.amazon.smithy.java.core.schema.SmithyIntEnum;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.SmithyEnum;
+import software.amazon.smithy.java.core.schema.SmithyIntEnum;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.jmespath.RuntimeType;
 import software.amazon.smithy.jmespath.evaluation.EvaluationUtils;
@@ -11,16 +22,8 @@ import software.amazon.smithy.jmespath.evaluation.InheritingClassMap;
 import software.amazon.smithy.jmespath.evaluation.JmespathRuntime;
 import software.amazon.smithy.jmespath.evaluation.ListArrayBuilder;
 import software.amazon.smithy.jmespath.evaluation.MapObjectBuilder;
-import software.amazon.smithy.jmespath.evaluation.NumberType;
 import software.amazon.smithy.jmespath.evaluation.MappingIterable;
-
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.time.Instant;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import software.amazon.smithy.jmespath.evaluation.NumberType;
 
 public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
 
@@ -80,7 +83,7 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
 
     @Override
     public boolean asBoolean(Object value) {
-        return (Boolean)value;
+        return (Boolean) value;
     }
 
     @Override
@@ -118,7 +121,7 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
         } else if (value instanceof Instant instant) {
             return JMESPathDocumentUtils.asBigDecimal(instant);
         } else if (value instanceof SmithyIntEnum) {
-            return ((SmithyIntEnum)value).getValue();
+            return ((SmithyIntEnum) value).getValue();
         } else {
             throw new IllegalArgumentException();
         }
@@ -139,7 +142,7 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
 
     @Override
     public Object element(Object value, Object index) {
-        return ((List<?>)value).get(asNumber(index).intValue());
+        return ((List<?>) value).get(asNumber(index).intValue());
     }
 
     @Override
@@ -164,7 +167,7 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
     public Object value(Object object, Object key) {
         if (object instanceof SerializableStruct struct) {
             // TODO: Check what happens on invalid member name
-            return struct.getMemberValue(struct.schema().member((String)key));
+            return struct.getMemberValue(struct.schema().member((String) key));
         } else if (object instanceof Map<?, ?> map) {
             return map.get(key);
         } else {
