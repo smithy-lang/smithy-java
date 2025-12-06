@@ -5,11 +5,10 @@
 
 package software.amazon.smithy.java.jmespath;
 
+import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.jmespath.tests.ComplianceTestRunner;
-
-import java.util.stream.Stream;
 
 public class GeneratedTypeJmespathRuntimeComplianceTests {
     @ParameterizedTest(name = "{0}")
