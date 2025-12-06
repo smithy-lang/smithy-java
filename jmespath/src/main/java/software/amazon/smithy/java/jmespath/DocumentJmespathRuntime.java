@@ -1,5 +1,12 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.jmespath;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.jmespath.JmespathException;
@@ -9,12 +16,9 @@ import software.amazon.smithy.jmespath.evaluation.EvaluationUtils;
 import software.amazon.smithy.jmespath.evaluation.JmespathRuntime;
 import software.amazon.smithy.jmespath.evaluation.ListArrayBuilder;
 import software.amazon.smithy.jmespath.evaluation.MapObjectBuilder;
-import software.amazon.smithy.jmespath.evaluation.NumberType;
 import software.amazon.smithy.jmespath.evaluation.MappingIterable;
+import software.amazon.smithy.jmespath.evaluation.NumberType;
 import software.amazon.smithy.model.shapes.ShapeType;
-
-import java.math.BigDecimal;
-import java.math.BigInteger;
 
 // TODO: default equal isn't correct, need to normalize number types
 public class DocumentJmespathRuntime implements JmespathRuntime<Document> {
@@ -83,8 +87,8 @@ public class DocumentJmespathRuntime implements JmespathRuntime<Document> {
             case LONG -> Document.of(number.longValue());
             case FLOAT -> Document.of(number.floatValue());
             case DOUBLE -> Document.of(number.doubleValue());
-            case BIG_INTEGER -> Document.of((BigInteger)number);
-            case BIG_DECIMAL -> Document.of((BigDecimal)number);
+            case BIG_INTEGER -> Document.of((BigInteger) number);
+            case BIG_DECIMAL -> Document.of((BigDecimal) number);
         };
     }
 
