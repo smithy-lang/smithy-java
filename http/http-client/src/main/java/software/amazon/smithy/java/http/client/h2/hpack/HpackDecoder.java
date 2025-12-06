@@ -25,14 +25,6 @@ public final class HpackDecoder {
     private int decodePos;
 
     /**
-     * Decoded header field.
-     *
-     * @param name Name of the header.
-     * @param value Value of the header.
-     */
-    public record HeaderField(String name, String value) {}
-
-    /**
      * Create a decoder with the given maximum dynamic table size.
      *
      * @param maxTableSize maximum dynamic table size in bytes
@@ -94,7 +86,7 @@ public final class HpackDecoder {
         }
 
         if (index <= StaticTable.SIZE) {
-            return new HeaderField(StaticTable.getName(index), StaticTable.getValue(index));
+            return StaticTable.get(index);
         } else {
             DynamicTable.HeaderField field = dynamicTable.get(index);
             return new HeaderField(field.name(), field.value());
@@ -110,7 +102,7 @@ public final class HpackDecoder {
         }
 
         if (index <= StaticTable.SIZE) {
-            return StaticTable.getName(index);
+            return StaticTable.get(index).name();
         } else {
             return dynamicTable.get(index).name();
         }
@@ -181,15 +173,21 @@ public final class HpackDecoder {
     /**
      * Decode a literal header field.
      * Updates decodePos and returns the decoded header field.
+     *
+     * <p>Validates literal header names per RFC 9113 Section 8.2. Indexed names are already validated
+     * (static table is RFC-defined, dynamic table entries were validated when added).
      */
     private HeaderField decodeLiteralField(byte[] data, int prefixBits) throws IOException {
         int nameIndex = decodeInteger(data, prefixBits);
 
         String name;
         if (nameIndex > 0) {
+            // Indexed name, so already validated (static or dynamic table)
             name = getIndexedName(nameIndex);
         } else {
+            // Literal name, so must validate
             name = decodeString(data);
+            validateHeaderName(name);
         }
 
         return new HeaderField(name, decodeString(data));
@@ -205,7 +203,8 @@ public final class HpackDecoder {
      * @throws IOException if decoding fails
      */
     public List<HeaderField> decodeBlock(byte[] data, int offset, int length) throws IOException {
-        List<HeaderField> headers = new ArrayList<>();
+        // Initial capacity of 12 avoids resizing for typical HTTP responses (5-15 headers)
+        List<HeaderField> headers = new ArrayList<>(12);
         decodePos = offset;
         int end = offset + length;
         int totalSize = 0;
@@ -217,11 +216,14 @@ public final class HpackDecoder {
             HeaderField field;
             if ((b & 0x80) != 0) {
                 // Indexed representation: 1xxxxxxx
+                // No validation needed - static table is RFC-defined lowercase,
+                // dynamic table entries were validated when added
                 int index = decodeInteger(data, 7);
                 field = getIndexedField(index);
                 headerFieldSeen = true;
             } else if ((b & 0x40) != 0) {
                 // Literal with indexing: 01xxxxxx
+                // decodeLiteralField validates literal names
                 field = decodeLiteralField(data, 6);
                 dynamicTable.add(field.name(), field.value());
                 headerFieldSeen = true;
@@ -236,12 +238,10 @@ public final class HpackDecoder {
                 continue;
             } else {
                 // Literal never indexed (0001xxxx) or without indexing (0000xxxx)
+                // decodeLiteralField validates literal names
                 field = decodeLiteralField(data, 4);
                 headerFieldSeen = true;
             }
-
-            // RFC 9113 Section 8.2: Field names MUST NOT contain uppercase characters
-            validateHeaderName(field.name());
 
             // Check header list size per RFC 7541 Section 4.1.
             // Since HPACK-decoded strings are ISO-8859-1, each char is one byte,

@@ -24,72 +24,72 @@ final class StaticTable {
     static final int SIZE = 61;
 
     /**
-     * Static table entries. Index 0 is unused (indices are 1-based).
-     * Each entry is {name, value} where value may be empty string.
+     * Static table entries as pre-allocated HeaderField instances.
+     * Index 0 is unused (indices are 1-based per RFC 7541).
      */
-    private static final String[][] ENTRIES = {
+    private static final HeaderField[] ENTRIES = {
             null, // Index 0 unused
-            {":authority", ""}, // 1
-            {":method", "GET"}, // 2
-            {":method", "POST"}, // 3
-            {":path", "/"}, // 4
-            {":path", "/index.html"}, // 5
-            {":scheme", "http"}, // 6
-            {":scheme", "https"}, // 7
-            {":status", "200"}, // 8
-            {":status", "204"}, // 9
-            {":status", "206"}, // 10
-            {":status", "304"}, // 11
-            {":status", "400"}, // 12
-            {":status", "404"}, // 13
-            {":status", "500"}, // 14
-            {"accept-charset", ""}, // 15
-            {"accept-encoding", "gzip, deflate"}, // 16
-            {"accept-language", ""}, // 17
-            {"accept-ranges", ""}, // 18
-            {"accept", ""}, // 19
-            {"access-control-allow-origin", ""}, // 20
-            {"age", ""}, // 21
-            {"allow", ""}, // 22
-            {"authorization", ""}, // 23
-            {"cache-control", ""}, // 24
-            {"content-disposition", ""}, // 25
-            {"content-encoding", ""}, // 26
-            {"content-language", ""}, // 27
-            {"content-length", ""}, // 28
-            {"content-location", ""}, // 29
-            {"content-range", ""}, // 30
-            {"content-type", ""}, // 31
-            {"cookie", ""}, // 32
-            {"date", ""}, // 33
-            {"etag", ""}, // 34
-            {"expect", ""}, // 35
-            {"expires", ""}, // 36
-            {"from", ""}, // 37
-            {"host", ""}, // 38
-            {"if-match", ""}, // 39
-            {"if-modified-since", ""}, // 40
-            {"if-none-match", ""}, // 41
-            {"if-range", ""}, // 42
-            {"if-unmodified-since", ""}, // 43
-            {"last-modified", ""}, // 44
-            {"link", ""}, // 45
-            {"location", ""}, // 46
-            {"max-forwards", ""}, // 47
-            {"proxy-authenticate", ""}, // 48
-            {"proxy-authorization", ""}, // 49
-            {"range", ""}, // 50
-            {"referer", ""}, // 51
-            {"refresh", ""}, // 52
-            {"retry-after", ""}, // 53
-            {"server", ""}, // 54
-            {"set-cookie", ""}, // 55
-            {"strict-transport-security", ""}, // 56
-            {"transfer-encoding", ""}, // 57
-            {"user-agent", ""}, // 58
-            {"vary", ""}, // 59
-            {"via", ""}, // 60
-            {"www-authenticate", ""} // 61
+            new HeaderField(":authority", ""), // 1
+            new HeaderField(":method", "GET"), // 2
+            new HeaderField(":method", "POST"), // 3
+            new HeaderField(":path", "/"), // 4
+            new HeaderField(":path", "/index.html"), // 5
+            new HeaderField(":scheme", "http"), // 6
+            new HeaderField(":scheme", "https"), // 7
+            new HeaderField(":status", "200"), // 8
+            new HeaderField(":status", "204"), // 9
+            new HeaderField(":status", "206"), // 10
+            new HeaderField(":status", "304"), // 11
+            new HeaderField(":status", "400"), // 12
+            new HeaderField(":status", "404"), // 13
+            new HeaderField(":status", "500"), // 14
+            new HeaderField("accept-charset", ""), // 15
+            new HeaderField("accept-encoding", "gzip, deflate"), // 16
+            new HeaderField("accept-language", ""), // 17
+            new HeaderField("accept-ranges", ""), // 18
+            new HeaderField("accept", ""), // 19
+            new HeaderField("access-control-allow-origin", ""), // 20
+            new HeaderField("age", ""), // 21
+            new HeaderField("allow", ""), // 22
+            new HeaderField("authorization", ""), // 23
+            new HeaderField("cache-control", ""), // 24
+            new HeaderField("content-disposition", ""), // 25
+            new HeaderField("content-encoding", ""), // 26
+            new HeaderField("content-language", ""), // 27
+            new HeaderField("content-length", ""), // 28
+            new HeaderField("content-location", ""), // 29
+            new HeaderField("content-range", ""), // 30
+            new HeaderField("content-type", ""), // 31
+            new HeaderField("cookie", ""), // 32
+            new HeaderField("date", ""), // 33
+            new HeaderField("etag", ""), // 34
+            new HeaderField("expect", ""), // 35
+            new HeaderField("expires", ""), // 36
+            new HeaderField("from", ""), // 37
+            new HeaderField("host", ""), // 38
+            new HeaderField("if-match", ""), // 39
+            new HeaderField("if-modified-since", ""), // 40
+            new HeaderField("if-none-match", ""), // 41
+            new HeaderField("if-range", ""), // 42
+            new HeaderField("if-unmodified-since", ""), // 43
+            new HeaderField("last-modified", ""), // 44
+            new HeaderField("link", ""), // 45
+            new HeaderField("location", ""), // 46
+            new HeaderField("max-forwards", ""), // 47
+            new HeaderField("proxy-authenticate", ""), // 48
+            new HeaderField("proxy-authorization", ""), // 49
+            new HeaderField("range", ""), // 50
+            new HeaderField("referer", ""), // 51
+            new HeaderField("refresh", ""), // 52
+            new HeaderField("retry-after", ""), // 53
+            new HeaderField("server", ""), // 54
+            new HeaderField("set-cookie", ""), // 55
+            new HeaderField("strict-transport-security", ""), // 56
+            new HeaderField("transfer-encoding", ""), // 57
+            new HeaderField("user-agent", ""), // 58
+            new HeaderField("vary", ""), // 59
+            new HeaderField("via", ""), // 60
+            new HeaderField("www-authenticate", "") // 61
     };
 
     /**
@@ -113,7 +113,7 @@ final class StaticTable {
         // Find max name length
         int maxLen = 0;
         for (int i = 1; i <= SIZE; i++) {
-            int len = ENTRIES[i][0].length();
+            int len = ENTRIES[i].name().length();
             if (len > maxLen) {
                 maxLen = len;
             }
@@ -123,7 +123,7 @@ final class StaticTable {
         // First pass: count entries per length
         int[] counts = new int[MAX_NAME_LEN + 1];
         for (int i = 1; i <= SIZE; i++) {
-            counts[ENTRIES[i][0].length()]++;
+            counts[ENTRIES[i].name().length()]++;
         }
 
         // Allocate buckets (empty bucket for lengths with no entries)
@@ -135,7 +135,7 @@ final class StaticTable {
         // Second pass: fill buckets
         int[] pos = new int[MAX_NAME_LEN + 1];
         for (int i = 1; i <= SIZE; i++) {
-            int len = ENTRIES[i][0].length();
+            int len = ENTRIES[i].name().length();
             buckets[len][pos[len]++] = i;
         }
 
@@ -143,31 +143,13 @@ final class StaticTable {
     }
 
     /**
-     * Get the header name at the given index.
+     * Get the header field at the given index.
      *
      * @param index 1-based index into static table
-     * @return header name
-     * @throws IndexOutOfBoundsException if index is out of range
+     * @return header field
      */
-    static String getName(int index) {
-        if (index < 1 || index > SIZE) {
-            throw new IndexOutOfBoundsException("Static table index out of range: " + index);
-        }
-        return ENTRIES[index][0];
-    }
-
-    /**
-     * Get the header value at the given index.
-     *
-     * @param index 1-based index into static table
-     * @return header value (may be empty string)
-     * @throws IndexOutOfBoundsException if index is out of range
-     */
-    static String getValue(int index) {
-        if (index < 1 || index > SIZE) {
-            throw new IndexOutOfBoundsException("Static table index out of range: " + index);
-        }
-        return ENTRIES[index][1];
+    static HeaderField get(int index) {
+        return ENTRIES[index];
     }
 
     /**
@@ -183,8 +165,8 @@ final class StaticTable {
             return -1;
         }
         for (int idx : NAME_BUCKETS_BY_LEN[len]) {
-            String[] e = ENTRIES[idx];
-            if (e[0].equals(name) && e[1].equals(value)) {
+            HeaderField e = ENTRIES[idx];
+            if (e.name().equals(name) && e.value().equals(value)) {
                 return idx;
             }
         }
@@ -201,7 +183,7 @@ final class StaticTable {
         int len = name.length();
         if (len <= MAX_NAME_LEN) {
             for (int idx : NAME_BUCKETS_BY_LEN[len]) {
-                if (ENTRIES[idx][0].equals(name)) {
+                if (ENTRIES[idx].name().equals(name)) {
                     return idx;
                 }
             }

@@ -32,7 +32,7 @@ import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
 import software.amazon.smithy.java.http.client.DelegatedClosingInputStream;
 import software.amazon.smithy.java.http.client.DelegatedClosingOutputStream;
 import software.amazon.smithy.java.http.client.HttpExchange;
-import software.amazon.smithy.java.http.client.h2.hpack.HpackDecoder;
+import software.amazon.smithy.java.http.client.h2.hpack.HeaderField;
 
 /**
  * HTTP/2 exchange implementation for a single stream with multiplexing support.
@@ -93,7 +93,7 @@ public final class H2Exchange implements HttpExchange {
     private volatile int streamId;
 
     // Pending headers from reader thread (protected by dataLock)
-    private List<HpackDecoder.HeaderField> pendingHeaders;
+    private List<HeaderField> pendingHeaders;
     private boolean pendingHeadersEndStream;
 
     // === Data buffer for zero-allocation read path ===
@@ -210,7 +210,7 @@ public final class H2Exchange implements HttpExchange {
      * @param fields the decoded header fields
      * @param endStream whether END_STREAM flag was set
      */
-    void deliverHeaders(List<HpackDecoder.HeaderField> fields, boolean endStream) {
+    void deliverHeaders(List<HeaderField> fields, boolean endStream) {
         dataLock.lock();
         try {
             // Process headers and update state (will be called from reader thread)
@@ -568,7 +568,7 @@ public final class H2Exchange implements HttpExchange {
             dataLock.lock();
             try {
                 if (pendingHeaders != null) {
-                    List<HpackDecoder.HeaderField> fields = pendingHeaders;
+                    List<HeaderField> fields = pendingHeaders;
                     boolean endStream = pendingHeadersEndStream;
                     pendingHeaders = null; // Consume the headers
 
@@ -589,7 +589,7 @@ public final class H2Exchange implements HttpExchange {
      * @param fields the decoded header fields
      * @param isEndStream whether END_STREAM flag was set
      */
-    private void handleHeadersEvent(List<HpackDecoder.HeaderField> fields, boolean isEndStream) throws IOException {
+    private void handleHeadersEvent(List<HeaderField> fields, boolean isEndStream) throws IOException {
         // Validate stream state per RFC 9113 Section 5.1
         if (streamState == StreamState.CLOSED) {
             throw new H2Exception(ERROR_STREAM_CLOSED, streamId, "Received HEADERS on closed stream");
@@ -643,13 +643,13 @@ public final class H2Exchange implements HttpExchange {
      * @param fields the decoded header fields
      * @param isEndStream whether this HEADERS frame has END_STREAM flag
      */
-    private void processResponseHeaders(List<HpackDecoder.HeaderField> fields, boolean isEndStream) throws IOException {
+    private void processResponseHeaders(List<HeaderField> fields, boolean isEndStream) throws IOException {
         ModifiableHttpHeaders headers = HttpHeaders.ofModifiable();
         int parsedStatusCode = -1;
         boolean seenRegularHeader = false;
         long contentLength = -1;
 
-        for (HpackDecoder.HeaderField field : fields) {
+        for (HeaderField field : fields) {
             String name = field.name();
             String value = field.value();
 
@@ -743,9 +743,9 @@ public final class H2Exchange implements HttpExchange {
      *
      * @param fields the pre-decoded header fields
      */
-    private void processTrailers(List<HpackDecoder.HeaderField> fields) throws IOException {
+    private void processTrailers(List<HeaderField> fields) throws IOException {
         ModifiableHttpHeaders trailers = HttpHeaders.ofModifiable();
-        for (HpackDecoder.HeaderField field : fields) {
+        for (HeaderField field : fields) {
             String name = field.name();
             // RFC 9113 Section 8.1: Trailers MUST NOT contain pseudo-headers
             if (name.startsWith(":")) {
@@ -907,7 +907,7 @@ public final class H2Exchange implements HttpExchange {
             while (readPos == writePos && readState == ReadState.READING_DATA) {
                 // Check for pending trailers
                 if (pendingHeaders != null) {
-                    List<HpackDecoder.HeaderField> fields = pendingHeaders;
+                    List<HeaderField> fields = pendingHeaders;
                     boolean endStream = pendingHeadersEndStream;
                     pendingHeaders = null;
                     handleHeadersEvent(fields, endStream);

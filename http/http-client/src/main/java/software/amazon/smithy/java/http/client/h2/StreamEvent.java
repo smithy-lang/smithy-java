@@ -7,7 +7,7 @@ package software.amazon.smithy.java.http.client.h2;
 
 import java.io.IOException;
 import java.util.List;
-import software.amazon.smithy.java.http.client.h2.hpack.HpackDecoder;
+import software.amazon.smithy.java.http.client.h2.hpack.HeaderField;
 
 /**
  * Events that can occur on an HTTP/2 stream.
@@ -26,7 +26,7 @@ sealed interface StreamEvent {
      * @param fields the decoded header fields
      * @param endStream true if FLAG_END_STREAM was set on the HEADERS frame
      */
-    record Headers(List<HpackDecoder.HeaderField> fields, boolean endStream) implements StreamEvent {}
+    record Headers(List<HeaderField> fields, boolean endStream) implements StreamEvent {}
 
     /**
      * Per-stream error (RST_STREAM received, protocol error, etc.).

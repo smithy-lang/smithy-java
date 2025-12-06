@@ -150,28 +150,22 @@ class BufferPoolTest {
 
     @Test
     void constructorValidatesMaxPoolCount() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new BufferPool(0, 1024, 1024, 128));
-        assertThrows(IllegalArgumentException.class, () ->
-                new BufferPool(-1, 1024, 1024, 128));
+        assertThrows(IllegalArgumentException.class, () -> new BufferPool(0, 1024, 1024, 128));
+        assertThrows(IllegalArgumentException.class, () -> new BufferPool(-1, 1024, 1024, 128));
     }
 
     @Test
     void constructorValidatesDefaultBufferSize() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new BufferPool(10, 1024, 1024, 0));
-        assertThrows(IllegalArgumentException.class, () ->
-                new BufferPool(10, 1024, 1024, -1));
+        assertThrows(IllegalArgumentException.class, () -> new BufferPool(10, 1024, 1024, 0));
+        assertThrows(IllegalArgumentException.class, () -> new BufferPool(10, 1024, 1024, -1));
     }
 
     @Test
     void constructorValidatesMaxPoolableSize() {
         // maxPoolableSize must be > 0
-        assertThrows(IllegalArgumentException.class, () ->
-                new BufferPool(10, 1024, 0, 128));
+        assertThrows(IllegalArgumentException.class, () -> new BufferPool(10, 1024, 0, 128));
         // maxPoolableSize must be <= maxBufferSize
-        assertThrows(IllegalArgumentException.class, () ->
-                new BufferPool(10, 256, 512, 128));
+        assertThrows(IllegalArgumentException.class, () -> new BufferPool(10, 256, 512, 128));
     }
 
     @Test

@@ -5,29 +5,6 @@
 
 package software.amazon.smithy.java.http.client.h2;
 
-import software.amazon.smithy.java.http.api.HttpHeaders;
-import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.api.HttpVersion;
-import software.amazon.smithy.java.http.client.BufferPool;
-import software.amazon.smithy.java.http.client.HttpExchange;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
-import software.amazon.smithy.java.http.client.connection.HttpConnection;
-import software.amazon.smithy.java.http.client.connection.Route;
-import software.amazon.smithy.java.http.client.h2.hpack.HpackDecoder;
-import software.amazon.smithy.java.logging.InternalLogger;
-
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.SSLSocket;
-import java.io.IOException;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
-import java.time.Duration;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import static software.amazon.smithy.java.http.client.h2.H2Constants.CONNECTION_PREFACE;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.DEFAULT_HEADER_TABLE_SIZE;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.DEFAULT_INITIAL_WINDOW_SIZE;
@@ -59,6 +36,29 @@ import static software.amazon.smithy.java.http.client.h2.H2Constants.SETTINGS_IN
 import static software.amazon.smithy.java.http.client.h2.H2Constants.SETTINGS_MAX_CONCURRENT_STREAMS;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.SETTINGS_MAX_FRAME_SIZE;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.SETTINGS_MAX_HEADER_LIST_SIZE;
+
+import java.io.IOException;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocket;
+import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.http.client.BufferPool;
+import software.amazon.smithy.java.http.client.HttpExchange;
+import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
+import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
+import software.amazon.smithy.java.http.client.connection.HttpConnection;
+import software.amazon.smithy.java.http.client.connection.Route;
+import software.amazon.smithy.java.http.client.h2.hpack.HeaderField;
+import software.amazon.smithy.java.http.client.h2.hpack.HpackDecoder;
+import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * HTTP/2 connection implementation with full stream multiplexing.
@@ -139,7 +139,10 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
 
     // Reusable buffer pool used between exchanges.
     private final BufferPool bufferPool = new BufferPool(
-            32, DEFAULT_INITIAL_WINDOW_SIZE, DEFAULT_INITIAL_WINDOW_SIZE, 1024);
+            32,
+            DEFAULT_INITIAL_WINDOW_SIZE,
+            DEFAULT_INITIAL_WINDOW_SIZE,
+            1024);
 
     /**
      * Create an HTTP/2 connection from a connected socket.
@@ -425,7 +428,7 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
                 // HPACK decoding MUST happen here in the reader thread to ensure
                 // dynamic table updates are processed in frame order across all streams.
                 byte[] headerBlock = frame.payload();
-                List<HpackDecoder.HeaderField> decoded;
+                List<HeaderField> decoded;
                 if (headerBlock != null && headerBlock.length > 0) {
                     decoded = decodeHeaders(headerBlock);
                 } else {
@@ -1008,7 +1011,7 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
      * @throws IOException if decoding fails
      * @throws H2Exception if header list size exceeds limit or HPACK decoding fails
      */
-    List<HpackDecoder.HeaderField> decodeHeaders(byte[] headerBlock) throws IOException {
+    List<HeaderField> decodeHeaders(byte[] headerBlock) throws IOException {
         // Check encoded size first (quick rejection)
         int maxHeaderListSize = H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE;
         if (headerBlock.length > maxHeaderListSize) {
@@ -1016,7 +1019,7 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
                     "Header block size " + headerBlock.length + " exceeds limit " + maxHeaderListSize);
         }
 
-        List<HpackDecoder.HeaderField> headers;
+        List<HeaderField> headers;
         // HPACK decoder is stateful (dynamic table), must be synchronized
         synchronized (hpackDecoder) {
             try {
@@ -1037,7 +1040,7 @@ public final class H2Connection implements HttpConnection, H2StreamWriter.Stream
 
         // Check decoded size (name + value + 32 bytes overhead per RFC 7541)
         int decodedSize = 0;
-        for (HpackDecoder.HeaderField field : headers) {
+        for (HeaderField field : headers) {
             decodedSize += field.name().length() + field.value().length() + 32;
             if (decodedSize > maxHeaderListSize) {
                 throw new H2Exception(ERROR_ENHANCE_YOUR_CALM,
