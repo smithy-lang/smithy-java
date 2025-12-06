@@ -5,14 +5,17 @@
 
 package software.amazon.smithy.java.mcp.server;
 
+import static software.amazon.smithy.java.core.serde.TimestampFormatter.Prelude.DATE_TIME;
+import static software.amazon.smithy.java.core.serde.TimestampFormatter.Prelude.EPOCH_SECONDS;
+import static software.amazon.smithy.java.core.serde.TimestampFormatter.Prelude.HTTP_DATE;
 import static software.amazon.smithy.java.mcp.server.PromptLoader.normalize;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -27,6 +30,7 @@ import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.framework.model.ValidationException;
+import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -34,6 +38,7 @@ import software.amazon.smithy.java.mcp.model.CallToolResult;
 import software.amazon.smithy.java.mcp.model.Capabilities;
 import software.amazon.smithy.java.mcp.model.InitializeResult;
 import software.amazon.smithy.java.mcp.model.JsonArraySchema;
+import software.amazon.smithy.java.mcp.model.JsonDocumentSchema;
 import software.amazon.smithy.java.mcp.model.JsonObjectSchema;
 import software.amazon.smithy.java.mcp.model.JsonPrimitiveSchema;
 import software.amazon.smithy.java.mcp.model.JsonPrimitiveType;
@@ -51,6 +56,7 @@ import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
@@ -79,7 +85,7 @@ public final class McpService {
     private final Map<String, Service> services;
     private final AtomicReference<JsonRpcRequest> initializeRequest = new AtomicReference<>();
     private final ToolFilter toolFilter;
-    private volatile boolean proxiesInitialized = false;
+    private final AtomicReference<Boolean> proxiesInitialized = new AtomicReference<>(false);
     private final McpMetricsObserver metricsObserver;
 
     McpService(
@@ -118,13 +124,19 @@ public final class McpService {
     ) {
         try {
             validate(req);
-            return switch (req.getMethod()) {
+            var method = req.getMethod();
+            return switch (method) {
                 case "initialize" -> handleInitialize(req);
-                case "prompts/list" -> handlePromptsList(req);
-                case "prompts/get" -> handlePromptsGet(req);
-                case "tools/list" -> handleToolsList(req, protocolVersion);
-                case "tools/call" -> handleToolsCall(req, asyncResponseCallback, protocolVersion);
-                default -> null; // Notifications or unknown methods
+                default -> {
+                    initializeProxies(rpcResponse -> {});
+                    yield switch (method) {
+                        case "prompts/list" -> handlePromptsList(req);
+                        case "prompts/get" -> handlePromptsGet(req);
+                        case "tools/list" -> handleToolsList(req, protocolVersion);
+                        case "tools/call" -> handleToolsCall(req, asyncResponseCallback, protocolVersion);
+                        default -> null; // Notifications or unknown methods
+                    };
+                }
             };
         } catch (Exception e) {
             return createErrorResponse(req, e);
@@ -166,15 +178,9 @@ public final class McpService {
                     clientTitle);
         }
 
-        this.initializeRequest.set(req);
+        this.initializeRequest.compareAndSet(null, req);
 
-        // Initialize proxies lazily after we have a real initialize request
-        if (!proxiesInitialized) {
-            initializeProxies(response -> {
-                // Proxies are initialized, no additional response needed
-            });
-            proxiesInitialized = true;
-        }
+        initializeProxies(rpcResponse -> {});
 
         var maybeVersion = req.getParams().getMember("protocolVersion");
         String pv = null;
@@ -305,31 +311,32 @@ public final class McpService {
      * Initializes proxies with the actual initialize request.
      */
     public void initializeProxies(Consumer<JsonRpcResponse> responseWriter) {
-        JsonRpcRequest initRequest = initializeRequest.get();
-        if (initRequest == null) {
-            LOG.warn("Cannot initialize proxies: no initialize request received yet");
-            return;
-        }
-
-        String protocolVersion = null;
-        var maybeVersion = initRequest.getParams().getMember("protocolVersion");
-        if (maybeVersion != null) {
-            var version = ProtocolVersion.version(maybeVersion.asString());
-            if (!(version instanceof ProtocolVersion.UnknownVersion)) {
-                protocolVersion = version.identifier();
-            }
-        }
-
-        for (McpServerProxy proxy : proxies.values()) {
-            try {
-                proxy.initialize(responseWriter, initRequest, protocolVersion);
-
-                List<ToolInfo> proxyTools = proxy.listTools();
-                for (var toolInfo : proxyTools) {
-                    tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
+        if (proxiesInitialized.compareAndSet(false, true)) {
+            JsonRpcRequest initRequest = initializeRequest.get();
+            var protocolVersion = ProtocolVersion.defaultVersion();
+            if (initRequest != null) {
+                var maybeVersion = initRequest.getParams().getMember("protocolVersion");
+                if (maybeVersion != null) {
+                    var pv = ProtocolVersion.version(maybeVersion.asString());
+                    if (!(pv instanceof ProtocolVersion.UnknownVersion)) {
+                        protocolVersion = pv;
+                    }
                 }
-            } catch (Exception e) {
-                LOG.error("Failed to initialize proxy: " + proxy.name(), e);
+            }
+
+            for (McpServerProxy proxy : proxies.values()) {
+                try {
+                    if (initRequest != null) {
+                        proxy.initialize(responseWriter, initRequest, protocolVersion);
+                    }
+
+                    List<ToolInfo> proxyTools = proxy.listTools();
+                    for (var toolInfo : proxyTools) {
+                        tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
+                    }
+                } catch (Exception e) {
+                    LOG.error("Failed to initialize proxy: " + proxy.name(), e);
+                }
             }
         }
     }
@@ -397,7 +404,15 @@ public final class McpService {
         if (supportsOutputSchema(protocolVersion)) {
             var outputSchema = tool.toolInfo().getOutputSchema();
             if (outputSchema != null) {
-                result.structuredContent(Document.of(output));
+                var operation = tool.operation();
+                if (operation != null) {
+                    var adaptedOutput = adaptOutputDocument(
+                            Document.of(output),
+                            operation.getApiOperation().outputSchema());
+                    result.structuredContent(adaptedOutput);
+                } else {
+                    result.structuredContent(Document.of(output));
+                }
             }
         }
 
@@ -517,7 +532,8 @@ public final class McpService {
 
             var jsonSchema = switch (member.type()) {
                 case LIST, SET -> createJsonArraySchema(member.memberTarget(), visited);
-                case MAP, STRUCTURE, UNION, DOCUMENT -> createJsonObjectSchema(member.memberTarget(), visited);
+                case MAP, STRUCTURE, UNION -> createJsonObjectSchema(member.memberTarget(), visited);
+                case DOCUMENT -> createJsonDocumentSchema(member);
                 default -> createJsonPrimitiveSchema(member);
             };
 
@@ -525,21 +541,19 @@ public final class McpService {
         }
 
         visited.remove(targetId);
-        var builder = JsonObjectSchema.builder()
+        return JsonObjectSchema.builder()
                 .properties(properties)
                 .required(requiredProperties)
-                .description(memberDescription(schema));
-        if (type.isShapeType(ShapeType.DOCUMENT)) {
-            builder.additionalProperties(true);
-        }
-        return builder.build();
+                .description(memberDescription(schema))
+                .build();
     }
 
     private static JsonArraySchema createJsonArraySchema(Schema schema, Set<ShapeId> visited) {
         var listMember = schema.listMember();
         var items = switch (listMember.type()) {
             case LIST, SET -> createJsonArraySchema(listMember.memberTarget(), visited);
-            case MAP, STRUCTURE, UNION, DOCUMENT -> createJsonObjectSchema(listMember.memberTarget(), visited);
+            case MAP, STRUCTURE, UNION -> createJsonObjectSchema(listMember.memberTarget(), visited);
+            case DOCUMENT -> createJsonDocumentSchema(listMember);
             default -> createJsonPrimitiveSchema(listMember);
         };
         return JsonArraySchema.builder()
@@ -552,13 +566,28 @@ public final class McpService {
         var type = switch (member.type()) {
             case BYTE, SHORT, INTEGER, INT_ENUM, LONG, FLOAT, DOUBLE -> JsonPrimitiveType.NUMBER;
             case ENUM, BLOB, STRING, BIG_DECIMAL, BIG_INTEGER -> JsonPrimitiveType.STRING;
-            case TIMESTAMP -> resolveTimestampType(member.memberTarget());
+            case TIMESTAMP -> resolveTimestampType(member);
             case BOOLEAN -> JsonPrimitiveType.BOOLEAN;
             default -> throw new RuntimeException(member + " is not a primitive type");
         };
 
         return JsonPrimitiveSchema.builder()
                 .type(type)
+                .description(memberDescription(member))
+                .build();
+    }
+
+    private static final List<String> DOCUMENT_TYPES = List.of(
+            "string",
+            "number",
+            "boolean",
+            "object",
+            "array",
+            "null");
+
+    private static JsonDocumentSchema createJsonDocumentSchema(Schema member) {
+        return JsonDocumentSchema.builder()
+                .type(DOCUMENT_TYPES)
                 .description(memberDescription(member))
                 .build();
     }
@@ -589,7 +618,7 @@ public final class McpService {
         return switch (trait.getFormat()) {
             case EPOCH_SECONDS -> JsonPrimitiveType.NUMBER;
             case DATE_TIME, HTTP_DATE -> JsonPrimitiveType.STRING;
-            default -> throw new RuntimeException("unknown timestamp format: " + trait.getFormat());
+            case UNKNOWN -> throw new RuntimeException("unknown timestamp format: " + trait.getFormat());
         };
     }
 
@@ -646,10 +675,11 @@ public final class McpService {
                     default -> badType(fromType, toType);
                 };
             case BLOB -> switch (fromType) {
-                case STRING -> Document.of(doc.asString().getBytes(StandardCharsets.UTF_8));
+                case STRING -> Document.of(Base64.getDecoder().decode(doc.asString()));
                 case BLOB -> doc;
                 default -> badType(fromType, toType);
             };
+            case TIMESTAMP -> adaptTimestampInput(doc, schema);
             case STRUCTURE, UNION -> {
                 var convertedMembers = new HashMap<String, Document>();
                 var members = schema.members();
@@ -657,7 +687,7 @@ public final class McpService {
                     var memberName = member.memberName();
                     var memberDoc = doc.getMember(memberName);
                     if (memberDoc != null) {
-                        convertedMembers.put(memberName, adaptDocument(memberDoc, member.memberTarget()));
+                        convertedMembers.put(memberName, adaptDocument(memberDoc, member));
                     }
                 }
                 yield Document.of(convertedMembers);
@@ -666,7 +696,7 @@ public final class McpService {
                 var listMember = schema.listMember();
                 var convertedList = new ArrayList<Document>();
                 for (var item : doc.asList()) {
-                    convertedList.add(adaptDocument(item, listMember.memberTarget()));
+                    convertedList.add(adaptDocument(item, listMember));
                 }
                 yield Document.of(convertedList);
             }
@@ -674,16 +704,78 @@ public final class McpService {
                 var mapValue = schema.mapValueMember();
                 var convertedMap = new HashMap<String, Document>();
                 for (var entry : doc.asStringMap().entrySet()) {
-                    convertedMap.put(entry.getKey(), adaptDocument(entry.getValue(), mapValue.memberTarget()));
+                    convertedMap.put(entry.getKey(), adaptDocument(entry.getValue(), mapValue));
                 }
                 yield Document.of(convertedMap);
             }
+            case DOCUMENT -> doc; // Documents pass through unchanged
             default -> doc;
         };
     }
 
     private static Document badType(ShapeType from, ShapeType to) {
         throw new RuntimeException("Cannot convert from " + from + " to " + to);
+    }
+
+    private static Document adaptTimestampInput(Document doc, Schema schema) {
+        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
+        var format = getFormat(trait);
+        return switch (format) {
+            case EPOCH_SECONDS -> Document.of(EPOCH_SECONDS.readFromNumber(doc.asNumber()));
+            case DATE_TIME -> Document.of(DATE_TIME.readFromString(doc.asString(), false));
+            case HTTP_DATE -> Document.of(HTTP_DATE.readFromString(doc.asString(), false));
+            default -> doc;
+        };
+    }
+
+    private static Document adaptOutputDocument(Document doc, Schema schema) {
+        var toType = schema.type();
+        return switch (toType) {
+            case BIG_DECIMAL -> Document.of(doc.asBigDecimal().toString());
+            case BIG_INTEGER -> Document.of(doc.asBigInteger().toString());
+            case BLOB -> Document.of(Base64.getEncoder().encodeToString(ByteBufferUtils.getBytes(doc.asBlob())));
+            case TIMESTAMP -> adaptTimestampOutput(doc, schema);
+            case STRUCTURE, UNION -> {
+                var convertedMembers = new HashMap<String, Document>();
+                for (var member : schema.members()) {
+                    var memberName = member.memberName();
+                    var memberDoc = doc.getMember(memberName);
+                    if (memberDoc != null) {
+                        convertedMembers.put(memberName, adaptOutputDocument(memberDoc, member));
+                    }
+                }
+                yield Document.of(convertedMembers);
+            }
+            case LIST, SET -> {
+                var listMember = schema.listMember();
+                var convertedList = new ArrayList<Document>();
+                for (var item : doc.asList()) {
+                    convertedList.add(adaptOutputDocument(item, listMember));
+                }
+                yield Document.of(convertedList);
+            }
+            case MAP -> {
+                var mapValue = schema.mapValueMember();
+                var convertedMap = new HashMap<String, Document>();
+                for (var entry : doc.asStringMap().entrySet()) {
+                    convertedMap.put(entry.getKey(), adaptOutputDocument(entry.getValue(), mapValue));
+                }
+                yield Document.of(convertedMap);
+            }
+            case DOCUMENT -> doc; // Documents pass through unchanged
+            default -> doc;
+        };
+    }
+
+    private static Document adaptTimestampOutput(Document doc, Schema schema) {
+        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
+        var instant = doc.asTimestamp();
+        TimestampFormatTrait.Format format = getFormat(trait);
+        return switch (format) {
+            case DATE_TIME -> Document.of(DATE_TIME.writeString(instant));
+            case HTTP_DATE -> Document.of(HTTP_DATE.writeString(instant));
+            default -> Document.of(instant.toEpochMilli() / 1000.0);
+        };
     }
 
     public static Builder builder() {
@@ -730,6 +822,14 @@ public final class McpService {
 
         public McpService build() {
             return new McpService(services, proxyList, name, version, toolFilter, metricsObserver);
+        }
+    }
+
+    private static TimestampFormatTrait.Format getFormat(TimestampFormatTrait trait) {
+        if (trait == null) {
+            return TimestampFormatTrait.Format.DATE_TIME;
+        } else {
+            return trait.getFormat();
         }
     }
 }

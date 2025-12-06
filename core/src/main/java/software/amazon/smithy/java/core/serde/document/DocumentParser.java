@@ -107,6 +107,12 @@ public final class DocumentParser implements ShapeSerializer {
 
     @Override
     public <T> void writeMap(Schema schema, T state, int size, BiConsumer<T, MapSerializer> consumer) {
+        if (schema.type() == ShapeType.DOCUMENT) {
+            var serializer = new DocumentMapSerializer(size);
+            consumer.accept(state, serializer);
+            setResult(new Documents.StringMapDocument(Documents.STR_MAP_SCHEMA, serializer.entries));
+            return;
+        }
         var keyMember = schema.mapKeyMember();
         if (keyMember.type() == ShapeType.STRING || keyMember.type() == ShapeType.ENUM) {
             var serializer = new DocumentMapSerializer(size);

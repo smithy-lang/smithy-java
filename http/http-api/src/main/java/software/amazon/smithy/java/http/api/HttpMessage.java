@@ -13,8 +13,10 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
  * HTTP message.
+ *
+ * <p>When closed, the body of the message is also closed.
  */
-public interface HttpMessage {
+public interface HttpMessage extends AutoCloseable {
     /**
      * Get the HTTP version.
      *
@@ -70,11 +72,19 @@ public interface HttpMessage {
     HttpHeaders headers();
 
     /**
-     * Get the body of the message, or null.
+     * Get the body of the message.
      *
-     * @return the message body or null.
+     * @return the message body (never null, may be zero length).
      */
     DataStream body();
+
+    @Override
+    default void close() {
+        var body = body();
+        if (body != null) {
+            body.close();
+        }
+    }
 
     /**
      * Builder for HTTP messages.

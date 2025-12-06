@@ -20,6 +20,15 @@ record HttpRequestImpl(
         HttpHeaders headers,
         DataStream body) implements HttpRequest {
 
+    HttpRequestImpl(ModifiableHttpRequestImpl from) {
+        this(from.httpVersion(), from.method(), from.uri(), from.headers().toUnmodifiable(), from.body());
+    }
+
+    @Override
+    public HttpRequest toUnmodifiable() {
+        return this;
+    }
+
     @Override
     public ModifiableHttpRequest toModifiable() {
         var mod = new ModifiableHttpRequestImpl();
@@ -32,28 +41,22 @@ record HttpRequestImpl(
     }
 
     static final class Builder implements HttpRequest.Builder {
-
-        String method;
-        URI uri;
-        DataStream body;
-        HttpHeaders headers = SimpleUnmodifiableHttpHeaders.EMPTY;
-        HttpVersion httpVersion = HttpVersion.HTTP_1_1;
-        private Map<String, List<String>> mutatedHeaders;
+        private final ModifiableHttpRequest modifiableHttpRequest = new ModifiableHttpRequestImpl();
 
         Builder() {}
 
         public Builder httpVersion(HttpVersion httpVersion) {
-            this.httpVersion = httpVersion;
+            modifiableHttpRequest.setHttpVersion(httpVersion);
             return this;
         }
 
         public Builder method(String method) {
-            this.method = method;
+            modifiableHttpRequest.setMethod(method);
             return this;
         }
 
         public Builder uri(URI uri) {
-            this.uri = uri;
+            modifiableHttpRequest.setUri(uri);
             return this;
         }
 
@@ -62,61 +65,49 @@ record HttpRequestImpl(
         }
 
         public Builder body(DataStream body) {
-            this.body = body;
+            modifiableHttpRequest.setBody(body);
             return this;
         }
 
-        public Builder headers(HttpHeaders headers) {
-            this.headers = Objects.requireNonNull(headers);
-            mutatedHeaders = null;
+        @Override
+        public HttpRequest.Builder headers(HttpHeaders headers) {
+            modifiableHttpRequest.setHeaders(headers.toModifiable());
             return this;
         }
 
         @Override
         public Builder withAddedHeader(String name, String value) {
-            mutatedHeaders = SimpleUnmodifiableHttpHeaders.addHeader(this.headers, mutatedHeaders, name, value);
+            modifiableHttpRequest.headers().addHeader(name, value);
             return this;
         }
 
         @Override
         public Builder withAddedHeaders(Map<String, List<String>> headers) {
-            mutatedHeaders = SimpleUnmodifiableHttpHeaders.addHeaders(this.headers, mutatedHeaders, headers);
+            modifiableHttpRequest.headers().addHeaders(headers);
             return this;
         }
 
         @Override
         public Builder withReplacedHeaders(Map<String, List<String>> headers) {
-            mutatedHeaders = SimpleUnmodifiableHttpHeaders.replaceHeaders(this.headers, mutatedHeaders, headers);
+            modifiableHttpRequest.headers().setHeaders(headers);
             return this;
         }
 
         private void beforeBuild() {
-            if (mutatedHeaders != null) {
-                headers = new SimpleUnmodifiableHttpHeaders(mutatedHeaders, false);
-            }
-            Objects.requireNonNull(httpVersion, "HttpVersion cannot be null");
-            Objects.requireNonNull(method, "Method cannot be null");
-            Objects.requireNonNull(uri, "URI cannot be null");
-            body = Objects.requireNonNullElse(body, DataStream.ofEmpty());
-            mutatedHeaders = null; // decouple from built request
+            Objects.requireNonNull(modifiableHttpRequest.method(), "method not set");
+            Objects.requireNonNull(modifiableHttpRequest.uri(), "uri not set");
         }
 
         @Override
         public HttpRequest build() {
             beforeBuild();
-            return new HttpRequestImpl(httpVersion, method, uri, headers, body);
+            return modifiableHttpRequest.toUnmodifiable();
         }
 
         @Override
         public ModifiableHttpRequest buildModifiable() {
             beforeBuild();
-            var mod = new ModifiableHttpRequestImpl();
-            mod.setHttpVersion(httpVersion);
-            mod.setMethod(method);
-            mod.setUri(uri);
-            mod.setHeaders(headers.toModifiable());
-            mod.setBody(body);
-            return mod;
+            return modifiableHttpRequest.copy();
         }
     }
 }

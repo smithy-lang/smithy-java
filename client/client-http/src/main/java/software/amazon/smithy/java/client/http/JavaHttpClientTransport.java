@@ -134,8 +134,11 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
 
         // Any explicitly set headers overwrite existing headers, they do not merge.
         for (var entry : request.headers().map().entrySet()) {
-            for (var value : entry.getValue()) {
-                httpRequestBuilder.setHeader(entry.getKey(), value);
+            // Skip restricted headers
+            if (!entry.getKey().equals("content-length")) {
+                for (var value : entry.getValue()) {
+                    httpRequestBuilder.setHeader(entry.getKey(), value);
+                }
             }
         }
 

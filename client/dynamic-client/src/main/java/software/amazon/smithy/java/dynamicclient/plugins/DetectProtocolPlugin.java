@@ -33,7 +33,8 @@ public final class DetectProtocolPlugin implements ClientPlugin {
     private static final List<ClientProtocolFactory<Trait>> PROTOCOL_FACTORIES = new ArrayList<>();
 
     static {
-        for (var protocolImpl : ServiceLoader.load(ClientProtocolFactory.class)) {
+        for (var protocolImpl : ServiceLoader.load(ClientProtocolFactory.class,
+                ClientProtocolFactory.class.getClassLoader())) {
             PROTOCOL_FACTORIES.add(protocolImpl);
         }
     }

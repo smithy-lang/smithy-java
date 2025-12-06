@@ -41,6 +41,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(SigV4Signer.class);
     private static final List<String> HEADERS_TO_IGNORE_IN_LOWER_CASE = List.of(
             "connection",
+            "content-length",
             "x-amzn-trace-id",
             "user-agent",
             "expect");

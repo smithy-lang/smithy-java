@@ -20,4 +20,11 @@ public interface ModifiableHttpResponse extends ModifiableHttpMessage, HttpRespo
     default ModifiableHttpResponse toModifiable() {
         return this;
     }
+
+    /**
+     * Create a copy of the modifiable response.
+     *
+     * @return the standalone copy.
+     */
+    ModifiableHttpResponse copy();
 }

@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.core.serde.document;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.aMapWithSize;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
@@ -35,5 +36,22 @@ public class DocumentParserTest {
         assertThat(parser.getResult().asList().get(1), nullValue());
         assertThat(parser.getResult().asList().get(2).asString(), equalTo("There"));
         assertThat(parser.getResult().asList().get(3), nullValue());
+    }
+
+    @Test
+    void writesMapWithDocumentSchema() {
+        DocumentParser parser = new DocumentParser();
+        parser.writeMap(PreludeSchemas.DOCUMENT, null, 2, (_ignore, ser) -> {
+            ser.writeEntry(PreludeSchemas.STRING, "key1", null, (state, valueSer) -> {
+                valueSer.writeString(PreludeSchemas.STRING, "value1");
+            });
+            ser.writeEntry(PreludeSchemas.STRING, "key2", null, (state, valueSer) -> {
+                valueSer.writeInteger(PreludeSchemas.INTEGER, 42);
+            });
+        });
+
+        assertThat(parser.getResult().asStringMap(), aMapWithSize(2));
+        assertThat(parser.getResult().asStringMap().get("key1").asString(), equalTo("value1"));
+        assertThat(parser.getResult().asStringMap().get("key2").asNumber().intValue(), equalTo(42));
     }
 }

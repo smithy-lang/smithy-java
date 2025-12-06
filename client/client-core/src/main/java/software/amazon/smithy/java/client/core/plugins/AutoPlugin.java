@@ -24,7 +24,7 @@ public final class AutoPlugin implements ClientPlugin {
 
     static {
         List<ClientPlugin> children = new ArrayList<>();
-        for (var plugin : ServiceLoader.load(AutoClientPlugin.class)) {
+        for (var plugin : ServiceLoader.load(AutoClientPlugin.class, AutoClientPlugin.class.getClassLoader())) {
             children.add(plugin);
         }
         CHILDREN = Collections.unmodifiableList(children);

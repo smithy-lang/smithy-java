@@ -25,18 +25,36 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
 
     private final Map<String, List<String>> headers = new HashMap<>();
 
+    static ModifiableHttpHeaders of(HttpHeaders headers) {
+        if (headers instanceof ModifiableHttpHeaders h) {
+            return h;
+        } else {
+            var hd = new SimpleModifiableHttpHeaders();
+            hd.setHeaders(headers);
+            return hd;
+        }
+    }
+
     @Override
     public void addHeader(String name, String value) {
-        getOrCreateValues(name).add(value);
+        getOrCreateValues(name).add(HeaderUtils.normalizeValue(value));
     }
 
     @Override
     public void addHeader(String name, List<String> values) {
-        getOrCreateValues(name).addAll(values);
+        if (!values.isEmpty()) {
+            var line = getOrCreateValues(name);
+            for (var v : values) {
+                line.add(HeaderUtils.normalizeValue(v));
+            }
+        }
     }
 
     private List<String> getOrCreateValues(String name) {
-        var key = HttpHeaders.normalizeHeaderName(name);
+        return getOrCreateValuesUnsafe(HeaderUtils.normalizeName(name));
+    }
+
+    private List<String> getOrCreateValuesUnsafe(String key) {
         var values = headers.get(key);
         if (values == null) {
             values = new ArrayList<>();
@@ -47,7 +65,7 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
 
     @Override
     public void setHeader(String name, String value) {
-        var key = HttpHeaders.normalizeHeaderName(name);
+        var key = HeaderUtils.normalizeName(name);
         var list = headers.get(key);
         if (list == null) {
             list = new ArrayList<>(1);
@@ -56,30 +74,21 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
             list.clear();
         }
 
-        list.add(value);
+        list.add(HeaderUtils.normalizeValue(value));
     }
 
     @Override
     public void setHeader(String name, List<String> values) {
-        var key = HttpHeaders.normalizeHeaderName(name);
-        var list = headers.get(key);
-        if (list == null) {
-            list = new ArrayList<>(values.size());
-            headers.put(key, list);
-        } else {
-            list.clear();
+        List<String> copy = new ArrayList<>(values.size());
+        for (var v : values) {
+            copy.add(HeaderUtils.normalizeValue(v));
         }
-
-        // believe it or not, this is more efficient than the bulk constructor
-        // https://bugs.openjdk.org/browse/JDK-8368292
-        for (var element : values) {
-            list.add(element);
-        }
+        headers.put(HeaderUtils.normalizeName(name), copy);
     }
 
     @Override
     public void removeHeader(String name) {
-        headers.remove(name.toLowerCase(Locale.ENGLISH));
+        headers.remove(HeaderUtils.normalizeName(name));
     }
 
     @Override
@@ -89,7 +98,7 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
 
     @Override
     public List<String> allValues(String name) {
-        return headers.getOrDefault(name.toLowerCase(Locale.ENGLISH), Collections.emptyList());
+        return headers.getOrDefault(name.toLowerCase(Locale.ROOT), Collections.emptyList());
     }
 
     @Override
@@ -110,6 +119,41 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
     @Override
     public Map<String, List<String>> map() {
         return Collections.unmodifiableMap(headers);
+    }
+
+    @Override
+    public void setHeaders(HttpHeaders headers) {
+        // No need to reformat or group keys because they come from another HttpHeaders container.
+        for (var e : headers.map().entrySet()) {
+            setHeaderUnsafe(e.getKey(), e.getValue());
+        }
+    }
+
+    @Override
+    public List<String> setHeaderIfAbsent(String name, List<String> values) {
+        return headers.computeIfAbsent(HeaderUtils.normalizeName(name), n -> {
+            var trimmed = new ArrayList<String>(values.size());
+            for (var v : values) {
+                trimmed.add(HeaderUtils.normalizeValue(v));
+            }
+            return trimmed;
+        });
+    }
+
+    @Override
+    public List<String> setHeaderIfAbsent(String name, String value) {
+        return headers.computeIfAbsent(HeaderUtils.normalizeName(name),
+                n -> List.of(HeaderUtils.normalizeValue(value)));
+    }
+
+    // Set header using a pre-formatted keys and already trimmed values.
+    private void setHeaderUnsafe(String key, List<String> values) {
+        var list = getOrCreateValuesUnsafe(key);
+        // believe it or not, this is more efficient than the bulk constructor
+        // https://bugs.openjdk.org/browse/JDK-8368292
+        for (var element : values) {
+            list.add(element);
+        }
     }
 
     @Override

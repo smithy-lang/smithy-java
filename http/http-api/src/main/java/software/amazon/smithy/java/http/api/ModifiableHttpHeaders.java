@@ -55,8 +55,8 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
     /**
      * Sets a header to the given value, overwriting old values if present.
      *
-     * <p>Any previously set values for this header are replaced as if {@link #removeHeader(String) and
-     * {@link #addHeader(String, String)}} were called in sequence. To add a new value to a
+     * <p>Any previously set values for this header are replaced as if {@link #removeHeader(String)} and
+     * {@link #addHeader(String, String)} were called in sequence. To add a new value to a
      * list of values, use {@link #addHeader(String, String)}.
      *
      * @param name Case-insensitive name of the header to set.
@@ -70,8 +70,8 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
     /**
      * Sets a header to the given value, overwriting old values if present.
      *
-     * <p>Any previously set values for this header are replaced as if {@link #removeHeader(String) and
-     * {@link #addHeader(String, String)}} were called in sequence. To add new values to a
+     * <p>Any previously set values for this header are replaced as if {@link #removeHeader(String)} and
+     * {@link #addHeader(String, String)} were called in sequence. To add new values to a
      * list of values, use {@link #addHeader(String, List)}.
      *
      * @param name Case-insensitive name of the header to set.
@@ -83,14 +83,61 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
     }
 
     /**
+     * Set a value, but only if it isn't set already.
+     *
+     * @param name Name of the value to set.
+     * @param values Value to set.
+     * @return the previous values associated with the name, or null if there was no mapping.
+     */
+    default List<String> setHeaderIfAbsent(String name, List<String> values) {
+        var current = allValues(name);
+        if (current != null) {
+            return current;
+        } else {
+            setHeader(name, values);
+            return null;
+        }
+    }
+
+    /**
+     * Set a value, but only if it isn't set already.
+     *
+     * @param name Name of the value to set.
+     * @param value Value to set.
+     * @return the previous values associated with the name, or null if there was no mapping.
+     */
+    default List<String> setHeaderIfAbsent(String name, String value) {
+        var current = allValues(name);
+        if (current != null) {
+            return current;
+        } else {
+            setHeader(name, List.of(value));
+            return null;
+        }
+    }
+
+    /**
      * Puts the given {@code headers}, similarly to if {@link #setHeader(String, List)} were to be called for each
-     * entry in the given map.
+     * entry in the given map (leaving other headers in place).
      *
      * @param headers Map of case-insensitive header names to their values.
      */
     default void setHeaders(Map<String, List<String>> headers) {
         for (var entry : headers.entrySet()) {
             setHeader(entry.getKey(), entry.getValue());
+        }
+    }
+
+    /**
+     * Puts the given {@code headers}, similarly to if {@link #setHeader(String, List)} were to be called for each
+     * entry in the given HttpHeaders.
+     *
+     * @param headers HTTP headers to copy from.
+     */
+    default void setHeaders(HttpHeaders headers) {
+        // Note: the default implementation is overridden in SimpleModifiableHttpHeaders.
+        for (var e : headers.map().entrySet()) {
+            setHeader(e.getKey(), e.getValue());
         }
     }
 
@@ -106,8 +153,14 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
      */
     void clear();
 
-    @Override
-    default ModifiableHttpHeaders toModifiable() {
-        return this;
+    /**
+     * Create a copy of the modifiable headers.
+     *
+     * @return a copy of the modifiable headers.
+     */
+    default ModifiableHttpHeaders copy() {
+        var copy = new SimpleModifiableHttpHeaders();
+        copy.setHeaders(this);
+        return copy;
     }
 }

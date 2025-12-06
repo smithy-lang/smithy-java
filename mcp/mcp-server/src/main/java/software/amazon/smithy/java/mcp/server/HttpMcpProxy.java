@@ -104,9 +104,7 @@ public final class HttpMcpProxy extends McpServerProxy {
             byte[] body = JSON_CODEC.serializeToString(request).getBytes(StandardCharsets.UTF_8);
             LOG.trace("Sending HTTP request to {}", endpoint);
 
-            String protocolVersionHeader = protocolVersion != null
-                    ? protocolVersion
-                    : ProtocolVersion.defaultVersion().identifier();
+            String protocolVersionHeader = getProtocolVersion().identifier();
 
             HttpRequest httpRequest = HttpRequest.builder()
                     .uri(endpoint)

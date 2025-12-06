@@ -12,8 +12,17 @@ final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
 
     private int statusCode = 200;
     private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
-    private HttpHeaders headers = new SimpleModifiableHttpHeaders();
+    private ModifiableHttpHeaders headers = new SimpleModifiableHttpHeaders();
     private DataStream body = DataStream.ofEmpty();
+
+    ModifiableHttpResponseImpl() {}
+
+    ModifiableHttpResponseImpl(ModifiableHttpResponseImpl copy) {
+        this.httpVersion = copy.httpVersion;
+        this.statusCode = copy.statusCode;
+        this.headers = copy.headers.copy();
+        this.body = copy.body;
+    }
 
     @Override
     public void setStatusCode(int statusCode) {
@@ -36,7 +45,7 @@ final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
     }
 
     @Override
-    public HttpHeaders headers() {
+    public ModifiableHttpHeaders headers() {
         return headers;
     }
 
@@ -52,7 +61,33 @@ final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
 
     @Override
     public void setBody(DataStream body) {
-        this.body = Objects.requireNonNull(body);
+        if (body == null) {
+            this.body = DataStream.ofEmpty();
+        } else {
+            this.body = body;
+            addBodyHeaders(body, headers);
+        }
+    }
+
+    // Shared helper method with ModifiableHttpRequestImpl to set headers based on the provided body.
+    static void addBodyHeaders(DataStream body, ModifiableHttpHeaders headers) {
+        var ct = body.contentType();
+        if (ct != null) {
+            headers.setHeaderIfAbsent("content-type", ct);
+        }
+        if (body.hasKnownLength()) {
+            headers.setHeaderIfAbsent("content-length", String.valueOf(body.contentLength()));
+        }
+    }
+
+    @Override
+    public HttpResponse toUnmodifiable() {
+        return new HttpResponseImpl(this);
+    }
+
+    @Override
+    public ModifiableHttpResponse copy() {
+        return new ModifiableHttpResponseImpl(this);
     }
 
     @Override

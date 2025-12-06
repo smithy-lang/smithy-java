@@ -10,6 +10,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -55,6 +56,24 @@ public abstract class ModelBundler {
             Set<String> allowedWords,
             Set<String> blockedWords
     ) {
+        return cleanAndFilterModel(model,
+                allowedServiceId,
+                allowedOperations,
+                blockedOperations,
+                allowedWords,
+                blockedWords,
+                s -> true);
+    }
+
+    protected static Model cleanAndFilterModel(
+            Model model,
+            ShapeId allowedServiceId,
+            Set<String> allowedOperations,
+            Set<String> blockedOperations,
+            Set<String> allowedWords,
+            Set<String> blockedWords,
+            Predicate<Shape> unreferencedShapeKeepFilter
+    ) {
         var allowedService = model.expectShape(allowedServiceId, ServiceShape.class);
         var serviceBuilder = allowedService.toBuilder();
 
@@ -81,7 +100,8 @@ public abstract class ModelBundler {
         builder.addShape(service);
         cleanDocumentation(service, builder);
         var transformer = ModelTransformer.create();
-        return transformer.removeUnreferencedShapes(transformer.removeUnreferencedTraitDefinitions(builder.build()));
+        return transformer.removeUnreferencedShapes(transformer.removeUnreferencedTraitDefinitions(builder.build()),
+                unreferencedShapeKeepFilter);
     }
 
     static boolean isAllowed(

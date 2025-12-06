@@ -10,8 +10,8 @@ smithy-gradle-plugins = "1.3.0"
 assertj = "3.27.6"
 jackson = "2.20.1"
 netty = "4.2.7.Final"
-dep-analysis = "3.5.0"
-aws-sdk = "2.39.4"
+dep-analysis = "3.5.1"
+aws-sdk = "2.40.0"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 jreleaser = "1.21.0"
@@ -19,7 +19,8 @@ picocli = "4.7.7"
 jline = "3.30.6"
 graalvm-native = "0.11.3"
 shadow = "8.3.9"
-jazzer = "0.27.0"
+jazzer = "0.28.0"
+json-schema-validator = "1.5.5"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -64,6 +65,7 @@ hamcrest = { module = "org.hamcrest:hamcrest", version.ref = "hamcrest" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj"}
 jazzer-junit = { module = "com.code-intelligence:jazzer-junit", version.ref = "jazzer" }
 jazzer-api = { module = "com.code-intelligence:jazzer-api", version.ref = "jazzer" }
+json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "json-schema-validator"}
 
 # plugin artifacts for buildsrc plugins
 test-logger-plugin = { module = "com.adarshr:gradle-test-logger-plugin", version.ref = "test-logger-plugin" }

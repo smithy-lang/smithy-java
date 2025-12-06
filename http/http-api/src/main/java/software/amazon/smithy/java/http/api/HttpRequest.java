@@ -33,6 +33,13 @@ public interface HttpRequest extends HttpMessage {
     ModifiableHttpRequest toModifiable();
 
     /**
+     * Creates an unmodifiable copy of the request, or returns it as is if it is already unmodifiable.
+     *
+     * @return the unmodifiable version of this request.
+     */
+    HttpRequest toUnmodifiable();
+
+    /**
      * Create a builder configured with the values of the request.
      *
      * @return the created builder.
