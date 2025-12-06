@@ -16,6 +16,8 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.SmithyEnum;
 import software.amazon.smithy.java.core.schema.SmithyIntEnum;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.jmespath.JmespathException;
+import software.amazon.smithy.jmespath.JmespathExceptionType;
 import software.amazon.smithy.jmespath.RuntimeType;
 import software.amazon.smithy.jmespath.evaluation.EvaluationUtils;
 import software.amazon.smithy.jmespath.evaluation.InheritingClassMap;
@@ -27,8 +29,11 @@ import software.amazon.smithy.jmespath.evaluation.NumberType;
 
 public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
 
+    public static final GeneratedTypeJmespathRuntime INSTANCE = new GeneratedTypeJmespathRuntime();
+
     private static final InheritingClassMap<RuntimeType> typeForClass = InheritingClassMap.<RuntimeType>builder()
             .put(String.class, RuntimeType.STRING)
+            .put(SmithyEnum.class, RuntimeType.STRING)
             .put(Boolean.class, RuntimeType.BOOLEAN)
             .put(Byte.class, RuntimeType.NUMBER)
             .put(Short.class, RuntimeType.NUMBER)
@@ -39,9 +44,10 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
             .put(BigInteger.class, RuntimeType.NUMBER)
             .put(BigDecimal.class, RuntimeType.NUMBER)
             .put(Instant.class, RuntimeType.NUMBER)
-            .put(SerializableStruct.class, RuntimeType.OBJECT)
-            .put(SmithyEnum.class, RuntimeType.STRING)
             .put(SmithyIntEnum.class, RuntimeType.NUMBER)
+            .put(List.class, RuntimeType.ARRAY)
+            .put(SerializableStruct.class, RuntimeType.OBJECT)
+            .put(Map.class, RuntimeType.OBJECT)
             .build();
 
     private static final InheritingClassMap<NumberType> numberTypeForClass = InheritingClassMap.<NumberType>builder()
@@ -95,8 +101,10 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
     public String asString(Object value) {
         if (value instanceof SmithyEnum enumValue) {
             return enumValue.getValue();
+        } else if (value instanceof String s){
+            return s;
         } else {
-            return (String) value;
+            throw new JmespathException(JmespathExceptionType.INVALID_TYPE, "Incorrect runtime type: " + value);
         }
     }
 
@@ -111,7 +119,7 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
         if (numberType != null) {
             return numberType;
         }
-        throw new IllegalArgumentException();
+        throw new JmespathException(JmespathExceptionType.INVALID_TYPE, "Incorrect runtime type: " + value);
     }
 
     @Override
@@ -123,21 +131,24 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
         } else if (value instanceof SmithyIntEnum) {
             return ((SmithyIntEnum) value).getValue();
         } else {
-            throw new IllegalArgumentException();
+            throw new JmespathException(JmespathExceptionType.INVALID_TYPE, "Incorrect runtime type: " + value);
         }
     }
 
     @Override
     public Number length(Object value) {
-        if (value instanceof String s) {
-            return EvaluationUtils.codePointCount(s);
-        } else if (value instanceof Collection<?> c) {
-            return c.size();
-        } else if (value instanceof SerializableStruct struct) {
-            return struct.schema().members().size();
-        } else {
-            throw new IllegalArgumentException("Unknown runtime type: " + value);
-        }
+        return switch (typeOf(value)) {
+            case STRING -> EvaluationUtils.codePointCount((String) value);
+            case ARRAY -> ((List<?>) value).size();
+            case OBJECT -> {
+                if (value instanceof Map<?, ?>) {
+                    yield ((Map<?, ?>) value).size();
+                } else {
+                    yield ((SerializableStruct) value).schema().members().size();
+                }
+            }
+            default -> throw new JmespathException(JmespathExceptionType.INVALID_TYPE, "Incorrect runtime type: " + value);
+        };
     }
 
     @Override
@@ -154,7 +165,7 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
         } else if (value instanceof SerializableStruct struct) {
             return new MappingIterable<>(Schema::memberName, struct.schema().members());
         } else {
-            throw new IllegalArgumentException("Unknown runtime type: " + value);
+            throw new JmespathException(JmespathExceptionType.INVALID_TYPE, "Incorrect runtime type: " + value);
         }
     }
 
@@ -171,7 +182,7 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
         } else if (object instanceof Map<?, ?> map) {
             return map.get(key);
         } else {
-            throw new IllegalArgumentException();
+            return null;
         }
     }
 
