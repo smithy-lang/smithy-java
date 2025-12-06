@@ -475,7 +475,7 @@ public final class H1Exchange implements HttpExchange {
                         + " exceeds maximum of " + MAX_RESPONSE_HEADER_COUNT);
             }
 
-            String name = HttpUtils.parseHeaderLine(responseLineBuffer, lineLen, headers);
+            String name = H1Utils.parseHeaderLine(responseLineBuffer, lineLen, headers);
             if (name == null) {
                 throw new IOException("Invalid header line: "
                         + new String(responseLineBuffer, 0, lineLen, StandardCharsets.US_ASCII));

@@ -102,7 +102,7 @@ final class HttpConnectionFactory {
         Socket socket = socketFactory.newSocket(route, allEndpoints);
 
         try {
-            socket.connect(new InetSocketAddress(address, route.port()), (int) connectTimeout.toMillis());
+            socket.connect(new InetSocketAddress(address, route.port()), toIntMillis(connectTimeout));
         } catch (IOException e) {
             closeQuietly(socket);
             throw e;
@@ -130,7 +130,7 @@ final class HttpConnectionFactory {
             sslSocket.setSSLParameters(params);
 
             int originalTimeout = sslSocket.getSoTimeout();
-            sslSocket.setSoTimeout((int) tlsNegotiationTimeout.toMillis());
+            sslSocket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
             try {
                 sslSocket.startHandshake();
             } finally {
@@ -223,8 +223,7 @@ final class HttpConnectionFactory {
         Socket proxySocket = socketFactory.newSocket(route, allProxyEndpoints);
 
         try {
-            int timeoutMillis = (int) connectTimeout.toMillis();
-            proxySocket.connect(new InetSocketAddress(proxyAddress, proxy.port()), timeoutMillis);
+            proxySocket.connect(new InetSocketAddress(proxyAddress, proxy.port()), toIntMillis(connectTimeout));
 
             // Connect to the proxy over TLS if the scheme is https
             if ("https".equalsIgnoreCase(proxy.proxyUri().getScheme())) {
@@ -267,7 +266,7 @@ final class HttpConnectionFactory {
             sslSocket.setSSLParameters(params);
 
             int originalTimeout = sslSocket.getSoTimeout();
-            sslSocket.setSoTimeout((int) tlsNegotiationTimeout.toMillis());
+            sslSocket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
             try {
                 sslSocket.startHandshake();
             } finally {
@@ -276,8 +275,17 @@ final class HttpConnectionFactory {
 
             return sslSocket;
         } catch (IOException e) {
+            closeQuietly(socket);
             throw new IOException("TLS handshake to HTTPS proxy " + proxy.hostname() + " failed", e);
         }
+    }
+
+    /**
+     * Convert Duration to int milliseconds, clamping to Integer.MAX_VALUE to avoid overflow.
+     */
+    private static int toIntMillis(Duration d) {
+        long ms = d.toMillis();
+        return ms > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) ms;
     }
 
     private static void closeQuietly(Socket socket) {

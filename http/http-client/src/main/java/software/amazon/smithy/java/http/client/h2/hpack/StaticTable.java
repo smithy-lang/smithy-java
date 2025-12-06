@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.http.client.h2.hpack;
 
+import software.amazon.smithy.java.http.api.HeaderNames;
+
 /**
  * HPACK static table from RFC 7541 Appendix A.
  *
@@ -13,6 +15,8 @@ package software.amazon.smithy.java.http.client.h2.hpack;
  * <p>This implementation uses length-based bucketing for fast lookups with zero per-lookup
  * allocations. Entries are grouped by header name length, so lookups only scan candidates
  * with matching name length (typically 1-3 entries per bucket).
+ *
+ * <p>Header names use constants from {@link HeaderNames} to enable pointer comparisons.
  */
 final class StaticTable {
 
@@ -24,72 +28,74 @@ final class StaticTable {
     static final int SIZE = 61;
 
     /**
-     * Static table entries. Index 0 is unused (indices are 1-based).
-     * Each entry is {name, value} where value may be empty string.
+     * Static table entries as pre-allocated HeaderField instances.
+     * Index 0 is unused (indices are 1-based per RFC 7541).
+     *
+     * <p>Names use HeaderNameRegistry constants for pointer equality.
      */
-    private static final String[][] ENTRIES = {
+    private static final HeaderField[] ENTRIES = {
             null, // Index 0 unused
-            {":authority", ""}, // 1
-            {":method", "GET"}, // 2
-            {":method", "POST"}, // 3
-            {":path", "/"}, // 4
-            {":path", "/index.html"}, // 5
-            {":scheme", "http"}, // 6
-            {":scheme", "https"}, // 7
-            {":status", "200"}, // 8
-            {":status", "204"}, // 9
-            {":status", "206"}, // 10
-            {":status", "304"}, // 11
-            {":status", "400"}, // 12
-            {":status", "404"}, // 13
-            {":status", "500"}, // 14
-            {"accept-charset", ""}, // 15
-            {"accept-encoding", "gzip, deflate"}, // 16
-            {"accept-language", ""}, // 17
-            {"accept-ranges", ""}, // 18
-            {"accept", ""}, // 19
-            {"access-control-allow-origin", ""}, // 20
-            {"age", ""}, // 21
-            {"allow", ""}, // 22
-            {"authorization", ""}, // 23
-            {"cache-control", ""}, // 24
-            {"content-disposition", ""}, // 25
-            {"content-encoding", ""}, // 26
-            {"content-language", ""}, // 27
-            {"content-length", ""}, // 28
-            {"content-location", ""}, // 29
-            {"content-range", ""}, // 30
-            {"content-type", ""}, // 31
-            {"cookie", ""}, // 32
-            {"date", ""}, // 33
-            {"etag", ""}, // 34
-            {"expect", ""}, // 35
-            {"expires", ""}, // 36
-            {"from", ""}, // 37
-            {"host", ""}, // 38
-            {"if-match", ""}, // 39
-            {"if-modified-since", ""}, // 40
-            {"if-none-match", ""}, // 41
-            {"if-range", ""}, // 42
-            {"if-unmodified-since", ""}, // 43
-            {"last-modified", ""}, // 44
-            {"link", ""}, // 45
-            {"location", ""}, // 46
-            {"max-forwards", ""}, // 47
-            {"proxy-authenticate", ""}, // 48
-            {"proxy-authorization", ""}, // 49
-            {"range", ""}, // 50
-            {"referer", ""}, // 51
-            {"refresh", ""}, // 52
-            {"retry-after", ""}, // 53
-            {"server", ""}, // 54
-            {"set-cookie", ""}, // 55
-            {"strict-transport-security", ""}, // 56
-            {"transfer-encoding", ""}, // 57
-            {"user-agent", ""}, // 58
-            {"vary", ""}, // 59
-            {"via", ""}, // 60
-            {"www-authenticate", ""} // 61
+            new HeaderField(HeaderNames.PSEUDO_AUTHORITY, ""), // 1
+            new HeaderField(HeaderNames.PSEUDO_METHOD, "GET"), // 2
+            new HeaderField(HeaderNames.PSEUDO_METHOD, "POST"), // 3
+            new HeaderField(HeaderNames.PSEUDO_PATH, "/"), // 4
+            new HeaderField(HeaderNames.PSEUDO_PATH, "/index.html"), // 5
+            new HeaderField(HeaderNames.PSEUDO_SCHEME, "http"), // 6
+            new HeaderField(HeaderNames.PSEUDO_SCHEME, "https"), // 7
+            new HeaderField(HeaderNames.PSEUDO_STATUS, "200"), // 8
+            new HeaderField(HeaderNames.PSEUDO_STATUS, "204"), // 9
+            new HeaderField(HeaderNames.PSEUDO_STATUS, "206"), // 10
+            new HeaderField(HeaderNames.PSEUDO_STATUS, "304"), // 11
+            new HeaderField(HeaderNames.PSEUDO_STATUS, "400"), // 12
+            new HeaderField(HeaderNames.PSEUDO_STATUS, "404"), // 13
+            new HeaderField(HeaderNames.PSEUDO_STATUS, "500"), // 14
+            new HeaderField(HeaderNames.ACCEPT_CHARSET, ""), // 15
+            new HeaderField(HeaderNames.ACCEPT_ENCODING, "gzip, deflate"), // 16
+            new HeaderField(HeaderNames.ACCEPT_LANGUAGE, ""), // 17
+            new HeaderField(HeaderNames.ACCEPT_RANGES, ""), // 18
+            new HeaderField(HeaderNames.ACCEPT, ""), // 19
+            new HeaderField(HeaderNames.ACCESS_CONTROL_ALLOW_ORIGIN, ""), // 20
+            new HeaderField(HeaderNames.AGE, ""), // 21
+            new HeaderField(HeaderNames.ALLOW, ""), // 22
+            new HeaderField(HeaderNames.AUTHORIZATION, ""), // 23
+            new HeaderField(HeaderNames.CACHE_CONTROL, ""), // 24
+            new HeaderField(HeaderNames.CONTENT_DISPOSITION, ""), // 25
+            new HeaderField(HeaderNames.CONTENT_ENCODING, ""), // 26
+            new HeaderField(HeaderNames.CONTENT_LANGUAGE, ""), // 27
+            new HeaderField(HeaderNames.CONTENT_LENGTH, ""), // 28
+            new HeaderField(HeaderNames.CONTENT_LOCATION, ""), // 29
+            new HeaderField(HeaderNames.CONTENT_RANGE, ""), // 30
+            new HeaderField(HeaderNames.CONTENT_TYPE, ""), // 31
+            new HeaderField(HeaderNames.COOKIE, ""), // 32
+            new HeaderField(HeaderNames.DATE, ""), // 33
+            new HeaderField(HeaderNames.ETAG, ""), // 34
+            new HeaderField(HeaderNames.EXPECT, ""), // 35
+            new HeaderField(HeaderNames.EXPIRES, ""), // 36
+            new HeaderField(HeaderNames.FROM, ""), // 37
+            new HeaderField(HeaderNames.HOST, ""), // 38
+            new HeaderField(HeaderNames.IF_MATCH, ""), // 39
+            new HeaderField(HeaderNames.IF_MODIFIED_SINCE, ""), // 40
+            new HeaderField(HeaderNames.IF_NONE_MATCH, ""), // 41
+            new HeaderField(HeaderNames.IF_RANGE, ""), // 42
+            new HeaderField(HeaderNames.IF_UNMODIFIED_SINCE, ""), // 43
+            new HeaderField(HeaderNames.LAST_MODIFIED, ""), // 44
+            new HeaderField(HeaderNames.LINK, ""), // 45
+            new HeaderField(HeaderNames.LOCATION, ""), // 46
+            new HeaderField(HeaderNames.MAX_FORWARDS, ""), // 47
+            new HeaderField(HeaderNames.PROXY_AUTHENTICATE, ""), // 48
+            new HeaderField(HeaderNames.PROXY_AUTHORIZATION, ""), // 49
+            new HeaderField(HeaderNames.RANGE, ""), // 50
+            new HeaderField(HeaderNames.REFERER, ""), // 51
+            new HeaderField(HeaderNames.REFRESH, ""), // 52
+            new HeaderField(HeaderNames.RETRY_AFTER, ""), // 53
+            new HeaderField(HeaderNames.SERVER, ""), // 54
+            new HeaderField(HeaderNames.SET_COOKIE, ""), // 55
+            new HeaderField(HeaderNames.STRICT_TRANSPORT_SECURITY, ""), // 56
+            new HeaderField(HeaderNames.TRANSFER_ENCODING, ""), // 57
+            new HeaderField(HeaderNames.USER_AGENT, ""), // 58
+            new HeaderField(HeaderNames.VARY, ""), // 59
+            new HeaderField(HeaderNames.VIA, ""), // 60
+            new HeaderField(HeaderNames.WWW_AUTHENTICATE, "") // 61
     };
 
     /**
@@ -113,7 +119,7 @@ final class StaticTable {
         // Find max name length
         int maxLen = 0;
         for (int i = 1; i <= SIZE; i++) {
-            int len = ENTRIES[i][0].length();
+            int len = ENTRIES[i].name().length();
             if (len > maxLen) {
                 maxLen = len;
             }
@@ -123,7 +129,7 @@ final class StaticTable {
         // First pass: count entries per length
         int[] counts = new int[MAX_NAME_LEN + 1];
         for (int i = 1; i <= SIZE; i++) {
-            counts[ENTRIES[i][0].length()]++;
+            counts[ENTRIES[i].name().length()]++;
         }
 
         // Allocate buckets (empty bucket for lengths with no entries)
@@ -135,7 +141,7 @@ final class StaticTable {
         // Second pass: fill buckets
         int[] pos = new int[MAX_NAME_LEN + 1];
         for (int i = 1; i <= SIZE; i++) {
-            int len = ENTRIES[i][0].length();
+            int len = ENTRIES[i].name().length();
             buckets[len][pos[len]++] = i;
         }
 
@@ -143,31 +149,13 @@ final class StaticTable {
     }
 
     /**
-     * Get the header name at the given index.
+     * Get the header field at the given index.
      *
      * @param index 1-based index into static table
-     * @return header name
-     * @throws IndexOutOfBoundsException if index is out of range
+     * @return header field
      */
-    static String getName(int index) {
-        if (index < 1 || index > SIZE) {
-            throw new IndexOutOfBoundsException("Static table index out of range: " + index);
-        }
-        return ENTRIES[index][0];
-    }
-
-    /**
-     * Get the header value at the given index.
-     *
-     * @param index 1-based index into static table
-     * @return header value (may be empty string)
-     * @throws IndexOutOfBoundsException if index is out of range
-     */
-    static String getValue(int index) {
-        if (index < 1 || index > SIZE) {
-            throw new IndexOutOfBoundsException("Static table index out of range: " + index);
-        }
-        return ENTRIES[index][1];
+    static HeaderField get(int index) {
+        return ENTRIES[index];
     }
 
     /**
@@ -183,8 +171,9 @@ final class StaticTable {
             return -1;
         }
         for (int idx : NAME_BUCKETS_BY_LEN[len]) {
-            String[] e = ENTRIES[idx];
-            if (e[0].equals(name) && e[1].equals(value)) {
+            HeaderField e = ENTRIES[idx];
+            var entryName = e.name();
+            if ((entryName == name || entryName.equals(name)) && e.value().equals(value)) {
                 return idx;
             }
         }
@@ -201,7 +190,9 @@ final class StaticTable {
         int len = name.length();
         if (len <= MAX_NAME_LEN) {
             for (int idx : NAME_BUCKETS_BY_LEN[len]) {
-                if (ENTRIES[idx][0].equals(name)) {
+                var entry = ENTRIES[idx];
+                var entryName = entry.name();
+                if (entryName == name || entryName.equals(name)) {
                     return idx;
                 }
             }

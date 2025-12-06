@@ -21,7 +21,7 @@ public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
      * @return the created headers.
      */
     static HttpHeaders of(Map<String, List<String>> headers) {
-        return headers.isEmpty() ? SimpleUnmodifiableHttpHeaders.EMPTY : new SimpleUnmodifiableHttpHeaders(headers);
+        return ArrayUnmodifiableHttpHeaders.of(headers);
     }
 
     /**
@@ -30,7 +30,17 @@ public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
      * @return the created headers.
      */
     static ModifiableHttpHeaders ofModifiable() {
-        return new SimpleModifiableHttpHeaders();
+        return new ArrayHttpHeaders();
+    }
+
+    /**
+     * Creates a mutable headers with expected capacity.
+     *
+     * @param expectedPairs expected number of header name-value pairs
+     * @return the created headers.
+     */
+    static ModifiableHttpHeaders ofModifiable(int expectedPairs) {
+        return new ArrayHttpHeaders(expectedPairs);
     }
 
     /**
@@ -110,7 +120,17 @@ public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
      * @return the created modifiable headers.
      */
     default ModifiableHttpHeaders toModifiable() {
-        return SimpleModifiableHttpHeaders.of(this);
+        if (this instanceof ModifiableHttpHeaders m) {
+            return m;
+        } else if (this instanceof ArrayUnmodifiableHttpHeaders) {
+            return ((ArrayUnmodifiableHttpHeaders) this).toModifiable();
+        } else {
+            ModifiableHttpHeaders copy = new ArrayHttpHeaders(size());
+            for (var e : map().entrySet()) {
+                copy.addHeader(e.getKey(), e.getValue());
+            }
+            return copy;
+        }
     }
 
     /**
@@ -119,6 +139,6 @@ public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
      * @return the unmodifiable headers.
      */
     default HttpHeaders toUnmodifiable() {
-        return SimpleUnmodifiableHttpHeaders.of(this);
+        return ArrayUnmodifiableHttpHeaders.of(this);
     }
 }

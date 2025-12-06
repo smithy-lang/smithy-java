@@ -13,7 +13,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.IntFunction;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -40,11 +39,11 @@ final class H1ConnectionManager {
      * Try to acquire a pooled connection for the route.
      *
      * @param route the route
-     * @param poolFactory
+     * @param maxConnections max pooled connections for this route (used if pool doesn't exist)
      * @return a valid pooled connection, or null if none available
      */
-    PooledConnection tryAcquire(Route route, IntFunction<HostPool> poolFactory) {
-        HostPool hostPool = pools.computeIfAbsent(route, k -> poolFactory.apply(0));
+    PooledConnection tryAcquire(Route route, int maxConnections) {
+        HostPool hostPool = pools.computeIfAbsent(route, k -> new HostPool(maxConnections));
 
         PooledConnection pooled;
         while ((pooled = hostPool.poll()) != null) {

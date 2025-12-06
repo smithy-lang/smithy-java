@@ -17,12 +17,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.SocketTimeoutException;
-import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,14 +32,14 @@ import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
 import software.amazon.smithy.java.http.client.DelegatedClosingInputStream;
 import software.amazon.smithy.java.http.client.DelegatedClosingOutputStream;
 import software.amazon.smithy.java.http.client.HttpExchange;
-import software.amazon.smithy.java.http.client.h2.hpack.HpackDecoder;
+import software.amazon.smithy.java.http.client.h2.hpack.HeaderField;
 
 /**
  * HTTP/2 exchange implementation for a single stream with multiplexing support.
  *
  * <p>This class manages the lifecycle of a single HTTP/2 stream (request/response pair).
- * Events (headers, data, errors) are received from the connection's reader thread via a
- * single {@link StreamEvent} queue.
+ * Response data is received from the connection's reader thread directly into a buffer,
+ * avoiding per-frame allocations. Headers and errors are signaled via condition variables.
  *
  * <h2>Stream Lifecycle</h2>
  * <ol>
@@ -52,6 +49,11 @@ import software.amazon.smithy.java.http.client.h2.hpack.HpackDecoder;
  *   <li>{@link #responseBody()} returns input stream for response DATA frames</li>
  *   <li>{@link #close()} sends RST_STREAM if needed and unregisters stream</li>
  * </ol>
+ *
+ * <h2>Zero-Allocation Read Path</h2>
+ * <p>The reader thread writes DATA frame payloads directly into {@code dataBuffer}.
+ * The user thread reads directly from this buffer. Flow control ensures the buffer
+ * never overflows: we only send WINDOW_UPDATE after user reads consume data.
  */
 public final class H2Exchange implements HttpExchange {
 
@@ -66,6 +68,16 @@ public final class H2Exchange implements HttpExchange {
         CLOSED // Both directions closed
     }
 
+    /**
+     * Read-side state machine for response processing.
+     */
+    enum ReadState {
+        WAITING_HEADERS, // Initial state, waiting for response HEADERS
+        READING_DATA, // Got headers, now streaming DATA
+        DONE, // END_STREAM received
+        ERROR // Error occurred
+    }
+
     // Request pseudo-headers (only allowed in requests, not responses)
     private static final Set<String> REQUEST_PSEUDO_HEADERS = Set.of(
             ":method",
@@ -76,14 +88,30 @@ public final class H2Exchange implements HttpExchange {
     // Shared empty array to avoid allocation
     private static final byte[] EMPTY_DATA = new byte[0];
 
-    private final H2Connection connection;
+    private final H2Muxer muxer;
     private final HttpRequest request;
     private volatile int streamId;
 
-    // Unified event queue - all stream events flow through here
-    // Producer: connection's reader thread
-    // Consumer: exchange methods (readResponseHeaders, readDataChunk)
-    private final BlockingQueue<StreamEvent> eventQueue = new LinkedBlockingQueue<>();
+    // Pending headers from reader thread (protected by dataLock)
+    private List<HeaderField> pendingHeaders;
+    private boolean pendingHeadersEndStream;
+
+    // === Data buffer for zero-allocation read path ===
+    // Lazily allocated when first DATA frame arrives. Size = initial flow control window.
+    // Flow control ensures server can't send more than this before we send WINDOW_UPDATE.
+    private byte[] dataBuffer;
+
+    // Buffer positions - protected by dataLock
+    // writePos: where reader thread writes next (reader-thread owned, but read by user under lock)
+    // readPos: where user reads next (user-thread owned)
+    private int writePos = 0;
+    private int readPos = 0;
+
+    // Read-side state machine and synchronization
+    private final ReentrantLock dataLock = new ReentrantLock();
+    private final Condition dataAvailable = dataLock.newCondition();
+    private volatile ReadState readState = ReadState.WAITING_HEADERS;
+    private volatile IOException readError;
 
     // Stream state machine per RFC 9113 Section 5.1
     private volatile StreamState streamState = StreamState.IDLE;
@@ -97,9 +125,6 @@ public final class H2Exchange implements HttpExchange {
     private volatile HttpHeaders responseHeaders;
     private volatile boolean responseHeadersReceived = false;
     private volatile boolean endStreamReceived = false;
-
-    // Informational responses (1xx) per RFC 9113 Section 8.1.1
-    private final List<InformationalResponse> informationalResponses = new ArrayList<>();
 
     // Trailer headers per RFC 9113 Section 8.1
     private volatile HttpHeaders trailerHeaders;
@@ -122,33 +147,38 @@ public final class H2Exchange implements HttpExchange {
     // Auto-close tracking: exchange closes when both streams are closed (count reaches 2)
     private final AtomicInteger closedStreamCount = new AtomicInteger(0);
 
-    // Flow control with signaling
-    // streamSendWindow is protected by flowControlLock (accessed by writer and reader threads)
-    // streamRecvWindow is only accessed by application thread in readDataChunk() (single-threaded)
-    private final ReentrantLock flowControlLock = new ReentrantLock();
-    private final Condition windowAvailable = flowControlLock.newCondition();
-    private int streamSendWindow;
+    // Flow control
+    // sendWindow: Semaphore-based, VT blocks naturally when exhausted (no lock needed)
+    // streamRecvWindow: only accessed by application thread in readDataChunk() (single-threaded)
+    private final FlowControlWindow sendWindow;
     private int streamRecvWindow;
+
+    // === OUTBOUND PATH (VT → Writer) ===
+    // Pending writes queued by VT, drained by writer thread
+    // ConcurrentLinkedQueue is lock-free and safe for concurrent producer/consumer access
+    final ConcurrentLinkedQueue<PendingWrite> pendingWrites = new ConcurrentLinkedQueue<>();
+    // Flag to prevent duplicate additions to connection's work queue
+    volatile boolean inWorkQueue;
 
     /**
      * Create a new HTTP/2 exchange without a stream ID.
      *
      * <p>The stream ID will be assigned later via {@link #setStreamId} when
-     * the connection allocates it under lock. This allows exchange construction
-     * to happen outside the critical section.
+     * the muxer allocates it. This allows exchange construction to happen
+     * outside the critical section.
      *
-     * @param connection the HTTP/2 connection
+     * @param muxer the muxer managing this stream
      * @param request the HTTP request
-     * @param readTimeout timeout for waiting on response data
-     * @param writeTimeout timeout for waiting on flow control window
+     * @param readTimeoutMs timeout in milliseconds for waiting on response data
+     * @param writeTimeoutMs timeout in milliseconds for waiting on flow control window
      */
-    H2Exchange(H2Connection connection, HttpRequest request, Duration readTimeout, Duration writeTimeout) {
-        this.connection = connection;
+    H2Exchange(H2Muxer muxer, HttpRequest request, long readTimeoutMs, long writeTimeoutMs) {
+        this.muxer = muxer;
         this.request = request;
         this.streamId = -1; // Will be set later
-        this.readTimeoutMs = readTimeout.toMillis();
-        this.writeTimeoutMs = writeTimeout.toMillis();
-        this.streamSendWindow = connection.getRemoteInitialWindowSize();
+        this.readTimeoutMs = readTimeoutMs;
+        this.writeTimeoutMs = writeTimeoutMs;
+        this.sendWindow = new FlowControlWindow(muxer.getRemoteInitialWindowSize());
         this.streamRecvWindow = DEFAULT_INITIAL_WINDOW_SIZE;
     }
 
@@ -157,6 +187,31 @@ public final class H2Exchange implements HttpExchange {
      */
     void setStreamId(int streamId) {
         this.streamId = streamId;
+    }
+
+    /**
+     * Get the stream ID.
+     */
+    int getStreamId() {
+        return streamId;
+    }
+
+    /**
+     * Get the muxer for this exchange.
+     */
+    H2Muxer getMuxer() {
+        return muxer;
+    }
+
+    /**
+     * Return a buffer to the muxer's pool.
+     *
+     * <p>Called by the writer thread after consuming a PendingWrite.
+     *
+     * @param buffer the buffer to return
+     */
+    void returnBuffer(byte[] buffer) {
+        muxer.returnBuffer(buffer);
     }
 
     /**
@@ -177,52 +232,171 @@ public final class H2Exchange implements HttpExchange {
     }
 
     /**
-     * Called by connection's reader thread to deliver an event.
+     * Called by connection's reader thread to deliver response headers.
      *
-     * <p>All stream events (headers, data, errors) flow through this single method.
-     * The reader thread is the only producer; exchange methods are the only consumers.
+     * <p>Headers are decoded by the reader thread to ensure HPACK state consistency.
+     * This method signals the user thread that headers are available.
+     *
+     * @param fields the decoded header fields
+     * @param endStream whether END_STREAM flag was set
      */
-    void enqueueEvent(StreamEvent event) {
-        eventQueue.add(event);
+    void deliverHeaders(List<HeaderField> fields, boolean endStream) {
+        dataLock.lock();
+        try {
+            // Process headers and update state (will be called from reader thread)
+            // The actual header processing happens here rather than in user thread
+            // to avoid needing a separate queue for headers
+            pendingHeaders = fields;
+            pendingHeadersEndStream = endStream;
+            dataAvailable.signalAll();
+        } finally {
+            dataLock.unlock();
+        }
     }
 
     /**
      * Called by connection when it's closing.
      *
-     * <p>Note: We set endStreamReceived but NOT streamState here. Setting streamState
-     * would race with pending events in the queue - handleHeadersEvent checks
-     * streamState and would throw a protocol error for legitimate pending events.
-     * The error event will be processed after pending events.
+     * <p>Signals the user thread that the connection has closed with an error.
      */
     void signalConnectionClosed(Throwable error) {
-        this.endStreamReceived = true;
-        IOException cause = (error instanceof IOException ioe) ? ioe : new IOException("Connection closed", error);
-        eventQueue.add(new StreamEvent.ConnectionError(cause));
+        dataLock.lock();
+        try {
+            this.endStreamReceived = true;
+            this.readError = (error instanceof IOException ioe) ? ioe : new IOException("Connection closed", error);
+            this.readState = ReadState.ERROR;
+            dataAvailable.signalAll();
+        } finally {
+            dataLock.unlock();
+        }
     }
 
     /**
      * Called by reader thread when a per-stream error occurs (e.g., RST_STREAM).
      *
-     * <p>This allows readResponseHeaders() and readDataChunk() to fail fast with
-     * a meaningful error instead of timing out.
-     *
-     * <p>Note: We set endStreamReceived but NOT streamState to avoid racing with
-     * pending events in the queue.
+     * <p>This allows read operations to fail fast with a meaningful error
+     * instead of timing out.
      */
     void signalStreamError(H2Exception error) {
-        this.endStreamReceived = true;
-        eventQueue.add(new StreamEvent.StreamError(error));
+        dataLock.lock();
+        try {
+            this.endStreamReceived = true;
+            this.readError = new IOException("Stream error", error);
+            this.readState = ReadState.ERROR;
+            dataAvailable.signalAll();
+        } finally {
+            dataLock.unlock();
+        }
     }
 
     /**
-     * Called by connection when WINDOW_UPDATE is received.
+     * Get the data buffer for direct writes by the reader thread.
+     *
+     * <p>Must be called while holding dataLock (via ensureBufferSpace).
      */
-    void signalWindowUpdate() {
-        flowControlLock.lock();
+    byte[] getDataBuffer() {
+        return dataBuffer;
+    }
+
+    /**
+     * Get the current write position for direct writes by the reader thread.
+     *
+     * <p>Must be called while holding dataLock (via ensureBufferSpace).
+     */
+    int getWritePos() {
+        return writePos;
+    }
+
+    /**
+     * Called by reader thread after writing data to advance the write position.
+     *
+     * <p>Note: We do NOT call updateStreamStateOnEndStream() here. The stream
+     * state transition happens when the user finishes reading (returns -1),
+     * not when data arrives. This avoids race conditions where the stream
+     * transitions to CLOSED before the user processes pending headers.
+     *
+     * @param bytesWritten number of bytes written
+     * @param endStream whether END_STREAM flag was set
+     */
+    void commitWrite(int bytesWritten, boolean endStream) {
+        dataLock.lock();
         try {
-            windowAvailable.signalAll();
+            writePos += bytesWritten;
+            if (endStream) {
+                this.endStreamReceived = true;
+                this.readState = ReadState.DONE;
+                // Don't update streamState here - it will be updated when
+                // the user finishes reading and we return -1
+            }
+            dataAvailable.signalAll();
         } finally {
-            flowControlLock.unlock();
+            dataLock.unlock();
+        }
+    }
+
+    // Initial buffer size - small to avoid waste on tiny responses
+    private static final int INITIAL_BUFFER_SIZE = 1024;
+
+    /**
+     * Called by reader thread to ensure buffer has space, allocating or compacting as needed.
+     *
+     * <p>Buffer is borrowed from the connection's pool when first needed, and returned
+     * when the exchange is closed. This reduces GC pressure for repeated requests.
+     *
+     * @param requiredSpace the amount of space needed
+     * @return true if space is available, false if buffer is genuinely full
+     */
+    boolean ensureBufferSpace(int requiredSpace) {
+        dataLock.lock();
+        try {
+            // Lazy allocation on first DATA frame - borrow from connection pool
+            if (dataBuffer == null) {
+                int size = Math.max(INITIAL_BUFFER_SIZE, requiredSpace);
+                size = Math.min(size, DEFAULT_INITIAL_WINDOW_SIZE);
+                dataBuffer = muxer.borrowBuffer(size);
+                return true;
+            }
+
+            if (writePos + requiredSpace <= dataBuffer.length) {
+                // Already have space
+                return true;
+            }
+
+            // Try compaction first
+            if (readPos > 0) {
+                int remaining = writePos - readPos;
+                if (remaining > 0) {
+                    System.arraycopy(dataBuffer, readPos, dataBuffer, 0, remaining);
+                }
+                writePos = remaining;
+                readPos = 0;
+
+                if (writePos + requiredSpace <= dataBuffer.length) {
+                    return true;
+                }
+            }
+
+            // Need to grow buffer - get a larger one from pool
+            int newSize = dataBuffer.length * 2;
+            while (newSize < writePos + requiredSpace) {
+                newSize *= 2;
+            }
+            newSize = Math.min(newSize, DEFAULT_INITIAL_WINDOW_SIZE);
+
+            if (writePos + requiredSpace > newSize) {
+                return false;
+            }
+
+            byte[] oldBuffer = dataBuffer;
+            dataBuffer = muxer.borrowBuffer(newSize);
+            if (writePos > 0) {
+                System.arraycopy(oldBuffer, 0, dataBuffer, 0, writePos);
+            }
+            // Return old buffer to pool
+            muxer.returnBuffer(oldBuffer);
+            return true;
+        } finally {
+            dataLock.unlock();
         }
     }
 
@@ -230,15 +404,7 @@ public final class H2Exchange implements HttpExchange {
      * Called by connection when SETTINGS changes initial window size.
      */
     void adjustSendWindow(int delta) {
-        flowControlLock.lock();
-        try {
-            streamSendWindow += delta;
-            if (streamSendWindow > 0) {
-                windowAvailable.signalAll();
-            }
-        } finally {
-            flowControlLock.unlock();
-        }
+        sendWindow.adjust(delta);
     }
 
     @Override
@@ -252,7 +418,7 @@ public final class H2Exchange implements HttpExchange {
             // If no request body is expected, then return a no-op stream.
             H2DataOutputStream rawOut = endStreamSent
                     ? new H2DataOutputStream(this, 0)
-                    : new H2DataOutputStream(this, connection.getRemoteMaxFrameSize());
+                    : new H2DataOutputStream(this, muxer.getRemoteMaxFrameSize());
             requestOut = new DelegatedClosingOutputStream(rawOut, rw -> {
                 rw.close(); // Send END_STREAM
                 onRequestStreamClosed();
@@ -333,12 +499,30 @@ public final class H2Exchange implements HttpExchange {
         // If response not fully received and stream was started, queue RST_STREAM
         if (!endStreamReceived && streamId > 0 && streamState != StreamState.CLOSED) {
             try {
-                connection.queueRst(streamId, ERROR_CANCEL);
+                // Short timeout for cleanup
+                muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.RST_STREAM, ERROR_CANCEL, 100);
             } catch (IOException ignored) {
                 // Best-effort cleanup. If queue is full, stream is closing anyway.
             }
-            // Signal end to any waiting consumers only if stream didn't end naturally
-            eventQueue.add(StreamEvent.DataChunk.END);
+            // Signal end to any waiting consumers
+            dataLock.lock();
+            try {
+                readState = ReadState.DONE;
+                dataAvailable.signalAll();
+            } finally {
+                dataLock.unlock();
+            }
+        }
+
+        // Return buffer to connection pool for reuse
+        dataLock.lock();
+        try {
+            if (dataBuffer != null) {
+                muxer.returnBuffer(dataBuffer);
+                dataBuffer = null;
+            }
+        } finally {
+            dataLock.unlock();
         }
 
         // Mark stream as closed
@@ -346,67 +530,81 @@ public final class H2Exchange implements HttpExchange {
 
         // Unregister from connection (only if stream was registered)
         if (streamId > 0) {
-            connection.unregisterStream(streamId);
+            muxer.releaseStream(streamId);
         }
     }
 
     /**
-     * Poll for the next event from the event queue.
+     * Wait for the next event from the reader thread.
      *
-     * <p>This is a simple blocking poll with timeout. Error events are handled
-     * inline by callers to avoid double pattern matching on the hot path.
+     * <p>Used for waiting on headers and errors. Data is read directly from
+     * the buffer, not via this method.
      *
-     * @return the next event (may be an error event)
      * @throws SocketTimeoutException if read timeout expires
-     * @throws IOException if interrupted
+     * @throws IOException if interrupted or error occurred
      */
-    private StreamEvent pollEvent() throws IOException {
+    private void awaitEvent() throws IOException {
+        dataLock.lock();
         try {
-            StreamEvent event = eventQueue.poll(readTimeoutMs, TimeUnit.MILLISECONDS);
-            if (event == null) {
-                throw new SocketTimeoutException("Read timed out after " + readTimeoutMs + "ms waiting for response");
+            // Wait for headers, error, or data (which also signals)
+            while (pendingHeaders == null && readState != ReadState.ERROR && readState != ReadState.DONE) {
+                if (!dataAvailable.await(readTimeoutMs, TimeUnit.MILLISECONDS)) {
+                    throw new SocketTimeoutException(
+                            "Read timed out after " + readTimeoutMs + "ms waiting for response");
+                }
             }
-            return event;
+
+            // Check for error
+            if (readState == ReadState.ERROR) {
+                throw readError;
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IOException("Interrupted waiting for stream event", e);
+            throw new IOException("Interrupted waiting for response", e);
+        } finally {
+            dataLock.unlock();
         }
     }
 
     /**
-     * Read and parse response headers from the event queue.
+     * Read and parse response headers.
      *
      * <p>Headers are decoded by the connection's reader thread to ensure
      * HPACK dynamic table consistency across all streams.
      */
     private void readResponseHeaders() throws IOException {
         while (!responseHeadersReceived) {
-            switch (pollEvent()) {
-                case StreamEvent.Headers h -> handleHeadersEvent(h);
-                case StreamEvent.DataChunk chunk -> throw new H2Exception(ERROR_PROTOCOL_ERROR,
-                        streamId,
-                        "Received DATA before response headers");
-                case StreamEvent.StreamError se -> throw new IOException(
-                        "Stream error before response headers",
-                        se.cause());
-                case StreamEvent.ConnectionError ce -> throw new IOException(
-                        "Connection error before response headers",
-                        ce.cause());
+            awaitEvent();
+
+            dataLock.lock();
+            try {
+                if (pendingHeaders != null) {
+                    List<HeaderField> fields = pendingHeaders;
+                    boolean endStream = pendingHeadersEndStream;
+                    pendingHeaders = null; // Consume the headers
+
+                    // Process headers (can throw)
+                    handleHeadersEvent(fields, endStream);
+                } else if (readState == ReadState.DONE) {
+                    throw new IOException("Stream ended before response headers received");
+                }
+            } finally {
+                dataLock.unlock();
             }
         }
     }
 
     /**
      * Handle a headers event during response reading.
+     *
+     * @param fields the decoded header fields
+     * @param isEndStream whether END_STREAM flag was set
      */
-    private void handleHeadersEvent(StreamEvent.Headers event) throws IOException {
+    private void handleHeadersEvent(List<HeaderField> fields, boolean isEndStream) throws IOException {
         // Validate stream state per RFC 9113 Section 5.1
         if (streamState == StreamState.CLOSED) {
             throw new H2Exception(ERROR_STREAM_CLOSED, streamId, "Received HEADERS on closed stream");
         }
-
-        List<HpackDecoder.HeaderField> fields = event.fields();
-        boolean isEndStream = event.endStream();
 
         if (!responseHeadersReceived) {
             // This is either informational (1xx) or final response headers
@@ -427,8 +625,13 @@ public final class H2Exchange implements HttpExchange {
 
         if (isEndStream) {
             endStreamReceived = true;
+            readState = ReadState.DONE;
             updateStreamStateOnEndStream();
             validateContentLength();
+        } else if (responseHeadersReceived && readState != ReadState.DONE) {
+            // Got final headers, transition to READING_DATA
+            // (but don't overwrite DONE if DATA+END_STREAM already arrived)
+            readState = ReadState.READING_DATA;
         }
     }
 
@@ -451,13 +654,13 @@ public final class H2Exchange implements HttpExchange {
      * @param fields the decoded header fields
      * @param isEndStream whether this HEADERS frame has END_STREAM flag
      */
-    private void processResponseHeaders(List<HpackDecoder.HeaderField> fields, boolean isEndStream) throws IOException {
+    private void processResponseHeaders(List<HeaderField> fields, boolean isEndStream) throws IOException {
         ModifiableHttpHeaders headers = HttpHeaders.ofModifiable();
         int parsedStatusCode = -1;
         boolean seenRegularHeader = false;
         long contentLength = -1;
 
-        for (HpackDecoder.HeaderField field : fields) {
+        for (HeaderField field : fields) {
             String name = field.name();
             String value = field.value();
 
@@ -522,17 +725,15 @@ public final class H2Exchange implements HttpExchange {
             throw new IOException("Response missing :status pseudo-header");
         }
 
-        // Check if this is an informational (1xx) response
+        // Check if this is an informational (1xx) response - skip and wait for final response
         if (parsedStatusCode >= 100 && parsedStatusCode < 200) {
-            // RFC 9113 Section 8.1.1: Informational responses are interim, continue waiting
-            // 1xx responses MUST NOT have END_STREAM (except 101 which is not allowed in HTTP/2)
+            // RFC 9113 Section 8.1.1: 1xx responses MUST NOT have END_STREAM
             if (isEndStream) {
                 throw new H2Exception(ERROR_PROTOCOL_ERROR,
                         streamId,
                         "Informational response (1xx) must not have END_STREAM");
             }
-            informationalResponses.add(new InformationalResponse(parsedStatusCode, headers));
-            // Don't mark responseHeadersReceived - wait for final response
+            // Don't store 1xx responses - just wait for final response
             return;
         }
 
@@ -553,9 +754,9 @@ public final class H2Exchange implements HttpExchange {
      *
      * @param fields the pre-decoded header fields
      */
-    private void processTrailers(List<HpackDecoder.HeaderField> fields) throws IOException {
+    private void processTrailers(List<HeaderField> fields) throws IOException {
         ModifiableHttpHeaders trailers = HttpHeaders.ofModifiable();
-        for (HpackDecoder.HeaderField field : fields) {
+        for (HeaderField field : fields) {
             String name = field.name();
             // RFC 9113 Section 8.1: Trailers MUST NOT contain pseudo-headers
             if (name.startsWith(":")) {
@@ -586,30 +787,37 @@ public final class H2Exchange implements HttpExchange {
      * Update stream send window from WINDOW_UPDATE frame.
      *
      * <p>Called by the connection's reader thread when a stream-level
-     * WINDOW_UPDATE is received. This is separate from the event queue
-     * because WINDOW_UPDATE affects the request send path, not response reading.
+     * WINDOW_UPDATE is received. This releases permits to the FlowControlWindow,
+     * which will automatically wake any blocked threads.
      *
      * @param increment the window size increment
      * @throws H2Exception if the increment causes overflow
      */
     void updateStreamSendWindow(int increment) throws H2Exception {
-        flowControlLock.lock();
-        try {
-            streamSendWindow += increment;
-            // Check for overflow per RFC 9113 (wrap-around to negative)
-            if (streamSendWindow < 0) {
-                throw new H2Exception(ERROR_FLOW_CONTROL_ERROR,
-                        streamId,
-                        "Stream send window overflow: " + streamSendWindow);
-            }
-            windowAvailable.signalAll();
-        } finally {
-            flowControlLock.unlock();
+        // Check for overflow per RFC 9113 before releasing
+        // Note: with Semaphore, we can't easily detect overflow, so we check available + increment
+        int currentWindow = sendWindow.available();
+        if ((long) currentWindow + increment > Integer.MAX_VALUE) {
+            throw new H2Exception(ERROR_FLOW_CONTROL_ERROR,
+                    streamId,
+                    "Stream send window overflow");
         }
+        sendWindow.release(increment);
     }
 
     /**
      * Write DATA frame for request body with flow control.
+     *
+     * <p>Uses the SPSC (single-producer, single-consumer) pattern:
+     * <ol>
+     *   <li>VT acquires flow control (blocks naturally via Semaphore)</li>
+     *   <li>VT copies data to pooled buffer and adds to pendingWrites queue</li>
+     *   <li>VT signals writer thread via dataWorkQueue</li>
+     *   <li>Writer thread drains pendingWrites and writes frames</li>
+     * </ol>
+     *
+     * <p>This eliminates contention on the shared ArrayBlockingQueue by using
+     * per-exchange queues for data.
      *
      * @throws SocketTimeoutException if write timeout expires waiting for flow control window
      */
@@ -619,39 +827,53 @@ public final class H2Exchange implements HttpExchange {
         boolean hasTrailers = requestTrailers != null;
 
         while (length > 0) {
-            int toSend;
+            // Determine how much we can send based on frame size limit
+            int maxFrameSize = muxer.getRemoteMaxFrameSize();
+            int toSend = Math.min(length, maxFrameSize);
 
-            flowControlLock.lock();
+            // Acquire stream-level flow control (blocks naturally via Semaphore)
             try {
-                // Wait for flow control window - need BOTH stream AND connection windows to be positive
-                while (streamSendWindow <= 0 || connection.getConnectionSendWindow() <= 0) {
-                    try {
-                        if (!windowAvailable.await(writeTimeoutMs, TimeUnit.MILLISECONDS)) {
-                            throw new SocketTimeoutException(
-                                    "Write timed out after " + writeTimeoutMs + "ms waiting for flow control window");
-                        }
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new IOException("Interrupted waiting for flow control window", e);
-                    }
+                if (!sendWindow.tryAcquire(toSend, writeTimeoutMs, TimeUnit.MILLISECONDS)) {
+                    throw new SocketTimeoutException(
+                            "Write timed out after " + writeTimeoutMs + "ms waiting for stream flow control window");
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted waiting for stream flow control window", e);
+            }
 
-                int available = Math.min(streamSendWindow, connection.getConnectionSendWindow());
-                available = Math.min(available, connection.getRemoteMaxFrameSize());
-                toSend = Math.min(available, length);
-
-                streamSendWindow -= toSend;
-            } finally {
-                flowControlLock.unlock();
+            // Acquire connection-level flow control
+            try {
+                muxer.acquireConnectionWindow(toSend, writeTimeoutMs);
+            } catch (InterruptedException e) {
+                // Release stream permits we acquired
+                sendWindow.release(toSend);
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted waiting for connection flow control window", e);
+            } catch (SocketTimeoutException e) {
+                // Release stream permits we acquired
+                sendWindow.release(toSend);
+                throw e;
             }
 
             boolean isLastChunk = (toSend == length);
             // Only set END_STREAM on DATA if this is the last chunk AND no trailers
             int flags = (endStream && isLastChunk && !hasTrailers) ? FLAG_END_STREAM : 0;
 
-            // Queue the write - writer thread handles I/O with batching
-            connection.queueData(streamId, data, offset, toSend, flags);
-            connection.consumeConnectionSendWindow(toSend);
+            // Copy data to pooled buffer (caller may reuse their buffer)
+            byte[] buf = muxer.borrowBuffer(toSend);
+            System.arraycopy(data, offset, buf, 0, toSend);
+
+            // Add to pendingWrites queue (lock-free concurrent queue)
+            PendingWrite pw = new PendingWrite();
+            pw.init(buf, 0, toSend, isLastChunk && endStream && !hasTrailers, flags);
+            pendingWrites.add(pw);
+
+            // Signal writer thread if not already in work queue
+            if (!inWorkQueue) {
+                inWorkQueue = true;
+                muxer.signalDataReady(this);
+            }
 
             offset += toSend;
             length -= toSend;
@@ -660,7 +882,7 @@ public final class H2Exchange implements HttpExchange {
         if (endStream) {
             if (hasTrailers) {
                 // Send trailers with END_STREAM
-                connection.queueTrailers(streamId, requestTrailers);
+                muxer.queueTrailers(streamId, requestTrailers);
             }
             endStreamSent = true;
             // Update stream state
@@ -678,9 +900,9 @@ public final class H2Exchange implements HttpExchange {
     void sendEndStream() throws IOException {
         if (!endStreamSent) {
             if (requestTrailers != null) {
-                connection.queueTrailers(streamId, requestTrailers);
+                muxer.queueTrailers(streamId, requestTrailers);
             } else {
-                connection.queueData(streamId, EMPTY_DATA, 0, 0, FLAG_END_STREAM);
+                muxer.queueData(streamId, EMPTY_DATA, 0, 0, FLAG_END_STREAM);
             }
             endStreamSent = true;
             // Update stream state
@@ -693,72 +915,96 @@ public final class H2Exchange implements HttpExchange {
     }
 
     /**
-     * Read next data chunk from response.
+     * Read data from the response buffer.
      *
-     * <p>Data chunks arrive via the unified event queue from the connection's
-     * reader thread. This method also handles trailers (HEADERS with END_STREAM
-     * after DATA) and stream-level flow control.
+     * <p>This is the primary read method for H2DataInputStream. Data is read
+     * directly from the exchange's buffer, which is filled by the reader thread.
+     *
+     * @param buf the destination buffer
+     * @param off offset in the destination buffer
+     * @param len maximum number of bytes to read
+     * @return number of bytes read, or -1 if end of stream
+     * @throws IOException if an error occurs
      */
-    StreamEvent.DataChunk readDataChunk() throws IOException {
+    int readFromBuffer(byte[] buf, int off, int len) throws IOException {
         // If we haven't received headers yet, read them first
         if (!responseHeadersReceived) {
             readResponseHeaders();
         }
 
-        // If we already know stream has ended, return immediately
-        if (endStreamReceived) {
-            return StreamEvent.DataChunk.END;
+        int bytesRead = 0;
+        dataLock.lock();
+        try {
+            // Wait for data, EOF, or error
+            while (readPos == writePos && readState == ReadState.READING_DATA) {
+                // Check for pending trailers
+                if (pendingHeaders != null) {
+                    List<HeaderField> fields = pendingHeaders;
+                    boolean endStream = pendingHeadersEndStream;
+                    pendingHeaders = null;
+                    handleHeadersEvent(fields, endStream);
+                    if (readState == ReadState.DONE) {
+                        break;
+                    }
+                }
+
+                try {
+                    if (!dataAvailable.await(readTimeoutMs, TimeUnit.MILLISECONDS)) {
+                        throw new SocketTimeoutException(
+                                "Read timed out after " + readTimeoutMs + "ms waiting for data");
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted waiting for data", e);
+                }
+            }
+
+            // Check for error
+            if (readState == ReadState.ERROR) {
+                throw readError;
+            }
+
+            // Check for EOF (no more data and stream is done)
+            if (readPos == writePos && readState == ReadState.DONE) {
+                updateStreamStateOnEndStream();
+                validateContentLength();
+                return -1;
+            }
+
+            // Copy from buffer to user's array
+            int available = writePos - readPos;
+            int toCopy = Math.min(available, len);
+            System.arraycopy(dataBuffer, readPos, buf, off, toCopy);
+            readPos += toCopy;
+            bytesRead = toCopy;
+
+            // Track received content length for validation
+            receivedContentLength += toCopy;
+
+        } finally {
+            dataLock.unlock();
         }
 
-        while (true) {
-            StreamEvent event = pollEvent();
+        // Update stream-level flow control outside the lock
+        // This sends WINDOW_UPDATE after user reads consume data
+        if (bytesRead > 0 && readState != ReadState.DONE) {
+            updateStreamRecvWindow(bytesRead);
+        }
 
-            switch (event) {
-                case StreamEvent.DataChunk chunk -> {
-                    // Track received content length for validation
-                    if (chunk.data() != null && chunk.length() > 0) {
-                        receivedContentLength += chunk.length();
+        return bytesRead;
+    }
 
-                        // Update stream-level flow control (only if stream is not ending)
-                        // Connection-level flow control is handled by the connection
-                        if (!chunk.endStream()) {
-                            updateStreamRecvWindow(chunk.length());
-                        }
-                    }
-
-                    if (chunk.endStream()) {
-                        endStreamReceived = true;
-                        updateStreamStateOnEndStream();
-                        validateContentLength();
-                    }
-
-                    return chunk;
-                }
-
-                case StreamEvent.Headers h -> {
-                    // Headers after data = trailers (must have END_STREAM)
-                    if (!h.endStream()) {
-                        throw new H2Exception(ERROR_PROTOCOL_ERROR,
-                                streamId,
-                                "Trailer HEADERS frame must have END_STREAM flag");
-                    }
-                    if (!h.fields().isEmpty()) {
-                        processTrailers(h.fields());
-                    }
-                    endStreamReceived = true;
-                    updateStreamStateOnEndStream();
-                    validateContentLength();
-                    return StreamEvent.DataChunk.END;
-                }
-
-                case StreamEvent.StreamError se -> throw new IOException(
-                        "Stream error while reading data",
-                        se.cause());
-
-                case StreamEvent.ConnectionError ce -> throw new IOException(
-                        "Connection error while reading data",
-                        ce.cause());
-            }
+    /**
+     * Get available bytes in buffer without blocking.
+     *
+     * @return number of bytes available for immediate read
+     */
+    int availableInBuffer() {
+        dataLock.lock();
+        try {
+            return dataBuffer == null ? 0 : writePos - readPos;
+        } finally {
+            dataLock.unlock();
         }
     }
 
@@ -774,34 +1020,13 @@ public final class H2Exchange implements HttpExchange {
         if (streamRecvWindow < DEFAULT_INITIAL_WINDOW_SIZE / 2) {
             int increment = DEFAULT_INITIAL_WINDOW_SIZE - streamRecvWindow;
             // Queue stream-level WINDOW_UPDATE - writer thread will send it
-            connection.queueWindowUpdate(streamId, increment);
+            muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.WINDOW_UPDATE, increment, writeTimeoutMs);
             streamRecvWindow += increment;
         }
-    }
-
-    /**
-     * Get informational (1xx) responses received before the final response.
-     *
-     * <p>Per RFC 9113 Section 8.1.1, a server may send one or more informational
-     * responses (status codes 100-199) before the final response. Common examples
-     * include 100 Continue and 103 Early Hints.
-     *
-     * @return list of informational responses (may be empty, never null)
-     */
-    public List<InformationalResponse> informationalResponses() {
-        return List.copyOf(informationalResponses);
     }
 
     @Override
     public HttpHeaders responseTrailerHeaders() {
         return trailerHeaders;
     }
-
-    /**
-     * Informational response (1xx) received before the final response.
-     *
-     * @param statusCode the informational status code (100-199)
-     * @param headers the headers from this informational response
-     */
-    public record InformationalResponse(int statusCode, HttpHeaders headers) {}
 }

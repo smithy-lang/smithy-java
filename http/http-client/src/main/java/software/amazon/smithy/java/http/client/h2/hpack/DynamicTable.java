@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.http.client.h2.hpack;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
@@ -87,6 +86,9 @@ final class DynamicTable {
      * @param newMaxSize new maximum size in bytes
      */
     void setMaxSize(int newMaxSize) {
+        if (newMaxSize == maxSize) {
+            return;
+        }
         this.maxSize = newMaxSize;
         evictToSize(newMaxSize);
     }
@@ -190,13 +192,11 @@ final class DynamicTable {
      * Calculate the size of an entry per RFC 7541 Section 4.1.
      * Size = length(name) in octets + length(value) in octets + 32
      *
-     * <p>Uses ISO-8859-1 encoding as per HPACK string literal spec (RFC 7541 Section 5.2).
+     * <p>HTTP/2 header names are lowercase ASCII, and values are effectively ASCII/Latin-1,
+     * so we count chars as bytes directly (avoids getBytes allocation per insertion).
      */
     static int entrySize(String name, String value) {
-        // RFC 7541 uses ISO-8859-1 encoding - must count bytes, not characters
-        return name.getBytes(StandardCharsets.ISO_8859_1).length
-                + value.getBytes(StandardCharsets.ISO_8859_1).length
-                + ENTRY_OVERHEAD;
+        return name.length() + value.length() + ENTRY_OVERHEAD;
     }
 
     private void evictToSize(int targetSize) {

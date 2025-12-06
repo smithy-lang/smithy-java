@@ -246,7 +246,7 @@ final class ChunkedInputStream extends InputStream {
         ModifiableHttpHeaders parsedTrailers = HttpHeaders.ofModifiable();
         int len;
         while ((len = delegate.readLine(lineBuffer, MAX_LINE_LENGTH)) > 0) {
-            String name = HttpUtils.parseHeaderLine(lineBuffer, len, parsedTrailers);
+            String name = H1Utils.parseHeaderLine(lineBuffer, len, parsedTrailers);
             if (name == null) {
                 throw new IOException("Invalid trailer line: "
                         + new String(lineBuffer, 0, len, StandardCharsets.US_ASCII));

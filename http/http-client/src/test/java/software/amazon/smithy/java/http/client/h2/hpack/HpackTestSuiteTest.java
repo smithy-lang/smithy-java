@@ -81,7 +81,7 @@ class HpackTestSuiteTest {
 
         // Decode this case's wire bytes
         byte[] wireBytes = hexToBytes(wireHex);
-        List<HpackDecoder.HeaderField> result = decoder.decode(wireBytes);
+        List<HeaderField> result = decoder.decode(wireBytes);
 
         // Verify the decoded headers match expected
         assertEquals(expectedHeaders.size(),
@@ -90,7 +90,7 @@ class HpackTestSuiteTest {
 
         for (int i = 0; i < expectedHeaders.size(); i++) {
             String[] expected = expectedHeaders.get(i);
-            HpackDecoder.HeaderField actual = result.get(i);
+            HeaderField actual = result.get(i);
 
             assertEquals(expected[0],
                     actual.name(),

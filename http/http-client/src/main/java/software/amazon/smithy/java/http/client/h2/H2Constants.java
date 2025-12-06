@@ -14,6 +14,11 @@ final class H2Constants {
 
     private H2Constants() {}
 
+    static final int WRITER_QUEUE_CAPACITY = 2048;
+
+    // Our limit for received header list size (not from server SETTINGS)
+    static final int DEFAULT_MAX_HEADER_LIST_SIZE = 8192;
+
     // Connection preface - client must send this first (RFC 9113 Section 3.4)
     static final byte[] CONNECTION_PREFACE =
             "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.US_ASCII);
@@ -51,11 +56,9 @@ final class H2Constants {
 
     // Default settings values
     static final int DEFAULT_HEADER_TABLE_SIZE = 4096;
-    static final int DEFAULT_ENABLE_PUSH = 1;
     static final int DEFAULT_MAX_CONCURRENT_STREAMS = Integer.MAX_VALUE;
     static final int DEFAULT_INITIAL_WINDOW_SIZE = 65535;
     static final int DEFAULT_MAX_FRAME_SIZE = 16384;
-    static final int DEFAULT_MAX_HEADER_LIST_SIZE = Integer.MAX_VALUE;
 
     // Frame size limits
     static final int MIN_MAX_FRAME_SIZE = 16384; // 2^14

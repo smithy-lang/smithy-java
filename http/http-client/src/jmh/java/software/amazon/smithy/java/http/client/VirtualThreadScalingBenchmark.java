@@ -101,7 +101,7 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  */
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = 2, time = 5)
+@Warmup(iterations = 3, time = 4)
 @Measurement(iterations = 3, time = 5)
 @Fork(value = 1, jvmArgs = {"-Xms2g", "-Xmx2g"})
 @State(Scope.Benchmark)
@@ -174,8 +174,8 @@ public class VirtualThreadScalingBenchmark {
         // Smithy H1 client
         smithyClientH1 = HttpClient.builder()
                 .connectionPool(HttpConnectionPool.builder()
-                        .maxConnectionsPerRoute(5000)
-                        .maxTotalConnections(5000)
+                        .maxConnectionsPerRoute(100)
+                        .maxTotalConnections(100)
                         .maxIdleTime(Duration.ofMinutes(2))
                         .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                         .dnsResolver(staticDns)
@@ -230,8 +230,8 @@ public class VirtualThreadScalingBenchmark {
         // Smithy H2 client (TLS with ALPN)
         smithyClientH2 = HttpClient.builder()
                 .connectionPool(HttpConnectionPool.builder()
-                        .maxConnectionsPerRoute(5000)
-                        .maxTotalConnections(5000)
+                        .maxConnectionsPerRoute(10000)
+                        .maxTotalConnections(10000)
                         .maxIdleTime(Duration.ofMinutes(2))
                         .dnsResolver(staticDns)
                         .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
@@ -580,7 +580,7 @@ public class VirtualThreadScalingBenchmark {
     @Benchmark
     @Threads(1)
     public void nettyH2cPooled(RequestCounter counter) throws InterruptedException {
-        runNettyH2c(3, counter);
+        runNettyH2c(20, counter);
     }
 
     private void runNettyH2c(int numConnections, RequestCounter counter) throws InterruptedException {
@@ -594,7 +594,8 @@ public class VirtualThreadScalingBenchmark {
         List<Channel> channels = new ArrayList<>();
         try {
             for (int i = 0; i < numConnections; i++) {
-                channels.add(nettyBootstrap.connect(new InetSocketAddress(nettyH2cHost, nettyH2cPort)).sync().channel());
+                channels.add(
+                        nettyBootstrap.connect(new InetSocketAddress(nettyH2cHost, nettyH2cPort)).sync().channel());
             }
         } catch (Exception e) {
             counter.errors = 1;
@@ -670,7 +671,8 @@ public class VirtualThreadScalingBenchmark {
                         }
                     });
 
-                    streamChannel.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, true));
+                    streamChannel
+                            .writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, true));
                 });
             };
 
