@@ -26,8 +26,6 @@ import software.amazon.smithy.model.node.Node;
         skipOperations = {
                 // We dont ignore defaults on input shapes
                 "aws.protocoltests.restjson#OperationWithDefaults",
-                // TODO: support content-encoding
-                "aws.protocoltests.restjson#PutWithContentEncoding"
         })
 public class RestJson1ProtocolTests {
     private static final String EMPTY_BODY = "";
@@ -50,7 +48,7 @@ public class RestJson1ProtocolTests {
             } else {
                 assertEquals(expectedStr, actualStr);
             }
-        } else {
+        } else if (expected.contentType() != null) { // Skip request compression tests since they do not have expected body
             assertEquals(EMPTY_BODY, actualStr);
         }
     }

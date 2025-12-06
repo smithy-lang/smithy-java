@@ -25,7 +25,6 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.protocoltests.harness.HttpClientRequestTests;
 import software.amazon.smithy.java.protocoltests.harness.HttpClientResponseTests;
 import software.amazon.smithy.java.protocoltests.harness.ProtocolTest;
-import software.amazon.smithy.java.protocoltests.harness.ProtocolTestFilter;
 import software.amazon.smithy.java.protocoltests.harness.StringBuildingSubscriber;
 import software.amazon.smithy.java.protocoltests.harness.TestType;
 
@@ -34,11 +33,6 @@ import software.amazon.smithy.java.protocoltests.harness.TestType;
         testType = TestType.CLIENT)
 public class RestXmlProtocolTests {
     @HttpClientRequestTests
-    @ProtocolTestFilter(
-            skipTests = {
-                    "SDKAppliedContentEncoding_restXml",
-                    "SDKAppendedGzipAfterProvidedEncoding_restXml",
-            })
     public void requestTest(DataStream expected, DataStream actual) {
         if (expected.contentLength() != 0) {
             var a = new String(ByteBufferUtils.getBytes(actual.asByteBuffer()), StandardCharsets.UTF_8);
@@ -51,7 +45,7 @@ public class RestXmlProtocolTests {
             } else {
                 assertEquals(a, b);
             }
-        } else {
+        } else if (expected.contentType() != null) { // Skip request compression tests since they do not have expected body
             assertEquals("", new StringBuildingSubscriber(actual).getResult());
         }
     }
