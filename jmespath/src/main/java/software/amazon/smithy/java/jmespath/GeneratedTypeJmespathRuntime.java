@@ -12,7 +12,7 @@ import software.amazon.smithy.jmespath.evaluation.JmespathRuntime;
 import software.amazon.smithy.jmespath.evaluation.ListArrayBuilder;
 import software.amazon.smithy.jmespath.evaluation.MapObjectBuilder;
 import software.amazon.smithy.jmespath.evaluation.NumberType;
-import software.amazon.smithy.jmespath.evaluation.WrappingIterable;
+import software.amazon.smithy.jmespath.evaluation.MappingIterable;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -143,14 +143,13 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
     }
 
     @Override
-    public Iterable<?> toIterable(Object value) {
+    public Iterable<?> asIterable(Object value) {
         if (value instanceof List<?> list) {
             return list;
         } else if (value instanceof Map<?, ?> map) {
             return map.keySet();
         } else if (value instanceof SerializableStruct struct) {
-            // TODO: Should this be only present members?
-            return new WrappingIterable<>(Schema::memberName, struct.schema().members());
+            return new MappingIterable<>(Schema::memberName, struct.schema().members());
         } else {
             throw new IllegalArgumentException("Unknown runtime type: " + value);
         }
