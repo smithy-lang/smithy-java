@@ -20,10 +20,6 @@ public class AwsJson1ProtocolTests {
     @HttpClientRequestTests
     @ProtocolTestFilter(
             skipTests = {
-                    // TODO: implement content-encoding
-                    "SDKAppliedContentEncoding_awsJson1_0",
-                    "SDKAppendsGzipAndIgnoresHttpProvidedEncoding_awsJson1_0",
-
                     // Skipping top-level input defaults isn't necessary in Smithy-Java given it uses builders and
                     // the defaults don't impact nullability. This applies to the following tests.
                     "AwsJson10ClientSkipsTopLevelDefaultValuesInInput",
@@ -42,8 +38,9 @@ public class AwsJson1ProtocolTests {
                     Node.parse(new String(ByteBufferUtils.getBytes(expected.asByteBuffer()),
                             StandardCharsets.UTF_8)));
         }
-        assertEquals(expectedJson, new StringBuildingSubscriber(actual).getResult());
-
+        if (expected.contentType() != null) { // Skip request compression tests since they do not have expected body
+            assertEquals(expectedJson, new StringBuildingSubscriber(actual).getResult());
+        }
     }
 
     @HttpClientResponseTests

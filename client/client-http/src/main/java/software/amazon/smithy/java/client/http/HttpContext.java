@@ -27,5 +27,17 @@ public final class HttpContext {
     public static final Context.Key<HttpHeaders> ENDPOINT_RESOLVER_HTTP_HEADERS = Context.key(
             "HTTP headers to use with the request returned from an endpoint resolver");
 
+    /**
+     * The minimum length of bytes threshold for a request body to be compressed. Defaults to 10240 bytes if not set.
+     */
+    public static final Context.Key<Integer> REQUEST_MIN_COMPRESSION_SIZE_BYTES =
+            Context.key("Minimum bytes size for request compression");
+
+    /**
+     * If request compression is disabled.
+     */
+    public static final Context.Key<Boolean> DISABLE_REQUEST_COMPRESSION =
+            Context.key("If request compression is disabled");
+
     private HttpContext() {}
 }

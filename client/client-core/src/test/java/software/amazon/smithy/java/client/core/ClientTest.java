@@ -35,6 +35,7 @@ import software.amazon.smithy.java.client.http.mock.MockPlugin;
 import software.amazon.smithy.java.client.http.mock.MockQueue;
 import software.amazon.smithy.java.client.http.plugins.ApplyHttpRetryInfoPlugin;
 import software.amazon.smithy.java.client.http.plugins.HttpChecksumPlugin;
+import software.amazon.smithy.java.client.http.plugins.RequestCompressionPlugin;
 import software.amazon.smithy.java.client.http.plugins.UserAgentPlugin;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
@@ -83,6 +84,7 @@ public class ClientTest {
             SimpleAuthDetectionPlugin.class,
             UserAgentPlugin.class,
             ApplyHttpRetryInfoPlugin.class,
+            RequestCompressionPlugin.class,
             HttpChecksumPlugin.class,
             FooPlugin.class);
 
