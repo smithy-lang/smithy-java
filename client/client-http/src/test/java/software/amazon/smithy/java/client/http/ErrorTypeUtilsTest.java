@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.http;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -52,5 +53,12 @@ public class ErrorTypeUtilsTest {
 
         assertEquals("foo", ErrorTypeUtils.readTypeAndCode(document1));
         assertEquals("bar", ErrorTypeUtils.readTypeAndCode(document2));
+    }
+
+    @Test
+    public void testWrongTypeIgnored() {
+        var document = Document.of(Map.of("__type", Document.of(123)));
+
+        assertNull(ErrorTypeUtils.readType(document));
     }
 }

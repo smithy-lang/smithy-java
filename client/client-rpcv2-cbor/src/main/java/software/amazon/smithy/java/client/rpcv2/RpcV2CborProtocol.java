@@ -57,7 +57,7 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
         this.errorDeserializer = HttpErrorDeserializer.builder()
                 .codec(CBOR_CODEC)
                 .serviceId(service)
-                .errorPayloadParser(new CborParser())
+                .errorPayloadParser(RpcV2CborProtocol::extractErrorType)
                 .build();
     }
 
@@ -170,13 +170,10 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
         return AwsEventDecoderFactory.forOutputStream(outputOperation, payloadCodec(), f -> f);
     }
 
-    private static final class CborParser extends HttpErrorDeserializer.DocumentPayloadParser {
-        @Override
-        public ShapeId extractErrorType(Document document, String namespace) {
-            return DocumentDeserializer.parseDiscriminator(
-                    ErrorTypeUtils.removeUri(ErrorTypeUtils.readType(document)),
-                    namespace);
-        }
+    private static ShapeId extractErrorType(Document document, String namespace) {
+        return DocumentDeserializer.parseDiscriminator(
+                ErrorTypeUtils.removeUri(ErrorTypeUtils.readType(document)),
+                namespace);
     }
 
     public static final class Factory implements ClientProtocolFactory<Rpcv2CborTrait> {

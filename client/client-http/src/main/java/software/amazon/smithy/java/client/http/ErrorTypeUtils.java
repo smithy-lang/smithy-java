@@ -8,7 +8,9 @@ package software.amazon.smithy.java.client.http;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeType;
 
-public class ErrorTypeUtils {
+public final class ErrorTypeUtils {
+
+    private ErrorTypeUtils() {}
 
     /**
      * Read the error type from __type field of the document.

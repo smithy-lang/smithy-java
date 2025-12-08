@@ -25,7 +25,7 @@ public final class AwsJson11Protocol extends AwsJsonProtocol {
      *                discriminator of documents that use relative shape IDs.
      */
     public AwsJson11Protocol(ShapeId service) {
-        super(TRAIT_ID, service, new HttpErrorDeserializer.DocumentPayloadParser());
+        super(TRAIT_ID, service, HttpErrorDeserializer.DEFAULT_ERROR_PAYLOAD_PARSER);
     }
 
     @Override
