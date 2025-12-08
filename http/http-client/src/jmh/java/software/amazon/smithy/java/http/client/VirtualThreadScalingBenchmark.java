@@ -215,6 +215,7 @@ public class VirtualThreadScalingBenchmark {
                         .maxIdleTime(Duration.ofMinutes(2))
                         .dnsResolver(staticDns)
                         .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
+                        .h2StreamsPerConnection(100)
                         .build())
                 .build();
 
@@ -580,7 +581,7 @@ public class VirtualThreadScalingBenchmark {
     @Benchmark
     @Threads(1)
     public void nettyH2cPooled(RequestCounter counter) throws InterruptedException {
-        runNettyH2c(20, counter);
+        runNettyH2c(3, counter);
     }
 
     private void runNettyH2c(int numConnections, RequestCounter counter) throws InterruptedException {
