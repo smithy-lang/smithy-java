@@ -127,10 +127,6 @@ import software.amazon.smithy.java.http.client.h2.H2Connection;
  * @see HttpVersionPolicy
  */
 public final class HttpConnectionPool implements ConnectionPool {
-    // Soft limit on streams per connection before creating a new one.
-    // Server's MAX_CONCURRENT_STREAMS is the hard limit; this spreads load before hitting it.
-    private static final int STREAMS_PER_CONNECTION = 1024;
-
     private final int defaultMaxConnectionsPerRoute;
     private final Map<String, Integer> perHostLimits;
     private final int maxTotalConnections;
@@ -188,7 +184,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         this.h1Manager = new H1ConnectionManager(this.maxIdleTimeNanos);
         this.connectionPermits = new Semaphore(builder.maxTotalConnections, false);
         this.listeners = List.copyOf(builder.listeners);
-        this.h2Manager = new H2ConnectionManager(STREAMS_PER_CONNECTION, listeners, this::onNewH2Connection);
+        this.h2Manager = new H2ConnectionManager(builder.h2StreamsPerConnection, listeners, this::onNewH2Connection);
         this.cleanupThread = Thread.ofVirtual().name("http-pool-cleanup").start(this::cleanupIdleConnections);
     }
 
