@@ -184,7 +184,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         this.h1Manager = new H1ConnectionManager(this.maxIdleTimeNanos);
         this.connectionPermits = new Semaphore(builder.maxTotalConnections, false);
         this.listeners = List.copyOf(builder.listeners);
-        this.h2Manager = new H2ConnectionManager(builder.h2StreamsPerConnection, listeners, this::onNewH2Connection);
+        this.h2Manager = new H2ConnectionManager(builder.h2StreamsPerConnection, this.acquireTimeoutMs, listeners, this::onNewH2Connection);
         this.cleanupThread = Thread.ofVirtual().name("http-pool-cleanup").start(this::cleanupIdleConnections);
     }
 
@@ -203,7 +203,8 @@ public final class HttpConnectionPool implements ConnectionPool {
             throw new IllegalStateException("Connection pool is closed");
         } else if ((route.isSecure() && versionPolicy != HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 || (!route.isSecure() && versionPolicy.usesH2cForCleartext())) {
-            return h2Manager.acquire(route);
+            int maxConns = getMaxConnectionsForRoute(route);
+            return h2Manager.acquire(route, maxConns);
         } else {
             return acquireH1(route);
         }
