@@ -21,9 +21,11 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  * Builder for HttpConnectionPool.
  */
 public final class HttpConnectionPoolBuilder {
+    int maxTotalConnections = 256;
     int maxConnectionsPerRoute = 20;
+    int h2StreamsPerConnection = 100;
     final Map<String, Integer> perHostLimits = new HashMap<>();
-    int maxTotalConnections = 200;
+
     Duration maxIdleTime = Duration.ofMinutes(2);
     Duration acquireTimeout = Duration.ofSeconds(30);
     Duration connectTimeout = Duration.ofSeconds(10);
@@ -35,7 +37,6 @@ public final class HttpConnectionPoolBuilder {
     HttpVersionPolicy versionPolicy = HttpVersionPolicy.AUTOMATIC;
     DnsResolver dnsResolver;
     HttpSocketFactory socketFactory = HttpSocketFactory::defaultSocketFactory;
-    int h2StreamsPerConnection = 100;
     final List<ConnectionPoolListener> listeners = new LinkedList<>();
 
     /**
@@ -47,9 +48,13 @@ public final class HttpConnectionPoolBuilder {
      * <p>Each route (unique scheme+host+port+proxy combination) gets its own
      * connection pool with this capacity.
      *
-     * <p><b>Note:</b> Per-route limits only apply to HTTP/1.1 connections.
-     * HTTP/2 connections use multiplexing to handle many concurrent requests over
-     * fewer connections, so only {@link #maxTotalConnections(int)} applies to them.
+     * <p><b>HTTP/1.1:</b> This limits concurrent requests, since each connection
+     * handles one request at a time.
+     *
+     * <p><b>HTTP/2:</b> This limits physical connections. Maximum concurrent streams
+     * per route = {@code maxConnectionsPerRoute × h2StreamsPerConnection}. For example,
+     * with default settings (20 connections × 100 streams), a route can handle up to
+     * 2000 concurrent requests.
      *
      * @param max maximum connections per route, must be positive
      * @return this builder
@@ -83,9 +88,14 @@ public final class HttpConnectionPoolBuilder {
      * <p>Host matching is case-insensitive. If a port-specific limit is set,
      * it takes precedence over the host-only limit.
      *
-     * <p><b>Note:</b> Per-host limits only apply to HTTP/1.1 connections and are
-     * always capped by {@link #maxTotalConnections(int)}. If a per-host limit exceeds
-     * {@code maxTotalConnections}, the global limit takes precedence.
+     * <p><b>HTTP/1.1:</b> Limits concurrent requests to the host.
+     *
+     * <p><b>HTTP/2:</b> Limits physical connections to the host. Maximum concurrent
+     * streams = {@code maxConnectionsForHost × h2StreamsPerConnection}. For example,
+     * {@code maxConnectionsForHost("api.com", 5)} with {@code h2StreamsPerConnection(100)}
+     * allows up to 500 concurrent streams to that host.
+     *
+     * <p><b>Note:</b> Always capped by {@link #maxTotalConnections(int)}.
      *
      * @param host the hostname (with optional port), case-insensitive
      * @param max  maximum connections for this specific host, must be positive
@@ -371,12 +381,18 @@ public final class HttpConnectionPoolBuilder {
     /**
      * Set maximum concurrent streams per HTTP/2 connection before creating a new connection (default: 100).
      *
-     * <p>This is a soft limit that controls when the pool creates additional HTTP/2 connections
+     * <p>This is a <b>soft limit</b> that controls when the pool creates additional HTTP/2 connections
      * to spread load. When an existing connection reaches this many active streams, the pool
-     * will create a new connection for the next request (subject to {@link #maxTotalConnections(int)}).
+     * will prefer to create a new connection for the next request (subject to {@link #maxConnectionsPerRoute(int)}
+     * and {@link #maxTotalConnections(int)}).
+     *
+     * <p><b>Important:</b> This limit can be exceeded when the connection limit is reached. If all
+     * connections are at or above this soft limit, the pool will still multiplex additional streams
+     * on existing connections rather than blocking or failing, up to the server's hard limit
+     * ({@code SETTINGS_MAX_CONCURRENT_STREAMS}).
      *
      * <p>This is distinct from the server's {@code SETTINGS_MAX_CONCURRENT_STREAMS}, which is
-     * a hard limit enforced by the server. This client-side limit helps balance load across
+     * a hard limit enforced by the server. This client-side soft limit helps balance load across
      * multiple connections to reduce lock contention and improve throughput under high concurrency.
      *
      * <p><a href="https://www.rfc-editor.org/rfc/rfc7540#section-6.5.2">RFC 7540 Section 6.5.2</a>
