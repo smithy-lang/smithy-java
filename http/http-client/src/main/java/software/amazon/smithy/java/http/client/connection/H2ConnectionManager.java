@@ -31,6 +31,7 @@ final class H2ConnectionManager {
 
     private final ConcurrentHashMap<Route, RouteState> routes = new ConcurrentHashMap<>();
     private final int streamsPerConnection;
+    private final long acquireTimeoutMs;
     private final List<ConnectionPoolListener> listeners;
     private final ConnectionFactory connectionFactory;
 
@@ -41,10 +42,12 @@ final class H2ConnectionManager {
 
     H2ConnectionManager(
             int streamsPerConnection,
+            long acquireTimeoutMs,
             List<ConnectionPoolListener> listeners,
             ConnectionFactory connectionFactory
     ) {
         this.streamsPerConnection = streamsPerConnection;
+        this.acquireTimeoutMs = acquireTimeoutMs;
         this.listeners = listeners;
         this.connectionFactory = connectionFactory;
     }
@@ -61,7 +64,7 @@ final class H2ConnectionManager {
      * which blocks waiting for a permit. Thread B tries to release a permit but first
      * needs to unregister, which requires the RouteState lock held by A.
      */
-    H2Connection acquire(Route route) throws IOException {
+    H2Connection acquire(Route route, int maxConnectionsForRoute) throws IOException {
         RouteState state = stateFor(route);
 
         // Fast path: snapshot of current connections, no locking
@@ -71,16 +74,52 @@ final class H2ConnectionManager {
             return conn;
         }
 
-        // Slow path: check existing under lock, but DON'T create while holding lock
+        long deadline = System.currentTimeMillis() + acquireTimeoutMs;
+
+        // Slow path: check existing under lock, wait if at limit
         synchronized (state) {
-            H2Connection[] snapshot = state.conns;
-            H2Connection rechecked = tryAcquireUnderLimit(snapshot);
-            if (rechecked != null) {
-                notifyAcquire(rechecked, true);
-                return rechecked;
+            while (true) {
+                // Try to find a connection under the soft limit (streamsPerConnection)
+                H2Connection[] snapshot = state.conns;
+                H2Connection rechecked = tryAcquireUnderLimit(snapshot);
+                if (rechecked != null) {
+                    notifyAcquire(rechecked, true);
+                    return rechecked;
+                } else if (snapshot.length < maxConnectionsForRoute) {
+                    // Under connection limit: exit loop to create new connection
+                    break;
+                }
+
+                // At connection limit, so try to reuse any connection even if over soft limit
+                // (but still under server's SETTINGS_MAX_CONCURRENT_STREAMS hard limit)
+                H2Connection overLimit = tryAcquire(snapshot);
+                if (overLimit != null) {
+                    notifyAcquire(overLimit, true);
+                    return overLimit;
+                }
+
+                // No connections available, so wait for one to free up capacity.
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    throw new IOException("Acquire timeout: no connection available after "
+                            + acquireTimeoutMs + "ms for " + route);
+                }
+
+                try {
+                    // Wait and then retry the loop.
+                    state.wait(remaining);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while waiting for connection", e);
+                }
             }
         }
 
+        return createNewH2Connection(route, state);
+    }
+
+    @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
+    private H2Connection createNewH2Connection(Route route, RouteState state) throws IOException {
         // Create new connection OUTSIDE the lock to avoid deadlock. Note: Multiple threads may race to create
         // connections for the same route. This is acceptable: we'd rather over-create slightly than deadlock.
         H2Connection newConn = connectionFactory.create(route);
@@ -160,20 +199,6 @@ final class H2ConnectionManager {
     }
 
     /**
-     * Register a new connection for the route.
-     */
-    void register(Route route, H2Connection conn) {
-        RouteState state = stateFor(route);
-        synchronized (state) {
-            H2Connection[] cur = state.conns;
-            H2Connection[] next = new H2Connection[cur.length + 1];
-            System.arraycopy(cur, 0, next, 0, cur.length);
-            next[cur.length] = conn;
-            state.conns = next;
-        }
-    }
-
-    /**
      * Unregister a connection from the route.
      */
     void unregister(Route route, H2Connection conn) {
@@ -191,17 +216,19 @@ final class H2ConnectionManager {
                     break;
                 }
             }
+
             if (idx < 0) {
                 return;
-            }
-            if (n == 1) {
+            } else if (n == 1) {
                 state.conns = EMPTY;
-                return;
+            } else {
+                // Compact array: copy elements before and after removed connection
+                H2Connection[] next = new H2Connection[n - 1];
+                System.arraycopy(cur, 0, next, 0, idx);
+                System.arraycopy(cur, idx + 1, next, idx, n - idx - 1);
+                state.conns = next;
             }
-            H2Connection[] next = new H2Connection[n - 1];
-            System.arraycopy(cur, 0, next, 0, idx);
-            System.arraycopy(cur, idx + 1, next, idx, n - idx - 1);
-            state.conns = next;
+            state.notifyAll(); // Wake threads waiting for capacity
         }
     }
 
@@ -272,6 +299,7 @@ final class H2ConnectionManager {
      * @param onRemove callback for removed connections
      * @return number of connections removed
      */
+    @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
     int cleanupIdle(long maxIdleTimeNanos, BiConsumer<H2Connection, CloseReason> onRemove) {
         int removed = 0;
         for (RouteState state : routes.values()) {
