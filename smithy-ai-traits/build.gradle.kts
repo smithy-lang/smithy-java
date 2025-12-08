@@ -49,3 +49,11 @@ tasks.compileJava {
 java.sourceSets["main"].java {
     srcDirs("model", "src/main/smithy")
 }
+
+tasks.jar {
+    doFirst {
+        manifest.attributes.remove("Build-Timestamp")
+        manifest.attributes.remove("Build-OS")
+        manifest.attributes.remove("Build-Jdk")
+    }
+}
