@@ -35,6 +35,7 @@ public final class HttpConnectionPoolBuilder {
     HttpVersionPolicy versionPolicy = HttpVersionPolicy.AUTOMATIC;
     DnsResolver dnsResolver;
     HttpSocketFactory socketFactory = HttpSocketFactory::defaultSocketFactory;
+    int h2StreamsPerConnection = 100;
     final List<ConnectionPoolListener> listeners = new LinkedList<>();
 
     /**
@@ -364,6 +365,42 @@ public final class HttpConnectionPoolBuilder {
      */
     public HttpConnectionPoolBuilder socketFactory(HttpSocketFactory socketFactory) {
         this.socketFactory = Objects.requireNonNull(socketFactory, "socketFactory");
+        return this;
+    }
+
+    /**
+     * Set maximum concurrent streams per HTTP/2 connection before creating a new connection (default: 100).
+     *
+     * <p>This is a soft limit that controls when the pool creates additional HTTP/2 connections
+     * to spread load. When an existing connection reaches this many active streams, the pool
+     * will create a new connection for the next request (subject to {@link #maxTotalConnections(int)}).
+     *
+     * <p>This is distinct from the server's {@code SETTINGS_MAX_CONCURRENT_STREAMS}, which is
+     * a hard limit enforced by the server. This client-side limit helps balance load across
+     * multiple connections to reduce lock contention and improve throughput under high concurrency.
+     *
+     * <p><a href="https://www.rfc-editor.org/rfc/rfc7540#section-6.5.2">RFC 7540 Section 6.5.2</a>
+     * recommends servers set {@code SETTINGS_MAX_CONCURRENT_STREAMS} to at least 100 to avoid
+     * unnecessarily limiting parallelism. This default aligns with that recommendation and matches
+     * <a href="https://go.googlesource.com/net/+/master/http2/transport.go">Go's net/http</a>
+     * default of 100.
+     *
+     * <p><b>Performance considerations:</b> Lower values create more connections but reduce
+     * per-connection lock contention. Higher values use fewer connections but may increase
+     * contention under high concurrency.
+     *
+     * <p><b>Note:</b> This setting only applies to HTTP/2 connections. HTTP/1.1 connections
+     * handle one request at a time and are managed by {@link #maxConnectionsPerRoute(int)}.
+     *
+     * @param streams maximum streams per connection, must be positive
+     * @return this builder
+     * @throws IllegalArgumentException if streams is not positive
+     */
+    public HttpConnectionPoolBuilder h2StreamsPerConnection(int streams) {
+        if (streams <= 0) {
+            throw new IllegalArgumentException("h2StreamsPerConnection must be positive: " + streams);
+        }
+        this.h2StreamsPerConnection = streams;
         return this;
     }
 
