@@ -14,6 +14,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
 import java.time.Duration;
+import java.util.HashMap;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.client.core.MessageExchange;
@@ -170,8 +171,10 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
         }
     }
 
-    private HttpResponse createSmithyResponse(java.net.http.HttpResponse<InputStream> response) {
-        var headerMap = response.headers().map();
+    // package-private for testing
+    HttpResponse createSmithyResponse(java.net.http.HttpResponse<InputStream> response) {
+        var headerMap = new HashMap<>(response.headers().map());
+        headerMap.remove(":status");
         LOGGER.trace("Got response: {}; headers: {}", response, headerMap);
 
         var headers = HttpHeaders.of(headerMap);
