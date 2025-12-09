@@ -31,6 +31,7 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -107,8 +108,24 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
 @State(Scope.Benchmark)
 public class VirtualThreadScalingBenchmark {
 
-    @Param({"10000"})
+    // Note: this takes _forever_, so comment out whatever you don't want to try if you want it to go faster.
+    @Param({
+            //"100", "1000", "5000", "10000", "20000",
+            "30000"})
     private int concurrency;
+
+    @Param({//"1", "2", "3", "4", "5", "10",
+            "20",
+            //"50"
+    })
+    private int connectionLimit;
+
+    @Param({
+            //            "100", "1024", "2048",
+            "4096"
+            //            , "8192"
+    })
+    private int streamsLimit;
 
     // Server URL - use jmhWithServer task or set manually
     // For h2c: "http://localhost:18081" (default)
@@ -207,17 +224,7 @@ public class VirtualThreadScalingBenchmark {
 
         // ===== HTTP/2 Cleartext Clients (h2c) =====
 
-        // Smithy H2c client (cleartext, prior knowledge)
-        smithyClientH2c = HttpClient.builder()
-                .connectionPool(HttpConnectionPool.builder()
-                        .maxConnectionsPerRoute(5000)
-                        .maxTotalConnections(5000)
-                        .maxIdleTime(Duration.ofMinutes(2))
-                        .dnsResolver(staticDns)
-                        .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
-                        .h2StreamsPerConnection(100)
-                        .build())
-                .build();
+        // Smithy H2c client - created per iteration in setupIteration()
 
         // Helidon H2c client (cleartext, prior knowledge)
         helidonClientH2c = Http2Client.builder()
@@ -237,6 +244,7 @@ public class VirtualThreadScalingBenchmark {
                         .dnsResolver(staticDns)
                         .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
                         .sslContext(trustAllSslContext)
+                        .h2StreamsPerConnection(100)
                         .build())
                 .build();
 
@@ -315,9 +323,7 @@ public class VirtualThreadScalingBenchmark {
         }
 
         // Close H2c clients
-        if (smithyClientH2c != null) {
-            smithyClientH2c.close();
-        }
+        // smithyClientH2c closed per-iteration in setupIteration()
         if (helidonClientH2c != null) {
             helidonClientH2c.closeResource();
         }
@@ -346,6 +352,50 @@ public class VirtualThreadScalingBenchmark {
         public void reset() {
             requests = 0;
             errors = 0;
+        }
+    }
+
+    @Setup(Level.Iteration)
+    public void setupIteration() throws Exception {
+        if (smithyClientH2c != null) {
+            smithyClientH2c.close();
+        }
+
+        DnsResolver staticDns = DnsResolver.staticMapping(Map.of(
+                "localhost",
+                List.of(InetAddress.getLoopbackAddress())));
+
+        System.out.println("Creating client: connectionLimit=" + connectionLimit + ", streamsLimit=" + streamsLimit);
+
+        smithyClientH2c = HttpClient.builder()
+                .connectionPool(HttpConnectionPool.builder()
+                        .maxConnectionsPerRoute(connectionLimit)
+                        .h2StreamsPerConnection(streamsLimit)
+                        .maxIdleTime(Duration.ofMinutes(2))
+                        .dnsResolver(staticDns)
+                        .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
+                        .build())
+                .build();
+
+        try (var res = smithyClientH2c.send(HttpRequest.builder()
+                .uri(URI.create(h2cBaseUrl + "/reset"))
+                .method("POST")
+                .build())) {
+            res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+        }
+        Thread.sleep(100);
+    }
+
+    @TearDown(Level.Iteration)
+    public void teardownIteration() throws Exception {
+        try (var res = smithyClientH2c.send(HttpRequest.builder()
+                .uri(URI.create(h2cBaseUrl + "/stats"))
+                .method("GET")
+                .build())) {
+            String stats =
+                    new String(res.body().asInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            System.out.println("Server stats [connectionLimit=" + connectionLimit + ", streamsLimit=" + streamsLimit
+                    + "]: " + stats);
         }
     }
 

@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.http.client.h2.hpack;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import software.amazon.smithy.java.http.api.HeaderNames;
@@ -163,7 +164,7 @@ public final class HpackDecoder {
         if (huffman) {
             str = Huffman.decode(data, decodePos, length);
         } else {
-            str = new String(data, decodePos, length, java.nio.charset.StandardCharsets.ISO_8859_1);
+            str = new String(data, decodePos, length, StandardCharsets.ISO_8859_1);
         }
         decodePos += length;
 

@@ -126,6 +126,9 @@ final class H2Muxer implements AutoCloseable {
             "proxy-authorization",
             "set-cookie");
 
+    // How often to check for read timeouts (every ~100ms)
+    private static final long READ_TIMOUT_FREQUENCY = TimeUnit.MILLISECONDS.toNanos(100);
+
     // Singleton wake-up signal
     private static final WorkItem.CheckDataQueue CHECK_DATA_QUEUE = new WorkItem.CheckDataQueue();
 
@@ -218,7 +221,7 @@ final class H2Muxer implements AutoCloseable {
     void closeExchanges(Duration timeout) {
         accepting = false;
 
-        streams.forEach(exchange -> exchange.signalConnectionClosed(null));
+        streams.forEach(null, (exchange, _ignore) -> exchange.signalConnectionClosed(null));
 
         long deadline = System.nanoTime() + timeout.toNanos();
         while (activeStreamCount.get() > 0 && System.nanoTime() < deadline) {
@@ -234,7 +237,9 @@ final class H2Muxer implements AutoCloseable {
         streams.clearAndClose(exchange -> {
             try {
                 exchange.close();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                // trying to close, ignore failure
+            }
         });
         activeStreamCount.set(0);
     }
@@ -299,7 +304,7 @@ final class H2Muxer implements AutoCloseable {
 
     void onConnectionClosing(Throwable error) {
         accepting = false;
-        streams.forEach(exchange -> exchange.signalConnectionClosed(error));
+        streams.forEach(error, H2Exchange::signalConnectionClosed);
     }
 
     void onSettingsReceived(int maxConcurrentStreams, int initialWindowSize, int maxFrameSize) {
@@ -309,7 +314,7 @@ final class H2Muxer implements AutoCloseable {
         int delta = initialWindowSize - this.remoteInitialWindowSize;
         this.remoteInitialWindowSize = initialWindowSize;
         if (delta != 0) {
-            streams.forEach(exchange -> exchange.adjustSendWindow(delta));
+            streams.forEach(delta, H2Exchange::adjustSendWindow);
         }
     }
 
@@ -455,11 +460,52 @@ final class H2Muxer implements AutoCloseable {
         return writeError;
     }
 
+    /**
+     * Check all active streams for read timeouts, called periodically from the worker loop.
+     *
+     * <p>Read timeouts are approximate: ±100ms due to the polling interval. This is acceptable because network
+     * I/O already has inherent latency variance, and callers setting a "30s timeout" don't expect millisecond
+     * precision.
+     *
+     * <p>There is an unavoidable race: data could arrive just after we decide to timeout but before we signal.
+     * We mitigate this by checking both deadline and activity sequence twice - we only timeout if the stream
+     * appears expired and idle across two snapshots. The remaining race window is small and acceptable because
+     * timeouts are approximate and failure is recoverable at the caller layer.
+     */
+    private void checkReadTimeouts(long nowNanos) {
+        streams.forEach(nowNanos, H2Muxer::checkExchangeTimeout);
+    }
+
+    private static void checkExchangeTimeout(H2Exchange exchange, long nowNanos) {
+        long seq1 = exchange.getReadSeq();
+        long d1 = exchange.getReadDeadlineNanos();
+        if (d1 <= 0 || nowNanos <= d1) {
+            return;
+        }
+
+        // Second snapshot: did anything change while we were looking?
+        long seq2 = exchange.getReadSeq();
+        long d2 = exchange.getReadDeadlineNanos();
+        if (seq1 != seq2 || d2 <= 0 || nowNanos <= d2) {
+            return;
+        }
+
+        // Try to claim the timeout - only first caller wins
+        if (!exchange.markReadTimedOut()) {
+            return;
+        }
+
+        exchange.signalConnectionClosed(new SocketTimeoutException(
+                "Read timeout: no data received for " + exchange.getReadTimeoutMs() + "ms"));
+    }
+
     // ==================== WRITER THREAD ====================
 
     private void workerLoop() {
         var batch = new ArrayList<WorkItem>(64);
         IOException failure = null;
+        long lastTimeoutCheck = System.nanoTime();
+        var readTimeoutFrequency = READ_TIMOUT_FREQUENCY;
 
         try {
             while (running) {
@@ -503,6 +549,13 @@ final class H2Muxer implements AutoCloseable {
                         failWriter(e);
                         return;
                     }
+                }
+
+                // Check for read timeouts periodically
+                long now = System.nanoTime();
+                if (now - lastTimeoutCheck > readTimeoutFrequency) {
+                    checkReadTimeouts(now);
+                    lastTimeoutCheck = now;
                 }
             }
         } catch (InterruptedException e) {
