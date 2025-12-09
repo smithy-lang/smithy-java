@@ -19,6 +19,8 @@ import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SchemaLocation;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
@@ -26,6 +28,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
@@ -40,9 +43,13 @@ import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
+import software.amazon.smithy.java.mcp.test.model.CalculateAreaInput;
+import software.amazon.smithy.java.mcp.test.model.CalculateAreaOutput;
 import software.amazon.smithy.java.mcp.test.model.Echo;
 import software.amazon.smithy.java.mcp.test.model.McpEchoInput;
 import software.amazon.smithy.java.mcp.test.model.McpEchoOutput;
+import software.amazon.smithy.java.mcp.test.model.Shape;
+import software.amazon.smithy.java.mcp.test.service.CalculateAreaOperation;
 import software.amazon.smithy.java.mcp.test.service.McpEchoOperation;
 import software.amazon.smithy.java.mcp.test.service.TestService;
 import software.amazon.smithy.java.server.RequestContext;
@@ -58,14 +65,16 @@ class McpServerIntegrationTest {
             .build();
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final JsonSchemaFactory SCHEMA_FACTORY = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7);
-    private static final JsonSchema JSON_SCHEMA_DRAFT_07 = SCHEMA_FACTORY.getSchema(
-            SchemaLocation.of("https://json-schema.org/draft-07/schema"));
+    private static final JsonSchemaFactory SCHEMA_FACTORY =
+            JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
+    private static final JsonSchema JSON_SCHEMA = SCHEMA_FACTORY.getSchema(
+            SchemaLocation.of("https://json-schema.org/draft/2020-12/schema"));
 
     private Server mcpServer;
     private TestInputStream input;
     private TestOutputStream output;
     private McpEchoOperationImpl echoOperation;
+    private CalculateAreaOperation calculateAreaOperation;
     private int requestId = 0;
 
     @BeforeEach
@@ -73,10 +82,12 @@ class McpServerIntegrationTest {
         input = new TestInputStream();
         output = new TestOutputStream();
         echoOperation = new McpEchoOperationImpl();
+        calculateAreaOperation = new CalculateAreaImpl();
         mcpServer = McpServer.builder()
                 .name("test-mcp")
                 .addService("test-service",
                         TestService.builder()
+                                .addCalculateAreaOperation(calculateAreaOperation)
                                 .addMcpEchoOperation(echoOperation)
                                 .build())
                 .input(input)
@@ -120,6 +131,23 @@ class McpServerIntegrationTest {
                 SCHEMA_FACTORY.getSchema(inputSchemaNode),
                 SCHEMA_FACTORY.getSchema(outputSchemaNode),
                 toolNode);
+    }
+
+    private ToolSchemas getCalculateAreaToolSchemas() throws Exception {
+        write("tools/list", Document.of(Map.of()));
+        var responseJson = readRawResponse();
+        var toolsNode = OBJECT_MAPPER.readTree(responseJson).path("result").path("tools");
+        for (var toolNode : toolsNode) {
+            if (toolNode.path("name").asText().equals("CalculateArea")) {
+                var inputSchemaNode = toolNode.path("inputSchema");
+                var outputSchemaNode = toolNode.path("outputSchema");
+                return new ToolSchemas(
+                        SCHEMA_FACTORY.getSchema(inputSchemaNode),
+                        SCHEMA_FACTORY.getSchema(outputSchemaNode),
+                        toolNode);
+            }
+        }
+        throw new AssertionError("CalculateArea tool not found");
     }
 
     private String readRawResponse() {
@@ -176,11 +204,11 @@ class McpServerIntegrationTest {
         var schemas = getMcpEchoToolSchemas();
 
         // Validate that inputSchema conforms to JSON Schema Draft-07
-        var inputErrors = JSON_SCHEMA_DRAFT_07.validate(schemas.toolNode().path("inputSchema"));
+        var inputErrors = JSON_SCHEMA.validate(schemas.toolNode().path("inputSchema"));
         assertTrue(inputErrors.isEmpty(), "Input schema validation errors: " + inputErrors);
 
         // Validate that outputSchema conforms to JSON Schema Draft-07
-        var outputErrors = JSON_SCHEMA_DRAFT_07.validate(schemas.toolNode().path("outputSchema"));
+        var outputErrors = JSON_SCHEMA.validate(schemas.toolNode().path("outputSchema"));
         assertTrue(outputErrors.isEmpty(), "Output schema validation errors: " + outputErrors);
     }
 
@@ -259,10 +287,13 @@ class McpServerIntegrationTest {
             assertEquals("array", echoProps.path("integerList").path("type").asText());
             assertEquals("array", echoProps.path("nestedList").path("type").asText());
 
-            // Nested structure, map, and union should be objects
+            // Nested structure and map should be objects
             assertEquals("object", echoProps.path("nested").path("type").asText());
             assertEquals("object", echoProps.path("stringMap").path("type").asText());
             assertEquals("object", echoProps.path("nestedMap").path("type").asText());
+
+            // Union should have oneOf (not type: object)
+            assertTrue(echoProps.path("unionValue").has("oneOf"), "Union should have oneOf property");
             assertEquals("object", echoProps.path("unionValue").path("type").asText());
 
             // Document should have type as array of all JSON types
@@ -721,8 +752,8 @@ class McpServerIntegrationTest {
         assertEquals(2.718281828, echo.getDoubleValue(), 0.0000001);
 
         // Verify big numbers
-        assertEquals(new java.math.BigDecimal("123.456"), echo.getBigDecimalValue());
-        assertEquals(new java.math.BigInteger("123456789012345678901234567890"), echo.getBigIntegerValue());
+        assertEquals(new BigDecimal("123.456"), echo.getBigDecimalValue());
+        assertEquals(new BigInteger("123456789012345678901234567890"), echo.getBigIntegerValue());
 
         // Verify blob
         var blobBuffer = echo.getBlobValue().rewind(); //TODO Investigate why this needs to re-winded.
@@ -898,6 +929,232 @@ class McpServerIntegrationTest {
         assertNotNull(response.getResult().getMember("content"));
     }
 
+    // ========== OneOf Schema Tests ==========
+
+    @Test
+    void testOneOfSchemaStructure() throws Exception {
+        initializeLatestProtocol();
+        var schemas = getCalculateAreaToolSchemas();
+        var inputSchema = schemas.inputSchema().getSchemaNode();
+
+        // Get oneOfInput property
+        var oneOfInputSchema = inputSchema.path("properties").path("oneOfInput");
+
+        // Should have oneOf array, not type
+        assertTrue(oneOfInputSchema.has("oneOf"), "oneOfInput should have 'oneOf' property");
+        assertEquals("object", oneOfInputSchema.path("type").asText());
+
+        var oneOfArray = oneOfInputSchema.path("oneOf");
+        assertEquals(3, oneOfArray.size(), "Should have 3 variants: Circle, Square, Rectangle");
+
+        // Each variant should be a wrapper object with member name as key (no discriminator in schema)
+        var memberNames = Set.of("circle", "square", "rectangle");
+        var foundMembers = new HashSet<String>();
+        for (var variant : oneOfArray) {
+            // Each variant should have exactly one property (the member name)
+            var properties = variant.path("properties");
+            assertEquals(1, properties.size(), "Each variant should have exactly one property (member name)");
+
+            // Get the member name
+            var memberName = properties.fieldNames().next();
+            assertTrue(memberNames.contains(memberName),
+                    "Member name should be one of: circle, square, rectangle");
+            foundMembers.add(memberName);
+
+            // Member name should be in required array
+            var requiredArray = variant.path("required");
+            boolean hasMemberInRequired = false;
+            for (var req : requiredArray) {
+                if (req.asText().equals(memberName)) {
+                    hasMemberInRequired = true;
+                    break;
+                }
+            }
+            assertTrue(hasMemberInRequired, "Member name " + memberName + " should be in required array");
+
+            // additionalProperties should be false
+            assertFalse(variant.path("additionalProperties").asBoolean(true),
+                    "additionalProperties should be false");
+        }
+
+        assertEquals(memberNames, foundMembers, "All member names should be present");
+    }
+
+    @Test
+    void testOneOfSchemaIsValidJsonSchemaDraft07() throws Exception {
+        initializeLatestProtocol();
+        var schemas = getCalculateAreaToolSchemas();
+
+        // Validate that inputSchema conforms to JSON Schema Draft-07
+        var inputErrors = JSON_SCHEMA.validate(schemas.toolNode().path("inputSchema"));
+        assertTrue(inputErrors.isEmpty(), "Input schema validation errors: " + inputErrors);
+
+        // Validate that outputSchema conforms to JSON Schema Draft-07
+        var outputErrors = JSON_SCHEMA.validate(schemas.toolNode().path("outputSchema"));
+        assertTrue(outputErrors.isEmpty(), "Output schema validation errors: " + outputErrors);
+    }
+
+    @Test
+    void testCalculateAreaWithCircle() {
+        initializeLatestProtocol();
+        // New format: wrapper object with member name as key
+        var circle = Document.of(Map.of("circle", Document.of(Map.of("radius", Document.of(5)))));
+        var input = Document.of(Map.of("oneOfInput", circle));
+        var response = callTool("CalculateArea", input);
+
+        assertNull(response.getError(),
+                "Expected no error but got: " + (response.getError() != null ? response.getError().getMessage() : ""));
+        var result = response.getResult().getMember("structuredContent");
+        assertNotNull(result, "structuredContent should be present");
+
+        double expectedArea = Math.PI * 5 * 5;
+        assertEquals(expectedArea, result.getMember("area").asNumber().doubleValue(), 0.001);
+    }
+
+    @Test
+    void testCalculateAreaWithSquare() {
+        initializeLatestProtocol();
+        // New format: wrapper object with member name as key
+        var square = Document.of(Map.of("square", Document.of(Map.of("side", Document.of(4)))));
+        var input = Document.of(Map.of("oneOfInput", square));
+        var response = callTool("CalculateArea", input);
+
+        assertNull(response.getError(),
+                "Expected no error but got: " + (response.getError() != null ? response.getError().getMessage() : ""));
+        var result = response.getResult().getMember("structuredContent");
+        assertNotNull(result, "structuredContent should be present");
+
+        double expectedArea = 4 * 4;
+        assertEquals(expectedArea, result.getMember("area").asNumber().doubleValue(), 0.001);
+    }
+
+    @Test
+    void testCalculateAreaWithRectangle() {
+        initializeLatestProtocol();
+        // New format: wrapper object with member name as key
+        var rectangle = Document.of(Map.of("rectangle",
+                Document.of(Map.of(
+                        "length",
+                        Document.of(6),
+                        "breadth",
+                        Document.of(4)))));
+        var input = Document.of(Map.of("oneOfInput", rectangle));
+        var response = callTool("CalculateArea", input);
+
+        assertNull(response.getError(),
+                "Expected no error but got: " + (response.getError() != null ? response.getError().getMessage() : ""));
+        var result = response.getResult().getMember("structuredContent");
+        assertNotNull(result, "structuredContent should be present");
+
+        double expectedArea = 6 * 4;
+        assertEquals(expectedArea, result.getMember("area").asNumber().doubleValue(), 0.001);
+    }
+
+    @Test
+    void testOneOfInputValidatesAgainstSchema() throws Exception {
+        initializeLatestProtocol();
+        var schemas = getCalculateAreaToolSchemas();
+
+        // Create valid Circle input and validate (wrapper format with member name as key)
+        var circleInput = OBJECT_MAPPER.readTree("""
+                {
+                    "oneOfInput": {
+                        "circle": {
+                            "radius": 5
+                        }
+                    }
+                }
+                """);
+        var circleErrors = schemas.inputSchema().validate(circleInput);
+        assertTrue(circleErrors.isEmpty(), "Circle input validation errors: " + circleErrors);
+
+        // Create valid Square input and validate
+        var squareInput = OBJECT_MAPPER.readTree("""
+                {
+                    "oneOfInput": {
+                        "square": {
+                            "side": 4
+                        }
+                    }
+                }
+                """);
+        var squareErrors = schemas.inputSchema().validate(squareInput);
+        assertTrue(squareErrors.isEmpty(), "Square input validation errors: " + squareErrors);
+
+        // Create valid Rectangle input and validate
+        var rectangleInput = OBJECT_MAPPER.readTree("""
+                {
+                    "oneOfInput": {
+                        "rectangle": {
+                            "length": 6,
+                            "breadth": 4
+                        }
+                    }
+                }
+                """);
+        var rectangleErrors = schemas.inputSchema().validate(rectangleInput);
+        assertTrue(rectangleErrors.isEmpty(), "Rectangle input validation errors: " + rectangleErrors);
+    }
+
+    @Test
+    void testOneOfOutputValidatesAgainstSchema() throws Exception {
+        initializeLatestProtocol();
+
+        // Get output schema
+        write("tools/list", Document.of(Map.of()));
+        var toolsResponseJson = readRawResponse();
+        var toolsNode = OBJECT_MAPPER.readTree(toolsResponseJson).path("result").path("tools");
+        JsonNode outputSchemaNode = null;
+        for (var tool : toolsNode) {
+            if (tool.path("name").asText().equals("CalculateArea")) {
+                outputSchemaNode = tool.path("outputSchema");
+                break;
+            }
+        }
+        assertNotNull(outputSchemaNode, "CalculateArea output schema not found");
+
+        // Call tool and get structuredContent (using wrapper format)
+        var circle = Document.of(Map.of("circle", Document.of(Map.of("radius", Document.of(5)))));
+        var params = Document.of(Map.of(
+                "name",
+                Document.of("CalculateArea"),
+                "arguments",
+                Document.of(Map.of("oneOfInput", circle))));
+        write("tools/call", params);
+        var callResponseJson = readRawResponse();
+        var callResponseNode = OBJECT_MAPPER.readTree(callResponseJson);
+        var structuredContentNode = callResponseNode.path("result").path("structuredContent");
+
+        assertFalse(structuredContentNode.isMissingNode(), "structuredContent should be present");
+
+        // Validate using output schema
+        JsonSchema schema = SCHEMA_FACTORY.getSchema(outputSchemaNode);
+        Set<ValidationMessage> errors = schema.validate(structuredContentNode);
+        assertTrue(errors.isEmpty(), "Output validation errors: " + errors);
+    }
+
+    @Test
+    void testUnionMemberNamesInSchema() throws Exception {
+        initializeLatestProtocol();
+        var schemas = getCalculateAreaToolSchemas();
+        var inputSchema = schemas.inputSchema().getSchemaNode();
+
+        var oneOfArray = inputSchema.path("properties").path("oneOfInput").path("oneOf");
+        var memberNames = new HashSet<String>();
+        for (var variant : oneOfArray) {
+            // Each variant has a single property which is the member name
+            var properties = variant.path("properties");
+            var memberName = properties.fieldNames().next();
+            memberNames.add(memberName);
+        }
+
+        // Verify member names match union members
+        assertTrue(memberNames.contains("circle"), "Should contain circle member");
+        assertTrue(memberNames.contains("square"), "Should contain square member");
+        assertTrue(memberNames.contains("rectangle"), "Should contain rectangle member");
+        assertEquals(3, memberNames.size(), "Should have exactly 3 members");
+    }
+
     // ========== Helper Methods ==========
 
     private void initializeWithProtocolVersion(ProtocolVersion protocolVersion) {
@@ -962,6 +1219,28 @@ class McpServerIntegrationTest {
 
         public McpEchoInput getLastInput() {
             return lastInput;
+        }
+    }
+
+    private static final class CalculateAreaImpl implements CalculateAreaOperation {
+
+        @Override
+        public CalculateAreaOutput calculateArea(CalculateAreaInput input, RequestContext context) {
+            var shape = Objects.requireNonNull(input.getOneOfInput());
+            double area;
+            if (shape instanceof Shape.CircleMember circleMember) {
+                var circle = circleMember.circle();
+                area = circle.getRadius() * circle.getRadius() * Math.PI;
+            } else if (shape instanceof Shape.SquareMember squareMember) {
+                var square = squareMember.square();
+                area = square.getSide() * square.getSide();
+            } else if (shape instanceof Shape.RectangleMember rectangleMember) {
+                var rectangle = rectangleMember.rectangle();
+                area = rectangle.getLength() * rectangle.getBreadth();
+            } else {
+                throw new IllegalArgumentException("Unknown shape type");
+            }
+            return CalculateAreaOutput.builder().area(area).originalShape(shape).build();
         }
     }
 }
