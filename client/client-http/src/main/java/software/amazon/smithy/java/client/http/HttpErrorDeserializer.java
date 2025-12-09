@@ -17,6 +17,7 @@ import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.document.DiscriminatorException;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -132,7 +133,7 @@ public final class HttpErrorDeserializer {
          *
          * @return the created error.
          */
-        CallException parsePayload(
+        default CallException parsePayload(
                 Context context,
                 Codec codec,
                 KnownErrorFactory knownErrorFactory,
@@ -140,7 +141,33 @@ public final class HttpErrorDeserializer {
                 TypeRegistry typeRegistry,
                 HttpResponse response,
                 ByteBuffer buffer
-        ) throws SerializationException, DiscriminatorException;
+        ) {
+            var document = codec.createDeserializer(buffer).readDocument();
+            var id = extractErrorType(document, serviceId.getNamespace());
+            var builder = typeRegistry.createBuilder(id, ModeledException.class);
+            if (builder != null) {
+                return knownErrorFactory.createErrorFromDocument(
+                        context,
+                        codec,
+                        response,
+                        buffer,
+                        document,
+                        builder);
+            }
+            return null;
+        }
+
+        /**
+         * This method should extract the error type from converted document based on the
+         * protocol requirement from either __type or code and apply necessary sanitizing to
+         * the error type.
+         *
+         * @param document The converted document of the payload.
+         * @param namespace The default namespace used for error type's ShapeId.
+         *
+         * @return the created error.
+         */
+        ShapeId extractErrorType(Document document, String namespace);
     }
 
     // Does not check for any error headers by default.
@@ -191,30 +218,12 @@ public final class HttpErrorDeserializer {
         }
     };
 
-    // This default parser should work for most protocols, but other  protocols
+    // This default parser should work for most protocols, but other protocols
     // that do not support document types will need a custom parser to extract error ShapeId.
-    private static final ErrorPayloadParser DEFAULT_ERROR_PAYLOAD_PARSER = (
-            Context context,
-            Codec codec,
-            KnownErrorFactory knownErrorFactory,
-            ShapeId serviceId,
-            TypeRegistry typeRegistry,
-            HttpResponse response,
-            ByteBuffer buffer) -> {
-        var document = codec.createDeserializer(buffer).readDocument();
-        var id = document.discriminator();
-        var builder = typeRegistry.createBuilder(id, ModeledException.class);
-        if (builder != null) {
-            return knownErrorFactory.createErrorFromDocument(
-                    context,
-                    codec,
-                    response,
-                    buffer,
-                    document,
-                    builder);
-        }
-        return null;
-    };
+    public static final ErrorPayloadParser DEFAULT_ERROR_PAYLOAD_PARSER =
+            (document, namespace) -> DocumentDeserializer.parseDiscriminator(
+                    ErrorTypeUtils.removeNamespaceAndUri(ErrorTypeUtils.readTypeAndCode(document)),
+                    namespace);
 
     private final Codec codec;
     private final HeaderErrorExtractor headerErrorExtractor;

@@ -18,11 +18,13 @@ import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
 import software.amazon.smithy.java.client.http.binding.HttpBindingClientProtocol;
 import software.amazon.smithy.java.client.http.binding.HttpBindingErrorFactory;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.InputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
@@ -95,24 +97,34 @@ public final class RestXmlClientProtocol extends HttpBindingClientProtocol<AwsEv
         return AwsEventDecoderFactory.forOutputStream(outputOperation, payloadCodec(), f -> f);
     }
 
-    private static final HttpErrorDeserializer.ErrorPayloadParser XML_ERROR_PAYLOAD_PARSER = (
-            Context context,
-            Codec codec,
-            HttpErrorDeserializer.KnownErrorFactory knownErrorFactory,
-            ShapeId serviceId,
-            TypeRegistry typeRegistry,
-            HttpResponse response,
-            ByteBuffer buffer) -> {
-        var deserializer = codec.createDeserializer(buffer);
-        String code = XmlUtil.parseErrorCodeName(deserializer);
-        var nameSpace = serviceId.getNamespace();
-        var id = ShapeId.fromOptionalNamespace(nameSpace, code);
-        var builder = typeRegistry.createBuilder(id, ModeledException.class);
-        if (builder != null) {
-            return knownErrorFactory.createError(context, codec, response, builder);
-        }
-        return null;
-    };
+    private static final HttpErrorDeserializer.ErrorPayloadParser XML_ERROR_PAYLOAD_PARSER =
+            new HttpErrorDeserializer.ErrorPayloadParser() {
+                @Override
+                public CallException parsePayload(
+                        Context context,
+                        Codec codec,
+                        HttpErrorDeserializer.KnownErrorFactory knownErrorFactory,
+                        ShapeId serviceId,
+                        TypeRegistry typeRegistry,
+                        HttpResponse response,
+                        ByteBuffer buffer
+                ) {
+                    var deserializer = codec.createDeserializer(buffer);
+                    String code = XmlUtil.parseErrorCodeName(deserializer);
+                    var nameSpace = serviceId.getNamespace();
+                    var id = ShapeId.fromOptionalNamespace(nameSpace, code);
+                    var builder = typeRegistry.createBuilder(id, ModeledException.class);
+                    if (builder != null) {
+                        return knownErrorFactory.createError(context, codec, response, builder);
+                    }
+                    return null;
+                }
+
+                @Override
+                public ShapeId extractErrorType(Document document, String namespace) {
+                    return null;
+                }
+            };
 
     public static final class Factory implements ClientProtocolFactory<RestXmlTrait> {
         @Override

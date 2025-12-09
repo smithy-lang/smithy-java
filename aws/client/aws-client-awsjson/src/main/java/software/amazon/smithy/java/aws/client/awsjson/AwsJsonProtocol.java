@@ -39,14 +39,22 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
      * @param service The service ID used to make X-Amz-Target, and the namespace is used when finding the
      *                discriminator of documents that use relative shape IDs.
      */
-    public AwsJsonProtocol(ShapeId trait, ShapeId service) {
+    public AwsJsonProtocol(
+            ShapeId trait,
+            ShapeId service,
+            HttpErrorDeserializer.ErrorPayloadParser errorPayloadParser
+    ) {
         super(trait);
         this.service = service;
-        this.codec = JsonCodec.builder().defaultNamespace(service.getNamespace()).build();
+        this.codec = JsonCodec.builder()
+                .defaultNamespace(service.getNamespace())
+                .useTimestampFormat(true)
+                .build();
 
         this.errorDeserializer = HttpErrorDeserializer.builder()
                 .codec(codec)
                 .serviceId(service)
+                .errorPayloadParser(errorPayloadParser)
                 .headerErrorExtractor(new AmznErrorHeaderExtractor())
                 .build();
     }
