@@ -116,3 +116,11 @@ tasks.sourcesJar {
     from(layout.buildDirectory.dir("merged-services"))
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
+
+tasks.jar {
+    doFirst {
+        manifest.attributes.remove("Build-Timestamp")
+        manifest.attributes.remove("Build-OS")
+        manifest.attributes.remove("Build-Jdk")
+    }
+}
