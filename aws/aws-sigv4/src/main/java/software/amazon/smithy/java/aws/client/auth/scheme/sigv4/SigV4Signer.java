@@ -15,6 +15,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
@@ -324,24 +325,26 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             return;
         }
 
-        SortedMap<String, String> sorted = new TreeMap<>();
+        SortedMap<String, List<String>> sorted = new TreeMap<>();
         var params = query.split("&");
 
         for (var param : params) {
             var keyVal = param.split("=");
             var key = keyVal[0];
+            var value = "";
             if (keyVal.length == 2) {
-                sorted.put(key, keyVal[1]);
-            } else {
-                sorted.put(key, "");
+                value = keyVal[1];
             }
+            sorted.computeIfAbsent(key, k -> new ArrayList<>()).add(value);
         }
 
         for (var entry : sorted.entrySet()) {
-            builder.append(entry.getKey());
-            builder.append('=');
-            builder.append(entry.getValue());
-            builder.append('&');
+            for (var value : entry.getValue()) {
+                builder.append(entry.getKey());
+                builder.append('=');
+                builder.append(value);
+                builder.append('&');
+            }
         }
 
         // Remove the trailing '&'.
