@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.http.client.h1;
 
+import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.http.api.HeaderNames;
 import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
 
@@ -52,7 +53,7 @@ final class H1Utils {
             valueEnd--;
         }
 
-        String value = new String(buf, valueStart, valueEnd - valueStart, java.nio.charset.StandardCharsets.US_ASCII);
+        String value = new String(buf, valueStart, valueEnd - valueStart, StandardCharsets.US_ASCII);
         headers.addHeader(name, value);
         return name;
     }

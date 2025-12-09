@@ -22,6 +22,7 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -97,9 +98,9 @@ public final class BenchmarkServer {
         this.h2Port = h2Port;
         this.h2cPort = h2cPort;
 
+        int cores = Runtime.getRuntime().availableProcessors();
         bossGroup = new NioEventLoopGroup(1);
-        // Use more worker threads for high concurrency
-        workerGroup = new NioEventLoopGroup(Runtime.getRuntime().availableProcessors() * 2);
+        workerGroup = new NioEventLoopGroup(cores * 4);
 
         // Start HTTP/1.1 server
         h1ServerChannel = startH1Server(h1Port);
@@ -187,25 +188,26 @@ public final class BenchmarkServer {
         ServerBootstrap b = new ServerBootstrap();
         b.group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
-                .option(ChannelOption.SO_BACKLOG, 16384)
+                .option(ChannelOption.SO_BACKLOG, 65536)
                 .option(ChannelOption.SO_REUSEADDR, true)
                 .childOption(ChannelOption.SO_KEEPALIVE, true)
                 .childOption(ChannelOption.TCP_NODELAY, true)
-                .childOption(ChannelOption.SO_RCVBUF, 1048576)
-                .childOption(ChannelOption.SO_SNDBUF, 1048576)
+                .childOption(ChannelOption.SO_RCVBUF, 2097152)
+                .childOption(ChannelOption.SO_SNDBUF, 2097152)
+                .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK, new WriteBufferWaterMark(32768, 65536))
                 .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) {
-                        // h2c prior knowledge: HTTP/2 directly without TLS or upgrade
-                        // Large initial window size for high throughput
                         var settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings()
-                                .maxConcurrentStreams(10000)
-                                .initialWindowSize(1048576); // 1MB stream window
+                                .maxConcurrentStreams(20000)
+                                .initialWindowSize(2097152);
                         ch.pipeline()
                                 .addLast(
                                         Http2FrameCodecBuilder.forServer()
                                                 .initialSettings(settings)
+                                                .autoAckSettingsFrame(true)
+                                                .autoAckPingFrame(true)
                                                 .build(),
                                         Http2RequestHandler.INSTANCE);
                     }
@@ -296,15 +298,67 @@ public final class BenchmarkServer {
                 .set("content-type", "application/json")
                 .setInt("content-length", CONTENT.length);
 
+        private static final java.util.concurrent.atomic.AtomicInteger connectionCount =
+                new java.util.concurrent.atomic.AtomicInteger();
+        private static final java.util.concurrent.ConcurrentHashMap<String,
+                java.util.concurrent.atomic.AtomicInteger> streamCounts =
+                        new java.util.concurrent.ConcurrentHashMap<>();
+
+        @Override
+        public void handlerAdded(ChannelHandlerContext ctx) {
+            int count = connectionCount.incrementAndGet();
+            String connId = ctx.channel().id().asShortText();
+            streamCounts.put(connId, new java.util.concurrent.atomic.AtomicInteger());
+            System.out.println("[H2] Connection opened: " + connId + " (total: " + count + ")");
+        }
+
+        @Override
+        public void handlerRemoved(ChannelHandlerContext ctx) {
+            int count = connectionCount.decrementAndGet();
+            String connId = ctx.channel().id().asShortText();
+            java.util.concurrent.atomic.AtomicInteger streams = streamCounts.remove(connId);
+            System.out.println("[H2] Connection closed: " + connId + " (handled "
+                    + (streams != null ? streams.get() : 0) + " streams, remaining: " + count + ")");
+        }
+
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) {
             if (msg instanceof Http2HeadersFrame headersFrame) {
-                if (headersFrame.isEndStream()) {
+                CharSequence path = headersFrame.headers().path();
+                if ("/reset".contentEquals(path)) {
+                    System.gc();
+                    System.out.println("[H2] Reset - Active connections: " + connectionCount.get());
+                    streamCounts
+                            .forEach((id, count) -> System.out.println("  " + id + ": " + count.get() + " streams"));
+                    Http2Headers resetHeaders = new DefaultHttp2Headers(true, 1).status("200");
+                    ctx.writeAndFlush(new DefaultHttp2HeadersFrame(resetHeaders, true).stream(headersFrame.stream()));
+                } else if ("/stats".contentEquals(path)) {
+                    StringBuilder json = new StringBuilder("{\"connections\":");
+                    json.append(connectionCount.get()).append(",\"streams\":{");
+                    streamCounts.forEach(
+                            (id, count) -> json.append("\"").append(id).append("\":").append(count.get()).append(","));
+                    if (json.charAt(json.length() - 1) == ',')
+                        json.setLength(json.length() - 1);
+                    json.append("}}");
+                    byte[] body = json.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    Http2Headers statsHeaders = new DefaultHttp2Headers(true, 2)
+                            .status("200")
+                            .setInt("content-length", body.length);
+                    ctx.write(new DefaultHttp2HeadersFrame(statsHeaders, false).stream(headersFrame.stream()));
+                    ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(body), true)
+                            .stream(headersFrame.stream()));
+                } else if (headersFrame.isEndStream()) {
+                    var counter = streamCounts.get(ctx.channel().id().asShortText());
+                    if (counter != null)
+                        counter.incrementAndGet();
                     sendResponse(ctx, headersFrame.stream());
                 }
             } else if (msg instanceof Http2DataFrame dataFrame) {
                 dataFrame.release();
                 if (dataFrame.isEndStream()) {
+                    var counter = streamCounts.get(ctx.channel().id().asShortText());
+                    if (counter != null)
+                        counter.incrementAndGet();
                     sendResponse(ctx, dataFrame.stream());
                 }
             }

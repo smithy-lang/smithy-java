@@ -184,7 +184,10 @@ public final class HttpConnectionPool implements ConnectionPool {
         this.h1Manager = new H1ConnectionManager(this.maxIdleTimeNanos);
         this.connectionPermits = new Semaphore(builder.maxTotalConnections, false);
         this.listeners = List.copyOf(builder.listeners);
-        this.h2Manager = new H2ConnectionManager(builder.h2StreamsPerConnection, this.acquireTimeoutMs, listeners, this::onNewH2Connection);
+        this.h2Manager = new H2ConnectionManager(builder.h2StreamsPerConnection,
+                this.acquireTimeoutMs,
+                listeners,
+                this::onNewH2Connection);
         this.cleanupThread = Thread.ofVirtual().name("http-pool-cleanup").start(this::cleanupIdleConnections);
     }
 

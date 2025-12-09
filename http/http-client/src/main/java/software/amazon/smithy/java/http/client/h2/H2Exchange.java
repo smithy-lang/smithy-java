@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import software.amazon.smithy.java.http.api.HttpHeaders;
@@ -119,6 +120,9 @@ public final class H2Exchange implements HttpExchange {
     // Stream-level timeouts
     private final long readTimeoutMs;
     private final long writeTimeoutMs;
+    private final AtomicLong readSeq = new AtomicLong(); // Activity counter, incremented on read activity
+    private volatile long readDeadlineNanos; // 0 = no deadline, >0 = deadline in nanos
+    private final AtomicBoolean readTimedOut = new AtomicBoolean(); // At-most-once timeout flag
 
     // Response state
     private volatile int statusCode = -1;
@@ -194,6 +198,53 @@ public final class H2Exchange implements HttpExchange {
      */
     int getStreamId() {
         return streamId;
+    }
+
+    /**
+     * Get read timeout in milliseconds.
+     */
+    long getReadTimeoutMs() {
+        return readTimeoutMs;
+    }
+
+    /**
+     * Get read deadline in nanoseconds (0 = no deadline).
+     */
+    long getReadDeadlineNanos() {
+        return readDeadlineNanos;
+    }
+
+    /**
+     * Get read activity sequence number.
+     */
+    long getReadSeq() {
+        return readSeq.get();
+    }
+
+    /**
+     * Attempt to mark this exchange as timed out. Returns true if successful (first caller wins).
+     * Used by timeout sweep to ensure at-most-once timeout per exchange.
+     */
+    boolean markReadTimedOut() {
+        return readTimedOut.compareAndSet(false, true);
+    }
+
+    /**
+     * Record read activity: bump sequence and reset deadline.
+     * Called when headers or data arrive.
+     */
+    private void onReadActivity() {
+        if (readTimeoutMs > 0) {
+            readSeq.incrementAndGet();
+            readDeadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(readTimeoutMs);
+        }
+    }
+
+    /**
+     * Clear read deadline (no timeout).
+     */
+    private void clearReadDeadline() {
+        readDeadlineNanos = 0;
     }
 
     /**
@@ -322,11 +373,14 @@ public final class H2Exchange implements HttpExchange {
         dataLock.lock();
         try {
             writePos += bytesWritten;
+            if (bytesWritten > 0) {
+                onReadActivity(); // Extend timeout when data arrives
+            }
             if (endStream) {
                 this.endStreamReceived = true;
                 this.readState = ReadState.DONE;
-                // Don't update streamState here - it will be updated when
-                // the user finishes reading and we return -1
+                clearReadDeadline(); // No more data expected, clear timeout
+                // Don't update streamState here. It will be updated when the user finishes reading, and we return -1.
             }
             dataAvailable.signalAll();
         } finally {
@@ -548,10 +602,7 @@ public final class H2Exchange implements HttpExchange {
         try {
             // Wait for headers, error, or data (which also signals)
             while (pendingHeaders == null && readState != ReadState.ERROR && readState != ReadState.DONE) {
-                if (!dataAvailable.await(readTimeoutMs, TimeUnit.MILLISECONDS)) {
-                    throw new SocketTimeoutException(
-                            "Read timed out after " + readTimeoutMs + "ms waiting for response");
-                }
+                dataAvailable.await(); // Untimed: muxer watchdog handles timeout
             }
 
             // Check for error
@@ -573,6 +624,8 @@ public final class H2Exchange implements HttpExchange {
      * HPACK dynamic table consistency across all streams.
      */
     private void readResponseHeaders() throws IOException {
+        onReadActivity(); // Start timeout when beginning to read response
+
         while (!responseHeadersReceived) {
             awaitEvent();
 
@@ -626,6 +679,7 @@ public final class H2Exchange implements HttpExchange {
         if (isEndStream) {
             endStreamReceived = true;
             readState = ReadState.DONE;
+            clearReadDeadline(); // No more data expected
             updateStreamStateOnEndStream();
             validateContentLength();
         } else if (responseHeadersReceived && readState != ReadState.DONE) {
@@ -949,10 +1003,7 @@ public final class H2Exchange implements HttpExchange {
                 }
 
                 try {
-                    if (!dataAvailable.await(readTimeoutMs, TimeUnit.MILLISECONDS)) {
-                        throw new SocketTimeoutException(
-                                "Read timed out after " + readTimeoutMs + "ms waiting for data");
-                    }
+                    dataAvailable.await(); // Untimed: muxer watchdog handles timeout
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new IOException("Interrupted waiting for data", e);
