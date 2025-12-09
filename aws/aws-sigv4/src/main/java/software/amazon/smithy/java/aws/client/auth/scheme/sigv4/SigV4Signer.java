@@ -30,7 +30,6 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.datastream.DataStream;
-import software.amazon.smithy.java.io.uri.URLEncoding;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -309,18 +308,17 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     private static void addCanonicalizedResourcePath(URI uri, StringBuilder builder) {
         String path = uri.normalize().getRawPath();
-        if (path.isEmpty()) {
+        if (path == null || path.isEmpty()) {
             builder.append('/');
             return;
         }
         if (!path.startsWith("/")) {
-            path = '/' + path;
+            builder.append('/');
         }
-        URLEncoding.encodeUnreserved(path, builder, true);
+        builder.append(path);
     }
 
     private static void addCanonicalizedQueryString(URI uri, StringBuilder builder) {
-        // Getting the raw query means the keys and values don't need to be encoded again.
         var query = uri.getRawQuery();
         if (query == null) {
             return;
@@ -332,10 +330,8 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         for (var param : params) {
             var keyVal = param.split("=");
             var key = keyVal[0];
-            var encodedKey = URLEncoding.encodeUnreserved(key, false);
             if (keyVal.length == 2) {
-                var encodedValue = URLEncoding.encodeUnreserved(keyVal[1], false);
-                sorted.put(encodedKey, encodedValue);
+                sorted.put(key, keyVal[1]);
             } else {
                 sorted.put(key, "");
             }

@@ -1,0 +1,4 @@
+GET /foo%3Abar/?foo=bar HTTP/1.1
+Host:example.amazonaws.com
+X-Amz-Date:20150830T123600Z
+Authorization:AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/service/aws4_request, SignedHeaders=host;x-amz-date, Signature=bd0ce8146a65497669ff3f650baae183b78931856b0005d4a51bc0612ba7c8a0
