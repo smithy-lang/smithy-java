@@ -7,7 +7,9 @@ package software.amazon.smithy.java.http.client.h2;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.IntPredicate;
 
 /**
  * Essentially a very fast custom hashmap of stream ID to H2Exchange.
@@ -30,6 +32,9 @@ import java.util.function.Consumer;
  *
  * <p>We map stream IDs to array slots via: {@code slot = ((streamId - 1) >>> 1) & slotMask}. This gives O(1) lookup
  * without hashing or Integer boxing overhead.
+ *
+ * <p>This class is a thread-safe registry and does not enforce any stream lifecycle policies
+ * (timeouts, errors, etc). Callers are responsible for managing timeouts and cleanup using forEach / clearAndClose.
  */
 final class StreamRegistry {
 
@@ -109,22 +114,25 @@ final class StreamRegistry {
     }
 
     /**
-     * Iterate over all active exchanges.
-     * Used for cold paths (cleanup, settings changes, connection close).
+     * Iterate over all active exchanges with a context value.
+     * Avoids lambda allocation by passing context to a BiConsumer.
      *
      * @param action the action to perform on each exchange
+     * @param context context value passed to each invocation
+     * @param <T> the context type
      */
-    void forEach(Consumer<H2Exchange> action) {
-        // Iterate Array and the spillover map
+    <T> void forEach(T context, BiConsumer<H2Exchange, T> action) {
         for (int i = 0; i < SLOTS; i++) {
             H2Exchange exchange = fastPath.get(i);
             if (exchange != null) {
-                action.accept(exchange);
+                action.accept(exchange, context);
             }
         }
 
         if (!spillover.isEmpty()) {
-            spillover.values().forEach(action);
+            for (H2Exchange exchange : spillover.values()) {
+                action.accept(exchange, context);
+            }
         }
     }
 
@@ -134,7 +142,7 @@ final class StreamRegistry {
      * @param predicate condition to check
      * @param action the action to perform on matching exchanges
      */
-    void forEachMatching(java.util.function.IntPredicate predicate, Consumer<H2Exchange> action) {
+    void forEachMatching(IntPredicate predicate, Consumer<H2Exchange> action) {
         // Iterate Array and spillover map.
         for (int i = 0; i < SLOTS; i++) {
             H2Exchange exchange = fastPath.get(i);
