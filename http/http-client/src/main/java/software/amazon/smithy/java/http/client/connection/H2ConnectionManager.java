@@ -25,6 +25,8 @@ final class H2ConnectionManager {
      */
     private static final class RouteState {
         volatile H2Connection[] conns = new H2Connection[0];
+        // Number of connections currently being created (to prevent over-creation)
+        int pendingCreations = 0;
     }
 
     private static final H2Connection[] EMPTY = new H2Connection[0];
@@ -66,39 +68,36 @@ final class H2ConnectionManager {
      */
     H2Connection acquire(Route route, int maxConnectionsForRoute) throws IOException {
         RouteState state = stateFor(route);
-
-        // Fast path: snapshot of current connections, no locking
-        H2Connection conn = tryAcquire(state.conns);
-        if (conn != null) {
-            notifyAcquire(conn, true);
-            return conn;
-        }
-
         long deadline = System.currentTimeMillis() + acquireTimeoutMs;
+        boolean shouldCreate = false;
 
-        // Slow path: check existing under lock, wait if at limit
         synchronized (state) {
             while (true) {
-                // Try to find a connection under the soft limit (streamsPerConnection)
                 H2Connection[] snapshot = state.conns;
-                H2Connection rechecked = tryAcquireUnderLimit(snapshot);
-                if (rechecked != null) {
-                    notifyAcquire(rechecked, true);
-                    return rechecked;
-                } else if (snapshot.length < maxConnectionsForRoute) {
-                    // Under connection limit: exit loop to create new connection
+                int totalConns = snapshot.length + state.pendingCreations;
+
+                // Try to find a connection under the soft limit
+                H2Connection conn = tryAcquireUnderLimit(snapshot);
+                if (conn != null) {
+                    notifyAcquire(conn, true);
+                    return conn;
+                }
+
+                // All connections at/above soft limit - create new if under connection limit
+                if (totalConns < maxConnectionsForRoute) {
+                    state.pendingCreations++;
+                    shouldCreate = true;
                     break;
                 }
 
-                // At connection limit, so try to reuse any connection even if over soft limit
-                // (but still under server's SETTINGS_MAX_CONCURRENT_STREAMS hard limit)
-                H2Connection overLimit = tryAcquire(snapshot);
-                if (overLimit != null) {
-                    notifyAcquire(overLimit, true);
-                    return overLimit;
+                // At connection limit - use any connection even if over soft limit
+                conn = tryAcquire(snapshot);
+                if (conn != null) {
+                    notifyAcquire(conn, true);
+                    return conn;
                 }
 
-                // No connections available, so wait for one to free up capacity.
+                // Wait for capacity
                 long remaining = deadline - System.currentTimeMillis();
                 if (remaining <= 0) {
                     throw new IOException("Acquire timeout: no connection available after "
@@ -106,7 +105,6 @@ final class H2ConnectionManager {
                 }
 
                 try {
-                    // Wait and then retry the loop.
                     state.wait(remaining);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -115,22 +113,38 @@ final class H2ConnectionManager {
             }
         }
 
-        return createNewH2Connection(route, state);
+        if (shouldCreate) {
+            return createNewH2Connection(route, state);
+        }
+        throw new IllegalStateException("unreachable");
     }
 
     @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
     private H2Connection createNewH2Connection(Route route, RouteState state) throws IOException {
-        // Create new connection OUTSIDE the lock to avoid deadlock. Note: Multiple threads may race to create
-        // connections for the same route. This is acceptable: we'd rather over-create slightly than deadlock.
-        H2Connection newConn = connectionFactory.create(route);
+        // Create new connection OUTSIDE the lock to avoid deadlock.
+        H2Connection newConn = null;
+        IOException createException = null;
+        try {
+            newConn = connectionFactory.create(route);
+        } catch (IOException e) {
+            createException = e;
+        } finally {
+            // Register under lock (or decrement pending on failure)
+            synchronized (state) {
+                state.pendingCreations--;
+                if (newConn != null) {
+                    H2Connection[] cur = state.conns;
+                    H2Connection[] next = new H2Connection[cur.length + 1];
+                    System.arraycopy(cur, 0, next, 0, cur.length);
+                    next[cur.length] = newConn;
+                    state.conns = next;
+                }
+                state.notifyAll(); // Wake waiters
+            }
+        }
 
-        // Register under lock
-        synchronized (state) {
-            H2Connection[] cur = state.conns;
-            H2Connection[] next = new H2Connection[cur.length + 1];
-            System.arraycopy(cur, 0, next, 0, cur.length);
-            next[cur.length] = newConn;
-            state.conns = next;
+        if (createException != null) {
+            throw createException;
         }
 
         notifyAcquire(newConn, false);
