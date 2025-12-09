@@ -1,16 +1,22 @@
 {
   "version": "1.0",
+  "sources": ["model"],
   "plugins": {
     "java-type-codegen": {
       "namespace": "software.amazon.smithy.java.mcp",
       "headerFile": "license.txt",
-      "runtimeTraits": ["smithy.api#documentation", "smithy.api#examples" ]
+      "runtimeTraits": ["smithy.api#documentation", "smithy.api#examples", "smithy.mcp#oneOf" ]
     },
     "java-server-codegen": {
       "service": "smithy.mcp.toolassistant#ToolAssistant",
       "namespace": "software.amazon.smithy.java.mcp.toolassistant",
       "headerFile": "license.txt",
-      "runtimeTraits": ["smithy.api#documentation", "smithy.api#examples", "smithy.ai#prompts" ]
+      "runtimeTraits": ["smithy.api#documentation", "smithy.api#examples", "smithy.ai#prompts", "smithy.mcp#oneOf" ]
+    },
+    "trait-codegen": {
+      "package": "software.amazon.smithy.java.mcp",
+      "namespace": "smithy.mcp",
+      "header": ["license.txt"]
     }
   }
 }

@@ -2,9 +2,12 @@ $version: "2"
 
 namespace smithy.java.mcp.test
 
+use smithy.mcp#oneOf
+
 service TestService {
     operations: [
-        McpEcho
+        McpEcho,
+    CalculateArea
     ]
 }
 
@@ -15,6 +18,56 @@ operation McpEcho {
     output:= {
         echo: Echo
     }
+}
+
+operation CalculateArea {
+    input : CalculateAreaInput
+
+    output := {
+        @required
+        area: Double
+
+        @required
+        originalShape: Shape
+    }
+}
+
+structure CalculateAreaInput {
+    oneOfInput : Shape
+}
+
+
+/// Union without @oneOf trait - uses wrapper format natively
+union Shape {
+    circle : Circle
+    square: Square
+    rectangle: Rectangle
+}
+
+/// Document with @oneOf trait - for testing Document-based polymorphic types
+/// Used when services need discriminator-based polymorphism
+@oneOf(discriminator: "__type", members: [
+    {name: "circle", target: Circle},
+    {name: "square", target: Square},
+    {name: "rectangle", target: Rectangle}
+])
+document ShapeWithOneOf
+
+structure Circle {
+    @required
+    radius : Integer
+}
+
+structure Square {
+    @required
+    side: Integer
+}
+
+structure Rectangle {
+    @required
+    length: Integer
+    @required
+    breadth: Integer
 }
 
 /// A comprehensive structure containing all supported Smithy types for testing MCP serde
