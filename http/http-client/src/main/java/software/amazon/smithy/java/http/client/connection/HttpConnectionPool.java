@@ -179,7 +179,8 @@ public final class HttpConnectionPool implements ConnectionPool {
                 builder.sslParameters,
                 builder.versionPolicy,
                 dnsResolver,
-                builder.socketFactory);
+                builder.socketFactory,
+                builder.h2InitialWindowSize);
 
         this.h1Manager = new H1ConnectionManager(this.maxIdleTimeNanos);
         this.connectionPermits = new Semaphore(builder.maxTotalConnections, false);

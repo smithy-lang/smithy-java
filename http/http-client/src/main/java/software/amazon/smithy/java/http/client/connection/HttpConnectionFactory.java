@@ -42,6 +42,7 @@ final class HttpConnectionFactory {
     private final HttpVersionPolicy versionPolicy;
     private final DnsResolver dnsResolver;
     private final HttpSocketFactory socketFactory;
+    private final int h2InitialWindowSize;
 
     HttpConnectionFactory(
             Duration connectTimeout,
@@ -52,7 +53,8 @@ final class HttpConnectionFactory {
             SSLParameters sslParameters,
             HttpVersionPolicy versionPolicy,
             DnsResolver dnsResolver,
-            HttpSocketFactory socketFactory
+            HttpSocketFactory socketFactory,
+            int h2InitialWindowSize
     ) {
         this.connectTimeout = connectTimeout;
         this.tlsNegotiationTimeout = tlsNegotiationTimeout;
@@ -63,6 +65,7 @@ final class HttpConnectionFactory {
         this.versionPolicy = versionPolicy;
         this.dnsResolver = dnsResolver;
         this.socketFactory = socketFactory;
+        this.h2InitialWindowSize = h2InitialWindowSize;
     }
 
     /**
@@ -175,7 +178,7 @@ final class HttpConnectionFactory {
 
         try {
             if ("h2".equals(protocol) || "h2c".equals(protocol)) {
-                return new H2Connection(socket, route, readTimeout, writeTimeout);
+                return new H2Connection(socket, route, readTimeout, writeTimeout, h2InitialWindowSize);
             } else {
                 return new H1Connection(socket, route, readTimeout);
             }

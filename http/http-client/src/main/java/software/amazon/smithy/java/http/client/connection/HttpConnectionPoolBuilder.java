@@ -24,6 +24,7 @@ public final class HttpConnectionPoolBuilder {
     int maxTotalConnections = 256;
     int maxConnectionsPerRoute = 20;
     int h2StreamsPerConnection = 100;
+    int h2InitialWindowSize = 65535; // RFC 9113 default
     final Map<String, Integer> perHostLimits = new HashMap<>();
 
     Duration maxIdleTime = Duration.ofMinutes(2);
@@ -375,6 +376,36 @@ public final class HttpConnectionPoolBuilder {
      */
     public HttpConnectionPoolBuilder socketFactory(HttpSocketFactory socketFactory) {
         this.socketFactory = Objects.requireNonNull(socketFactory, "socketFactory");
+        return this;
+    }
+
+    /**
+     * Set HTTP/2 initial window size for flow control (default: 65535 bytes).
+     *
+     * <p>This controls the initial flow control window size advertised to the server
+     * for both connection-level and stream-level flow control. Larger values allow
+     * more data to be sent before waiting for WINDOW_UPDATE frames, which improves
+     * throughput for large payloads.
+     *
+     * <p><b>Performance considerations:</b>
+     * <ul>
+     *   <li>Default (65535): RFC 9113 default, conservative memory usage</li>
+     *   <li>1MB (1048576): Good for large response bodies, reduces WINDOW_UPDATE overhead</li>
+     *   <li>Higher values: Better throughput but more memory per stream</li>
+     * </ul>
+     *
+     * <p>For workloads with large response bodies (e.g., file downloads, large API responses),
+     * consider setting this to 1MB or higher to reduce flow control overhead.
+     *
+     * @param windowSize initial window size in bytes, must be between 1 and 2^31-1
+     * @return this builder
+     * @throws IllegalArgumentException if windowSize is not in valid range
+     */
+    public HttpConnectionPoolBuilder h2InitialWindowSize(int windowSize) {
+        if (windowSize <= 0) {
+            throw new IllegalArgumentException("h2InitialWindowSize must be positive: " + windowSize);
+        }
+        this.h2InitialWindowSize = windowSize;
         return this;
     }
 
