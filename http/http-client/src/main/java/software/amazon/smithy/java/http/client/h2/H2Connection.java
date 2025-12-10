@@ -732,7 +732,9 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     // Called only from reader thread - no synchronization needed
     void consumeConnectionRecvWindow(int bytes) throws IOException {
         connectionRecvWindow -= bytes;
-        if (connectionRecvWindow < initialWindowSize / 2) {
+        // Send WINDOW_UPDATE when window drops below threshold to reduce control frame overhead
+        // while still leaving enough buffer to avoid server stalls
+        if (connectionRecvWindow < initialWindowSize / H2Constants.WINDOW_UPDATE_THRESHOLD_DIVISOR) {
             int increment = initialWindowSize - connectionRecvWindow;
             connectionRecvWindow += increment;
             muxer.queueControlFrame(0,

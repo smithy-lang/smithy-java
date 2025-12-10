@@ -205,6 +205,17 @@ public class H2cScalingBenchmark {
         public void reset() {
             super.reset();
         }
+
+        // Override getters so JMH annotation processor sees them directly
+        @Override
+        public long requests() {
+            return requests;
+        }
+
+        @Override
+        public long errors() {
+            return errors;
+        }
     }
 
     @Benchmark
