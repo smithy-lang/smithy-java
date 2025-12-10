@@ -267,6 +267,16 @@ public final class H2Exchange implements HttpExchange {
     }
 
     /**
+     * Borrow a buffer from the muxer's pool.
+     *
+     * @param minSize minimum size needed
+     * @return a buffer of at least minSize bytes
+     */
+    byte[] borrowBuffer(int minSize) {
+        return muxer.borrowBuffer(minSize);
+    }
+
+    /**
      * Return a buffer to the muxer's pool.
      *
      * <p>Called by the writer thread after consuming a PendingWrite.
