@@ -14,13 +14,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.http.client.BufferPool;
+import software.amazon.smithy.java.http.client.ByteAllocator;
 
-class BufferPoolTest {
+class ByteAllocatorTest {
 
     @Test
     void borrowReturnsBufferOfRequestedSize() {
-        BufferPool pool = new BufferPool(10, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
         byte[] buffer = pool.borrow(256);
 
@@ -30,7 +30,7 @@ class BufferPoolTest {
 
     @Test
     void borrowReturnsDefaultSizeWhenRequestedSizeIsSmaller() {
-        BufferPool pool = new BufferPool(10, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
         byte[] buffer = pool.borrow(64);
 
@@ -40,7 +40,7 @@ class BufferPoolTest {
 
     @Test
     void releasedBufferCanBeReused() {
-        BufferPool pool = new BufferPool(10, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
         byte[] buffer1 = pool.borrow(128);
         pool.release(buffer1);
@@ -51,7 +51,7 @@ class BufferPoolTest {
 
     @Test
     void poolSizeIncreasesOnRelease() {
-        BufferPool pool = new BufferPool(10, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
         assertEquals(0, pool.size());
 
         byte[] buffer = pool.borrow(128);
@@ -62,7 +62,7 @@ class BufferPoolTest {
 
     @Test
     void poolSizeDecreasesOnBorrow() {
-        BufferPool pool = new BufferPool(10, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
         byte[] buffer1 = pool.borrow(128);
         pool.release(buffer1);
@@ -74,7 +74,7 @@ class BufferPoolTest {
 
     @Test
     void poolRespectsMaxSize() {
-        BufferPool pool = new BufferPool(2, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(2, 1024, 1024, 128);
 
         // Fill pool to max
         pool.release(new byte[128]);
@@ -88,7 +88,7 @@ class BufferPoolTest {
 
     @Test
     void buffersLargerThanMaxPoolableSizeAreNotPooled() {
-        BufferPool pool = new BufferPool(10, 1024, 256, 128);
+        ByteAllocator pool = new ByteAllocator(10, 1024, 256, 128);
 
         byte[] largeBuffer = new byte[512]; // Larger than maxPoolableSize (256)
         pool.release(largeBuffer);
@@ -98,7 +98,7 @@ class BufferPoolTest {
 
     @Test
     void borrowThrowsWhenRequestedSizeExceedsMaxBufferSize() {
-        BufferPool pool = new BufferPool(10, 256, 256, 128);
+        ByteAllocator pool = new ByteAllocator(10, 256, 256, 128);
 
         IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
@@ -111,7 +111,7 @@ class BufferPoolTest {
 
     @Test
     void nullBufferIsIgnored() {
-        BufferPool pool = new BufferPool(10, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
         pool.release(null); // Should not throw
 
@@ -120,7 +120,7 @@ class BufferPoolTest {
 
     @Test
     void clearRemovesAllBuffers() {
-        BufferPool pool = new BufferPool(10, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
         pool.release(new byte[128]);
         pool.release(new byte[128]);
@@ -134,7 +134,7 @@ class BufferPoolTest {
 
     @Test
     void tooSmallPooledBufferIsDropped() {
-        BufferPool pool = new BufferPool(10, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
         // Release a small buffer
         byte[] smallBuffer = new byte[64];
@@ -150,27 +150,27 @@ class BufferPoolTest {
 
     @Test
     void constructorValidatesMaxPoolCount() {
-        assertThrows(IllegalArgumentException.class, () -> new BufferPool(0, 1024, 1024, 128));
-        assertThrows(IllegalArgumentException.class, () -> new BufferPool(-1, 1024, 1024, 128));
+        assertThrows(IllegalArgumentException.class, () -> new ByteAllocator(0, 1024, 1024, 128));
+        assertThrows(IllegalArgumentException.class, () -> new ByteAllocator(-1, 1024, 1024, 128));
     }
 
     @Test
     void constructorValidatesDefaultBufferSize() {
-        assertThrows(IllegalArgumentException.class, () -> new BufferPool(10, 1024, 1024, 0));
-        assertThrows(IllegalArgumentException.class, () -> new BufferPool(10, 1024, 1024, -1));
+        assertThrows(IllegalArgumentException.class, () -> new ByteAllocator(10, 1024, 1024, 0));
+        assertThrows(IllegalArgumentException.class, () -> new ByteAllocator(10, 1024, 1024, -1));
     }
 
     @Test
     void constructorValidatesMaxPoolableSize() {
         // maxPoolableSize must be > 0
-        assertThrows(IllegalArgumentException.class, () -> new BufferPool(10, 1024, 0, 128));
+        assertThrows(IllegalArgumentException.class, () -> new ByteAllocator(10, 1024, 0, 128));
         // maxPoolableSize must be <= maxBufferSize
-        assertThrows(IllegalArgumentException.class, () -> new BufferPool(10, 256, 512, 128));
+        assertThrows(IllegalArgumentException.class, () -> new ByteAllocator(10, 256, 512, 128));
     }
 
     @Test
     void borrowThrowsWhenMinSizeIsZeroOrNegative() {
-        BufferPool pool = new BufferPool(10, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
         assertThrows(IllegalArgumentException.class, () -> pool.borrow(0));
         assertThrows(IllegalArgumentException.class, () -> pool.borrow(-1));
@@ -178,7 +178,7 @@ class BufferPoolTest {
 
     @Test
     void lifoOrderPreserved() {
-        BufferPool pool = new BufferPool(10, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
         byte[] buffer1 = new byte[128];
         byte[] buffer2 = new byte[128];
@@ -196,7 +196,7 @@ class BufferPoolTest {
 
     @Test
     void concurrentBorrowAndReleaseIsThreadSafe() throws InterruptedException {
-        BufferPool pool = new BufferPool(100, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(100, 1024, 1024, 128);
         int threadCount = 10;
         int operationsPerThread = 1000;
 

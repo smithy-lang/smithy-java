@@ -21,8 +21,10 @@ import java.util.function.IntPredicate;
  * occupied (by a long-lived stream), the new stream goes here.</li>
  * </ul>
  *
- * <p>This guarantees that "Lapping" (ID wrap-around) never causes data loss, even if a stream stays open indefinitely
- * while millions of others cycle through.
+ * <p>The spillover mechanism handles slot collisions: since we map stream IDs to slots via modulo, a long-lived
+ * stream occupying a slot would block newer streams that hash to the same slot. The spillover map ensures these
+ * newer streams are still tracked. Note that HTTP/2 stream IDs never wrap around on the same connection - they
+ * monotonically increase until exhaustion (at which point the connection must be closed per RFC 9113).
  *
  * <p>HTTP/2 client stream IDs have useful properties we exploit:
  * <ul>
@@ -30,7 +32,8 @@ import java.util.function.IntPredicate;
  *   <li>Monotonically increasing (never reused on same connection)</li>
  * </ul>
  *
- * <p>We map stream IDs to array slots via: {@code slot = ((streamId - 1) >>> 1) & slotMask}. This gives O(1) lookup
+ * <p>We map stream IDs to array slots via: {@code slot = ((streamId - 1) >>> 1) & slotMask}. This converts
+ * odd IDs (1, 3, 5, ...) to sequential indices (0, 1, 2, ...) then masks to the slot range, giving O(1) lookup
  * without hashing or Integer boxing overhead.
  *
  * <p>This class is a thread-safe registry and does not enforce any stream lifecycle policies
@@ -39,7 +42,7 @@ import java.util.function.IntPredicate;
 final class StreamRegistry {
 
     // 4096 slots covers normal concurrency (100-1000) with ample headroom.
-    // Memory cost: 4096 * 4 bytes (ref) = 16KB per connection.
+    // Memory cost: 4096 * 4-8 bytes (ref) = 16-32KB per connection (depends on compressed oops).
     private static final int SLOTS = 4096;
     private static final int SLOT_MASK = SLOTS - 1;
 
@@ -48,7 +51,7 @@ final class StreamRegistry {
 
     /**
      * Map stream ID to slot index.
-     * Stream IDs are odd (1, 3, 5, ...), so we divide by 2 to get compact indices.
+     * Stream IDs are odd (1, 3, 5, ...), so we subtract 1 and divide by 2 to get sequential indices (0, 1, 2, ...).
      */
     private static int streamIdToSlot(int streamId) {
         return ((streamId - 1) >>> 1) & SLOT_MASK;

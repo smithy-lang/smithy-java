@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.http.client.h2.hpack;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -563,30 +564,33 @@ final class Huffman {
     private static final int[][] DECODE_TABLE = buildDecodeTable();
 
     /**
-     * Encode bytes using Huffman coding.
+     * Encode bytes using Huffman coding directly to an output stream.
+     *
+     * <p>This avoids allocating an intermediate byte[] buffer.
      *
      * @param data the bytes to encode
-     * @return Huffman-encoded bytes
+     * @param offset start offset in data
+     * @param length number of bytes to encode
+     * @param out the output stream to write to
+     * @throws IOException if writing fails
      */
-    static byte[] encode(byte[] data) {
-        int capacity = encodedLength(data);
-        byte[] buf = new byte[capacity];
-        int pos = 0;
+    static void encode(byte[] data, int offset, int length, OutputStream out) throws IOException {
         long current = 0;
         int bits = 0;
 
-        for (byte b : data) {
-            int index = b & 0xFF;
+        int end = offset + length;
+        for (int i = offset; i < end; i++) {
+            int index = data[i] & 0xFF;
             int code = CODES[index];
-            int length = LENGTHS[index];
+            int codeLength = LENGTHS[index];
 
-            current <<= length;
+            current <<= codeLength;
             current |= code;
-            bits += length;
+            bits += codeLength;
 
             while (bits >= 8) {
                 bits -= 8;
-                buf[pos++] = (byte) (current >> bits);
+                out.write((int) (current >> bits));
             }
         }
 
@@ -594,22 +598,23 @@ final class Huffman {
         if (bits > 0) {
             current <<= (8 - bits);
             current |= (EOS_CODE >> (EOS_LENGTH - (8 - bits)));
-            buf[pos++] = (byte) current;
+            out.write((int) current);
         }
-
-        return (pos == capacity) ? buf : Arrays.copyOf(buf, pos);
     }
 
     /**
-     * Calculate the encoded length of a byte array without actually encoding it.
+     * Calculate the encoded length of a byte array region without actually encoding it.
      *
      * @param data the bytes to measure
+     * @param offset start offset in data
+     * @param length number of bytes to measure
      * @return length in bytes when Huffman-encoded
      */
-    static int encodedLength(byte[] data) {
+    static int encodedLength(byte[] data, int offset, int length) {
         int bits = 0;
-        for (byte b : data) {
-            bits += LENGTHS[b & 0xFF];
+        int end = offset + length;
+        for (int i = offset; i < end; i++) {
+            bits += LENGTHS[data[i] & 0xFF];
         }
         return (bits + 7) / 8;
     }
