@@ -88,6 +88,10 @@ public final class H2Exchange implements HttpExchange {
     // Shared empty array to avoid allocation
     private static final byte[] EMPTY_DATA = new byte[0];
 
+    // Short spin before full park - avoids heavy park/unpark for near-miss data arrivals
+    private static final int SPIN_WAITS = 2;
+    private static final long SPIN_WAIT_NANOS = 40_000L; // 40µs each
+
     private final H2Muxer muxer;
     private final HttpRequest request;
     private volatile int streamId;
@@ -123,6 +127,7 @@ public final class H2Exchange implements HttpExchange {
     private final AtomicLong readSeq = new AtomicLong(); // Activity counter, incremented on read activity
     private volatile int readDeadlineTick; // 0 = no deadline, >0 = deadline tick
     private final AtomicBoolean readTimedOut = new AtomicBoolean(); // At-most-once timeout flag
+    private boolean waitingForData; // guarded by dataLock - true when VT is blocked waiting for data
 
     // Response state
     private volatile int statusCode = -1;
@@ -305,12 +310,11 @@ public final class H2Exchange implements HttpExchange {
     void deliverHeaders(List<HeaderField> fields, boolean endStream) {
         dataLock.lock();
         try {
-            // Process headers and update state (will be called from reader thread)
-            // The actual header processing happens here rather than in user thread
-            // to avoid needing a separate queue for headers
             pendingHeaders = fields;
             pendingHeadersEndStream = endStream;
-            dataAvailable.signalAll();
+            if (waitingForData) {
+                dataAvailable.signalAll();
+            }
         } finally {
             dataLock.unlock();
         }
@@ -383,6 +387,8 @@ public final class H2Exchange implements HttpExchange {
     void commitWrite(int bytesWritten, boolean endStream) {
         dataLock.lock();
         try {
+            boolean wasEmpty = (writePos == readPos);
+
             writePos += bytesWritten;
             if (bytesWritten > 0) {
                 onReadActivity(); // Extend timeout when data arrives
@@ -391,9 +397,12 @@ public final class H2Exchange implements HttpExchange {
                 this.endStreamReceived = true;
                 this.readState = ReadState.DONE;
                 clearReadDeadline(); // No more data expected, clear timeout
-                // Don't update streamState here. It will be updated when the user finishes reading, and we return -1.
             }
-            dataAvailable.signalAll();
+
+            // Only wake the reader if it's actually blocked waiting
+            if ((wasEmpty || endStream) && waitingForData) {
+                dataAvailable.signalAll();
+            }
         } finally {
             dataLock.unlock();
         }
@@ -613,7 +622,12 @@ public final class H2Exchange implements HttpExchange {
         try {
             // Wait for headers, error, or data (which also signals)
             while (pendingHeaders == null && readState != ReadState.ERROR && readState != ReadState.DONE) {
-                dataAvailable.await(); // Untimed: muxer watchdog handles timeout
+                waitingForData = true;
+                try {
+                    dataAvailable.await(); // Untimed: muxer watchdog handles timeout
+                } finally {
+                    waitingForData = false;
+                }
             }
 
             // Check for error
@@ -1013,11 +1027,34 @@ public final class H2Exchange implements HttpExchange {
                     }
                 }
 
+                // Short timed waits to catch near-miss data arrivals
+                int spins = 0;
+                while (readPos == writePos && readState == ReadState.READING_DATA && spins++ < SPIN_WAITS) {
+                    waitingForData = true;
+                    try {
+                        dataAvailable.awaitNanos(SPIN_WAIT_NANOS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("Interrupted waiting for data", e);
+                    } finally {
+                        waitingForData = false;
+                    }
+                }
+
+                // If data arrived during spin, we're done waiting
+                if (readPos != writePos || readState != ReadState.READING_DATA) {
+                    break;
+                }
+
+                // Still nothing after short waits: do a full park
+                waitingForData = true;
                 try {
-                    dataAvailable.await(); // Untimed: muxer watchdog handles timeout
+                    dataAvailable.await();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new IOException("Interrupted waiting for data", e);
+                } finally {
+                    waitingForData = false;
                 }
             }
 
