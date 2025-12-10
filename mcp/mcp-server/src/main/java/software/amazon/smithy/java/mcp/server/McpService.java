@@ -836,6 +836,9 @@ public final class McpService {
     }
 
     private Document adaptOutputDocument(Document doc, Schema schema) {
+        if (doc == null) {
+            return null;
+        }
         var toType = schema.type();
         return switch (toType) {
             case BIG_DECIMAL -> Document.of(doc.asBigDecimal().toString());
@@ -869,7 +872,9 @@ public final class McpService {
                 var listMember = schema.listMember();
                 var convertedList = new ArrayList<Document>();
                 for (var item : doc.asList()) {
-                    convertedList.add(adaptOutputDocument(item, listMember));
+                    if (item != null) {
+                        convertedList.add(adaptOutputDocument(item, listMember));
+                    }
                 }
                 yield Document.of(convertedList);
             }
@@ -877,7 +882,9 @@ public final class McpService {
                 var mapValue = schema.mapValueMember();
                 var convertedMap = new HashMap<String, Document>();
                 for (var entry : doc.asStringMap().entrySet()) {
-                    convertedMap.put(entry.getKey(), adaptOutputDocument(entry.getValue(), mapValue));
+                    if (entry.getValue() != null) {
+                        convertedMap.put(entry.getKey(), adaptOutputDocument(entry.getValue(), mapValue));
+                    }
                 }
                 yield Document.of(convertedMap);
             }
