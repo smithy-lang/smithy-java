@@ -14,11 +14,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.Error;
+import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaLocation;
-import com.networknt.schema.SpecVersion;
-import com.networknt.schema.ValidationMessage;
+import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.SpecificationVersion;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -65,9 +65,9 @@ class McpServerIntegrationTest {
             .build();
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final JsonSchemaFactory SCHEMA_FACTORY =
-            JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
-    private static final JsonSchema JSON_SCHEMA = SCHEMA_FACTORY.getSchema(
+    private static final SchemaRegistry SCHEMA_FACTORY =
+            SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12);
+    private static final Schema JSON_SCHEMA = SCHEMA_FACTORY.getSchema(
             SchemaLocation.of("https://json-schema.org/draft/2020-12/schema"));
 
     private Server mcpServer;
@@ -119,7 +119,7 @@ class McpServerIntegrationTest {
         return getEchoFromResponse(response);
     }
 
-    private record ToolSchemas(JsonSchema inputSchema, JsonSchema outputSchema, JsonNode toolNode) {}
+    private record ToolSchemas(Schema inputSchema, Schema outputSchema, JsonNode toolNode) {}
 
     private ToolSchemas getMcpEchoToolSchemas() throws Exception {
         write("tools/list", Document.of(Map.of()));
@@ -649,8 +649,8 @@ class McpServerIntegrationTest {
         assertNotNull(structuredContentNode, "Structured content should not be null for: " + description);
 
         // Validate using Jackson-parsed JSON directly
-        JsonSchema schema = SCHEMA_FACTORY.getSchema(outputSchemaNode);
-        Set<ValidationMessage> errors = schema.validate(structuredContentNode);
+        Schema schema = SCHEMA_FACTORY.getSchema(outputSchemaNode);
+        List<Error> errors = schema.validate(structuredContentNode);
         assertTrue(errors.isEmpty(),
                 "Validation errors for " + description + ": " + errors);
     }
@@ -828,8 +828,8 @@ class McpServerIntegrationTest {
         assertNotNull(structuredContentNode);
 
         // Validate using Jackson-parsed JSON directly
-        JsonSchema schema = SCHEMA_FACTORY.getSchema(outputSchemaNode);
-        Set<ValidationMessage> errors = schema.validate(structuredContentNode);
+        Schema schema = SCHEMA_FACTORY.getSchema(outputSchemaNode);
+        List<Error> errors = schema.validate(structuredContentNode);
         assertTrue(errors.isEmpty(), "Validation errors: " + errors);
     }
 
@@ -898,8 +898,8 @@ class McpServerIntegrationTest {
         assertNotNull(structuredContentNode);
 
         // Validate using Jackson-parsed JSON directly
-        JsonSchema schema = SCHEMA_FACTORY.getSchema(outputSchemaNode);
-        Set<ValidationMessage> errors = schema.validate(structuredContentNode);
+        Schema schema = SCHEMA_FACTORY.getSchema(outputSchemaNode);
+        List<Error> errors = schema.validate(structuredContentNode);
         assertTrue(errors.isEmpty(), "Validation errors: " + errors);
     }
 
@@ -1128,8 +1128,8 @@ class McpServerIntegrationTest {
         assertFalse(structuredContentNode.isMissingNode(), "structuredContent should be present");
 
         // Validate using output schema
-        JsonSchema schema = SCHEMA_FACTORY.getSchema(outputSchemaNode);
-        Set<ValidationMessage> errors = schema.validate(structuredContentNode);
+        Schema schema = SCHEMA_FACTORY.getSchema(outputSchemaNode);
+        List<Error> errors = schema.validate(structuredContentNode);
         assertTrue(errors.isEmpty(), "Output validation errors: " + errors);
     }
 
