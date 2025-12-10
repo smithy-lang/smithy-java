@@ -127,7 +127,8 @@ final class H2Muxer implements AutoCloseable {
             "set-cookie");
 
     // How often to check for read timeouts (every ~100ms)
-    private static final long READ_TIMOUT_FREQUENCY = TimeUnit.MILLISECONDS.toNanos(100);
+    // This is also the resolution of the tick-based timeout system
+    static final int TIMEOUT_POLL_INTERVAL_MS = 100;
 
     // Singleton wake-up signal
     private static final WorkItem.CheckDataQueue CHECK_DATA_QUEUE = new WorkItem.CheckDataQueue();
@@ -153,10 +154,14 @@ final class H2Muxer implements AutoCloseable {
     private volatile int goawayLastStreamId = Integer.MAX_VALUE;
     private volatile IOException writeError;
 
+    // Tick-based timeout: incremented every TIMEOUT_POLL_INTERVAL_MS by watchdog
+    private volatile int timeoutTick;
+
     // === DEPENDENCIES ===
     private final ConnectionCallback connectionCallback;
     private final H2FrameCodec frameCodec;
     private final BufferPool bufferPool;
+    private final int initialWindowSize;
 
     // === WORK QUEUES ===
     private final BlockingQueue<WorkItem> workQueue;
@@ -178,11 +183,19 @@ final class H2Muxer implements AutoCloseable {
      * @param frameCodec the frame codec for writing
      * @param initialTableSize initial HPACK table size
      * @param threadName name for the writer thread
+     * @param initialWindowSize initial flow control window size
      */
-    H2Muxer(ConnectionCallback connectionCallback, H2FrameCodec frameCodec, int initialTableSize, String threadName) {
+    H2Muxer(
+            ConnectionCallback connectionCallback,
+            H2FrameCodec frameCodec,
+            int initialTableSize,
+            String threadName,
+            int initialWindowSize
+    ) {
         this.connectionCallback = connectionCallback;
         this.frameCodec = frameCodec;
-        this.bufferPool = new BufferPool(32, DEFAULT_INITIAL_WINDOW_SIZE, DEFAULT_INITIAL_WINDOW_SIZE, 1024);
+        this.initialWindowSize = initialWindowSize;
+        this.bufferPool = new BufferPool(32, initialWindowSize, initialWindowSize, 1024);
         this.workQueue = new ArrayBlockingQueue<>(H2Constants.WRITER_QUEUE_CAPACITY);
         this.hpackEncoder = new HpackEncoder(initialTableSize);
         this.headerEncodeBuffer = new ByteBufferOutputStream(512);
@@ -212,7 +225,7 @@ final class H2Muxer implements AutoCloseable {
                     " (limit: " + remoteMaxConcurrentStreams + ")");
         }
 
-        return new H2Exchange(this, request, readTimeoutMs, writeTimeoutMs);
+        return new H2Exchange(this, request, readTimeoutMs, writeTimeoutMs, initialWindowSize);
     }
 
     /**
@@ -452,6 +465,18 @@ final class H2Muxer implements AutoCloseable {
         return remoteInitialWindowSize;
     }
 
+    int getInitialWindowSize() {
+        return initialWindowSize;
+    }
+
+    /**
+     * Get the current timeout tick for deadline calculations.
+     * Called by exchanges when read activity occurs.
+     */
+    int currentTimeoutTick() {
+        return timeoutTick;
+    }
+
     void setMaxTableSize(int newSize) {
         this.pendingTableSizeUpdate = newSize;
     }
@@ -467,26 +492,30 @@ final class H2Muxer implements AutoCloseable {
      * I/O already has inherent latency variance, and callers setting a "30s timeout" don't expect millisecond
      * precision.
      *
+     * <p>Uses a tick-based system where the watchdog increments a global tick counter every poll interval.
+     * Exchanges track their deadline as a tick number rather than nanoseconds, eliminating System.nanoTime()
+     * calls from the hot path.
+     *
      * <p>There is an unavoidable race: data could arrive just after we decide to timeout but before we signal.
      * We mitigate this by checking both deadline and activity sequence twice - we only timeout if the stream
      * appears expired and idle across two snapshots. The remaining race window is small and acceptable because
      * timeouts are approximate and failure is recoverable at the caller layer.
      */
-    private void checkReadTimeouts(long nowNanos) {
-        streams.forEach(nowNanos, H2Muxer::checkExchangeTimeout);
+    private void checkReadTimeouts(int tick) {
+        streams.forEach(tick, H2Muxer::checkExchangeTimeout);
     }
 
-    private static void checkExchangeTimeout(H2Exchange exchange, long nowNanos) {
+    private static void checkExchangeTimeout(H2Exchange exchange, int nowTick) {
         long seq1 = exchange.getReadSeq();
-        long d1 = exchange.getReadDeadlineNanos();
-        if (d1 <= 0 || nowNanos <= d1) {
+        int d1 = exchange.getReadDeadlineTick();
+        if (d1 <= 0 || nowTick < d1) {
             return;
         }
 
         // Second snapshot: did anything change while we were looking?
         long seq2 = exchange.getReadSeq();
-        long d2 = exchange.getReadDeadlineNanos();
-        if (seq1 != seq2 || d2 <= 0 || nowNanos <= d2) {
+        int d2 = exchange.getReadDeadlineTick();
+        if (seq1 != seq2 || d2 <= 0 || nowTick < d2) {
             return;
         }
 
@@ -504,8 +533,7 @@ final class H2Muxer implements AutoCloseable {
     private void workerLoop() {
         var batch = new ArrayList<WorkItem>(64);
         IOException failure = null;
-        long lastTimeoutCheck = System.nanoTime();
-        var readTimeoutFrequency = READ_TIMOUT_FREQUENCY;
+        long lastTimeoutCheck = System.currentTimeMillis();
 
         try {
             while (running) {
@@ -551,10 +579,11 @@ final class H2Muxer implements AutoCloseable {
                     }
                 }
 
-                // Check for read timeouts periodically
-                long now = System.nanoTime();
-                if (now - lastTimeoutCheck > readTimeoutFrequency) {
-                    checkReadTimeouts(now);
+                // Check for read timeouts periodically using tick-based system
+                long now = System.currentTimeMillis();
+                if (now - lastTimeoutCheck >= TIMEOUT_POLL_INTERVAL_MS) {
+                    int tick = ++timeoutTick;
+                    checkReadTimeouts(tick);
                     lastTimeoutCheck = now;
                 }
             }
