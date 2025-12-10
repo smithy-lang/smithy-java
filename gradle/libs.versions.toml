@@ -20,7 +20,7 @@ jline = "3.30.6"
 graalvm-native = "0.11.3"
 shadow = "8.3.9"
 jazzer = "0.28.0"
-json-schema-validator = "1.5.5"
+json-schema-validator = "2.0.0"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
