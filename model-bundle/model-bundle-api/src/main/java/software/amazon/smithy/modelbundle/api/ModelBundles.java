@@ -13,6 +13,7 @@ import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.traits.StreamingTrait;
@@ -63,7 +64,7 @@ public final class ModelBundles {
             var op = model.expectShape(opId, OperationShape.class);
             boolean skipOperation = false;
             if (op.getOutput().isPresent()) {
-                for (var member : model.expectShape(op.getOutputShape(), StructureShape.class).members()) {
+                for (var member : model.expectShape(op.getOutputShape()).members()) {
                     if (model.expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
                         b.removeShape(op.toShapeId());
                         skipOperation = true;
@@ -79,7 +80,7 @@ public final class ModelBundles {
             if (op.getInput().isEmpty() && additionalInputShape != null) {
                 addProxyOperationWithAdditionalInput(op, additionalInputShape, b, serviceBuilder, model);
             } else {
-                var shape = model.expectShape(op.getInputShape(), StructureShape.class);
+                var shape = model.expectShape(op.getInputShape());
                 for (var member : shape.members()) {
                     if (model.expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
                         b.removeShape(op.toShapeId());
@@ -113,48 +114,62 @@ public final class ModelBundles {
             ServiceShape.Builder serviceBuilder,
             Model model
     ) {
-        var input = op.getInput();
-        StructureShape finalInput;
-        if (op.getInput().isEmpty()) {
-            var containerId = syntheticContainerForInput(additionalInput);
-            var container = builder.getCurrentShapes().get(containerId);
-            if (container == null) {
-                finalInput = createSyntheticInput(containerId, additionalInput);
-                builder.addShape(finalInput);
-            } else {
-                finalInput = (StructureShape) container;
-            }
-        } else {
-            var inputBuilder = model.expectShape(input.get(), StructureShape.class).toBuilder();
-            inputBuilder.addMember(MemberShape.builder()
-                    .id(ShapeId.from(inputBuilder.getId().toString() + "$additionalInput"))
-                    .target(additionalInput.getId())
-                    .build());
-            finalInput = inputBuilder.id(ShapeId.from(inputBuilder.getId().toString()) + "Proxy").build();
-            builder.addShape(finalInput);
-        }
+        // Determine the original input shape and member name (if present)
+        ShapeId originalInputShapeId = op.getInput().map(model::expectShape).map(Shape::getId).orElse(null);
+        String inputMemberName = originalInputShapeId != null
+                ? toLowerCamelCase(originalInputShapeId.getName())
+                : null;
+
+        // Create wrapper shape ID
+        var wrapperShapeId = ShapeId.from(op.getId().toString() + "ProxyInput");
+
+        // Create the synthetic wrapper input
+        StructureShape finalInput = createSyntheticInput(
+                wrapperShapeId,
+                additionalInput,
+                originalInputShapeId,
+                inputMemberName);
+        builder.addShape(finalInput);
 
         var newOperation = op.toBuilder()
-                .id(ShapeId.from(op.getId().toString() + "Proxy"))
+                .id(ShapeId.from(op.getId() + "Proxy"))
                 .input(finalInput)
                 .output(op.getOutputShape())
-                .addTrait(new ProxyOperationTrait(op.getId()))
+                .addTrait(new ProxyOperationTrait(op.getId(), inputMemberName, "additionalInput"))
                 .build();
         builder.addShape(newOperation);
         serviceBuilder.addOperation(newOperation).build();
     }
 
-    private static ShapeId syntheticContainerForInput(StructureShape additionalInput) {
-        return ShapeId.from("smithy.mcp#AdditionalInputFor" + additionalInput.getId().getName());
+    private static String toLowerCamelCase(String name) {
+        if (name == null || name.isEmpty()) {
+            return name;
+        }
+        return Character.toLowerCase(name.charAt(0)) + name.substring(1);
     }
 
-    private static StructureShape createSyntheticInput(ShapeId containerId, StructureShape additionalInput) {
-        return StructureShape.builder()
-                .id(containerId)
-                .addMember(MemberShape.builder()
-                        .id(containerId.toString() + "$additionalInput")
-                        .target(additionalInput.getId())
-                        .build())
-                .build();
+    private static StructureShape createSyntheticInput(
+            ShapeId containerId,
+            StructureShape additionalInput,
+            ShapeId originalInputShapeId,
+            String inputMemberName
+    ) {
+        var builder = StructureShape.builder().id(containerId);
+
+        // Add member for original input if present
+        if (originalInputShapeId != null && inputMemberName != null) {
+            builder.addMember(MemberShape.builder()
+                    .id(containerId.toString() + "$" + inputMemberName)
+                    .target(originalInputShapeId)
+                    .build());
+        }
+
+        // Add member for additional input
+        builder.addMember(MemberShape.builder()
+                .id(containerId.toString() + "$additionalInput")
+                .target(additionalInput.getId())
+                .build());
+
+        return builder.build();
     }
 }
