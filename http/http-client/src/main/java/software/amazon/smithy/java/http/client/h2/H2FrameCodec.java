@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.http.client.h2;
 
+import static software.amazon.smithy.java.http.client.h2.H2Constants.CONNECTION_PREFACE;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.ERROR_FRAME_SIZE_ERROR;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.ERROR_PROTOCOL_ERROR;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.FLAG_ACK;
@@ -25,11 +26,10 @@ import static software.amazon.smithy.java.http.client.h2.H2Constants.FRAME_TYPE_
 import static software.amazon.smithy.java.http.client.h2.H2Constants.FRAME_TYPE_WINDOW_UPDATE;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.frameTypeName;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
+import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
+import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
+import software.amazon.smithy.java.io.ByteBufferOutputStream;
 
 /**
  * HTTP/2 frame encoding and decoding.
@@ -49,119 +49,337 @@ import java.nio.charset.StandardCharsets;
  */
 final class H2FrameCodec {
 
-    private final InputStream in;
-    private final OutputStream out;
+    private final UnsyncBufferedInputStream in;
+    private final UnsyncBufferedOutputStream out;
     private final int maxFrameSize;
 
-    // Separate buffers for reading and writing to avoid concurrent access issues.
-    // The reader thread uses readHeaderBuf, while writer threads use writeHeaderBuf.
-    private final byte[] readHeaderBuf = new byte[FRAME_HEADER_SIZE];
+    // Write header buffer - used by writer thread only.
+    // Read operations use zero-copy direct buffer access from UnsyncBufferedInputStream.
     private final byte[] writeHeaderBuf = new byte[FRAME_HEADER_SIZE];
 
-    // Scratch buffer for control frames to avoid allocation on hot path.
-    // Covers PING(8), SETTINGS(up to ~10 params = 60), WINDOW_UPDATE(4), RST_STREAM(4),
-    // PRIORITY(5), and small GOAWAY frames. Larger payloads fall back to allocation.
-    private static final int CONTROL_FRAME_SCRATCH_SIZE = 64;
-    private final byte[] controlFrameScratch = new byte[CONTROL_FRAME_SCRATCH_SIZE];
+    // Scratch buffer for writing control frames - writer thread only.
+    // Used for WINDOW_UPDATE(4), RST_STREAM(4), and GOAWAY(8+) payloads.
+    // Read operations use zero-copy direct buffer access from UnsyncBufferedInputStream.
+    private static final int WRITE_SCRATCH_SIZE = 64;
+    private final byte[] writeScratch = new byte[WRITE_SCRATCH_SIZE];
 
-    // Shared empty array for zero-length payloads
-    private static final byte[] EMPTY_PAYLOAD = new byte[0];
+    // Reusable buffer for accumulating header blocks when CONTINUATION frames are needed.
+    // Reader thread only. Reset and reused across requests to avoid repeated allocations.
+    private final ByteBufferOutputStream headerBlockBuffer = new ByteBufferOutputStream(4096);
 
-    H2FrameCodec(InputStream in, OutputStream out, int maxFrameSize) {
+    // Current frame state (filled by nextFrame()) - stateful parser pattern
+    private int currentType;
+    private int currentFlags;
+    private int currentStreamId;
+    private int currentPayloadLength;
+
+    H2FrameCodec(UnsyncBufferedInputStream in, UnsyncBufferedOutputStream out, int maxFrameSize) {
         this.in = in;
         this.out = out;
         this.maxFrameSize = maxFrameSize;
     }
 
     /**
-     * Read a frame from the input stream.
+     * Write the HTTP/2 connection preface (RFC 9113 Section 3.4).
+     * This must be sent by the client before any frames.
+     */
+    void writeConnectionPreface() throws IOException {
+        out.write(CONNECTION_PREFACE);
+    }
+
+    // ==================== Stateful Parser API ====================
+
+    /**
+     * Read the next frame header and store state internally.
      *
-     * <p><b>Important:</b> For control frames (SETTINGS, PING, WINDOW_UPDATE, RST_STREAM,
-     * PRIORITY, GOAWAY), the returned Frame's payload may reference a shared scratch buffer.
-     * The payload is only valid until the next call to {@code readFrame()}. Callers must
-     * parse control frames immediately before reading the next frame.
+     * <p>After this call, use {@link #frameType()}, {@link #frameStreamId()},
+     * {@link #frameFlags()}, {@link #framePayloadLength()}, and {@link #hasFrameFlag(int)}
+     * to access the current frame's metadata.
      *
-     * @return the frame, or null if EOF
+     * <p>The payload must be read via {@link #readPayloadInto(byte[], int, int)} or
+     * {@link #skipBytes(int)} before calling {@code nextFrame()} again.
+     *
+     * <p>This method uses zero-copy direct buffer access for frame header parsing,
+     * avoiding intermediate copies when possible.
+     *
+     * @return frame type (0-255), or -1 on EOF
      * @throws IOException if reading fails or frame is malformed
      */
-    Frame readFrame() throws IOException {
-        // Read 9-byte header
-        int read = readFully(readHeaderBuf, 0, FRAME_HEADER_SIZE);
-        if (read < FRAME_HEADER_SIZE) {
-            if (read == 0) {
-                return null; // EOF
+    int nextFrame() throws IOException {
+        // Zero-copy: ensure 9 bytes in buffer, then parse directly
+        if (!in.ensure(FRAME_HEADER_SIZE)) {
+            // EOF or incomplete header
+            if (in.buffered() == 0) {
+                return -1; // Clean EOF
             }
-            throw new IOException("Incomplete frame header: read " + read + " bytes");
+            throw new IOException("Incomplete frame header: read " + in.buffered() + " bytes");
         }
 
-        // Parse header
-        int length = ((readHeaderBuf[0] & 0xFF) << 16) | ((readHeaderBuf[1] & 0xFF) << 8) | (readHeaderBuf[2] & 0xFF);
-        int type = readHeaderBuf[3] & 0xFF;
-        int flags = readHeaderBuf[4] & 0xFF;
-        int streamId = ((readHeaderBuf[5] & 0x7F) << 24) // Mask off reserved bit
-                | ((readHeaderBuf[6] & 0xFF) << 16)
-                | ((readHeaderBuf[7] & 0xFF) << 8)
-                | (readHeaderBuf[8] & 0xFF);
+        // Parse header directly from input buffer (zero-copy)
+        byte[] buf = in.buffer();
+        int p = in.position();
+
+        currentPayloadLength = ((buf[p] & 0xFF) << 16)
+                | ((buf[p + 1] & 0xFF) << 8)
+                | (buf[p + 2] & 0xFF);
+        currentType = buf[p + 3] & 0xFF;
+        currentFlags = buf[p + 4] & 0xFF;
+        currentStreamId = ((buf[p + 5] & 0x7F) << 24) // Mask off reserved bit
+                | ((buf[p + 6] & 0xFF) << 16)
+                | ((buf[p + 7] & 0xFF) << 8)
+                | (buf[p + 8] & 0xFF);
+
+        in.consume(FRAME_HEADER_SIZE);
 
         // Validate frame size
-        if (length > maxFrameSize) {
-            throw new H2Exception(ERROR_FRAME_SIZE_ERROR, "Frame size " + length + " exceeds " + maxFrameSize);
+        if (currentPayloadLength > maxFrameSize) {
+            throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
+                    "Frame size " + currentPayloadLength + " exceeds " + maxFrameSize);
         }
 
         // Validate stream ID requirements per RFC 9113
-        validateStreamId(type, streamId);
+        validateStreamId(currentType, currentStreamId);
 
         // Validate fixed-size frame payloads per RFC 9113
-        validateFrameSize(type, flags, length);
+        validateFrameSize(currentType, currentFlags, currentPayloadLength);
 
-        // Read payload - use scratch buffer for control frames to avoid allocation
-        byte[] payload;
-        if (length == 0) {
-            payload = EMPTY_PAYLOAD;
-        } else if (isControlFrame(type) && length <= CONTROL_FRAME_SCRATCH_SIZE) {
-            // Control frames use scratch buffer (valid until next readFrame call)
-            read = readFully(controlFrameScratch, 0, length);
-            if (read < length) {
-                throw new IOException("Incomplete frame payload: expected " + length + ", read " + read);
-            }
-            payload = controlFrameScratch;
-        } else {
-            // DATA, HEADERS, CONTINUATION, PUSH_PROMISE, or large control frames
-            payload = new byte[length];
-            read = readFully(payload, 0, length);
-            if (read < length) {
-                throw new IOException("Incomplete frame payload: expected " + length + ", read " + read);
-            }
-        }
-
-        // Handle padding for DATA, HEADERS, and PUSH_PROMISE frames
-        if ((flags & FLAG_PADDED) != 0
-                && (type == FRAME_TYPE_DATA || type == FRAME_TYPE_HEADERS || type == FRAME_TYPE_PUSH_PROMISE)) {
-            payload = removePadding(payload, type);
-            length = payload.length; // Update length after stripping padding
-            flags &= ~FLAG_PADDED; // Clear padded flag after processing
-        }
-
-        // Handle PRIORITY in HEADERS frame
-        if (type == FRAME_TYPE_HEADERS && (flags & FLAG_PRIORITY) != 0) {
-            payload = removePriority(payload);
-            length = payload.length; // Update length after stripping priority
-            flags &= ~FLAG_PRIORITY; // Clear priority flag after processing
-        }
-
-        return new Frame(type, flags, streamId, payload, length);
+        return currentType;
     }
 
     /**
-     * Check if frame type is a control frame (processed immediately, payload doesn't escape).
+     * Get the current frame's type.
+     *
+     * @return frame type (e.g., FRAME_TYPE_DATA, FRAME_TYPE_HEADERS)
      */
-    private static boolean isControlFrame(int type) {
-        return type == FRAME_TYPE_SETTINGS
-                || type == FRAME_TYPE_PING
-                || type == FRAME_TYPE_WINDOW_UPDATE
-                || type == FRAME_TYPE_RST_STREAM
-                || type == FRAME_TYPE_PRIORITY
-                || type == FRAME_TYPE_GOAWAY;
+    int frameType() {
+        return currentType;
+    }
+
+    /**
+     * Get the current frame's flags.
+     *
+     * @return frame flags byte
+     */
+    int frameFlags() {
+        return currentFlags;
+    }
+
+    /**
+     * Get the current frame's stream ID.
+     *
+     * @return stream identifier (0 for connection-level frames)
+     */
+    int frameStreamId() {
+        return currentStreamId;
+    }
+
+    /**
+     * Get the current frame's payload length.
+     *
+     * @return payload length in bytes
+     */
+    int framePayloadLength() {
+        return currentPayloadLength;
+    }
+
+    /**
+     * Check if the current frame has a specific flag set.
+     *
+     * @param flag the flag to check (e.g., FLAG_END_STREAM)
+     * @return true if the flag is set
+     */
+    boolean hasFrameFlag(int flag) {
+        return (currentFlags & flag) != 0;
+    }
+
+    /**
+     * Check if there is more data buffered in the input stream.
+     *
+     * <p>This is used for adaptive signaling: when processing DATA frames in a burst,
+     * we can defer waking the consumer thread if more frames are already buffered,
+     * reducing thread wakeup overhead.
+     *
+     * @return true if more data is immediately available without blocking
+     */
+    boolean hasBufferedData() {
+        return in.buffered() > 0;
+    }
+
+    // ==================== Payload Parsing Methods ====================
+
+    /**
+     * Parse SETTINGS frame payload.
+     *
+     * @param payload the payload buffer
+     * @param length the actual payload length
+     * @return array of {id, value} pairs
+     * @throws H2Exception if payload is invalid
+     */
+    int[] parseSettings(byte[] payload, int length) throws H2Exception {
+        if (payload == null || length == 0) {
+            return new int[0];
+        }
+
+        // SETTINGS payload MUST be a multiple of 6 bytes (RFC 9113 Section 6.5)
+        if (length % 6 != 0) {
+            throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
+                    "SETTINGS frame payload length " + length + " is not a multiple of 6");
+        }
+
+        int count = length / 6;
+        int[] settings = new int[count * 2];
+        int pos = 0;
+        for (int i = 0; i < count; i++) {
+            int id = ((payload[pos] & 0xFF) << 8) | (payload[pos + 1] & 0xFF);
+            int value = ((payload[pos + 2] & 0xFF) << 24)
+                    | ((payload[pos + 3] & 0xFF) << 16)
+                    | ((payload[pos + 4] & 0xFF) << 8)
+                    | (payload[pos + 5] & 0xFF);
+            settings[i * 2] = id;
+            settings[i * 2 + 1] = value;
+            pos += 6;
+        }
+        return settings;
+    }
+
+    /**
+     * Parse GOAWAY frame payload.
+     *
+     * @param payload the payload buffer
+     * @param length the actual payload length
+     * @return {lastStreamId, errorCode}
+     * @throws H2Exception if payload is invalid
+     */
+    int[] parseGoaway(byte[] payload, int length) throws H2Exception {
+        if (payload == null || length < 8) {
+            throw new H2Exception(ERROR_FRAME_SIZE_ERROR, "GOAWAY frame payload too short: " + length);
+        }
+
+        int lastStreamId = ((payload[0] & 0x7F) << 24)
+                | ((payload[1] & 0xFF) << 16)
+                | ((payload[2] & 0xFF) << 8)
+                | (payload[3] & 0xFF);
+        int errorCode = ((payload[4] & 0xFF) << 24)
+                | ((payload[5] & 0xFF) << 16)
+                | ((payload[6] & 0xFF) << 8)
+                | (payload[7] & 0xFF);
+        return new int[] {lastStreamId, errorCode};
+    }
+
+    /**
+     * Parse WINDOW_UPDATE frame payload.
+     *
+     * @param payload the payload buffer
+     * @param length the actual payload length
+     * @return window size increment
+     * @throws H2Exception if payload is invalid or increment is zero
+     */
+    int parseWindowUpdate(byte[] payload, int length) throws H2Exception {
+        if (payload == null || length != 4) {
+            throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
+                    "WINDOW_UPDATE frame must have 4-byte payload, got " + length);
+        }
+
+        int increment = ((payload[0] & 0x7F) << 24)
+                | ((payload[1] & 0xFF) << 16)
+                | ((payload[2] & 0xFF) << 8)
+                | (payload[3] & 0xFF);
+
+        if (increment == 0) {
+            throw new H2Exception(ERROR_PROTOCOL_ERROR, "WINDOW_UPDATE increment must be non-zero");
+        }
+
+        return increment;
+    }
+
+    /**
+     * Read and parse WINDOW_UPDATE frame payload directly from stream.
+     *
+     * <p>Uses zero-copy direct buffer access when possible. Reader thread only.
+     *
+     * @return window size increment
+     * @throws IOException if reading fails
+     * @throws H2Exception if payload is invalid or increment is zero
+     */
+    int readAndParseWindowUpdate() throws IOException, H2Exception {
+        if (currentPayloadLength != 4) {
+            throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
+                    "WINDOW_UPDATE frame must have 4-byte payload, got " + currentPayloadLength);
+        }
+
+        // Zero-copy: ensure 4 bytes in buffer, then parse directly
+        if (!in.ensure(4)) {
+            throw new IOException("Unexpected EOF reading WINDOW_UPDATE payload");
+        }
+
+        byte[] buf = in.buffer();
+        int p = in.position();
+
+        int increment = ((buf[p] & 0x7F) << 24)
+                | ((buf[p + 1] & 0xFF) << 16)
+                | ((buf[p + 2] & 0xFF) << 8)
+                | (buf[p + 3] & 0xFF);
+
+        in.consume(4);
+
+        if (increment == 0) {
+            throw new H2Exception(ERROR_PROTOCOL_ERROR, "WINDOW_UPDATE increment must be non-zero");
+        }
+
+        return increment;
+    }
+
+    /**
+     * Parse RST_STREAM frame payload.
+     *
+     * @param payload the payload buffer
+     * @param length the actual payload length
+     * @return error code
+     * @throws H2Exception if payload is invalid
+     */
+    int parseRstStream(byte[] payload, int length) throws H2Exception {
+        if (payload == null || length != 4) {
+            throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
+                    "RST_STREAM frame must have 4-byte payload, got " + length);
+        }
+
+        return ((payload[0] & 0xFF) << 24)
+                | ((payload[1] & 0xFF) << 16)
+                | ((payload[2] & 0xFF) << 8)
+                | (payload[3] & 0xFF);
+    }
+
+    /**
+     * Read and parse RST_STREAM frame payload directly from stream.
+     *
+     * <p>Uses zero-copy direct buffer access when possible. Reader thread only.
+     *
+     * @return error code
+     * @throws IOException if reading fails
+     * @throws H2Exception if payload is invalid
+     */
+    int readAndParseRstStream() throws IOException, H2Exception {
+        if (currentPayloadLength != 4) {
+            throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
+                    "RST_STREAM frame must have 4-byte payload, got " + currentPayloadLength);
+        }
+
+        // Zero-copy: ensure 4 bytes in buffer, then parse directly
+        if (!in.ensure(4)) {
+            throw new IOException("Unexpected EOF reading RST_STREAM payload");
+        }
+
+        byte[] buf = in.buffer();
+        int p = in.position();
+
+        int errorCode = ((buf[p] & 0xFF) << 24)
+                | ((buf[p + 1] & 0xFF) << 16)
+                | ((buf[p + 2] & 0xFF) << 8)
+                | (buf[p + 3] & 0xFF);
+
+        in.consume(4);
+
+        return errorCode;
     }
 
     /**
@@ -170,16 +388,18 @@ final class H2FrameCodec {
      * <p>Per RFC 9113 Section 4.3, a header block must be transmitted as a contiguous
      * sequence of frames with no interleaved frames of any other type or from any other stream.
      *
-     * @param initialFrame the initial HEADERS or PUSH_PROMISE frame
+     * <p>This method uses the stateful parser API. The initial frame's header must have
+     * already been read via {@link #nextFrame()} and payload via {@link #readPayloadInto}.
+     *
+     * @param initialStreamId the stream ID from the initial HEADERS/PUSH_PROMISE frame
+     * @param initialPayload the payload from the initial frame
+     * @param initialLength the actual payload length
      * @return the complete header block payload
      * @throws IOException if reading fails
      */
-    byte[] readHeaderBlock(Frame initialFrame) throws IOException {
-        byte[] initialPayload = initialFrame.payload();
-        int initialLength = initialFrame.payloadLength();
-
+    byte[] readHeaderBlock(int initialStreamId, byte[] initialPayload, int initialLength) throws IOException {
         // For PUSH_PROMISE, strip the 4-byte promised stream ID to get the header block fragment
-        if (initialFrame.type() == FRAME_TYPE_PUSH_PROMISE && initialPayload != null) {
+        if (currentType == FRAME_TYPE_PUSH_PROMISE && initialPayload != null) {
             if (initialLength < 4) {
                 throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
                         "PUSH_PROMISE frame payload too short for promised stream ID");
@@ -191,47 +411,62 @@ final class H2FrameCodec {
             initialLength = fragmentLength;
         }
 
-        if (initialFrame.hasFlag(FLAG_END_HEADERS)) {
-            return initialPayload != null ? initialPayload : EMPTY_PAYLOAD;
+        if (hasFrameFlag(FLAG_END_HEADERS)) {
+            return initialPayload != null ? initialPayload : H2Constants.EMPTY_BYTES;
         }
 
-        // Need to read CONTINUATION frames
-        ByteArrayOutputStream headerBlock = new ByteArrayOutputStream(initialLength);
+        // Need to read CONTINUATION frames - use reusable buffer
+        headerBlockBuffer.reset();
         if (initialPayload != null) {
-            headerBlock.write(initialPayload);
+            headerBlockBuffer.write(initialPayload, 0, initialLength);
         }
 
         while (true) {
-            Frame cont = readFrame();
-            if (cont == null) {
+            int type = nextFrame();
+            if (type < 0) {
                 throw new IOException("EOF while reading CONTINUATION frames");
             }
 
             // Per RFC 9113 Section 4.3: header block must be contiguous
             // Only CONTINUATION frames for the same stream are allowed
-            if (cont.type() != FRAME_TYPE_CONTINUATION) {
+            if (type != FRAME_TYPE_CONTINUATION) {
                 throw new H2Exception(ERROR_PROTOCOL_ERROR,
-                        "Header block interrupted by " + frameTypeName(cont.type()) +
+                        "Header block interrupted by " + frameTypeName(type) +
                                 " frame (RFC 9113 Section 4.3 violation)");
             }
 
-            if (cont.streamId() != initialFrame.streamId()) {
+            if (currentStreamId != initialStreamId) {
                 throw new H2Exception(ERROR_PROTOCOL_ERROR,
                         "CONTINUATION frame stream ID mismatch: expected " +
-                                initialFrame.streamId() + ", got " + cont.streamId());
+                                initialStreamId + ", got " + currentStreamId);
             }
 
-            byte[] contPayload = cont.payload();
-            if (contPayload != null) {
-                headerBlock.write(contPayload);
+            int contLength = currentPayloadLength;
+            if (contLength > 0) {
+                // Read directly into headerBlockBuffer to avoid intermediate allocation
+                readPayloadIntoBuffer(contLength);
             }
 
-            if (cont.hasFlag(FLAG_END_HEADERS)) {
+            if (hasFrameFlag(FLAG_END_HEADERS)) {
                 break;
             }
         }
 
-        return headerBlock.toByteArray();
+        // Return view into headerBlockBuffer - valid until next readHeaderBlock call
+        // Caller must process before next frame read (which is guaranteed since reader thread is single-threaded)
+        return headerBlockBuffer.array();
+    }
+
+    /**
+     * Get the size of the header block data after a readHeaderBlock call that used CONTINUATION frames.
+     *
+     * <p>When readHeaderBlock returns headerBlockBuffer.array(), use this method to get the valid data length.
+     * Only valid when the previous readHeaderBlock result came from headerBlockBuffer (not the input payload).
+     *
+     * @return size of valid data in the header block buffer
+     */
+    int headerBlockSize() {
+        return headerBlockBuffer.size();
     }
 
     private void validateFrameSize(int type, int flags, int length) throws H2Exception {
@@ -288,10 +523,34 @@ final class H2FrameCodec {
             case FRAME_TYPE_PUSH_PROMISE:
                 // PUSH_PROMISE must have at least 4 bytes for the promised stream ID
                 // (plus 1 byte for pad length if PADDED flag is set)
-                int minLength = (flags & FLAG_PADDED) != 0 ? 5 : 4;
-                if (length < minLength) {
+                int pushMinLen = (flags & FLAG_PADDED) != 0 ? 5 : 4;
+                if (length < pushMinLen) {
                     throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
-                            "PUSH_PROMISE frame must have at least " + minLength + "-byte payload, got " + length);
+                            "PUSH_PROMISE frame must have at least " + pushMinLen + "-byte payload, got " + length);
+                }
+                break;
+
+            case FRAME_TYPE_DATA:
+                // DATA frame with PADDED flag must have at least 1 byte (pad length)
+                if ((flags & FLAG_PADDED) != 0 && length < 1) {
+                    throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
+                            "DATA frame with PADDED flag must have at least 1-byte payload, got " + length);
+                }
+                break;
+
+            case FRAME_TYPE_HEADERS:
+                // HEADERS with PADDED and/or PRIORITY flags need minimum payload sizes
+                int headersMinLen = 0;
+                if ((flags & FLAG_PADDED) != 0) {
+                    headersMinLen += 1; // 1 byte for pad length
+                }
+                if ((flags & FLAG_PRIORITY) != 0) {
+                    headersMinLen += 5; // 5 bytes for priority data
+                }
+                if (length < headersMinLen) {
+                    throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
+                            "HEADERS frame with current flags must have at least " + headersMinLen
+                                    + "-byte payload, got " + length);
                 }
                 break;
 
@@ -347,42 +606,6 @@ final class H2FrameCodec {
     }
 
     /**
-     * Remove padding from a padded frame payload.
-     */
-    private byte[] removePadding(byte[] payload, int frameType) throws H2Exception {
-        if (payload.length < 1) {
-            throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
-                    "Padded " + frameTypeName(frameType) + " frame too short");
-        }
-
-        int padLength = payload[0] & 0xFF;
-        if (padLength >= payload.length) {
-            throw new H2Exception(ERROR_PROTOCOL_ERROR,
-                    "Pad length " + padLength + " exceeds payload length " + payload.length);
-        }
-
-        int dataLength = payload.length - 1 - padLength;
-        byte[] data = new byte[dataLength];
-        System.arraycopy(payload, 1, data, 0, dataLength);
-        return data;
-    }
-
-    /**
-     * Remove PRIORITY fields from HEADERS frame payload.
-     */
-    private byte[] removePriority(byte[] payload) throws H2Exception {
-        // PRIORITY adds 5 bytes: 4-byte stream dependency + 1-byte weight
-        if (payload.length < 5) {
-            throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
-                    "HEADERS frame with PRIORITY flag too short");
-        }
-
-        byte[] data = new byte[payload.length - 5];
-        System.arraycopy(payload, 5, data, 0, data.length);
-        return data;
-    }
-
-    /**
      * Write a frame to the output stream.
      *
      * @param type frame type
@@ -399,7 +622,12 @@ final class H2FrameCodec {
      * Write a frame to the output stream.
      *
      * <p>This method is NOT synchronized. Callers must ensure exclusive access
-     * to the output stream (e.g., via H2Connection's writer thread).
+     * to the output stream (e.g., via H2Muxer's writer thread).
+     *
+     * <p>The underlying UnsyncBufferedOutputStream will buffer small writes.
+     * For payloads larger than the buffer size, the header is buffered and the
+     * payload is written directly to the underlying stream. This is safe because
+     * the writer thread has exclusive access - no interleaving can occur.
      *
      * @param type frame type
      * @param flags frame flags
@@ -422,10 +650,9 @@ final class H2FrameCodec {
             throw new IllegalArgumentException("Invalid stream ID: " + streamId);
         }
 
-        if (length > maxFrameSize) {
-            throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
-                    "Frame payload size " + length + " exceeds maximum " + maxFrameSize);
-        }
+        // Note: For outbound frames, the caller (H2Exchange.writeData) is responsible for
+        // chunking data according to the peer's MAX_FRAME_SIZE setting. We don't validate
+        // here because maxFrameSize is our receive limit, not the peer's.
 
         // Write header (using writeHeaderBuf - caller must ensure exclusive access)
         writeHeaderBuf[0] = (byte) ((length >> 16) & 0xFF);
@@ -513,23 +740,41 @@ final class H2FrameCodec {
 
     /**
      * Write GOAWAY frame.
+     *
+     * <p>Debug data is written directly using writeAscii() to avoid allocation
+     * when the debug string is ASCII (the common case for error messages).
      */
     void writeGoaway(int lastStreamId, int errorCode, String debugData) throws IOException {
-        byte[] debug = debugData != null ? debugData.getBytes(StandardCharsets.UTF_8) : EMPTY_PAYLOAD;
-        byte[] payload = new byte[8 + debug.length];
+        int debugLen = debugData != null ? debugData.length() : 0;
+        int payloadLen = 8 + debugLen;
 
-        payload[0] = (byte) ((lastStreamId >> 24) & 0x7F);
-        payload[1] = (byte) ((lastStreamId >> 16) & 0xFF);
-        payload[2] = (byte) ((lastStreamId >> 8) & 0xFF);
-        payload[3] = (byte) (lastStreamId & 0xFF);
-        payload[4] = (byte) ((errorCode >> 24) & 0xFF);
-        payload[5] = (byte) ((errorCode >> 16) & 0xFF);
-        payload[6] = (byte) ((errorCode >> 8) & 0xFF);
-        payload[7] = (byte) (errorCode & 0xFF);
+        // Write frame header manually to avoid allocating payload array
+        writeHeaderBuf[0] = (byte) ((payloadLen >> 16) & 0xFF);
+        writeHeaderBuf[1] = (byte) ((payloadLen >> 8) & 0xFF);
+        writeHeaderBuf[2] = (byte) (payloadLen & 0xFF);
+        writeHeaderBuf[3] = (byte) FRAME_TYPE_GOAWAY;
+        writeHeaderBuf[4] = 0; // flags
+        writeHeaderBuf[5] = 0; // stream ID = 0
+        writeHeaderBuf[6] = 0;
+        writeHeaderBuf[7] = 0;
+        writeHeaderBuf[8] = 0;
+        out.write(writeHeaderBuf);
 
-        System.arraycopy(debug, 0, payload, 8, debug.length);
+        // Write fixed 8-byte GOAWAY payload (lastStreamId + errorCode) using scratch buffer
+        writeScratch[0] = (byte) ((lastStreamId >> 24) & 0x7F);
+        writeScratch[1] = (byte) ((lastStreamId >> 16) & 0xFF);
+        writeScratch[2] = (byte) ((lastStreamId >> 8) & 0xFF);
+        writeScratch[3] = (byte) (lastStreamId & 0xFF);
+        writeScratch[4] = (byte) ((errorCode >> 24) & 0xFF);
+        writeScratch[5] = (byte) ((errorCode >> 16) & 0xFF);
+        writeScratch[6] = (byte) ((errorCode >> 8) & 0xFF);
+        writeScratch[7] = (byte) (errorCode & 0xFF);
+        out.write(writeScratch, 0, 8);
 
-        writeFrame(FRAME_TYPE_GOAWAY, 0, 0, payload);
+        // Write debug data directly as ASCII (avoids String.getBytes allocation)
+        if (debugLen > 0) {
+            out.writeAscii(debugData);
+        }
     }
 
     /**
@@ -542,11 +787,11 @@ final class H2FrameCodec {
         }
 
         // Use scratch buffer to avoid allocation
-        controlFrameScratch[0] = (byte) ((windowSizeIncrement >> 24) & 0x7F);
-        controlFrameScratch[1] = (byte) ((windowSizeIncrement >> 16) & 0xFF);
-        controlFrameScratch[2] = (byte) ((windowSizeIncrement >> 8) & 0xFF);
-        controlFrameScratch[3] = (byte) (windowSizeIncrement & 0xFF);
-        writeFrame(FRAME_TYPE_WINDOW_UPDATE, 0, streamId, controlFrameScratch, 0, 4);
+        writeScratch[0] = (byte) ((windowSizeIncrement >> 24) & 0x7F);
+        writeScratch[1] = (byte) ((windowSizeIncrement >> 16) & 0xFF);
+        writeScratch[2] = (byte) ((windowSizeIncrement >> 8) & 0xFF);
+        writeScratch[3] = (byte) (windowSizeIncrement & 0xFF);
+        writeFrame(FRAME_TYPE_WINDOW_UPDATE, 0, streamId, writeScratch, 0, 4);
     }
 
     /**
@@ -555,11 +800,11 @@ final class H2FrameCodec {
      */
     void writeRstStream(int streamId, int errorCode) throws IOException {
         // Use scratch buffer to avoid allocation
-        controlFrameScratch[0] = (byte) ((errorCode >> 24) & 0xFF);
-        controlFrameScratch[1] = (byte) ((errorCode >> 16) & 0xFF);
-        controlFrameScratch[2] = (byte) ((errorCode >> 8) & 0xFF);
-        controlFrameScratch[3] = (byte) (errorCode & 0xFF);
-        writeFrame(FRAME_TYPE_RST_STREAM, 0, streamId, controlFrameScratch, 0, 4);
+        writeScratch[0] = (byte) ((errorCode >> 24) & 0xFF);
+        writeScratch[1] = (byte) ((errorCode >> 16) & 0xFF);
+        writeScratch[2] = (byte) ((errorCode >> 8) & 0xFF);
+        writeScratch[3] = (byte) (errorCode & 0xFF);
+        writeFrame(FRAME_TYPE_RST_STREAM, 0, streamId, writeScratch, 0, 4);
     }
 
     /**
@@ -571,23 +816,15 @@ final class H2FrameCodec {
         out.flush();
     }
 
-    private int readFully(byte[] buf, int off, int len) throws IOException {
-        int total = 0;
-        while (total < len) {
-            int n = in.read(buf, off + total, len - total);
-            if (n < 0) {
-                break;
-            }
-            total += n;
-        }
-        return total;
-    }
-
     /**
      * Read payload bytes directly into a provided buffer.
      *
      * <p>This method is used by the reader thread to read DATA frame payloads
      * directly into an exchange's buffer, avoiding an intermediate allocation.
+     *
+     * <p>Uses zero-copy when the entire payload is already buffered. When partially
+     * buffered, drains the buffer then reads directly from the underlying stream
+     * to avoid redundant buffer fill/copy overhead.
      *
      * @param dest the destination buffer
      * @param offset offset in the destination buffer
@@ -595,9 +832,71 @@ final class H2FrameCodec {
      * @throws IOException if reading fails or EOF is reached before all bytes are read
      */
     void readPayloadInto(byte[] dest, int offset, int length) throws IOException {
-        int read = readFully(dest, offset, length);
-        if (read < length) {
-            throw new IOException("Incomplete payload: expected " + length + ", read " + read);
+        // Fast path: if entirely buffered, single arraycopy (zero-copy from network perspective)
+        int buffered = in.buffered();
+        if (length <= buffered) {
+            System.arraycopy(in.buffer(), in.position(), dest, offset, length);
+            in.consume(length);
+            return;
+        }
+
+        // Drain what's buffered first
+        if (buffered > 0) {
+            System.arraycopy(in.buffer(), in.position(), dest, offset, buffered);
+            in.consume(buffered);
+            offset += buffered;
+            length -= buffered;
+        }
+
+        // Read remainder directly from underlying stream (buffer is now empty).
+        // Using readDirect avoids the buffer fill/check overhead in read().
+        while (length > 0) {
+            int n = in.readDirect(dest, offset, length);
+            if (n < 0) {
+                throw new IOException("Incomplete payload: unexpected EOF");
+            }
+            offset += n;
+            length -= n;
+        }
+    }
+
+    /**
+     * Read payload bytes directly into the headerBlockBuffer.
+     *
+     * <p>Used when reading CONTINUATION frames to avoid allocating intermediate byte[] arrays.
+     *
+     * @param length number of bytes to read
+     * @throws IOException if reading fails or EOF is reached before all bytes are read
+     */
+    private void readPayloadIntoBuffer(int length) throws IOException {
+        // Fast path: if entirely buffered, write directly to headerBlockBuffer
+        int buffered = in.buffered();
+        if (length <= buffered) {
+            headerBlockBuffer.write(in.buffer(), in.position(), length);
+            in.consume(length);
+            return;
+        }
+
+        // Drain what's buffered first
+        if (buffered > 0) {
+            headerBlockBuffer.write(in.buffer(), in.position(), buffered);
+            in.consume(buffered);
+            length -= buffered;
+        }
+
+        // Read remainder in chunks using scratch buffer
+        while (length > 0) {
+            int toRead = Math.min(length, writeScratch.length);
+            int totalRead = 0;
+            while (totalRead < toRead) {
+                int n = in.readDirect(writeScratch, totalRead, toRead - totalRead);
+                if (n < 0) {
+                    throw new IOException("Incomplete payload: unexpected EOF");
+                }
+                totalRead += n;
+            }
+            headerBlockBuffer.write(writeScratch, 0, totalRead);
+            length -= totalRead;
         }
     }
 
@@ -605,225 +904,52 @@ final class H2FrameCodec {
      * Read a single byte from the input stream.
      *
      * <p>Used for reading pad length in padded DATA frames without allocating.
+     * Uses zero-copy direct buffer access when possible.
      *
      * @return the byte value (0-255)
      * @throws IOException if reading fails or EOF is reached
      */
     int readByte() throws IOException {
-        int b = in.read();
-        if (b < 0) {
+        if (!in.ensure(1)) {
             throw new IOException("Unexpected EOF reading byte");
         }
+        int b = in.buffer()[in.position()] & 0xFF;
+        in.consume(1);
         return b;
-    }
-
-    /**
-     * Read the frame header only, without reading the payload.
-     *
-     * <p>This is used for DATA frames where we want to read the payload directly
-     * into the exchange buffer, avoiding an intermediate allocation.
-     *
-     * @return a FrameHeader with type, flags, streamId, and payload length, or null if EOF
-     * @throws IOException if reading fails or frame is malformed
-     */
-    FrameHeader readFrameHeader() throws IOException {
-        // Read 9-byte header
-        int read = readFully(readHeaderBuf, 0, FRAME_HEADER_SIZE);
-        if (read < FRAME_HEADER_SIZE) {
-            if (read == 0) {
-                return null; // EOF
-            }
-            throw new IOException("Incomplete frame header: read " + read + " bytes");
-        }
-
-        // Parse header
-        int length = ((readHeaderBuf[0] & 0xFF) << 16) | ((readHeaderBuf[1] & 0xFF) << 8) | (readHeaderBuf[2] & 0xFF);
-        int type = readHeaderBuf[3] & 0xFF;
-        int flags = readHeaderBuf[4] & 0xFF;
-        int streamId = ((readHeaderBuf[5] & 0x7F) << 24) // Mask off reserved bit
-                | ((readHeaderBuf[6] & 0xFF) << 16)
-                | ((readHeaderBuf[7] & 0xFF) << 8)
-                | (readHeaderBuf[8] & 0xFF);
-
-        // Validate frame size
-        if (length > maxFrameSize) {
-            throw new H2Exception(ERROR_FRAME_SIZE_ERROR, "Frame size " + length + " exceeds " + maxFrameSize);
-        }
-
-        return new FrameHeader(type, flags, streamId, length);
     }
 
     /**
      * Skip the specified number of bytes in the input stream.
      *
-     * <p>Used to skip past padding bytes in DATA frames.
+     * <p>Used to skip past padding bytes in DATA frames. Uses direct buffer
+     * consume for small skips (common case), falling back to stream skip
+     * for larger amounts.
      *
      * @param length number of bytes to skip
-     * @throws IOException if skipping fails
+     * @throws IOException if skipping fails or EOF is reached before all bytes are skipped
      */
     void skipBytes(int length) throws IOException {
-        int remaining = length;
+        // Fast path: if entirely buffered, just consume (common for padding)
+        int buffered = in.buffered();
+        if (length <= buffered) {
+            in.consume(length);
+            return;
+        }
+
+        // Consume what's buffered
+        if (buffered > 0) {
+            in.consume(buffered);
+            length -= buffered;
+        }
+
+        // Skip remainder in underlying stream
+        long remaining = length;
         while (remaining > 0) {
-            // Use scratch buffer for skipping
-            int toRead = Math.min(remaining, CONTROL_FRAME_SCRATCH_SIZE);
-            int read = readFully(controlFrameScratch, 0, toRead);
-            if (read < toRead) {
-                throw new IOException("Unexpected EOF while skipping " + length + " bytes");
+            long skipped = in.skip(remaining);
+            if (skipped <= 0) {
+                throw new IOException("Unexpected EOF while skipping bytes");
             }
-            remaining -= toRead;
-        }
-    }
-
-    /**
-     * Frame header information for deferred payload reading.
-     */
-    record FrameHeader(int type, int flags, int streamId, int payloadLength) {
-        boolean hasFlag(int flag) {
-            return (flags & flag) != 0;
-        }
-    }
-
-    /**
-     * Represents an HTTP/2 frame.
-     *
-     * <p><b>Note:</b> For control frames, the payload array may be a shared scratch buffer
-     * that is larger than the actual payload. Always use {@link #payloadLength()} to get
-     * the actual payload size, not {@code payload.length}.
-     *
-     * @param type frame type
-     * @param flags frame flags
-     * @param streamId stream identifier
-     * @param payload payload bytes (may be shared scratch buffer for control frames)
-     * @param length actual payload length (may be less than payload.length for scratch buffer)
-     */
-    record Frame(int type, int flags, int streamId, byte[] payload, int length) {
-
-        boolean hasFlag(int flag) {
-            return (flags & flag) != 0;
-        }
-
-        int payloadLength() {
-            return length;
-        }
-
-        /**
-         * Parse SETTINGS frame payload.
-         *
-         * @return array of {id, value} pairs
-         * @throws H2Exception if frame is invalid
-         */
-        int[] parseSettings() throws H2Exception {
-            if (type != FRAME_TYPE_SETTINGS) {
-                throw new H2Exception(ERROR_PROTOCOL_ERROR,
-                        "Expected SETTINGS frame, got " + frameTypeName(type));
-            }
-            if (payload == null || length == 0) {
-                return new int[0];
-            }
-
-            // SETTINGS payload MUST be a multiple of 6 bytes (RFC 9113 Section 6.5)
-            if (length % 6 != 0) {
-                throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
-                        "SETTINGS frame payload length " + length + " is not a multiple of 6");
-            }
-
-            int count = length / 6;
-            int[] settings = new int[count * 2];
-            int pos = 0;
-            for (int i = 0; i < count; i++) {
-                int id = ((payload[pos] & 0xFF) << 8) | (payload[pos + 1] & 0xFF);
-                int value = ((payload[pos + 2] & 0xFF) << 24)
-                        | ((payload[pos + 3] & 0xFF) << 16)
-                        | ((payload[pos + 4] & 0xFF) << 8)
-                        | (payload[pos + 5] & 0xFF);
-                settings[i * 2] = id;
-                settings[i * 2 + 1] = value;
-                pos += 6;
-            }
-            return settings;
-        }
-
-        /**
-         * Parse GOAWAY frame payload.
-         *
-         * @return {lastStreamId, errorCode}
-         * @throws H2Exception if frame is invalid
-         */
-        int[] parseGoaway() throws H2Exception {
-            if (type != FRAME_TYPE_GOAWAY) {
-                throw new H2Exception(ERROR_PROTOCOL_ERROR, "Expected GOAWAY frame, got " + frameTypeName(type));
-            } else if (payload == null || length < 8) {
-                throw new H2Exception(ERROR_FRAME_SIZE_ERROR, "GOAWAY frame payload too short: " + length);
-            }
-
-            int lastStreamId = ((payload[0] & 0x7F) << 24)
-                    | ((payload[1] & 0xFF) << 16)
-                    | ((payload[2] & 0xFF) << 8)
-                    | (payload[3] & 0xFF);
-            int errorCode = ((payload[4] & 0xFF) << 24)
-                    | ((payload[5] & 0xFF) << 16)
-                    | ((payload[6] & 0xFF) << 8)
-                    | (payload[7] & 0xFF);
-            return new int[] {lastStreamId, errorCode};
-        }
-
-        /**
-         * Parse WINDOW_UPDATE frame payload.
-         *
-         * @return window size increment
-         * @throws H2Exception if frame is invalid or increment is zero
-         */
-        int parseWindowUpdate() throws H2Exception {
-            if (type != FRAME_TYPE_WINDOW_UPDATE) {
-                throw new H2Exception(ERROR_PROTOCOL_ERROR,
-                        "Expected WINDOW_UPDATE frame, got " + frameTypeName(type));
-            }
-            if (payload == null || length != 4) {
-                throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
-                        "WINDOW_UPDATE frame must have 4-byte payload, got " + length);
-            }
-
-            int increment = ((payload[0] & 0x7F) << 24)
-                    | ((payload[1] & 0xFF) << 16)
-                    | ((payload[2] & 0xFF) << 8)
-                    | (payload[3] & 0xFF);
-
-            if (increment == 0) {
-                throw new H2Exception(ERROR_PROTOCOL_ERROR, "WINDOW_UPDATE increment must be non-zero");
-            }
-
-            return increment;
-        }
-
-        /**
-         * Parse RST_STREAM frame payload.
-         *
-         * @return error code
-         * @throws H2Exception if frame is invalid
-         */
-        int parseRstStream() throws H2Exception {
-            if (type != FRAME_TYPE_RST_STREAM) {
-                throw new H2Exception(ERROR_PROTOCOL_ERROR,
-                        "Expected RST_STREAM frame, got " + frameTypeName(type));
-            }
-            if (payload == null || length != 4) {
-                throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
-                        "RST_STREAM frame must have 4-byte payload, got " + length);
-            }
-
-            return ((payload[0] & 0xFF) << 24)
-                    | ((payload[1] & 0xFF) << 16)
-                    | ((payload[2] & 0xFF) << 8)
-                    | (payload[3] & 0xFF);
-        }
-
-        @Override
-        public String toString() {
-            return String.format("Frame{type=%s, flags=0x%02x, streamId=%d, length=%d}",
-                    frameTypeName(type),
-                    flags,
-                    streamId,
-                    length);
+            remaining -= skipped;
         }
     }
 }

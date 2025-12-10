@@ -69,6 +69,35 @@ public final class ByteBufferOutputStream extends OutputStream {
     }
 
     /**
+     * Returns the internal buffer array.
+     *
+     * <p>This provides direct access to avoid copying. The valid data is from index 0 to {@link #size()} - 1.
+     * The buffer may be larger than the valid data. Do not hold onto a reference to this data.
+     *
+     * @return the internal buffer
+     */
+    public byte[] array() {
+        return buf;
+    }
+
+    /**
+     * Writes an ASCII string directly to the buffer.
+     * Each character is cast to a byte (assumes ASCII/Latin-1 input).
+     *
+     * @param s the string to write
+     */
+    @SuppressWarnings("deprecation")
+    public void writeAscii(String s) {
+        int len = s.length();
+        if (len == 0) {
+            return;
+        }
+        ensureCapacity(count + len);
+        s.getBytes(0, len, buf, count);
+        count += len;
+    }
+
+    /**
      * Resets the stream to empty, allowing buffer reuse.
      * The internal buffer is retained, avoiding reallocation.
      */

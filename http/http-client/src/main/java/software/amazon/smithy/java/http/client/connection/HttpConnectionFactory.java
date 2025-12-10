@@ -30,44 +30,21 @@ import software.amazon.smithy.java.http.client.h2.H2Connection;
  *   <li>Proxy tunneling (HTTP and HTTPS proxies)</li>
  *   <li>Protocol selection (HTTP/1.1 vs HTTP/2)</li>
  * </ul>
+ *
+ * @param sslParameters may be null
  */
-final class HttpConnectionFactory {
-
-    private final Duration connectTimeout;
-    private final Duration tlsNegotiationTimeout;
-    private final Duration readTimeout;
-    private final Duration writeTimeout;
-    private final SSLContext sslContext;
-    private final SSLParameters sslParameters; // may be null
-    private final HttpVersionPolicy versionPolicy;
-    private final DnsResolver dnsResolver;
-    private final HttpSocketFactory socketFactory;
-    private final int h2InitialWindowSize;
-
-    HttpConnectionFactory(
-            Duration connectTimeout,
-            Duration tlsNegotiationTimeout,
-            Duration readTimeout,
-            Duration writeTimeout,
-            SSLContext sslContext,
-            SSLParameters sslParameters,
-            HttpVersionPolicy versionPolicy,
-            DnsResolver dnsResolver,
-            HttpSocketFactory socketFactory,
-            int h2InitialWindowSize
-    ) {
-        this.connectTimeout = connectTimeout;
-        this.tlsNegotiationTimeout = tlsNegotiationTimeout;
-        this.readTimeout = readTimeout;
-        this.writeTimeout = writeTimeout;
-        this.sslContext = sslContext;
-        this.sslParameters = sslParameters;
-        this.versionPolicy = versionPolicy;
-        this.dnsResolver = dnsResolver;
-        this.socketFactory = socketFactory;
-        this.h2InitialWindowSize = h2InitialWindowSize;
-    }
-
+record HttpConnectionFactory(
+        Duration connectTimeout,
+        Duration tlsNegotiationTimeout,
+        Duration readTimeout,
+        Duration writeTimeout,
+        SSLContext sslContext,
+        SSLParameters sslParameters,
+        HttpVersionPolicy versionPolicy,
+        DnsResolver dnsResolver,
+        HttpSocketFactory socketFactory,
+        int h2InitialWindowSize,
+        int h2MaxFrameSize) {
     /**
      * Create a new connection to the given route.
      *
@@ -178,7 +155,7 @@ final class HttpConnectionFactory {
 
         try {
             if ("h2".equals(protocol) || "h2c".equals(protocol)) {
-                return new H2Connection(socket, route, readTimeout, writeTimeout, h2InitialWindowSize);
+                return new H2Connection(socket, route, readTimeout, writeTimeout, h2InitialWindowSize, h2MaxFrameSize);
             } else {
                 return new H1Connection(socket, route, readTimeout);
             }

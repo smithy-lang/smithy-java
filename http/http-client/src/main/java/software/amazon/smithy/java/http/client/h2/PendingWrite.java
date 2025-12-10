@@ -10,7 +10,7 @@ package software.amazon.smithy.java.http.client.h2;
  */
 final class PendingWrite {
     /**
-     * The data buffer (borrowed from BufferPool).
+     * The data buffer (borrowed from ByteAllocator).
      */
     byte[] data;
 
@@ -25,29 +25,26 @@ final class PendingWrite {
     int length;
 
     /**
-     * Whether this write has the END_STREAM flag.
-     */
-    boolean endStream;
-
-    /**
-     * Frame flags (e.g., END_STREAM).
+     * Frame flags for the DATA frame. Valid flags from {@link H2Constants}:
+     * <ul>
+     *   <li>{@link H2Constants#FLAG_END_STREAM} (0x1) - Last frame for this stream</li>
+     *   <li>{@link H2Constants#FLAG_PADDED} (0x8) - Frame is padded (not used)</li>
+     * </ul>
      */
     int flags;
 
     /**
      * Initialize this pending write with data.
      *
-     * @param data      the data buffer
-     * @param offset    offset within buffer
-     * @param length    length to write
-     * @param endStream whether this is the last write
-     * @param flags     frame flags
+     * @param data   the data buffer
+     * @param offset offset within buffer
+     * @param length length to write
+     * @param flags  frame flags (see {@link H2Constants#FLAG_END_STREAM})
      */
-    void init(byte[] data, int offset, int length, boolean endStream, int flags) {
+    void init(byte[] data, int offset, int length, int flags) {
         this.data = data;
         this.offset = offset;
         this.length = length;
-        this.endStream = endStream;
         this.flags = flags;
     }
 
@@ -58,7 +55,6 @@ final class PendingWrite {
         this.data = null;
         this.offset = 0;
         this.length = 0;
-        this.endStream = false;
         this.flags = 0;
     }
 }

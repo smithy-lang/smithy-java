@@ -180,7 +180,8 @@ public final class HttpConnectionPool implements ConnectionPool {
                 builder.versionPolicy,
                 dnsResolver,
                 builder.socketFactory,
-                builder.h2InitialWindowSize);
+                builder.h2InitialWindowSize,
+                builder.h2MaxFrameSize);
 
         this.h1Manager = new H1ConnectionManager(this.maxIdleTimeNanos);
         this.connectionPermits = new Semaphore(builder.maxTotalConnections, false);

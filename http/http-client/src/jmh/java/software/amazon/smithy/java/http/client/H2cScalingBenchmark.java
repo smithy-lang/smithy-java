@@ -17,7 +17,10 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
+import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
 import io.netty.handler.codec.http2.Http2DataFrame;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
@@ -25,17 +28,6 @@ import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.Http2StreamFrame;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -55,6 +47,17 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.io.datastream.DataStream;
+
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * HTTP/2 cleartext (h2c) client scaling benchmark.
@@ -79,11 +82,11 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 @State(Scope.Benchmark)
 public class H2cScalingBenchmark {
 
-    @Param({"1000"})
+    @Param({"5000"})
     private int concurrency;
 
-    @Param({"1"
-            //, "5"
+    @Param({"3",
+            "5"
             //, "10", "20", "50"
     })
     private int connections;
@@ -301,13 +304,65 @@ public class H2cScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void nettyGetMb(Counter counter) throws Exception {
-        var requests = new AtomicLong();
-        var errors = new AtomicLong();
-        var firstError = new AtomicReference<Throwable>();
-        var running = new AtomicBoolean(true);
-        var inFlight = new AtomicLong(0);  // Track actually in-flight requests
+    public void netty(Counter counter) throws Exception {
+        DefaultHttp2Headers headers = new DefaultHttp2Headers();
+        headers.method("GET");
+        headers.path("/get");
+        headers.scheme("http");
+        headers.authority("localhost:18081");
 
+        var connectionIndex = new AtomicInteger(0);
+
+        BenchmarkSupport.runBenchmark(concurrency, 1000, (DefaultHttp2Headers h) -> {
+            var latch = new CountDownLatch(1);
+            var error = new AtomicReference<Throwable>();
+
+            int idx = connectionIndex.getAndIncrement() % nettyStreamBootstraps.size();
+            nettyStreamBootstraps.get(idx).open().addListener(future -> {
+                if (!future.isSuccess()) {
+                    error.set(future.cause());
+                    latch.countDown();
+                    return;
+                }
+
+                Http2StreamChannel streamChannel = (Http2StreamChannel) future.get();
+                streamChannel.pipeline().addLast(new SimpleChannelInboundHandler<Http2StreamFrame>() {
+                    @Override
+                    protected void channelRead0(ChannelHandlerContext ctx, Http2StreamFrame frame) {
+                        if (frame instanceof Http2DataFrame df) {
+                            df.content().skipBytes(df.content().readableBytes());
+                        }
+                        boolean endStream = (frame instanceof Http2HeadersFrame hf && hf.isEndStream())
+                                || (frame instanceof Http2DataFrame df2 && df2.isEndStream());
+                        if (endStream) {
+                            ctx.close();
+                            latch.countDown();
+                        }
+                    }
+
+                    @Override
+                    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                        error.set(cause);
+                        ctx.close();
+                        latch.countDown();
+                    }
+                });
+
+                streamChannel.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(h, true));
+            });
+
+            latch.await();
+            if (error.get() != null) {
+                throw new RuntimeException(error.get());
+            }
+        }, headers, counter);
+
+        counter.logErrors("Netty H2c GET");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void nettyGetMb(Counter counter) throws Exception {
         DefaultHttp2Headers headers = new DefaultHttp2Headers();
         headers.method("GET");
         headers.path("/getmb");
@@ -315,23 +370,16 @@ public class H2cScalingBenchmark {
         headers.authority("localhost:18081");
 
         var connectionIndex = new AtomicInteger(0);
-        Runnable[] makeRequest = new Runnable[1];
-        makeRequest[0] = () -> {
-            if (!running.get()) {
-                return;  // Don't start new requests when stopped
-            }
 
-            inFlight.incrementAndGet();  // Track in-flight
+        BenchmarkSupport.runBenchmark(concurrency, 1000, (DefaultHttp2Headers h) -> {
+            var latch = new CountDownLatch(1);
+            var error = new AtomicReference<Throwable>();
 
             int idx = connectionIndex.getAndIncrement() % nettyStreamBootstraps.size();
             nettyStreamBootstraps.get(idx).open().addListener(future -> {
                 if (!future.isSuccess()) {
-                    inFlight.decrementAndGet();
-                    errors.incrementAndGet();
-                    firstError.compareAndSet(null, future.cause());
-                    if (running.get()) {
-                        makeRequest[0].run();  // Retry only if still running
-                    }
+                    error.set(future.cause());
+                    latch.countDown();
                     return;
                 }
 
@@ -352,54 +400,155 @@ public class H2cScalingBenchmark {
                         boolean endStream = (frame instanceof Http2HeadersFrame hf && hf.isEndStream())
                                 || (frame instanceof Http2DataFrame df2 && df2.isEndStream());
                         if (endStream) {
-                            inFlight.decrementAndGet();
-                            requests.incrementAndGet();
                             ctx.close();
-                            if (running.get()) {
-                                makeRequest[0].run();  // Start next only if still running
-                            }
+                            latch.countDown();
                         }
                     }
 
                     @Override
                     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-                        inFlight.decrementAndGet();
-                        errors.incrementAndGet();
-                        firstError.compareAndSet(null, cause);
+                        error.set(cause);
                         ctx.close();
-                        if (running.get()) {
-                            makeRequest[0].run();  // Retry only if still running
-                        }
+                        latch.countDown();
                     }
                 });
 
-                streamChannel.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, true));
+                streamChannel.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(h, true));
             });
-        };
 
-        // Start initial concurrent requests
-        for (int i = 0; i < concurrency; i++) {
-            makeRequest[0].run();
-        }
+            latch.await();
+            if (error.get() != null) {
+                throw new RuntimeException(error.get());
+            }
+        }, headers, counter);
 
-        // Run for 1 second
-        Thread.sleep(1000);
-        running.set(false);
-
-        // Wait for ALL in-flight requests to complete (reasonable timeout)
-        long deadline = System.currentTimeMillis() + 10000;  // 10 second max
-        while (inFlight.get() > 0 && System.currentTimeMillis() < deadline) {
-            Thread.sleep(10);
-        }
-
-        if (inFlight.get() > 0) {
-            System.out.println("WARNING: " + inFlight.get() + " requests still in-flight after timeout");
-        }
-
-        counter.requests = requests.get();
-        counter.errors = errors.get();
-        counter.firstError = firstError.get();
         System.out.println("Netty H2c GET 1MB: " + counter.requests + " requests, " + counter.errors + " errors");
         counter.logErrors("Netty H2c GET 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void nettyPost(Counter counter) throws Exception {
+        DefaultHttp2Headers headers = new DefaultHttp2Headers();
+        headers.method("POST");
+        headers.path("/post");
+        headers.scheme("http");
+        headers.authority("localhost:18081");
+        headers.setInt("content-length", BenchmarkSupport.POST_PAYLOAD.length);
+
+        var connectionIndex = new AtomicInteger(0);
+
+        BenchmarkSupport.runBenchmark(concurrency, 1000, (DefaultHttp2Headers h) -> {
+            var latch = new CountDownLatch(1);
+            var error = new AtomicReference<Throwable>();
+
+            int idx = connectionIndex.getAndIncrement() % nettyStreamBootstraps.size();
+            nettyStreamBootstraps.get(idx).open().addListener(future -> {
+                if (!future.isSuccess()) {
+                    error.set(future.cause());
+                    latch.countDown();
+                    return;
+                }
+
+                Http2StreamChannel streamChannel = (Http2StreamChannel) future.get();
+                streamChannel.pipeline().addLast(new SimpleChannelInboundHandler<Http2StreamFrame>() {
+                    @Override
+                    protected void channelRead0(ChannelHandlerContext ctx, Http2StreamFrame frame) {
+                        if (frame instanceof Http2DataFrame df) {
+                            df.content().skipBytes(df.content().readableBytes());
+                        }
+                        boolean endStream = (frame instanceof Http2HeadersFrame hf && hf.isEndStream())
+                                || (frame instanceof Http2DataFrame df2 && df2.isEndStream());
+                        if (endStream) {
+                            ctx.close();
+                            latch.countDown();
+                        }
+                    }
+
+                    @Override
+                    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                        error.set(cause);
+                        ctx.close();
+                        latch.countDown();
+                    }
+                });
+
+                // Send headers (endStream=false since we have a body)
+                streamChannel.write(new DefaultHttp2HeadersFrame(h, false));
+                // Send body with endStream=true
+                streamChannel.writeAndFlush(new DefaultHttp2DataFrame(
+                        Unpooled.wrappedBuffer(BenchmarkSupport.POST_PAYLOAD), true));
+            });
+
+            latch.await();
+            if (error.get() != null) {
+                throw new RuntimeException(error.get());
+            }
+        }, headers, counter);
+
+        counter.logErrors("Netty H2c POST");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void nettyPutMb(Counter counter) throws Exception {
+        DefaultHttp2Headers headers = new DefaultHttp2Headers();
+        headers.method("PUT");
+        headers.path("/putmb");
+        headers.scheme("http");
+        headers.authority("localhost:18081");
+        headers.setInt("content-length", BenchmarkSupport.MB_PAYLOAD.length);
+
+        var connectionIndex = new AtomicInteger(0);
+
+        BenchmarkSupport.runBenchmark(concurrency, 1000, (DefaultHttp2Headers h) -> {
+            var latch = new CountDownLatch(1);
+            var error = new AtomicReference<Throwable>();
+
+            int idx = connectionIndex.getAndIncrement() % nettyStreamBootstraps.size();
+            nettyStreamBootstraps.get(idx).open().addListener(future -> {
+                if (!future.isSuccess()) {
+                    error.set(future.cause());
+                    latch.countDown();
+                    return;
+                }
+
+                Http2StreamChannel streamChannel = (Http2StreamChannel) future.get();
+                streamChannel.pipeline().addLast(new SimpleChannelInboundHandler<Http2StreamFrame>() {
+                    @Override
+                    protected void channelRead0(ChannelHandlerContext ctx, Http2StreamFrame frame) {
+                        if (frame instanceof Http2DataFrame df) {
+                            df.content().skipBytes(df.content().readableBytes());
+                        }
+                        boolean endStream = (frame instanceof Http2HeadersFrame hf && hf.isEndStream())
+                                || (frame instanceof Http2DataFrame df2 && df2.isEndStream());
+                        if (endStream) {
+                            ctx.close();
+                            latch.countDown();
+                        }
+                    }
+
+                    @Override
+                    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                        error.set(cause);
+                        ctx.close();
+                        latch.countDown();
+                    }
+                });
+
+                // Send headers (endStream=false since we have a body)
+                streamChannel.write(new DefaultHttp2HeadersFrame(h, false));
+                // Send body with endStream=true
+                streamChannel.writeAndFlush(new DefaultHttp2DataFrame(
+                        Unpooled.wrappedBuffer(BenchmarkSupport.MB_PAYLOAD), true));
+            });
+
+            latch.await();
+            if (error.get() != null) {
+                throw new RuntimeException(error.get());
+            }
+        }, headers, counter);
+
+        counter.logErrors("Netty H2c PUT 1MB");
     }
 }

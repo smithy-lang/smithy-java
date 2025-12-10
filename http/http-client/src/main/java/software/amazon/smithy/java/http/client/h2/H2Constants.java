@@ -14,7 +14,8 @@ final class H2Constants {
 
     private H2Constants() {}
 
-    static final int WRITER_QUEUE_CAPACITY = 2048;
+    // Shared empty byte array to avoid repeated allocations
+    static final byte[] EMPTY_BYTES = new byte[0];
 
     // Our limit for received header list size (not from server SETTINGS)
     static final int DEFAULT_MAX_HEADER_LIST_SIZE = 8192;
@@ -52,7 +53,6 @@ final class H2Constants {
     static final int SETTINGS_INITIAL_WINDOW_SIZE = 0x4;
     static final int SETTINGS_MAX_FRAME_SIZE = 0x5;
     static final int SETTINGS_MAX_HEADER_LIST_SIZE = 0x6;
-    static final int SETTINGS_NO_RFC7540_PRIORITIES = 0x9; // RFC 9113 - disable deprecated priority
 
     // Default settings values
     static final int DEFAULT_HEADER_TABLE_SIZE = 4096;
@@ -63,9 +63,6 @@ final class H2Constants {
     // Frame size limits
     static final int MIN_MAX_FRAME_SIZE = 16384; // 2^14
     static final int MAX_MAX_FRAME_SIZE = 16777215; // 2^24 - 1
-
-    // Window size limits
-    static final int MAX_WINDOW_SIZE = Integer.MAX_VALUE; // 2^31 - 1
 
     // WINDOW_UPDATE threshold: send update when window drops below this fraction of initial size.
     // Using 1/3 (33%) reduces control frame overhead while leaving enough buffer to avoid stalls.

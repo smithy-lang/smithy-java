@@ -25,6 +25,17 @@ public final class DelegatedClosingOutputStream extends FilterOutputStream {
     }
 
     @Override
+    public void write(byte[] b, int off, int len) throws IOException {
+        // Override to delegate directly - FilterOutputStream's default loops byte-by-byte
+        out.write(b, off, len);
+    }
+
+    @Override
+    public void flush() throws IOException {
+        out.flush();
+    }
+
+    @Override
     public void close() throws IOException {
         if (closed.compareAndSet(false, true)) {
             closeCallback.close(out);

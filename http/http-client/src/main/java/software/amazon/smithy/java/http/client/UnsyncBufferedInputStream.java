@@ -11,6 +11,8 @@ import java.io.OutputStream;
 
 /**
  * A buffered input stream like {@link java.io.BufferedInputStream}, but without synchronization.
+ *
+ * <p>This class exposes its guts for optimal performance. Be responsible, and note the warnings on each method.
  */
 public final class UnsyncBufferedInputStream extends InputStream {
     private final InputStream in;
@@ -83,7 +85,7 @@ public final class UnsyncBufferedInputStream extends InputStream {
             }
         }
 
-        // If caller wants something large, bypass our buffer
+        // If remaining request is large, bypass our buffer to avoid double-copy
         if (len >= buf.length) {
             int direct = in.read(b, off, len);
             if (direct < 0) {
@@ -92,7 +94,7 @@ public final class UnsyncBufferedInputStream extends InputStream {
             return n + direct;
         }
 
-        // Otherwise, refill and copy from buffer
+        // For smaller remaining requests, refill buffer and copy
         if (fill() <= 0) {
             return n == 0 ? -1 : n;
         }
@@ -175,6 +177,139 @@ public final class UnsyncBufferedInputStream extends InputStream {
             transferred += n;
         }
         return transferred;
+    }
+
+    /**
+     * Read directly from the underlying stream, bypassing this buffer entirely.
+     *
+     * <p>This is useful when the caller knows the buffer is empty (e.g., after
+     * draining via {@link #consume}) and wants to avoid the buffer fill/check overhead.
+     *
+     * @param b destination buffer
+     * @param off offset in destination
+     * @param len maximum bytes to read
+     * @return bytes read, or -1 on EOF
+     * @throws IOException if an I/O error occurs
+     * @throws IllegalStateException if the buffer is not empty
+     */
+    public int readDirect(byte[] b, int off, int len) throws IOException {
+        if (closed) {
+            throw new IOException("Stream closed");
+        }
+        if (pos < limit) {
+            throw new IllegalStateException("Buffer not empty: " + (limit - pos) + " bytes remaining");
+        }
+        return in.read(b, off, len);
+    }
+
+    /**
+     * Returns the internal buffer array.
+     *
+     * <p><b>WARNING:</b> The caller must not modify the buffer contents.
+     * This method is provided for zero-copy read access only.
+     *
+     * @return the internal buffer array
+     */
+    public byte[] buffer() {
+        return buf;
+    }
+
+    /**
+     * Returns the current read position in the internal buffer.
+     *
+     * <p>Valid data in the buffer spans from {@code position()} to {@code limit()}.
+     *
+     * @return the current read position
+     */
+    public int position() {
+        return pos;
+    }
+
+    /**
+     * Returns the current limit of valid data in the internal buffer.
+     *
+     * <p>Valid data in the buffer spans from {@code position()} to {@code limit()}.
+     *
+     * @return the limit of valid data
+     */
+    public int limit() {
+        return limit;
+    }
+
+    /**
+     * Returns the number of bytes currently buffered and available for reading.
+     *
+     * <p>This is equivalent to {@code limit() - position()}.
+     *
+     * @return the number of buffered bytes available
+     */
+    public int buffered() {
+        return limit - pos;
+    }
+
+    /**
+     * Advances the internal read position, consuming bytes from the buffer.
+     *
+     * <p>This is used after directly reading from the buffer via {@link #buffer()}.
+     *
+     * @param n number of bytes to consume
+     * @throws IndexOutOfBoundsException if n > buffered()
+     */
+    public void consume(int n) {
+        if (n < 0 || pos + n > limit) {
+            throw new IndexOutOfBoundsException("Cannot consume " + n + " bytes, only " + (limit - pos) + " available");
+        }
+        pos += n;
+    }
+
+    /**
+     * Ensures at least {@code n} bytes are available in the buffer.
+     *
+     * <p>If fewer than {@code n} bytes are currently buffered, this method compacts
+     * the buffer (moves remaining data to the front) and reads more data from the
+     * underlying stream until at least {@code n} bytes are available or EOF is reached.
+     *
+     * <p>After this method returns true, the caller can safely read {@code n} bytes
+     * directly from {@link #buffer()} starting at {@link #position()}.
+     *
+     * @param n the minimum number of bytes required
+     * @return true if at least n bytes are now available, false if EOF was reached
+     * @throws IOException if an I/O error occurs
+     * @throws IllegalArgumentException if n > buffer size
+     */
+    public boolean ensure(int n) throws IOException {
+        if (closed) {
+            throw new IOException("Stream closed");
+        }
+        if (n > buf.length) {
+            throw new IllegalArgumentException("Cannot ensure " + n + " bytes, buffer size is " + buf.length);
+        }
+        if (n <= 0) {
+            return true;
+        }
+
+        int avail = limit - pos;
+        if (avail >= n) {
+            return true;
+        }
+
+        // Compact: move remaining data to front of buffer
+        if (pos > 0 && avail > 0) {
+            System.arraycopy(buf, pos, buf, 0, avail);
+        }
+        pos = 0;
+        limit = avail;
+
+        // Fill until we have enough or hit EOF
+        while (limit < n) {
+            int read = in.read(buf, limit, buf.length - limit);
+            if (read < 0) {
+                return false; // EOF before we could get n bytes
+            }
+            limit += read;
+        }
+
+        return true;
     }
 
     /**

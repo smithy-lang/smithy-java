@@ -11,26 +11,19 @@ import static software.amazon.smithy.java.http.client.h2.H2Constants.DEFAULT_MAX
 import static software.amazon.smithy.java.http.client.h2.H2Constants.FLAG_ACK;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.FRAME_TYPE_DATA;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.FRAME_TYPE_PING;
-import static software.amazon.smithy.java.http.client.h2.H2Constants.PSEUDO_AUTHORITY;
-import static software.amazon.smithy.java.http.client.h2.H2Constants.PSEUDO_METHOD;
-import static software.amazon.smithy.java.http.client.h2.H2Constants.PSEUDO_PATH;
-import static software.amazon.smithy.java.http.client.h2.H2Constants.PSEUDO_SCHEME;
 
 import java.io.IOException;
 import java.net.SocketTimeoutException;
-import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.client.BufferPool;
+import software.amazon.smithy.java.http.client.ByteAllocator;
 import software.amazon.smithy.java.http.client.h2.hpack.HpackEncoder;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
 
@@ -63,45 +56,6 @@ final class H2Muxer implements AutoCloseable {
         int getRemoteMaxHeaderListSize();
     }
 
-    /**
-     * Work items processed by the writer thread.
-     */
-    private sealed interface WorkItem {
-        record EncodeHeaders(
-                HttpRequest request,
-                H2Exchange exchange,
-                boolean endStream,
-                CompletableFuture<Integer> streamIdFuture,
-                CompletableFuture<Void> writeComplete) implements WorkItem {}
-
-        record WriteData(
-                int streamId,
-                byte[] data,
-                int offset,
-                int length,
-                int flags,
-                CompletableFuture<Void> completion) implements WorkItem {}
-
-        record WriteTrailers(
-                int streamId,
-                HttpHeaders trailers,
-                CompletableFuture<Void> completion) implements WorkItem {}
-
-        record WriteRst(int streamId, int errorCode) implements WorkItem {}
-
-        record WriteGoaway(int lastStreamId, int errorCode, String debugData) implements WorkItem {}
-
-        record WriteWindowUpdate(int streamId, int increment) implements WorkItem {}
-
-        record WriteSettingsAck() implements WorkItem {}
-
-        record WritePing(byte[] payload, boolean ack) implements WorkItem {}
-
-        record Shutdown() implements WorkItem {}
-
-        record CheckDataQueue() implements WorkItem {}
-    }
-
     enum ControlFrameType {
         RST_STREAM,
         WINDOW_UPDATE,
@@ -110,28 +64,16 @@ final class H2Muxer implements AutoCloseable {
         GOAWAY
     }
 
-    // Headers that must not be sent over HTTP/2 (connection-specific)
-    private static final Set<String> CONNECTION_HEADERS = Set.of(
-            "connection",
-            "keep-alive",
-            "proxy-connection",
-            "transfer-encoding",
-            "upgrade",
-            "host");
-
-    // Headers that should not be indexed in HPACK (contain sensitive data)
-    private static final Set<String> SENSITIVE_HEADERS = Set.of(
-            "authorization",
-            "cookie",
-            "proxy-authorization",
-            "set-cookie");
-
-    // How often to check for read timeouts (every ~100ms)
-    // This is also the resolution of the tick-based timeout system
+    // The resolution of the tick-based timeout system, used to check for read timeouts.
     static final int TIMEOUT_POLL_INTERVAL_MS = 100;
 
-    // Singleton wake-up signal
-    private static final WorkItem.CheckDataQueue CHECK_DATA_QUEUE = new WorkItem.CheckDataQueue();
+    // Reusable singleton work items
+    private static final H2MuxerWorkItem.CheckDataQueue CHECK_DATA_QUEUE = H2MuxerWorkItem.CheckDataQueue.INSTANCE;
+    private static final H2MuxerWorkItem.Shutdown SHUTDOWN = H2MuxerWorkItem.Shutdown.INSTANCE;
+    private static final H2MuxerWorkItem.WriteSettingsAck SETTINGS_ACK = H2MuxerWorkItem.WriteSettingsAck.INSTANCE;
+
+    // Static method reference to avoid allocation in hot timeout check path
+    private static final BiConsumer<H2Exchange, Integer> TIMEOUT_CHECKER = H2Muxer::checkExchangeTimeout;
 
     // === STREAM REGISTRY ===
     private final StreamRegistry streams = new StreamRegistry();
@@ -145,7 +87,7 @@ final class H2Muxer implements AutoCloseable {
     private volatile int remoteMaxFrameSize = DEFAULT_MAX_FRAME_SIZE;
 
     // === CONNECTION FLOW CONTROL ===
-    private final FlowControlWindow connectionSendWindow = new FlowControlWindow(DEFAULT_INITIAL_WINDOW_SIZE);
+    private final FlowControlWindow connectionSendWindow;
 
     // === STATE ===
     private volatile boolean accepting = true;
@@ -160,18 +102,18 @@ final class H2Muxer implements AutoCloseable {
     // === DEPENDENCIES ===
     private final ConnectionCallback connectionCallback;
     private final H2FrameCodec frameCodec;
-    private final BufferPool bufferPool;
+    private final ByteAllocator allocator;
     private final int initialWindowSize;
 
     // === WORK QUEUES ===
-    private final BlockingQueue<WorkItem> workQueue;
+    // CLQ + LockSupport for lock-free work submission without DelayScheduler overhead
+    private final ConcurrentLinkedQueue<H2MuxerWorkItem> workQueue = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<H2Exchange> dataWorkQueue = new ConcurrentLinkedQueue<>();
-    private volatile boolean dataWorkPending;
+    private final AtomicBoolean dataWorkPending = new AtomicBoolean(false);
 
-    // === HPACK ENCODER (only accessed by writer thread) ===
-    private final HpackEncoder hpackEncoder;
-    private final ByteBufferOutputStream headerEncodeBuffer;
-    private volatile int pendingTableSizeUpdate = -1;
+    // === HEADER ENCODER (only accessed by writer thread) ===
+    private final H2RequestHeaderEncoder headerEncoder;
+    private final AtomicInteger pendingTableSizeUpdate = new AtomicInteger(-1);
 
     // === WRITER THREAD ===
     private final Thread workerThread;
@@ -195,10 +137,11 @@ final class H2Muxer implements AutoCloseable {
         this.connectionCallback = connectionCallback;
         this.frameCodec = frameCodec;
         this.initialWindowSize = initialWindowSize;
-        this.bufferPool = new BufferPool(32, initialWindowSize, initialWindowSize, 1024);
-        this.workQueue = new ArrayBlockingQueue<>(H2Constants.WRITER_QUEUE_CAPACITY);
-        this.hpackEncoder = new HpackEncoder(initialTableSize);
-        this.headerEncodeBuffer = new ByteBufferOutputStream(512);
+        this.connectionSendWindow = new FlowControlWindow(DEFAULT_INITIAL_WINDOW_SIZE);
+        this.allocator = new ByteAllocator(64, initialWindowSize, initialWindowSize, 1024);
+        this.headerEncoder = new H2RequestHeaderEncoder(
+                new HpackEncoder(initialTableSize),
+                new ByteBufferOutputStream(512));
         this.workerThread = Thread.ofVirtual().name(threadName).start(this::workerLoop);
     }
 
@@ -233,8 +176,9 @@ final class H2Muxer implements AutoCloseable {
      */
     void closeExchanges(Duration timeout) {
         accepting = false;
-
-        streams.forEach(null, (exchange, _ignore) -> exchange.signalConnectionClosed(null));
+        streams.forEach(null, (exchange, _ignore) -> {
+            exchange.signalConnectionClosed(null);
+        });
 
         long deadline = System.nanoTime() + timeout.toNanos();
         while (activeStreamCount.get() > 0 && System.nanoTime() < deadline) {
@@ -338,8 +282,8 @@ final class H2Muxer implements AutoCloseable {
 
         H2Exception refusedError = new H2Exception(
                 errorCode,
-                "Stream affected by GOAWAY (lastStreamId=" + lastStreamId +
-                        ", error=" + H2Constants.errorCodeName(errorCode) + ")");
+                "Stream affected by GOAWAY (lastStreamId=" + lastStreamId
+                        + ", error=" + H2Constants.errorCodeName(errorCode) + ")");
         streams.forEachMatching(
                 streamId -> streamId > lastStreamId,
                 exchange -> exchange.signalConnectionClosed(refusedError));
@@ -349,7 +293,7 @@ final class H2Muxer implements AutoCloseable {
 
     void acquireConnectionWindow(int requestedBytes, long timeoutMs)
             throws SocketTimeoutException, InterruptedException {
-        if (!connectionSendWindow.tryAcquire(requestedBytes, timeoutMs, TimeUnit.MILLISECONDS)) {
+        if (!connectionSendWindow.tryAcquire(requestedBytes, timeoutMs)) {
             throw new SocketTimeoutException(
                     "Write timed out after " + timeoutMs + "ms waiting for connection flow control window");
         }
@@ -369,90 +313,82 @@ final class H2Muxer implements AutoCloseable {
             return;
         }
         dataWorkQueue.offer(exchange);
-        if (!dataWorkPending) {
-            dataWorkPending = true;
-            workQueue.offer(CHECK_DATA_QUEUE);
-        }
-    }
-
-    void queueControlFrame(int streamId, ControlFrameType frameType, Object payload, long timeoutMs)
-            throws IOException {
-        WorkItem item = switch (frameType) {
-            case RST_STREAM -> new WorkItem.WriteRst(streamId, (Integer) payload);
-            case WINDOW_UPDATE -> new WorkItem.WriteWindowUpdate(streamId, (Integer) payload);
-            case SETTINGS_ACK -> new WorkItem.WriteSettingsAck();
-            case PING -> new WorkItem.WritePing((byte[]) payload, false);
-            case GOAWAY -> {
-                Object[] args = (Object[]) payload;
-                yield new WorkItem.WriteGoaway((Integer) args[0], (Integer) args[1], (String) args[2]);
-            }
-        };
-
-        try {
-            if (!workQueue.offer(item, timeoutMs, TimeUnit.MILLISECONDS)) {
-                throw new IOException("Work queue full, cannot queue control frame (timeout: " + timeoutMs + "ms)");
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Interrupted while queuing control frame", e);
-        }
-    }
-
-    void queueTrailers(int streamId, HttpHeaders trailers) throws IOException {
-        WorkItem item = new WorkItem.WriteTrailers(streamId, trailers, new CompletableFuture<>());
-        if (!workQueue.offer(item)) {
-            throw new IOException("Work queue full, cannot queue trailers");
-        }
-    }
-
-    void queueData(int streamId, byte[] data, int offset, int length, int flags) throws IOException {
-        WorkItem item = new WorkItem.WriteData(streamId, data, offset, length, flags, new CompletableFuture<>());
-        if (!workQueue.offer(item)) {
-            throw new IOException("Work queue full, cannot queue data frame");
+        // CAS ensures only one thread enqueues CHECK_DATA_QUEUE per batch
+        if (dataWorkPending.compareAndSet(false, true)) {
+            enqueue(CHECK_DATA_QUEUE);
         }
     }
 
     /**
+     * Enqueue a work item with deadline and signal the writer.
+     */
+    private void enqueue(H2MuxerWorkItem item, long timeoutMs) {
+        item.deadlineTick = deadlineTick(timeoutMs);
+        workQueue.add(item);
+        signalWriter();
+    }
+
+    /**
+     * Enqueue a work item without timeout and signal the writer.
+     */
+    private void enqueue(H2MuxerWorkItem item) {
+        item.deadlineTick = 0;
+        workQueue.add(item);
+        signalWriter();
+    }
+
+    void queueControlFrame(int streamId, ControlFrameType frameType, Object payload, long timeoutMs) {
+        H2MuxerWorkItem item = switch (frameType) {
+            case RST_STREAM -> new H2MuxerWorkItem.WriteRst(streamId, (Integer) payload);
+            case WINDOW_UPDATE -> new H2MuxerWorkItem.WriteWindowUpdate(streamId, (Integer) payload);
+            case SETTINGS_ACK -> SETTINGS_ACK;
+            case PING -> new H2MuxerWorkItem.WritePing((byte[]) payload, false);
+            case GOAWAY -> {
+                Object[] args = (Object[]) payload;
+                yield new H2MuxerWorkItem.WriteGoaway((Integer) args[0], (Integer) args[1], (String) args[2]);
+            }
+        };
+        enqueue(item, timeoutMs);
+    }
+
+    void queueTrailers(int streamId, HttpHeaders trailers) {
+        enqueue(new H2MuxerWorkItem.WriteTrailers(streamId, trailers));
+    }
+
+    void queueData(int streamId, byte[] data, int offset, int length, int flags) {
+        enqueue(new H2MuxerWorkItem.WriteData(streamId, data, offset, length, flags));
+    }
+
+    /**
      * Submit a HEADERS frame for encoding and writing.
+     * Always succeeds (CLQ is unbounded, bounded by stream slots).
+     * Timeout is enforced by watchdog sweep checking deadlineTick.
+     *
+     * <p>After calling this method, the caller should call {@link H2Exchange#awaitWriteCompletion()}
+     * to block until the write completes, then read the stream ID from the exchange.
      *
      * @param request the HTTP request
      * @param exchange the exchange
      * @param endStream whether END_STREAM should be set
-     * @param streamIdFuture future completed with stream ID after allocation
-     * @param writeComplete future completed when write finishes
-     * @param timeoutMs timeout for queue submission
-     * @return true if submitted, false if queue full or not accepting
+     * @param timeoutMs timeout for write completion (checked by watchdog)
+     * @return true if submitted, false if not accepting
      */
-    boolean submitHeaders(
-            HttpRequest request,
-            H2Exchange exchange,
-            boolean endStream,
-            CompletableFuture<Integer> streamIdFuture,
-            CompletableFuture<Void> writeComplete,
-            long timeoutMs
-    ) {
+    boolean submitHeaders(HttpRequest request, H2Exchange exchange, boolean endStream, long timeoutMs) {
         if (!accepting) {
             return false;
         }
-        var item = new WorkItem.EncodeHeaders(request, exchange, endStream, streamIdFuture, writeComplete);
-        try {
-            return workQueue.offer(item, timeoutMs, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
+        enqueue(new H2MuxerWorkItem.EncodeHeaders(request, exchange, endStream), timeoutMs);
+        return true;
     }
 
-    // ==================== BUFFER POOL ====================
+    // ==================== BUFFER ALLOCATION ====================
 
     byte[] borrowBuffer(int minSize) {
-        return bufferPool.borrow(minSize);
+        return allocator.borrow(minSize);
     }
 
     void returnBuffer(byte[] buffer) {
-        if (buffer != null) {
-            bufferPool.release(buffer);
-        }
+        allocator.release(buffer);
     }
 
     // ==================== SETTINGS ====================
@@ -477,8 +413,28 @@ final class H2Muxer implements AutoCloseable {
         return timeoutTick;
     }
 
+    /**
+     * Convert timeout in milliseconds to deadline tick.
+     * Returns 0 if timeoutMs <= 0 (no timeout).
+     */
+    private int deadlineTick(long timeoutMs) {
+        if (timeoutMs <= 0) {
+            return 0;
+        }
+        int timeoutTicks = (int) Math.ceil((double) timeoutMs / TIMEOUT_POLL_INTERVAL_MS);
+        return timeoutTick + timeoutTicks;
+    }
+
+    /**
+     * Signal the writer thread that work is available.
+     * Uses LockSupport.unpark which is safe to call even if thread isn't parked.
+     */
+    private void signalWriter() {
+        LockSupport.unpark(workerThread);
+    }
+
     void setMaxTableSize(int newSize) {
-        this.pendingTableSizeUpdate = newSize;
+        pendingTableSizeUpdate.set(newSize);
     }
 
     IOException getWriteError() {
@@ -502,7 +458,7 @@ final class H2Muxer implements AutoCloseable {
      * timeouts are approximate and failure is recoverable at the caller layer.
      */
     private void checkReadTimeouts(int tick) {
-        streams.forEach(tick, H2Muxer::checkExchangeTimeout);
+        streams.forEach(tick, TIMEOUT_CHECKER);
     }
 
     private static void checkExchangeTimeout(H2Exchange exchange, int nowTick) {
@@ -528,31 +484,37 @@ final class H2Muxer implements AutoCloseable {
                 "Read timeout: no data received for " + exchange.getReadTimeoutMs() + "ms"));
     }
 
+    /**
+     * Check for write timeouts by examining the head of the work queue.
+     * If the head item has a deadline that has passed, fail the connection.
+     * Since items are processed in order, if head is stuck, everything is stuck.
+     */
+    private void checkWriteTimeouts(int tick) {
+        H2MuxerWorkItem head = workQueue.peek();
+        if (head != null && head.deadlineTick > 0 && tick >= head.deadlineTick) {
+            failWriter(new SocketTimeoutException(
+                    "Write timeout: work item stuck in queue (deadline tick " + head.deadlineTick
+                            + ", current tick " + tick + ")"));
+        }
+    }
+
     // ==================== WRITER THREAD ====================
 
     private void workerLoop() {
-        var batch = new ArrayList<WorkItem>(64);
+        var batch = new ArrayList<H2MuxerWorkItem>(64);
         IOException failure = null;
         long lastTimeoutCheck = System.currentTimeMillis();
 
         try {
             while (running) {
-                WorkItem item = workQueue.take();
-
-                if (item instanceof WorkItem.Shutdown) {
-                    return;
-                }
-
-                if (!(item instanceof WorkItem.CheckDataQueue)) {
-                    batch.add(item);
-                }
-
+                // Drain all available work items from the queue
+                H2MuxerWorkItem item;
                 while ((item = workQueue.poll()) != null) {
-                    if (item instanceof WorkItem.Shutdown) {
+                    if (item instanceof H2MuxerWorkItem.Shutdown) {
                         processBatch(batch);
                         return;
                     }
-                    if (!(item instanceof WorkItem.CheckDataQueue)) {
+                    if (!(item instanceof H2MuxerWorkItem.CheckDataQueue)) {
                         batch.add(item);
                     }
                 }
@@ -561,7 +523,7 @@ final class H2Muxer implements AutoCloseable {
                     processBatch(batch);
                 }
 
-                dataWorkPending = false;
+                dataWorkPending.set(false);
 
                 boolean processedData = false;
                 H2Exchange exchange;
@@ -579,18 +541,18 @@ final class H2Muxer implements AutoCloseable {
                     }
                 }
 
-                // Check for read timeouts periodically using tick-based system
+                // Check for timeouts periodically using tick-based system
                 long now = System.currentTimeMillis();
                 if (now - lastTimeoutCheck >= TIMEOUT_POLL_INTERVAL_MS) {
                     int tick = ++timeoutTick;
                     checkReadTimeouts(tick);
+                    checkWriteTimeouts(tick);
                     lastTimeoutCheck = now;
                 }
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            if (running) {
-                failure = new IOException("Writer thread interrupted", e);
+
+                // Park until signaled or timeout interval elapses (for watchdog)
+                // LockSupport.parkNanos is VT-friendly and doesn't create DelayScheduler tasks
+                LockSupport.parkNanos(TIMEOUT_POLL_INTERVAL_MS * 1_000_000L);
             }
         } catch (Throwable t) {
             failure = new IOException("Writer thread crashed", t);
@@ -633,21 +595,21 @@ final class H2Muxer implements AutoCloseable {
         }
     }
 
-    private void processBatch(ArrayList<WorkItem> batch) {
+    private void processBatch(ArrayList<H2MuxerWorkItem> batch) {
         if (batch.isEmpty()) {
             return;
         }
 
         try {
-            for (WorkItem item : batch) {
+            for (H2MuxerWorkItem item : batch) {
                 processItem(item);
             }
             frameCodec.flush();
-            for (WorkItem item : batch) {
+            for (H2MuxerWorkItem item : batch) {
                 completeItem(item, null);
             }
         } catch (IOException e) {
-            for (WorkItem item : batch) {
+            for (H2MuxerWorkItem item : batch) {
                 completeItem(item, e);
             }
         } finally {
@@ -655,186 +617,71 @@ final class H2Muxer implements AutoCloseable {
         }
     }
 
-    private void processItem(WorkItem item) throws IOException {
+    private void processItem(H2MuxerWorkItem item) throws IOException {
         switch (item) {
-            case WorkItem.EncodeHeaders h -> processEncodeHeaders(h);
-            case WorkItem.WriteData d ->
-                frameCodec.writeFrame(FRAME_TYPE_DATA, d.flags(), d.streamId(), d.data(), d.offset(), d.length());
-            case WorkItem.WriteTrailers t -> processWriteTrailers(t);
-            case WorkItem.WriteRst r -> frameCodec.writeRstStream(r.streamId(), r.errorCode());
-            case WorkItem.WriteGoaway g -> frameCodec.writeGoaway(g.lastStreamId(), g.errorCode(), g.debugData());
-            case WorkItem.WriteWindowUpdate w -> frameCodec.writeWindowUpdate(w.streamId(), w.increment());
-            case WorkItem.WriteSettingsAck s -> frameCodec.writeSettingsAck();
-            case WorkItem.WritePing p -> frameCodec.writeFrame(FRAME_TYPE_PING, p.ack() ? FLAG_ACK : 0, 0, p.payload());
-            case WorkItem.Shutdown s -> {
+            case H2MuxerWorkItem.EncodeHeaders h -> processEncodeHeaders(h);
+            case H2MuxerWorkItem.WriteData d ->
+                frameCodec.writeFrame(FRAME_TYPE_DATA, d.flags, d.streamId, d.data, d.offset, d.length);
+            case H2MuxerWorkItem.WriteTrailers t -> processWriteTrailers(t);
+            case H2MuxerWorkItem.WriteRst r -> frameCodec.writeRstStream(r.streamId, r.errorCode);
+            case H2MuxerWorkItem.WriteGoaway g -> frameCodec.writeGoaway(g.lastStreamId, g.errorCode, g.debugData);
+            case H2MuxerWorkItem.WriteWindowUpdate w -> frameCodec.writeWindowUpdate(w.streamId, w.increment);
+            case H2MuxerWorkItem.WriteSettingsAck s -> frameCodec.writeSettingsAck();
+            case H2MuxerWorkItem.WritePing p ->
+                frameCodec.writeFrame(FRAME_TYPE_PING, p.ack ? FLAG_ACK : 0, 0, p.payload);
+            case H2MuxerWorkItem.Shutdown s -> {
             }
-            case WorkItem.CheckDataQueue c -> {
+            case H2MuxerWorkItem.CheckDataQueue c -> {
             }
         }
     }
 
-    private void processEncodeHeaders(WorkItem.EncodeHeaders req) throws IOException {
-        H2Exchange exchange = req.exchange();
+    private void processEncodeHeaders(H2MuxerWorkItem.EncodeHeaders req) throws IOException {
+        H2Exchange exchange = req.exchange;
+
+        if (!connectionCallback.isAcceptingStreams()) {
+            throw new IOException("Connection is not accepting new streams");
+        }
+
+        int streamId = allocateAndRegisterStream(exchange);
 
         try {
-            if (!connectionCallback.isAcceptingStreams()) {
-                req.streamIdFuture()
-                        .completeExceptionally(new IOException("Connection is not accepting new streams"));
-                return;
-            }
-
-            int streamId = allocateAndRegisterStream(exchange);
-
-            int tableUpdate = pendingTableSizeUpdate;
+            // Atomically read and clear to avoid losing updates from concurrent setMaxTableSize calls
+            int tableUpdate = pendingTableSizeUpdate.getAndSet(-1);
             if (tableUpdate >= 0) {
-                hpackEncoder.setMaxTableSize(tableUpdate);
-                pendingTableSizeUpdate = -1;
+                headerEncoder.setMaxTableSize(tableUpdate);
             }
 
-            byte[] headerBlock = encodeHeaders(req.request());
+            headerEncoder.encodeHeaders(req.request, connectionCallback.getRemoteMaxHeaderListSize());
 
-            exchange.onHeadersEncoded(req.endStream());
+            exchange.onHeadersEncoded(req.endStream);
+            frameCodec.writeHeaders(streamId, headerEncoder.buffer(), 0, headerEncoder.size(), req.endStream);
 
-            frameCodec.writeHeaders(streamId, headerBlock, 0, headerBlock.length, req.endStream());
-
-            req.streamIdFuture().complete(streamId);
+            // Stream ID is already set on exchange by allocateAndRegisterStream
+            // Caller will read it after awaitWriteCompletion returns
 
         } catch (Exception e) {
-            int streamId = exchange.getStreamId();
-            if (streamId > 0) {
-                releaseStream(streamId);
+            releaseStream(streamId);
+            if (e instanceof IOException ioe) {
+                throw ioe;
             }
-            if (e instanceof IOException || e instanceof H2Exception) {
-                req.streamIdFuture().completeExceptionally(e);
-            } else {
-                req.streamIdFuture().completeExceptionally(new IOException("Encoding failed", e));
-            }
+            throw new IOException("Encoding failed", e);
         }
     }
 
-    private void processWriteTrailers(WorkItem.WriteTrailers req) throws IOException {
-        byte[] headerBlock = encodeTrailers(req.trailers());
-        frameCodec.writeHeaders(req.streamId(), headerBlock, 0, headerBlock.length, true);
+    private void processWriteTrailers(H2MuxerWorkItem.WriteTrailers req) throws IOException {
+        headerEncoder.encodeTrailers(req.trailers);
+        frameCodec.writeHeaders(req.streamId, headerEncoder.buffer(), 0, headerEncoder.size(), true);
     }
 
-    private byte[] encodeHeaders(HttpRequest request) throws IOException {
-        headerEncodeBuffer.reset();
-        hpackEncoder.beginHeaderBlock(headerEncodeBuffer);
-
-        long headerListSize = 0;
-        String method = request.method();
-        boolean isConnect = "CONNECT".equalsIgnoreCase(method);
-
-        String authority = getAuthority(request);
-        String scheme = isConnect ? null : request.uri().getScheme();
-        String path = isConnect ? null : getPath(request);
-
-        hpackEncoder.encodeHeader(headerEncodeBuffer, PSEUDO_METHOD, method, false);
-        headerListSize += PSEUDO_METHOD.length() + method.length() + 32;
-
-        if (!isConnect) {
-            hpackEncoder.encodeHeader(headerEncodeBuffer, PSEUDO_SCHEME, scheme, false);
-            headerListSize += PSEUDO_SCHEME.length() + (scheme != null ? scheme.length() : 0) + 32;
-        }
-
-        hpackEncoder.encodeHeader(headerEncodeBuffer, PSEUDO_AUTHORITY, authority, false);
-        headerListSize += PSEUDO_AUTHORITY.length() + authority.length() + 32;
-
-        if (!isConnect) {
-            hpackEncoder.encodeHeader(headerEncodeBuffer, PSEUDO_PATH, path, false);
-            headerListSize += PSEUDO_PATH.length() + path.length() + 32;
-        }
-
-        for (var entry : request.headers()) {
-            String name = entry.getKey();
-            if (CONNECTION_HEADERS.contains(name)) {
-                continue;
-            }
-            boolean isTe = "te".equals(name);
-            boolean sensitive = SENSITIVE_HEADERS.contains(name);
-            for (String value : entry.getValue()) {
-                if (isTe && !"trailers".equalsIgnoreCase(value)) {
-                    continue;
-                }
-                hpackEncoder.encodeHeader(headerEncodeBuffer, name, value, sensitive);
-                headerListSize += name.length() + value.length() + 32;
-            }
-        }
-
-        int maxSize = connectionCallback.getRemoteMaxHeaderListSize();
-        if (maxSize != Integer.MAX_VALUE && headerListSize > maxSize) {
-            throw new IOException("Header list size (" + headerListSize + ") exceeds limit (" + maxSize + ")");
-        }
-
-        return finishHeaderBlock();
-    }
-
-    private byte[] encodeTrailers(HttpHeaders trailers) throws IOException {
-        headerEncodeBuffer.reset();
-        hpackEncoder.beginHeaderBlock(headerEncodeBuffer);
-
-        for (var entry : trailers) {
-            String name = entry.getKey();
-            if (name.startsWith(":")) {
-                throw new IOException("Trailers must not contain pseudo-header: " + name);
-            }
-            boolean sensitive = SENSITIVE_HEADERS.contains(name);
-            for (String value : entry.getValue()) {
-                hpackEncoder.encodeHeader(headerEncodeBuffer, name, value, sensitive);
-            }
-        }
-
-        return finishHeaderBlock();
-    }
-
-    private byte[] finishHeaderBlock() {
-        ByteBuffer buffer = headerEncodeBuffer.toByteBuffer();
-        byte[] result = new byte[buffer.remaining()];
-        buffer.get(result);
-        return result;
-    }
-
-    private String getAuthority(HttpRequest request) {
-        String host = request.uri().getHost();
-        int port = request.uri().getPort();
-        String scheme = request.uri().getScheme();
-        if (port == -1 || (port == 443 && "https".equalsIgnoreCase(scheme))
-                || (port == 80 && "http".equalsIgnoreCase(scheme))) {
-            return host;
-        }
-        return host + ":" + port;
-    }
-
-    private String getPath(HttpRequest request) {
-        String path = request.uri().getRawPath();
-        if (path == null || path.isEmpty()) {
-            path = "/";
-        }
-        String query = request.uri().getRawQuery();
-        if (query != null && !query.isEmpty()) {
-            path = path + "?" + query;
-        }
-        return path;
-    }
-
-    private void completeItem(WorkItem item, IOException error) {
-        CompletableFuture<Void> completion = switch (item) {
-            case WorkItem.EncodeHeaders h -> h.writeComplete();
-            case WorkItem.WriteData d -> d.completion();
-            case WorkItem.WriteTrailers t -> t.completion();
-            case WorkItem.WriteRst r -> null;
-            case WorkItem.WriteGoaway g -> null;
-            case WorkItem.WriteWindowUpdate w -> null;
-            case WorkItem.WriteSettingsAck s -> null;
-            case WorkItem.WritePing p -> null;
-            case WorkItem.Shutdown s -> null;
-            case WorkItem.CheckDataQueue c -> null;
-        };
-        if (completion != null) {
+    private void completeItem(H2MuxerWorkItem item, IOException error) {
+        // Get the exchange to signal (only EncodeHeaders has an exchange directly)
+        H2Exchange exchange = (item instanceof H2MuxerWorkItem.EncodeHeaders h) ? h.exchange : null;
+        if (exchange != null) {
             if (error == null) {
-                completion.complete(null);
+                exchange.signalWriteSuccess();
             } else {
-                completion.completeExceptionally(error);
+                exchange.signalWriteFailure(error);
             }
         }
     }
@@ -848,11 +695,8 @@ final class H2Muxer implements AutoCloseable {
     }
 
     private void drainAndFailPending(IOException error) {
-        WorkItem item;
+        H2MuxerWorkItem item;
         while ((item = workQueue.poll()) != null) {
-            if (item instanceof WorkItem.EncodeHeaders h) {
-                h.streamIdFuture().completeExceptionally(error);
-            }
             completeItem(item, error);
         }
     }
@@ -861,8 +705,12 @@ final class H2Muxer implements AutoCloseable {
     public void close() {
         accepting = false;
 
+        // Signal writer to process remaining work before we shut down
+        signalWriter();
+
         long deadline = System.currentTimeMillis() + 1000;
         while (!workQueue.isEmpty() && System.currentTimeMillis() < deadline) {
+            signalWriter(); // Keep signaling in case writer parks between checks
             try {
                 Thread.sleep(10);
             } catch (InterruptedException e) {
@@ -872,7 +720,7 @@ final class H2Muxer implements AutoCloseable {
         }
 
         running = false;
-        var _ignore = workQueue.offer(new WorkItem.Shutdown());
+        enqueue(SHUTDOWN);
 
         if (workerThread != null) {
             workerThread.interrupt();
@@ -889,7 +737,7 @@ final class H2Muxer implements AutoCloseable {
     void shutdownNow() {
         accepting = false;
         running = false;
-        var _ignore = workQueue.offer(new WorkItem.Shutdown());
+        enqueue(SHUTDOWN);
         if (workerThread != null) {
             workerThread.interrupt();
         }

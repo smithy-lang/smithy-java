@@ -9,11 +9,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 /**
- * A very small, very fast, lock-free buffer pool for reusing byte arrays.
+ * A lock-free byte array allocator with optional pooling to reduce GC pressure.
  *
- * <p>Designed for use by a single HTTP/2 connection to reduce GC pressure
- * from repeated request/response cycles. Each connection should have its
- * own pool to minimize contention.
+ * <p>Designed for use by a single HTTP/2 connection. Each connection should have
+ * its own allocator to minimize contention.
  *
  * <p>Implementation details:
  * <ul>
@@ -23,13 +22,13 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
  *       it, which is fine for a GC-reducing pool.</li>
  * </ul>
  *
- * <p>The pool has a configurable maximum count and poolable size. Buffers larger
+ * <p>The allocator has a configurable maximum count and poolable size. Buffers larger
  * than {@code maxPoolableSize} are never pooled. Requests larger than
  * {@code maxBufferSize} are rejected.
  *
- * <p>Thread-safe: multiple threads can borrow and return buffers concurrently.
+ * <p>Thread-safe: multiple threads can borrow and release buffers concurrently.
  */
-public final class BufferPool {
+public final class ByteAllocator {
 
     // LIFO stack of pooled buffers: [0, top) are valid entries.
     private final AtomicReferenceArray<byte[]> stack;
@@ -41,14 +40,14 @@ public final class BufferPool {
     private final int defaultBufferSize;
 
     /**
-     * Create a buffer pool.
+     * Create a byte allocator with pooling.
      *
      * @param maxPoolCount maximum number of buffers to keep in pool
      * @param maxBufferSize hard limit on buffer size (throws if exceeded)
      * @param maxPoolableSize buffers larger than this are not pooled (but still allowed)
      * @param defaultBufferSize default size for new buffers when pool is empty
      */
-    public BufferPool(int maxPoolCount, int maxBufferSize, int maxPoolableSize, int defaultBufferSize) {
+    public ByteAllocator(int maxPoolCount, int maxBufferSize, int maxPoolableSize, int defaultBufferSize) {
         if (maxPoolCount <= 0) {
             throw new IllegalArgumentException("maxPoolCount must be > 0");
         }
@@ -71,8 +70,12 @@ public final class BufferPool {
      * <p>If a pooled buffer is available and large enough, it's returned.
      * Otherwise, a new buffer is allocated with at least {@code minSize} bytes.
      *
+     * <p><b>Important:</b> The returned buffer may be larger than {@code minSize}.
+     * Callers must track the actual data length separately and not rely on
+     * {@code buffer.length} to determine data boundaries.
+     *
      * @param minSize minimum buffer size needed
-     * @return a buffer of at least minSize bytes
+     * @return a buffer of at least minSize bytes (may be larger)
      * @throws IllegalArgumentException if minSize exceeds maxBufferSize
      */
     public byte[] borrow(int minSize) {
