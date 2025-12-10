@@ -306,7 +306,7 @@ public class H2cScalingBenchmark {
         var errors = new AtomicLong();
         var firstError = new AtomicReference<Throwable>();
         var running = new AtomicBoolean(true);
-        var activeTasks = new AtomicLong(concurrency);
+        var inFlight = new AtomicLong(0);  // Track actually in-flight requests
 
         DefaultHttp2Headers headers = new DefaultHttp2Headers();
         headers.method("GET");
@@ -318,19 +318,20 @@ public class H2cScalingBenchmark {
         Runnable[] makeRequest = new Runnable[1];
         makeRequest[0] = () -> {
             if (!running.get()) {
-                activeTasks.decrementAndGet();
-                return;
+                return;  // Don't start new requests when stopped
             }
+
+            inFlight.incrementAndGet();  // Track in-flight
 
             int idx = connectionIndex.getAndIncrement() % nettyStreamBootstraps.size();
             nettyStreamBootstraps.get(idx).open().addListener(future -> {
                 if (!future.isSuccess()) {
+                    inFlight.decrementAndGet();
                     errors.incrementAndGet();
                     firstError.compareAndSet(null, future.cause());
-                    if (!running.get())
-                        activeTasks.decrementAndGet();
-                    else
-                        makeRequest[0].run();
+                    if (running.get()) {
+                        makeRequest[0].run();  // Retry only if still running
+                    }
                     return;
                 }
 
@@ -351,18 +352,24 @@ public class H2cScalingBenchmark {
                         boolean endStream = (frame instanceof Http2HeadersFrame hf && hf.isEndStream())
                                 || (frame instanceof Http2DataFrame df2 && df2.isEndStream());
                         if (endStream) {
+                            inFlight.decrementAndGet();
                             requests.incrementAndGet();
                             ctx.close();
-                            makeRequest[0].run();
+                            if (running.get()) {
+                                makeRequest[0].run();  // Start next only if still running
+                            }
                         }
                     }
 
                     @Override
                     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                        inFlight.decrementAndGet();
                         errors.incrementAndGet();
                         firstError.compareAndSet(null, cause);
                         ctx.close();
-                        makeRequest[0].run();
+                        if (running.get()) {
+                            makeRequest[0].run();  // Retry only if still running
+                        }
                     }
                 });
 
@@ -370,17 +377,23 @@ public class H2cScalingBenchmark {
             });
         };
 
+        // Start initial concurrent requests
         for (int i = 0; i < concurrency; i++) {
             makeRequest[0].run();
         }
 
+        // Run for 1 second
         Thread.sleep(1000);
         running.set(false);
 
-        // Don't wait long - just let in-flight requests drain briefly
-        long deadline = System.currentTimeMillis() + 100;
-        while (activeTasks.get() > 0 && System.currentTimeMillis() < deadline) {
+        // Wait for ALL in-flight requests to complete (reasonable timeout)
+        long deadline = System.currentTimeMillis() + 10000;  // 10 second max
+        while (inFlight.get() > 0 && System.currentTimeMillis() < deadline) {
             Thread.sleep(10);
+        }
+
+        if (inFlight.get() > 0) {
+            System.out.println("WARNING: " + inFlight.get() + " requests still in-flight after timeout");
         }
 
         counter.requests = requests.get();
