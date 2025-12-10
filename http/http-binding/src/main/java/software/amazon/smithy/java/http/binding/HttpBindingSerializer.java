@@ -66,6 +66,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private DataStream httpPayload;
     private Flow.Publisher<? extends SerializableStruct> eventStream;
     private int responseStatus;
+    private boolean contentTypeHeaderInInput;
 
     private final BindingMatcher bindingMatcher;
     private final UriPattern uriPattern;
@@ -111,7 +112,11 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         // Prescanning names from @httpHeader for @httpPrefixHeaders
         for (var member : schema.members()) {
             if (member.hasTrait(TraitKey.HTTP_HEADER_TRAIT)) {
-                namesFromHttpHeader.add(member.expectTrait(TraitKey.HTTP_HEADER_TRAIT).getValue());
+                var headerName = member.expectTrait(TraitKey.HTTP_HEADER_TRAIT).getValue();
+                if (!contentTypeHeaderInInput && headerName.equalsIgnoreCase("content-type")) {
+                    contentTypeHeaderInInput = true;
+                }
+                namesFromHttpHeader.add(headerName);
             }
         }
 
@@ -147,7 +152,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
     void setHttpPayload(Schema schema, DataStream value) {
         httpPayload = value;
-        if (headers.containsKey("content-type")) {
+        if (headers.containsKey("content-type") || contentTypeHeaderInInput) {
             return;
         }
 
