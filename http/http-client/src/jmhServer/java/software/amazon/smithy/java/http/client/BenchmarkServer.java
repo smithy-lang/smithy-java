@@ -74,6 +74,7 @@ import java.util.concurrent.CountDownLatch;
 public final class BenchmarkServer {
 
     private static final byte[] CONTENT = "{\"status\":\"ok\"}".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] MB_CONTENT = new byte[1024 * 1024]; // 1MB for large transfer tests
 
     // Fixed ports for benchmark server (avoids dynamic port discovery complexity)
     public static final int DEFAULT_H1_PORT = 18080;
@@ -240,14 +241,30 @@ public final class BenchmarkServer {
     private static class Http1RequestHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest msg) {
-            FullHttpResponse response = new DefaultFullHttpResponse(
-                    HTTP_1_1,
-                    OK,
-                    Unpooled.wrappedBuffer(CONTENT));
-            response.headers()
-                    .set(CONTENT_TYPE, "application/json")
-                    .set(CONNECTION, KEEP_ALIVE)
-                    .setInt(CONTENT_LENGTH, CONTENT.length);
+            String uri = msg.uri();
+            FullHttpResponse response;
+
+            if (uri.startsWith("/post") || uri.startsWith("/putmb")) {
+                // POST/PUT returns empty 200 OK
+                response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.EMPTY_BUFFER);
+                response.headers()
+                        .set(CONNECTION, KEEP_ALIVE)
+                        .setInt(CONTENT_LENGTH, 0);
+            } else if (uri.startsWith("/getmb")) {
+                // Return 1MB response
+                response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.wrappedBuffer(MB_CONTENT));
+                response.headers()
+                        .set(CONTENT_TYPE, "application/octet-stream")
+                        .set(CONNECTION, KEEP_ALIVE)
+                        .setInt(CONTENT_LENGTH, MB_CONTENT.length);
+            } else {
+                // GET returns JSON body
+                response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.wrappedBuffer(CONTENT));
+                response.headers()
+                        .set(CONTENT_TYPE, "application/json")
+                        .set(CONNECTION, KEEP_ALIVE)
+                        .setInt(CONTENT_LENGTH, CONTENT.length);
+            }
             ctx.writeAndFlush(response);
         }
 
@@ -297,6 +314,13 @@ public final class BenchmarkServer {
                 .status("200")
                 .set("content-type", "application/json")
                 .setInt("content-length", CONTENT.length);
+        private static final Http2Headers EMPTY_RESPONSE_HEADERS = new DefaultHttp2Headers(true, 2)
+                .status("200")
+                .setInt("content-length", 0);
+        private static final Http2Headers MB_RESPONSE_HEADERS = new DefaultHttp2Headers(true, 3)
+                .status("200")
+                .set("content-type", "application/octet-stream")
+                .setInt("content-length", MB_CONTENT.length);
 
         private static final java.util.concurrent.atomic.AtomicInteger connectionCount =
                 new java.util.concurrent.atomic.AtomicInteger();
@@ -347,6 +371,24 @@ public final class BenchmarkServer {
                     ctx.write(new DefaultHttp2HeadersFrame(statsHeaders, false).stream(headersFrame.stream()));
                     ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(body), true)
                             .stream(headersFrame.stream()));
+                } else if ("/post".contentEquals(path) || "/putmb".contentEquals(path)) {
+                    // POST/PUT with body - wait for data frames, then send empty 200
+                    if (headersFrame.isEndStream()) {
+                        // No body, respond immediately
+                        var counter = streamCounts.get(ctx.channel().id().asShortText());
+                        if (counter != null)
+                            counter.incrementAndGet();
+                        sendEmptyResponse(ctx, headersFrame.stream());
+                    }
+                    // else: wait for DATA frames
+                } else if ("/getmb".contentEquals(path)) {
+                    // Return 1MB response
+                    if (headersFrame.isEndStream()) {
+                        var counter = streamCounts.get(ctx.channel().id().asShortText());
+                        if (counter != null)
+                            counter.incrementAndGet();
+                        sendMbResponse(ctx, headersFrame.stream());
+                    }
                 } else if (headersFrame.isEndStream()) {
                     var counter = streamCounts.get(ctx.channel().id().asShortText());
                     if (counter != null)
@@ -359,7 +401,8 @@ public final class BenchmarkServer {
                     var counter = streamCounts.get(ctx.channel().id().asShortText());
                     if (counter != null)
                         counter.incrementAndGet();
-                    sendResponse(ctx, dataFrame.stream());
+                    // POST requests with body get empty response
+                    sendEmptyResponse(ctx, dataFrame.stream());
                 }
             }
         }
@@ -368,6 +411,17 @@ public final class BenchmarkServer {
             ctx.write(new DefaultHttp2HeadersFrame(RESPONSE_HEADERS, false).stream(stream));
             ctx.writeAndFlush(new DefaultHttp2DataFrame(
                     Unpooled.wrappedBuffer(CONTENT),
+                    true).stream(stream));
+        }
+
+        private void sendEmptyResponse(ChannelHandlerContext ctx, Http2FrameStream stream) {
+            ctx.writeAndFlush(new DefaultHttp2HeadersFrame(EMPTY_RESPONSE_HEADERS, true).stream(stream));
+        }
+
+        private void sendMbResponse(ChannelHandlerContext ctx, Http2FrameStream stream) {
+            ctx.write(new DefaultHttp2HeadersFrame(MB_RESPONSE_HEADERS, false).stream(stream));
+            ctx.writeAndFlush(new DefaultHttp2DataFrame(
+                    Unpooled.wrappedBuffer(MB_CONTENT),
                     true).stream(stream));
         }
 

@@ -108,7 +108,8 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     private volatile int remoteMaxHeaderListSize = Integer.MAX_VALUE;
 
     // Connection receive window (send window is managed by muxer). Only accessed by reader thread.
-    private int connectionRecvWindow = DEFAULT_INITIAL_WINDOW_SIZE;
+    private int connectionRecvWindow;
+    private final int initialWindowSize;
 
     // Connection state
     private volatile State state = State.CONNECTED;
@@ -121,8 +122,15 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
 
     /**
      * Create an HTTP/2 connection from a connected socket.
+     *
+     * @param socket the connected socket
+     * @param route the route for this connection
+     * @param readTimeout read timeout duration
+     * @param writeTimeout write timeout duration
+     * @param initialWindowSize initial flow control window size in bytes
      */
-    public H2Connection(Socket socket, Route route, Duration readTimeout, Duration writeTimeout) throws IOException {
+    public H2Connection(Socket socket, Route route, Duration readTimeout, Duration writeTimeout, int initialWindowSize)
+            throws IOException {
         this.socket = socket;
         var socketIn = new UnsyncBufferedInputStream(socket.getInputStream(), 8192);
         this.socketOut = new UnsyncBufferedOutputStream(socket.getOutputStream(), 8192);
@@ -131,9 +139,15 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         this.writeTimeoutMs = writeTimeout.toMillis();
         this.frameCodec = new H2FrameCodec(socketIn, socketOut, DEFAULT_MAX_FRAME_SIZE);
         this.hpackDecoder = new HpackDecoder(DEFAULT_HEADER_TABLE_SIZE);
+        this.initialWindowSize = initialWindowSize;
+        this.connectionRecvWindow = initialWindowSize;
 
         // Create muxer before connection preface (applyRemoteSettings needs it)
-        this.muxer = new H2Muxer(this, frameCodec, DEFAULT_HEADER_TABLE_SIZE, "h2-writer-" + route.host());
+        this.muxer = new H2Muxer(this,
+                frameCodec,
+                DEFAULT_HEADER_TABLE_SIZE,
+                "h2-writer-" + route.host(),
+                initialWindowSize);
 
         // Perform connection preface
         try {
@@ -378,12 +392,20 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
                 SETTINGS_MAX_CONCURRENT_STREAMS,
                 100,
                 SETTINGS_INITIAL_WINDOW_SIZE,
-                65535,
+                initialWindowSize,
                 SETTINGS_MAX_FRAME_SIZE,
                 16384,
                 SETTINGS_ENABLE_PUSH,
                 0);
         frameCodec.flush();
+
+        // If using a larger window than the RFC default, send a connection-level WINDOW_UPDATE
+        // to expand the connection receive window immediately
+        if (initialWindowSize > DEFAULT_INITIAL_WINDOW_SIZE) {
+            int increment = initialWindowSize - DEFAULT_INITIAL_WINDOW_SIZE;
+            frameCodec.writeWindowUpdate(0, increment);
+            frameCodec.flush();
+        }
     }
 
     private void receiveServerPreface() throws IOException {
@@ -710,8 +732,8 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     // Called only from reader thread - no synchronization needed
     void consumeConnectionRecvWindow(int bytes) throws IOException {
         connectionRecvWindow -= bytes;
-        if (connectionRecvWindow < DEFAULT_INITIAL_WINDOW_SIZE / 2) {
-            int increment = DEFAULT_INITIAL_WINDOW_SIZE - connectionRecvWindow;
+        if (connectionRecvWindow < initialWindowSize / 2) {
+            int increment = initialWindowSize - connectionRecvWindow;
             connectionRecvWindow += increment;
             muxer.queueControlFrame(0,
                     H2Muxer.ControlFrameType.WINDOW_UPDATE,

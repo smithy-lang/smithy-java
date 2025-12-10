@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.http.client.h2;
 
-import static software.amazon.smithy.java.http.client.h2.H2Constants.DEFAULT_INITIAL_WINDOW_SIZE;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.ERROR_CANCEL;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.ERROR_FLOW_CONTROL_ERROR;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.ERROR_PROTOCOL_ERROR;
@@ -117,11 +116,12 @@ public final class H2Exchange implements HttpExchange {
     // Stream state machine per RFC 9113 Section 5.1
     private volatile StreamState streamState = StreamState.IDLE;
 
-    // Stream-level timeouts
+    // Stream-level timeouts (tick-based: 1 tick = TIMEOUT_POLL_INTERVAL_MS)
     private final long readTimeoutMs;
     private final long writeTimeoutMs;
+    private final int readTimeoutTicks; // Number of ticks before timeout (0 = no timeout)
     private final AtomicLong readSeq = new AtomicLong(); // Activity counter, incremented on read activity
-    private volatile long readDeadlineNanos; // 0 = no deadline, >0 = deadline in nanos
+    private volatile int readDeadlineTick; // 0 = no deadline, >0 = deadline tick
     private final AtomicBoolean readTimedOut = new AtomicBoolean(); // At-most-once timeout flag
 
     // Response state
@@ -155,6 +155,7 @@ public final class H2Exchange implements HttpExchange {
     // sendWindow: Semaphore-based, VT blocks naturally when exhausted (no lock needed)
     // streamRecvWindow: only accessed by application thread in readDataChunk() (single-threaded)
     private final FlowControlWindow sendWindow;
+    private final int initialWindowSize;
     private int streamRecvWindow;
 
     // === OUTBOUND PATH (VT → Writer) ===
@@ -175,15 +176,21 @@ public final class H2Exchange implements HttpExchange {
      * @param request the HTTP request
      * @param readTimeoutMs timeout in milliseconds for waiting on response data
      * @param writeTimeoutMs timeout in milliseconds for waiting on flow control window
+     * @param initialWindowSize initial flow control window size for this stream
      */
-    H2Exchange(H2Muxer muxer, HttpRequest request, long readTimeoutMs, long writeTimeoutMs) {
+    H2Exchange(H2Muxer muxer, HttpRequest request, long readTimeoutMs, long writeTimeoutMs, int initialWindowSize) {
         this.muxer = muxer;
         this.request = request;
         this.streamId = -1; // Will be set later
         this.readTimeoutMs = readTimeoutMs;
         this.writeTimeoutMs = writeTimeoutMs;
+        // Convert timeout to ticks: ceil(readTimeoutMs / pollIntervalMs)
+        this.readTimeoutTicks = readTimeoutMs <= 0
+                ? 0
+                : Math.max(1, (int) Math.ceil((double) readTimeoutMs / H2Muxer.TIMEOUT_POLL_INTERVAL_MS));
         this.sendWindow = new FlowControlWindow(muxer.getRemoteInitialWindowSize());
-        this.streamRecvWindow = DEFAULT_INITIAL_WINDOW_SIZE;
+        this.initialWindowSize = initialWindowSize;
+        this.streamRecvWindow = initialWindowSize;
     }
 
     /**
@@ -208,10 +215,10 @@ public final class H2Exchange implements HttpExchange {
     }
 
     /**
-     * Get read deadline in nanoseconds (0 = no deadline).
+     * Get read deadline tick (0 = no deadline).
      */
-    long getReadDeadlineNanos() {
-        return readDeadlineNanos;
+    int getReadDeadlineTick() {
+        return readDeadlineTick;
     }
 
     /**
@@ -232,11 +239,15 @@ public final class H2Exchange implements HttpExchange {
     /**
      * Record read activity: bump sequence and reset deadline.
      * Called when headers or data arrive.
+     *
+     * <p>Uses tick-based timeout: instead of calling System.nanoTime() (expensive),
+     * we read the current tick from the muxer (cheap volatile read) and compute
+     * the deadline as currentTick + timeoutTicks.
      */
     private void onReadActivity() {
-        if (readTimeoutMs > 0) {
+        if (readTimeoutTicks > 0) {
             readSeq.incrementAndGet();
-            readDeadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(readTimeoutMs);
+            readDeadlineTick = muxer.currentTimeoutTick() + readTimeoutTicks;
         }
     }
 
@@ -244,7 +255,7 @@ public final class H2Exchange implements HttpExchange {
      * Clear read deadline (no timeout).
      */
     private void clearReadDeadline() {
-        readDeadlineNanos = 0;
+        readDeadlineTick = 0;
     }
 
     /**
@@ -406,7 +417,7 @@ public final class H2Exchange implements HttpExchange {
             // Lazy allocation on first DATA frame - borrow from connection pool
             if (dataBuffer == null) {
                 int size = Math.max(INITIAL_BUFFER_SIZE, requiredSpace);
-                size = Math.min(size, DEFAULT_INITIAL_WINDOW_SIZE);
+                size = Math.min(size, initialWindowSize);
                 dataBuffer = muxer.borrowBuffer(size);
                 return true;
             }
@@ -435,7 +446,7 @@ public final class H2Exchange implements HttpExchange {
             while (newSize < writePos + requiredSpace) {
                 newSize *= 2;
             }
-            newSize = Math.min(newSize, DEFAULT_INITIAL_WINDOW_SIZE);
+            newSize = Math.min(newSize, initialWindowSize);
 
             if (writePos + requiredSpace > newSize) {
                 return false;
@@ -1068,8 +1079,8 @@ public final class H2Exchange implements HttpExchange {
      */
     private void updateStreamRecvWindow(int bytesConsumed) throws IOException {
         streamRecvWindow -= bytesConsumed;
-        if (streamRecvWindow < DEFAULT_INITIAL_WINDOW_SIZE / 2) {
-            int increment = DEFAULT_INITIAL_WINDOW_SIZE - streamRecvWindow;
+        if (streamRecvWindow < initialWindowSize / 2) {
+            int increment = initialWindowSize - streamRecvWindow;
             // Queue stream-level WINDOW_UPDATE - writer thread will send it
             muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.WINDOW_UPDATE, increment, writeTimeoutMs);
             streamRecvWindow += increment;
