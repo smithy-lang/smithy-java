@@ -130,26 +130,22 @@ val stopBenchmarkServer by tasks.registering {
 }
 
 // Configure JMH
+// Run with: ./gradlew :http:http-client:jmh -Pjmh.includes="H2cScalingBenchmark.smithy"
+// To customize params, edit @Param annotations in benchmark source files
 jmh {
-    includes = listOf(".*smithyH2c.*")
+    val includesProp = project.findProperty("jmh.includes")?.toString()
+    includes = if (includesProp != null) listOf(includesProp) else listOf(".*")
 
     warmupIterations = 3
     iterations = 3
     fork = 1
 //    profilers.add("async:output=flamegraph")
-//    profilers.add("async:output=collapsed")
+    profilers.add("async:output=collapsed")
     // profilers.add("gc")
 }
 
-// Task that runs JMH with external server (starts server, runs jmh, stops server)
-val jmhWithServer by tasks.registering(Exec::class) {
+// Make jmh task auto-start/stop the benchmark server
+tasks.named("jmh") {
     dependsOn(startBenchmarkServer)
     finalizedBy(stopBenchmarkServer)
-    notCompatibleWithConfigurationCache("Runs JMH with external server")
-
-    workingDir = project.rootDir
-    commandLine(
-        "./gradlew",
-        ":http:http-client:jmh",
-    )
 }
