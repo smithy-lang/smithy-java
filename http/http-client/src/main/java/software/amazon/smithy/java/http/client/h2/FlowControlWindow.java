@@ -5,18 +5,20 @@
 
 package software.amazon.smithy.java.http.client.h2;
 
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * HTTP/2 flow control window backed by a Semaphore.
+ * HTTP/2 flow control window.
  *
- * <p>Wraps acquire/release semantics for flow control with Virtual Thread-friendly
- * blocking. Uses an unfair semaphore for throughput over ordering.
+ * <p>Uses ReentrantLock instead of synchronized to avoid virtual thread pinning.
  */
 final class FlowControlWindow {
 
-    private final Semaphore permits;
+    private final ReentrantLock lock = new ReentrantLock();
+    private final Condition available = lock.newCondition();
+    private long window;
 
     /**
      * Create a flow control window.
@@ -24,58 +26,91 @@ final class FlowControlWindow {
      * @param initialWindow the initial window size (e.g., 65535 for HTTP/2 default)
      */
     FlowControlWindow(int initialWindow) {
-        // Use unfair semaphore for better throughput (no FIFO ordering overhead)
-        this.permits = new Semaphore(initialWindow, false);
+        this.window = initialWindow;
     }
 
     /**
-     * Acquire permits with a timeout.
+     * Try to acquire bytes from the window with a timeout.
      *
      * @param bytes number of bytes to acquire
-     * @param timeout maximum time to wait
-     * @param unit time unit for timeout
-     * @return true if permits acquired, false if timeout expired
+     * @param timeoutMs maximum time to wait in milliseconds
+     * @return true if bytes acquired, false if timeout expired
      * @throws InterruptedException if interrupted while waiting
      */
-    boolean tryAcquire(int bytes, long timeout, TimeUnit unit) throws InterruptedException {
-        return permits.tryAcquire(bytes, timeout, unit);
+    boolean tryAcquire(int bytes, long timeoutMs) throws InterruptedException {
+        lock.lock();
+        try {
+            // Fast path: no waiting needed
+            if (window >= bytes) {
+                window -= bytes;
+                return true;
+            }
+
+            // Slow path: wait with timeout
+            long remainingNs = TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+            while (window < bytes) {
+                if (remainingNs <= 0) {
+                    return false;
+                }
+                remainingNs = available.awaitNanos(remainingNs);
+            }
+
+            window -= bytes;
+            return true;
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**
-     * Release permits back to the window.
+     * Release bytes back to the window.
      *
      * @param bytes number of bytes to release
      */
     void release(int bytes) {
         if (bytes > 0) {
-            permits.release(bytes);
+            lock.lock();
+            try {
+                window += bytes;
+                available.signalAll();
+            } finally {
+                lock.unlock();
+            }
         }
     }
 
     /**
      * Get the current available window size.
      *
-     * @return available bytes in the window
+     * @return available bytes in the window (may be negative if window was shrunk)
      */
     int available() {
-        return permits.availablePermits();
+        lock.lock();
+        try {
+            return (int) Math.min(window, Integer.MAX_VALUE);
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**
      * Adjust the window size (e.g., when SETTINGS changes initial window).
      *
-     * <p>This can increase or decrease the window. If decreasing and the new window would be negative, this may
-     * cause subsequent acquires to block until the window recovers.
+     * <p>This can increase or decrease the window. If decreasing, the window
+     * may become negative (valid in HTTP/2), and writers will block until
+     * WINDOW_UPDATE frames restore capacity.
      *
      * @param delta change in window size (positive or negative)
      */
     void adjust(int delta) {
-        if (delta > 0) {
-            permits.release(delta);
-        } else if (delta < 0) {
-            // Reducing window: try to acquire the permits. If not enough available, the window goes "into debt"
-            // and future acquires will block longer.
-            var _ignored = permits.tryAcquire(-delta);
+        lock.lock();
+        try {
+            window += delta;
+            if (delta > 0) {
+                available.signalAll();
+            }
+        } finally {
+            lock.unlock();
         }
     }
 }

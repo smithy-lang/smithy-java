@@ -15,14 +15,45 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
+import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 
 class H2FrameCodecTest {
+
+    // Test helper record that simulates the old Frame record for testing
+    record TestFrame(int type, int flags, int streamId, byte[] payload, int length, H2FrameCodec codec) {
+        boolean hasFlag(int flag) {
+            return (flags & flag) != 0;
+        }
+
+        int payloadLength() {
+            return length;
+        }
+
+        int[] parseSettings() throws H2Exception {
+            return codec.parseSettings(payload, length);
+        }
+
+        int[] parseGoaway() throws H2Exception {
+            return codec.parseGoaway(payload, length);
+        }
+
+        int parseWindowUpdate() throws H2Exception {
+            return codec.parseWindowUpdate(payload, length);
+        }
+
+        int parseRstStream() throws H2Exception {
+            return codec.parseRstStream(payload, length);
+        }
+    }
 
     // Write helper methods
     @Test
     void writeSettings() throws IOException {
         var out = new ByteArrayOutputStream();
-        codec(out).writeSettings(1, 4096, 3, 100);
+        var c = codec(out);
+        c.writeSettings(1, 4096, 3, 100);
+        c.flush();
         var frame = decode(out);
         int[] s = frame.parseSettings();
 
@@ -36,7 +67,9 @@ class H2FrameCodecTest {
     @Test
     void writeSettingsAck() throws IOException {
         var out = new ByteArrayOutputStream();
-        codec(out).writeSettingsAck();
+        var c = codec(out);
+        c.writeSettingsAck();
+        c.flush();
         var frame = decode(out);
 
         assertEquals(4, frame.type());
@@ -48,7 +81,9 @@ class H2FrameCodecTest {
     @Test
     void writeGoaway() throws IOException {
         var out = new ByteArrayOutputStream();
-        codec(out).writeGoaway(5, 2, "debug");
+        var c = codec(out);
+        c.writeGoaway(5, 2, "debug");
+        c.flush();
         var frame = decode(out);
         int[] g = frame.parseGoaway();
 
@@ -59,7 +94,9 @@ class H2FrameCodecTest {
     @Test
     void writeGoawayNullDebug() throws IOException {
         var out = new ByteArrayOutputStream();
-        codec(out).writeGoaway(1, 0, null);
+        var c = codec(out);
+        c.writeGoaway(1, 0, null);
+        c.flush();
         var frame = decode(out);
 
         assertEquals(7, frame.type());
@@ -70,7 +107,9 @@ class H2FrameCodecTest {
     @Test
     void writeWindowUpdate() throws IOException {
         var out = new ByteArrayOutputStream();
-        codec(out).writeWindowUpdate(1, 65535);
+        var c = codec(out);
+        c.writeWindowUpdate(1, 65535);
+        c.flush();
         var frame = decode(out);
 
         assertEquals(65535, frame.parseWindowUpdate());
@@ -79,7 +118,9 @@ class H2FrameCodecTest {
     @Test
     void writeRstStream() throws IOException {
         var out = new ByteArrayOutputStream();
-        codec(out).writeRstStream(1, 8);
+        var c = codec(out);
+        c.writeRstStream(1, 8);
+        c.flush();
         var frame = decode(out);
 
         assertEquals(8, frame.parseRstStream());
@@ -88,23 +129,30 @@ class H2FrameCodecTest {
     @Test
     void writeHeadersWithContinuation() throws IOException {
         var out = new ByteArrayOutputStream();
-        var codec = new H2FrameCodec(new ByteArrayInputStream(new byte[0]), out, 16);
+        var codec = new H2FrameCodec(wrapIn(new byte[0]), wrapOut(out), 16);
         byte[] block = new byte[50];
         codec.writeHeaders(1, block, 0, 50, true);
         codec.flush();
 
-        var readCodec =
-                new H2FrameCodec(new ByteArrayInputStream(out.toByteArray()), new ByteArrayOutputStream(), 16384);
-        var frame = readCodec.readFrame();
-        byte[] result = readCodec.readHeaderBlock(frame);
+        var readCodec = new H2FrameCodec(wrapIn(out.toByteArray()), wrapOut(new ByteArrayOutputStream()), 16384);
+        int type = readCodec.nextFrame();
+        assertEquals(1, type); // HEADERS
+        int streamId = readCodec.frameStreamId();
+        int length = readCodec.framePayloadLength();
+        byte[] payload = new byte[length];
+        readCodec.readPayloadInto(payload, 0, length);
+        readCodec.readHeaderBlock(streamId, payload, length);
 
-        assertEquals(50, result.length);
+        // Zero-copy: use headerBlockSize() for valid length
+        assertEquals(50, readCodec.headerBlockSize());
     }
 
     @Test
     void writeHeadersSingleFrame() throws IOException {
         var out = new ByteArrayOutputStream();
-        codec(out).writeHeaders(1, new byte[] {1, 2, 3}, 0, 3, false);
+        var c = codec(out);
+        c.writeHeaders(1, new byte[] {1, 2, 3}, 0, 3, false);
+        c.flush();
         var frame = decode(out);
 
         assertTrue(frame.hasFlag(0x04)); // END_HEADERS
@@ -117,12 +165,10 @@ class H2FrameCodecTest {
                 () -> codec(new ByteArrayOutputStream()).writeFrame(0, 0, -1, new byte[0]));
     }
 
-    @Test
-    void throwsOnPayloadExceedsMax() {
-        var codec = new H2FrameCodec(new ByteArrayInputStream(new byte[0]), new ByteArrayOutputStream(), 100);
-
-        assertThrows(H2Exception.class, () -> codec.writeFrame(0, 0, 1, new byte[200]));
-    }
+    // Note: We no longer validate outbound frame size in writeFrame() because
+    // the peer's MAX_FRAME_SIZE setting may be larger than our receive limit.
+    // The caller (H2Exchange.writeData) is responsible for chunking according
+    // to the peer's advertised MAX_FRAME_SIZE.
 
     @Test
     void throwsOnWindowUpdateZero() {
@@ -141,11 +187,18 @@ class H2FrameCodecTest {
         out.write(buildFrame(1, 0, 1, new byte[] {1, 2})); // HEADERS no END_HEADERS
         out.write(buildFrame(9, 0x04, 1, new byte[] {3, 4})); // CONTINUATION with END_HEADERS
 
-        var codec = new H2FrameCodec(new ByteArrayInputStream(out.toByteArray()), new ByteArrayOutputStream(), 16384);
-        var frame = codec.readFrame();
-        byte[] block = codec.readHeaderBlock(frame);
+        var codec = new H2FrameCodec(wrapIn(out.toByteArray()), wrapOut(new ByteArrayOutputStream()), 16384);
+        int type = codec.nextFrame();
+        assertEquals(1, type); // HEADERS
+        int streamId = codec.frameStreamId();
+        int length = codec.framePayloadLength();
+        byte[] payload = new byte[length];
+        codec.readPayloadInto(payload, 0, length);
+        byte[] block = codec.readHeaderBlock(streamId, payload, length);
+        int blockSize = codec.headerBlockSize();
 
-        assertArrayEquals(new byte[] {1, 2, 3, 4}, block);
+        // Zero-copy: block is a view into internal buffer, use headerBlockSize() for valid length
+        assertArrayEquals(new byte[] {1, 2, 3, 4}, Arrays.copyOf(block, blockSize));
     }
 
     @Test
@@ -153,9 +206,16 @@ class H2FrameCodecTest {
         var out = new ByteArrayOutputStream();
         out.write(buildFrame(1, 0, 1, new byte[] {1}));
         out.write(buildFrame(9, 0x04, 2, new byte[] {2})); // wrong stream
-        var codec = new H2FrameCodec(new ByteArrayInputStream(out.toByteArray()), new ByteArrayOutputStream(), 16384);
+        var codec = new H2FrameCodec(wrapIn(out.toByteArray()), wrapOut(new ByteArrayOutputStream()), 16384);
 
-        assertThrows(H2Exception.class, () -> codec.readHeaderBlock(codec.readFrame()));
+        assertThrows(H2Exception.class, () -> {
+            int type = codec.nextFrame();
+            int streamId = codec.frameStreamId();
+            int length = codec.framePayloadLength();
+            byte[] payload = new byte[length];
+            codec.readPayloadInto(payload, 0, length);
+            codec.readHeaderBlock(streamId, payload, length);
+        });
     }
 
     @Test
@@ -163,67 +223,59 @@ class H2FrameCodecTest {
         var out = new ByteArrayOutputStream();
         out.write(buildFrame(1, 0, 1, new byte[] {1}));
         out.write(buildFrame(0, 0, 1, new byte[] {2})); // DATA interrupts
-        var codec = new H2FrameCodec(new ByteArrayInputStream(out.toByteArray()), new ByteArrayOutputStream(), 16384);
+        var codec = new H2FrameCodec(wrapIn(out.toByteArray()), wrapOut(new ByteArrayOutputStream()), 16384);
 
-        assertThrows(H2Exception.class, () -> codec.readHeaderBlock(codec.readFrame()));
+        assertThrows(H2Exception.class, () -> {
+            int type = codec.nextFrame();
+            int streamId = codec.frameStreamId();
+            int length = codec.framePayloadLength();
+            byte[] payload = new byte[length];
+            codec.readPayloadInto(payload, 0, length);
+            codec.readHeaderBlock(streamId, payload, length);
+        });
     }
 
     @Test
     void throwsOnEofDuringContinuation() throws IOException {
         var out = new ByteArrayOutputStream();
         out.write(buildFrame(1, 0, 1, new byte[] {1}));
-        var codec = new H2FrameCodec(new ByteArrayInputStream(out.toByteArray()), new ByteArrayOutputStream(), 16384);
+        var codec = new H2FrameCodec(wrapIn(out.toByteArray()), wrapOut(new ByteArrayOutputStream()), 16384);
 
-        assertThrows(IOException.class, () -> codec.readHeaderBlock(codec.readFrame()));
+        assertThrows(IOException.class, () -> {
+            int type = codec.nextFrame();
+            int streamId = codec.frameStreamId();
+            int length = codec.framePayloadLength();
+            byte[] payload = new byte[length];
+            codec.readPayloadInto(payload, 0, length);
+            codec.readHeaderBlock(streamId, payload, length);
+        });
     }
 
     @Test
     void readHeaderBlockFromPushPromise() throws IOException {
-        byte[] payload = {0, 0, 0, 2, 'a', 'b'};
-        var codec = new H2FrameCodec(new ByteArrayInputStream(buildFrame(5, 0x04, 1, payload)),
-                new ByteArrayOutputStream(),
+        byte[] framePayload = {0, 0, 0, 2, 'a', 'b'};
+        var codec = new H2FrameCodec(wrapIn(buildFrame(5, 0x04, 1, framePayload)),
+                wrapOut(new ByteArrayOutputStream()),
                 16384);
-        byte[] block = codec.readHeaderBlock(codec.readFrame());
+        int type = codec.nextFrame();
+        assertEquals(5, type); // PUSH_PROMISE
+        int streamId = codec.frameStreamId();
+        int length = codec.framePayloadLength();
+        byte[] payload = new byte[length];
+        codec.readPayloadInto(payload, 0, length);
+        byte[] block = codec.readHeaderBlock(streamId, payload, length);
 
         assertArrayEquals(new byte[] {'a', 'b'}, block);
     }
 
-    // Padding/Priority edge cases
-    @Test
-    void throwsOnPadLengthExceedsPayload() {
-        byte[] payload = {10, 'a'};
-
-        assertThrows(H2Exception.class, () -> decode(buildFrame(0, 0x08, 1, payload)));
-    }
+    // Padding validation note: With the stateful API, padding processing is the caller's
+    // responsibility. The codec validates minimum payload size for PADDED flag but doesn't
+    // read/validate the actual pad length byte since that requires reading the payload.
+    // H2Connection.handleDataFrame() handles this validation when processing DATA frames.
 
     @Test
     void throwsOnPriorityHeadersTooShort() {
-        assertThrows(H2Exception.class, () -> decode(buildFrame(1, 0x24, 1, new byte[3])));
-    }
-
-    @Test
-    void removePaddingFromPushPromise() throws IOException {
-        // PUSH_PROMISE (type 5) with PADDED flag (0x08), pad=1, promised stream=2, header block='x'
-        byte[] payload = {1, 0, 0, 0, 2, 'x', 0}; // padLen=1, promisedId=2, data='x', padding=0
-        var codec = new H2FrameCodec(new ByteArrayInputStream(buildFrame(5, 0x0C, 1, payload)),
-                new ByteArrayOutputStream(),
-                16384);
-        var frame = codec.readFrame();
-
-        assertEquals(5, frame.type());
-        assertEquals(5, frame.payloadLength()); // promisedId(4) + 'x'(1)
-        byte[] headerBlock = codec.readHeaderBlock(frame);
-        assertArrayEquals(new byte[] {'x'}, headerBlock);
-    }
-
-    @Test
-    void removePriorityFromHeaders() throws IOException {
-        // HEADERS with PRIORITY flag - 5 bytes priority + header block
-        byte[] payload = {0, 0, 0, 1, 16, 'a', 'b'}; // dependency=1, weight=16, headers='ab'
-        var frame = decode(buildFrame(1, 0x24, 1, payload)); // PRIORITY | END_HEADERS
-
-        assertEquals(2, frame.payloadLength());
-        assertArrayEquals(new byte[] {'a', 'b'}, Arrays.copyOfRange(frame.payload(), 0, frame.payloadLength()));
+        assertThrows(H2Exception.class, () -> decodeAndReadPayload(buildFrame(1, 0x24, 1, new byte[3])));
     }
 
     // validateFrameSize tests
@@ -316,11 +368,11 @@ class H2FrameCodecTest {
     // Frame size exceeds max during read
     @Test
     void throwsOnFrameSizeExceedsMax() {
-        var codec = new H2FrameCodec(new ByteArrayInputStream(buildFrame(0, 0, 1, new byte[200])),
-                new ByteArrayOutputStream(),
+        var codec = new H2FrameCodec(wrapIn(buildFrame(0, 0, 1, new byte[200])),
+                wrapOut(new ByteArrayOutputStream()),
                 100);
 
-        assertThrows(H2Exception.class, codec::readFrame);
+        assertThrows(H2Exception.class, codec::nextFrame);
     }
 
     // removePadding edge case - empty payload
@@ -329,120 +381,129 @@ class H2FrameCodecTest {
         assertThrows(H2Exception.class, () -> decode(buildFrame(0, 0x08, 1, new byte[0])));
     }
 
-    // PUSH_PROMISE payload too short for promised stream ID (in readHeaderBlock)
+    // PUSH_PROMISE payload too short for promised stream ID (validated at nextFrame() time)
     @Test
-    void throwsOnPushPromisePayloadTooShortForStreamId() throws IOException {
-        // Create a Frame directly with short payload to test readHeaderBlock path
-        var frame = new H2FrameCodec.Frame(5, 0x04, 1, new byte[2], 2);
-        var codec = new H2FrameCodec(new ByteArrayInputStream(new byte[0]), new ByteArrayOutputStream(), 16384);
-
-        assertThrows(H2Exception.class, () -> codec.readHeaderBlock(frame));
+    void throwsOnPushPromisePayloadTooShortForStreamId() {
+        // Build a PUSH_PROMISE frame with payload too short for stream ID (requires 4 bytes min)
+        var codec = new H2FrameCodec(wrapIn(buildFrame(5, 0x04, 1, new byte[2])),
+                wrapOut(new ByteArrayOutputStream()),
+                16384);
+        // Validation now happens at nextFrame() time
+        assertThrows(H2Exception.class, codec::nextFrame);
     }
 
-    // Frame.parseSettings edge cases
-    @Test
-    void parseSettingsWrongFrameType() throws IOException {
-        var frame = decode(buildFrame(0, 0, 1, new byte[1])); // DATA frame
-        assertThrows(H2Exception.class, frame::parseSettings);
-    }
-
+    // Codec.parseSettings edge cases
     @Test
     void parseSettingsPayloadNotMultipleOf6() throws IOException {
-        var frame = decode(buildFrame(4, 0, 0, new byte[7])); // 7 bytes, not multiple of 6
+        var codec = new H2FrameCodec(wrapIn(new byte[0]), wrapOut(new ByteArrayOutputStream()), 16384);
+        byte[] payload = new byte[7]; // 7 bytes, not multiple of 6
 
-        assertThrows(H2Exception.class, frame::parseSettings);
+        assertThrows(H2Exception.class, () -> codec.parseSettings(payload, 7));
     }
 
-    // Frame.parseGoaway edge cases
-    @Test
-    void parseGoawayWrongFrameType() throws IOException {
-        var frame = decode(buildFrame(0, 0, 1, new byte[1]));
-
-        assertThrows(H2Exception.class, frame::parseGoaway);
-    }
-
+    // Codec.parseGoaway edge cases
     @Test
     void parseGoawayPayloadTooShort() {
-        var frame = new H2FrameCodec.Frame(7, 0, 0, new byte[4], 4);
+        var codec = new H2FrameCodec(wrapIn(new byte[0]), wrapOut(new ByteArrayOutputStream()), 16384);
 
-        assertThrows(H2Exception.class, frame::parseGoaway);
+        assertThrows(H2Exception.class, () -> codec.parseGoaway(new byte[4], 4));
     }
 
-    // Frame.parseWindowUpdate edge cases
-    @Test
-    void parseWindowUpdateWrongFrameType() throws IOException {
-        var frame = decode(buildFrame(0, 0, 1, new byte[1]));
-
-        assertThrows(H2Exception.class, frame::parseWindowUpdate);
-    }
-
+    // Codec.parseWindowUpdate edge cases
     @Test
     void parseWindowUpdateWrongPayloadLength() {
-        // WINDOW_UPDATE frame with 3-byte payload instead of required 4
-        var frame = new H2FrameCodec.Frame(8, 0, 1, new byte[3], 3);
+        var codec = new H2FrameCodec(wrapIn(new byte[0]), wrapOut(new ByteArrayOutputStream()), 16384);
 
-        assertThrows(H2Exception.class, frame::parseWindowUpdate);
+        assertThrows(H2Exception.class, () -> codec.parseWindowUpdate(new byte[3], 3));
     }
 
     @Test
     void parseWindowUpdateZeroIncrement() throws IOException {
-        var frame = decode(buildFrame(8, 0, 1, new byte[4])); // all zeros = increment 0
+        var codec = new H2FrameCodec(wrapIn(new byte[0]), wrapOut(new ByteArrayOutputStream()), 16384);
 
-        assertThrows(H2Exception.class, frame::parseWindowUpdate);
+        assertThrows(H2Exception.class, () -> codec.parseWindowUpdate(new byte[4], 4)); // all zeros = increment 0
     }
 
-    // Frame.parseRstStream edge cases
-    @Test
-    void parseRstStreamWrongFrameType() throws IOException {
-        var frame = decode(buildFrame(0, 0, 1, new byte[1]));
-
-        assertThrows(H2Exception.class, frame::parseRstStream);
-    }
-
+    // Codec.parseRstStream edge cases
     @Test
     void parseRstStreamWrongPayloadLength() throws IOException {
-        var frame = new H2FrameCodec.Frame(3, 0, 1, new byte[3], 3);
+        var codec = new H2FrameCodec(wrapIn(new byte[0]), wrapOut(new ByteArrayOutputStream()), 16384);
 
-        assertThrows(H2Exception.class, frame::parseRstStream);
+        assertThrows(H2Exception.class, () -> codec.parseRstStream(new byte[3], 3));
     }
 
     // Incomplete payload reads
     @Test
-    void throwsOnIncompleteControlFramePayload() {
+    void throwsOnIncompletePayload() {
         // Build header claiming 8-byte PING payload but only provide 4 bytes
         byte[] truncated = new byte[9 + 4]; // header + partial payload
         truncated[2] = 8; // length = 8
         truncated[3] = 6; // type = PING
         // streamId = 0 (already zeros)
-        var codec = new H2FrameCodec(new ByteArrayInputStream(truncated), new ByteArrayOutputStream(), 16384);
+        var codec = new H2FrameCodec(wrapIn(truncated), wrapOut(new ByteArrayOutputStream()), 16384);
 
-        assertThrows(IOException.class, codec::readFrame);
-    }
-
-    @Test
-    void throwsOnIncompleteDataFramePayload() {
-        // Build header claiming 100-byte DATA payload but only provide 50 bytes
-        byte[] truncated = new byte[9 + 50];
-        truncated[2] = 100; // length = 100
-        truncated[3] = 0; // type = DATA
-        truncated[8] = 1; // streamId = 1
-        var codec = new H2FrameCodec(new ByteArrayInputStream(truncated), new ByteArrayOutputStream(), 16384);
-
-        assertThrows(IOException.class, codec::readFrame);
+        assertThrows(IOException.class, () -> {
+            codec.nextFrame();
+            byte[] payload = new byte[codec.framePayloadLength()];
+            codec.readPayloadInto(payload, 0, payload.length);
+        });
     }
 
     // Helpers
+    private static final int BUF_SIZE = 8192;
+
+    private UnsyncBufferedInputStream wrapIn(byte[] data) {
+        return new UnsyncBufferedInputStream(new ByteArrayInputStream(data), BUF_SIZE);
+    }
+
+    private UnsyncBufferedOutputStream wrapOut(ByteArrayOutputStream out) {
+        return new UnsyncBufferedOutputStream(out, BUF_SIZE);
+    }
+
     private H2FrameCodec codec(ByteArrayOutputStream out) {
-        return new H2FrameCodec(new ByteArrayInputStream(new byte[0]), out, 16384);
+        return new H2FrameCodec(wrapIn(new byte[0]), wrapOut(out), 16384);
     }
 
-    private H2FrameCodec.Frame decode(ByteArrayOutputStream out) throws IOException {
-        var c = new H2FrameCodec(new ByteArrayInputStream(out.toByteArray()), new ByteArrayOutputStream(), 16384);
-        return c.readFrame();
+    private TestFrame decode(ByteArrayOutputStream out) throws IOException {
+        var codec = new H2FrameCodec(wrapIn(out.toByteArray()), wrapOut(new ByteArrayOutputStream()), 16384);
+        int type = codec.nextFrame();
+        int flags = codec.frameFlags();
+        int streamId = codec.frameStreamId();
+        int length = codec.framePayloadLength();
+        byte[] payload;
+        if (length == 0) {
+            payload = new byte[0];
+        } else {
+            payload = new byte[length];
+            codec.readPayloadInto(payload, 0, length);
+        }
+        return new TestFrame(type, flags, streamId, payload, length, codec);
     }
 
-    private H2FrameCodec.Frame decode(byte[] frame) throws IOException {
-        return new H2FrameCodec(new ByteArrayInputStream(frame), new ByteArrayOutputStream(), 16384).readFrame();
+    private TestFrame decode(byte[] frame) throws IOException {
+        var codec = new H2FrameCodec(wrapIn(frame), wrapOut(new ByteArrayOutputStream()), 16384);
+        int type = codec.nextFrame();
+        int flags = codec.frameFlags();
+        int streamId = codec.frameStreamId();
+        int length = codec.framePayloadLength();
+        byte[] payload;
+        if (length == 0) {
+            payload = new byte[0];
+        } else {
+            payload = new byte[length];
+            codec.readPayloadInto(payload, 0, length);
+        }
+        return new TestFrame(type, flags, streamId, payload, length, codec);
+    }
+
+    private void decodeAndReadPayload(byte[] frame) throws IOException {
+        var codec = new H2FrameCodec(wrapIn(frame), wrapOut(new ByteArrayOutputStream()), 16384);
+        int type = codec.nextFrame();
+        int length = codec.framePayloadLength();
+        if (length > 0) {
+            byte[] payload = new byte[length];
+            codec.readPayloadInto(payload, 0, length);
+        }
     }
 
     private byte[] buildFrame(int type, int flags, int streamId, byte[] payload) {

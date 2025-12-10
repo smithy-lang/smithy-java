@@ -15,8 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLContext;
@@ -99,34 +98,32 @@ public final class BenchmarkSupport {
     }
 
     /**
-     * Run a benchmark loop with virtual threads.
+     * Run a benchmark loop with virtual threads until totalRequests is reached.
      *
-     * @param concurrency number of virtual threads
-     * @param durationMs how long to run
+     * @param concurrency number of virtual threads generating load
+     * @param totalRequests total requests to complete before stopping
      * @param task the task each thread runs in a loop
      * @param context context passed to task (avoids lambda allocation)
      * @param counter output counter for requests/errors
      */
     public static <T> void runBenchmark(
             int concurrency,
-            long durationMs,
+            int totalRequests,
             BenchmarkTask<T> task,
             T context,
             RequestCounter counter
     ) throws InterruptedException {
-        var requests = new AtomicLong();
+        var completed = new AtomicInteger(0);
         var errors = new AtomicLong();
         var firstError = new AtomicReference<Throwable>();
-        var running = new AtomicBoolean(true);
         var latch = new CountDownLatch(concurrency);
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < concurrency; i++) {
                 executor.submit(() -> {
                     try {
-                        while (running.get()) {
+                        while (completed.getAndIncrement() < totalRequests) {
                             task.run(context);
-                            requests.incrementAndGet();
                         }
                     } catch (Exception e) {
                         errors.incrementAndGet();
@@ -137,13 +134,10 @@ public final class BenchmarkSupport {
                 });
             }
 
-            Thread.sleep(durationMs);
-            running.set(false);
-            // Don't wait long - VTs may be blocked on in-flight requests
-            latch.await(100, TimeUnit.MILLISECONDS);
+            latch.await(); // Wait for all work to complete
         }
 
-        counter.requests = requests.get();
+        counter.requests = completed.get();
         counter.errors = errors.get();
         counter.firstError = firstError.get();
     }

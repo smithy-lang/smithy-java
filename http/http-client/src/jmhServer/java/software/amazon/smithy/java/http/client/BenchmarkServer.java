@@ -39,7 +39,9 @@ import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameStream;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
+import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
+import io.netty.handler.codec.http2.Http2StreamFrame;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
@@ -80,6 +82,15 @@ public final class BenchmarkServer {
     public static final int DEFAULT_H1_PORT = 18080;
     public static final int DEFAULT_H2_PORT = 18443;
     public static final int DEFAULT_H2C_PORT = 18081;
+
+    // HTTP/2 settings - tunable for benchmarking
+    private static final int H2_MAX_CONCURRENT_STREAMS = 20000;
+    private static final int H2_INITIAL_WINDOW_SIZE = 1024 * 1024 * 2;
+    private static final int H2_MAX_FRAME_SIZE = 1024 * 64;
+
+    // HTTP/2 TLS settings (slightly more conservative)
+    private static final int H2_TLS_MAX_CONCURRENT_STREAMS = 10000;
+    private static final int H2_TLS_INITIAL_WINDOW_SIZE = 1024 * 1024;
 
     private final EventLoopGroup bossGroup;
     private final EventLoopGroup workerGroup;
@@ -201,8 +212,9 @@ public final class BenchmarkServer {
                     @Override
                     public void initChannel(SocketChannel ch) {
                         var settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings()
-                                .maxConcurrentStreams(20000)
-                                .initialWindowSize(2097152);
+                                .maxConcurrentStreams(H2_MAX_CONCURRENT_STREAMS)
+                                .initialWindowSize(H2_INITIAL_WINDOW_SIZE)
+                                .maxFrameSize(H2_MAX_FRAME_SIZE);
                         ch.pipeline()
                                 .addLast(
                                         Http2FrameCodecBuilder.forServer()
@@ -210,7 +222,12 @@ public final class BenchmarkServer {
                                                 .autoAckSettingsFrame(true)
                                                 .autoAckPingFrame(true)
                                                 .build(),
-                                        Http2RequestHandler.INSTANCE);
+                                        new Http2MultiplexHandler(new ChannelInitializer<Channel>() {
+                                            @Override
+                                            protected void initChannel(Channel ch) {
+                                                ch.pipeline().addLast(new Http2StreamHandler());
+                                            }
+                                        }));
                     }
                 });
 
@@ -286,14 +303,20 @@ public final class BenchmarkServer {
         protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                 var settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings()
-                        .maxConcurrentStreams(10000)
-                        .initialWindowSize(1048576); // 1MB stream window
+                        .maxConcurrentStreams(H2_TLS_MAX_CONCURRENT_STREAMS)
+                        .initialWindowSize(H2_TLS_INITIAL_WINDOW_SIZE)
+                        .maxFrameSize(H2_MAX_FRAME_SIZE);
                 ctx.pipeline()
                         .addLast(
                                 Http2FrameCodecBuilder.forServer()
                                         .initialSettings(settings)
                                         .build(),
-                                Http2RequestHandler.INSTANCE);
+                                new Http2MultiplexHandler(new ChannelInitializer<Channel>() {
+                                    @Override
+                                    protected void initChannel(Channel ch) {
+                                        ch.pipeline().addLast(new Http2StreamHandler());
+                                    }
+                                }));
             } else {
                 ctx.pipeline()
                         .addLast(
@@ -305,11 +328,12 @@ public final class BenchmarkServer {
     }
 
     /**
-     * Handler for HTTP/2 requests using the frame codec API.
+     * Per-stream handler for HTTP/2 requests.
+     *
+     * <p>Each stream gets its own instance via Http2MultiplexHandler.
+     * Flow control is handled automatically by Netty when using stream channels.
      */
-    @io.netty.channel.ChannelHandler.Sharable
-    private static class Http2RequestHandler extends ChannelInboundHandlerAdapter {
-        static final Http2RequestHandler INSTANCE = new Http2RequestHandler();
+    private static class Http2StreamHandler extends SimpleChannelInboundHandler<Http2StreamFrame> {
         private static final Http2Headers RESPONSE_HEADERS = new DefaultHttp2Headers(true, 3)
                 .status("200")
                 .set("content-type", "application/json")
@@ -322,107 +346,52 @@ public final class BenchmarkServer {
                 .set("content-type", "application/octet-stream")
                 .setInt("content-length", MB_CONTENT.length);
 
-        private static final java.util.concurrent.atomic.AtomicInteger connectionCount =
-                new java.util.concurrent.atomic.AtomicInteger();
-        private static final java.util.concurrent.ConcurrentHashMap<String,
-                java.util.concurrent.atomic.AtomicInteger> streamCounts =
-                        new java.util.concurrent.ConcurrentHashMap<>();
-
         @Override
-        public void handlerAdded(ChannelHandlerContext ctx) {
-            int count = connectionCount.incrementAndGet();
-            String connId = ctx.channel().id().asShortText();
-            streamCounts.put(connId, new java.util.concurrent.atomic.AtomicInteger());
-            System.out.println("[H2] Connection opened: " + connId + " (total: " + count + ")");
-        }
-
-        @Override
-        public void handlerRemoved(ChannelHandlerContext ctx) {
-            int count = connectionCount.decrementAndGet();
-            String connId = ctx.channel().id().asShortText();
-            java.util.concurrent.atomic.AtomicInteger streams = streamCounts.remove(connId);
-            System.out.println("[H2] Connection closed: " + connId + " (handled "
-                    + (streams != null ? streams.get() : 0) + " streams, remaining: " + count + ")");
-        }
-
-        @Override
-        public void channelRead(ChannelHandlerContext ctx, Object msg) {
-            if (msg instanceof Http2HeadersFrame headersFrame) {
+        protected void channelRead0(ChannelHandlerContext ctx, Http2StreamFrame frame) {
+            if (frame instanceof Http2HeadersFrame headersFrame) {
                 CharSequence path = headersFrame.headers().path();
                 if ("/reset".contentEquals(path)) {
                     System.gc();
-                    System.out.println("[H2] Reset - Active connections: " + connectionCount.get());
-                    streamCounts
-                            .forEach((id, count) -> System.out.println("  " + id + ": " + count.get() + " streams"));
+                    System.out.println("[H2] Reset triggered");
                     Http2Headers resetHeaders = new DefaultHttp2Headers(true, 1).status("200");
-                    ctx.writeAndFlush(new DefaultHttp2HeadersFrame(resetHeaders, true).stream(headersFrame.stream()));
+                    ctx.writeAndFlush(new DefaultHttp2HeadersFrame(resetHeaders, true));
                 } else if ("/stats".contentEquals(path)) {
-                    StringBuilder json = new StringBuilder("{\"connections\":");
-                    json.append(connectionCount.get()).append(",\"streams\":{");
-                    streamCounts.forEach(
-                            (id, count) -> json.append("\"").append(id).append("\":").append(count.get()).append(","));
-                    if (json.charAt(json.length() - 1) == ',')
-                        json.setLength(json.length() - 1);
+                    StringBuilder json = new StringBuilder("{");
+                    json.append("\"settings\":{");
+                    json.append("\"maxConcurrentStreams\":").append(H2_MAX_CONCURRENT_STREAMS).append(",");
+                    json.append("\"initialWindowSize\":").append(H2_INITIAL_WINDOW_SIZE).append(",");
+                    json.append("\"maxFrameSize\":").append(H2_MAX_FRAME_SIZE);
                     json.append("}}");
                     byte[] body = json.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
                     Http2Headers statsHeaders = new DefaultHttp2Headers(true, 2)
                             .status("200")
                             .setInt("content-length", body.length);
-                    ctx.write(new DefaultHttp2HeadersFrame(statsHeaders, false).stream(headersFrame.stream()));
-                    ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(body), true)
-                            .stream(headersFrame.stream()));
+                    ctx.write(new DefaultHttp2HeadersFrame(statsHeaders, false));
+                    ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(body), true));
                 } else if ("/post".contentEquals(path) || "/putmb".contentEquals(path)) {
-                    // POST/PUT with body - wait for data frames, then send empty 200
+                    // POST/PUT with body - wait for data frames
                     if (headersFrame.isEndStream()) {
                         // No body, respond immediately
-                        var counter = streamCounts.get(ctx.channel().id().asShortText());
-                        if (counter != null)
-                            counter.incrementAndGet();
-                        sendEmptyResponse(ctx, headersFrame.stream());
+                        ctx.writeAndFlush(new DefaultHttp2HeadersFrame(EMPTY_RESPONSE_HEADERS, true));
                     }
-                    // else: wait for DATA frames
+                    // else: wait for DATA frames with endStream
                 } else if ("/getmb".contentEquals(path)) {
-                    // Return 1MB response
                     if (headersFrame.isEndStream()) {
-                        var counter = streamCounts.get(ctx.channel().id().asShortText());
-                        if (counter != null)
-                            counter.incrementAndGet();
-                        sendMbResponse(ctx, headersFrame.stream());
+                        ctx.write(new DefaultHttp2HeadersFrame(MB_RESPONSE_HEADERS, false));
+                        ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(MB_CONTENT), true));
                     }
                 } else if (headersFrame.isEndStream()) {
-                    var counter = streamCounts.get(ctx.channel().id().asShortText());
-                    if (counter != null)
-                        counter.incrementAndGet();
-                    sendResponse(ctx, headersFrame.stream());
+                    // Simple GET - respond with JSON body
+                    ctx.write(new DefaultHttp2HeadersFrame(RESPONSE_HEADERS, false));
+                    ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(CONTENT), true));
                 }
-            } else if (msg instanceof Http2DataFrame dataFrame) {
-                dataFrame.release();
+            } else if (frame instanceof Http2DataFrame dataFrame) {
+                // Data consumed - flow control handled automatically by Http2MultiplexHandler
                 if (dataFrame.isEndStream()) {
-                    var counter = streamCounts.get(ctx.channel().id().asShortText());
-                    if (counter != null)
-                        counter.incrementAndGet();
-                    // POST requests with body get empty response
-                    sendEmptyResponse(ctx, dataFrame.stream());
+                    // POST/PUT complete - send empty response
+                    ctx.writeAndFlush(new DefaultHttp2HeadersFrame(EMPTY_RESPONSE_HEADERS, true));
                 }
             }
-        }
-
-        private void sendResponse(ChannelHandlerContext ctx, Http2FrameStream stream) {
-            ctx.write(new DefaultHttp2HeadersFrame(RESPONSE_HEADERS, false).stream(stream));
-            ctx.writeAndFlush(new DefaultHttp2DataFrame(
-                    Unpooled.wrappedBuffer(CONTENT),
-                    true).stream(stream));
-        }
-
-        private void sendEmptyResponse(ChannelHandlerContext ctx, Http2FrameStream stream) {
-            ctx.writeAndFlush(new DefaultHttp2HeadersFrame(EMPTY_RESPONSE_HEADERS, true).stream(stream));
-        }
-
-        private void sendMbResponse(ChannelHandlerContext ctx, Http2FrameStream stream) {
-            ctx.write(new DefaultHttp2HeadersFrame(MB_RESPONSE_HEADERS, false).stream(stream));
-            ctx.writeAndFlush(new DefaultHttp2DataFrame(
-                    Unpooled.wrappedBuffer(MB_CONTENT),
-                    true).stream(stream));
         }
 
         @Override
