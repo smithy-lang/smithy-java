@@ -25,6 +25,11 @@ public final class DelegatedClosingInputStream extends FilterInputStream {
     }
 
     @Override
+    public int read(byte[] b, int off, int len) throws IOException {
+        return in.read(b, off, len);
+    }
+
+    @Override
     public void close() throws IOException {
         if (closed.compareAndSet(false, true)) {
             closeCallback.close(in);

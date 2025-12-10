@@ -25,6 +25,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
+import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 
 /**
  * HTTP/2 frame codec test suite using test vectors from http2jp/http2-frame-test-case.
@@ -52,6 +54,59 @@ class H2FrameTestSuiteTest {
 
     // Codec strips PADDED and PRIORITY flags after processing padding/priority fields
     private static final int STRIPPED_FLAGS_MASK = ~(FLAG_PADDED | FLAG_PRIORITY);
+
+    /**
+     * Helper record that wraps stateful codec API for test convenience.
+     */
+    record TestFrame(int type, int flags, int streamId, byte[] payload, int length, H2FrameCodec codec) {
+        boolean hasFlag(int flag) {
+            return (flags & flag) != 0;
+        }
+
+        int payloadLength() {
+            return length;
+        }
+
+        int[] parseSettings() throws H2Exception {
+            return codec.parseSettings(payload, length);
+        }
+
+        int[] parseGoaway() throws H2Exception {
+            return codec.parseGoaway(payload, length);
+        }
+
+        int parseWindowUpdate() throws H2Exception {
+            return codec.parseWindowUpdate(payload, length);
+        }
+
+        int parseRstStream() throws H2Exception {
+            return codec.parseRstStream(payload, length);
+        }
+    }
+
+    /**
+     * Read a frame using the stateful API and return a TestFrame for convenience.
+     */
+    private static TestFrame readFrame(H2FrameCodec codec) throws IOException {
+        int type = codec.nextFrame();
+        if (type < 0) {
+            return null;
+        }
+
+        int flags = codec.frameFlags();
+        int streamId = codec.frameStreamId();
+        int payloadLength = codec.framePayloadLength();
+
+        byte[] payload;
+        if (payloadLength == 0) {
+            payload = new byte[0];
+        } else {
+            payload = new byte[payloadLength];
+            codec.readPayloadInto(payload, 0, payloadLength);
+        }
+
+        return new TestFrame(type, flags, streamId, payload, payloadLength, codec);
+    }
 
     static Stream<Arguments> frameTestCases() throws IOException {
         List<Arguments> args = new ArrayList<>();
@@ -108,12 +163,12 @@ class H2FrameTestSuiteTest {
     ) throws IOException {
 
         byte[] wireBytes = hexToBytes(wireHex);
-        H2FrameCodec codec = new H2FrameCodec(new ByteArrayInputStream(wireBytes), new ByteArrayOutputStream(), 16384);
+        H2FrameCodec codec = new H2FrameCodec(wrapIn(wireBytes), wrapOut(new ByteArrayOutputStream()), 16384);
 
         if (expectError) {
-            assertThrows(IOException.class, codec::readFrame, "Expected error for: " + description);
+            assertThrows(IOException.class, () -> readFrame(codec), "Expected error for: " + description);
         } else {
-            H2FrameCodec.Frame frame = codec.readFrame();
+            TestFrame frame = readFrame(codec);
 
             assertNotNull(frame, "Frame should not be null for: " + description);
             assertEquals(expectedType, frame.type(), "Type mismatch for: " + description);
@@ -150,12 +205,12 @@ class H2FrameTestSuiteTest {
     @MethodSource("roundTripTestCases")
     void roundTripFrame(String description, String wireHex) throws IOException {
         byte[] wireBytes = hexToBytes(wireHex);
-        var decodeCodec = new H2FrameCodec(new ByteArrayInputStream(wireBytes), new ByteArrayOutputStream(), 16384);
-        H2FrameCodec.Frame original = decodeCodec.readFrame();
+        var decodeCodec = new H2FrameCodec(wrapIn(wireBytes), wrapOut(new ByteArrayOutputStream()), 16384);
+        TestFrame original = readFrame(decodeCodec);
 
         // Re-encode
         var encodeOut = new ByteArrayOutputStream();
-        var encodeCodec = new H2FrameCodec(new ByteArrayInputStream(new byte[0]), encodeOut, 16384);
+        var encodeCodec = new H2FrameCodec(wrapIn(new byte[0]), wrapOut(encodeOut), 16384);
         encodeCodec.writeFrame(
                 original.type(),
                 original.flags(),
@@ -166,10 +221,10 @@ class H2FrameTestSuiteTest {
         encodeCodec.flush();
 
         // Decode again
-        var redecodeCodec = new H2FrameCodec(new ByteArrayInputStream(encodeOut.toByteArray()),
-                new ByteArrayOutputStream(),
+        var redecodeCodec = new H2FrameCodec(wrapIn(encodeOut.toByteArray()),
+                wrapOut(new ByteArrayOutputStream()),
                 16384);
-        H2FrameCodec.Frame roundTripped = redecodeCodec.readFrame();
+        TestFrame roundTripped = readFrame(redecodeCodec);
 
         // Verify matches
         assertEquals(original.type(), roundTripped.type(), "Type mismatch after round-trip: " + description);
@@ -188,7 +243,7 @@ class H2FrameTestSuiteTest {
         assertArrayEquals(origPayload, rtPayload, "Payload mismatch after round-trip: " + description);
     }
 
-    private void verifyPayload(H2FrameCodec.Frame frame, JsonNode payload, String description) throws IOException {
+    private void verifyPayload(TestFrame frame, JsonNode payload, String description) throws IOException {
         if (payload == null) {
             return;
         }
@@ -206,15 +261,25 @@ class H2FrameTestSuiteTest {
         }
     }
 
-    private void verifyDataPayload(H2FrameCodec.Frame frame, JsonNode payload, String description) {
+    private void verifyDataPayload(TestFrame frame, JsonNode payload, String description) {
         if (payload.has("data")) {
             String expectedData = payload.get("data").asText();
-            String actualData = new String(frame.payload(), 0, frame.payloadLength(), StandardCharsets.UTF_8);
+
+            // Handle PADDED frames - the raw payload includes: [padLength][data][padding]
+            int offset = 0;
+            int dataLength = frame.payloadLength();
+            if (frame.hasFlag(FLAG_PADDED) && payload.has("padding_length")) {
+                int padLength = payload.get("padding_length").asInt();
+                offset = 1; // Skip the pad length byte
+                dataLength = frame.payloadLength() - 1 - padLength;
+            }
+
+            String actualData = new String(frame.payload(), offset, dataLength, StandardCharsets.UTF_8);
             assertEquals(expectedData, actualData, "DATA payload mismatch for: " + description);
         }
     }
 
-    private void verifyRstStreamPayload(H2FrameCodec.Frame frame, JsonNode payload, String description)
+    private void verifyRstStreamPayload(TestFrame frame, JsonNode payload, String description)
             throws IOException {
         if (payload.has("error_code")) {
             int expectedErrorCode = payload.get("error_code").asInt();
@@ -223,7 +288,7 @@ class H2FrameTestSuiteTest {
         }
     }
 
-    private void verifySettingsPayload(H2FrameCodec.Frame frame, JsonNode payload, String description)
+    private void verifySettingsPayload(TestFrame frame, JsonNode payload, String description)
             throws IOException {
         if (payload.has("settings")) {
             int[] settings = frame.parseSettings();
@@ -243,7 +308,7 @@ class H2FrameTestSuiteTest {
         }
     }
 
-    private void verifyPingPayload(H2FrameCodec.Frame frame, JsonNode payload, String description) {
+    private void verifyPingPayload(TestFrame frame, JsonNode payload, String description) {
         if (payload.has("opaque_data")) {
             String expectedStr = payload.get("opaque_data").asText();
             byte[] expected = expectedStr.getBytes(StandardCharsets.US_ASCII);
@@ -253,7 +318,7 @@ class H2FrameTestSuiteTest {
         }
     }
 
-    private void verifyGoawayPayload(H2FrameCodec.Frame frame, JsonNode payload, String description)
+    private void verifyGoawayPayload(TestFrame frame, JsonNode payload, String description)
             throws IOException {
         int[] goaway = frame.parseGoaway();
         if (payload.has("last_stream_id")) {
@@ -268,7 +333,7 @@ class H2FrameTestSuiteTest {
         }
     }
 
-    private void verifyWindowUpdatePayload(H2FrameCodec.Frame frame, JsonNode payload, String description)
+    private void verifyWindowUpdatePayload(TestFrame frame, JsonNode payload, String description)
             throws IOException {
         if (payload.has("window_size_increment")) {
             int expected = payload.get("window_size_increment").asInt();
@@ -284,5 +349,15 @@ class H2FrameTestSuiteTest {
             data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4) + Character.digit(hex.charAt(i + 1), 16));
         }
         return data;
+    }
+
+    private static final int BUF_SIZE = 8192;
+
+    private static UnsyncBufferedInputStream wrapIn(byte[] data) {
+        return new UnsyncBufferedInputStream(new ByteArrayInputStream(data), BUF_SIZE);
+    }
+
+    private static UnsyncBufferedOutputStream wrapOut(ByteArrayOutputStream out) {
+        return new UnsyncBufferedOutputStream(out, BUF_SIZE);
     }
 }

@@ -375,4 +375,243 @@ class UnsyncBufferedInputStreamTest {
         assertThrows(IllegalArgumentException.class,
                 () -> new UnsyncBufferedInputStream(delegate, -1));
     }
+
+    // ==================== Direct Buffer Access Tests ====================
+
+    @Test
+    void bufferReturnsInternalBuffer() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3, 4, 5});
+        var stream = new UnsyncBufferedInputStream(delegate, 8);
+
+        // Trigger a read to fill the buffer
+        stream.read();
+
+        byte[] buf = stream.buffer();
+        assertEquals(8, buf.length); // Buffer size we specified
+    }
+
+    @Test
+    void positionAndLimitTrackBufferState() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3, 4, 5});
+        var stream = new UnsyncBufferedInputStream(delegate, 8);
+
+        // Initially empty
+        assertEquals(0, stream.position());
+        assertEquals(0, stream.limit());
+        assertEquals(0, stream.buffered());
+
+        // After read, buffer is filled
+        stream.read();
+        assertEquals(1, stream.position()); // Advanced by one read
+        assertEquals(5, stream.limit()); // All 5 bytes loaded
+        assertEquals(4, stream.buffered()); // 4 remaining
+    }
+
+    @Test
+    void consumeAdvancesPosition() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3, 4, 5});
+        var stream = new UnsyncBufferedInputStream(delegate, 8);
+
+        // Fill buffer
+        stream.read();
+        int initialPos = stream.position();
+
+        stream.consume(2);
+        assertEquals(initialPos + 2, stream.position());
+        assertEquals(2, stream.buffered());
+    }
+
+    @Test
+    void consumeThrowsOnOverflow() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3});
+        var stream = new UnsyncBufferedInputStream(delegate, 8);
+
+        // Fill buffer
+        stream.read();
+
+        assertThrows(IndexOutOfBoundsException.class, () -> stream.consume(10));
+    }
+
+    @Test
+    void consumeThrowsOnNegative() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3});
+        var stream = new UnsyncBufferedInputStream(delegate, 8);
+
+        stream.read();
+
+        assertThrows(IndexOutOfBoundsException.class, () -> stream.consume(-1));
+    }
+
+    @Test
+    void ensureReturnsTrueWhenDataAvailable() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10});
+        var stream = new UnsyncBufferedInputStream(delegate, 8);
+
+        assertEquals(true, stream.ensure(5));
+        // ensure() reads at least 5 bytes, may read more (up to buffer size)
+        assertEquals(true, stream.buffered() >= 5);
+    }
+
+    @Test
+    void ensureCompactsAndFillsBuffer() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10});
+        var stream = new UnsyncBufferedInputStream(delegate, 8);
+
+        // Fill buffer and consume some
+        stream.ensure(8); // Fill entire buffer [1,2,3,4,5,6,7,8]
+        stream.consume(6); // Now position=6, only 2 bytes left [7,8]
+
+        // Ensure more than available - should compact and fill
+        assertEquals(true, stream.ensure(4));
+        // After compacting, position should be 0
+        assertEquals(0, stream.position());
+        assertEquals(true, stream.buffered() >= 4);
+
+        // Verify data integrity - after consuming bytes 1-6, next byte should be 7
+        byte[] buf = stream.buffer();
+        assertEquals(7, buf[0]); // First unread byte after consuming 1-6
+    }
+
+    @Test
+    void ensureReturnsFalseOnEof() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3});
+        var stream = new UnsyncBufferedInputStream(delegate, 8);
+
+        // Try to ensure more bytes than available (but within buffer size)
+        assertEquals(false, stream.ensure(5));
+        // But we should have whatever was available
+        assertEquals(3, stream.buffered());
+    }
+
+    @Test
+    void ensureThrowsWhenRequestExceedsBufferSize() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3, 4, 5});
+        var stream = new UnsyncBufferedInputStream(delegate, 4);
+
+        assertThrows(IllegalArgumentException.class, () -> stream.ensure(10));
+    }
+
+    @Test
+    void ensureReturnsTrueForZeroOrNegative() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {});
+        var stream = new UnsyncBufferedInputStream(delegate, 8);
+
+        assertEquals(true, stream.ensure(0));
+        assertEquals(true, stream.ensure(-5));
+    }
+
+    @Test
+    void ensureThrowsWhenClosed() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3});
+        var stream = new UnsyncBufferedInputStream(delegate, 8);
+        stream.close();
+
+        assertThrows(IOException.class, () -> stream.ensure(1));
+    }
+
+    @Test
+    void readDirectBypassesBuffer() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3, 4, 5});
+        var stream = new UnsyncBufferedInputStream(delegate, 8);
+
+        // Buffer is empty initially, so readDirect should work
+        byte[] buf = new byte[3];
+        int n = stream.readDirect(buf, 0, 3);
+        assertEquals(3, n);
+        assertArrayEquals(new byte[] {1, 2, 3}, buf);
+    }
+
+    @Test
+    void readDirectThrowsIfBufferNotEmpty() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3, 4, 5});
+        var stream = new UnsyncBufferedInputStream(delegate, 8);
+
+        // Fill the buffer by reading one byte
+        stream.read();
+
+        // Now buffer has data, readDirect should throw
+        assertThrows(IllegalStateException.class, () -> stream.readDirect(new byte[3], 0, 3));
+    }
+
+    @Test
+    void readDirectWorksAfterDrainingBuffer() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3, 4, 5, 6, 7, 8});
+        var stream = new UnsyncBufferedInputStream(delegate, 4);
+
+        // Fill buffer [1,2,3,4] and consume all
+        stream.ensure(4);
+        stream.consume(4);
+
+        // Buffer is now empty, readDirect should work
+        byte[] buf = new byte[4];
+        int n = stream.readDirect(buf, 0, 4);
+        assertEquals(4, n);
+        assertArrayEquals(new byte[] {5, 6, 7, 8}, buf);
+    }
+
+    @Test
+    void readDirectThrowsWhenClosed() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3});
+        var stream = new UnsyncBufferedInputStream(delegate, 8);
+        stream.close();
+
+        assertThrows(IOException.class, () -> stream.readDirect(new byte[3], 0, 3));
+    }
+
+    @Test
+    void directBufferAccessForZeroCopyParsing() throws IOException {
+        // Simulate zero-copy frame header parsing like H2FrameCodec does
+        byte[] frameData = {
+                0,
+                0,
+                10, // length = 10
+                0, // type = DATA
+                1, // flags = END_STREAM
+                0,
+                0,
+                0,
+                1, // stream ID = 1
+                'H',
+                'e',
+                'l',
+                'l',
+                'o',
+                ' ',
+                'W',
+                'o',
+                'r',
+                'l' // payload
+        };
+        var delegate = new ByteArrayInputStream(frameData);
+        var stream = new UnsyncBufferedInputStream(delegate, 64);
+
+        // Ensure 9-byte header is available
+        assertEquals(true, stream.ensure(9));
+
+        // Parse header directly from buffer (zero-copy)
+        byte[] buf = stream.buffer();
+        int p = stream.position();
+
+        int length = ((buf[p] & 0xFF) << 16)
+                | ((buf[p + 1] & 0xFF) << 8)
+                | (buf[p + 2] & 0xFF);
+        int type = buf[p + 3] & 0xFF;
+        int flags = buf[p + 4] & 0xFF;
+        int streamId = ((buf[p + 5] & 0x7F) << 24)
+                | ((buf[p + 6] & 0xFF) << 16)
+                | ((buf[p + 7] & 0xFF) << 8)
+                | (buf[p + 8] & 0xFF);
+
+        stream.consume(9);
+
+        assertEquals(10, length);
+        assertEquals(0, type);
+        assertEquals(1, flags);
+        assertEquals(1, streamId);
+
+        // Now read the payload
+        byte[] payload = new byte[length];
+        assertEquals(length, stream.read(payload));
+        assertEquals("Hello Worl", new String(payload, StandardCharsets.US_ASCII));
+    }
 }

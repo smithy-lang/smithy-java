@@ -8,31 +8,61 @@ package software.amazon.smithy.java.http.client.connection;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.http.client.h2.H2Connection;
 
 /**
- * Manages HTTP/2 connections for multiplexing.
+ * Manages HTTP/2 connections with adaptive load balancing.
  *
- * <p>Uses a per-route state object containing a lock and volatile connection array.
- * Fast path (acquire existing connection) requires no locking - just a volatile read
- * and array scan. Slow path (create new connection) synchronizes on per-route lock.
+ * <h2>Load Balancing Strategy</h2>
+ * <p>Uses a two-tier "watermark" strategy to distribute streams across connections:
+ *
+ * <ol>
+ *   <li><b>Green Zone</b> (streams &lt; soft limit): Uses atomic round-robin to distribute
+ *       requests evenly. Each caller atomically increments an index to get a unique starting
+ *       position, ensuring fair distribution even under high concurrency.</li>
+ *   <li><b>Expansion</b>: When all connections exceed the soft limit, creates a new connection
+ *       (if under the maximum). This prevents overloading a single TCP connection.</li>
+ *   <li><b>Red Zone</b> (at max connections): Uses least-loaded selection to find the
+ *       connection with the fewest active streams, up to the hard limit.</li>
+ *   <li><b>Saturation</b>: When all connections are at the hard limit, callers wait
+ *       for capacity with a configurable timeout.</li>
+ * </ol>
+ *
+ * <h2>Threading</h2>
+ * <p>Uses per-route state with a volatile connection array for lock-free reads in the
+ * common case. Connection creation and removal synchronize on the per-route state object.
+ * The round-robin index uses {@link AtomicInteger} for visibility and atomicity across
+ * thousands of concurrent virtual threads.
  */
 final class H2ConnectionManager {
 
     /**
-     * Per-route state: synchronize on this object for mutations, volatile array for lock-free reads.
+     * Per-route connection state.
      */
     private static final class RouteState {
+        /** Connections for this route. Volatile for lock-free reads. */
         volatile H2Connection[] conns = new H2Connection[0];
-        // Number of connections currently being created (to prevent over-creation)
+
+        /** Connections currently being created (prevents over-creation). Guarded by sync on this. */
         int pendingCreations = 0;
+
+        /** Round-robin index for connection selection. Atomic for concurrent access. */
+        final AtomicInteger nextIndex = new AtomicInteger(0);
     }
 
     private static final H2Connection[] EMPTY = new H2Connection[0];
 
+    // Soft limit as a fraction of streamsPerConnection. When all connections exceed this threshold,
+    // we try to create a new connection (if under max).
+    // This prevents overloading a single TCP connection even when the server allows many streams.
+    private static final int SOFT_LIMIT_DIVISOR = 8;
+    private static final int SOFT_LIMIT_FLOOR = 50;
+
     private final ConcurrentHashMap<Route, RouteState> routes = new ConcurrentHashMap<>();
-    private final int streamsPerConnection;
+    private final int streamsPerConnection; // Hard limit from server
+    private final int softConcurrencyLimit; // Soft limit for load balancing
     private final long acquireTimeoutMs;
     private final List<ConnectionPoolListener> listeners;
     private final ConnectionFactory connectionFactory;
@@ -49,6 +79,7 @@ final class H2ConnectionManager {
             ConnectionFactory connectionFactory
     ) {
         this.streamsPerConnection = streamsPerConnection;
+        this.softConcurrencyLimit = Math.max(SOFT_LIMIT_FLOOR, streamsPerConnection / SOFT_LIMIT_DIVISOR);
         this.acquireTimeoutMs = acquireTimeoutMs;
         this.listeners = listeners;
         this.connectionFactory = connectionFactory;
@@ -59,45 +90,46 @@ final class H2ConnectionManager {
     }
 
     /**
-     * Acquire an H2 connection for the route, creating one if needed.
+     * Acquire an HTTP/2 connection for the route, creating one if needed.
      *
-     * <p>Connection creation happens OUTSIDE the synchronized block to prevent deadlock.
-     * The deadlock scenario: Thread A holds RouteState lock while creating a connection,
-     * which blocks waiting for a permit. Thread B tries to release a permit but first
-     * needs to unregister, which requires the RouteState lock held by A.
+     * <p>Connection creation happens outside the synchronized block to prevent deadlock
+     * when connection establishment blocks on I/O.
+     *
+     * @param route the target route
+     * @param maxConnectionsForRoute maximum connections allowed for this route
+     * @return an H2 connection ready for use
+     * @throws IOException if acquisition times out or is interrupted
      */
     H2Connection acquire(Route route, int maxConnectionsForRoute) throws IOException {
         RouteState state = stateFor(route);
         long deadline = System.currentTimeMillis() + acquireTimeoutMs;
-        boolean shouldCreate = false;
 
         synchronized (state) {
             while (true) {
                 H2Connection[] snapshot = state.conns;
                 int totalConns = snapshot.length + state.pendingCreations;
 
-                // Try to find a connection under the soft limit
-                H2Connection conn = tryAcquireUnderLimit(snapshot);
+                // Green zone: round-robin among connections under soft limit
+                H2Connection conn = tryAcquireRoundRobin(snapshot, state, softConcurrencyLimit);
                 if (conn != null) {
                     notifyAcquire(conn, true);
                     return conn;
                 }
 
-                // All connections at/above soft limit - create new if under connection limit
+                // Expansion: all connections above soft limit, create new if allowed
                 if (totalConns < maxConnectionsForRoute) {
                     state.pendingCreations++;
-                    shouldCreate = true;
                     break;
                 }
 
-                // At connection limit - use any connection even if over soft limit
-                conn = tryAcquire(snapshot);
+                // Red zone: at max connections, use least-loaded up to hard limit
+                conn = tryAcquireLeastLoaded(snapshot, streamsPerConnection);
                 if (conn != null) {
                     notifyAcquire(conn, true);
                     return conn;
                 }
 
-                // Wait for capacity
+                // Saturation: all connections at hard limit, wait for capacity
                 long remaining = deadline - System.currentTimeMillis();
                 if (remaining <= 0) {
                     throw new IOException("Acquire timeout: no connection available after "
@@ -113,10 +145,7 @@ final class H2ConnectionManager {
             }
         }
 
-        if (shouldCreate) {
-            return createNewH2Connection(route, state);
-        }
-        throw new IllegalStateException("unreachable");
+        return createNewH2Connection(route, state);
     }
 
     @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
@@ -152,17 +181,42 @@ final class H2ConnectionManager {
     }
 
     /**
-     * Find a reusable connection, preferring low stream count.
+     * Round-robin selection: find a connection under the limit, starting from a unique index.
      *
-     * <p>Single pass: tracks best candidate (lowest active streams under limit),
-     * falls back to any valid connection if none under limit.
-     *
-     * <p>Note: getActiveStreamCountIfAccepting() checks active state, write errors, and muxer capacity,
-     * returning the stream count in a single call to avoid redundant atomic reads.
-     * Socket health is monitored by the reader thread, so separate validateForReuse() is not
-     * needed in this hot path.
+     * <p>Each caller atomically claims a starting index, then scans connections from that
+     * position. This ensures even distribution under high concurrency, each gets a different starting point rather
+     * than all hammering connection[0].
      */
-    private H2Connection tryAcquire(H2Connection[] conns) {
+    private H2Connection tryAcquireRoundRobin(H2Connection[] conns, RouteState state, int limit) {
+        int n = conns.length;
+        if (n == 0) {
+            return null;
+        }
+
+        // Mask with MAX_VALUE handles overflow when counter wraps to negative.
+        int start = (state.nextIndex.getAndIncrement() & Integer.MAX_VALUE) % n;
+
+        for (int i = 0; i < n; i++) {
+            int idx = (start + i) % n;
+            H2Connection conn = conns[idx];
+            if (conn == null) {
+                continue;
+            }
+            int active = conn.getActiveStreamCountIfAccepting();
+            if (active >= 0 && active < limit) {
+                return conn;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Least-loaded selection: find the connection with the fewest active streams.
+     *
+     * <p>Scans all connections to find the best candidate. Used in the red zone when all connections exceed the
+     * soft limit and we need to balance the load.
+     */
+    private H2Connection tryAcquireLeastLoaded(H2Connection[] conns, int limit) {
         H2Connection best = null;
         int bestActive = Integer.MAX_VALUE;
 
@@ -170,46 +224,17 @@ final class H2ConnectionManager {
             if (conn == null) {
                 continue;
             }
-
             int active = conn.getActiveStreamCountIfAccepting();
-            if (active < 0) {
-                continue;
-            }
-
-            if (active < streamsPerConnection) {
-                // Prefer lowest active count
-                if (active < bestActive) {
-                    best = conn;
-                    bestActive = active;
-                    if (active == 0) {
-                        break; // Can't do better than idle
-                    }
-                }
-            } else if (best == null) {
-                // Fallback: any valid connection
+            if (active >= 0 && active < limit && active < bestActive) {
                 best = conn;
+                bestActive = active;
+                if (active == 0) {
+                    break;
+                }
             }
         }
 
         return best;
-    }
-
-    /**
-     * Find a connection strictly under the soft limit.
-     */
-    private H2Connection tryAcquireUnderLimit(H2Connection[] conns) {
-        for (H2Connection conn : conns) {
-            if (conn == null) {
-                continue;
-            }
-            // getActiveStreamCountIfAccepting() checks: active, writeError, muxer capacity
-            // and returns the count in a single call to avoid redundant atomic reads
-            int active = conn.getActiveStreamCountIfAccepting();
-            if (active >= 0 && active < streamsPerConnection) {
-                return conn;
-            }
-        }
-        return null;
     }
 
     /**
@@ -246,9 +271,6 @@ final class H2ConnectionManager {
         }
     }
 
-    /**
-     * Remove dead or exhausted connections for the route.
-     */
     void cleanupDead(Route route, BiConsumer<H2Connection, CloseReason> onRemove) {
         RouteState state = routes.get(route);
         if (state == null) {
@@ -296,9 +318,6 @@ final class H2ConnectionManager {
         }
     }
 
-    /**
-     * Clean up dead connections for all routes.
-     */
     void cleanupAllDead(BiConsumer<H2Connection, CloseReason> onRemove) {
         for (Route route : routes.keySet()) {
             cleanupDead(route, onRemove);
@@ -306,16 +325,13 @@ final class H2ConnectionManager {
     }
 
     /**
-     * Clean up idle connections that have no active streams and have been idle
-     * longer than the specified timeout.
+     * Clean up idle connections that have no active streams and have been idle longer than the specified timeout.
      *
      * @param maxIdleTimeNanos maximum idle time in nanoseconds
-     * @param onRemove callback for removed connections
-     * @return number of connections removed
+     * @param onRemove         callback for removed connections
      */
     @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
-    int cleanupIdle(long maxIdleTimeNanos, BiConsumer<H2Connection, CloseReason> onRemove) {
-        int removed = 0;
+    void cleanupIdle(long maxIdleTimeNanos, BiConsumer<H2Connection, CloseReason> onRemove) {
         for (RouteState state : routes.values()) {
             H2Connection[] cur = state.conns;
 
@@ -343,7 +359,6 @@ final class H2ConnectionManager {
                     }
                     if (conn.getIdleTimeNanos() > maxIdleTimeNanos) {
                         onRemove.accept(conn, CloseReason.IDLE_TIMEOUT);
-                        removed++;
                     } else {
                         tmp[w++] = conn;
                     }
@@ -355,12 +370,8 @@ final class H2ConnectionManager {
                 }
             }
         }
-        return removed;
     }
 
-    /**
-     * Close all connections.
-     */
     void closeAll(BiConsumer<H2Connection, CloseReason> onClose) {
         for (RouteState state : routes.values()) {
             H2Connection[] snapshot = state.conns;

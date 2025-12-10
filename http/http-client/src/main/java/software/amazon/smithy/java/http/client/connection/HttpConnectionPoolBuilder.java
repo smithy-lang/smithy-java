@@ -25,6 +25,7 @@ public final class HttpConnectionPoolBuilder {
     int maxConnectionsPerRoute = 20;
     int h2StreamsPerConnection = 100;
     int h2InitialWindowSize = 65535; // RFC 9113 default
+    int h2MaxFrameSize = 16384; // RFC 9113 default
     final Map<String, Integer> perHostLimits = new HashMap<>();
 
     Duration maxIdleTime = Duration.ofMinutes(2);
@@ -406,6 +407,37 @@ public final class HttpConnectionPoolBuilder {
             throw new IllegalArgumentException("h2InitialWindowSize must be positive: " + windowSize);
         }
         this.h2InitialWindowSize = windowSize;
+        return this;
+    }
+
+    /**
+     * Set HTTP/2 maximum frame size for receiving DATA frames (default: 16384 bytes).
+     *
+     * <p>This controls the SETTINGS_MAX_FRAME_SIZE advertised to the server,
+     * which determines the maximum size of DATA frames the server can send.
+     * Larger frames reduce per-frame overhead and can improve throughput for
+     * large response bodies.
+     *
+     * <p><b>Performance considerations:</b>
+     * <ul>
+     *   <li>Default (16384): RFC 9113 minimum, maximum compatibility</li>
+     *   <li>65536 (64KB): Good balance of throughput and memory</li>
+     *   <li>262144 (256KB): Better for large downloads, reduces frame overhead</li>
+     * </ul>
+     *
+     * <p><b>Note:</b> The actual frame size used depends on the server respecting
+     * this setting. Some servers may send smaller frames regardless.
+     *
+     * @param frameSize maximum frame size in bytes, must be between 16384 and 16777215
+     * @return this builder
+     * @throws IllegalArgumentException if frameSize is not in valid range
+     */
+    public HttpConnectionPoolBuilder h2MaxFrameSize(int frameSize) {
+        if (frameSize < 16384 || frameSize > 16777215) {
+            throw new IllegalArgumentException(
+                    "h2MaxFrameSize must be between 16384 and 16777215: " + frameSize);
+        }
+        this.h2MaxFrameSize = frameSize;
         return this;
     }
 

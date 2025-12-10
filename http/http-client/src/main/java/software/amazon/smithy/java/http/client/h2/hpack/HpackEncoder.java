@@ -7,8 +7,8 @@ package software.amazon.smithy.java.http.client.h2.hpack;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Set;
+import software.amazon.smithy.java.io.ByteBufferOutputStream;
 
 /**
  * HPACK encoder for HTTP/2 header compression (RFC 7541).
@@ -30,6 +30,10 @@ public final class HpackEncoder {
     // Track pending table size update to emit at start of next header block (RFC 7541 Section 4.2)
     // -1 means no update pending
     private int pendingTableSizeUpdate = -1;
+
+    // Reusable scratch buffer for string encoding to avoid per-string allocation.
+    // Typical header values are < 256 bytes; buffer grows if needed.
+    private byte[] stringBuf = new byte[256];
 
     /**
      * Create an encoder with the given maximum dynamic table size.
@@ -103,9 +107,7 @@ public final class HpackEncoder {
      * @param sensitive whether this header contains sensitive data
      * @throws IOException if encoding fails
      */
-    public void encodeHeader(OutputStream out, String name, String value, boolean sensitive)
-            throws IOException {
-
+    public void encodeHeader(OutputStream out, String name, String value, boolean sensitive) throws IOException {
         // Sensitive headers should never be indexed
         if (sensitive || NEVER_INDEX_HEADERS.contains(name)) {
             encodeLiteralNeverIndexed(out, name, value);
@@ -148,15 +150,10 @@ public final class HpackEncoder {
     }
 
     /**
-     * Encode a header as literal with indexing.
-     * Format: 01xxxxxx (6-bit prefix for index)
+     * Encode a header as literal with indexing. Format: 01xxxxxx (6-bit prefix for index)
      */
-    private void encodeLiteralWithIndexing(
-            OutputStream out,
-            int nameIndex,
-            String name,
-            String value
-    ) throws IOException {
+    private void encodeLiteralWithIndexing(OutputStream out, int nameIndex, String name, String value)
+            throws IOException {
         if (nameIndex > 0) {
             // Indexed name
             encodeInteger(out, nameIndex, 6, 0x40);
@@ -169,8 +166,7 @@ public final class HpackEncoder {
     }
 
     /**
-     * Encode a header as literal never indexed.
-     * Format: 0001xxxx (4-bit prefix for index)
+     * Encode a header as literal never indexed. Format: 0001xxxx (4-bit prefix for index)
      */
     private void encodeLiteralNeverIndexed(OutputStream out, int nameIndex, String name, String value)
             throws IOException {
@@ -192,8 +188,7 @@ public final class HpackEncoder {
     }
 
     /**
-     * Encode an integer with the given prefix size.
-     * RFC 7541 Section 5.1
+     * Encode an integer with the given prefix size. RFC 7541 Section 5.1
      */
     private void encodeInteger(OutputStream out, int value, int prefixBits, int prefix) throws IOException {
         int maxPrefix = (1 << prefixBits) - 1;
@@ -215,23 +210,38 @@ public final class HpackEncoder {
      * Encode a string, using Huffman encoding if it saves space.
      * RFC 7541 Section 5.2
      */
+    @SuppressWarnings("deprecation")
     private void encodeString(OutputStream out, String str) throws IOException {
-        // Convert to bytes once and reuse for both length calculation and encoding
-        byte[] raw = str.getBytes(StandardCharsets.ISO_8859_1);
+        int len = str.length();
 
         if (useHuffman) {
-            int huffmanLen = Huffman.encodedLength(raw);
-            if (huffmanLen < raw.length) {
-                // Use Huffman encoding
-                byte[] huffman = Huffman.encode(raw);
-                encodeInteger(out, huffman.length, 7, 0x80); // H=1
-                out.write(huffman);
-                return;
+            // Need bytes in scratch buffer to calculate Huffman length
+            if (len > stringBuf.length) {
+                stringBuf = new byte[len];
+            }
+            str.getBytes(0, len, stringBuf, 0);
+
+            // Only use Huffman if it saves space.
+            int huffmanLen = Huffman.encodedLength(stringBuf, 0, len);
+            if (huffmanLen < len) {
+                encodeInteger(out, huffmanLen, 7, 0x80); // H=1
+                Huffman.encode(stringBuf, 0, len, out);
+            } else {
+                encodeInteger(out, len, 7, 0x00); // H=0
+                out.write(stringBuf, 0, len);
+            }
+        } else {
+            // Raw encoding, use optimized path for ByteBufferOutputStream if available.
+            encodeInteger(out, len, 7, 0x00); // H=0
+            if (out instanceof ByteBufferOutputStream bbos) {
+                bbos.writeAscii(str);
+            } else {
+                if (len > stringBuf.length) {
+                    stringBuf = new byte[len];
+                }
+                str.getBytes(0, len, stringBuf, 0);
+                out.write(stringBuf, 0, len);
             }
         }
-
-        // Use raw encoding
-        encodeInteger(out, raw.length, 7, 0x00); // H=0
-        out.write(raw);
     }
 }
