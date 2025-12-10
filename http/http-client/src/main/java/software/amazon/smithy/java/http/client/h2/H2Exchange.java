@@ -446,8 +446,8 @@ public final class H2Exchange implements HttpExchange {
                 }
             }
 
-            // Need to grow buffer - get a larger one from pool
-            int newSize = dataBuffer.length * 2;
+            // Need to grow buffer - get a larger one from pool. Grow by 4x to reduce resizing frequency.
+            int newSize = dataBuffer.length * 4;
             while (newSize < writePos + requiredSpace) {
                 newSize *= 2;
             }
