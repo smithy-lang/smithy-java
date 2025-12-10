@@ -7,6 +7,7 @@ package software.amazon.smithy.java.http.client.h2;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
  * Input stream for reading response body from DATA frames.
@@ -16,8 +17,11 @@ import java.io.InputStream;
  * per-frame allocations and reduces copying.
  */
 final class H2DataInputStream extends InputStream {
+
+    private static final int TRANSFER_BUFFER_SIZE = 16384;
     private final H2Exchange exchange;
     private boolean closed = false;
+    private byte[] singleBuff;
 
     H2DataInputStream(H2Exchange exchange) {
         this.exchange = exchange;
@@ -28,9 +32,11 @@ final class H2DataInputStream extends InputStream {
         if (closed) {
             return -1;
         }
-        byte[] buf = new byte[1];
-        int n = exchange.readFromBuffer(buf, 0, 1);
-        return n == 1 ? (buf[0] & 0xFF) : -1;
+        if (singleBuff == null) {
+            singleBuff = new byte[1];
+        }
+        int n = exchange.readFromBuffer(singleBuff, 0, 1);
+        return n == 1 ? (singleBuff[0] & 0xFF) : -1;
     }
 
     @Override
@@ -55,5 +61,26 @@ final class H2DataInputStream extends InputStream {
     @Override
     public void close() {
         closed = true;
+    }
+
+    @Override
+    public long transferTo(OutputStream out) throws IOException {
+        if (closed) {
+            return 0;
+        }
+
+        // Borrow buffer from pool instead of allocating
+        byte[] buffer = exchange.borrowBuffer(TRANSFER_BUFFER_SIZE);
+        try {
+            long transferred = 0;
+            int read;
+            while ((read = exchange.readFromBuffer(buffer, 0, buffer.length)) >= 0) {
+                out.write(buffer, 0, read);
+                transferred += read;
+            }
+            return transferred;
+        } finally {
+            exchange.returnBuffer(buffer);
+        }
     }
 }
