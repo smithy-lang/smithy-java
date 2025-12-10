@@ -86,6 +86,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     }
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(H2Connection.class);
+    private static final int BUFFER_SIZE = 65536;
     private static final byte[] EMPTY_PAYLOAD = new byte[0];
     private static final int SETTINGS_TIMEOUT_MS = 10_000;
     private static final int GRACEFUL_SHUTDOWN_MS = 1000;
@@ -132,8 +133,8 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     public H2Connection(Socket socket, Route route, Duration readTimeout, Duration writeTimeout, int initialWindowSize)
             throws IOException {
         this.socket = socket;
-        var socketIn = new UnsyncBufferedInputStream(socket.getInputStream(), 8192);
-        this.socketOut = new UnsyncBufferedOutputStream(socket.getOutputStream(), 8192);
+        var socketIn = new UnsyncBufferedInputStream(socket.getInputStream(), BUFFER_SIZE);
+        this.socketOut = new UnsyncBufferedOutputStream(socket.getOutputStream(), BUFFER_SIZE);
         this.route = route;
         this.readTimeoutMs = readTimeout.toMillis();
         this.writeTimeoutMs = writeTimeout.toMillis();
