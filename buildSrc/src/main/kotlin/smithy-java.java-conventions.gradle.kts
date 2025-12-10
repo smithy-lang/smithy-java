@@ -89,7 +89,7 @@ spotless {
         removeUnusedImports()
         importOrder("\\#", "")
         // Ignore generated generated code for formatter check
-        targetExclude("**/build/**/*.java", "**/build/generated-src/*.*")
+        targetExclude("**/build/**/*.java", "**/build/generated-src*/*.*")
     }
 
     // Formatting for build.gradle.kts files

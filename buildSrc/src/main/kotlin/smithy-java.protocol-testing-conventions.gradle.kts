@@ -14,16 +14,5 @@ tasks.named("spotbugsIt") {
     enabled = false
 }
 
-val generatedSrcDir = layout.buildDirectory.dir("generated-src").get()
-
-// Add generated sources to integration test sources
-sourceSets {
-    named("it") {
-        java {
-            srcDir(generatedSrcDir)
-        }
-    }
-}
-
 // Ensure integ tests are executed as part of test suite
 tasks["test"].finalizedBy("integ")

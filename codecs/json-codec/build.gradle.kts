@@ -33,7 +33,7 @@ tasks {
         }
     }
     jar {
-        finalizedBy(shadowJar)
+        enabled = false
     }
 }
 
