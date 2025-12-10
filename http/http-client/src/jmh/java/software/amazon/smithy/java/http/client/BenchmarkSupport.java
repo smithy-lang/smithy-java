@@ -155,11 +155,21 @@ public final class BenchmarkSupport {
 
     /**
      * Simple counter for benchmark results. Used with @AuxCounters.
+     * JMH picks up public fields OR getter methods for aux counters.
      */
     public static class RequestCounter {
         public long requests;
         public long errors;
         public Throwable firstError;
+
+        // Getter methods for JMH aux counters (some versions need these)
+        public long requests() {
+            return requests;
+        }
+
+        public long errors() {
+            return errors;
+        }
 
         public void reset() {
             requests = 0;

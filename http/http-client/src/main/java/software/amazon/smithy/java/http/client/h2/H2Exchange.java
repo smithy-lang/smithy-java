@@ -88,10 +88,6 @@ public final class H2Exchange implements HttpExchange {
     // Shared empty array to avoid allocation
     private static final byte[] EMPTY_DATA = new byte[0];
 
-    // Short spin before full park - avoids heavy park/unpark for near-miss data arrivals
-    private static final int SPIN_WAITS = 2;
-    private static final long SPIN_WAIT_NANOS = 40_000L; // 40µs each
-
     private final H2Muxer muxer;
     private final HttpRequest request;
     private volatile int streamId;
@@ -1011,7 +1007,7 @@ public final class H2Exchange implements HttpExchange {
             readResponseHeaders();
         }
 
-        int bytesRead = 0;
+        int bytesRead;
         dataLock.lock();
         try {
             // Wait for data, EOF, or error
@@ -1027,26 +1023,7 @@ public final class H2Exchange implements HttpExchange {
                     }
                 }
 
-                // Short timed waits to catch near-miss data arrivals
-                int spins = 0;
-                while (readPos == writePos && readState == ReadState.READING_DATA && spins++ < SPIN_WAITS) {
-                    waitingForData = true;
-                    try {
-                        dataAvailable.awaitNanos(SPIN_WAIT_NANOS);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new IOException("Interrupted waiting for data", e);
-                    } finally {
-                        waitingForData = false;
-                    }
-                }
-
-                // If data arrived during spin, we're done waiting
-                if (readPos != writePos || readState != ReadState.READING_DATA) {
-                    break;
-                }
-
-                // Still nothing after short waits: do a full park
+                // Wait for data to arrive
                 waitingForData = true;
                 try {
                     dataAvailable.await();
@@ -1110,13 +1087,14 @@ public final class H2Exchange implements HttpExchange {
     /**
      * Update stream receive window after consuming data.
      *
-     * <p>Sends WINDOW_UPDATE when the window gets below half of the initial size.
+     * <p>Sends WINDOW_UPDATE when the window drops below the threshold defined by
+     * {@link H2Constants#WINDOW_UPDATE_THRESHOLD_DIVISOR}.
      *
      * @throws IOException if the write queue is full
      */
     private void updateStreamRecvWindow(int bytesConsumed) throws IOException {
         streamRecvWindow -= bytesConsumed;
-        if (streamRecvWindow < initialWindowSize / 2) {
+        if (streamRecvWindow < initialWindowSize / H2Constants.WINDOW_UPDATE_THRESHOLD_DIVISOR) {
             int increment = initialWindowSize - streamRecvWindow;
             // Queue stream-level WINDOW_UPDATE - writer thread will send it
             muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.WINDOW_UPDATE, increment, writeTimeoutMs);
