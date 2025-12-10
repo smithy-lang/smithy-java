@@ -67,6 +67,10 @@ final class H2Constants {
     // Window size limits
     static final int MAX_WINDOW_SIZE = Integer.MAX_VALUE; // 2^31 - 1
 
+    // WINDOW_UPDATE threshold: send update when window drops below this fraction of initial size.
+    // Using 1/4 (25%) reduces control frame overhead while leaving enough buffer to avoid stalls.
+    static final int WINDOW_UPDATE_THRESHOLD_DIVISOR = 4;
+
     // Error codes (RFC 9113 Section 7)
     static final int ERROR_NO_ERROR = 0x0;
     static final int ERROR_PROTOCOL_ERROR = 0x1;
