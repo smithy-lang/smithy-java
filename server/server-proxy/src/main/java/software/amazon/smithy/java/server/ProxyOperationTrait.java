@@ -41,9 +41,13 @@ public final class ProxyOperationTrait implements Trait {
 
     private static final ShapeId SHAPE_ID = ShapeId.from("smithy.server.api#proxyOperation");
     private final ShapeId delegateOperation;
+    private final String inputMemberName;
+    private final String additionalInputMemberName;
 
-    public ProxyOperationTrait(ShapeId delegateOperation) {
+    public ProxyOperationTrait(ShapeId delegateOperation, String inputMemberName, String additionalInputMemberName) {
         this.delegateOperation = delegateOperation;
+        this.inputMemberName = inputMemberName;
+        this.additionalInputMemberName = additionalInputMemberName;
     }
 
     @Override
@@ -58,5 +62,23 @@ public final class ProxyOperationTrait implements Trait {
 
     public ShapeId getDelegateOperation() {
         return delegateOperation;
+    }
+
+    /**
+     * Gets the name of the member containing the original input in the wrapper structure.
+     *
+     * @return the input member name, or null if the original operation had no input
+     */
+    public String getInputMemberName() {
+        return inputMemberName;
+    }
+
+    /**
+     * Gets the name of the member containing the additional input in the wrapper structure.
+     *
+     * @return the additional input member name
+     */
+    public String getAdditionalInputMemberName() {
+        return additionalInputMemberName;
     }
 }
