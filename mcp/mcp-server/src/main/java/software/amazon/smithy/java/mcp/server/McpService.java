@@ -21,7 +21,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -333,17 +335,13 @@ public final class McpService {
             }
 
             for (McpServerProxy proxy : proxies.values()) {
-                try {
-                    if (initRequest != null) {
-                        proxy.initialize(responseWriter, initRequest, protocolVersion);
-                    }
+                if (initRequest != null) {
+                    proxy.initialize(responseWriter, initRequest, protocolVersion);
+                }
 
-                    List<ToolInfo> proxyTools = proxy.listTools();
-                    for (var toolInfo : proxyTools) {
-                        tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
-                    }
-                } catch (Exception e) {
-                    LOG.error("Failed to initialize proxy: " + proxy.name(), e);
+                List<ToolInfo> proxyTools = proxy.listTools();
+                for (var toolInfo : proxyTools) {
+                    tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
                 }
             }
         }
@@ -457,8 +455,9 @@ public final class McpService {
         return createErrorResponse(req, exception, true); //TODO change the default to false.
     }
 
-    private JsonRpcResponse createErrorResponse(JsonRpcRequest req, Exception exception, boolean sendStackTrace) {
+    private JsonRpcResponse createErrorResponse(JsonRpcRequest req, Throwable exception, boolean sendStackTrace) {
         String s;
+        exception = unwrapException(exception);
         if (sendStackTrace) {
             try (var sw = new StringWriter();
                     var pw = new PrintWriter(sw)) {
@@ -472,6 +471,14 @@ public final class McpService {
             s = exception.getMessage();
         }
         return createErrorResponse(req, s);
+    }
+
+    private Throwable unwrapException(Throwable exception) {
+        return switch (exception) {
+            case CompletionException ce when ce.getCause() != null -> ce.getCause();
+            case ExecutionException ee when ee.getCause() != null -> ee.getCause();
+            default -> exception;
+        };
     }
 
     private JsonRpcResponse createErrorResponse(JsonRpcRequest req, String s) {
