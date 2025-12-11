@@ -604,13 +604,7 @@ public final class McpService {
             var targetSchema = schemaIndex.getSchema(targetShapeId);
             var memberSchema = createJsonObjectSchema(targetSchema, visited);
 
-            var wrapperSchema = JsonObjectSchema.builder()
-                    .properties(Map.of(memberName, Document.of(memberSchema)))
-                    .required(List.of(memberName))
-                    .additionalProperties(false)
-                    .build();
-
-            oneOfVariants.add(Document.of(wrapperSchema));
+            oneOfVariants.add(createUnionVariant(memberName, memberSchema));
         }
 
         return JsonOneOfSchema.builder()
@@ -631,14 +625,7 @@ public final class McpService {
             var memberName = member.memberName();
             var memberSchema = createMemberSchema(member, visited);
 
-            // Wrap in object with member name as key
-            var wrapperSchema = JsonObjectSchema.builder()
-                    .properties(Map.of(memberName, Document.of(memberSchema)))
-                    .required(List.of(memberName))
-                    .additionalProperties(false)
-                    .build();
-
-            variants.add(Document.of(wrapperSchema));
+            variants.add(createUnionVariant(memberName, memberSchema));
         }
 
         visited.remove(targetId);
@@ -646,6 +633,15 @@ public final class McpService {
                 .oneOf(variants)
                 .description(memberDescription(schema))
                 .build();
+    }
+
+    private static Document createUnionVariant(String memberName, SerializableShape memberSchema) {
+        var wrapperSchema = JsonObjectSchema.builder()
+                .properties(Map.of(memberName, Document.of(memberSchema)))
+                .required(List.of(memberName))
+                .additionalProperties(Document.of(false))
+                .build();
+        return Document.of(wrapperSchema);
     }
 
     private SerializableShape createMemberSchema(Schema member, Set<ShapeId> visited) {
