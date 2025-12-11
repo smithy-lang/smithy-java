@@ -565,10 +565,21 @@ public final class McpService {
             default -> throw new RuntimeException(member + " is not a primitive type");
         };
 
-        return JsonPrimitiveSchema.builder()
+        var builder = JsonPrimitiveSchema.builder()
                 .type(type)
-                .description(memberDescription(member))
-                .build();
+                .description(memberDescription(member));
+
+        List<Document> enumValues = switch (member.type()) {
+            case ENUM -> member.stringEnumValues().stream().map(Document::of).toList();
+            case INT_ENUM -> member.intEnumValues().stream().map(Document::of).toList();
+            default -> List.of();
+        };
+
+        if (!enumValues.isEmpty()) {
+            builder.enumValues(enumValues);
+        }
+
+        return builder.build();
     }
 
     private static final List<String> DOCUMENT_TYPES = List.of(

@@ -276,11 +276,19 @@ class McpServerIntegrationTest {
             assertEquals("string", echoProps.path("dateTimeTimestamp").path("type").asText());
             assertEquals("string", echoProps.path("httpDateTimestamp").path("type").asText());
 
-            // Enum should be string
+            // Enum should be string with enum values
             assertEquals("string", echoProps.path("enumValue").path("type").asText());
+            assertTrue(echoProps.path("enumValue").has("enum"), "enumValue should have enum constraint");
+            var enumValues = new HashSet<String>();
+            echoProps.path("enumValue").path("enum").forEach(node -> enumValues.add(node.asText()));
+            assertEquals(Set.of("VALUE_ONE", "VALUE_TWO"), enumValues);
 
-            // IntEnum should be number
+            // IntEnum should be number with enum values
             assertEquals("number", echoProps.path("intEnumValue").path("type").asText());
+            assertTrue(echoProps.path("intEnumValue").has("enum"), "intEnumValue should have enum constraint");
+            var intEnumValues = new HashSet<Integer>();
+            echoProps.path("intEnumValue").path("enum").forEach(node -> intEnumValues.add(node.asInt()));
+            assertEquals(Set.of(1, 2, 3), intEnumValues);
 
             // Lists should be arrays
             assertEquals("array", echoProps.path("stringList").path("type").asText());
@@ -664,6 +672,36 @@ class McpServerIntegrationTest {
         assertEquals("VALUE_ONE", echo.getMember("enumValue").asString());
     }
 
+    @Test
+    void testEnumSchemaValidatesInput() throws Exception {
+        initializeLatestProtocol();
+        var schemas = getMcpEchoToolSchemas();
+
+        // Valid enum value should pass validation
+        var validInput = OBJECT_MAPPER.readTree("""
+                {
+                    "echo": {
+                        "requiredField": "test",
+                        "enumValue": "VALUE_ONE"
+                    }
+                }
+                """);
+        var validErrors = schemas.inputSchema().validate(validInput);
+        assertTrue(validErrors.isEmpty(), "Valid enum value should pass: " + validErrors);
+
+        // Invalid enum value should fail validation
+        var invalidInput = OBJECT_MAPPER.readTree("""
+                {
+                    "echo": {
+                        "requiredField": "test",
+                        "enumValue": "INVALID_VALUE"
+                    }
+                }
+                """);
+        var invalidErrors = schemas.inputSchema().validate(invalidInput);
+        assertFalse(invalidErrors.isEmpty(), "Invalid enum value should fail validation");
+    }
+
     // ========== IntEnum Tests ==========
 
     @Test
@@ -671,6 +709,36 @@ class McpServerIntegrationTest {
         initializeLatestProtocol();
         var echo = echoSingleField("intEnumValue", Document.of(2));
         assertEquals(2, echo.getMember("intEnumValue").asNumber().intValue());
+    }
+
+    @Test
+    void testIntEnumSchemaValidatesInput() throws Exception {
+        initializeLatestProtocol();
+        var schemas = getMcpEchoToolSchemas();
+
+        // Valid int enum value should pass validation
+        var validInput = OBJECT_MAPPER.readTree("""
+                {
+                    "echo": {
+                        "requiredField": "test",
+                        "intEnumValue": 1
+                    }
+                }
+                """);
+        var validErrors = schemas.inputSchema().validate(validInput);
+        assertTrue(validErrors.isEmpty(), "Valid int enum value should pass: " + validErrors);
+
+        // Invalid int enum value should fail validation
+        var invalidInput = OBJECT_MAPPER.readTree("""
+                {
+                    "echo": {
+                        "requiredField": "test",
+                        "intEnumValue": 999
+                    }
+                }
+                """);
+        var invalidErrors = schemas.inputSchema().validate(invalidInput);
+        assertFalse(invalidErrors.isEmpty(), "Invalid int enum value should fail validation");
     }
 
     // ========== Union Tests ==========

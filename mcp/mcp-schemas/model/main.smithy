@@ -141,6 +141,9 @@ structure JsonPrimitiveSchema {
 
     @jsonName("const")
     constValue: String
+
+    @jsonName("enum")
+    enumValues: JsonSchemaList
 }
 
 structure JsonDocumentSchema {
