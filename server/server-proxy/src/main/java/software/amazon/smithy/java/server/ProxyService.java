@@ -318,13 +318,16 @@ public final class ProxyService implements Service {
                         .putConfig(PROXY_INPUT, input.getMember(proxyTrait.getAdditionalInputMemberName()))
                         .build();
 
-                // Unwrap original input from wrapper
                 Document unwrappedInput;
-                var inputMemberName = proxyTrait.getInputMemberName();
-                if (inputMemberName != null) {
-                    unwrappedInput = input.getMember(inputMemberName);
+                if (proxyTrait.shouldUnwrapInput()) {
+                    var inputMemberName = proxyTrait.getInputMemberName();
+                    if (inputMemberName != null) {
+                        unwrappedInput = input.getMember(inputMemberName);
+                    } else {
+                        unwrappedInput = Document.of(Unit.getInstance());
+                    }
                 } else {
-                    unwrappedInput = Document.of(Unit.getInstance());
+                    unwrappedInput = input;
                 }
 
                 output = dynamicClient.call(operation, unwrappedInput, requestOverride);

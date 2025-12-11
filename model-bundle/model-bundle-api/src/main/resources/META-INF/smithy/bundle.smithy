@@ -26,6 +26,10 @@ structure SmithyBundle {
     /// model describing the generic arguments that must be present in every request. If this
     /// bundle does not require generic arguments, this field may be omitted.
     additionalInput: AdditionalInput
+
+    /// Version of the model bundle format. Determines how additionalInput is handled.
+    /// If not specified, defaults to V1 (legacy) behavior.
+    modelBundleVersion: ModelBundleVersion
 }
 
 string SmithyModel
@@ -36,4 +40,13 @@ structure AdditionalInput {
 
     @required
     model: SmithyModel
+}
+
+/// Version of the model bundle format. Used to determine input handling behavior.
+enum ModelBundleVersion {
+    /// Mix additionalInput into existing input shape (legacy behavior)
+    V1
+
+    /// Wrap input in new structure containing both original input and additionalInput
+    V2
 }

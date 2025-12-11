@@ -43,11 +43,18 @@ public final class ProxyOperationTrait implements Trait {
     private final ShapeId delegateOperation;
     private final String inputMemberName;
     private final String additionalInputMemberName;
+    private final boolean unwrapInput;
 
-    public ProxyOperationTrait(ShapeId delegateOperation, String inputMemberName, String additionalInputMemberName) {
+    public ProxyOperationTrait(
+            ShapeId delegateOperation,
+            String inputMemberName,
+            String additionalInputMemberName,
+            boolean unwrapInput
+    ) {
         this.delegateOperation = delegateOperation;
         this.inputMemberName = inputMemberName;
         this.additionalInputMemberName = additionalInputMemberName;
+        this.unwrapInput = unwrapInput;
     }
 
     @Override
@@ -80,5 +87,21 @@ public final class ProxyOperationTrait implements Trait {
      */
     public String getAdditionalInputMemberName() {
         return additionalInputMemberName;
+    }
+
+    /**
+     * Returns whether the proxy service should unwrap the input from a wrapper structure.
+     *
+     * <p>When true (V2 behavior), the proxy input is a wrapper structure containing both
+     * the original input member and the additional input member. The proxy service should
+     * extract the original input before forwarding to the delegate operation.</p>
+     *
+     * <p>When false (V1 legacy behavior), the additional input was mixed into the existing
+     * input shape, so no unwrapping is needed - the full input can be passed directly.</p>
+     *
+     * @return true if the proxy service should unwrap the input, false otherwise
+     */
+    public boolean shouldUnwrapInput() {
+        return unwrapInput;
     }
 }

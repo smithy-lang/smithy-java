@@ -17,6 +17,7 @@ import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.traits.StreamingTrait;
+import software.amazon.smithy.modelbundle.api.model.ModelBundleVersion;
 import software.amazon.smithy.modelbundle.api.model.SmithyBundle;
 
 public final class ModelBundles {
@@ -38,6 +39,9 @@ public final class ModelBundles {
 
     // visible for testing
     static Model prepareModelForBundling(SmithyBundle bundle) {
+        // Check version - default to V1 if not specified (legacy behavior)
+        boolean useWrapping = bundle.getModelBundleVersion() == ModelBundleVersion.V2;
+
         // TODO: model the type in the returned bundle
         var suffix = bundle.getModel().startsWith("$version") ? "smithy" : "json";
         var modelAssemble = new ModelAssembler().putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
@@ -78,7 +82,11 @@ public final class ModelBundles {
             }
 
             if (op.getInput().isEmpty() && additionalInputShape != null) {
-                addProxyOperationWithAdditionalInput(op, additionalInputShape, b, serviceBuilder, model);
+                if (useWrapping) {
+                    addProxyOperationWithWrappedInput(op, additionalInputShape, b, serviceBuilder, model);
+                } else {
+                    addProxyOperationWithMixedInput(op, additionalInputShape, b, serviceBuilder, model);
+                }
             } else {
                 var shape = model.expectShape(op.getInputShape());
                 for (var member : shape.members()) {
@@ -94,7 +102,11 @@ public final class ModelBundles {
                 }
 
                 if (additionalInputShape != null) {
-                    addProxyOperationWithAdditionalInput(op, additionalInputShape, b, serviceBuilder, model);
+                    if (useWrapping) {
+                        addProxyOperationWithWrappedInput(op, additionalInputShape, b, serviceBuilder, model);
+                    } else {
+                        addProxyOperationWithMixedInput(op, additionalInputShape, b, serviceBuilder, model);
+                    }
                 }
             }
         }
@@ -107,7 +119,10 @@ public final class ModelBundles {
         return b.build();
     }
 
-    private static void addProxyOperationWithAdditionalInput(
+    /**
+     * V2 behavior: Wrap input in a new structure containing both original input and additionalInput.
+     */
+    private static void addProxyOperationWithWrappedInput(
             OperationShape op,
             StructureShape additionalInput,
             Model.Builder builder,
@@ -124,7 +139,7 @@ public final class ModelBundles {
         var wrapperShapeId = ShapeId.from(op.getId().toString() + "ProxyInput");
 
         // Create the synthetic wrapper input
-        StructureShape finalInput = createSyntheticInput(
+        StructureShape finalInput = createWrappedInput(
                 wrapperShapeId,
                 additionalInput,
                 originalInputShapeId,
@@ -135,10 +150,67 @@ public final class ModelBundles {
                 .id(ShapeId.from(op.getId() + "Proxy"))
                 .input(finalInput)
                 .output(op.getOutputShape())
-                .addTrait(new ProxyOperationTrait(op.getId(), inputMemberName, "additionalInput"))
+                .addTrait(new ProxyOperationTrait(op.getId(), inputMemberName, "additionalInput", true))
                 .build();
         builder.addShape(newOperation);
         serviceBuilder.addOperation(newOperation).build();
+    }
+
+    /**
+     * V1 (legacy) behavior: Mix additionalInput into the existing input shape.
+     */
+    private static void addProxyOperationWithMixedInput(
+            OperationShape op,
+            StructureShape additionalInput,
+            Model.Builder builder,
+            ServiceShape.Builder serviceBuilder,
+            Model model
+    ) {
+        var input = op.getInput();
+        StructureShape finalInput;
+        if (op.getInput().isEmpty()) {
+            // Create synthetic container with just additionalInput
+            var containerId = syntheticContainerForInput(additionalInput);
+            var container = builder.getCurrentShapes().get(containerId);
+            if (container == null) {
+                finalInput = createLegacySyntheticInput(containerId, additionalInput);
+                builder.addShape(finalInput);
+            } else {
+                finalInput = (StructureShape) container;
+            }
+        } else {
+            // Mix additionalInput member into existing input shape
+            var inputBuilder = model.expectShape(input.get(), StructureShape.class).toBuilder();
+            inputBuilder.addMember(MemberShape.builder()
+                    .id(ShapeId.from(inputBuilder.getId().toString() + "$additionalInput"))
+                    .target(additionalInput.getId())
+                    .build());
+            finalInput = inputBuilder.id(ShapeId.from(inputBuilder.getId().toString()) + "Proxy").build();
+            builder.addShape(finalInput);
+        }
+
+        var newOperation = op.toBuilder()
+                .id(ShapeId.from(op.getId().toString() + "Proxy"))
+                .input(finalInput)
+                .output(op.getOutputShape())
+                .addTrait(new ProxyOperationTrait(op.getId(), null, "additionalInput", false))
+                .build();
+        builder.addShape(newOperation);
+        serviceBuilder.addOperation(newOperation).build();
+    }
+
+    private static ShapeId syntheticContainerForInput(StructureShape additionalInput) {
+        return ShapeId.from("smithy.mcp#AdditionalInputFor" + additionalInput.getId().getName());
+    }
+
+    private static StructureShape createLegacySyntheticInput(ShapeId containerId, StructureShape additionalInput) {
+        return StructureShape.builder()
+                .id(containerId)
+                .addMember(MemberShape.builder()
+                        .id(containerId.toString() + "$additionalInput")
+                        .target(additionalInput.getId())
+                        .build())
+                .build();
     }
 
     private static String toLowerCamelCase(String name) {
@@ -148,7 +220,7 @@ public final class ModelBundles {
         return Character.toLowerCase(name.charAt(0)) + name.substring(1);
     }
 
-    private static StructureShape createSyntheticInput(
+    private static StructureShape createWrappedInput(
             ShapeId containerId,
             StructureShape additionalInput,
             ShapeId originalInputShapeId,
