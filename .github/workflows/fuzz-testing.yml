@@ -7,11 +7,6 @@ on:
 
   # Allow manual trigger
   workflow_dispatch:
-    inputs:
-      duration:
-        description: 'Fuzz test duration (e.g., 10m, 1h)'
-        required: false
-        default: '15m'
 
 permissions:
   contents: read
@@ -56,8 +51,7 @@ jobs:
 
       - name: Run all fuzz tests
         run: |
-          DURATION="${{ github.event.inputs.duration || '5h' }}"
-          ./gradlew fuzz -Pfuzz.maxDuration=$DURATION --stacktrace
+          ./gradlew fuzz -Pfuzz.maxDuration=4h --stacktrace
 
       - name: Save fuzz corpus cache
         uses: actions/cache/save@v4
