@@ -1,3 +1,2 @@
-GET /foo/?foo=bar&foo=baz HTTP/1.1
+GET /foo/?foo=c&foo=b&foo=a HTTP/1.1
 Host:example.amazonaws.com
-x-amz-content-sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855

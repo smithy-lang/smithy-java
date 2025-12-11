@@ -16,12 +16,12 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.SortedMap;
 import java.util.TreeMap;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -31,6 +31,7 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.uri.URLEncoding;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -316,7 +317,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         if (!path.startsWith("/")) {
             builder.append('/');
         }
-        builder.append(path);
+        URLEncoding.encodeUnreserved(path, builder, true);
     }
 
     private static void addCanonicalizedQueryString(URI uri, StringBuilder builder) {
@@ -324,29 +325,20 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         if (query == null) {
             return;
         }
-
-        SortedMap<String, List<String>> sorted = new TreeMap<>();
         var params = query.split("&");
+        var pairs = new ArrayList<String>(params.length / 2);
 
         for (var param : params) {
             var keyVal = param.split("=");
             var key = keyVal[0];
-            var value = "";
-            if (keyVal.length == 2) {
-                value = keyVal[1];
-            }
-            sorted.computeIfAbsent(key, k -> new ArrayList<>()).add(value);
+            var value = keyVal.length == 2 ? keyVal[1] : "";
+            pairs.add(key + "=" + value);
         }
 
-        for (var entry : sorted.entrySet()) {
-            for (var value : entry.getValue()) {
-                builder.append(entry.getKey());
-                builder.append('=');
-                builder.append(value);
-                builder.append('&');
-            }
+        Collections.sort(pairs);
+        for (var entry : pairs) {
+            builder.append(entry).append('&');
         }
-
         // Remove the trailing '&'.
         builder.setLength(builder.length() - 1);
     }
