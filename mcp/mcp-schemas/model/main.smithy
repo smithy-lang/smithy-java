@@ -110,7 +110,7 @@ structure JsonObjectSchema {
 
     required: StringList
 
-    additionalProperties: Boolean
+    additionalProperties: Document
 
     description: String
 
