@@ -1,5 +1,4 @@
-GET /foo/?foo=bar&foo=baz HTTP/1.1
+GET /foo/?foo=c&foo=b&foo=a HTTP/1.1
 Host:example.amazonaws.com
 X-Amz-Date:20150830T123600Z
-x-amz-content-sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-Authorization:AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/service/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=c92dfa7bd1679dedf93f5ff0417d56e5afbdd3dc430a6ef75ed3f615848bbce2
+Authorization:AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/service/aws4_request, SignedHeaders=host;x-amz-date, Signature=182c9f88ef9e0368a379e7d9e01d22639588b166acbd4820176eeb1d02c01b40
