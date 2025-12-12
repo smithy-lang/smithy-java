@@ -96,6 +96,8 @@ structure Echo {
     dateTimeTimestamp: Timestamp
     @timestampFormat("http-date")
     httpDateTimestamp: Timestamp
+    // Default timestamp (no format trait - defaults to date-time)
+    defaultTimestamp: Timestamp
 
     // Collections
     stringList: StringList

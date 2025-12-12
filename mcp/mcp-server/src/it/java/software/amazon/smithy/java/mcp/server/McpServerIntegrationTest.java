@@ -275,6 +275,8 @@ class McpServerIntegrationTest {
             assertEquals("number", echoProps.path("epochSecondsTimestamp").path("type").asText());
             assertEquals("string", echoProps.path("dateTimeTimestamp").path("type").asText());
             assertEquals("string", echoProps.path("httpDateTimestamp").path("type").asText());
+            // Default timestamp (no format trait) should be string (date-time format)
+            assertEquals("string", echoProps.path("defaultTimestamp").path("type").asText());
 
             // Enum should be string with enum values
             assertEquals("string", echoProps.path("enumValue").path("type").asText());
@@ -433,6 +435,15 @@ class McpServerIntegrationTest {
         var httpDateStr = "Tue, 14 Nov 2023 22:13:20 GMT";
         var echo = echoSingleField("httpDateTimestamp", Document.of(httpDateStr));
         assertEquals(httpDateStr, echo.getMember("httpDateTimestamp").asString());
+    }
+
+    @Test
+    void testDefaultTimestampRoundTrip() {
+        initializeLatestProtocol();
+        // Default format is date-time (ISO 8601 string)
+        var dateTimeStr = "2023-11-14T22:13:20Z";
+        var echo = echoSingleField("defaultTimestamp", Document.of(dateTimeStr));
+        assertEquals(dateTimeStr, echo.getMember("defaultTimestamp").asString());
     }
 
     // ========== List Tests ==========
@@ -796,6 +807,7 @@ class McpServerIntegrationTest {
         echoData.put("epochSecondsTimestamp", Document.of(1700000000.0));
         echoData.put("dateTimeTimestamp", Document.of("2023-11-14T22:13:20Z"));
         echoData.put("httpDateTimestamp", Document.of("Tue, 14 Nov 2023 22:13:20 GMT"));
+        echoData.put("defaultTimestamp", Document.of("2023-11-14T22:13:20Z"));
         echoData.put("stringList", Document.of(List.of(Document.of("a"), Document.of("b"))));
         echoData.put("integerList", Document.of(List.of(Document.of(1), Document.of(2))));
         echoData.put("stringMap", Document.of(Map.of("key1", Document.of("value1"))));
@@ -833,6 +845,7 @@ class McpServerIntegrationTest {
         assertNotNull(echo.getEpochSecondsTimestamp());
         assertNotNull(echo.getDateTimeTimestamp());
         assertNotNull(echo.getHttpDateTimestamp());
+        assertNotNull(echo.getDefaultTimestamp());
 
         // Verify collections
         assertEquals(2, echo.getStringList().size());
@@ -941,6 +954,7 @@ class McpServerIntegrationTest {
         echoData.put("epochSecondsTimestamp", Document.of(1700000000.0));
         echoData.put("dateTimeTimestamp", Document.of("2023-11-14T22:13:20Z"));
         echoData.put("httpDateTimestamp", Document.of("Tue, 14 Nov 2023 22:13:20 GMT"));
+        echoData.put("defaultTimestamp", Document.of("2023-11-14T22:13:20Z"));
         echoData.put("stringList", Document.of(List.of(Document.of("a"))));
         echoData.put("integerList", Document.of(List.of(Document.of(1))));
         echoData.put("nestedList", Document.of(List.of(nested)));
