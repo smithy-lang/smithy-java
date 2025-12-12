@@ -78,7 +78,7 @@ class McpServerIntegrationTest {
     private McpEchoOperationImpl echoOperation;
     private CalculateAreaOperation calculateAreaOperation;
     private int requestId = 0;
-    private Map<String, Schema> outputSchemaCache = new HashMap<>();
+    private final Map<String, Schema> outputSchemaCache = new HashMap<>();
     private ProtocolVersion currentProtocolVersion = null;
 
     @BeforeEach
@@ -278,12 +278,15 @@ class McpServerIntegrationTest {
             // Blob should be string (base64)
             assertEquals("string", echoProps.path("blobValue").path("type").asText());
 
-            // Timestamps - epoch-seconds is number, date-time and http-date are strings
-            assertEquals("number", echoProps.path("epochSecondsTimestamp").path("type").asText());
+            // All timestamps should be strings with format: date-time
+            assertEquals("string", echoProps.path("epochSecondsTimestamp").path("type").asText());
+            assertEquals("date-time", echoProps.path("epochSecondsTimestamp").path("format").asText());
             assertEquals("string", echoProps.path("dateTimeTimestamp").path("type").asText());
+            assertEquals("date-time", echoProps.path("dateTimeTimestamp").path("format").asText());
             assertEquals("string", echoProps.path("httpDateTimestamp").path("type").asText());
-            // Default timestamp (no format trait) should be string (date-time format)
+            assertEquals("date-time", echoProps.path("httpDateTimestamp").path("format").asText());
             assertEquals("string", echoProps.path("defaultTimestamp").path("type").asText());
+            assertEquals("date-time", echoProps.path("defaultTimestamp").path("format").asText());
 
             // Enum should be string with enum values
             assertEquals("string", echoProps.path("enumValue").path("type").asText());
@@ -423,9 +426,10 @@ class McpServerIntegrationTest {
     @Test
     void testEpochSecondsTimestampRoundTrip() {
         initializeLatestProtocol();
-        var epochSeconds = 1700000000.0;
+        var epochSeconds = 1700000000.0; // Input: epoch seconds number
+        var expectedOutput = "2023-11-14T22:13:20Z"; // Output: date-time string
         var echo = echoSingleField("epochSecondsTimestamp", Document.of(epochSeconds));
-        assertEquals(epochSeconds, echo.getMember("epochSecondsTimestamp").asNumber().doubleValue(), 0.001);
+        assertEquals(expectedOutput, echo.getMember("epochSecondsTimestamp").asString());
     }
 
     @Test
@@ -439,9 +443,10 @@ class McpServerIntegrationTest {
     @Test
     void testHttpDateTimestampRoundTrip() {
         initializeLatestProtocol();
-        var httpDateStr = "Tue, 14 Nov 2023 22:13:20 GMT";
+        var httpDateStr = "Tue, 14 Nov 2023 22:13:20 GMT"; // Input: http-date string
+        var expectedOutput = "2023-11-14T22:13:20Z"; // Output: date-time string
         var echo = echoSingleField("httpDateTimestamp", Document.of(httpDateStr));
-        assertEquals(httpDateStr, echo.getMember("httpDateTimestamp").asString());
+        assertEquals(expectedOutput, echo.getMember("httpDateTimestamp").asString());
     }
 
     @Test

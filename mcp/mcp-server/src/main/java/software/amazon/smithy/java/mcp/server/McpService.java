@@ -61,7 +61,6 @@ import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
@@ -571,8 +570,7 @@ public final class McpService {
     private JsonPrimitiveSchema createJsonPrimitiveSchema(Schema member) {
         var type = switch (member.type()) {
             case BYTE, SHORT, INTEGER, INT_ENUM, LONG, FLOAT, DOUBLE -> JsonPrimitiveType.NUMBER;
-            case ENUM, BLOB, STRING, BIG_DECIMAL, BIG_INTEGER -> JsonPrimitiveType.STRING;
-            case TIMESTAMP -> resolveTimestampType(member);
+            case ENUM, BLOB, STRING, BIG_DECIMAL, BIG_INTEGER, TIMESTAMP -> JsonPrimitiveType.STRING;
             case BOOLEAN -> JsonPrimitiveType.BOOLEAN;
             default -> throw new RuntimeException(member + " is not a primitive type");
         };
@@ -580,6 +578,11 @@ public final class McpService {
         var builder = JsonPrimitiveSchema.builder()
                 .type(type)
                 .description(memberDescription(member));
+
+        // Add format annotation for timestamps per JSON Schema spec
+        if (member.type() == ShapeType.TIMESTAMP) {
+            builder.format("date-time");
+        }
 
         List<Document> enumValues = switch (member.type()) {
             case ENUM -> member.stringEnumValues().stream().map(Document::of).toList();
@@ -723,15 +726,6 @@ public final class McpService {
         return description;
     }
 
-    private static JsonPrimitiveType resolveTimestampType(Schema schema) {
-        var format = getFormat(schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT));
-        return switch (format) {
-            case EPOCH_SECONDS -> JsonPrimitiveType.NUMBER;
-            case DATE_TIME, HTTP_DATE -> JsonPrimitiveType.STRING;
-            case UNKNOWN -> throw new RuntimeException("unknown timestamp format: " + format);
-        };
-    }
-
     private static String createDescription(
             String serviceName,
             String operationName,
@@ -791,7 +785,7 @@ public final class McpService {
                 case BLOB -> doc;
                 default -> badType(fromType, toType);
             };
-            case TIMESTAMP -> adaptTimestampInput(doc, schema);
+            case TIMESTAMP -> adaptTimestampInput(doc);
             case STRUCTURE -> {
                 var convertedMembers = new HashMap<String, Document>();
                 var members = schema.members();
@@ -871,15 +865,22 @@ public final class McpService {
         throw new RuntimeException("Cannot convert from " + from + " to " + to);
     }
 
-    private static Document adaptTimestampInput(Document doc, Schema schema) {
-        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
-        var format = getFormat(trait);
-        return switch (format) {
-            case EPOCH_SECONDS -> Document.of(EPOCH_SECONDS.readFromNumber(doc.asNumber()));
-            case DATE_TIME -> Document.of(DATE_TIME.readFromString(doc.asString(), false));
-            case HTTP_DATE -> Document.of(HTTP_DATE.readFromString(doc.asString(), false));
-            default -> doc;
-        };
+    /**
+     *  This is primarily for more robustness against AI hallucinations.
+     */
+    private static Document adaptTimestampInput(Document doc) {
+        // If input is a string, try DATE_TIME first, fallback to HTTP_DATE
+        if (doc.isType(ShapeType.STRING)) {
+            var str = doc.asString();
+            try {
+                return Document.of(DATE_TIME.readFromString(str, false));
+            } catch (Exception e) {
+                // Fallback to HTTP_DATE format
+                return Document.of(HTTP_DATE.readFromString(str, false));
+            }
+        }
+        // If input is a number, use epoch seconds
+        return Document.of(EPOCH_SECONDS.readFromNumber(doc.asNumber()));
     }
 
     private Document adaptOutputDocument(Document doc, Schema schema) {
@@ -891,7 +892,7 @@ public final class McpService {
             case BIG_DECIMAL -> Document.of(doc.asBigDecimal().toString());
             case BIG_INTEGER -> Document.of(doc.asBigInteger().toString());
             case BLOB -> Document.of(Base64.getEncoder().encodeToString(ByteBufferUtils.getBytes(doc.asBlob())));
-            case TIMESTAMP -> adaptTimestampOutput(doc, schema);
+            case TIMESTAMP -> Document.of(DATE_TIME.writeString(doc.asTimestamp()));
             case STRUCTURE -> {
                 var convertedMembers = new HashMap<String, Document>();
                 for (var member : schema.members()) {
@@ -962,17 +963,6 @@ public final class McpService {
         };
     }
 
-    private static Document adaptTimestampOutput(Document doc, Schema schema) {
-        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
-        var instant = doc.asTimestamp();
-        TimestampFormatTrait.Format format = getFormat(trait);
-        return switch (format) {
-            case DATE_TIME -> Document.of(DATE_TIME.writeString(instant));
-            case HTTP_DATE -> Document.of(HTTP_DATE.writeString(instant));
-            default -> Document.of(instant.toEpochMilli() / 1000.0);
-        };
-    }
-
     public static Builder builder() {
         return new Builder();
     }
@@ -1017,14 +1007,6 @@ public final class McpService {
 
         public McpService build() {
             return new McpService(services, proxyList, name, version, toolFilter, metricsObserver);
-        }
-    }
-
-    private static TimestampFormatTrait.Format getFormat(TimestampFormatTrait trait) {
-        if (trait == null) {
-            return TimestampFormatTrait.Format.DATE_TIME;
-        } else {
-            return trait.getFormat();
         }
     }
 }
