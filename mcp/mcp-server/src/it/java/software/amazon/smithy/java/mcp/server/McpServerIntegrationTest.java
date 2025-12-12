@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.MissingNode;
 import com.networknt.schema.Error;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaLocation;
@@ -23,6 +24,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -76,6 +78,8 @@ class McpServerIntegrationTest {
     private McpEchoOperationImpl echoOperation;
     private CalculateAreaOperation calculateAreaOperation;
     private int requestId = 0;
+    private Map<String, Schema> outputSchemaCache = new HashMap<>();
+    private ProtocolVersion currentProtocolVersion = null;
 
     @BeforeEach
     void init() {
@@ -98,6 +102,8 @@ class McpServerIntegrationTest {
 
     @AfterEach
     void teardown() {
+        outputSchemaCache.clear();
+        currentProtocolVersion = null;
         if (mcpServer != null) {
             mcpServer.shutdown().join();
         }
@@ -110,6 +116,7 @@ class McpServerIntegrationTest {
     }
 
     private Document getEchoFromResponse(JsonRpcResponse response) {
+        assertNull(response.getError());
         return response.getResult().getMember("structuredContent").getMember("echo");
     }
 
@@ -591,6 +598,42 @@ class McpServerIntegrationTest {
     }
 
     static Stream<Arguments> documentSchemaValidationTestCases() {
+        var listOfNulls = new ArrayList<Document>();
+        listOfNulls.add(null);
+        listOfNulls.add(null);
+        listOfNulls.add(Document.of("non-null"));
+
+        var mapOfNulls = new HashMap<String, Document>();
+        mapOfNulls.put("first", null);
+        mapOfNulls.put("second", null);
+        mapOfNulls.put("third", Document.of("non-null"));
+
+        // All nulls array
+        var allNullsArray = new ArrayList<Document>();
+        allNullsArray.add(null);
+        allNullsArray.add(null);
+        allNullsArray.add(null);
+
+        // All nulls map
+        var allNullsMap = new HashMap<String, Document>();
+        allNullsMap.put("a", null);
+        allNullsMap.put("b", null);
+        allNullsMap.put("c", null);
+
+        // Nested structure with nulls
+        var innerMapWithNull = new HashMap<String, Document>();
+        innerMapWithNull.put("present", Document.of("value"));
+        innerMapWithNull.put("absent", null);
+
+        var listWithNestedNull = new ArrayList<Document>();
+        listWithNestedNull.add(Document.of(innerMapWithNull));
+        listWithNestedNull.add(null);
+
+        var nestedWithNulls = new HashMap<String, Document>();
+        nestedWithNulls.put("map", Document.of(innerMapWithNull));
+        nestedWithNulls.put("list", Document.of(listWithNestedNull));
+        nestedWithNulls.put("nullKey", null);
+
         return Stream.of(
                 // String document
                 Arguments.of("string document", Document.of("hello world")),
@@ -630,8 +673,13 @@ class McpServerIntegrationTest {
                                 Document.of(true),
                                 Document.of(Map.of("nested", Document.of("value"))),
                                 Document.of(List.of(Document.of(1), Document.of(2)))))),
-                // Empty object document
-                Arguments.of("empty object document", Document.of(Map.of())));
+                Arguments.of("empty object document", Document.of(Map.of())),
+                Arguments.of("empty array document", Document.of(List.of())),
+                Arguments.of("array of nulls document", Document.of(listOfNulls)),
+                Arguments.of("map of nulls document", Document.of(mapOfNulls)),
+                Arguments.of("all nulls array document", Document.of(allNullsArray)),
+                Arguments.of("all nulls map document", Document.of(allNullsMap)),
+                Arguments.of("nested nulls document", Document.of(nestedWithNulls)));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -665,7 +713,8 @@ class McpServerIntegrationTest {
         var callResponseNode = OBJECT_MAPPER.readTree(callResponseJson);
         var structuredContentNode = callResponseNode.path("result").path("structuredContent");
 
-        assertNotNull(structuredContentNode, "Structured content should not be null for: " + description);
+        assertFalse(structuredContentNode.isMissingNode(),
+                "Structured content should not be missing for: " + description);
 
         // Validate using Jackson-parsed JSON directly
         Schema schema = SCHEMA_FACTORY.getSchema(outputSchemaNode);
@@ -977,7 +1026,7 @@ class McpServerIntegrationTest {
         var callResponseNode = OBJECT_MAPPER.readTree(callResponseJson);
         var structuredContentNode = callResponseNode.path("result").path("structuredContent");
 
-        assertNotNull(structuredContentNode);
+        assertFalse(structuredContentNode.isMissingNode(), "Missing structured content");
 
         // Validate using Jackson-parsed JSON directly
         Schema schema = SCHEMA_FACTORY.getSchema(outputSchemaNode);
@@ -1009,6 +1058,499 @@ class McpServerIntegrationTest {
         assertNull(response.getResult().getMember("structuredContent"));
         // But content should still be present
         assertNotNull(response.getResult().getMember("content"));
+    }
+
+    // ========== Null Handling Tests ==========
+
+    @Test
+    void testNullDocumentValue() {
+        initializeLatestProtocol();
+        var echoData = new HashMap<String, Document>();
+        echoData.put("requiredField", Document.of("required"));
+        echoData.put("documentValue", null);
+        var response = callTool("McpEcho", createEchoInput(echoData));
+        assertNull(response.getError(),
+                "Expected no error but got: " + (response.getError() != null ? response.getError().getMessage() : ""));
+        var echo = getEchoFromResponse(response);
+        assertNull(echo.getMember("documentValue"), "documentValue should be null when set to null");
+    }
+
+    @Test
+    void testNestedDocumentWithNulls() {
+        initializeLatestProtocol();
+        // Create nested structure with nulls
+        var innerMap = new HashMap<String, Document>();
+        innerMap.put("present", Document.of("value"));
+        innerMap.put("absent", null);
+
+        var listWithNulls = new ArrayList<Document>();
+        listWithNulls.add(Document.of(innerMap));
+        listWithNulls.add(null);
+
+        var outerMap = new HashMap<String, Document>();
+        outerMap.put("nested", Document.of(innerMap));
+        outerMap.put("list", Document.of(listWithNulls));
+        var inputDoc = Document.of(outerMap);
+
+        var echo = echoSingleField("documentValue", inputDoc);
+        var returnedDoc = echo.getMember("documentValue");
+        assertNotNull(returnedDoc, "documentValue should not be null");
+
+        // Verify nested map
+        var nestedMap = returnedDoc.getMember("nested").asStringMap();
+        assertEquals("value", nestedMap.get("present").asString());
+        assertNull(nestedMap.get("absent"), "absent key should have null value");
+
+        // Verify list with nulls
+        var returnedList = returnedDoc.getMember("list").asList();
+        assertEquals(2, returnedList.size());
+        assertNotNull(returnedList.get(0), "First list element should not be null");
+        assertNull(returnedList.get(1), "Second list element should be null");
+
+        // Verify input matches output
+        assertTrue(Document.equals(inputDoc, returnedDoc), "Input should match output");
+        // Verify server received correct input
+        var lastInput = echoOperation.getLastInput().getEcho().getDocumentValue();
+        assertTrue(Document.equals(inputDoc, lastInput), "Input should match server received input");
+    }
+
+    @Test
+    void testAllNullsContainers() {
+        initializeLatestProtocol();
+
+        // Test all-nulls array
+        var allNullsArray = new ArrayList<Document>();
+        allNullsArray.add(null);
+        allNullsArray.add(null);
+        allNullsArray.add(null);
+        var inputArrayDoc = Document.of(allNullsArray);
+
+        var echoArray = echoSingleField("documentValue", inputArrayDoc);
+        var returnedList = echoArray.getMember("documentValue").asList();
+        assertEquals(3, returnedList.size());
+        assertNull(returnedList.get(0), "Array element 0 should be null");
+        assertNull(returnedList.get(1), "Array element 1 should be null");
+        assertNull(returnedList.get(2), "Array element 2 should be null");
+        // Verify input matches output
+        assertTrue(Document.equals(inputArrayDoc, echoArray.getMember("documentValue")),
+                "Array input should match output");
+        // Verify server received correct input
+        var lastInputArray = echoOperation.getLastInput().getEcho().getDocumentValue();
+        assertTrue(Document.equals(inputArrayDoc, lastInputArray), "Array input should match server received input");
+
+        // Test all-nulls map
+        var allNullsMap = new HashMap<String, Document>();
+        allNullsMap.put("a", null);
+        allNullsMap.put("b", null);
+        allNullsMap.put("c", null);
+        var inputMapDoc = Document.of(allNullsMap);
+
+        var echoMap = echoSingleField("documentValue", inputMapDoc);
+        var returnedMap = echoMap.getMember("documentValue").asStringMap();
+        assertEquals(3, returnedMap.size());
+        assertNull(returnedMap.get("a"), "Map key 'a' should have null value");
+        assertNull(returnedMap.get("b"), "Map key 'b' should have null value");
+        assertNull(returnedMap.get("c"), "Map key 'c' should have null value");
+        // Verify input matches output
+        assertTrue(Document.equals(inputMapDoc, echoMap.getMember("documentValue")), "Map input should match output");
+        // Verify server received correct input
+        var lastInputMap = echoOperation.getLastInput().getEcho().getDocumentValue();
+        assertTrue(Document.equals(inputMapDoc, lastInputMap), "Map input should match server received input");
+    }
+
+    @Test
+    void testNullsPreservePositionInArray() {
+        initializeLatestProtocol();
+        var list = new ArrayList<Document>();
+        list.add(null); // position 0
+        list.add(Document.of("middle")); // position 1
+        list.add(null); // position 2
+        list.add(Document.of("end")); // position 3
+        var inputDoc = Document.of(list);
+
+        var echo = echoSingleField("documentValue", inputDoc);
+        var returnedList = echo.getMember("documentValue").asList();
+        assertEquals(4, returnedList.size());
+        assertNull(returnedList.get(0), "Position 0 should be null");
+        assertEquals("middle", returnedList.get(1).asString());
+        assertNull(returnedList.get(2), "Position 2 should be null");
+        assertEquals("end", returnedList.get(3).asString());
+        // Verify input matches output
+        assertTrue(Document.equals(inputDoc, echo.getMember("documentValue")), "Input should match output");
+        // Verify server received correct input
+        var lastInput = echoOperation.getLastInput().getEcho().getDocumentValue();
+        assertTrue(Document.equals(inputDoc, lastInput), "Input should match server received input");
+    }
+
+    @Test
+    void testNullsInRawJson() throws Exception {
+        initializeLatestProtocol();
+
+        // Test map with nulls in raw JSON
+        var mapWithNulls = new HashMap<String, Document>();
+        mapWithNulls.put("nullKey", null);
+        mapWithNulls.put("present", Document.of("value"));
+        var inputMapDoc = Document.of(mapWithNulls);
+
+        var echoDataMap = new HashMap<String, Document>();
+        echoDataMap.put("requiredField", Document.of("required"));
+        echoDataMap.put("documentValue", inputMapDoc);
+
+        var paramsMap = Document.of(Map.of(
+                "name",
+                Document.of("McpEcho"),
+                "arguments",
+                createEchoInput(echoDataMap)));
+        write("tools/call", paramsMap);
+        var mapResponseJson = readRawResponse();
+
+        var mapResponseNode = OBJECT_MAPPER.readTree(mapResponseJson);
+        var mapDocNode = mapResponseNode.path("result").path("structuredContent").path("echo").path("documentValue");
+        assertTrue(mapDocNode.has("nullKey"), "JSON should contain nullKey");
+        assertTrue(mapDocNode.get("nullKey").isNull(), "nullKey should be JSON null");
+        assertEquals("value", mapDocNode.get("present").asText());
+
+        // Test array with nulls in raw JSON
+        var listWithNulls = new ArrayList<Document>();
+        listWithNulls.add(null);
+        listWithNulls.add(Document.of("value"));
+        listWithNulls.add(null);
+        var inputArrayDoc = Document.of(listWithNulls);
+
+        var echoDataArray = new HashMap<String, Document>();
+        echoDataArray.put("requiredField", Document.of("required"));
+        echoDataArray.put("documentValue", inputArrayDoc);
+
+        var paramsArray = Document.of(Map.of(
+                "name",
+                Document.of("McpEcho"),
+                "arguments",
+                createEchoInput(echoDataArray)));
+        write("tools/call", paramsArray);
+        var arrayResponseJson = readRawResponse();
+
+        var arrayResponseNode = OBJECT_MAPPER.readTree(arrayResponseJson);
+        var arrayDocNode =
+                arrayResponseNode.path("result").path("structuredContent").path("echo").path("documentValue");
+        assertTrue(arrayDocNode.isArray(), "documentValue should be an array");
+        assertEquals(3, arrayDocNode.size());
+        assertTrue(arrayDocNode.get(0).isNull(), "Array element 0 should be JSON null");
+        assertEquals("value", arrayDocNode.get(1).asText());
+        assertTrue(arrayDocNode.get(2).isNull(), "Array element 2 should be JSON null");
+    }
+
+    @Test
+    void testNullsInTypedLists() {
+        initializeLatestProtocol();
+
+        // Test nulls in StringList
+        var stringListWithNulls = new ArrayList<Document>();
+        stringListWithNulls.add(Document.of("first"));
+        stringListWithNulls.add(null);
+        stringListWithNulls.add(Document.of("third"));
+
+        var echoDataStringList = new HashMap<String, Document>();
+        echoDataStringList.put("requiredField", Document.of("required"));
+        echoDataStringList.put("stringList", Document.of(stringListWithNulls));
+
+        var responseStringList = callTool("McpEcho", createEchoInput(echoDataStringList));
+        assertNull(responseStringList.getError(),
+                "Expected no error but got: "
+                        + (responseStringList.getError() != null ? responseStringList.getError().getMessage() : ""));
+        var echoStringList = getEchoFromResponse(responseStringList);
+        var returnedStringList = echoStringList.getMember("stringList").asList();
+        assertEquals(3, returnedStringList.size());
+        assertEquals("first", returnedStringList.get(0).asString());
+        assertNull(returnedStringList.get(1), "Element 1 should be null");
+        assertEquals("third", returnedStringList.get(2).asString());
+        // Verify server received correct input
+        var lastInputStringList = echoOperation.getLastInput().getEcho().getStringList();
+        assertEquals(3, lastInputStringList.size());
+        assertEquals("first", lastInputStringList.get(0));
+        assertNull(lastInputStringList.get(1), "Server received list element 1 should be null");
+        assertEquals("third", lastInputStringList.get(2));
+
+        // Test nulls in IntegerList
+        var intListWithNulls = new ArrayList<Document>();
+        intListWithNulls.add(Document.of(1));
+        intListWithNulls.add(null);
+        intListWithNulls.add(Document.of(3));
+
+        var echoDataIntList = new HashMap<String, Document>();
+        echoDataIntList.put("requiredField", Document.of("required"));
+        echoDataIntList.put("integerList", Document.of(intListWithNulls));
+
+        var responseIntList = callTool("McpEcho", createEchoInput(echoDataIntList));
+        assertNull(responseIntList.getError(),
+                "Expected no error but got: "
+                        + (responseIntList.getError() != null ? responseIntList.getError().getMessage() : ""));
+        var echoIntList = getEchoFromResponse(responseIntList);
+        var returnedIntList = echoIntList.getMember("integerList").asList();
+        assertEquals(3, returnedIntList.size());
+        assertEquals(1, returnedIntList.get(0).asInteger());
+        assertNull(returnedIntList.get(1), "Element 1 should be null");
+        assertEquals(3, returnedIntList.get(2).asInteger());
+        // Verify server received correct input
+        var lastInputIntList = echoOperation.getLastInput().getEcho().getIntegerList();
+        assertEquals(3, lastInputIntList.size());
+        assertEquals(Integer.valueOf(1), lastInputIntList.get(0));
+        assertNull(lastInputIntList.get(1), "Server received list element 1 should be null");
+        assertEquals(Integer.valueOf(3), lastInputIntList.get(2));
+    }
+
+    @Test
+    void testNullsInTypedMaps() {
+        initializeLatestProtocol();
+
+        // Test nulls in StringMap
+        var stringMapWithNulls = new HashMap<String, Document>();
+        stringMapWithNulls.put("present", Document.of("value"));
+        stringMapWithNulls.put("nullKey", null);
+        stringMapWithNulls.put("another", Document.of("anotherValue"));
+
+        var echoDataStringMap = new HashMap<String, Document>();
+        echoDataStringMap.put("requiredField", Document.of("required"));
+        echoDataStringMap.put("stringMap", Document.of(stringMapWithNulls));
+
+        var responseStringMap = callTool("McpEcho", createEchoInput(echoDataStringMap));
+        assertNull(responseStringMap.getError(),
+                "Expected no error but got: "
+                        + (responseStringMap.getError() != null ? responseStringMap.getError().getMessage() : ""));
+        var echoStringMap = getEchoFromResponse(responseStringMap);
+        var returnedStringMap = echoStringMap.getMember("stringMap").asStringMap();
+        assertEquals(3, returnedStringMap.size());
+        assertEquals("value", returnedStringMap.get("present").asString());
+        assertNull(returnedStringMap.get("nullKey"), "nullKey should have null value");
+        assertEquals("anotherValue", returnedStringMap.get("another").asString());
+        // Verify server received correct input
+        var lastInputStringMap = echoOperation.getLastInput().getEcho().getStringMap();
+        assertEquals(3, lastInputStringMap.size());
+        assertEquals("value", lastInputStringMap.get("present"));
+        assertNull(lastInputStringMap.get("nullKey"), "Server received map nullKey should be null");
+        assertEquals("anotherValue", lastInputStringMap.get("another"));
+    }
+
+    @Test
+    void testDeeplyNestedNulls() {
+        initializeLatestProtocol();
+        // Create deeply nested structure with nulls at various levels
+        var level3 = new HashMap<String, Document>();
+        level3.put("deep", Document.of("value"));
+        level3.put("nullDeep", null);
+
+        var level2List = new ArrayList<Document>();
+        level2List.add(Document.of(level3));
+        level2List.add(null);
+
+        var level2Map = new HashMap<String, Document>();
+        level2Map.put("list", Document.of(level2List));
+        level2Map.put("nullKey", null);
+
+        var level1 = new HashMap<String, Document>();
+        level1.put("level2", Document.of(level2Map));
+        level1.put("nullLevel", null);
+        var inputDoc = Document.of(level1);
+
+        var echo = echoSingleField("documentValue", inputDoc);
+        var returnedDoc = echo.getMember("documentValue");
+
+        // Verify level 1
+        assertNull(returnedDoc.getMember("nullLevel"), "nullLevel should be null");
+        var level2 = returnedDoc.getMember("level2");
+        assertNotNull(level2, "level2 should exist");
+
+        // Verify level 2
+        assertNull(level2.getMember("nullKey"), "nullKey at level 2 should be null");
+        var level2ListReturned = level2.getMember("list").asList();
+        assertEquals(2, level2ListReturned.size());
+        assertNull(level2ListReturned.get(1), "Second element in list should be null");
+
+        // Verify level 3
+        var level3Returned = level2ListReturned.get(0);
+        assertEquals("value", level3Returned.getMember("deep").asString());
+        assertNull(level3Returned.getMember("nullDeep"), "nullDeep should be null");
+
+        // Verify server received correct input
+        var lastInput = echoOperation.getLastInput().getEcho().getDocumentValue();
+        assertTrue(Document.equals(inputDoc, lastInput), "Input should match server received input");
+    }
+
+    // ========== Explicit Null Input Tests ==========
+
+    @Test
+    void testExplicitNullInputsForAllFieldTypes() {
+        initializeLatestProtocol();
+        // Send explicit null for ALL optional field types in a single request
+        var echoData = new HashMap<String, Document>();
+        echoData.put("requiredField", Document.of("required"));
+        // Primitives
+        echoData.put("stringValue", null);
+        echoData.put("booleanValue", null);
+        echoData.put("byteValue", null);
+        echoData.put("shortValue", null);
+        echoData.put("integerValue", null);
+        echoData.put("longValue", null);
+        echoData.put("floatValue", null);
+        echoData.put("doubleValue", null);
+        // Big numbers
+        echoData.put("bigDecimalValue", null);
+        echoData.put("bigIntegerValue", null);
+        // Blob
+        echoData.put("blobValue", null);
+        // Timestamps
+        echoData.put("epochSecondsTimestamp", null);
+        echoData.put("dateTimeTimestamp", null);
+        echoData.put("httpDateTimestamp", null);
+        echoData.put("defaultTimestamp", null);
+        // Collections
+        echoData.put("stringList", null);
+        echoData.put("integerList", null);
+        echoData.put("nestedList", null);
+        echoData.put("stringMap", null);
+        echoData.put("nestedMap", null);
+        // Nested structure
+        echoData.put("nested", null);
+        // Document
+        echoData.put("documentValue", null);
+        // Enum and IntEnum
+        echoData.put("enumValue", null);
+        echoData.put("intEnumValue", null);
+        // Union
+        echoData.put("unionValue", null);
+
+        var response = callTool("McpEcho", createEchoInput(echoData));
+        assertNull(response.getError(),
+                "Expected no error but got: " + (response.getError() != null ? response.getError().getMessage() : ""));
+
+        var echo = getEchoFromResponse(response);
+        // Verify all fields are null
+        assertNull(echo.getMember("stringValue"));
+        assertNull(echo.getMember("booleanValue"));
+        assertNull(echo.getMember("byteValue"));
+        assertNull(echo.getMember("shortValue"));
+        assertNull(echo.getMember("integerValue"));
+        assertNull(echo.getMember("longValue"));
+        assertNull(echo.getMember("floatValue"));
+        assertNull(echo.getMember("doubleValue"));
+        assertNull(echo.getMember("bigDecimalValue"));
+        assertNull(echo.getMember("bigIntegerValue"));
+        assertNull(echo.getMember("blobValue"));
+        assertNull(echo.getMember("epochSecondsTimestamp"));
+        assertNull(echo.getMember("dateTimeTimestamp"));
+        assertNull(echo.getMember("httpDateTimestamp"));
+        assertNull(echo.getMember("defaultTimestamp"));
+        assertNull(echo.getMember("stringList"));
+        assertNull(echo.getMember("integerList"));
+        assertNull(echo.getMember("nestedList"));
+        assertNull(echo.getMember("stringMap"));
+        assertNull(echo.getMember("nestedMap"));
+        assertNull(echo.getMember("nested"));
+        assertNull(echo.getMember("documentValue"));
+        assertNull(echo.getMember("enumValue"));
+        assertNull(echo.getMember("intEnumValue"));
+        assertNull(echo.getMember("unionValue"));
+    }
+
+    @Test
+    void testExplicitNullInputInRawJson() throws Exception {
+        initializeLatestProtocol();
+        // Verify that explicitly null inputs appear correctly in JSON
+        var echoData = new HashMap<String, Document>();
+        echoData.put("requiredField", Document.of("required"));
+        echoData.put("stringValue", null);
+        echoData.put("integerValue", null);
+
+        var params = Document.of(Map.of(
+                "name",
+                Document.of("McpEcho"),
+                "arguments",
+                createEchoInput(echoData)));
+        write("tools/call", params);
+        var callResponseJson = readRawResponse();
+
+        var responseNode = OBJECT_MAPPER.readTree(callResponseJson);
+        var echoNode = responseNode.path("result").path("structuredContent").path("echo");
+
+        // Required field should be present
+        assertEquals("required", echoNode.get("requiredField").asText());
+
+        // Explicit null fields should either be null or absent
+        if (echoNode.has("stringValue")) {
+            assertTrue(echoNode.get("stringValue").isNull(), "stringValue if present should be null");
+        }
+        if (echoNode.has("integerValue")) {
+            assertTrue(echoNode.get("integerValue").isNull(), "integerValue if present should be null");
+        }
+    }
+
+    // ========== Optional Field Null Tests (Unset Fields) ==========
+
+    @Test
+    void testAllOptionalFieldsReturnNullWhenUnset() {
+        initializeLatestProtocol();
+        // Only set requiredField, verify all optional fields are null
+        var response = callTool("McpEcho", createEchoInput(Map.of()));
+        assertNull(response.getError(),
+                "Expected no error but got: " + (response.getError() != null ? response.getError().getMessage() : ""));
+
+        var echo = getEchoFromResponse(response);
+        assertEquals("default-required", echo.getMember("requiredField").asString());
+
+        // Verify all optional fields are null
+        assertNull(echo.getMember("stringValue"));
+        assertNull(echo.getMember("booleanValue"));
+        assertNull(echo.getMember("byteValue"));
+        assertNull(echo.getMember("shortValue"));
+        assertNull(echo.getMember("integerValue"));
+        assertNull(echo.getMember("longValue"));
+        assertNull(echo.getMember("floatValue"));
+        assertNull(echo.getMember("doubleValue"));
+        assertNull(echo.getMember("bigDecimalValue"));
+        assertNull(echo.getMember("bigIntegerValue"));
+        assertNull(echo.getMember("blobValue"));
+        assertNull(echo.getMember("epochSecondsTimestamp"));
+        assertNull(echo.getMember("dateTimeTimestamp"));
+        assertNull(echo.getMember("httpDateTimestamp"));
+        assertNull(echo.getMember("defaultTimestamp"));
+        assertNull(echo.getMember("stringList"));
+        assertNull(echo.getMember("integerList"));
+        assertNull(echo.getMember("nestedList"));
+        assertNull(echo.getMember("stringMap"));
+        assertNull(echo.getMember("nestedMap"));
+        assertNull(echo.getMember("nested"));
+        assertNull(echo.getMember("documentValue"));
+        assertNull(echo.getMember("enumValue"));
+        assertNull(echo.getMember("intEnumValue"));
+        assertNull(echo.getMember("unionValue"));
+    }
+
+    @Test
+    void testOptionalFieldsOmittedFromJson() throws Exception {
+        initializeLatestProtocol();
+        // Only set requiredField
+        var params = Document.of(Map.of(
+                "name",
+                Document.of("McpEcho"),
+                "arguments",
+                createEchoInput(Map.of())));
+        write("tools/call", params);
+        var callResponseJson = readRawResponse();
+
+        var responseNode = OBJECT_MAPPER.readTree(callResponseJson);
+        var echoNode = responseNode.path("result").path("structuredContent").path("echo");
+
+        // requiredField should be present
+        assertTrue(echoNode.has("requiredField"), "requiredField should be present");
+        assertEquals("default-required", echoNode.get("requiredField").asText());
+
+        // Optional fields should either be absent or null (implementation dependent)
+        // Verify they are not present with non-null values
+        if (echoNode.has("stringValue")) {
+            assertTrue(echoNode.get("stringValue").isNull(), "stringValue if present should be null");
+        }
+        if (echoNode.has("integerValue")) {
+            assertTrue(echoNode.get("integerValue").isNull(), "integerValue if present should be null");
+        }
     }
 
     // ========== OneOf Schema Tests ==========
@@ -1186,14 +1728,14 @@ class McpServerIntegrationTest {
         write("tools/list", Document.of(Map.of()));
         var toolsResponseJson = readRawResponse();
         var toolsNode = OBJECT_MAPPER.readTree(toolsResponseJson).path("result").path("tools");
-        JsonNode outputSchemaNode = null;
+        JsonNode outputSchemaNode = MissingNode.getInstance();
         for (var tool : toolsNode) {
             if (tool.path("name").asText().equals("CalculateArea")) {
                 outputSchemaNode = tool.path("outputSchema");
                 break;
             }
         }
-        assertNotNull(outputSchemaNode, "CalculateArea output schema not found");
+        assertFalse(outputSchemaNode.isMissingNode(), "CalculateArea output schema not found");
 
         // Call tool and get structuredContent (using wrapper format)
         var circle = Document.of(Map.of("circle", Document.of(Map.of("radius", Document.of(5)))));
@@ -1240,6 +1782,7 @@ class McpServerIntegrationTest {
     // ========== Helper Methods ==========
 
     private void initializeWithProtocolVersion(ProtocolVersion protocolVersion) {
+        this.currentProtocolVersion = protocolVersion;
         var params = Document.of(Map.of("protocolVersion", Document.of(protocolVersion.identifier())));
         write("initialize", params);
         var response = read();
@@ -1247,11 +1790,55 @@ class McpServerIntegrationTest {
     }
 
     private Document createEchoInput(Map<String, Document> echoFields) {
-        var echoWithRequired = new java.util.HashMap<>(echoFields);
+        var echoWithRequired = new HashMap<>(echoFields);
         if (!echoWithRequired.containsKey("requiredField")) {
             echoWithRequired.put("requiredField", Document.of("default-required"));
         }
         return Document.of(Map.of("echo", Document.of(echoWithRequired)));
+    }
+
+    private void cacheToolSchemas() throws Exception {
+        write("tools/list", Document.of(Map.of()));
+        var responseJson = readRawResponse();
+        var responseNode = OBJECT_MAPPER.readTree(responseJson);
+        var tools = responseNode.path("result").path("tools");
+        for (var tool : tools) {
+            var name = tool.path("name").asText();
+            var outputSchemaNode = tool.path("outputSchema");
+            if (!outputSchemaNode.isMissingNode()) {
+                outputSchemaCache.put(name, SCHEMA_FACTORY.getSchema(outputSchemaNode));
+            }
+        }
+    }
+
+    private void validateStructuredContent(String toolName, String responseJson) throws Exception {
+        // Only validate for protocol versions that support structured content (v2025_06_18+)
+        boolean supportsStructuredContent = currentProtocolVersion != null
+                && currentProtocolVersion.compareTo(ProtocolVersion.v2025_06_18.INSTANCE) >= 0;
+
+        if (!supportsStructuredContent) {
+            return; // Skip validation for older protocols
+        }
+
+        // Cache schemas lazily
+        if (outputSchemaCache.isEmpty()) {
+            cacheToolSchemas();
+        }
+
+        var responseNode = OBJECT_MAPPER.readTree(responseJson);
+        var structuredContentNode = responseNode.path("result").path("structuredContent");
+
+        // Assert structured content IS present for compatible protocols
+        assertFalse(structuredContentNode.isMissingNode(),
+                "structuredContent should be present for protocol version " + currentProtocolVersion.identifier());
+
+        // Validate against schema
+        var schema = outputSchemaCache.get(toolName);
+        if (schema != null) {
+            var errors = schema.validate(structuredContentNode);
+            assertTrue(errors.isEmpty(),
+                    "Schema validation failed for " + toolName + ": " + errors);
+        }
     }
 
     private JsonRpcResponse callTool(String toolName, Document arguments) {
@@ -1261,7 +1848,16 @@ class McpServerIntegrationTest {
                 "arguments",
                 arguments));
         write("tools/call", params);
-        return read();
+        var responseJson = readRawResponse();
+
+        // Validate structured content against schema
+        try {
+            validateStructuredContent(toolName, responseJson);
+        } catch (Exception e) {
+            throw new RuntimeException("Schema validation failed", e);
+        }
+
+        return CODEC.deserializeShape(responseJson, JsonRpcResponse.builder());
     }
 
     private Map<String, Document> findTool(List<Document> tools, String name) {
@@ -1310,17 +1906,20 @@ class McpServerIntegrationTest {
         public CalculateAreaOutput calculateArea(CalculateAreaInput input, RequestContext context) {
             var shape = Objects.requireNonNull(input.getOneOfInput());
             double area;
-            if (shape instanceof Shape.CircleMember circleMember) {
-                var circle = circleMember.circle();
-                area = circle.getRadius() * circle.getRadius() * Math.PI;
-            } else if (shape instanceof Shape.SquareMember squareMember) {
-                var square = squareMember.square();
-                area = square.getSide() * square.getSide();
-            } else if (shape instanceof Shape.RectangleMember rectangleMember) {
-                var rectangle = rectangleMember.rectangle();
-                area = rectangle.getLength() * rectangle.getBreadth();
-            } else {
-                throw new IllegalArgumentException("Unknown shape type");
+            switch (shape) {
+                case Shape.CircleMember circleMember -> {
+                    var circle = circleMember.circle();
+                    area = circle.getRadius() * circle.getRadius() * Math.PI;
+                }
+                case Shape.SquareMember squareMember -> {
+                    var square = squareMember.square();
+                    area = square.getSide() * square.getSide();
+                }
+                case Shape.RectangleMember rectangleMember -> {
+                    var rectangle = rectangleMember.rectangle();
+                    area = rectangle.getLength() * rectangle.getBreadth();
+                }
+                default -> throw new IllegalArgumentException("Unknown shape type");
             }
             return CalculateAreaOutput.builder().area(area).originalShape(shape).build();
         }

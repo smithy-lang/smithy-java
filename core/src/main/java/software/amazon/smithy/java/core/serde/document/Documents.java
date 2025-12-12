@@ -231,7 +231,13 @@ final class Documents {
             serializer.writeMap(schema, members, members.size(), (members, s) -> {
                 var key = schema.mapKeyMember();
                 for (var entry : members.entrySet()) {
-                    s.writeEntry(key, entry.getKey(), entry.getValue(), Document::serialize);
+                    s.writeEntry(key, entry.getKey(), entry.getValue(), (doc, ser) -> {
+                        if (doc == null) {
+                            ser.writeNull(schema.mapValueMember());
+                        } else {
+                            doc.serialize(ser);
+                        }
+                    });
                 }
             });
         }

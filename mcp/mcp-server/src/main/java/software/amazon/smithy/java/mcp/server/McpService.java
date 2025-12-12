@@ -550,9 +550,21 @@ public final class McpService {
     private JsonArraySchema createJsonArraySchema(Schema schema, Set<ShapeId> visited) {
         var listMember = schema.listMember();
         var items = createMemberSchema(listMember, visited);
+
+        // For sparse lists, allow null items using anyOf
+        Document itemsSchema;
+        if (schema.hasTrait(TraitKey.SPARSE_TRAIT)) {
+            var nullSchema = Map.of("type", Document.of("null"));
+            itemsSchema = Document.of(Map.of(
+                    "anyOf",
+                    Document.of(List.of(Document.of(items), Document.of(nullSchema)))));
+        } else {
+            itemsSchema = Document.of(items);
+        }
+
         return JsonArraySchema.builder()
                 .description(memberDescription(schema))
-                .items(Document.of(items))
+                .items(itemsSchema)
                 .build();
     }
 
@@ -665,11 +677,33 @@ public final class McpService {
     private SerializableShape createMemberSchema(Schema member, Set<ShapeId> visited) {
         return switch (member.type()) {
             case LIST, SET -> createJsonArraySchema(member.memberTarget(), visited);
-            case MAP, STRUCTURE -> createJsonObjectSchema(member.memberTarget(), visited);
+            case MAP -> createJsonMapSchema(member.memberTarget(), visited);
+            case STRUCTURE -> createJsonObjectSchema(member.memberTarget(), visited);
             case UNION -> createJsonUnionSchema(member.memberTarget(), visited);
             case DOCUMENT -> createJsonDocumentSchema(member, visited);
             default -> createJsonPrimitiveSchema(member);
         };
+    }
+
+    private JsonObjectSchema createJsonMapSchema(Schema schema, Set<ShapeId> visited) {
+        var mapValueMember = schema.mapValueMember();
+        var valueSchema = createMemberSchema(mapValueMember, visited);
+
+        // For sparse maps, allow null values using anyOf
+        Document additionalPropertiesSchema;
+        if (schema.hasTrait(TraitKey.SPARSE_TRAIT)) {
+            var nullSchema = Map.of("type", Document.of("null"));
+            additionalPropertiesSchema = Document.of(Map.of(
+                    "anyOf",
+                    Document.of(List.of(Document.of(valueSchema), Document.of(nullSchema)))));
+        } else {
+            additionalPropertiesSchema = Document.of(valueSchema);
+        }
+
+        return JsonObjectSchema.builder()
+                .description(memberDescription(schema))
+                .additionalProperties(additionalPropertiesSchema)
+                .build();
     }
 
     private static String memberDescription(Schema schema) {
@@ -736,6 +770,9 @@ public final class McpService {
     }
 
     private static Document adaptDocument(Document doc, Schema schema) {
+        if (doc == null) {
+            return null;
+        }
         var fromType = doc.type();
         var toType = schema.type();
         return switch (toType) {
@@ -882,9 +919,7 @@ public final class McpService {
                 var listMember = schema.listMember();
                 var convertedList = new ArrayList<Document>();
                 for (var item : doc.asList()) {
-                    if (item != null) {
-                        convertedList.add(adaptOutputDocument(item, listMember));
-                    }
+                    convertedList.add(adaptOutputDocument(item, listMember));
                 }
                 yield Document.of(convertedList);
             }
@@ -892,9 +927,7 @@ public final class McpService {
                 var mapValue = schema.mapValueMember();
                 var convertedMap = new HashMap<String, Document>();
                 for (var entry : doc.asStringMap().entrySet()) {
-                    if (entry.getValue() != null) {
-                        convertedMap.put(entry.getKey(), adaptOutputDocument(entry.getValue(), mapValue));
-                    }
+                    convertedMap.put(entry.getKey(), adaptOutputDocument(entry.getValue(), mapValue));
                 }
                 yield Document.of(convertedMap);
             }

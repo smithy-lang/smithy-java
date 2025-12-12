@@ -135,23 +135,28 @@ structure NestedEcho {
     recursive: NestedEcho
 }
 
+@sparse
 list StringList {
     member: String
 }
 
+@sparse
 list IntegerList {
     member: Integer
 }
 
+@sparse
 list NestedEchoList {
     member: NestedEcho
 }
 
+@sparse
 map StringMap {
     key: String
     value: String
 }
 
+@sparse
 map NestedEchoMap {
     key: String
     value: NestedEcho
