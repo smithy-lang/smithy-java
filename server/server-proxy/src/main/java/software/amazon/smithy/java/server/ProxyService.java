@@ -323,6 +323,9 @@ public final class ProxyService implements Service {
                     var inputMemberName = proxyTrait.getInputMemberName();
                     if (inputMemberName != null) {
                         unwrappedInput = input.getMember(inputMemberName);
+                        if (unwrappedInput == null) {
+                            throw new IllegalArgumentException("Expected input to be present in " + inputMemberName);
+                        }
                     } else {
                         unwrappedInput = Document.of(Unit.getInstance());
                     }
