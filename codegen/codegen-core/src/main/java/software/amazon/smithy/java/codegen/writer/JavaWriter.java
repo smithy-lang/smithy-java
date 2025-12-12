@@ -82,6 +82,15 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
                 super.toString());
     }
 
+    /**
+     * @return Returns the formatted writer contents without headers, package declarations, or imports.
+     */
+    public String toContentString() {
+        putNameContext();
+        setExpressionStart(PLACEHOLDER_FORMAT_CHAR);
+        return format("£L", super.toString());
+    }
+
     public void newLine() {
         writeInlineWithNoFormatting(getNewline());
     }
