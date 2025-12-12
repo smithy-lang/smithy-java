@@ -144,6 +144,9 @@ structure JsonPrimitiveSchema {
 
     @jsonName("enum")
     enumValues: JsonSchemaList
+
+    /// JSON Schema format annotation (e.g., "date-time" for timestamps)
+    format: String
 }
 
 structure JsonDocumentSchema {
