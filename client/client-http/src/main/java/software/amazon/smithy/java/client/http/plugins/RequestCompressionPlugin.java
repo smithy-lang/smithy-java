@@ -13,13 +13,11 @@ import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.http.HttpContext;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.client.http.compression.CompressionAlgorithm;
-import software.amazon.smithy.java.client.http.compression.Gzip;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.model.traits.RequestCompressionTrait;
-import software.amazon.smithy.utils.ListUtils;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
@@ -32,20 +30,21 @@ public final class RequestCompressionPlugin implements AutoClientPlugin {
     public void configureClient(ClientConfig.Builder config) {
         if (config.isUsingMessageExchange(HttpMessageExchange.INSTANCE)) {
             config.addInterceptor(RequestCompressionInterceptor.INSTANCE);
-            config.putConfigIfAbsent(HttpContext.DISABLE_REQUEST_COMPRESSION, false);
         }
     }
 
     static final class RequestCompressionInterceptor implements ClientInterceptor {
 
         private static final int DEFAULT_MIN_COMPRESSION_SIZE_BYTES = 10240;
-        private static final int COMPRESSION_SIZE_CAP = 10485760;
+        // This cap matches ApiGateway's spec: https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-openapi-minimum-compression-size.html
+        private static final int MIN_COMPRESSION_SIZE_CAP = 10485760;
         private static final String CONTENT_ENCODING_HEADER = "Content-Encoding";
         private static final ClientInterceptor INSTANCE = new RequestCompressionInterceptor();
         private static final TraitKey<RequestCompressionTrait> REQUEST_COMPRESSION_TRAIT_KEY =
                 TraitKey.get(RequestCompressionTrait.class);
         // Currently only Gzip is supported in Smithy model: https://smithy.io/2.0/spec/behavior-traits.html#requestcompression-trait
-        private static final List<CompressionAlgorithm> supportedAlgorithms = ListUtils.of(new Gzip());
+        private static final List<CompressionAlgorithm> supportedAlgorithms =
+                CompressionAlgorithm.supportedAlgorithms();
 
         @Override
         public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
@@ -54,12 +53,12 @@ public final class RequestCompressionPlugin implements AutoClientPlugin {
 
         private static HttpRequest processRequest(RequestHook<?, ?, HttpRequest> hook) {
             if (shouldCompress(hook)) {
-                RequestCompressionTrait compressionTrait =
+                var compressionTrait =
                         hook.operation().schema().getTrait(REQUEST_COMPRESSION_TRAIT_KEY);
                 var request = hook.request();
                 // Will pick the first supported algorithm to compress the body.
-                for (String algorithmId : compressionTrait.getEncodings()) {
-                    for (CompressionAlgorithm algorithm : supportedAlgorithms) {
+                for (var algorithmId : compressionTrait.getEncodings()) {
+                    for (var algorithm : supportedAlgorithms) {
                         if (algorithmId.equals(algorithm.algorithmId())) {
                             var compressed = algorithm.compress(request.body());
                             return request.toBuilder()
@@ -96,7 +95,7 @@ public final class RequestCompressionPlugin implements AutoClientPlugin {
         }
 
         private static void validateCompressionSize(int minCompressionSize) {
-            if (minCompressionSize < 0 || minCompressionSize > COMPRESSION_SIZE_CAP) {
+            if (minCompressionSize < 0 || minCompressionSize > MIN_COMPRESSION_SIZE_CAP) {
                 throw new IllegalArgumentException("Min compression size must be between 0 and 10485760");
             }
         }
