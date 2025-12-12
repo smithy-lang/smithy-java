@@ -690,15 +690,11 @@ public final class McpService {
     }
 
     private static JsonPrimitiveType resolveTimestampType(Schema schema) {
-        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
-        if (trait == null) {
-            // default is epoch-seconds
-            return JsonPrimitiveType.NUMBER;
-        }
-        return switch (trait.getFormat()) {
+        var format = getFormat(schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT));
+        return switch (format) {
             case EPOCH_SECONDS -> JsonPrimitiveType.NUMBER;
             case DATE_TIME, HTTP_DATE -> JsonPrimitiveType.STRING;
-            case UNKNOWN -> throw new RuntimeException("unknown timestamp format: " + trait.getFormat());
+            case UNKNOWN -> throw new RuntimeException("unknown timestamp format: " + format);
         };
     }
 
