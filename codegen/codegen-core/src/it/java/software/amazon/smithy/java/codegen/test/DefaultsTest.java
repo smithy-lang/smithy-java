@@ -28,8 +28,9 @@ public class DefaultsTest {
         var defaults = DefaultsInput.builder().build();
 
         assertTrue(defaults.isBoolean());
-        assertEquals(defaults.getBigDecimal(), BigDecimal.valueOf(1.0));
-        assertEquals(defaults.getBigInteger(), BigInteger.valueOf(1));
+        assertEquals(defaults.getBigDecimal(), new BigDecimal("1e309"));
+        assertEquals(defaults.getBigInteger(),
+                new BigInteger("123456789123456789123456789123456789123456789123456789"));
         assertEquals(defaults.getByte(), (byte) 1);
         assertEquals(defaults.getDouble(), 1.0);
         assertEquals(defaults.getFloat(), 1f);
