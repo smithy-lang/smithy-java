@@ -955,17 +955,24 @@ public final class StructureGenerator<
 
             @Override
             public Void bigIntegerShape(BigIntegerShape bigIntegerShape) {
-                writer.write("$T.valueOf($L)", BigInteger.class, defaultValue.expectNumberNode().getValue().intValue());
+                writeBigNumberDefault(defaultValue.expectNumberNode().getValue(), BigInteger.class);
                 return null;
             }
 
             @Override
             public Void bigDecimalShape(BigDecimalShape bigDecimalShape) {
-                writer.write(
-                        "$T.valueOf($L)",
-                        BigDecimal.class,
-                        defaultValue.expectNumberNode().getValue().doubleValue());
+                writeBigNumberDefault(defaultValue.expectNumberNode().getValue(), BigDecimal.class);
                 return null;
+            }
+
+            private void writeBigNumberDefault(Number number, Class<?> clazz) {
+                switch (number) {
+                    case Long l -> writer.write("$T.valueOf($LL)", clazz, l);
+                    case Double d -> writer.write("$T.valueOf($L)", clazz, d);
+                    case BigInteger b -> writer.write("new $T($S)", clazz, b.toString());
+                    case BigDecimal bd -> writer.write("new $T($S)", clazz, bd.toString());
+                    default -> throw new IllegalStateException("Unexcepted value: " + number);
+                }
             }
 
             @Override

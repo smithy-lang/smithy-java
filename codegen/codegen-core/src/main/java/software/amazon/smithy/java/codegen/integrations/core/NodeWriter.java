@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.codegen.integrations.core;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.BooleanNode;
@@ -33,7 +35,19 @@ record NodeWriter(JavaWriter writer, Node node) implements NodeVisitor<Void>, Ru
 
     @Override
     public Void numberNode(NumberNode numberNode) {
-        writer.writeInline("${node:T}.from($L)", numberNode.getValue());
+        var number = numberNode.getValue();
+        writer.pushState();
+        writer.putContext("bigDecimal", BigDecimal.class);
+        writer.putContext("bigInt", BigInteger.class);
+        switch (number) {
+            case BigDecimal i ->
+                writer.writeInline("${node:T}.from(new ${bigDecimal:T}($S))", i.toString());
+            case BigInteger i ->
+                writer.writeInline("${node:T}.from(new ${bigInt:T}($S))", i.toString());
+            case Long l -> writer.writeInline("${node:T}.from($LL)", l);
+            default -> writer.writeInline("${node:T}.from($L)", number);
+        }
+        writer.popState();
         return null;
     }
 
@@ -100,7 +114,18 @@ record NodeWriter(JavaWriter writer, Node node) implements NodeVisitor<Void>, Ru
 
         @Override
         public Void numberNode(NumberNode numberNode) {
-            writer.writeInline("$L", numberNode.getValue());
+            var number = numberNode.getValue();
+            writer.pushState();
+            writer.putContext("bigDecimal", BigDecimal.class);
+            writer.putContext("bigInt", BigInteger.class);
+            switch (number) {
+                case BigDecimal i ->
+                    writer.writeInline("new ${bigDecimal:T}($S)", i.toString());
+                case BigInteger i -> writer.writeInline("new ${bigInt:T}($S)", i.toString());
+                case Long l -> writer.writeInline("$LL", l);
+                default -> writer.writeInline("$L", number);
+            }
+            writer.popState();
             return null;
         }
 
