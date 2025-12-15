@@ -59,6 +59,20 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
         addImport(symbol, symbol.getName());
     }
 
+    /**
+     * @return Returns the namespace that the file being written is contained within.
+     */
+    public String getPackageNamespace() {
+        return packageNamespace;
+    }
+
+    /**
+     * @return Returns the name of the file being written to.
+     */
+    public String getFilename() {
+        return filename;
+    }
+
     @Override
     public String toString() {
         // Do not add headers or attempt symbol resolution for resource files
