@@ -499,6 +499,143 @@ class McpServerIntegrationTest {
         assertEquals(42, returnedList.getFirst().getMember("innerNumber").asNumber().intValue());
     }
 
+    @Test
+    void testEmptyListInDocumentValue() {
+        initializeLatestProtocol();
+
+        // Empty list inside documentValue
+        var emptyListDoc = Document.of(List.of());
+        var echoEmptyDocList = echoSingleField("documentValue", emptyListDoc);
+        var returnedEmptyDocList = echoEmptyDocList.getMember("documentValue").asList();
+        assertEquals(0, returnedEmptyDocList.size(), "Empty list in documentValue should have size 0");
+        assertTrue(Document.equals(emptyListDoc, echoEmptyDocList.getMember("documentValue")),
+                "Empty list document should match input");
+
+        // Verify server received empty list in documentValue correctly
+        var lastInputEmptyDocList = echoOperation.getLastInput().getEcho().getDocumentValue();
+        assertTrue(Document.equals(emptyListDoc, lastInputEmptyDocList),
+                "Server should receive empty list in documentValue");
+    }
+
+    @Test
+    void testEmptyTypedListFields() {
+        initializeLatestProtocol();
+
+        // Empty stringList as typed Echo field
+        var emptyStringListDoc = Document.of(List.of());
+        var echoEmptyStringList = echoSingleField("stringList", emptyStringListDoc);
+        var returnedStringList = echoEmptyStringList.getMember("stringList").asList();
+        assertEquals(0, returnedStringList.size(), "Empty stringList should have size 0");
+
+        // Verify server received empty list correctly
+        var lastInputEmptyStringList = echoOperation.getLastInput().getEcho();
+        assertEquals(0, lastInputEmptyStringList.getStringList().size(), "Server should receive empty stringList");
+
+        // Empty integerList as typed Echo field
+        var emptyIntListDoc = Document.of(List.of());
+        var echoEmptyIntList = echoSingleField("integerList", emptyIntListDoc);
+        var returnedIntList = echoEmptyIntList.getMember("integerList").asList();
+        assertEquals(0, returnedIntList.size(), "Empty integerList should have size 0");
+
+        // Verify server received empty list correctly
+        var lastInputEmptyIntList = echoOperation.getLastInput().getEcho();
+        assertEquals(0, lastInputEmptyIntList.getIntegerList().size(), "Server should receive empty integerList");
+    }
+
+    @Test
+    void testNullTypedListFields() {
+        initializeLatestProtocol();
+
+        // Null stringList (explicit null in input)
+        var echoDataWithNullStringList = new HashMap<String, Document>();
+        echoDataWithNullStringList.put("stringList", null);
+
+        var responseNullStringList = callTool("McpEcho", createEchoInput(echoDataWithNullStringList));
+        assertNull(responseNullStringList.getError(),
+                "Expected no error but got: "
+                        + (responseNullStringList.getError() != null
+                                ? responseNullStringList.getError().getMessage()
+                                : ""));
+        var echoNullStringList = getEchoFromResponse(responseNullStringList);
+
+        // Verify null list is not present in response (omitted)
+        assertNull(echoNullStringList.getMember("stringList"), "Null stringList should not be present in output");
+
+        // Verify server did not receive stringList (null input means field is not set)
+        var lastInputNullStringList = echoOperation.getLastInput().getEcho();
+        assertFalse(lastInputNullStringList.hasStringList(), "Server should not have stringList set for null input");
+
+        // Omitted stringList (field not present in input at all)
+        var echoDataWithOmittedList = new HashMap<String, Document>();
+        // stringList is intentionally not included
+
+        var responseOmittedList = callTool("McpEcho", createEchoInput(echoDataWithOmittedList));
+        assertNull(responseOmittedList.getError(),
+                "Expected no error but got: "
+                        + (responseOmittedList.getError() != null ? responseOmittedList.getError().getMessage() : ""));
+        var echoOmittedList = getEchoFromResponse(responseOmittedList);
+
+        // Verify omitted list is not present in response
+        assertNull(echoOmittedList.getMember("stringList"), "Omitted stringList should not be present in output");
+
+        // Verify server did not receive stringList (omitted input means field is not set)
+        var lastInputOmittedList = echoOperation.getLastInput().getEcho();
+        assertFalse(lastInputOmittedList.hasStringList(), "Server should not have stringList set for omitted input");
+    }
+
+    @Test
+    void testNullDocumentValue() {
+        initializeLatestProtocol();
+
+        // Null documentValue (explicit null in input)
+        var echoDataWithNullDoc = new HashMap<String, Document>();
+        echoDataWithNullDoc.put("documentValue", null);
+
+        var responseNullDoc = callTool("McpEcho", createEchoInput(echoDataWithNullDoc));
+        assertNull(responseNullDoc.getError(),
+                "Expected no error but got: "
+                        + (responseNullDoc.getError() != null ? responseNullDoc.getError().getMessage() : ""));
+        var echoNullDoc = getEchoFromResponse(responseNullDoc);
+        assertNull(echoNullDoc.getMember("documentValue"), "Null documentValue should not be present in output");
+
+        // Verify server received null for null documentValue
+        var lastInputNullDoc = echoOperation.getLastInput().getEcho().getDocumentValue();
+        assertNull(lastInputNullDoc, "Server should receive null for null documentValue");
+
+        // Omitted documentValue (field not present in input)
+        var echoDataWithOmittedDoc = new HashMap<String, Document>();
+        // documentValue is intentionally not included
+
+        var responseOmittedDoc = callTool("McpEcho", createEchoInput(echoDataWithOmittedDoc));
+        assertNull(responseOmittedDoc.getError(),
+                "Expected no error but got: "
+                        + (responseOmittedDoc.getError() != null ? responseOmittedDoc.getError().getMessage() : ""));
+        var echoOmittedDoc = getEchoFromResponse(responseOmittedDoc);
+        assertNull(echoOmittedDoc.getMember("documentValue"), "Omitted documentValue should not be present in output");
+
+        // Verify server received null for omitted documentValue
+        var lastInputOmittedDoc = echoOperation.getLastInput().getEcho().getDocumentValue();
+        assertNull(lastInputOmittedDoc, "Server should receive null for omitted documentValue");
+    }
+
+    @Test
+    void testEmptyMapInDocumentValue() {
+        initializeLatestProtocol();
+
+        // Empty map inside documentValue
+        var emptyMapDoc = Document.of(Map.of());
+        var echoEmptyDocMap = echoSingleField("documentValue", emptyMapDoc);
+        var returnedEmptyDocMap = echoEmptyDocMap.getMember("documentValue").asStringMap();
+        assertEquals(0, returnedEmptyDocMap.size(), "Empty map in documentValue should have size 0");
+        assertTrue(Document.equals(emptyMapDoc, echoEmptyDocMap.getMember("documentValue")),
+                "Empty map document should match input");
+
+        // Verify server received empty map in documentValue correctly
+        var lastInputEmptyDocMap = echoOperation.getLastInput().getEcho().getDocumentValue();
+        assertTrue(Document.equals(emptyMapDoc, lastInputEmptyDocMap),
+                "Server should receive empty map in documentValue");
+    }
+
     // ========== Map Tests ==========
 
     @Test
@@ -1066,19 +1203,6 @@ class McpServerIntegrationTest {
     }
 
     // ========== Null Handling Tests ==========
-
-    @Test
-    void testNullDocumentValue() {
-        initializeLatestProtocol();
-        var echoData = new HashMap<String, Document>();
-        echoData.put("requiredField", Document.of("required"));
-        echoData.put("documentValue", null);
-        var response = callTool("McpEcho", createEchoInput(echoData));
-        assertNull(response.getError(),
-                "Expected no error but got: " + (response.getError() != null ? response.getError().getMessage() : ""));
-        var echo = getEchoFromResponse(response);
-        assertNull(echo.getMember("documentValue"), "documentValue should be null when set to null");
-    }
 
     @Test
     void testNestedDocumentWithNulls() {
