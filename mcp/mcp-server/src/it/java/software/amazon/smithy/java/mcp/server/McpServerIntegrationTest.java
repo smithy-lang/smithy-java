@@ -302,6 +302,13 @@ class McpServerIntegrationTest {
             echoProps.path("intEnumValue").path("enum").forEach(node -> intEnumValues.add(node.asInt()));
             assertEquals(Set.of(1, 2, 3), intEnumValues);
 
+            // String with enum trait should be string with enum values
+            assertEquals("string", echoProps.path("stringEnumValue").path("type").asText());
+            assertTrue(echoProps.path("stringEnumValue").has("enum"), "stringEnumValue should have enum constraint");
+            var stringEnumValues = new HashSet<String>();
+            echoProps.path("stringEnumValue").path("enum").forEach(node -> stringEnumValues.add(node.asText()));
+            assertEquals(Set.of("OPTION_A", "OPTION_B", "OPTION_C"), stringEnumValues);
+
             // Lists should be arrays
             assertEquals("array", echoProps.path("stringList").path("type").asText());
             assertEquals("array", echoProps.path("integerList").path("type").asText());
@@ -941,6 +948,45 @@ class McpServerIntegrationTest {
                 """);
         var invalidErrors = schemas.inputSchema().validate(invalidInput);
         assertFalse(invalidErrors.isEmpty(), "Invalid int enum value should fail validation");
+    }
+
+    // ========== String with Enum Trait Tests ==========
+
+    @Test
+    void testStringWithEnumTraitRoundTrip() {
+        initializeLatestProtocol();
+        var echo = echoSingleField("stringEnumValue", Document.of("OPTION_A"));
+        assertEquals("OPTION_A", echo.getMember("stringEnumValue").asString());
+    }
+
+    @Test
+    void testStringWithEnumTraitSchemaValidatesInput() throws Exception {
+        initializeLatestProtocol();
+        var schemas = getMcpEchoToolSchemas();
+
+        // Valid string enum value should pass validation
+        var validInput = OBJECT_MAPPER.readTree("""
+                {
+                    "echo": {
+                        "requiredField": "test",
+                        "stringEnumValue": "OPTION_A"
+                    }
+                }
+                """);
+        var validErrors = schemas.inputSchema().validate(validInput);
+        assertTrue(validErrors.isEmpty(), "Valid string enum value should pass: " + validErrors);
+
+        // Invalid string enum value should fail validation
+        var invalidInput = OBJECT_MAPPER.readTree("""
+                {
+                    "echo": {
+                        "requiredField": "test",
+                        "stringEnumValue": "INVALID_VALUE"
+                    }
+                }
+                """);
+        var invalidErrors = schemas.inputSchema().validate(invalidInput);
+        assertFalse(invalidErrors.isEmpty(), "Invalid string enum value should fail validation");
     }
 
     // ========== Union Tests ==========

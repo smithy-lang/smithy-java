@@ -585,7 +585,7 @@ public final class McpService {
         }
 
         List<Document> enumValues = switch (member.type()) {
-            case ENUM -> member.stringEnumValues().stream().map(Document::of).toList();
+            case ENUM, STRING -> member.stringEnumValues().stream().map(Document::of).toList();
             case INT_ENUM -> member.intEnumValues().stream().map(Document::of).toList();
             default -> List.of();
         };
