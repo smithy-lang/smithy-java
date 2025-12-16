@@ -117,6 +117,9 @@ structure Echo {
     // Enum
     enumValue: TestEnum
 
+    // String with enum trait (constrained string values)
+    stringEnumValue: StringWithEnumTrait
+
     // IntEnum (integer enumeration)
     intEnumValue: TestIntEnum
 
@@ -166,6 +169,14 @@ enum TestEnum {
     VALUE_ONE = "VALUE_ONE"
     VALUE_TWO = "VALUE_TWO"
 }
+
+/// A string with enum trait for testing enum values on string shapes
+@enum([
+    { value: "OPTION_A", name: "OPTION_A" },
+    { value: "OPTION_B", name: "OPTION_B" },
+    { value: "OPTION_C", name: "OPTION_C" }
+])
+string StringWithEnumTrait
 
 intEnum TestIntEnum {
     ONE = 1
