@@ -5,33 +5,40 @@
 
 package software.amazon.smithy.java.json.jackson;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonFactoryBuilder;
-import com.fasterxml.jackson.core.StreamReadFeature;
-import com.fasterxml.jackson.core.StreamWriteFeature;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.json.JsonSerdeProvider;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.utils.SmithyInternalApi;
+import tools.jackson.core.ObjectReadContext;
+import tools.jackson.core.ObjectWriteContext;
+import tools.jackson.core.PrettyPrinter;
+import tools.jackson.core.StreamReadFeature;
+import tools.jackson.core.StreamWriteFeature;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.core.util.DefaultPrettyPrinter;
 
 @SmithyInternalApi
 public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
 
     private static final JsonFactory FACTORY;
+    private static final ObjectWriteContext PRETTY_PRINT_CONTEXT;
     static final SerializedStringCache SERIALIZED_STRINGS = new SerializedStringCache();
 
     static {
-        var serBuilder = new JsonFactoryBuilder();
-        serBuilder.disable(JsonFactory.Feature.INTERN_FIELD_NAMES);
-        serBuilder.enable(StreamWriteFeature.USE_FAST_DOUBLE_WRITER);
-        serBuilder.enable(StreamReadFeature.USE_FAST_DOUBLE_PARSER);
-        serBuilder.enable(StreamReadFeature.USE_FAST_BIG_NUMBER_PARSER);
-        FACTORY = serBuilder.build();
+        FACTORY = JsonFactory.builder()
+                .enable(StreamWriteFeature.USE_FAST_DOUBLE_WRITER)
+                .enable(StreamReadFeature.USE_FAST_DOUBLE_PARSER)
+                .enable(StreamReadFeature.USE_FAST_BIG_NUMBER_PARSER)
+                .build();
+        PRETTY_PRINT_CONTEXT = new ObjectWriteContext.Base() {
+            @Override
+            public PrettyPrinter getPrettyPrinter() {
+                return new DefaultPrettyPrinter();
+            }
+        };
     }
 
     @Override
@@ -49,22 +56,15 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
             byte[] source,
             JsonSettings settings
     ) {
-        try {
-            return new JacksonJsonDeserializer(FACTORY.createParser(source), settings);
-        } catch (IOException e) {
-            throw new SerializationException(e);
-        }
+        return new JacksonJsonDeserializer(FACTORY.createParser(readCtx(settings), source), settings);
     }
 
     @Override
     public ShapeDeserializer newDeserializer(ByteBuffer source, JsonSettings settings) {
-        try {
-            int offset = source.arrayOffset() + source.position();
-            int length = source.remaining();
-            return new JacksonJsonDeserializer(FACTORY.createParser(source.array(), offset, length), settings);
-        } catch (IOException e) {
-            throw new SerializationException(e);
-        }
+        int offset = source.arrayOffset() + source.position();
+        int length = source.remaining();
+        var ctx = readCtx(settings);
+        return new JacksonJsonDeserializer(FACTORY.createParser(ctx, source.array(), offset, length), settings);
     }
 
     @Override
@@ -72,10 +72,15 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
             OutputStream sink,
             JsonSettings settings
     ) {
-        try {
-            return new JacksonJsonSerializer(FACTORY.createGenerator(sink), settings);
-        } catch (IOException e) {
-            throw new SerializationException(e);
-        }
+        var ctx = writeCtx(settings);
+        return new JacksonJsonSerializer(FACTORY.createGenerator(ctx, sink), settings);
+    }
+
+    private static ObjectWriteContext writeCtx(JsonSettings settings) {
+        return settings.prettyPrint() ? PRETTY_PRINT_CONTEXT : ObjectWriteContext.empty();
+    }
+
+    private static ObjectReadContext readCtx(JsonSettings settings) {
+        return ObjectReadContext.empty();
     }
 }
