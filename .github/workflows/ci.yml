@@ -50,7 +50,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: git config --system core.longpaths true
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         if: failure()
         with:
           name: java-${{ matrix.java }}-${{ matrix.os }}-test-report
