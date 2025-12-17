@@ -27,7 +27,7 @@ jobs:
           distribution: 'corretto'
 
       - name: Cache compiled buildscripts
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
             key: ${{ runner.os }}-gradle-${{ hashFiles('buildSrc/**/*.kts') }}
             path: |

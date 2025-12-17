@@ -26,7 +26,7 @@ jobs:
           distribution: 'corretto'
 
       - name: Cache compiled buildscripts
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: ${{ runner.os }}-gradle-${{ hashFiles('buildSrc/**/*.kts') }}
           path: |
@@ -40,7 +40,7 @@ jobs:
             caches
 
       - name: Restore fuzz corpus cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           key: fuzz-corpus-${{ github.run_id }}
           restore-keys: |
@@ -54,7 +54,7 @@ jobs:
           ./gradlew fuzz -Pfuzz.maxDuration=4h --stacktrace
 
       - name: Save fuzz corpus cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         if: always()
         with:
           key: fuzz-corpus-${{ github.run_id }}
