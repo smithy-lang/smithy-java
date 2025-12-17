@@ -29,7 +29,7 @@ tasks {
                         .toString(),
                 ),
             )
-            relocate("com.fasterxml.jackson.core", "software.amazon.smithy.java.internal.shaded.com.fasterxml.jackson.core")
+            relocate("tools.jackson.core", "software.amazon.smithy.java.internal.shaded.tools.jackson.core")
         }
     }
     jar {

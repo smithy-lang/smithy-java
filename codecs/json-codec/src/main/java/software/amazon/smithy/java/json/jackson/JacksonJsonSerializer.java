@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.json.jackson;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -23,6 +21,7 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.model.shapes.ShapeType;
+import tools.jackson.core.JsonGenerator;
 
 final class JacksonJsonSerializer implements ShapeSerializer {
 
@@ -36,9 +35,6 @@ final class JacksonJsonSerializer implements ShapeSerializer {
             JsonSettings settings
     ) {
         this.generator = generator;
-        if (settings.prettyPrint()) {
-            generator.useDefaultPrettyPrinter();
-        }
         this.settings = settings;
     }
 
@@ -219,9 +215,9 @@ final class JacksonJsonSerializer implements ShapeSerializer {
         protected ShapeSerializer before(Schema schema) {
             try {
                 final String fieldName = settings.fieldMapper().memberToField(schema);
-                generator.writeFieldName(JacksonJsonSerdeProvider.SERIALIZED_STRINGS.create(fieldName));
+                generator.writeName(JacksonJsonSerdeProvider.SERIALIZED_STRINGS.create(fieldName));
                 return JacksonJsonSerializer.this;
-            } catch (IOException e) {
+            } catch (Exception e) {
                 throw new SerializationException(e);
             }
         }
@@ -258,9 +254,9 @@ final class JacksonJsonSerializer implements ShapeSerializer {
                 BiConsumer<T, ShapeSerializer> valueSerializer
         ) {
             try {
-                generator.writeFieldName(key);
+                generator.writeName(key);
                 valueSerializer.accept(state, JacksonJsonSerializer.this);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 throw new SerializationException(e);
             }
         }
@@ -291,7 +287,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
             try {
                 parent.generator.writeStartObject();
                 if (parent.settings.serializeTypeInDocuments()) {
-                    parent.generator.writeStringField("__type", schema.id().toString());
+                    parent.generator.writeStringProperty("__type", schema.id().toString());
                 }
                 struct.serializeMembers(parent.structSerializer);
                 parent.generator.writeEndObject();

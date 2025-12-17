@@ -8,7 +8,7 @@ spotbugs = "6.0.22"
 spotless = "8.1.0"
 smithy-gradle-plugins = "1.3.0"
 assertj = "3.27.6"
-jackson = "2.20.1"
+jackson = "3.0.0"
 netty = "4.2.9.Final"
 dep-analysis = "3.5.1"
 aws-sdk = "2.40.10"
@@ -20,7 +20,7 @@ jline = "3.30.6"
 graalvm-native = "0.11.3"
 shadow = "8.3.9"
 jazzer = "0.28.0"
-json-schema-validator = "2.0.0"
+json-schema-validator = "3.0.0"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -44,7 +44,7 @@ aws-sdk-retries = {module = "software.amazon.awssdk:retries", version.ref = "aws
 aws-sdk-core = {module = "software.amazon.awssdk:sdk-core", version.ref = "aws-sdk"}
 aws-sdk-auth = {module = "software.amazon.awssdk:auth", version.ref = "aws-sdk"}
 
-jackson-core = {module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson"}
+jackson-core = {module = "tools.jackson.core:jackson-core", version.ref = "jackson"}
 
 netty-all = {module = "io.netty:netty-all", version.ref = "netty"}
 

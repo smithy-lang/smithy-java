@@ -12,9 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.MissingNode;
 import com.networknt.schema.Error;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaLocation;
@@ -56,6 +53,9 @@ import software.amazon.smithy.java.mcp.test.service.McpEchoOperation;
 import software.amazon.smithy.java.mcp.test.service.TestService;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Server;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.MissingNode;
 
 class McpServerIntegrationTest {
 
@@ -128,7 +128,7 @@ class McpServerIntegrationTest {
 
     private record ToolSchemas(Schema inputSchema, Schema outputSchema, JsonNode toolNode) {}
 
-    private ToolSchemas getMcpEchoToolSchemas() throws Exception {
+    private ToolSchemas getMcpEchoToolSchemas() {
         write("tools/list", Document.of(Map.of()));
         var responseJson = readRawResponse();
         var toolNode = OBJECT_MAPPER.readTree(responseJson).path("result").path("tools").get(0);
@@ -140,12 +140,12 @@ class McpServerIntegrationTest {
                 toolNode);
     }
 
-    private ToolSchemas getCalculateAreaToolSchemas() throws Exception {
+    private ToolSchemas getCalculateAreaToolSchemas() {
         write("tools/list", Document.of(Map.of()));
         var responseJson = readRawResponse();
         var toolsNode = OBJECT_MAPPER.readTree(responseJson).path("result").path("tools");
         for (var toolNode : toolsNode) {
-            if (toolNode.path("name").asText().equals("CalculateArea")) {
+            if (toolNode.path("name").asString().equals("CalculateArea")) {
                 var inputSchemaNode = toolNode.path("inputSchema");
                 var outputSchemaNode = toolNode.path("outputSchema");
                 return new ToolSchemas(
@@ -206,7 +206,7 @@ class McpServerIntegrationTest {
     // ========== Schema Validation Tests ==========
 
     @Test
-    void testGeneratedSchemasAreValidJsonSchemaDraft07() throws Exception {
+    void testGeneratedSchemasAreValidJsonSchemaDraft07() {
         initializeLatestProtocol();
         var schemas = getMcpEchoToolSchemas();
 
@@ -220,30 +220,30 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    void testToolsListSchemaStructure() throws Exception {
+    void testToolsListSchemaStructure() {
         initializeLatestProtocol();
         var schemas = getMcpEchoToolSchemas();
         var toolNode = schemas.toolNode();
 
-        assertEquals("McpEcho", toolNode.path("name").asText());
+        assertEquals("McpEcho", toolNode.path("name").asString());
         assertFalse(toolNode.path("inputSchema").isMissingNode());
         assertFalse(toolNode.path("outputSchema").isMissingNode());
 
         // Use JsonSchema's getSchemaNode() for type assertions
         var inputSchemaNode = schemas.inputSchema().getSchemaNode();
-        assertEquals("object", inputSchemaNode.path("type").asText());
-        assertEquals("http://json-schema.org/draft-07/schema#", inputSchemaNode.path("$schema").asText());
+        assertEquals("object", inputSchemaNode.path("type").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", inputSchemaNode.path("$schema").asString());
         assertTrue(inputSchemaNode.path("properties").has("echo"));
 
         // Also verify output schema structure
         var outputSchemaNode = schemas.outputSchema().getSchemaNode();
-        assertEquals("object", outputSchemaNode.path("type").asText());
-        assertEquals("http://json-schema.org/draft-07/schema#", outputSchemaNode.path("$schema").asText());
+        assertEquals("object", outputSchemaNode.path("type").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", outputSchemaNode.path("$schema").asString());
         assertTrue(outputSchemaNode.path("properties").has("echo"));
     }
 
     @Test
-    void testEchoSchemaTypeMapping() throws Exception {
+    void testEchoSchemaTypeMapping() {
         initializeLatestProtocol();
         var schemas = getMcpEchoToolSchemas();
 
@@ -262,78 +262,78 @@ class McpServerIntegrationTest {
         // Verify both input and output schemas have same type mappings
         for (var echoProps : List.of(inputEchoProps, outputEchoProps)) {
             // Primitives should map to appropriate JSON Schema types
-            assertEquals("string", echoProps.path("stringValue").path("type").asText());
-            assertEquals("boolean", echoProps.path("booleanValue").path("type").asText());
-            assertEquals("number", echoProps.path("byteValue").path("type").asText());
-            assertEquals("number", echoProps.path("shortValue").path("type").asText());
-            assertEquals("number", echoProps.path("integerValue").path("type").asText());
-            assertEquals("number", echoProps.path("longValue").path("type").asText());
-            assertEquals("number", echoProps.path("floatValue").path("type").asText());
-            assertEquals("number", echoProps.path("doubleValue").path("type").asText());
+            assertEquals("string", echoProps.path("stringValue").path("type").asString());
+            assertEquals("boolean", echoProps.path("booleanValue").path("type").asString());
+            assertEquals("number", echoProps.path("byteValue").path("type").asString());
+            assertEquals("number", echoProps.path("shortValue").path("type").asString());
+            assertEquals("number", echoProps.path("integerValue").path("type").asString());
+            assertEquals("number", echoProps.path("longValue").path("type").asString());
+            assertEquals("number", echoProps.path("floatValue").path("type").asString());
+            assertEquals("number", echoProps.path("doubleValue").path("type").asString());
 
             // BigDecimal and BigInteger should be strings
-            assertEquals("string", echoProps.path("bigDecimalValue").path("type").asText());
-            assertEquals("string", echoProps.path("bigIntegerValue").path("type").asText());
+            assertEquals("string", echoProps.path("bigDecimalValue").path("type").asString());
+            assertEquals("string", echoProps.path("bigIntegerValue").path("type").asString());
 
             // Blob should be string (base64)
-            assertEquals("string", echoProps.path("blobValue").path("type").asText());
+            assertEquals("string", echoProps.path("blobValue").path("type").asString());
 
             // All timestamps should be strings with format: date-time
-            assertEquals("string", echoProps.path("epochSecondsTimestamp").path("type").asText());
-            assertEquals("date-time", echoProps.path("epochSecondsTimestamp").path("format").asText());
-            assertEquals("string", echoProps.path("dateTimeTimestamp").path("type").asText());
-            assertEquals("date-time", echoProps.path("dateTimeTimestamp").path("format").asText());
-            assertEquals("string", echoProps.path("httpDateTimestamp").path("type").asText());
-            assertEquals("date-time", echoProps.path("httpDateTimestamp").path("format").asText());
-            assertEquals("string", echoProps.path("defaultTimestamp").path("type").asText());
-            assertEquals("date-time", echoProps.path("defaultTimestamp").path("format").asText());
+            assertEquals("string", echoProps.path("epochSecondsTimestamp").path("type").asString());
+            assertEquals("date-time", echoProps.path("epochSecondsTimestamp").path("format").asString());
+            assertEquals("string", echoProps.path("dateTimeTimestamp").path("type").asString());
+            assertEquals("date-time", echoProps.path("dateTimeTimestamp").path("format").asString());
+            assertEquals("string", echoProps.path("httpDateTimestamp").path("type").asString());
+            assertEquals("date-time", echoProps.path("httpDateTimestamp").path("format").asString());
+            assertEquals("string", echoProps.path("defaultTimestamp").path("type").asString());
+            assertEquals("date-time", echoProps.path("defaultTimestamp").path("format").asString());
 
             // Enum should be string with enum values
-            assertEquals("string", echoProps.path("enumValue").path("type").asText());
+            assertEquals("string", echoProps.path("enumValue").path("type").asString());
             assertTrue(echoProps.path("enumValue").has("enum"), "enumValue should have enum constraint");
             var enumValues = new HashSet<String>();
-            echoProps.path("enumValue").path("enum").forEach(node -> enumValues.add(node.asText()));
+            echoProps.path("enumValue").path("enum").forEach(node -> enumValues.add(node.asString()));
             assertEquals(Set.of("VALUE_ONE", "VALUE_TWO"), enumValues);
 
             // IntEnum should be number with enum values
-            assertEquals("number", echoProps.path("intEnumValue").path("type").asText());
+            assertEquals("number", echoProps.path("intEnumValue").path("type").asString());
             assertTrue(echoProps.path("intEnumValue").has("enum"), "intEnumValue should have enum constraint");
             var intEnumValues = new HashSet<Integer>();
             echoProps.path("intEnumValue").path("enum").forEach(node -> intEnumValues.add(node.asInt()));
             assertEquals(Set.of(1, 2, 3), intEnumValues);
 
             // String with enum trait should be string with enum values
-            assertEquals("string", echoProps.path("stringEnumValue").path("type").asText());
+            assertEquals("string", echoProps.path("stringEnumValue").path("type").asString());
             assertTrue(echoProps.path("stringEnumValue").has("enum"), "stringEnumValue should have enum constraint");
             var stringEnumValues = new HashSet<String>();
-            echoProps.path("stringEnumValue").path("enum").forEach(node -> stringEnumValues.add(node.asText()));
+            echoProps.path("stringEnumValue").path("enum").forEach(node -> stringEnumValues.add(node.asString()));
             assertEquals(Set.of("OPTION_A", "OPTION_B", "OPTION_C"), stringEnumValues);
 
             // Lists should be arrays
-            assertEquals("array", echoProps.path("stringList").path("type").asText());
-            assertEquals("array", echoProps.path("integerList").path("type").asText());
-            assertEquals("array", echoProps.path("nestedList").path("type").asText());
+            assertEquals("array", echoProps.path("stringList").path("type").asString());
+            assertEquals("array", echoProps.path("integerList").path("type").asString());
+            assertEquals("array", echoProps.path("nestedList").path("type").asString());
 
             // Nested structure and map should be objects
-            assertEquals("object", echoProps.path("nested").path("type").asText());
-            assertEquals("object", echoProps.path("stringMap").path("type").asText());
-            assertEquals("object", echoProps.path("nestedMap").path("type").asText());
+            assertEquals("object", echoProps.path("nested").path("type").asString());
+            assertEquals("object", echoProps.path("stringMap").path("type").asString());
+            assertEquals("object", echoProps.path("nestedMap").path("type").asString());
 
             // Union should have oneOf (not type: object)
             assertTrue(echoProps.path("unionValue").has("oneOf"), "Union should have oneOf property");
-            assertEquals("object", echoProps.path("unionValue").path("type").asText());
+            assertEquals("object", echoProps.path("unionValue").path("type").asString());
 
             // Document should have type as array of all JSON types
             var documentType = echoProps.path("documentValue").path("type");
             assertTrue(documentType.isArray(), "Document type should be an array");
             var types = new HashSet<String>();
-            documentType.forEach(node -> types.add(node.asText()));
+            documentType.forEach(node -> types.add(node.asString()));
             assertEquals(Set.of("string", "number", "boolean", "object", "array", "null"), types);
         }
     }
 
     @Test
-    void testRequiredFieldInSchema() throws Exception {
+    void testRequiredFieldInSchema() {
         initializeLatestProtocol();
         var schemas = getMcpEchoToolSchemas();
 
@@ -344,7 +344,7 @@ class McpServerIntegrationTest {
 
             assertTrue(required.isArray(), "required should be an array");
             var requiredFields = new HashSet<String>();
-            required.forEach(node -> requiredFields.add(node.asText()));
+            required.forEach(node -> requiredFields.add(node.asString()));
             assertTrue(requiredFields.contains("requiredField"), "requiredField should be in required array");
         }
     }
@@ -833,7 +833,7 @@ class McpServerIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("documentSchemaValidationTestCases")
-    void testDocumentValidatesAgainstSchema(String description, Document documentValue) throws Exception {
+    void testDocumentValidatesAgainstSchema(String description, Document documentValue) {
         initializeLatestProtocol();
 
         // Get output schema from raw JSON (using Jackson directly)
@@ -882,7 +882,7 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    void testEnumSchemaValidatesInput() throws Exception {
+    void testEnumSchemaValidatesInput() {
         initializeLatestProtocol();
         var schemas = getMcpEchoToolSchemas();
 
@@ -921,7 +921,7 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    void testIntEnumSchemaValidatesInput() throws Exception {
+    void testIntEnumSchemaValidatesInput() {
         initializeLatestProtocol();
         var schemas = getMcpEchoToolSchemas();
 
@@ -960,7 +960,7 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    void testStringWithEnumTraitSchemaValidatesInput() throws Exception {
+    void testStringWithEnumTraitSchemaValidatesInput() {
         initializeLatestProtocol();
         var schemas = getMcpEchoToolSchemas();
 
@@ -1103,7 +1103,7 @@ class McpServerIntegrationTest {
     // ========== JSON Schema Validation Tests ==========
 
     @Test
-    void testStructuredContentValidatesAgainstOutputSchema() throws Exception {
+    void testStructuredContentValidatesAgainstOutputSchema() {
         initializeLatestProtocol();
 
         // Get output schema from raw JSON (using Jackson directly, not Smithy serializers)
@@ -1152,7 +1152,7 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    void testAllTypesValidateAgainstOutputSchema() throws Exception {
+    void testAllTypesValidateAgainstOutputSchema() {
         initializeLatestProtocol();
 
         // Get output schema from raw JSON (using Jackson directly)
@@ -1358,7 +1358,7 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    void testNullsInRawJson() throws Exception {
+    void testNullsInRawJson() {
         initializeLatestProtocol();
 
         // Test map with nulls in raw JSON
@@ -1383,7 +1383,7 @@ class McpServerIntegrationTest {
         var mapDocNode = mapResponseNode.path("result").path("structuredContent").path("echo").path("documentValue");
         assertTrue(mapDocNode.has("nullKey"), "JSON should contain nullKey");
         assertTrue(mapDocNode.get("nullKey").isNull(), "nullKey should be JSON null");
-        assertEquals("value", mapDocNode.get("present").asText());
+        assertEquals("value", mapDocNode.get("present").asString());
 
         // Test array with nulls in raw JSON
         var listWithNulls = new ArrayList<Document>();
@@ -1410,7 +1410,7 @@ class McpServerIntegrationTest {
         assertTrue(arrayDocNode.isArray(), "documentValue should be an array");
         assertEquals(3, arrayDocNode.size());
         assertTrue(arrayDocNode.get(0).isNull(), "Array element 0 should be JSON null");
-        assertEquals("value", arrayDocNode.get(1).asText());
+        assertEquals("value", arrayDocNode.get(1).asString());
         assertTrue(arrayDocNode.get(2).isNull(), "Array element 2 should be JSON null");
     }
 
@@ -1627,7 +1627,7 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    void testExplicitNullInputInRawJson() throws Exception {
+    void testExplicitNullInputInRawJson() {
         initializeLatestProtocol();
         // Verify that explicitly null inputs appear correctly in JSON
         var echoData = new HashMap<String, Document>();
@@ -1647,7 +1647,7 @@ class McpServerIntegrationTest {
         var echoNode = responseNode.path("result").path("structuredContent").path("echo");
 
         // Required field should be present
-        assertEquals("required", echoNode.get("requiredField").asText());
+        assertEquals("required", echoNode.get("requiredField").asString());
 
         // Explicit null fields should either be null or absent
         if (echoNode.has("stringValue")) {
@@ -1700,7 +1700,7 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    void testOptionalFieldsOmittedFromJson() throws Exception {
+    void testOptionalFieldsOmittedFromJson() {
         initializeLatestProtocol();
         // Only set requiredField
         var params = Document.of(Map.of(
@@ -1716,7 +1716,7 @@ class McpServerIntegrationTest {
 
         // requiredField should be present
         assertTrue(echoNode.has("requiredField"), "requiredField should be present");
-        assertEquals("default-required", echoNode.get("requiredField").asText());
+        assertEquals("default-required", echoNode.get("requiredField").asString());
 
         // Optional fields should either be absent or null (implementation dependent)
         // Verify they are not present with non-null values
@@ -1731,7 +1731,7 @@ class McpServerIntegrationTest {
     // ========== OneOf Schema Tests ==========
 
     @Test
-    void testOneOfSchemaStructure() throws Exception {
+    void testOneOfSchemaStructure() {
         initializeLatestProtocol();
         var schemas = getCalculateAreaToolSchemas();
         var inputSchema = schemas.inputSchema().getSchemaNode();
@@ -1741,7 +1741,7 @@ class McpServerIntegrationTest {
 
         // Should have oneOf array, not type
         assertTrue(oneOfInputSchema.has("oneOf"), "oneOfInput should have 'oneOf' property");
-        assertEquals("object", oneOfInputSchema.path("type").asText());
+        assertEquals("object", oneOfInputSchema.path("type").asString());
 
         var oneOfArray = oneOfInputSchema.path("oneOf");
         assertEquals(3, oneOfArray.size(), "Should have 3 variants: Circle, Square, Rectangle");
@@ -1755,7 +1755,7 @@ class McpServerIntegrationTest {
             assertEquals(1, properties.size(), "Each variant should have exactly one property (member name)");
 
             // Get the member name
-            var memberName = properties.fieldNames().next();
+            var memberName = properties.propertyNames().iterator().next();
             assertTrue(memberNames.contains(memberName),
                     "Member name should be one of: circle, square, rectangle");
             foundMembers.add(memberName);
@@ -1764,7 +1764,7 @@ class McpServerIntegrationTest {
             var requiredArray = variant.path("required");
             boolean hasMemberInRequired = false;
             for (var req : requiredArray) {
-                if (req.asText().equals(memberName)) {
+                if (req.asString().equals(memberName)) {
                     hasMemberInRequired = true;
                     break;
                 }
@@ -1780,7 +1780,7 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    void testOneOfSchemaIsValidJsonSchemaDraft07() throws Exception {
+    void testOneOfSchemaIsValidJsonSchemaDraft07() {
         initializeLatestProtocol();
         var schemas = getCalculateAreaToolSchemas();
 
@@ -1850,7 +1850,7 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    void testOneOfInputValidatesAgainstSchema() throws Exception {
+    void testOneOfInputValidatesAgainstSchema() {
         initializeLatestProtocol();
         var schemas = getCalculateAreaToolSchemas();
 
@@ -1896,7 +1896,7 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    void testOneOfOutputValidatesAgainstSchema() throws Exception {
+    void testOneOfOutputValidatesAgainstSchema() {
         initializeLatestProtocol();
 
         // Get output schema
@@ -1905,7 +1905,7 @@ class McpServerIntegrationTest {
         var toolsNode = OBJECT_MAPPER.readTree(toolsResponseJson).path("result").path("tools");
         JsonNode outputSchemaNode = MissingNode.getInstance();
         for (var tool : toolsNode) {
-            if (tool.path("name").asText().equals("CalculateArea")) {
+            if (tool.path("name").asString().equals("CalculateArea")) {
                 outputSchemaNode = tool.path("outputSchema");
                 break;
             }
@@ -1933,7 +1933,7 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    void testUnionMemberNamesInSchema() throws Exception {
+    void testUnionMemberNamesInSchema() {
         initializeLatestProtocol();
         var schemas = getCalculateAreaToolSchemas();
         var inputSchema = schemas.inputSchema().getSchemaNode();
@@ -1943,7 +1943,7 @@ class McpServerIntegrationTest {
         for (var variant : oneOfArray) {
             // Each variant has a single property which is the member name
             var properties = variant.path("properties");
-            var memberName = properties.fieldNames().next();
+            var memberName = properties.propertyNames().iterator().next();
             memberNames.add(memberName);
         }
 
@@ -1972,13 +1972,13 @@ class McpServerIntegrationTest {
         return Document.of(Map.of("echo", Document.of(echoWithRequired)));
     }
 
-    private void cacheToolSchemas() throws Exception {
+    private void cacheToolSchemas() {
         write("tools/list", Document.of(Map.of()));
         var responseJson = readRawResponse();
         var responseNode = OBJECT_MAPPER.readTree(responseJson);
         var tools = responseNode.path("result").path("tools");
         for (var tool : tools) {
-            var name = tool.path("name").asText();
+            var name = tool.path("name").asString();
             var outputSchemaNode = tool.path("outputSchema");
             if (!outputSchemaNode.isMissingNode()) {
                 outputSchemaCache.put(name, SCHEMA_FACTORY.getSchema(outputSchemaNode));
@@ -1986,7 +1986,7 @@ class McpServerIntegrationTest {
         }
     }
 
-    private void validateStructuredContent(String toolName, String responseJson) throws Exception {
+    private void validateStructuredContent(String toolName, String responseJson) {
         // Only validate for protocol versions that support structured content (v2025_06_18+)
         boolean supportsStructuredContent = currentProtocolVersion != null
                 && currentProtocolVersion.compareTo(ProtocolVersion.v2025_06_18.INSTANCE) >= 0;
