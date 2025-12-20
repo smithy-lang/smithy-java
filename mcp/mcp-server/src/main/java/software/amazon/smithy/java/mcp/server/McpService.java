@@ -220,8 +220,19 @@ public final class McpService {
     }
 
     private JsonRpcResponse handlePromptsList(JsonRpcRequest req) {
+        var allPrompts = new ArrayList<>(prompts.values().stream().map(Prompt::promptInfo).toList());
+
+        // Add prompts from proxy servers
+        for (McpServerProxy proxy : proxies.values()) {
+            var response = proxy.rpc(req).join();
+            if (response.getError() == null) {
+                var proxyPrompts = response.getResult().asShape(ListPromptsResult.builder()).getPrompts();
+                allPrompts.addAll(proxyPrompts);
+            }
+        }
+
         var result = ListPromptsResult.builder()
-                .prompts(prompts.values().stream().map(Prompt::promptInfo).toList())
+                .prompts(allPrompts)
                 .build();
         return createSuccessResponse(req.getId(), result);
     }
@@ -232,12 +243,12 @@ public final class McpService {
 
         var prompt = prompts.get(normalize(promptName));
 
-        if (prompt == null) {
-            throw new RuntimeException("Prompt not found: " + promptName);
+        if (prompt != null) {
+            var result = promptProcessor.buildPromptResult(prompt, promptArguments);
+            return createSuccessResponse(req.getId(), result);
         }
 
-        var result = promptProcessor.buildPromptResult(prompt, promptArguments);
-        return createSuccessResponse(req.getId(), result);
+        throw new RuntimeException("Prompt not found: " + promptName);
     }
 
     private JsonRpcResponse handleToolsList(JsonRpcRequest req, ProtocolVersion protocolVersion) {
