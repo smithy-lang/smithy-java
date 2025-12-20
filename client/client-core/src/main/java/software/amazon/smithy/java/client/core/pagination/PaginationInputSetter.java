@@ -7,8 +7,8 @@ package software.amazon.smithy.java.client.core.pagination;
 
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
-import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ShapeUtils;
 
 /**
  * Replaces values of a top-level structure members with values for pagination.
@@ -35,7 +35,7 @@ final class PaginationInputSetter<I extends SerializableStruct> {
 
     I create(String token, Integer maxResults) {
         var builder = operation.inputBuilder();
-        SchemaUtils.copyShape(input, builder);
+        ShapeUtils.copyShape(input, builder);
         if (token != null) {
             builder.setMemberValue(inputTokenSchema, token);
         }

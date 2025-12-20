@@ -11,8 +11,8 @@ import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ShapeUtils;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
@@ -53,7 +53,7 @@ public final class InjectIdempotencyTokenPlugin implements ClientPlugin {
 
                 if (value == null) {
                     var builder = operation.inputBuilder();
-                    SchemaUtils.copyShape(hook.input(), builder);
+                    ShapeUtils.copyShape(hook.input(), builder);
                     var tokenProvider = hook.context().get(IDEMPOTENCY_TOKEN_PROVIDER);
                     var tokenValue = tokenProvider != null ? tokenProvider : UUID.randomUUID().toString();
                     builder.setMemberValue(tokenMember, tokenValue);
