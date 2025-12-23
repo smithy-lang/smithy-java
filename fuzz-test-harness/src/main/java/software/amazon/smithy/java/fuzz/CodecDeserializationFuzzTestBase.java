@@ -19,6 +19,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.schema.ShapeUtils;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.io.ByteBufferUtils;
@@ -60,7 +61,7 @@ public abstract class CodecDeserializationFuzzTestBase {
         return shapeBuilders.stream()
                 .flatMap(b -> Stream.generate(() -> b).limit(10))
                 .map(Supplier::get)
-                .map(s -> s.deserialize(new RandomShapeGenerator()).build())
+                .map(ShapeUtils::generateRandom)
                 .map(t -> {
                     try (var codec = this.codecToFuzz()) {
                         return codec.serialize(t);

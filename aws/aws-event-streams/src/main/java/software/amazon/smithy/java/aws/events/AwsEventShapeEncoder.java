@@ -18,8 +18,8 @@ import software.amazon.eventstream.HeaderValue;
 import software.amazon.eventstream.Message;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
-import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ShapeUtils;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -75,7 +75,7 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
             typeHolder.set(initialEventType.value());
             var os = new ByteArrayOutputStream();
             try (var baseSerializer = possibleTypes.get(initialEventType.value()).apply(os, headers)) {
-                SchemaUtils.withFilteredMembers(item.schema(), item, AwsEventShapeEncoder::excludeEventStreamMember)
+                ShapeUtils.withFilteredMembers(item.schema(), item, AwsEventShapeEncoder::excludeEventStreamMember)
                         .serialize(baseSerializer);
             }
             return os.toByteArray();
@@ -202,14 +202,14 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
         @Override
         public void writeStruct(Schema schema, SerializableStruct struct) {
             if (hasEventPayloadMember(schema)) {
-                SchemaUtils.withFilteredMembers(schema, struct, this::isEventPayload)
+                ShapeUtils.withFilteredMembers(schema, struct, this::isEventPayload)
                         .serializeMembers(baseSerializer);
 
             } else {
-                SchemaUtils.withFilteredMembers(schema, struct, this::isPayloadMember)
+                ShapeUtils.withFilteredMembers(schema, struct, this::isPayloadMember)
                         .serialize(baseSerializer);
             }
-            SchemaUtils.withFilteredMembers(schema, struct, this::isHeadersMember)
+            ShapeUtils.withFilteredMembers(schema, struct, this::isHeadersMember)
                     .serialize(headerSerializer);
         }
 
