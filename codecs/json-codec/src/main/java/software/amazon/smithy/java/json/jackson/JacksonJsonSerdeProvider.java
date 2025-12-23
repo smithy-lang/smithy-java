@@ -7,11 +7,13 @@ package software.amazon.smithy.java.json.jackson;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.json.JsonSerdeProvider;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.utils.SmithyInternalApi;
+import tools.jackson.core.JacksonException;
 import tools.jackson.core.ObjectReadContext;
 import tools.jackson.core.ObjectWriteContext;
 import tools.jackson.core.PrettyPrinter;
@@ -56,7 +58,11 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
             byte[] source,
             JsonSettings settings
     ) {
-        return new JacksonJsonDeserializer(FACTORY.createParser(readCtx(settings), source), settings);
+        try {
+            return new JacksonJsonDeserializer(FACTORY.createParser(readCtx(settings), source), settings);
+        } catch (JacksonException e) {
+            throw new SerializationException(e);
+        }
     }
 
     @Override
@@ -64,7 +70,11 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
         int offset = source.arrayOffset() + source.position();
         int length = source.remaining();
         var ctx = readCtx(settings);
-        return new JacksonJsonDeserializer(FACTORY.createParser(ctx, source.array(), offset, length), settings);
+        try {
+            return new JacksonJsonDeserializer(FACTORY.createParser(ctx, source.array(), offset, length), settings);
+        } catch (JacksonException e) {
+            throw new SerializationException(e);
+        }
     }
 
     @Override
