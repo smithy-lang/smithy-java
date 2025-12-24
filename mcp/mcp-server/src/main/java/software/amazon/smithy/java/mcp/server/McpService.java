@@ -763,7 +763,7 @@ public final class McpService {
         return first + second;
     }
 
-    private static Document adaptDocument(Document doc, Schema schema) {
+    private Document adaptDocument(Document doc, Schema schema) {
         if (doc == null) {
             return null;
         }
@@ -834,7 +834,7 @@ public final class McpService {
         };
     }
 
-    private static Document adaptDocumentWithOneOf(Document doc, Schema schema) {
+    private Document adaptDocumentWithOneOf(Document doc, Schema schema) {
         var targetSchema = schema.isMember() ? schema.memberTarget() : schema;
         var oneOfTrait = targetSchema.getTrait(ONE_OF_TRAIT);
 
@@ -850,9 +850,11 @@ public final class McpService {
                 if (memberDoc != null) {
                     // Build the flat object with discriminator
                     var flatMembers = new HashMap<String, Document>();
-                    flatMembers.put(discriminator, Document.of(memberDef.getTarget().toString()));
+                    var memberId = memberDef.getTarget();
+                    flatMembers.put(discriminator, Document.of(memberId.toString()));
                     // Copy all fields from the inner object
-                    flatMembers.putAll(memberDoc.asStringMap());
+                    var memberSchema = schemaIndex.getSchema(memberId);
+                    flatMembers.putAll(adaptDocument(memberDoc, memberSchema).asStringMap());
                     return Document.of(flatMembers);
                 }
             }
@@ -943,13 +945,14 @@ public final class McpService {
                     var discriminatorValue = doc.getMember(discriminator);
 
                     if (discriminatorValue != null) {
-                        var shapeIdStr = discriminatorValue.asString();
+                        var shapeId = ShapeId.from(discriminatorValue.asString());
                         // Find the matching member definition
                         for (var memberDef : oneOfTrait.getMembers()) {
-                            if (memberDef.getTarget().toString().equals(shapeIdStr)) {
+                            if (memberDef.getTarget().equals(shapeId)) {
                                 var memberName = memberDef.getName();
+                                var memberSchema = schemaIndex.getSchema(shapeId);
                                 // Build the inner object without the discriminator field
-                                var innerMembers = new HashMap<>(doc.asStringMap());
+                                var innerMembers = new HashMap<>(adaptOutputDocument(doc, memberSchema).asStringMap());
                                 innerMembers.remove(discriminator);
                                 // Return wrapper format
                                 yield Document.of(Map.of(memberName, Document.of(innerMembers)));

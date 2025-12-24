@@ -53,6 +53,28 @@ union Shape {
 ])
 document ShapeWithOneOf
 
+/// Circle structure with optional nested shapes for testing recursive @oneOf adaptation
+structure CircleWithNested {
+    @required
+    radius : Integer
+
+    /// List of nested shapes (for testing recursive @oneOf document adaptation)
+    nestedShapes: ShapeWithOneOfList
+}
+
+/// @oneOf document with nested list of @oneOf documents
+@oneOf(discriminator: "__type", members: [
+    {name: "circleWithNested", target: CircleWithNested},
+    {name: "square", target: Square},
+    {name: "rectangle", target: Rectangle}
+])
+document NestedShapeWithOneOf
+
+/// List of nested @oneOf documents
+list NestedShapeWithOneOfList {
+    member: NestedShapeWithOneOf
+}
+
 structure Circle {
     @required
     radius : Integer
@@ -126,6 +148,21 @@ structure Echo {
     // Union type
     unionValue: TestUnion
 
+    // Union in collections (for testing nested union adaptation)
+    unionList: UnionList
+    unionMap: UnionMap
+
+    // @oneOf document in collections (for testing Document-based polymorphic types)
+    shapeWithOneOfList: ShapeWithOneOfList
+    shapeWithOneOfMap: ShapeWithOneOfMap
+
+    // Nested @oneOf documents (for testing recursive adaptation)
+    nestedShapeWithOneOf: NestedShapeWithOneOf
+    nestedShapeWithOneOfList: NestedShapeWithOneOfList
+
+    // Helper to make CircleWithNested reachable for schema generation
+    circleWithNested: CircleWithNested
+
     // Required field to test required validation
     @required
     requiredField: String
@@ -188,4 +225,26 @@ union TestUnion {
     stringOption: String
     integerOption: Integer
     nestedOption: NestedEcho
+}
+
+/// List of unions for testing nested union adaptation
+list UnionList {
+    member: TestUnion
+}
+
+/// Map of unions for testing nested union adaptation
+map UnionMap {
+    key: String
+    value: TestUnion
+}
+
+/// List of @oneOf documents for testing Document-based polymorphic types in collections
+list ShapeWithOneOfList {
+    member: ShapeWithOneOf
+}
+
+/// Map of @oneOf documents for testing Document-based polymorphic types in collections
+map ShapeWithOneOfMap {
+    key: String
+    value: ShapeWithOneOf
 }
