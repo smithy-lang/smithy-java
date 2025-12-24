@@ -140,8 +140,8 @@ public final class UnionGenerator
 
                                     @Override
                                     @SuppressWarnings("unchecked")
-                                    public <T> T getValue() {
-                                        return (T)${?hasBoxed}(${member:B})${/hasBoxed} ${^unit}${memberName:L}${/unit}${?unit}null${/unit};
+                                    public ${?hasBoxed}${member:B}${/hasBoxed}${^hasBoxed}${member:N}${/hasBoxed} getValue() {
+                                        return ${^unit}${memberName:L}${/unit}${?unit}null${/unit};
                                     }
 
                                     ${toString:C|}
@@ -192,8 +192,8 @@ public final class UnionGenerator
 
                                 @Override
                                 @SuppressWarnings("unchecked")
-                                public <T> T getValue() {
-                                    return (T) memberName;
+                                public String getValue() {
+                                    return memberName;
                                 }
 
                                 private record $$Hidden() implements ${shape:T} {
