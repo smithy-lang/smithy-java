@@ -51,8 +51,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) blobValue;
+        public ByteBuffer getValue() {
+            return blobValue;
         }
 
         @Override
@@ -72,8 +72,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T)(Boolean) booleanValue;
+        public Boolean getValue() {
+            return booleanValue;
         }
 
         @Override
@@ -96,8 +96,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) listValue;
+        public List<String> getValue() {
+            return listValue;
         }
 
         @Override
@@ -120,8 +120,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) mapValue;
+        public Map<String, String> getValue() {
+            return mapValue;
         }
 
         @Override
@@ -144,8 +144,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) bigDecimalValue;
+        public BigDecimal getValue() {
+            return bigDecimalValue;
         }
 
         @Override
@@ -168,8 +168,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) bigIntegerValue;
+        public BigInteger getValue() {
+            return bigIntegerValue;
         }
 
         @Override
@@ -189,8 +189,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T)(Byte) byteValue;
+        public Byte getValue() {
+            return byteValue;
         }
 
         @Override
@@ -210,8 +210,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T)(Double) doubleValue;
+        public Double getValue() {
+            return doubleValue;
         }
 
         @Override
@@ -231,8 +231,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T)(Float) floatValue;
+        public Float getValue() {
+            return floatValue;
         }
 
         @Override
@@ -252,8 +252,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T)(Integer) integerValue;
+        public Integer getValue() {
+            return integerValue;
         }
 
         @Override
@@ -273,8 +273,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T)(Long) longValue;
+        public Long getValue() {
+            return longValue;
         }
 
         @Override
@@ -294,8 +294,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T)(Short) shortValue;
+        public Short getValue() {
+            return shortValue;
         }
 
         @Override
@@ -318,8 +318,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) stringValue;
+        public String getValue() {
+            return stringValue;
         }
 
         @Override
@@ -342,8 +342,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) structureValue;
+        public NestedStruct getValue() {
+            return structureValue;
         }
 
         @Override
@@ -366,8 +366,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) timestampValue;
+        public Instant getValue() {
+            return timestampValue;
         }
 
         @Override
@@ -390,8 +390,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) unionValue;
+        public NestedUnion getValue() {
+            return unionValue;
         }
 
         @Override
@@ -414,8 +414,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) enumValue;
+        public NestedEnum getValue() {
+            return enumValue;
         }
 
         @Override
@@ -438,8 +438,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) intEnumValue;
+        public NestedIntEnum getValue() {
+            return intEnumValue;
         }
 
         @Override
@@ -459,8 +459,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) null;
+        public Unit getValue() {
+            return null;
         }
 
         @Override
@@ -481,8 +481,8 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) memberName;
+        public String getValue() {
+            return memberName;
         }
 
         private record $Hidden() implements UnionType {
