@@ -280,15 +280,34 @@ class McpServerIntegrationTest {
             // Blob should be string (base64)
             assertEquals("string", echoProps.path("blobValue").path("type").asString());
 
-            // All timestamps should be strings with format: date-time
-            assertEquals("string", echoProps.path("epochSecondsTimestamp").path("type").asString());
-            assertEquals("date-time", echoProps.path("epochSecondsTimestamp").path("format").asString());
-            assertEquals("string", echoProps.path("dateTimeTimestamp").path("type").asString());
-            assertEquals("date-time", echoProps.path("dateTimeTimestamp").path("format").asString());
-            assertEquals("string", echoProps.path("httpDateTimestamp").path("type").asString());
-            assertEquals("date-time", echoProps.path("httpDateTimestamp").path("format").asString());
-            assertEquals("string", echoProps.path("defaultTimestamp").path("type").asString());
-            assertEquals("date-time", echoProps.path("defaultTimestamp").path("format").asString());
+            // TimestampUnion should have oneOf with 4 variants (each timestamp format)
+            var timestampUnion = echoProps.path("timestampUnion");
+            assertTrue(timestampUnion.has("oneOf"), "timestampUnion should have oneOf property");
+            assertEquals("object", timestampUnion.path("type").asString());
+            var timestampOneOf = timestampUnion.path("oneOf");
+            assertEquals(4, timestampOneOf.size(), "Should have 4 timestamp format variants");
+            // Each variant's timestamp property should be string with date-time format
+            var timestampNames =
+                    List.of("epochSecondsTimestamp", "dateTimeTimestamp", "httpDateTimestamp", "defaultTimestamp");
+            for (var name : timestampNames) {
+                // Find the variant containing this timestamp
+                boolean found = false;
+                for (var variant : timestampOneOf) {
+                    var props = variant.path("properties");
+                    if (!props.path(name).isMissingNode()) {
+                        var timestampProp = props.path(name);
+                        assertEquals("string",
+                                timestampProp.path("type").asString(),
+                                "Timestamp " + name + " should be string");
+                        assertEquals("date-time",
+                                timestampProp.path("format").asString(),
+                                "Timestamp " + name + " should have date-time format");
+                        found = true;
+                        break;
+                    }
+                }
+                assertTrue(found, "Should find variant with " + name);
+            }
 
             // Enum should be string with enum values
             assertEquals("string", echoProps.path("enumValue").path("type").asString());
@@ -430,41 +449,45 @@ class McpServerIntegrationTest {
         assertEquals(originalData, decodedData);
     }
 
-    // ========== Timestamp Tests ==========
+    // ========== Timestamp Union Tests ==========
 
     @Test
-    void testEpochSecondsTimestampRoundTrip() {
+    void testEpochSecondsTimestampUnionRoundTrip() {
         initializeLatestProtocol();
         var epochSeconds = 1700000000.0; // Input: epoch seconds number
         var expectedOutput = "2023-11-14T22:13:20Z"; // Output: date-time string
-        var echo = echoSingleField("epochSecondsTimestamp", Document.of(epochSeconds));
-        assertEquals(expectedOutput, echo.getMember("epochSecondsTimestamp").asString());
+        var union = Document.of(Map.of("epochSecondsTimestamp", Document.of(epochSeconds)));
+        var echo = echoSingleField("timestampUnion", union);
+        assertEquals(expectedOutput, echo.getMember("timestampUnion").getMember("epochSecondsTimestamp").asString());
     }
 
     @Test
-    void testDateTimeTimestampRoundTrip() {
+    void testDateTimeTimestampUnionRoundTrip() {
         initializeLatestProtocol();
         var dateTimeStr = "2023-11-14T22:13:20Z";
-        var echo = echoSingleField("dateTimeTimestamp", Document.of(dateTimeStr));
-        assertEquals(dateTimeStr, echo.getMember("dateTimeTimestamp").asString());
+        var union = Document.of(Map.of("dateTimeTimestamp", Document.of(dateTimeStr)));
+        var echo = echoSingleField("timestampUnion", union);
+        assertEquals(dateTimeStr, echo.getMember("timestampUnion").getMember("dateTimeTimestamp").asString());
     }
 
     @Test
-    void testHttpDateTimestampRoundTrip() {
+    void testHttpDateTimestampUnionRoundTrip() {
         initializeLatestProtocol();
         var httpDateStr = "Tue, 14 Nov 2023 22:13:20 GMT"; // Input: http-date string
         var expectedOutput = "2023-11-14T22:13:20Z"; // Output: date-time string
-        var echo = echoSingleField("httpDateTimestamp", Document.of(httpDateStr));
-        assertEquals(expectedOutput, echo.getMember("httpDateTimestamp").asString());
+        var union = Document.of(Map.of("httpDateTimestamp", Document.of(httpDateStr)));
+        var echo = echoSingleField("timestampUnion", union);
+        assertEquals(expectedOutput, echo.getMember("timestampUnion").getMember("httpDateTimestamp").asString());
     }
 
     @Test
-    void testDefaultTimestampRoundTrip() {
+    void testDefaultTimestampUnionRoundTrip() {
         initializeLatestProtocol();
         // Default format is date-time (ISO 8601 string)
         var dateTimeStr = "2023-11-14T22:13:20Z";
-        var echo = echoSingleField("defaultTimestamp", Document.of(dateTimeStr));
-        assertEquals(dateTimeStr, echo.getMember("defaultTimestamp").asString());
+        var union = Document.of(Map.of("defaultTimestamp", Document.of(dateTimeStr)));
+        var echo = echoSingleField("timestampUnion", union);
+        assertEquals(dateTimeStr, echo.getMember("timestampUnion").getMember("defaultTimestamp").asString());
     }
 
     // ========== List Tests ==========
@@ -1188,6 +1211,63 @@ class McpServerIntegrationTest {
         assertEquals(20, lastNestedList.get(1).getMember("length").asNumber().intValue());
     }
 
+    @Test
+    void testTimestampInOneOfUnionOutputSerialization() {
+        initializeLatestProtocol();
+
+        // Test all timestamp formats nested inside a @oneOf union (CircleWithNested -> TimestampUnion)
+        // This tests the fix where timestamps in oneOf unions are properly serialized
+        // because oneOf documents are deserialized as untyped Documents without schema info
+
+        // Test epoch-seconds timestamp
+        var circleWithEpochTimestamp = Document.of(Map.of("circleWithNested",
+                Document.of(Map.of(
+                        "radius",
+                        Document.of(10),
+                        "timestampUnion",
+                        Document.of(Map.of("epochSecondsTimestamp", Document.of(1700000000.0)))))));
+        var echo = echoSingleField("nestedShapeWithOneOf", circleWithEpochTimestamp);
+        var result = echo.getMember("nestedShapeWithOneOf").getMember("circleWithNested");
+        assertEquals("2023-11-14T22:13:20Z",
+                result.getMember("timestampUnion").getMember("epochSecondsTimestamp").asString());
+
+        // Test date-time timestamp
+        var circleWithDateTimeTimestamp = Document.of(Map.of("circleWithNested",
+                Document.of(Map.of(
+                        "radius",
+                        Document.of(10),
+                        "timestampUnion",
+                        Document.of(Map.of("dateTimeTimestamp", Document.of("2023-11-14T22:13:20Z")))))));
+        echo = echoSingleField("nestedShapeWithOneOf", circleWithDateTimeTimestamp);
+        result = echo.getMember("nestedShapeWithOneOf").getMember("circleWithNested");
+        assertEquals("2023-11-14T22:13:20Z",
+                result.getMember("timestampUnion").getMember("dateTimeTimestamp").asString());
+
+        // Test http-date timestamp
+        var circleWithHttpDateTimestamp = Document.of(Map.of("circleWithNested",
+                Document.of(Map.of(
+                        "radius",
+                        Document.of(10),
+                        "timestampUnion",
+                        Document.of(Map.of("httpDateTimestamp", Document.of("Tue, 14 Nov 2023 22:13:20 GMT")))))));
+        echo = echoSingleField("nestedShapeWithOneOf", circleWithHttpDateTimestamp);
+        result = echo.getMember("nestedShapeWithOneOf").getMember("circleWithNested");
+        assertEquals("2023-11-14T22:13:20Z",
+                result.getMember("timestampUnion").getMember("httpDateTimestamp").asString());
+
+        // Test default timestamp
+        var circleWithDefaultTimestamp = Document.of(Map.of("circleWithNested",
+                Document.of(Map.of(
+                        "radius",
+                        Document.of(10),
+                        "timestampUnion",
+                        Document.of(Map.of("defaultTimestamp", Document.of("2023-11-14T22:13:20Z")))))));
+        echo = echoSingleField("nestedShapeWithOneOf", circleWithDefaultTimestamp);
+        result = echo.getMember("nestedShapeWithOneOf").getMember("circleWithNested");
+        assertEquals("2023-11-14T22:13:20Z",
+                result.getMember("timestampUnion").getMember("defaultTimestamp").asString());
+    }
+
     // ========== Input Deserialization Verification Tests ==========
 
     @Test
@@ -1207,10 +1287,7 @@ class McpServerIntegrationTest {
         echoData.put("bigDecimalValue", Document.of("123.456"));
         echoData.put("bigIntegerValue", Document.of("123456789012345678901234567890"));
         echoData.put("blobValue", Document.of(base64Blob));
-        echoData.put("epochSecondsTimestamp", Document.of(1700000000.0));
-        echoData.put("dateTimeTimestamp", Document.of("2023-11-14T22:13:20Z"));
-        echoData.put("httpDateTimestamp", Document.of("Tue, 14 Nov 2023 22:13:20 GMT"));
-        echoData.put("defaultTimestamp", Document.of("2023-11-14T22:13:20Z"));
+        echoData.put("timestampUnion", Document.of(Map.of("dateTimeTimestamp", Document.of("2023-11-14T22:13:20Z"))));
         echoData.put("stringList", Document.of(List.of(Document.of("a"), Document.of("b"))));
         echoData.put("integerList", Document.of(List.of(Document.of(1), Document.of(2))));
         echoData.put("stringMap", Document.of(Map.of("key1", Document.of("value1"))));
@@ -1244,11 +1321,8 @@ class McpServerIntegrationTest {
         var blobBytes = ByteBufferUtils.getBytes(blobBuffer);
         assertEquals("test data", new String(blobBytes, StandardCharsets.UTF_8));
 
-        // Verify timestamps
-        assertNotNull(echo.getEpochSecondsTimestamp());
-        assertNotNull(echo.getDateTimeTimestamp());
-        assertNotNull(echo.getHttpDateTimestamp());
-        assertNotNull(echo.getDefaultTimestamp());
+        // Verify timestamp union
+        assertNotNull(echo.getTimestampUnion());
 
         // Verify collections
         assertEquals(2, echo.getStringList().size());
@@ -1292,7 +1366,7 @@ class McpServerIntegrationTest {
         echoData.put("bigDecimalValue", Document.of("123.456"));
         echoData.put("bigIntegerValue", Document.of("123456789"));
         echoData.put("blobValue", Document.of(base64Blob));
-        echoData.put("epochSecondsTimestamp", Document.of(1700000000.0));
+        echoData.put("timestampUnion", Document.of(Map.of("epochSecondsTimestamp", Document.of(1700000000.0))));
         echoData.put("stringList", Document.of(List.of(Document.of("a"), Document.of("b"))));
         echoData.put("stringMap", Document.of(Map.of("key", Document.of("value"))));
         echoData.put("enumValue", Document.of("VALUE_ONE"));
@@ -1354,10 +1428,7 @@ class McpServerIntegrationTest {
         echoData.put("bigDecimalValue", Document.of("999.999"));
         echoData.put("bigIntegerValue", Document.of("999999999999999999"));
         echoData.put("blobValue", Document.of(base64Blob));
-        echoData.put("epochSecondsTimestamp", Document.of(1700000000.0));
-        echoData.put("dateTimeTimestamp", Document.of("2023-11-14T22:13:20Z"));
-        echoData.put("httpDateTimestamp", Document.of("Tue, 14 Nov 2023 22:13:20 GMT"));
-        echoData.put("defaultTimestamp", Document.of("2023-11-14T22:13:20Z"));
+        echoData.put("timestampUnion", Document.of(Map.of("dateTimeTimestamp", Document.of("2023-11-14T22:13:20Z"))));
         echoData.put("stringList", Document.of(List.of(Document.of("a"))));
         echoData.put("integerList", Document.of(List.of(Document.of(1))));
         echoData.put("nestedList", Document.of(List.of(nested)));
@@ -1738,11 +1809,8 @@ class McpServerIntegrationTest {
         echoData.put("bigIntegerValue", null);
         // Blob
         echoData.put("blobValue", null);
-        // Timestamps
-        echoData.put("epochSecondsTimestamp", null);
-        echoData.put("dateTimeTimestamp", null);
-        echoData.put("httpDateTimestamp", null);
-        echoData.put("defaultTimestamp", null);
+        // Timestamp union
+        echoData.put("timestampUnion", null);
         // Collections
         echoData.put("stringList", null);
         echoData.put("integerList", null);
@@ -1776,10 +1844,7 @@ class McpServerIntegrationTest {
         assertNull(echo.getMember("bigDecimalValue"));
         assertNull(echo.getMember("bigIntegerValue"));
         assertNull(echo.getMember("blobValue"));
-        assertNull(echo.getMember("epochSecondsTimestamp"));
-        assertNull(echo.getMember("dateTimeTimestamp"));
-        assertNull(echo.getMember("httpDateTimestamp"));
-        assertNull(echo.getMember("defaultTimestamp"));
+        assertNull(echo.getMember("timestampUnion"));
         assertNull(echo.getMember("stringList"));
         assertNull(echo.getMember("integerList"));
         assertNull(echo.getMember("nestedList"));
@@ -1849,10 +1914,7 @@ class McpServerIntegrationTest {
         assertNull(echo.getMember("bigDecimalValue"));
         assertNull(echo.getMember("bigIntegerValue"));
         assertNull(echo.getMember("blobValue"));
-        assertNull(echo.getMember("epochSecondsTimestamp"));
-        assertNull(echo.getMember("dateTimeTimestamp"));
-        assertNull(echo.getMember("httpDateTimestamp"));
-        assertNull(echo.getMember("defaultTimestamp"));
+        assertNull(echo.getMember("timestampUnion"));
         assertNull(echo.getMember("stringList"));
         assertNull(echo.getMember("integerList"));
         assertNull(echo.getMember("nestedList"));
