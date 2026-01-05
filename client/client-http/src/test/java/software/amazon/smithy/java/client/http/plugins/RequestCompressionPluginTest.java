@@ -50,7 +50,7 @@ public class RequestCompressionPluginTest {
                 .body(DataStream.ofString(REQUEST_BODY))
                 .build();
 
-        var result = interceptor.modifyBeforeTransmit(
+        var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req));
 
         assertThat(result.headers().allValues("Content-Encoding"), empty());
@@ -68,7 +68,7 @@ public class RequestCompressionPluginTest {
                 .body(DataStream.ofString(largeBody))
                 .build();
 
-        var result = interceptor.modifyBeforeTransmit(
+        var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req));
 
         assertThat(result.headers().allValues("Content-Encoding"), contains("gzip"));
@@ -87,7 +87,7 @@ public class RequestCompressionPluginTest {
                 .body(DataStream.ofString(REQUEST_BODY))
                 .build();
 
-        var result = interceptor.modifyBeforeTransmit(
+        var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req));
 
         assertThat(result.headers().allValues("Content-Encoding"), empty());
@@ -104,7 +104,7 @@ public class RequestCompressionPluginTest {
                 .body(DataStream.ofString(REQUEST_BODY))
                 .build();
 
-        var result = interceptor.modifyBeforeTransmit(
+        var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req));
 
         assertThat(result.headers().allValues("Content-Encoding"), empty());
@@ -115,7 +115,7 @@ public class RequestCompressionPluginTest {
         var interceptor = new RequestCompressionPlugin.RequestCompressionInterceptor();
         var context = Context.create();
         context.put(HttpContext.REQUEST_MIN_COMPRESSION_SIZE_BYTES, 999999);
-        String original = "small";
+        var original = "small";
         var streamBody = DataStream.ofInputStream(new ByteArrayInputStream(original.getBytes(StandardCharsets.UTF_8)));
         var req = HttpRequest.builder()
                 .uri(new URI("/"))
@@ -123,7 +123,7 @@ public class RequestCompressionPluginTest {
                 .body(streamBody)
                 .build();
 
-        var result = interceptor.modifyBeforeTransmit(
+        var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithStreamingInput(), context, new TestInput(), req));
 
         assertThat(result.headers().allValues("Content-Encoding"), contains("gzip"));
@@ -136,7 +136,7 @@ public class RequestCompressionPluginTest {
         var interceptor = new RequestCompressionPlugin.RequestCompressionInterceptor();
         var context = Context.create();
         context.put(HttpContext.REQUEST_MIN_COMPRESSION_SIZE_BYTES, -1);
-        String largeBody = REQUEST_BODY.repeat(100);
+        var largeBody = REQUEST_BODY.repeat(100);
         var req = HttpRequest.builder()
                 .uri(new URI("/"))
                 .method("POST")
@@ -144,7 +144,7 @@ public class RequestCompressionPluginTest {
                 .build();
 
         var hook = new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req);
-        Assertions.assertThrows(IllegalArgumentException.class, () -> interceptor.modifyBeforeTransmit(hook));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> interceptor.modifyBeforeRetryLoop(hook));
     }
 
     @Test
@@ -152,7 +152,7 @@ public class RequestCompressionPluginTest {
         var interceptor = new RequestCompressionPlugin.RequestCompressionInterceptor();
         var context = Context.create();
         context.put(HttpContext.REQUEST_MIN_COMPRESSION_SIZE_BYTES, 10485761);
-        String largeBody = REQUEST_BODY.repeat(100);
+        var largeBody = REQUEST_BODY.repeat(100);
         var req = HttpRequest.builder()
                 .uri(new URI("/"))
                 .method("POST")
@@ -160,7 +160,7 @@ public class RequestCompressionPluginTest {
                 .build();
 
         var hook = new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req);
-        Assertions.assertThrows(IllegalArgumentException.class, () -> interceptor.modifyBeforeTransmit(hook));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> interceptor.modifyBeforeRetryLoop(hook));
     }
 
     @Test
@@ -174,7 +174,7 @@ public class RequestCompressionPluginTest {
                 .body(DataStream.ofString(REQUEST_BODY))
                 .build();
 
-        var result = interceptor.modifyBeforeTransmit(
+        var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithoutCompressionTrait(), context, new TestInput(), req));
 
         assertThat(result.headers().allValues("Content-Encoding"), empty());
@@ -192,7 +192,7 @@ public class RequestCompressionPluginTest {
                 .withAddedHeader("Content-Encoding", "custom")
                 .build();
 
-        var result = interceptor.modifyBeforeTransmit(
+        var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req));
 
         var encodings = result.headers().allValues("Content-Encoding");

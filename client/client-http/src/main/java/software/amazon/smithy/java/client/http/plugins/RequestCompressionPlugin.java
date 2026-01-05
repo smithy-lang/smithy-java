@@ -47,7 +47,7 @@ public final class RequestCompressionPlugin implements AutoClientPlugin {
                 CompressionAlgorithm.supportedAlgorithms();
 
         @Override
-        public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
+        public <RequestT> RequestT modifyBeforeRetryLoop(RequestHook<?, ?, RequestT> hook) {
             return hook.mapRequest(HttpRequest.class, RequestCompressionInterceptor::processRequest);
         }
 
