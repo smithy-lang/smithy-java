@@ -785,7 +785,7 @@ public final class McpService {
                 case BLOB -> doc;
                 default -> badType(fromType, toType);
             };
-            case TIMESTAMP -> adaptTimestampInput(doc);
+            case TIMESTAMP -> adaptTimestamp(doc);
             case STRUCTURE -> {
                 var convertedMembers = new HashMap<String, Document>();
                 var members = schema.members();
@@ -870,7 +870,11 @@ public final class McpService {
     /**
      *  This is primarily for more robustness against AI hallucinations.
      */
-    private static Document adaptTimestampInput(Document doc) {
+    private static Document adaptTimestamp(Document doc) {
+        // If already a timestamp, format as date-time string
+        if (doc.isType(ShapeType.TIMESTAMP)) {
+            return Document.of(DATE_TIME.writeString(doc.asTimestamp()));
+        }
         // If input is a string, try DATE_TIME first, fallback to HTTP_DATE
         if (doc.isType(ShapeType.STRING)) {
             var str = doc.asString();
@@ -894,7 +898,10 @@ public final class McpService {
             case BIG_DECIMAL -> Document.of(doc.asBigDecimal().toString());
             case BIG_INTEGER -> Document.of(doc.asBigInteger().toString());
             case BLOB -> Document.of(Base64.getEncoder().encodeToString(ByteBufferUtils.getBytes(doc.asBlob())));
-            case TIMESTAMP -> Document.of(DATE_TIME.writeString(doc.asTimestamp()));
+            // Use adaptTimestamp() instead of asTimestamp() because oneOf union members are
+            // deserialized as untyped Documents (no schema available). Timestamps in these
+            // documents remain as strings or numbers rather than being converted to Timestamp Documents.
+            case TIMESTAMP -> adaptTimestamp(doc);
             case STRUCTURE -> {
                 var convertedMembers = new HashMap<String, Document>();
                 for (var member : schema.members()) {

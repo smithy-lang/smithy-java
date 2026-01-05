@@ -60,6 +60,9 @@ structure CircleWithNested {
 
     /// List of nested shapes (for testing recursive @oneOf document adaptation)
     nestedShapes: ShapeWithOneOfList
+
+    /// Timestamp union for testing timestamp serialization in @oneOf documents
+    timestampUnion: TimestampUnion
 }
 
 /// @oneOf document with nested list of @oneOf documents
@@ -73,6 +76,17 @@ document NestedShapeWithOneOf
 /// List of nested @oneOf documents
 list NestedShapeWithOneOfList {
     member: NestedShapeWithOneOf
+}
+
+/// Union containing different timestamp formats for testing timestamp serialization
+union TimestampUnion {
+    @timestampFormat("epoch-seconds")
+    epochSecondsTimestamp: Timestamp
+    @timestampFormat("date-time")
+    dateTimeTimestamp: Timestamp
+    @timestampFormat("http-date")
+    httpDateTimestamp: Timestamp
+    defaultTimestamp: Timestamp
 }
 
 structure Circle {
@@ -111,15 +125,8 @@ structure Echo {
     // Binary (serialized as base64 string)
     blobValue: Blob
 
-    // Timestamps with different formats
-    @timestampFormat("epoch-seconds")
-    epochSecondsTimestamp: Timestamp
-    @timestampFormat("date-time")
-    dateTimeTimestamp: Timestamp
-    @timestampFormat("http-date")
-    httpDateTimestamp: Timestamp
-    // Default timestamp (no format trait - defaults to date-time)
-    defaultTimestamp: Timestamp
+    // Timestamp union with different formats
+    timestampUnion: TimestampUnion
 
     // Collections
     stringList: StringList
