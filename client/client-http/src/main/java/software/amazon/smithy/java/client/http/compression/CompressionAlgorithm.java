@@ -25,7 +25,9 @@ public interface CompressionAlgorithm {
      */
     DataStream compress(DataStream data);
 
+    List<CompressionAlgorithm> SUPPORTED_ALGORITHMS = List.of(new Gzip());
+
     static List<CompressionAlgorithm> supportedAlgorithms() {
-        return ListUtils.of(new Gzip());
+        return SUPPORTED_ALGORITHMS;
     }
 }
