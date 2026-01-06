@@ -7,7 +7,6 @@ package software.amazon.smithy.java.client.http.compression;
 
 import java.util.List;
 import software.amazon.smithy.java.io.datastream.DataStream;
-import software.amazon.smithy.utils.ListUtils;
 
 /**
  * Represents a compression algorithm that can be used to compress request
