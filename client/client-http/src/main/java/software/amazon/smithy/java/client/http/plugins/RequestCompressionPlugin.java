@@ -96,7 +96,8 @@ public final class RequestCompressionPlugin implements AutoClientPlugin {
 
         private static void validateCompressionSize(int minCompressionSize) {
             if (minCompressionSize < 0 || minCompressionSize > MIN_COMPRESSION_SIZE_CAP) {
-                throw new IllegalArgumentException("Min compression size must be between 0 and " + MIN_COMPRESSION_SIZE_CAP);
+                throw new IllegalArgumentException(
+                        "Min compression size must be between 0 and " + MIN_COMPRESSION_SIZE_CAP);
             }
         }
     }
