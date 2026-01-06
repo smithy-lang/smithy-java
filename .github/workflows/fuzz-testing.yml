@@ -7,11 +7,6 @@ on:
 
   # Allow manual trigger
   workflow_dispatch:
-    inputs:
-      duration:
-        description: 'Fuzz test duration (e.g., 10m, 1h)'
-        required: false
-        default: '15m'
 
 permissions:
   contents: read
@@ -31,7 +26,7 @@ jobs:
           distribution: 'corretto'
 
       - name: Cache compiled buildscripts
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: ${{ runner.os }}-gradle-${{ hashFiles('buildSrc/**/*.kts') }}
           path: |
@@ -45,7 +40,7 @@ jobs:
             caches
 
       - name: Restore fuzz corpus cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           key: fuzz-corpus-${{ github.run_id }}
           restore-keys: |
@@ -56,11 +51,10 @@ jobs:
 
       - name: Run all fuzz tests
         run: |
-          DURATION="${{ github.event.inputs.duration || '5h' }}"
-          ./gradlew fuzz -Pfuzz.maxDuration=$DURATION --stacktrace
+          ./gradlew fuzz -Pfuzz.maxDuration=4h --stacktrace
 
       - name: Save fuzz corpus cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         if: always()
         with:
           key: fuzz-corpus-${{ github.run_id }}
@@ -69,14 +63,14 @@ jobs:
             **/src/fuzz/resources/corpus/
 
       - name: Upload fuzz test reports
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: fuzz-test-reports
           path: '**/build/reports/fuzz-coverage/**'
 
       - name: Upload crash artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         if: failure()
         with:
           name: fuzz-crashes

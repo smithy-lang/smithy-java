@@ -13,10 +13,10 @@ operation Defaults {
         @default(true)
         boolean: Boolean
 
-        @default(1)
+        @default(1e309)
         bigDecimal: BigDecimal
 
-        @default(1)
+        @default(123456789123456789123456789123456789123456789123456789)
         bigInteger: BigInteger
 
         @default(1)

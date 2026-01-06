@@ -15,12 +15,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.SortedMap;
 import java.util.TreeMap;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -309,45 +310,35 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     private static void addCanonicalizedResourcePath(URI uri, StringBuilder builder) {
         String path = uri.normalize().getRawPath();
-        if (path.isEmpty()) {
+        if (path == null || path.isEmpty()) {
             builder.append('/');
             return;
         }
         if (!path.startsWith("/")) {
-            path = '/' + path;
+            builder.append('/');
         }
         URLEncoding.encodeUnreserved(path, builder, true);
     }
 
     private static void addCanonicalizedQueryString(URI uri, StringBuilder builder) {
-        // Getting the raw query means the keys and values don't need to be encoded again.
         var query = uri.getRawQuery();
         if (query == null) {
             return;
         }
-
-        SortedMap<String, String> sorted = new TreeMap<>();
         var params = query.split("&");
+        var pairs = new ArrayList<String>(params.length / 2);
 
         for (var param : params) {
             var keyVal = param.split("=");
             var key = keyVal[0];
-            var encodedKey = URLEncoding.encodeUnreserved(key, false);
-            if (keyVal.length == 2) {
-                var encodedValue = URLEncoding.encodeUnreserved(keyVal[1], false);
-                sorted.put(encodedKey, encodedValue);
-            } else {
-                sorted.put(key, "");
-            }
+            var value = keyVal.length == 2 ? keyVal[1] : "";
+            pairs.add(key + "=" + value);
         }
 
-        for (var entry : sorted.entrySet()) {
-            builder.append(entry.getKey());
-            builder.append('=');
-            builder.append(entry.getValue());
-            builder.append('&');
+        Collections.sort(pairs);
+        for (var entry : pairs) {
+            builder.append(entry).append('&');
         }
-
         // Remove the trailing '&'.
         builder.setLength(builder.length() - 1);
     }

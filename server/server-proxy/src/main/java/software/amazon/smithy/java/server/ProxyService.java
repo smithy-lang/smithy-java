@@ -24,6 +24,7 @@ import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.Unit;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DocumentException;
@@ -154,12 +155,17 @@ public final class ProxyService implements Service {
 
         var outputSchema = schemaConverter.getSchema(model.expectShape(targetOperation.getOutputShape()));
 
+        // Get trait directly for proxy operations (null for non-proxy)
+        ProxyOperationTrait proxyTrait = isProxy
+                ? sourceOperation.expectTrait(ProxyOperationTrait.class)
+                : null;
+
         var function = new DynamicFunction(
                 dynamicClient,
                 targetOperation.getId().getName(),
                 outputSchema,
                 service,
-                isProxy);
+                proxyTrait);
 
         return Operation.of(operationName, function, apiOperation, this);
     }
@@ -301,17 +307,33 @@ public final class ProxyService implements Service {
             String operation,
             Schema outputSchema,
             ServiceShape serviceShape,
-            boolean isProxy) implements BiFunction<StructDocument, RequestContext, StructDocument> {
+            ProxyOperationTrait proxyTrait) implements BiFunction<StructDocument, RequestContext, StructDocument> {
 
         @Override
         public StructDocument apply(StructDocument input, RequestContext requestContext) {
             Document output;
-            if (isProxy) {
-                //We need to stash the original input because dynamic client will erase anything extra.
+            if (proxyTrait != null) {
+                // Stash additionalInput in context
                 var requestOverride = RequestOverrideConfig.builder()
-                        .putConfig(PROXY_INPUT, input.getMember("additionalInput"))
+                        .putConfig(PROXY_INPUT, input.getMember(proxyTrait.getAdditionalInputMemberName()))
                         .build();
-                output = dynamicClient.call(operation, input, requestOverride);
+
+                Document unwrappedInput;
+                if (proxyTrait.shouldUnwrapInput()) {
+                    var inputMemberName = proxyTrait.getInputMemberName();
+                    if (inputMemberName != null) {
+                        unwrappedInput = input.getMember(inputMemberName);
+                        if (unwrappedInput == null) {
+                            throw new IllegalArgumentException("Expected input to be present in " + inputMemberName);
+                        }
+                    } else {
+                        unwrappedInput = Document.of(Unit.getInstance());
+                    }
+                } else {
+                    unwrappedInput = input;
+                }
+
+                output = dynamicClient.call(operation, unwrappedInput, requestOverride);
             } else {
                 output = dynamicClient.call(operation, input);
             }

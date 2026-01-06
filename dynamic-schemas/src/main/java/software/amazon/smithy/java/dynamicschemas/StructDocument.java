@@ -144,7 +144,7 @@ public final class StructDocument implements Document, SerializableStruct {
             if (value != null) {
                 var member = schema.member(name);
                 if (member != null) {
-                    value.serializeContents(serializer);
+                    value.serialize(serializer);
                 }
             }
         }

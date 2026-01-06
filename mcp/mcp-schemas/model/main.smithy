@@ -34,15 +34,6 @@ structure JsonRpcErrorResponse {
     data: Document
 }
 
-@trait(selector: "service")
-structure jsonRpc2 {}
-
-@trait(selector: "operation")
-structure jsonRpc2Method {
-    @required
-    method: NonEmptyString
-}
-
 @private
 @length(min: 1)
 string NonEmptyString
@@ -119,7 +110,7 @@ structure JsonObjectSchema {
 
     required: StringList
 
-    additionalProperties: Boolean
+    additionalProperties: Document
 
     description: String
 
@@ -147,6 +138,15 @@ structure JsonPrimitiveSchema {
     type: JsonPrimitiveType
 
     description: String
+
+    @jsonName("const")
+    constValue: String
+
+    @jsonName("enum")
+    enumValues: JsonSchemaList
+
+    /// JSON Schema format annotation (e.g., "date-time" for timestamps)
+    format: String
 }
 
 structure JsonDocumentSchema {
@@ -154,6 +154,22 @@ structure JsonDocumentSchema {
     type: StringList
 
     description: String
+}
+
+structure JsonOneOfSchema {
+    /// List of inline schema variants
+    @required
+    oneOf: JsonSchemaList
+
+    description: String
+
+    @required
+    type: String = "object"
+}
+
+list JsonSchemaList {
+    /// Each element is a full inline JSON Schema (JsonObjectSchema, etc.)
+    member: Document
 }
 
 enum JsonPrimitiveType {
@@ -260,3 +276,34 @@ structure GetPromptResult {
     description: String
     messages: PromptMessageList
 }
+
+@unstable
+@trait(selector: "document")
+structure oneOf {
+    /// Discriminator field name to add during runtime input adaptation
+    @required
+    discriminator: String
+
+    /// List of possible variant types
+    @required
+    members: OneOfMemberList
+}
+
+list OneOfMemberList {
+    member: OneOfMember
+}
+
+structure OneOfMember {
+    /// The member name (e.g., "circle", "square")
+    @required
+    name: String
+
+    /// Target shape ID - uses @idRef for Smithy validation
+    @required
+    target: OneOfTargetShape
+}
+
+/// Shape ID reference for oneOf target - validates it points to a structure
+@private
+@idRef(failWhenMissing: true, selector: "structure")
+string OneOfTargetShape

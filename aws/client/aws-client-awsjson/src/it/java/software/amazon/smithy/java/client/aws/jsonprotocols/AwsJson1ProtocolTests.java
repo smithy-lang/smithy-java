@@ -48,12 +48,6 @@ public class AwsJson1ProtocolTests {
             skipTests = {
                     "AwsJson10ClientPopulatesDefaultsValuesWhenMissingInResponse",
                     "AwsJson10ClientIgnoresDefaultValuesIfMemberValuesArePresentInResponse",
-                    //The below fail because we haven't implemented code based exception handling
-                    "AwsJson10FooErrorUsingCode",
-                    "AwsJson10FooErrorUsingCodeAndNamespace",
-                    "AwsJson10FooErrorUsingCodeUriAndNamespace",
-                    "AwsJson10FooErrorWithDunderTypeUriAndNamespace"
-
             },
             skipOperations = "aws.protocoltests.json10#OperationWithRequiredMembersWithDefaults")
     public void responseTest(Runnable test) {

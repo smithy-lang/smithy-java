@@ -1213,4 +1213,166 @@ public class McpServerTest {
             .discoverModels()
             .assemble()
             .unwrap();
+
+    private static final String UNION_MODEL_STR =
+            """
+                    $version: "2"
+
+                    namespace smithy.test.union
+
+                    use smithy.mcp#oneOf
+
+                    @aws.protocols#awsJson1_0
+                    service TestUnionService {
+                        operations: [ProcessShape, ProcessShapeWithOneOf]
+                    }
+
+                    /// Process a regular union (no @oneOf trait)
+                    operation ProcessShape {
+                        input: ProcessShapeInput
+                        output: ProcessShapeOutput
+                    }
+
+                    /// Process a union with @oneOf trait (discriminator transformation)
+                    operation ProcessShapeWithOneOf {
+                        input: ProcessShapeWithOneOfInput
+                        output: ProcessShapeWithOneOfOutput
+                    }
+
+                    structure ProcessShapeInput {
+                        shape: Shape
+                    }
+
+                    structure ProcessShapeOutput {
+                        shape: Shape
+                    }
+
+                    structure ProcessShapeWithOneOfInput {
+                        shape: ShapeWithOneOf
+                    }
+
+                    structure ProcessShapeWithOneOfOutput {
+                        shape: ShapeWithOneOf
+                    }
+
+                    /// Union without @oneOf trait - uses wrapper format natively
+                    union Shape {
+                        circle: Circle
+                        square: Square
+                    }
+
+                    /// Document with @oneOf trait - for testing Document-based polymorphic types
+                    @oneOf(discriminator: "__type", members: [
+                        {name: "circle", target: Circle},
+                        {name: "square", target: Square}
+                    ])
+                    document ShapeWithOneOf
+
+                    structure Circle {
+                        @required
+                        radius: Integer
+                    }
+
+                    structure Square {
+                        @required
+                        side: Integer
+                    }""";
+
+    private static final Model UNION_MODEL = Model.assembler()
+            .addUnparsedModel("test-union.smithy", UNION_MODEL_STR)
+            .discoverModels()
+            .assemble()
+            .unwrap();
+
+    @Test
+    void testUnionSchemaGeneratesOneOfWithWrappedMembers() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.union#TestUnionService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(UNION_MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(ProtocolVersion.v2025_06_18.INSTANCE);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        // Find ProcessShape tool and validate its input schema
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("ProcessShape"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        var inputSchema = tool.get("inputSchema").asStringMap();
+        var properties = inputSchema.get("properties").asStringMap();
+        var shapeProperty = properties.get("shape").asStringMap();
+
+        // Union should have oneOf array with wrapped member variants
+        var oneOf = shapeProperty.get("oneOf").asList();
+        assertEquals(2, oneOf.size(), "Union should have 2 oneOf variants");
+
+        // Each variant should be an object with one property
+        for (var variant : oneOf) {
+            var variantMap = variant.asStringMap();
+            assertEquals("object", variantMap.get("type").asString());
+            var variantProps = variantMap.get("properties").asStringMap();
+            assertEquals(1, variantProps.size(), "Each variant should have exactly one property");
+            var required = variantMap.get("required").asList();
+            assertEquals(1, required.size(), "Each variant should have one required property");
+            assertFalse(variantMap.get("additionalProperties").asBoolean(), "additionalProperties should be false");
+        }
+
+        // Verify the member names are circle and square
+        var memberNames = oneOf.stream()
+                .flatMap(v -> v.asStringMap().get("properties").asStringMap().keySet().stream())
+                .toList();
+        assertTrue(memberNames.contains("circle"));
+        assertTrue(memberNames.contains("square"));
+    }
+
+    @Test
+    void testUnionWithOneOfTraitSchemaAlsoGeneratesOneOf() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.union#TestUnionService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(UNION_MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(ProtocolVersion.v2025_06_18.INSTANCE);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        // Find ProcessShapeWithOneOf tool
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("ProcessShapeWithOneOf"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        var inputSchema = tool.get("inputSchema").asStringMap();
+        var properties = inputSchema.get("properties").asStringMap();
+        var shapeProperty = properties.get("shape").asStringMap();
+
+        // Document with @oneOf should have oneOf array generated from trait members
+        var oneOf = shapeProperty.get("oneOf").asList();
+        assertEquals(2, oneOf.size(), "Document with @oneOf should have 2 oneOf variants");
+    }
 }

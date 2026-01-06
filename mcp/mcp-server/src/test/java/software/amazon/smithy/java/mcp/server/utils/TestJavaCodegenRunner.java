@@ -9,6 +9,8 @@ package software.amazon.smithy.java.mcp.server.utils;
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import static software.amazon.smithy.model.node.Node.fromStrings;
+
 import java.nio.file.Paths;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.build.PluginContext;
@@ -37,6 +39,11 @@ public final class TestJavaCodegenRunner {
                         ObjectNode.builder()
                                 .withMember("service", "smithy.java.mcp.test#TestService")
                                 .withMember("namespace", "software.amazon.smithy.java.mcp.test")
+                                .withMember("runtimeTraits",
+                                        fromStrings("smithy.api#documentation",
+                                                "smithy.api#examples",
+                                                "smithy.ai#prompts",
+                                                "smithy.mcp#oneOf"))
                                 .build())
                 .model(model)
                 .build();

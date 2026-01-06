@@ -17,6 +17,7 @@ import software.amazon.smithy.java.cbor.Rpcv2CborCodec;
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
+import software.amazon.smithy.java.client.http.ErrorTypeUtils;
 import software.amazon.smithy.java.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
 import software.amazon.smithy.java.context.Context;
@@ -27,6 +28,8 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.Unit;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
+import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
@@ -51,7 +54,11 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
     public RpcV2CborProtocol(ShapeId service) {
         super(Rpcv2CborTrait.ID);
         this.service = service;
-        this.errorDeserializer = HttpErrorDeserializer.builder().codec(CBOR_CODEC).serviceId(service).build();
+        this.errorDeserializer = HttpErrorDeserializer.builder()
+                .codec(CBOR_CODEC)
+                .serviceId(service)
+                .errorPayloadParser(RpcV2CborProtocol::extractErrorType)
+                .build();
     }
 
     @Override
@@ -161,6 +168,12 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
             OutputEventStreamingApiOperation<?, ?, ?> outputOperation
     ) {
         return AwsEventDecoderFactory.forOutputStream(outputOperation, payloadCodec(), f -> f);
+    }
+
+    private static ShapeId extractErrorType(Document document, String namespace) {
+        return DocumentDeserializer.parseDiscriminator(
+                ErrorTypeUtils.removeUri(ErrorTypeUtils.readType(document)),
+                namespace);
     }
 
     public static final class Factory implements ClientProtocolFactory<Rpcv2CborTrait> {

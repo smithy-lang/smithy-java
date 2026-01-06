@@ -41,9 +41,20 @@ public final class ProxyOperationTrait implements Trait {
 
     private static final ShapeId SHAPE_ID = ShapeId.from("smithy.server.api#proxyOperation");
     private final ShapeId delegateOperation;
+    private final String inputMemberName;
+    private final String additionalInputMemberName;
+    private final boolean unwrapInput;
 
-    public ProxyOperationTrait(ShapeId delegateOperation) {
+    public ProxyOperationTrait(
+            ShapeId delegateOperation,
+            String inputMemberName,
+            String additionalInputMemberName,
+            boolean unwrapInput
+    ) {
         this.delegateOperation = delegateOperation;
+        this.inputMemberName = inputMemberName;
+        this.additionalInputMemberName = additionalInputMemberName;
+        this.unwrapInput = unwrapInput;
     }
 
     @Override
@@ -58,5 +69,39 @@ public final class ProxyOperationTrait implements Trait {
 
     public ShapeId getDelegateOperation() {
         return delegateOperation;
+    }
+
+    /**
+     * Gets the name of the member containing the original input in the wrapper structure.
+     *
+     * @return the input member name, or null if the original operation had no input
+     */
+    public String getInputMemberName() {
+        return inputMemberName;
+    }
+
+    /**
+     * Gets the name of the member containing the additional input in the wrapper structure.
+     *
+     * @return the additional input member name
+     */
+    public String getAdditionalInputMemberName() {
+        return additionalInputMemberName;
+    }
+
+    /**
+     * Returns whether the proxy service should unwrap the input from a wrapper structure.
+     *
+     * <p>When true (V2 behavior), the proxy input is a wrapper structure containing both
+     * the original input member and the additional input member. The proxy service should
+     * extract the original input before forwarding to the delegate operation.</p>
+     *
+     * <p>When false (V1 legacy behavior), the additional input was mixed into the existing
+     * input shape, so no unwrapping is needed - the full input can be passed directly.</p>
+     *
+     * @return true if the proxy service should unwrap the input, false otherwise
+     */
+    public boolean shouldUnwrapInput() {
+        return unwrapInput;
     }
 }

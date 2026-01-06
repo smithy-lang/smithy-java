@@ -43,8 +43,8 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) type;
+        public Type getValue() {
+            return type;
         }
 
         @Override
@@ -65,8 +65,8 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
 
         @Override
         @SuppressWarnings("unchecked")
-        public <T> T getValue() {
-            return (T) memberName;
+        public String getValue() {
+            return memberName;
         }
 
         private record $Hidden() implements UnionWithTypeMember {

@@ -21,11 +21,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -34,12 +37,14 @@ import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.logging.InternalLogger;
+import software.amazon.smithy.java.mcp.OneOfTrait;
 import software.amazon.smithy.java.mcp.model.CallToolResult;
 import software.amazon.smithy.java.mcp.model.Capabilities;
 import software.amazon.smithy.java.mcp.model.InitializeResult;
 import software.amazon.smithy.java.mcp.model.JsonArraySchema;
 import software.amazon.smithy.java.mcp.model.JsonDocumentSchema;
 import software.amazon.smithy.java.mcp.model.JsonObjectSchema;
+import software.amazon.smithy.java.mcp.model.JsonOneOfSchema;
 import software.amazon.smithy.java.mcp.model.JsonPrimitiveSchema;
 import software.amazon.smithy.java.mcp.model.JsonPrimitiveType;
 import software.amazon.smithy.java.mcp.model.JsonRpcErrorResponse;
@@ -56,7 +61,6 @@ import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
@@ -76,10 +80,12 @@ public final class McpService {
                     .build())
             .build();
 
+    private static final TraitKey<OneOfTrait> ONE_OF_TRAIT = TraitKey.get(OneOfTrait.class);
+
     private final Map<String, Tool> tools;
     private final Map<String, Prompt> prompts;
     private final PromptProcessor promptProcessor;
-    private final String name;
+    private final String serviceName;
     private final String version;
     private final Map<String, McpServerProxy> proxies;
     private final Map<String, Service> services;
@@ -87,6 +93,7 @@ public final class McpService {
     private final ToolFilter toolFilter;
     private final AtomicReference<Boolean> proxiesInitialized = new AtomicReference<>(false);
     private final McpMetricsObserver metricsObserver;
+    private final SchemaIndex schemaIndex;
 
     McpService(
             Map<String, Service> services,
@@ -97,10 +104,12 @@ public final class McpService {
             McpMetricsObserver metricsObserver
     ) {
         this.services = services;
+        this.schemaIndex =
+                SchemaIndex.compose(services.values().stream().map(Service::schemaIndex).toArray(SchemaIndex[]::new));
         this.tools = createTools(services);
         this.prompts = PromptLoader.loadPrompts(services.values());
         this.promptProcessor = new PromptProcessor();
-        this.name = name;
+        this.serviceName = name;
         this.version = version;
         this.proxies = proxyList.stream().collect(Collectors.toMap(McpServerProxy::name, p -> p));
         this.toolFilter = toolFilter;
@@ -202,7 +211,7 @@ public final class McpService {
                         .prompts(Prompts.builder().listChanged(true).build())
                         .build())
                 .serverInfo(ServerInfo.builder()
-                        .name(name)
+                        .name(serviceName)
                         .version(version)
                         .build())
                 .build();
@@ -325,17 +334,13 @@ public final class McpService {
             }
 
             for (McpServerProxy proxy : proxies.values()) {
-                try {
-                    if (initRequest != null) {
-                        proxy.initialize(responseWriter, initRequest, protocolVersion);
-                    }
+                if (initRequest != null) {
+                    proxy.initialize(responseWriter, initRequest, protocolVersion);
+                }
 
-                    List<ToolInfo> proxyTools = proxy.listTools();
-                    for (var toolInfo : proxyTools) {
-                        tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
-                    }
-                } catch (Exception e) {
-                    LOG.error("Failed to initialize proxy: " + proxy.name(), e);
+                List<ToolInfo> proxyTools = proxy.listTools();
+                for (var toolInfo : proxyTools) {
+                    tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
                 }
             }
         }
@@ -396,24 +401,14 @@ public final class McpService {
             SerializableShape output,
             ProtocolVersion protocolVersion
     ) {
+        var adaptedOutput = adaptOutputDocument(Document.of(output), tool.operation().getApiOperation().outputSchema());
         var result = CallToolResult.builder()
                 .content(List.of(TextContent.builder()
-                        .text(CODEC.serializeToString(output))
+                        .text(CODEC.serializeToString(adaptedOutput))
                         .build()));
 
         if (supportsOutputSchema(protocolVersion)) {
-            var outputSchema = tool.toolInfo().getOutputSchema();
-            if (outputSchema != null) {
-                var operation = tool.operation();
-                if (operation != null) {
-                    var adaptedOutput = adaptOutputDocument(
-                            Document.of(output),
-                            operation.getApiOperation().outputSchema());
-                    result.structuredContent(adaptedOutput);
-                } else {
-                    result.structuredContent(Document.of(output));
-                }
-            }
+            result.structuredContent(adaptedOutput);
         }
 
         return result.build();
@@ -459,8 +454,9 @@ public final class McpService {
         return createErrorResponse(req, exception, true); //TODO change the default to false.
     }
 
-    private JsonRpcResponse createErrorResponse(JsonRpcRequest req, Exception exception, boolean sendStackTrace) {
+    private JsonRpcResponse createErrorResponse(JsonRpcRequest req, Throwable exception, boolean sendStackTrace) {
         String s;
+        exception = unwrapException(exception);
         if (sendStackTrace) {
             try (var sw = new StringWriter();
                     var pw = new PrintWriter(sw)) {
@@ -474,6 +470,14 @@ public final class McpService {
             s = exception.getMessage();
         }
         return createErrorResponse(req, s);
+    }
+
+    private Throwable unwrapException(Throwable exception) {
+        return switch (exception) {
+            case CompletionException ce when ce.getCause() != null -> ce.getCause();
+            case ExecutionException ee when ee.getCause() != null -> ee.getCause();
+            default -> exception;
+        };
     }
 
     private JsonRpcResponse createErrorResponse(JsonRpcRequest req, String s) {
@@ -512,7 +516,7 @@ public final class McpService {
         return tools;
     }
 
-    private static JsonObjectSchema createJsonObjectSchema(Schema schema, Set<ShapeId> visited) {
+    private JsonObjectSchema createJsonObjectSchema(Schema schema, Set<ShapeId> visited) {
         var targetId = schema.id();
         if (!visited.add(targetId)) {
             // if we're in a recursive cycle, just say "type": "object" and bail
@@ -523,19 +527,13 @@ public final class McpService {
         var requiredProperties = new ArrayList<String>();
         boolean isMember = schema.isMember();
         var members = isMember ? schema.memberTarget().members() : schema.members();
-        var type = isMember ? schema.memberTarget().type() : schema.type();
         for (var member : members) {
             var name = member.memberName();
             if (member.hasTrait(TraitKey.REQUIRED_TRAIT)) {
                 requiredProperties.add(name);
             }
 
-            var jsonSchema = switch (member.type()) {
-                case LIST, SET -> createJsonArraySchema(member.memberTarget(), visited);
-                case MAP, STRUCTURE, UNION -> createJsonObjectSchema(member.memberTarget(), visited);
-                case DOCUMENT -> createJsonDocumentSchema(member);
-                default -> createJsonPrimitiveSchema(member);
-            };
+            var jsonSchema = createMemberSchema(member, visited);
 
             properties.put(name, Document.of(jsonSchema));
         }
@@ -548,33 +546,55 @@ public final class McpService {
                 .build();
     }
 
-    private static JsonArraySchema createJsonArraySchema(Schema schema, Set<ShapeId> visited) {
+    private JsonArraySchema createJsonArraySchema(Schema schema, Set<ShapeId> visited) {
         var listMember = schema.listMember();
-        var items = switch (listMember.type()) {
-            case LIST, SET -> createJsonArraySchema(listMember.memberTarget(), visited);
-            case MAP, STRUCTURE, UNION -> createJsonObjectSchema(listMember.memberTarget(), visited);
-            case DOCUMENT -> createJsonDocumentSchema(listMember);
-            default -> createJsonPrimitiveSchema(listMember);
-        };
+        var items = createMemberSchema(listMember, visited);
+
+        // For sparse lists, allow null items using anyOf
+        Document itemsSchema;
+        if (schema.hasTrait(TraitKey.SPARSE_TRAIT)) {
+            var nullSchema = Map.of("type", Document.of("null"));
+            itemsSchema = Document.of(Map.of(
+                    "anyOf",
+                    Document.of(List.of(Document.of(items), Document.of(nullSchema)))));
+        } else {
+            itemsSchema = Document.of(items);
+        }
+
         return JsonArraySchema.builder()
                 .description(memberDescription(schema))
-                .items(Document.of(items))
+                .items(itemsSchema)
                 .build();
     }
 
-    private static JsonPrimitiveSchema createJsonPrimitiveSchema(Schema member) {
+    private JsonPrimitiveSchema createJsonPrimitiveSchema(Schema member) {
         var type = switch (member.type()) {
             case BYTE, SHORT, INTEGER, INT_ENUM, LONG, FLOAT, DOUBLE -> JsonPrimitiveType.NUMBER;
-            case ENUM, BLOB, STRING, BIG_DECIMAL, BIG_INTEGER -> JsonPrimitiveType.STRING;
-            case TIMESTAMP -> resolveTimestampType(member);
+            case ENUM, BLOB, STRING, BIG_DECIMAL, BIG_INTEGER, TIMESTAMP -> JsonPrimitiveType.STRING;
             case BOOLEAN -> JsonPrimitiveType.BOOLEAN;
             default -> throw new RuntimeException(member + " is not a primitive type");
         };
 
-        return JsonPrimitiveSchema.builder()
+        var builder = JsonPrimitiveSchema.builder()
                 .type(type)
-                .description(memberDescription(member))
-                .build();
+                .description(memberDescription(member));
+
+        // Add format annotation for timestamps per JSON Schema spec
+        if (member.type() == ShapeType.TIMESTAMP) {
+            builder.format("date-time");
+        }
+
+        List<Document> enumValues = switch (member.type()) {
+            case ENUM, STRING -> member.stringEnumValues().stream().map(Document::of).toList();
+            case INT_ENUM -> member.intEnumValues().stream().map(Document::of).toList();
+            default -> List.of();
+        };
+
+        if (!enumValues.isEmpty()) {
+            builder.enumValues(enumValues);
+        }
+
+        return builder.build();
     }
 
     private static final List<String> DOCUMENT_TYPES = List.of(
@@ -585,10 +605,107 @@ public final class McpService {
             "array",
             "null");
 
-    private static JsonDocumentSchema createJsonDocumentSchema(Schema member) {
+    private JsonDocumentSchema createJsonDocumentSchema(Schema member) {
         return JsonDocumentSchema.builder()
                 .type(DOCUMENT_TYPES)
                 .description(memberDescription(member))
+                .build();
+    }
+
+    private SerializableShape createJsonDocumentSchema(Schema member, Set<ShapeId> visited) {
+        var targetSchema = member.isMember() ? member.memberTarget() : member;
+        var oneOfTrait = targetSchema.getTrait(ONE_OF_TRAIT);
+
+        if (oneOfTrait != null) {
+            return createJsonOneOfSchema(oneOfTrait, member, visited);
+        } else {
+            return createJsonDocumentSchema(member);
+        }
+    }
+
+    private JsonOneOfSchema createJsonOneOfSchema(
+            OneOfTrait oneOfTrait,
+            Schema documentMember,
+            Set<ShapeId> visited
+    ) {
+        var oneOfVariants = new ArrayList<Document>();
+
+        for (var memberDef : oneOfTrait.getMembers()) {
+            var memberName = memberDef.getName();
+            var targetShapeId = memberDef.getTarget();
+
+            var targetSchema = schemaIndex.getSchema(targetShapeId);
+            var memberSchema = createJsonObjectSchema(targetSchema, visited);
+
+            oneOfVariants.add(createUnionVariant(memberName, memberSchema));
+        }
+
+        return JsonOneOfSchema.builder()
+                .oneOf(oneOfVariants)
+                .description(memberDescription(documentMember))
+                .build();
+    }
+
+    private SerializableShape createJsonUnionSchema(Schema schema, Set<ShapeId> visited) {
+        var targetId = schema.id();
+        if (!visited.add(targetId)) {
+            return JsonObjectSchema.builder().build();
+        }
+
+        var variants = new ArrayList<Document>();
+
+        for (var member : schema.members()) {
+            var memberName = member.memberName();
+            var memberSchema = createMemberSchema(member, visited);
+
+            variants.add(createUnionVariant(memberName, memberSchema));
+        }
+
+        visited.remove(targetId);
+        return JsonOneOfSchema.builder()
+                .oneOf(variants)
+                .description(memberDescription(schema))
+                .build();
+    }
+
+    private static Document createUnionVariant(String memberName, SerializableShape memberSchema) {
+        var wrapperSchema = JsonObjectSchema.builder()
+                .properties(Map.of(memberName, Document.of(memberSchema)))
+                .required(List.of(memberName))
+                .additionalProperties(Document.of(false))
+                .build();
+        return Document.of(wrapperSchema);
+    }
+
+    private SerializableShape createMemberSchema(Schema member, Set<ShapeId> visited) {
+        return switch (member.type()) {
+            case LIST, SET -> createJsonArraySchema(member.memberTarget(), visited);
+            case MAP -> createJsonMapSchema(member.memberTarget(), visited);
+            case STRUCTURE -> createJsonObjectSchema(member.memberTarget(), visited);
+            case UNION -> createJsonUnionSchema(member.memberTarget(), visited);
+            case DOCUMENT -> createJsonDocumentSchema(member, visited);
+            default -> createJsonPrimitiveSchema(member);
+        };
+    }
+
+    private JsonObjectSchema createJsonMapSchema(Schema schema, Set<ShapeId> visited) {
+        var mapValueMember = schema.mapValueMember();
+        var valueSchema = createMemberSchema(mapValueMember, visited);
+
+        // For sparse maps, allow null values using anyOf
+        Document additionalPropertiesSchema;
+        if (schema.hasTrait(TraitKey.SPARSE_TRAIT)) {
+            var nullSchema = Map.of("type", Document.of("null"));
+            additionalPropertiesSchema = Document.of(Map.of(
+                    "anyOf",
+                    Document.of(List.of(Document.of(valueSchema), Document.of(nullSchema)))));
+        } else {
+            additionalPropertiesSchema = Document.of(valueSchema);
+        }
+
+        return JsonObjectSchema.builder()
+                .description(memberDescription(schema))
+                .additionalProperties(additionalPropertiesSchema)
                 .build();
     }
 
@@ -607,19 +724,6 @@ public final class McpService {
             }
         }
         return description;
-    }
-
-    private static JsonPrimitiveType resolveTimestampType(Schema schema) {
-        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
-        if (trait == null) {
-            // default is epoch-seconds
-            return JsonPrimitiveType.NUMBER;
-        }
-        return switch (trait.getFormat()) {
-            case EPOCH_SECONDS -> JsonPrimitiveType.NUMBER;
-            case DATE_TIME, HTTP_DATE -> JsonPrimitiveType.STRING;
-            case UNKNOWN -> throw new RuntimeException("unknown timestamp format: " + trait.getFormat());
-        };
     }
 
     private static String createDescription(
@@ -659,7 +763,10 @@ public final class McpService {
         return first + second;
     }
 
-    private static Document adaptDocument(Document doc, Schema schema) {
+    private Document adaptDocument(Document doc, Schema schema) {
+        if (doc == null) {
+            return null;
+        }
         var fromType = doc.type();
         var toType = schema.type();
         return switch (toType) {
@@ -668,19 +775,18 @@ public final class McpService {
                 case BIG_INTEGER -> doc;
                 default -> badType(fromType, toType);
             };
-            case BIG_INTEGER ->
-                switch (fromType) {
-                    case STRING -> Document.of(new BigInteger(doc.asString()));
-                    case BIG_INTEGER -> doc;
-                    default -> badType(fromType, toType);
-                };
+            case BIG_INTEGER -> switch (fromType) {
+                case STRING -> Document.of(new BigInteger(doc.asString()));
+                case BIG_INTEGER -> doc;
+                default -> badType(fromType, toType);
+            };
             case BLOB -> switch (fromType) {
                 case STRING -> Document.of(Base64.getDecoder().decode(doc.asString()));
                 case BLOB -> doc;
                 default -> badType(fromType, toType);
             };
-            case TIMESTAMP -> adaptTimestampInput(doc, schema);
-            case STRUCTURE, UNION -> {
+            case TIMESTAMP -> adaptTimestamp(doc);
+            case STRUCTURE -> {
                 var convertedMembers = new HashMap<String, Document>();
                 var members = schema.members();
                 for (var member : members) {
@@ -688,6 +794,21 @@ public final class McpService {
                     var memberDoc = doc.getMember(memberName);
                     if (memberDoc != null) {
                         convertedMembers.put(memberName, adaptDocument(memberDoc, member));
+                    }
+                }
+                yield Document.of(convertedMembers);
+            }
+            case UNION -> {
+                var convertedMembers = new HashMap<String, Document>();
+
+                // Find which member is set and adapt it
+                // Input is in wrapper format: {"circle": {...}}
+                for (var member : schema.members()) {
+                    var memberName = member.memberName();
+                    var memberDoc = doc.getMember(memberName);
+                    if (memberDoc != null) {
+                        convertedMembers.put(memberName, adaptDocument(memberDoc, member));
+                        break;
                     }
                 }
                 yield Document.of(convertedMembers);
@@ -708,34 +829,80 @@ public final class McpService {
                 }
                 yield Document.of(convertedMap);
             }
-            case DOCUMENT -> doc; // Documents pass through unchanged
+            case DOCUMENT -> adaptDocumentWithOneOf(doc, schema);
             default -> doc;
         };
+    }
+
+    private Document adaptDocumentWithOneOf(Document doc, Schema schema) {
+        var targetSchema = schema.isMember() ? schema.memberTarget() : schema;
+        var oneOfTrait = targetSchema.getTrait(ONE_OF_TRAIT);
+
+        if (oneOfTrait != null) {
+            // MCP sends wrapper format: {"circle": {"radius": 5}}
+            // Need to convert to discriminated format: {"__type": "smithy.example#Circle", "radius": 5}
+            var discriminator = oneOfTrait.getDiscriminator();
+
+            // Find which member is set in the wrapper
+            for (var memberDef : oneOfTrait.getMembers()) {
+                var memberName = memberDef.getName();
+                var memberDoc = doc.getMember(memberName);
+                if (memberDoc != null) {
+                    // Build the flat object with discriminator
+                    var flatMembers = new HashMap<String, Document>();
+                    var memberId = memberDef.getTarget();
+                    flatMembers.put(discriminator, Document.of(memberId.toString()));
+                    // Copy all fields from the inner object
+                    var memberSchema = schemaIndex.getSchema(memberId);
+                    flatMembers.putAll(adaptDocument(memberDoc, memberSchema).asStringMap());
+                    return Document.of(flatMembers);
+                }
+            }
+            // Fallback - return as-is if can't determine type
+        }
+        return doc;
     }
 
     private static Document badType(ShapeType from, ShapeType to) {
         throw new RuntimeException("Cannot convert from " + from + " to " + to);
     }
 
-    private static Document adaptTimestampInput(Document doc, Schema schema) {
-        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
-        var format = getFormat(trait);
-        return switch (format) {
-            case EPOCH_SECONDS -> Document.of(EPOCH_SECONDS.readFromNumber(doc.asNumber()));
-            case DATE_TIME -> Document.of(DATE_TIME.readFromString(doc.asString(), false));
-            case HTTP_DATE -> Document.of(HTTP_DATE.readFromString(doc.asString(), false));
-            default -> doc;
-        };
+    /**
+     *  This is primarily for more robustness against AI hallucinations.
+     */
+    private static Document adaptTimestamp(Document doc) {
+        // If already a timestamp, format as date-time string
+        if (doc.isType(ShapeType.TIMESTAMP)) {
+            return Document.of(DATE_TIME.writeString(doc.asTimestamp()));
+        }
+        // If input is a string, try DATE_TIME first, fallback to HTTP_DATE
+        if (doc.isType(ShapeType.STRING)) {
+            var str = doc.asString();
+            try {
+                return Document.of(DATE_TIME.readFromString(str, false));
+            } catch (Exception e) {
+                // Fallback to HTTP_DATE format
+                return Document.of(HTTP_DATE.readFromString(str, false));
+            }
+        }
+        // If input is a number, use epoch seconds
+        return Document.of(EPOCH_SECONDS.readFromNumber(doc.asNumber()));
     }
 
-    private static Document adaptOutputDocument(Document doc, Schema schema) {
+    private Document adaptOutputDocument(Document doc, Schema schema) {
+        if (doc == null) {
+            return null;
+        }
         var toType = schema.type();
         return switch (toType) {
             case BIG_DECIMAL -> Document.of(doc.asBigDecimal().toString());
             case BIG_INTEGER -> Document.of(doc.asBigInteger().toString());
             case BLOB -> Document.of(Base64.getEncoder().encodeToString(ByteBufferUtils.getBytes(doc.asBlob())));
-            case TIMESTAMP -> adaptTimestampOutput(doc, schema);
-            case STRUCTURE, UNION -> {
+            // Use adaptTimestamp() instead of asTimestamp() because oneOf union members are
+            // deserialized as untyped Documents (no schema available). Timestamps in these
+            // documents remain as strings or numbers rather than being converted to Timestamp Documents.
+            case TIMESTAMP -> adaptTimestamp(doc);
+            case STRUCTURE -> {
                 var convertedMembers = new HashMap<String, Document>();
                 for (var member : schema.members()) {
                     var memberName = member.memberName();
@@ -745,6 +912,18 @@ public final class McpService {
                     }
                 }
                 yield Document.of(convertedMembers);
+            }
+            case UNION -> {
+                // Regular union - already in wrapper format: {"circle": {...}}
+                for (var member : schema.members()) {
+                    var memberName = member.memberName();
+                    var memberDoc = doc.getMember(memberName);
+                    if (memberDoc != null) {
+                        var adaptedMemberDoc = adaptOutputDocument(memberDoc, member);
+                        yield Document.of(Map.of(memberName, adaptedMemberDoc));
+                    }
+                }
+                yield Document.of(Map.of());
             }
             case LIST, SET -> {
                 var listMember = schema.listMember();
@@ -762,19 +941,35 @@ public final class McpService {
                 }
                 yield Document.of(convertedMap);
             }
-            case DOCUMENT -> doc; // Documents pass through unchanged
-            default -> doc;
-        };
-    }
+            case DOCUMENT -> {
+                var targetSchema = schema.isMember() ? schema.memberTarget() : schema;
+                var oneOfTrait = targetSchema.getTrait(ONE_OF_TRAIT);
 
-    private static Document adaptTimestampOutput(Document doc, Schema schema) {
-        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
-        var instant = doc.asTimestamp();
-        TimestampFormatTrait.Format format = getFormat(trait);
-        return switch (format) {
-            case DATE_TIME -> Document.of(DATE_TIME.writeString(instant));
-            case HTTP_DATE -> Document.of(HTTP_DATE.writeString(instant));
-            default -> Document.of(instant.toEpochMilli() / 1000.0);
+                if (oneOfTrait != null) {
+                    // External service returns: {"__type": "smithy.example#Circle", "radius": 5}
+                    // Need to convert to MCP wrapper format: {"circle": {"radius": 5}}
+                    var discriminator = oneOfTrait.getDiscriminator();
+                    var discriminatorValue = doc.getMember(discriminator);
+
+                    if (discriminatorValue != null) {
+                        var shapeId = ShapeId.from(discriminatorValue.asString());
+                        // Find the matching member definition
+                        for (var memberDef : oneOfTrait.getMembers()) {
+                            if (memberDef.getTarget().equals(shapeId)) {
+                                var memberName = memberDef.getName();
+                                var memberSchema = schemaIndex.getSchema(shapeId);
+                                // Build the inner object without the discriminator field
+                                var innerMembers = new HashMap<>(adaptOutputDocument(doc, memberSchema).asStringMap());
+                                innerMembers.remove(discriminator);
+                                // Return wrapper format
+                                yield Document.of(Map.of(memberName, Document.of(innerMembers)));
+                            }
+                        }
+                    }
+                }
+                yield doc;
+            }
+            default -> doc;
         };
     }
 
@@ -822,14 +1017,6 @@ public final class McpService {
 
         public McpService build() {
             return new McpService(services, proxyList, name, version, toolFilter, metricsObserver);
-        }
-    }
-
-    private static TimestampFormatTrait.Format getFormat(TimestampFormatTrait trait) {
-        if (trait == null) {
-            return TimestampFormatTrait.Format.DATE_TIME;
-        } else {
-            return trait.getFormat();
         }
     }
 }

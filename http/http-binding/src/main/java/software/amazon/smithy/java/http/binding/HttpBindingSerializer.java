@@ -18,8 +18,8 @@ import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
-import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ShapeUtils;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.InterceptingSerializer;
@@ -66,6 +66,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private DataStream httpPayload;
     private Flow.Publisher<? extends SerializableStruct> eventStream;
     private int responseStatus;
+    private boolean contentTypeHeaderInInput;
 
     private final BindingMatcher bindingMatcher;
     private final UriPattern uriPattern;
@@ -111,7 +112,11 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         // Prescanning names from @httpHeader for @httpPrefixHeaders
         for (var member : schema.members()) {
             if (member.hasTrait(TraitKey.HTTP_HEADER_TRAIT)) {
-                namesFromHttpHeader.add(member.expectTrait(TraitKey.HTTP_HEADER_TRAIT).getValue());
+                var headerName = member.expectTrait(TraitKey.HTTP_HEADER_TRAIT).getValue();
+                if (!contentTypeHeaderInInput && headerName.equalsIgnoreCase("content-type")) {
+                    contentTypeHeaderInInput = true;
+                }
+                namesFromHttpHeader.add(headerName);
             }
         }
 
@@ -119,7 +124,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             shapeBodyOutput = new ByteArrayOutputStream();
             shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
             // Serialize only the body members to the codec.
-            SchemaUtils.withFilteredMembers(schema, struct, this::bodyBindingPredicate)
+            ShapeUtils.withFilteredMembers(schema, struct, this::bodyBindingPredicate)
                     .serialize(shapeBodySerializer);
             headers.put("content-type", List.of(payloadMediaType));
         }
@@ -147,7 +152,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
     void setHttpPayload(Schema schema, DataStream value) {
         httpPayload = value;
-        if (headers.containsKey("content-type")) {
+        if (headers.containsKey("content-type") || contentTypeHeaderInInput) {
             return;
         }
 

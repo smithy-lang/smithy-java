@@ -5,14 +5,10 @@
 
 package software.amazon.smithy.java.json.jackson;
 
-import static com.fasterxml.jackson.core.JsonToken.END_ARRAY;
-import static com.fasterxml.jackson.core.JsonToken.END_OBJECT;
-import static com.fasterxml.jackson.core.JsonToken.VALUE_NULL;
+import static tools.jackson.core.JsonToken.END_ARRAY;
+import static tools.jackson.core.JsonToken.END_OBJECT;
+import static tools.jackson.core.JsonToken.VALUE_NULL;
 
-import com.fasterxml.jackson.core.Base64Variants;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -28,6 +24,10 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonDocuments;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.model.shapes.ShapeType;
+import tools.jackson.core.Base64Variants;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.JsonToken;
 
 final class JacksonJsonDeserializer implements ShapeDeserializer {
 
@@ -42,7 +42,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
         this.settings = settings;
         try {
             this.parser.nextToken();
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new SerializationException(e);
         }
     }
@@ -116,7 +116,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
         try {
             return switch (parser.currentToken()) {
                 case VALUE_NUMBER_FLOAT, VALUE_NUMBER_INT -> parser.getFloatValue();
-                case VALUE_STRING -> switch (parser.getText()) {
+                case VALUE_STRING -> switch (parser.getString()) {
                     case "Infinity" -> Float.POSITIVE_INFINITY;
                     case "-Infinity" -> Float.NEGATIVE_INFINITY;
                     case "NaN" -> Float.NaN;
@@ -211,7 +211,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                 }
                 case START_OBJECT -> {
                     Map<String, Document> values = new LinkedHashMap<>();
-                    for (var field = parser.nextFieldName(); field != null; field = parser.nextFieldName()) {
+                    for (var field = parser.nextName(); field != null; field = parser.nextName()) {
                         parser.nextToken();
                         values.put(field, readDocument());
                     }
@@ -219,7 +219,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                 }
                 default -> throw new SerializationException("Unexpected token: " + describeToken());
             };
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -232,7 +232,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     public Instant readTimestamp(Schema schema) {
         try {
             var format = settings.timestampResolver().resolve(schema);
-            return switch (parser.getCurrentToken()) {
+            return switch (parser.currentToken()) {
                 case VALUE_NUMBER_FLOAT, VALUE_NUMBER_INT -> format.readFromNumber(parser.getNumberValue());
                 case VALUE_STRING -> format.readFromString(parser.getText(), true);
                 default -> throw new SerializationException("Expected a timestamp, but found " + describeToken());
@@ -246,7 +246,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         try {
             var fieldToMember = settings.fieldMapper().fieldToMember(schema);
-            for (var memberName = parser.nextFieldName(); memberName != null; memberName = parser.nextFieldName()) {
+            for (var memberName = parser.nextName(); memberName != null; memberName = parser.nextName()) {
                 if (parser.nextToken() != VALUE_NULL) {
                     var member = fieldToMember.member(memberName);
                     if (member != null) {
@@ -296,7 +296,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     @Override
     public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
         try {
-            for (var fieldName = parser.nextFieldName(); fieldName != null; fieldName = parser.nextFieldName()) {
+            for (var fieldName = parser.nextName(); fieldName != null; fieldName = parser.nextName()) {
                 parser.nextToken();
                 mapMemberConsumer.accept(state, fieldName, this);
             }

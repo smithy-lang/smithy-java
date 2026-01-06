@@ -5,10 +5,10 @@
 
 package software.amazon.smithy.java.json.jackson;
 
-import com.fasterxml.jackson.core.SerializableString;
-import com.fasterxml.jackson.core.io.SerializedString;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import tools.jackson.core.SerializableString;
+import tools.jackson.core.io.SerializedString;
 
 /**
  * A cache of structure member field names to SerializableString.

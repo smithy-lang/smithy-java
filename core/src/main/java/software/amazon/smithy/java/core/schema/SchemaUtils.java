@@ -5,49 +5,9 @@
 
 package software.amazon.smithy.java.core.schema;
 
-import java.util.function.Predicate;
-import software.amazon.smithy.java.core.serde.InterceptingSerializer;
-import software.amazon.smithy.java.core.serde.ShapeSerializer;
-
 public final class SchemaUtils {
 
     private SchemaUtils() {}
-
-    /**
-     * Create a serializable struct that only serializes members that pass the given predicate.
-     *
-     * @param schema Structure schema.
-     * @param struct Struct to serialize.
-     * @param memberPredicate Predicate that takes a member schema.
-     * @return the filtered struct.
-     */
-    public static SerializableStruct withFilteredMembers(
-            Schema schema,
-            SerializableStruct struct,
-            Predicate<Schema> memberPredicate
-    ) {
-        return new SerializableStruct() {
-            @Override
-            public Schema schema() {
-                return schema;
-            }
-
-            @Override
-            public void serializeMembers(ShapeSerializer serializer) {
-                struct.serializeMembers(new InterceptingSerializer() {
-                    @Override
-                    protected ShapeSerializer before(Schema schema) {
-                        return memberPredicate.test(schema) ? serializer : ShapeSerializer.nullSerializer();
-                    }
-                });
-            }
-
-            @Override
-            public <T> T getMemberValue(Schema member) {
-                return memberPredicate.test(schema()) ? struct.getMemberValue(member) : null;
-            }
-        };
-    }
 
     /**
      * Ensures that {@code member} is contained in {@code parent}, and if so returns {@code value}.
@@ -91,19 +51,4 @@ public final class SchemaUtils {
                         + ": " + actual.id());
     }
 
-    /**
-     * Attempts to copy the values from a struct into a shape builder.
-     *
-     * @param source The shape to copy from.
-     * @param sink   The builder to copy into.
-     * @throws IllegalArgumentException if the two shapes are incompatible and don't use the same schemas.
-     */
-    public static void copyShape(SerializableStruct source, ShapeBuilder<?> sink) {
-        for (var member : source.schema().members()) {
-            var value = source.getMemberValue(member);
-            if (value != null) {
-                sink.setMemberValue(member, value);
-            }
-        }
-    }
 }

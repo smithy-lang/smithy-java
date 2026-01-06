@@ -9,7 +9,7 @@ import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 
 /**
- * A BundlePlugin applies the settings specified in a {@link software.amazon.smithy.modelbundle.api.model.Bundle}
+ * A BundlePlugin applies the settings specified in a {@link software.amazon.smithy.modelbundle.api.model.SmithyBundle}
  * on a per-call basis.
  */
 public interface BundlePlugin {
