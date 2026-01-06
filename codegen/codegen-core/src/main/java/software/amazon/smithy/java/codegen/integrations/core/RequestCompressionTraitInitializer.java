@@ -22,6 +22,6 @@ final class RequestCompressionTraitInitializer implements TraitInitializer<Reque
         writer.putContext("requestComp", RequestCompressionTrait.class);
         writer.putContext("list", List.class);
         writer.writeInline(
-                "${requestComp:T}.builder().encodings(${list:T}.of(${#enc}${enc:S}${^key.last}, ${/key.last}${/enc})).build()");
+                "${requestComp:T}.builder().encodings(${list:T}.of(${#enc}${value:S}${^key.last}, ${/key.last}${/enc})).build()");
     }
 }
