@@ -159,32 +159,32 @@ public final class DocumentParser implements ShapeSerializer {
 
     @Override
     public void writeByte(Schema schema, byte value) {
-        setResult(new Documents.NumberDocument(schema, value));
+        setResult(new Documents.ByteDocument(schema, value));
     }
 
     @Override
     public void writeShort(Schema schema, short value) {
-        setResult(new Documents.NumberDocument(schema, value));
+        setResult(new Documents.ShortDocument(schema, value));
     }
 
     @Override
     public void writeInteger(Schema schema, int value) {
-        setResult(new Documents.NumberDocument(schema, value));
+        setResult(new Documents.IntegerDocument(schema, value));
     }
 
     @Override
     public void writeLong(Schema schema, long value) {
-        setResult(new Documents.NumberDocument(schema, value));
+        setResult(new Documents.LongDocument(schema, value));
     }
 
     @Override
     public void writeFloat(Schema schema, float value) {
-        setResult(new Documents.NumberDocument(schema, value));
+        setResult(new Documents.FloatDocument(schema, value));
     }
 
     @Override
     public void writeDouble(Schema schema, double value) {
-        setResult(new Documents.NumberDocument(schema, value));
+        setResult(new Documents.DoubleDocument(schema, value));
     }
 
     @Override

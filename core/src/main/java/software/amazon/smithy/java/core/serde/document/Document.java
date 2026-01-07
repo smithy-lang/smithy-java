@@ -461,7 +461,17 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document ofNumber(Number value) {
-        return new Documents.NumberDocument(DocumentUtils.getSchemaForNumber(value), value);
+        return switch (value) {
+            case Byte b -> new Documents.ByteDocument(PreludeSchemas.BYTE, b);
+            case Short s -> new Documents.ShortDocument(PreludeSchemas.SHORT, s);
+            case Integer i -> new Documents.IntegerDocument(PreludeSchemas.INTEGER, i);
+            case Long l -> new Documents.LongDocument(PreludeSchemas.LONG, l);
+            case Float f -> new Documents.FloatDocument(PreludeSchemas.FLOAT, f);
+            case Double d -> new Documents.DoubleDocument(PreludeSchemas.DOUBLE, d);
+            case BigInteger bi -> new Documents.NumberDocument(PreludeSchemas.BIG_INTEGER, bi);
+            case BigDecimal bd -> new Documents.NumberDocument(PreludeSchemas.BIG_DECIMAL, bd);
+            default -> throw new IllegalArgumentException("Unsupported Number: %s".formatted(value.getClass()));
+        };
     }
 
     /**
@@ -471,7 +481,7 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document of(byte value) {
-        return new Documents.NumberDocument(PreludeSchemas.BYTE, value);
+        return new Documents.ByteDocument(PreludeSchemas.BYTE, value);
     }
 
     /**
@@ -481,7 +491,7 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document of(short value) {
-        return new Documents.NumberDocument(PreludeSchemas.SHORT, value);
+        return new Documents.ShortDocument(PreludeSchemas.SHORT, value);
     }
 
     /**
@@ -491,7 +501,7 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document of(int value) {
-        return new Documents.NumberDocument(PreludeSchemas.INTEGER, value);
+        return new Documents.IntegerDocument(PreludeSchemas.INTEGER, value);
     }
 
     /**
@@ -501,7 +511,7 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document of(long value) {
-        return new Documents.NumberDocument(PreludeSchemas.LONG, value);
+        return new Documents.LongDocument(PreludeSchemas.LONG, value);
     }
 
     /**
@@ -511,7 +521,7 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document of(float value) {
-        return new Documents.NumberDocument(PreludeSchemas.FLOAT, value);
+        return new Documents.FloatDocument(PreludeSchemas.FLOAT, value);
     }
 
     /**
@@ -521,7 +531,7 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document of(double value) {
-        return new Documents.NumberDocument(PreludeSchemas.DOUBLE, value);
+        return new Documents.DoubleDocument(PreludeSchemas.DOUBLE, value);
     }
 
     /**
