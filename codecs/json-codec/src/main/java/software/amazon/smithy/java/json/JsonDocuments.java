@@ -48,7 +48,17 @@ public final class JsonDocuments {
     }
 
     public static Document of(Number value, JsonSettings settings) {
-        return new NumberDocument(value, settings, DocumentUtils.getSchemaForNumber(value));
+        return switch (value) {
+            case Byte b -> new ByteDocument(b, settings);
+            case Short s -> new ShortDocument(s, settings);
+            case Integer i -> new IntegerDocument(i, settings);
+            case Long l -> new LongDocument(l, settings);
+            case Float f -> new FloatDocument(f, settings);
+            case Double d -> new DoubleDocument(d, settings);
+            case BigInteger bi -> new NumberDocument(bi, settings, PreludeSchemas.BIG_INTEGER);
+            case BigDecimal bd -> new NumberDocument(bd, settings, PreludeSchemas.BIG_DECIMAL);
+            default -> throw new IllegalArgumentException("Unsupported Number: %s".formatted(value.getClass()));
+        };
     }
 
     public static Document of(List<Document> values, JsonSettings settings) {
@@ -140,12 +150,12 @@ public final class JsonDocuments {
 
         @Override
         public BigInteger asBigInteger() {
-            return value instanceof BigInteger ? (BigInteger) value : BigInteger.valueOf(value.longValue());
+            return value instanceof BigInteger bi ? bi : BigInteger.valueOf(value.longValue());
         }
 
         @Override
         public BigDecimal asBigDecimal() {
-            return value instanceof BigDecimal ? (BigDecimal) value : BigDecimal.valueOf(value.doubleValue());
+            return value instanceof BigDecimal bd ? bd : BigDecimal.valueOf(value.doubleValue());
         }
 
         @Override
@@ -162,6 +172,409 @@ public final class JsonDocuments {
         @Override
         public void serializeContents(ShapeSerializer serializer) {
             DocumentUtils.serializeNumber(serializer, schema, value);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return Document.equals(this, obj);
+        }
+    }
+
+    // Primitive numeric document types - no auto-boxing
+    record ByteDocument(byte value, JsonSettings settings) implements Document {
+        @Override
+        public ShapeType type() {
+            return ShapeType.BYTE;
+        }
+
+        @Override
+        public byte asByte() {
+            return value;
+        }
+
+        @Override
+        public short asShort() {
+            return value;
+        }
+
+        @Override
+        public int asInteger() {
+            return value;
+        }
+
+        @Override
+        public long asLong() {
+            return value;
+        }
+
+        @Override
+        public float asFloat() {
+            return value;
+        }
+
+        @Override
+        public double asDouble() {
+            return value;
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+            return BigInteger.valueOf(value);
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+            return BigDecimal.valueOf((double) value);
+        }
+
+        @Override
+        public Instant asTimestamp() {
+            return TimestampResolver.readTimestamp(value, settings.timestampResolver().defaultFormat());
+        }
+
+        @Override
+        public ShapeDeserializer createDeserializer() {
+            return new JsonDocumentDeserializer(settings, this);
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+            serializer.writeByte(PreludeSchemas.BYTE, value);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return Document.equals(this, obj);
+        }
+    }
+
+    record ShortDocument(short value, JsonSettings settings) implements Document {
+        @Override
+        public ShapeType type() {
+            return ShapeType.SHORT;
+        }
+
+        @Override
+        public byte asByte() {
+            return (byte) value;
+        }
+
+        @Override
+        public short asShort() {
+            return value;
+        }
+
+        @Override
+        public int asInteger() {
+            return value;
+        }
+
+        @Override
+        public long asLong() {
+            return value;
+        }
+
+        @Override
+        public float asFloat() {
+            return value;
+        }
+
+        @Override
+        public double asDouble() {
+            return value;
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+            return BigInteger.valueOf(value);
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+            return BigDecimal.valueOf((double) value);
+        }
+
+        @Override
+        public Instant asTimestamp() {
+            return TimestampResolver.readTimestamp(value, settings.timestampResolver().defaultFormat());
+        }
+
+        @Override
+        public ShapeDeserializer createDeserializer() {
+            return new JsonDocumentDeserializer(settings, this);
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+            serializer.writeShort(PreludeSchemas.SHORT, value);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return Document.equals(this, obj);
+        }
+    }
+
+    record IntegerDocument(int value, JsonSettings settings) implements Document {
+        @Override
+        public ShapeType type() {
+            return ShapeType.INTEGER;
+        }
+
+        @Override
+        public byte asByte() {
+            return (byte) value;
+        }
+
+        @Override
+        public short asShort() {
+            return (short) value;
+        }
+
+        @Override
+        public int asInteger() {
+            return value;
+        }
+
+        @Override
+        public long asLong() {
+            return value;
+        }
+
+        @Override
+        public float asFloat() {
+            return value;
+        }
+
+        @Override
+        public double asDouble() {
+            return value;
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+            return BigInteger.valueOf(value);
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+            return BigDecimal.valueOf((double) value);
+        }
+
+        @Override
+        public Instant asTimestamp() {
+            return TimestampResolver.readTimestamp(value, settings.timestampResolver().defaultFormat());
+        }
+
+        @Override
+        public ShapeDeserializer createDeserializer() {
+            return new JsonDocumentDeserializer(settings, this);
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+            serializer.writeInteger(PreludeSchemas.INTEGER, value);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return Document.equals(this, obj);
+        }
+    }
+
+    record LongDocument(long value, JsonSettings settings) implements Document {
+        @Override
+        public ShapeType type() {
+            return ShapeType.LONG;
+        }
+
+        @Override
+        public byte asByte() {
+            return (byte) value;
+        }
+
+        @Override
+        public short asShort() {
+            return (short) value;
+        }
+
+        @Override
+        public int asInteger() {
+            return (int) value;
+        }
+
+        @Override
+        public long asLong() {
+            return value;
+        }
+
+        @Override
+        public float asFloat() {
+            return value;
+        }
+
+        @Override
+        public double asDouble() {
+            return value;
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+            return BigInteger.valueOf(value);
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+            return BigDecimal.valueOf((double) value);
+        }
+
+        @Override
+        public Instant asTimestamp() {
+            return TimestampResolver.readTimestamp(value, settings.timestampResolver().defaultFormat());
+        }
+
+        @Override
+        public ShapeDeserializer createDeserializer() {
+            return new JsonDocumentDeserializer(settings, this);
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+            serializer.writeLong(PreludeSchemas.LONG, value);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return Document.equals(this, obj);
+        }
+    }
+
+    record FloatDocument(float value, JsonSettings settings) implements Document {
+        @Override
+        public ShapeType type() {
+            return ShapeType.FLOAT;
+        }
+
+        @Override
+        public byte asByte() {
+            return (byte) value;
+        }
+
+        @Override
+        public short asShort() {
+            return (short) value;
+        }
+
+        @Override
+        public int asInteger() {
+            return (int) value;
+        }
+
+        @Override
+        public long asLong() {
+            return (long) value;
+        }
+
+        @Override
+        public float asFloat() {
+            return value;
+        }
+
+        @Override
+        public double asDouble() {
+            return value;
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+            return BigInteger.valueOf((long) value);
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+            return BigDecimal.valueOf(value);
+        }
+
+        @Override
+        public Instant asTimestamp() {
+            return TimestampResolver.readTimestamp(value, settings.timestampResolver().defaultFormat());
+        }
+
+        @Override
+        public ShapeDeserializer createDeserializer() {
+            return new JsonDocumentDeserializer(settings, this);
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+            serializer.writeFloat(PreludeSchemas.FLOAT, value);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return Document.equals(this, obj);
+        }
+    }
+
+    record DoubleDocument(double value, JsonSettings settings) implements Document {
+        @Override
+        public ShapeType type() {
+            return ShapeType.DOUBLE;
+        }
+
+        @Override
+        public byte asByte() {
+            return (byte) value;
+        }
+
+        @Override
+        public short asShort() {
+            return (short) value;
+        }
+
+        @Override
+        public int asInteger() {
+            return (int) value;
+        }
+
+        @Override
+        public long asLong() {
+            return (long) value;
+        }
+
+        @Override
+        public float asFloat() {
+            return (float) value;
+        }
+
+        @Override
+        public double asDouble() {
+            return value;
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+            return BigInteger.valueOf((long) value);
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+            return BigDecimal.valueOf(value);
+        }
+
+        @Override
+        public Instant asTimestamp() {
+            return TimestampResolver.readTimestamp(value, settings.timestampResolver().defaultFormat());
+        }
+
+        @Override
+        public ShapeDeserializer createDeserializer() {
+            return new JsonDocumentDeserializer(settings, this);
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+            serializer.writeDouble(PreludeSchemas.DOUBLE, value);
         }
 
         @Override

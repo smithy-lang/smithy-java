@@ -42,12 +42,12 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public class DocumentTest {
     @Test
     public void getAsNumber() {
-        assertThat(Document.of((byte) 1).asNumber(), equalTo(Byte.valueOf((byte) 1)));
-        assertThat(Document.of((short) 1).asNumber(), equalTo(Short.valueOf((short) 1)));
-        assertThat(Document.of(1).asNumber(), equalTo(Integer.valueOf(1)));
-        assertThat(Document.of(1L).asNumber(), equalTo(Long.valueOf(1L)));
-        assertThat(Document.of(1f).asNumber(), equalTo(Float.valueOf(1f)));
-        assertThat(Document.of(1.0).asNumber(), equalTo(Double.valueOf(1.0)));
+        assertThat(Document.of((byte) 1).asNumber(), equalTo((byte) 1));
+        assertThat(Document.of((short) 1).asNumber(), equalTo((short) 1));
+        assertThat(Document.of(1).asNumber(), equalTo(1));
+        assertThat(Document.of(1L).asNumber(), equalTo(1L));
+        assertThat(Document.of(1f).asNumber(), equalTo(1f));
+        assertThat(Document.of(1.0).asNumber(), equalTo(1.0));
         assertThat(Document.of(new BigDecimal(1)).asNumber(), equalTo(new BigDecimal(1)));
         assertThat(Document.of(BigInteger.valueOf(1)).asNumber(), equalTo(BigInteger.valueOf(1)));
     }
