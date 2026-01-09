@@ -19,6 +19,16 @@ jobs:
         os: [macos-latest, ubuntu-latest]
 
     steps:
+      # HACK TEMPORARY WORKAROUND UNTIL https://github.com/smithy-lang/smithy/pull/2878 IS RELEASED
+      - uses: actions/checkout@v6
+        with:
+          repository: 'robin-aws/smithy'
+          path: 'smithy'
+          ref: 'smithy-jmespath-evaluator'
+      - working-directory: smithy
+        run: ./gradlew publishToMavenLocal
+      # END HACK
+
       - uses: actions/checkout@v6
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v5
