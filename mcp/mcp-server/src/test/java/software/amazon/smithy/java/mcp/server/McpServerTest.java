@@ -79,6 +79,36 @@ public class McpServerTest {
     }
 
     @Test
+    public void testPing() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("ping", Document.of(Map.of()), Document.of(42));
+        var response = read();
+        assertEquals(42, response.getId().asNumber().intValue());
+        assertNotNull(response.getResult());
+        assertTrue(response.getResult().asStringMap().isEmpty());
+        assertEquals("2.0", response.getJsonrpc());
+
+        write("ping", Document.of(Map.of()), Document.of("ping-id"));
+        response = read();
+        assertEquals("ping-id", response.getId().asString());
+        assertNotNull(response.getResult());
+        assertTrue(response.getResult().asStringMap().isEmpty());
+    }
+
+    @Test
     public void noOutputSchemaWithUnsupportedProtocolVersion() {
         server = McpServer.builder()
                 .name("smithy-mcp-server")

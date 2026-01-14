@@ -135,6 +135,7 @@ public final class McpService {
             var method = req.getMethod();
             return switch (method) {
                 case "initialize" -> handleInitialize(req);
+                case "ping" -> handlePing(req);
                 default -> {
                     initializeProxies(rpcResponse -> {});
                     yield switch (method) {
@@ -216,6 +217,14 @@ public final class McpService {
                 .build();
 
         return createSuccessResponse(req.getId(), result);
+    }
+
+    private JsonRpcResponse handlePing(JsonRpcRequest req) {
+        return JsonRpcResponse.builder()
+                .id(req.getId())
+                .result(Document.of(Map.of()))
+                .jsonrpc("2.0")
+                .build();
     }
 
     private JsonRpcResponse handlePromptsList(JsonRpcRequest req) {
