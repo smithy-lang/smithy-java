@@ -52,6 +52,7 @@ import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
 import software.amazon.smithy.java.mcp.model.ListPromptsResult;
 import software.amazon.smithy.java.mcp.model.ListToolsResult;
+import software.amazon.smithy.java.mcp.model.PromptInfo;
 import software.amazon.smithy.java.mcp.model.Prompts;
 import software.amazon.smithy.java.mcp.model.ServerInfo;
 import software.amazon.smithy.java.mcp.model.TextContent;
@@ -84,7 +85,6 @@ public final class McpService {
 
     private final Map<String, Tool> tools;
     private final Map<String, Prompt> prompts;
-    private final PromptProcessor promptProcessor;
     private final String serviceName;
     private final String version;
     private final Map<String, McpServerProxy> proxies;
@@ -107,8 +107,7 @@ public final class McpService {
         this.schemaIndex =
                 SchemaIndex.compose(services.values().stream().map(Service::schemaIndex).toArray(SchemaIndex[]::new));
         this.tools = createTools(services);
-        this.prompts = PromptLoader.loadPrompts(services.values());
-        this.promptProcessor = new PromptProcessor();
+        this.prompts = new ConcurrentHashMap<>(PromptLoader.loadPrompts(services.values()));
         this.serviceName = name;
         this.version = version;
         this.proxies = proxyList.stream().collect(Collectors.toMap(McpServerProxy::name, p -> p));
@@ -236,7 +235,7 @@ public final class McpService {
             throw new RuntimeException("Prompt not found: " + promptName);
         }
 
-        var result = promptProcessor.buildPromptResult(prompt, promptArguments);
+        var result = prompt.getPromptResult(promptArguments, req.getId());
         return createSuccessResponse(req.getId(), result);
     }
 
@@ -342,6 +341,19 @@ public final class McpService {
                 for (var toolInfo : proxyTools) {
                     tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
                 }
+
+                // Fetch and register prompts from proxy
+                try {
+                    List<PromptInfo> proxyPrompts = proxy.listPrompts();
+                    for (var promptInfo : proxyPrompts) {
+                        var normalizedName = PromptLoader.normalize(promptInfo.getName());
+                        if (!prompts.containsKey(normalizedName)) {
+                            prompts.put(normalizedName, new Prompt(promptInfo, proxy));
+                        }
+                    }
+                } catch (Exception e) {
+                    LOG.error("Failed to fetch prompts from proxy: " + proxy.name(), e);
+                }
             }
         }
     }
@@ -375,6 +387,19 @@ public final class McpService {
             }
         } catch (Exception e) {
             LOG.error("Failed to fetch tools from proxy", e);
+        }
+
+        // Also fetch prompts from the new proxy
+        try {
+            List<PromptInfo> proxyPrompts = mcpServerProxy.listPrompts();
+            for (var promptInfo : proxyPrompts) {
+                var normalizedName = PromptLoader.normalize(promptInfo.getName());
+                if (!prompts.containsKey(normalizedName)) {
+                    prompts.put(normalizedName, new Prompt(promptInfo, mcpServerProxy));
+                }
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to fetch prompts from proxy: " + mcpServerProxy.name(), e);
         }
     }
 

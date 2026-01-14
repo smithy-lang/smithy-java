@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.mcp.server;
 
+import static software.amazon.smithy.java.mcp.model.ListPromptsResult.builder;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -17,6 +19,7 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
 import software.amazon.smithy.java.mcp.model.ListToolsResult;
+import software.amazon.smithy.java.mcp.model.PromptInfo;
 import software.amazon.smithy.java.mcp.model.ToolInfo;
 
 public abstract class McpServerProxy {
@@ -41,6 +44,24 @@ public abstract class McpServerProxy {
             return response.getResult()
                     .asShape(ListToolsResult.builder())
                     .getTools()
+                    .stream()
+                    .toList();
+        }).join();
+    }
+
+    public List<PromptInfo> listPrompts() {
+        JsonRpcRequest request = JsonRpcRequest.builder()
+                .method("prompts/list")
+                .id(generateRequestId())
+                .jsonrpc("2.0")
+                .build();
+        return rpc(request).thenApply(response -> {
+            if (response.getError() != null) {
+                throw new RuntimeException("Error listing prompts: " + response.getError().getMessage());
+            }
+            return response.getResult()
+                    .asShape(builder())
+                    .getPrompts()
                     .stream()
                     .toList();
         }).join();
