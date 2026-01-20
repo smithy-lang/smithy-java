@@ -313,6 +313,10 @@ final class BytecodeWriter {
                 dos.writeByte(Bytecode.CONST_INTEGER);
                 dos.writeInt(i);
             }
+            case Long l -> {
+                dos.writeByte(Bytecode.CONST_INTEGER);
+                dos.writeInt(l.intValue());
+            }
             case Boolean b -> {
                 dos.writeByte(Bytecode.CONST_BOOLEAN);
                 dos.writeByte(b ? 1 : 0);

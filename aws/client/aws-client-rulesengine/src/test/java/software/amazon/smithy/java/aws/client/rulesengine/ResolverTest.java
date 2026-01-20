@@ -82,6 +82,7 @@ public class ResolverTest {
     public static void before() throws Exception {
         model = Model.assembler()
                 .discoverModels()
+                .addImport(ResolverTest.class.getResource("s3-bdd.smithy"))
                 .putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
                 .assemble()
                 .unwrap();
