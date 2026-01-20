@@ -140,6 +140,7 @@ class BytecodeCompilerTest {
                 .addParameter(Parameter.builder()
                         .name("flag")
                         .type(ParameterType.BOOLEAN)
+                        .required(true)
                         .build())
                 .build();
 
@@ -163,10 +164,12 @@ class BytecodeCompilerTest {
                 .addParameter(Parameter.builder()
                         .name("str1")
                         .type(ParameterType.STRING)
+                        .required(true)
                         .build())
                 .addParameter(Parameter.builder()
                         .name("str2")
                         .type(ParameterType.STRING)
+                        .required(true)
                         .build())
                 .build();
 
@@ -285,6 +288,7 @@ class BytecodeCompilerTest {
                 .addParameter(Parameter.builder()
                         .name("name")
                         .type(ParameterType.STRING)
+                        .required(true)
                         .build())
                 .build();
 
@@ -298,12 +302,20 @@ class BytecodeCompilerTest {
 
     @Test
     void testCompileTupleLiteral() {
-        Condition condition = createConditionWithExpression(
+        // Put tuple literal in endpoint properties to test opcode generation without isSet
+        Map<Identifier, Literal> properties = new HashMap<>();
+        properties.put(Identifier.of("items"),
                 Literal.tupleLiteral(List.of(
                         Literal.stringLiteral(Template.fromString("a")),
                         Literal.stringLiteral(Template.fromString("b")))));
 
-        EndpointBddTrait bdd = createBddWithCondition(condition);
+        Rule rule = EndpointRule.builder()
+                .endpoint(Endpoint.builder()
+                        .url(Literal.stringLiteral(Template.fromString("https://example.com")))
+                        .properties(properties)
+                        .build());
+
+        EndpointBddTrait bdd = createBddWithResults(List.of(NoMatchRule.INSTANCE, rule));
         BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
 
         Bytecode bytecode = compiler.compile();
@@ -317,9 +329,17 @@ class BytecodeCompilerTest {
         members.put(Identifier.of("key1"), Literal.stringLiteral(Template.fromString("value1")));
         members.put(Identifier.of("key2"), Literal.stringLiteral(Template.fromString("value2")));
 
-        Condition condition = createConditionWithExpression(Literal.recordLiteral(members));
+        // Put record literal in endpoint properties to test opcode generation without isSet
+        Map<Identifier, Literal> properties = new HashMap<>();
+        properties.put(Identifier.of("record"), Literal.recordLiteral(members));
 
-        EndpointBddTrait bdd = createBddWithCondition(condition);
+        Rule rule = EndpointRule.builder()
+                .endpoint(Endpoint.builder()
+                        .url(Literal.stringLiteral(Template.fromString("https://example.com")))
+                        .properties(properties)
+                        .build());
+
+        EndpointBddTrait bdd = createBddWithResults(List.of(NoMatchRule.INSTANCE, rule));
         BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
 
         Bytecode bytecode = compiler.compile();
@@ -329,20 +349,43 @@ class BytecodeCompilerTest {
 
     @Test
     void testCompileGetAttrWithPropertyAccess() {
-        GetAttr getAttr = GetAttr.ofExpressions(
-                Expression.getReference(Identifier.of("obj")),
-                Expression.of("prop"));
+        // Use parseURL result which returns a record type, then access a property on it
+        LibraryFunction parseUrl = ParseUrl.ofExpressions(
+                Expression.getReference(Identifier.of("url")));
 
-        Condition condition = createConditionWithExpression(getAttr);
+        // First assign parseURL result to a variable, then access property on it
+        Condition assignCondition = Condition.builder()
+                .fn(parseUrl)
+                .result(Identifier.of("parsedUrl"))
+                .build();
+
+        GetAttr getAttr = GetAttr.ofExpressions(
+                Expression.getReference(Identifier.of("parsedUrl")),
+                Expression.of("scheme"));
+
+        // scheme returns StringType, so use StringEquals instead of isSet
+        Condition condition = Condition.builder()
+                .fn(StringEquals.ofExpressions(getAttr, Literal.stringLiteral(Template.fromString("https"))))
+                .build();
 
         Parameters params = Parameters.builder()
                 .addParameter(Parameter.builder()
-                        .name("obj")
+                        .name("url")
                         .type(ParameterType.STRING)
+                        .required(true)
                         .build())
                 .build();
 
-        EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
+        EndpointBddTrait bdd = EndpointBddTrait.builder()
+                .parameters(params)
+                .conditions(List.of(assignCondition, condition))
+                .results(List.of(NoMatchRule.INSTANCE))
+                .bdd(new Bdd(3, 2, 1, 3, nc -> {
+                    nc.accept(-1, 1, -1); // Terminal node at index 0
+                    nc.accept(0, 2, -1); // Condition node at index 1
+                    nc.accept(1, 100000000, -1); // Condition node at index 2
+                }))
+                .build();
         BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
 
         Bytecode bytecode = compiler.compile();
@@ -362,6 +405,7 @@ class BytecodeCompilerTest {
                 .addParameter(Parameter.builder()
                         .name("array")
                         .type(ParameterType.STRING_ARRAY)
+                        .required(true)
                         .build())
                 .build();
 
@@ -387,6 +431,7 @@ class BytecodeCompilerTest {
                 .addParameter(Parameter.builder()
                         .name("str")
                         .type(ParameterType.STRING)
+                        .required(true)
                         .build())
                 .build();
 
@@ -404,12 +449,16 @@ class BytecodeCompilerTest {
                 Expression.getReference(Identifier.of("host")),
                 Literal.booleanLiteral(true));
 
-        Condition condition = createConditionWithExpression(isValidHost);
+        // isValidHostLabel returns boolean, not optional, so use BooleanEquals instead of isSet
+        Condition condition = Condition.builder()
+                .fn(BooleanEquals.ofExpressions(isValidHost, Literal.booleanLiteral(true)))
+                .build();
 
         Parameters params = Parameters.builder()
                 .addParameter(Parameter.builder()
                         .name("host")
                         .type(ParameterType.STRING)
+                        .required(true)
                         .build())
                 .build();
 
@@ -432,6 +481,7 @@ class BytecodeCompilerTest {
                 .addParameter(Parameter.builder()
                         .name("url")
                         .type(ParameterType.STRING)
+                        .required(true)
                         .build())
                 .build();
 
@@ -501,8 +551,17 @@ class BytecodeCompilerTest {
             elements.add(Literal.integerLiteral(i));
         }
 
-        Condition condition = createConditionWithExpression(Literal.tupleLiteral(elements));
-        EndpointBddTrait bdd = createBddWithCondition(condition);
+        // Put list literal in endpoint properties to test opcode generation without isSet
+        Map<Identifier, Literal> properties = new HashMap<>();
+        properties.put(Identifier.of("items"), Literal.tupleLiteral(elements));
+
+        Rule rule = EndpointRule.builder()
+                .endpoint(Endpoint.builder()
+                        .url(Literal.stringLiteral(Template.fromString("https://example.com")))
+                        .properties(properties)
+                        .build());
+
+        EndpointBddTrait bdd = createBddWithResults(List.of(NoMatchRule.INSTANCE, rule));
         BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
 
         Bytecode bytecode = compiler.compile();
@@ -519,8 +578,17 @@ class BytecodeCompilerTest {
             members.put(Identifier.of("key" + i), Literal.integerLiteral(i));
         }
 
-        Condition condition = createConditionWithExpression(Literal.recordLiteral(members));
-        EndpointBddTrait bdd = createBddWithCondition(condition);
+        // Put map literal in endpoint properties to test opcode generation without isSet
+        Map<Identifier, Literal> properties = new HashMap<>();
+        properties.put(Identifier.of("record"), Literal.recordLiteral(members));
+
+        Rule rule = EndpointRule.builder()
+                .endpoint(Endpoint.builder()
+                        .url(Literal.stringLiteral(Template.fromString("https://example.com")))
+                        .properties(properties)
+                        .build());
+
+        EndpointBddTrait bdd = createBddWithResults(List.of(NoMatchRule.INSTANCE, rule));
         BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
 
         Bytecode bytecode = compiler.compile();
