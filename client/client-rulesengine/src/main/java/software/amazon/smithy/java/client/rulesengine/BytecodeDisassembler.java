@@ -78,7 +78,11 @@ final class BytecodeDisassembler {
             Map.entry(Opcodes.RETURN_VALUE, new InstructionDef("RETURN_VALUE")),
 
             // Control flow
-            Map.entry(Opcodes.JNN_OR_POP, new InstructionDef("JNN_OR_POP", Show.JUMP_OFFSET)));
+            Map.entry(Opcodes.JNN_OR_POP, new InstructionDef("JNN_OR_POP", Show.JUMP_OFFSET)),
+            Map.entry(Opcodes.GET_NEGATIVE_INDEX, new InstructionDef("GET_NEGATIVE_INDEX", Show.NUMBER)),
+            Map.entry(Opcodes.GET_NEGATIVE_INDEX_REG, new InstructionDef("GET_NEGATIVE_INDEX_REG", Show.REG_INDEX)),
+            Map.entry(Opcodes.JMP_IF_FALSE, new InstructionDef("JMP_IF_FALSE", Show.JUMP_OFFSET)),
+            Map.entry(Opcodes.JUMP, new InstructionDef("JUMP", Show.JUMP_OFFSET)));
 
     private enum Show {
         CONST,

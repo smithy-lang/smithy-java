@@ -40,6 +40,7 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpTrait;
+import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.transform.ModelTransformer;
 import software.amazon.smithy.rulesengine.traits.EndpointTestCase;
 import software.amazon.smithy.rulesengine.traits.EndpointTestsTrait;
@@ -55,8 +56,13 @@ public class ResolverTest {
     private Object inputParams = null;
 
     // S3 requires a customization to remove buckets from the path :(
-    private static Model customizeS3Model(Model m) {
-        return ModelTransformer.create().mapShapes(m, s -> {
+    private static Model customizeS3Model(Model model) {
+        var transformer = ModelTransformer.create();
+
+        // Remove streaming trait - not yet supported
+        Model m = transformer.removeTraitsIf(model, (shape, trait) -> trait instanceof StreamingTrait);
+
+        return transformer.mapShapes(m, s -> {
             if (s.isOperationShape()) {
                 var httpTrait = s.getTrait(HttpTrait.class).orElse(null);
                 if (httpTrait != null && httpTrait.getUri().getLabel("Bucket").isPresent()) {
@@ -76,7 +82,6 @@ public class ResolverTest {
     public static void before() throws Exception {
         model = Model.assembler()
                 .discoverModels()
-                .addImport(ResolverTest.class.getResource("s3.json"))
                 .putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
                 .assemble()
                 .unwrap();

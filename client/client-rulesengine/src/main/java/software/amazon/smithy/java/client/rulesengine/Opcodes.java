@@ -422,4 +422,42 @@ public final class Opcodes {
      * <p><code>SPLIT</code>
      */
     public static final byte SPLIT = 41;
+
+    /**
+     * Get an indexed element from the value at the top of the stack using a negative index,
+     * replacing it with the element. Negative indices count from the end (-1 is last element).
+     *
+     * <p>Stack: [..., array] => [..., array[length + index]]
+     *
+     * <p><code>GET_NEGATIVE_INDEX [index:byte]</code> where index is stored as positive (e.g., 1 means -1)
+     */
+    public static final byte GET_NEGATIVE_INDEX = 43;
+
+    /**
+     * Load an indexed element from a register using a negative index and push it onto the stack.
+     * Negative indices count from the end (-1 is last element).
+     *
+     * <p>Stack: [...] => [..., register[length + index]]
+     *
+     * <p><code>GET_NEGATIVE_INDEX_REG [register:byte] [index:byte]</code> where index is stored as positive
+     */
+    public static final byte GET_NEGATIVE_INDEX_REG = 44;
+
+    /**
+     * Conditional jump. Pops the top stack value; if false (or null), jumps forward by offset.
+     *
+     * <p>Stack: [..., value] => [...]
+     *
+     * <p><code>JMP_IF_FALSE [offset:ushort]</code>
+     */
+    public static final byte JMP_IF_FALSE = 45;
+
+    /**
+     * Unconditional forward jump.
+     *
+     * <p>Stack: [...] => [...]
+     *
+     * <p><code>JUMP [offset:ushort]</code>
+     */
+    public static final byte JUMP = 46;
 }

@@ -280,6 +280,36 @@ final class BytecodeCompiler {
 
                         return null;
                     }
+                    case "ite" -> {
+                        if (args.size() != 3) {
+                            throw new RulesEvaluationError("ite requires exactly 3 arguments, got " + args.size());
+                        }
+
+                        // Compile condition
+                        compileExpression(args.get(0));
+
+                        // If false, jump to false branch
+                        writer.writeByte(Opcodes.JMP_IF_FALSE);
+                        String falseLabel = writer.createLabel();
+                        writer.writeJumpPlaceholder(falseLabel);
+
+                        // True branch
+                        compileExpression(args.get(1));
+
+                        // Unconditionally jump over false branch
+                        writer.writeByte(Opcodes.JUMP);
+                        String endLabel = writer.createLabel();
+                        writer.writeJumpPlaceholder(endLabel);
+
+                        // False branch
+                        writer.markLabel(falseLabel);
+                        compileExpression(args.get(2));
+
+                        // Mark the end label
+                        writer.markLabel(endLabel);
+
+                        return null;
+                    }
                     case "substring" -> {
                         compileExpression(args.get(0)); // string
                         writer.writeByte(Opcodes.SUBSTRING);
@@ -351,9 +381,16 @@ final class BytecodeCompiler {
                 int propIndex = writer.getConstantIndex(key.key().toString());
                 writer.writeShort(propIndex);
             } else if (part instanceof GetAttr.Part.Index idx) {
-                writer.writeByte(Opcodes.GET_INDEX_REG);
-                writer.writeByte(regIndex);
-                writer.writeByte(idx.index());
+                int index = idx.index();
+                if (index < 0) {
+                    writer.writeByte(Opcodes.GET_NEGATIVE_INDEX_REG);
+                    writer.writeByte(regIndex);
+                    writer.writeByte(-index); // Store as positive
+                } else {
+                    writer.writeByte(Opcodes.GET_INDEX_REG);
+                    writer.writeByte(regIndex);
+                    writer.writeByte(index);
+                }
             }
             return;
         }
@@ -368,8 +405,14 @@ final class BytecodeCompiler {
                 writer.writeByte(Opcodes.GET_PROPERTY);
                 writer.writeShort(propIndex);
             } else if (part instanceof GetAttr.Part.Index idx) {
-                writer.writeByte(Opcodes.GET_INDEX);
-                writer.writeByte(idx.index());
+                int index = idx.index();
+                if (index < 0) {
+                    writer.writeByte(Opcodes.GET_NEGATIVE_INDEX);
+                    writer.writeByte(-index); // Store as positive
+                } else {
+                    writer.writeByte(Opcodes.GET_INDEX);
+                    writer.writeByte(index);
+                }
             }
         }
     }

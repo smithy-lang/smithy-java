@@ -31,6 +31,7 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpTrait;
+import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.transform.ModelTransformer;
 
 @State(Scope.Benchmark)
@@ -49,7 +50,6 @@ public class Bench {
     public void setup() {
         model = Model.assembler()
                 .discoverModels()
-                .addImport(ResolverTest.class.getResource("s3.json"))
                 .putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
                 .assemble()
                 .unwrap();
@@ -83,13 +83,18 @@ public class Bench {
                 .build();
     }
 
-    // S3 requires a customization to remove buckets from the path :(
-    private static Model customizeS3Model(Model m) {
-        return ModelTransformer.create().mapShapes(m, s -> {
+    // S3 requires customizations
+    private static Model customizeS3Model(Model model) {
+        var transformer = ModelTransformer.create();
+
+        // Remove streaming trait - not yet supported
+        Model m = transformer.removeTraitsIf(model, (shape, trait) -> trait instanceof StreamingTrait);
+
+        // Remove buckets from the path
+        return transformer.mapShapes(m, s -> {
             if (s.isOperationShape()) {
                 var httpTrait = s.getTrait(HttpTrait.class).orElse(null);
                 if (httpTrait != null && httpTrait.getUri().getLabel("Bucket").isPresent()) {
-                    // Remove the bucket from the URI pattern.
                     var uriString = httpTrait.getUri().toString().replace("{Bucket}", "");
                     uriString = uriString.replace("//", "/");
                     var newUri = UriPattern.parse(uriString);

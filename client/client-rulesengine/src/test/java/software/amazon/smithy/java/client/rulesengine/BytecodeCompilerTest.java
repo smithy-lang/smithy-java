@@ -24,9 +24,11 @@ import software.amazon.smithy.rulesengine.language.syntax.Identifier;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.Expression;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.Template;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.BooleanEquals;
+import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Coalesce;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.GetAttr;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.IsSet;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.IsValidHostLabel;
+import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Ite;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.LibraryFunction;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Not;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.ParseUrl;
@@ -595,6 +597,63 @@ class BytecodeCompilerTest {
 
         assertOpcodePresent(bytecode, Opcodes.MAPN);
     }
+
+    @Test
+    void testCompileIte() {
+        // ite(flag, "yes", "no")
+        LibraryFunction ite = Ite.ofExpressions(
+                Expression.getReference(Identifier.of("flag")),
+                Literal.stringLiteral(Template.fromString("yes")),
+                Literal.stringLiteral(Template.fromString("no")));
+
+        Condition condition = Condition.builder()
+                .fn(StringEquals.ofExpressions(ite, Literal.stringLiteral(Template.fromString("yes"))))
+                .build();
+
+        Parameters params = Parameters.builder()
+                .addParameter(Parameter.builder()
+                        .name("flag")
+                        .type(ParameterType.BOOLEAN)
+                        .required(true)
+                        .build())
+                .build();
+
+        EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+
+        Bytecode bytecode = compiler.compile();
+
+        assertOpcodePresent(bytecode, Opcodes.JMP_IF_FALSE);
+        assertOpcodePresent(bytecode, Opcodes.JUMP);
+    }
+
+    @Test
+    void testCompileCoalesce() {
+        // coalesce(optionalParam, "default")
+        LibraryFunction coalesce = Coalesce.ofExpressions(
+                Expression.getReference(Identifier.of("optionalParam")),
+                Literal.stringLiteral(Template.fromString("default")));
+
+        Condition condition = Condition.builder()
+                .fn(StringEquals.ofExpressions(coalesce, Literal.stringLiteral(Template.fromString("default"))))
+                .build();
+
+        Parameters params = Parameters.builder()
+                .addParameter(Parameter.builder()
+                        .name("optionalParam")
+                        .type(ParameterType.STRING)
+                        .build()) // Not required, so it's optional
+                .build();
+
+        EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+
+        Bytecode bytecode = compiler.compile();
+
+        assertOpcodePresent(bytecode, Opcodes.JNN_OR_POP);
+    }
+
+    // Note: Negative index test omitted - requires unreleased Smithy version that supports negative indices in GetAttr
 
     private void assertOpcodePresent(Bytecode bytecode, int expectedOpcode) {
         ByteBuffer instructions = bytecode.getInstructions();
