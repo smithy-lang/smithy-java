@@ -28,6 +28,19 @@ dependencies {
 configurations["testImplementation"].extendsFrom(s3Model)
 configurations["jmhImplementation"].extendsFrom(s3Model)
 
+// Share the S3 BDD trait between JMH and tests
+sourceSets {
+    val sharedResources = "src/shared-resources"
+
+    named("test") {
+        resources.srcDir(sharedResources)
+    }
+
+    named("jmh") {
+        resources.srcDir(sharedResources)
+    }
+}
+
 jmh {
     warmupIterations = 3
     iterations = 5
