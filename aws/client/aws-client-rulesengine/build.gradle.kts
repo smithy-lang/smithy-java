@@ -8,6 +8,9 @@ description = "This module provides AWS-Specific client rules engine functionali
 extra["displayName"] = "Smithy :: Java :: AWS :: Client :: Rules Engine"
 extra["moduleName"] = "software.amazon.smithy.java.aws.client.rulesengine"
 
+// Custom configuration for S3 model - kept separate from main classpath
+val s3Model: Configuration by configurations.creating
+
 dependencies {
     api(project(":aws:client:aws-client-core"))
     api(project(":client:client-rulesengine"))
@@ -17,20 +20,13 @@ dependencies {
     testImplementation(project(":aws:client:aws-client-restxml"))
     testImplementation(project(":aws:client:aws-client-restjson"))
     testImplementation(project(":client:dynamic-client"))
+
+    s3Model("software.amazon.api.models:s3:1.0.12")
 }
 
-// Share the S3 model between JMH and tests.
-sourceSets {
-    val sharedResources = "src/shared-resources"
-
-    named("test") {
-        resources.srcDir(sharedResources)
-    }
-
-    named("jmh") {
-        resources.srcDir(sharedResources)
-    }
-}
+// Add S3 model to test and JMH classpaths
+configurations["testImplementation"].extendsFrom(s3Model)
+configurations["jmhImplementation"].extendsFrom(s3Model)
 
 jmh {
     warmupIterations = 3

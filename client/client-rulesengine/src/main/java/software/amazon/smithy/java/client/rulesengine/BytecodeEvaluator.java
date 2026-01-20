@@ -391,6 +391,32 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     stack[idx] = Split.split(string, delimiter, limit);
                     stackPosition = idx + 1;
                 }
+                case Opcodes.GET_NEGATIVE_INDEX -> {
+                    int index = instructions[pc++] & 0xFF;
+                    int idx = stackPosition - 1;
+                    stack[idx] = getNegativeIndex(stack[idx], index);
+                }
+                case Opcodes.GET_NEGATIVE_INDEX_REG -> {
+                    int regIndex = instructions[pc++] & 0xFF;
+                    int index = instructions[pc++] & 0xFF;
+                    var target = registers[regIndex];
+                    push(getNegativeIndex(target, index));
+                }
+                case Opcodes.JMP_IF_FALSE -> {
+                    Object condition = stack[--stackPosition];
+                    // Read as unsigned 16-bit value (0-65535)
+                    int offset = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                    pc += 2;
+                    if (condition != Boolean.TRUE) {
+                        pc += offset;
+                    }
+                }
+                case Opcodes.JUMP -> {
+                    // Read as unsigned 16-bit value (0-65535)
+                    int offset = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                    pc += 2;
+                    pc += offset;
+                }
                 default -> throw new RulesEvaluationError("Unknown rules engine instruction: " + opcode, pc);
             }
         }
@@ -419,6 +445,17 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         if (target instanceof List<?> l) {
             if (index >= 0 && index < l.size()) {
                 return l.get(index);
+            }
+        }
+        return null;
+    }
+
+    // Get a value by negative index from an object. Index is stored as positive (1 means -1, last element).
+    private Object getNegativeIndex(Object target, int negIndex) {
+        if (target instanceof List<?> l) {
+            int actualIndex = l.size() - negIndex;
+            if (actualIndex >= 0 && actualIndex < l.size()) {
+                return l.get(actualIndex);
             }
         }
         return null;
