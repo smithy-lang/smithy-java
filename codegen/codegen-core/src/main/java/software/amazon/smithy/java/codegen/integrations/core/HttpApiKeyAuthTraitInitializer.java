@@ -19,12 +19,13 @@ final class HttpApiKeyAuthTraitInitializer implements TraitInitializer<HttpApiKe
     public void accept(JavaWriter writer, HttpApiKeyAuthTrait httpApiKeyAuthTrait) {
         writer.putContext("auth", HttpApiKeyAuthTrait.class);
         writer.putContext("name", httpApiKeyAuthTrait.getName());
-        writer.putContext("in", httpApiKeyAuthTrait.getIn());
+        var location = httpApiKeyAuthTrait.getIn().toString().equals("header") ? "HEADER" : "QUERY";
+        writer.putContext("location", location);
         writer.putContext("scheme", httpApiKeyAuthTrait.getScheme());
         writer.writeInline("""
                 ${auth:T}.builder()
                     .name(${name:S})
-                    .in(${auth:T}.Location.from(${in:S})${?scheme}
+                    .in(${auth:T}.Location.${location:L})${?scheme}
                     .scheme(${scheme:S})${/scheme}
                     .build()""");
     }
