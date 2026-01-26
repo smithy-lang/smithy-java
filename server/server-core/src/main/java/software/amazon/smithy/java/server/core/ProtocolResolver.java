@@ -26,7 +26,7 @@ public final class ProtocolResolver {
     public ProtocolResolver(ServiceMatcher serviceMatcher) {
         serverProtocolHandlers = SERVER_PROTOCOL_HANDLERS.values()
                 .stream()
-                .sorted(Comparator.comparing(ServerProtocolProvider::priority).reversed())
+                .sorted(Comparator.comparing(ServerProtocolProvider::precision))
                 .map(p -> p.provideProtocolHandler(serviceMatcher.getAllServices()))
                 .toList();
         this.serviceMatcher = serviceMatcher;

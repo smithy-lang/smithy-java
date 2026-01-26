@@ -53,9 +53,14 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         var httpMethodToMatchers = new HashMap<String, UriMatcherMapBuilder<Operation<?, ?>>>();
         for (Service service : services) {
             for (var operation : service.getAllOperations()) {
+                // Only process operations with HTTP trait.
                 var httpTrait = operation.getApiOperation()
                         .schema()
-                        .expectTrait(TraitKey.HTTP_TRAIT);
+                        .getTrait(TraitKey.HTTP_TRAIT);
+                if (httpTrait == null) {
+                    continue;
+                }
+
                 String method = httpTrait.getMethod();
                 String pattern = httpTrait
                         .getUri()

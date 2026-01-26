@@ -387,7 +387,7 @@ public abstract sealed class Schema implements MemberLookup
     public final <T extends Trait> T expectTrait(TraitKey<T> trait) {
         var t = getTrait(trait);
         if (t == null) {
-            throw new NoSuchElementException("Expected trait not found: " + trait.getClass().getName());
+            throw new NoSuchElementException("Expected trait not found: " + trait.traitClass().getName());
         }
         return t;
     }
