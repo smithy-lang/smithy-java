@@ -177,7 +177,6 @@ public class GeneratedTypeJmespathRuntime implements JmespathRuntime<Object> {
     @Override
     public Object value(Object object, Object key) {
         if (object instanceof SerializableStruct struct) {
-            // TODO: Check what happens on invalid member name
             return struct.getMemberValue(struct.schema().member((String) key));
         } else if (object instanceof Map<?, ?> map) {
             return map.get(key);
