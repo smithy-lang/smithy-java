@@ -8,6 +8,7 @@ package software.amazon.smithy.java.http.client;
 import io.helidon.webclient.api.HttpClientResponse;
 import io.helidon.webclient.http2.Http2Client;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -17,7 +18,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
@@ -28,6 +28,16 @@ import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.Http2StreamFrame;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -47,17 +57,6 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.io.datastream.DataStream;
-
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * HTTP/2 cleartext (h2c) client scaling benchmark.
@@ -477,7 +476,8 @@ public class H2cScalingBenchmark {
                 streamChannel.write(new DefaultHttp2HeadersFrame(h, false));
                 // Send body with endStream=true
                 streamChannel.writeAndFlush(new DefaultHttp2DataFrame(
-                        Unpooled.wrappedBuffer(BenchmarkSupport.POST_PAYLOAD), true));
+                        Unpooled.wrappedBuffer(BenchmarkSupport.POST_PAYLOAD),
+                        true));
             });
 
             latch.await();
@@ -540,7 +540,8 @@ public class H2cScalingBenchmark {
                 streamChannel.write(new DefaultHttp2HeadersFrame(h, false));
                 // Send body with endStream=true
                 streamChannel.writeAndFlush(new DefaultHttp2DataFrame(
-                        Unpooled.wrappedBuffer(BenchmarkSupport.MB_PAYLOAD), true));
+                        Unpooled.wrappedBuffer(BenchmarkSupport.MB_PAYLOAD),
+                        true));
             });
 
             latch.await();
