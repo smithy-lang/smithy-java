@@ -108,7 +108,7 @@ public final class McpServer implements Server {
     }
 
     public void addNewProxy(McpServerProxy mcpServerProxy) {
-        mcpService.addNewProxy(mcpServerProxy, this::writeResponse);
+        mcpService.addNewProxy(mcpServerProxy, this::writeResponse, this::writeNotification);
         refreshTools();
     }
 
@@ -128,8 +128,23 @@ public final class McpServer implements Server {
         }
     }
 
+    private void writeNotification(JsonRpcRequest notification) {
+        synchronized (os) {
+            try {
+                os.write(CODEC.serializeToString(notification).getBytes(StandardCharsets.UTF_8));
+                os.write('\n');
+                os.flush();
+            } catch (Exception e) {
+                LOG.error("Error encoding notification", e);
+            }
+        }
+    }
+
     @Override
     public void start() {
+        // Set up notification writer for proxies
+        mcpService.setNotificationWriter(this::writeNotification);
+
         // Initialize proxies
         mcpService.startProxies();
 
