@@ -94,6 +94,7 @@ public final class McpService {
     private final AtomicReference<Boolean> proxiesInitialized = new AtomicReference<>(false);
     private final McpMetricsObserver metricsObserver;
     private final SchemaIndex schemaIndex;
+    private Consumer<JsonRpcRequest> notificationWriter;
 
     McpService(
             Map<String, Service> services,
@@ -312,6 +313,13 @@ public final class McpService {
     }
 
     /**
+     * Sets the notification writer for forwarding notifications from proxies.
+     */
+    public void setNotificationWriter(Consumer<JsonRpcRequest> notificationWriter) {
+        this.notificationWriter = notificationWriter;
+    }
+
+    /**
      * Starts proxies without initializing them.
      */
     public void startProxies() {
@@ -342,6 +350,11 @@ public final class McpService {
             }
 
             for (McpServerProxy proxy : proxies.values()) {
+                // Set up request notification consumer BEFORE initialization
+                if (notificationWriter != null) {
+                    proxy.updateRequestNotificationConsumer(notificationWriter);
+                }
+
                 if (initRequest != null) {
                     proxy.initialize(responseWriter, initRequest, protocolVersion);
                 }
@@ -386,7 +399,23 @@ public final class McpService {
      * Adds a new proxy and initializes it.
      */
     public void addNewProxy(McpServerProxy mcpServerProxy, Consumer<JsonRpcResponse> responseWriter) {
+        addNewProxy(mcpServerProxy, responseWriter, null);
+    }
+
+    /**
+     * Adds a new proxy and initializes it with optional request notification writer.
+     */
+    public void addNewProxy(
+            McpServerProxy mcpServerProxy,
+            Consumer<JsonRpcResponse> responseWriter,
+            Consumer<JsonRpcRequest> notificationWriter
+    ) {
         proxies.put(mcpServerProxy.name(), mcpServerProxy);
+
+        if (notificationWriter != null) {
+            mcpServerProxy.updateRequestNotificationConsumer(notificationWriter);
+        }
+
         mcpServerProxy.start();
 
         try {

@@ -129,11 +129,109 @@ public final class HttpMcpProxy extends McpServerProxy {
                 return CompletableFuture.completedFuture(handleErrorResponse(response));
             }
 
+            // Check if response is SSE
+            String contentType = response.body().contentType();
+            if ("text/event-stream".equals(contentType)) {
+                return CompletableFuture.completedFuture(parseSseResponse(response, request));
+            }
+
             return CompletableFuture.completedFuture(JsonRpcResponse.builder()
                     .deserialize(JSON_CODEC.createDeserializer(response.body().asByteBuffer()))
                     .build());
         } catch (Exception e) {
             return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    private JsonRpcResponse parseSseResponse(HttpResponse response, JsonRpcRequest request) {
+        try {
+            byte[] bodyBytes = ByteBufferUtils.getBytes(response.body().asByteBuffer());
+            String sseContent = new String(bodyBytes, StandardCharsets.UTF_8);
+
+            JsonRpcResponse finalResponse = null;
+            String[] lines = sseContent.split("\n", -1); // Use -1 to include trailing empty strings
+            StringBuilder dataBuffer = new StringBuilder();
+
+            for (String line : lines) {
+                if (line.startsWith("data: ")) {
+                    dataBuffer.append(line.substring(6));
+                } else if (line.trim().isEmpty() && dataBuffer.length() > 0) {
+                    // End of an SSE event
+                    String jsonData = dataBuffer.toString().trim();
+                    dataBuffer.setLength(0);
+
+                    if (jsonData.isEmpty()) {
+                        continue;
+                    }
+
+                    try {
+                        // Check if it's a notification by looking for "method" field
+                        if (jsonData.contains("\"method\"")) {
+                            // This is a notification - parse as JsonRpcRequest and forward
+                            JsonRpcRequest notification =
+                                    JSON_CODEC.deserializeShape(jsonData, JsonRpcRequest.builder());
+                            notifyRequest(notification);
+                        } else {
+                            // This is a response - parse as JsonRpcResponse
+                            JsonRpcResponse message = JSON_CODEC.deserializeShape(jsonData, JsonRpcResponse.builder());
+                            finalResponse = message;
+                        }
+                    } catch (Exception e) {
+                        LOG.warn("Failed to parse SSE message: {}", jsonData, e);
+                    }
+                }
+            }
+
+            // Process any remaining data in buffer (in case stream doesn't end with empty line)
+            if (dataBuffer.length() > 0) {
+                String jsonData = dataBuffer.toString().trim();
+                if (!jsonData.isEmpty()) {
+                    try {
+                        // Check if it's a notification by looking for "method" field
+                        if (jsonData.contains("\"method\"")) {
+                            JsonRpcRequest notification =
+                                    JSON_CODEC.deserializeShape(jsonData, JsonRpcRequest.builder());
+                            notifyRequest(notification);
+                        } else {
+                            JsonRpcResponse message = JSON_CODEC.deserializeShape(jsonData, JsonRpcResponse.builder());
+
+                            if (message.getId() == null) {
+                                notifyRequest(JsonRpcRequest.builder()
+                                        .jsonrpc("2.0")
+                                        .method("notifications/unknown")
+                                        .build());
+                            } else {
+                                finalResponse = message;
+                            }
+                        }
+                    } catch (Exception e) {
+                        LOG.warn("Failed to parse remaining SSE message: {}", jsonData, e);
+                    }
+                }
+            }
+
+            if (finalResponse == null) {
+                return JsonRpcResponse.builder()
+                        .jsonrpc("2.0")
+                        .id(request.getId())
+                        .error(JsonRpcErrorResponse.builder()
+                                .code(-32001)
+                                .message("SSE parsing error: No final response found in stream")
+                                .build())
+                        .build();
+            }
+
+            return finalResponse;
+        } catch (Exception e) {
+            LOG.error("Error parsing SSE response", e);
+            return JsonRpcResponse.builder()
+                    .jsonrpc("2.0")
+                    .id(request.getId())
+                    .error(JsonRpcErrorResponse.builder()
+                            .code(-32001)
+                            .message("SSE parsing error: " + e.getMessage())
+                            .build())
+                    .build();
         }
     }
 
