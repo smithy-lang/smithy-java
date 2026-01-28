@@ -35,7 +35,7 @@ public class ProtocolTestProtocolProvider implements ServerProtocolProvider {
     }
 
     @Override
-    public int priority() {
+    public int precision() {
         return Integer.MAX_VALUE;
     }
 

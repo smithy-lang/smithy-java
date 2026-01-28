@@ -15,5 +15,5 @@ public interface ServerProtocolProvider {
 
     ShapeId getProtocolId();
 
-    int priority();
+    int precision();
 }

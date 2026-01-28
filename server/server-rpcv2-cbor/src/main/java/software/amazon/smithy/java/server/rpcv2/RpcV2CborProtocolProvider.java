@@ -24,7 +24,7 @@ public final class RpcV2CborProtocolProvider implements ServerProtocolProvider {
     }
 
     @Override
-    public int priority() {
-        return 1;
+    public int precision() {
+        return 0;
     }
 }
