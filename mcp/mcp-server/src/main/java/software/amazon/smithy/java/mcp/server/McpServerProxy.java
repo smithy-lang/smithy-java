@@ -16,6 +16,7 @@ import java.util.function.Consumer;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
 import software.amazon.smithy.java.mcp.model.ListToolsResult;
@@ -24,9 +25,11 @@ import software.amazon.smithy.java.mcp.model.ToolInfo;
 
 public abstract class McpServerProxy {
 
+    private static final InternalLogger LOG = InternalLogger.getLogger(McpServerProxy.class);
     private static final AtomicInteger ID_GENERATOR = new AtomicInteger(0);
 
     private final AtomicReference<Consumer<JsonRpcResponse>> notificationConsumer = new AtomicReference<>();
+    private final AtomicReference<Consumer<JsonRpcRequest>> requestNotificationConsumer = new AtomicReference<>();
     private final AtomicReference<ProtocolVersion> protocolVersion =
             new AtomicReference<>(ProtocolVersion.defaultVersion());
 
@@ -69,6 +72,7 @@ public abstract class McpServerProxy {
 
     public void initialize(
             Consumer<JsonRpcResponse> notificationConsumer,
+            Consumer<JsonRpcRequest> requestNotificationConsumer,
             JsonRpcRequest initializeRequest,
             ProtocolVersion protocolVersion
     ) {
@@ -78,6 +82,7 @@ public abstract class McpServerProxy {
             throw new RuntimeException("Error during initialization: " + result.getError().getMessage());
         }
         this.notificationConsumer.set(notificationConsumer);
+        this.requestNotificationConsumer.set(requestNotificationConsumer);
         this.protocolVersion.set(protocolVersion);
     }
 
@@ -115,6 +120,21 @@ public abstract class McpServerProxy {
         var nc = notificationConsumer.get();
         if (nc != null) {
             nc.accept(response);
+        }
+    }
+
+    /**
+     * Forwards a notification request by converting it to a response format.
+     * Notifications have a method field but no id.
+     */
+    protected void notifyRequest(JsonRpcRequest notification) {
+        var rnc = requestNotificationConsumer.get();
+        if (rnc != null) {
+            LOG.debug("Forwarding notification to consumer: method={}", notification.getMethod());
+            rnc.accept(notification);
+        } else {
+            LOG.warn("No request notification consumer set, dropping notification: method={}",
+                    notification.getMethod());
         }
     }
 

@@ -8,12 +8,14 @@ package software.amazon.smithy.java.mcp.server;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.http.HttpContext;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.ByteBufferUtils;
@@ -24,6 +26,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.model.JsonRpcErrorResponse;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
+import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
@@ -38,6 +41,7 @@ public final class HttpMcpProxy extends McpServerProxy {
     private final String name;
     private final Signer<HttpRequest, ?> signer;
     private final Duration timeout;
+    private volatile String sessionId;
 
     private HttpMcpProxy(Builder builder) {
         this.transport = builder.transport != null ? builder.transport : new JavaHttpClientTransport();
@@ -106,12 +110,25 @@ public final class HttpMcpProxy extends McpServerProxy {
 
             String protocolVersionHeader = getProtocolVersion().identifier();
 
-            HttpRequest httpRequest = HttpRequest.builder()
+            HttpRequest.Builder requestBuilder = HttpRequest.builder()
                     .uri(endpoint)
                     .method("POST")
                     .withAddedHeader("Content-Type", "application/json")
                     .withAddedHeader("Accept", "application/json, text/event-stream")
-                    .withAddedHeader("MCP-Protocol-Version", protocolVersionHeader)
+                    .withAddedHeader("MCP-Protocol-Version", protocolVersionHeader);
+
+            // Include session ID if we have one
+            String currentSessionId = sessionId;
+            if (currentSessionId != null) {
+                requestBuilder.withAddedHeader("Mcp-Session-Id", currentSessionId);
+                LOG.debug("Including session ID in request: method={}, sessionId={}",
+                        request.getMethod(),
+                        currentSessionId);
+            } else {
+                LOG.debug("No session ID available for request: method={}", request.getMethod());
+            }
+
+            HttpRequest httpRequest = requestBuilder
                     .body(DataStream.ofBytes(body, "application/json"))
                     .build();
 
@@ -125,8 +142,30 @@ public final class HttpMcpProxy extends McpServerProxy {
             HttpResponse response = transport.send(context, httpRequest);
             LOG.trace("Received HTTP response with status: {}", response.statusCode());
 
+            // Extract and store session ID from response only during initialize
+            if ("initialize".equals(request.getMethod())) {
+                String responseSessionId = response.headers().firstValue("Mcp-Session-Id");
+                if (responseSessionId != null) {
+                    sessionId = responseSessionId;
+                    LOG.debug("Stored session ID from initialize response: {}", responseSessionId);
+                }
+            }
+
+            // "When a client receives HTTP 404 in response to a request containing an Mcp-Session-Id, 
+            // it MUST start a new session by sending a new InitializeRequest without a session ID attached."
+            if (response.statusCode() == 404 && sessionId != null) {
+                LOG.debug("Received 404 with active session ID. Clearing session to force restart.");
+                sessionId = null;
+            }
+
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 return CompletableFuture.completedFuture(handleErrorResponse(response));
+            }
+
+            // Check if response is SSE
+            String contentType = response.body().contentType();
+            if ("text/event-stream".equals(contentType)) {
+                return CompletableFuture.completedFuture(parseSseResponse(response, request));
             }
 
             return CompletableFuture.completedFuture(JsonRpcResponse.builder()
@@ -134,6 +173,145 @@ public final class HttpMcpProxy extends McpServerProxy {
                     .build());
         } catch (Exception e) {
             return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    private JsonRpcResponse parseSseResponse(HttpResponse response, JsonRpcRequest request) {
+        try {
+            byte[] bodyBytes = ByteBufferUtils.getBytes(response.body().asByteBuffer());
+            String sseContent = new String(bodyBytes, StandardCharsets.UTF_8);
+
+            JsonRpcResponse finalResponse = null;
+            Iterable<String> lines = sseContent.lines()::iterator;
+            StringBuilder dataBuffer = new StringBuilder();
+
+            for (String line : lines) {
+                if (line.startsWith("data:")) {
+                    dataBuffer.append(line.substring(5).replaceFirst("^ ", ""));
+                } else if (line.trim().isEmpty() && dataBuffer.length() > 0) {
+                    // End of an SSE event
+                    String jsonData = dataBuffer.toString().trim();
+                    dataBuffer.setLength(0);
+
+                    if (jsonData.isEmpty()) {
+                        continue;
+                    }
+
+                    try {
+                        // Parse JSON once into Document
+                        Document jsonDocument = JSON_CODEC.createDeserializer(jsonData.getBytes(StandardCharsets.UTF_8))
+                                .readDocument();
+
+                        // Check if it's a notification by checking for top-level "id" field
+                        // Notifications have "method" but no "id", responses have "id"
+                        if (isNotification(jsonDocument)) {
+                            // This is a notification - convert Document to JsonRpcRequest and forward
+                            JsonRpcRequest notification = JsonRpcRequest.builder()
+                                    .deserialize(jsonDocument.createDeserializer())
+                                    .build();
+                            LOG.debug("Received notification from SSE stream: method={}", notification.getMethod());
+                            notifyRequest(notification);
+                        } else {
+                            // This is a response - convert Document to JsonRpcResponse
+                            JsonRpcResponse message = JsonRpcResponse.builder()
+                                    .deserialize(jsonDocument.createDeserializer())
+                                    .build();
+                            finalResponse = message;
+                        }
+                    } catch (Exception e) {
+                        LOG.warn("Failed to parse SSE message: {}", jsonData, e);
+                    }
+                }
+            }
+
+            // Process any remaining data in buffer (in case stream doesn't end with empty line)
+            if (dataBuffer.length() > 0) {
+                String jsonData = dataBuffer.toString().trim();
+                if (!jsonData.isEmpty()) {
+                    try {
+                        // Parse JSON once into Document
+                        Document jsonDocument = JSON_CODEC.createDeserializer(jsonData.getBytes(StandardCharsets.UTF_8))
+                                .readDocument();
+
+                        // Check if it's a notification by checking for top-level "id" field
+                        // Notifications have "method" but no "id", responses have "id"
+                        if (isNotification(jsonDocument)) {
+                            JsonRpcRequest notification = JsonRpcRequest.builder()
+                                    .deserialize(jsonDocument.createDeserializer())
+                                    .build();
+                            LOG.debug("Received notification from remaining SSE buffer: method={}",
+                                    notification.getMethod());
+                            notifyRequest(notification);
+                        } else {
+                            JsonRpcResponse message = JsonRpcResponse.builder()
+                                    .deserialize(jsonDocument.createDeserializer())
+                                    .build();
+
+                            if (message.getId() == null) {
+                                notifyRequest(JsonRpcRequest.builder()
+                                        .jsonrpc("2.0")
+                                        .method("notifications/unknown")
+                                        .build());
+                            } else {
+                                finalResponse = message;
+                            }
+                        }
+                    } catch (Exception e) {
+                        LOG.warn("Failed to parse remaining SSE message: {}", jsonData, e);
+                    }
+                }
+            }
+
+            if (finalResponse == null) {
+                return JsonRpcResponse.builder()
+                        .jsonrpc("2.0")
+                        .id(request.getId())
+                        .error(JsonRpcErrorResponse.builder()
+                                .code(-32001)
+                                .message("SSE parsing error: No final response found in stream")
+                                .build())
+                        .build();
+            }
+
+            return finalResponse;
+        } catch (Exception e) {
+            LOG.error("Error parsing SSE response", e);
+            return JsonRpcResponse.builder()
+                    .jsonrpc("2.0")
+                    .id(request.getId())
+                    .error(JsonRpcErrorResponse.builder()
+                            .code(-32001)
+                            .message("SSE parsing error: " + e.getMessage())
+                            .build())
+                    .build();
+        }
+    }
+
+    /**
+     * Determines if a Document represents a notification (has "method" but no "id")
+     * rather than a response (has "id").
+     * 
+     * - Responses have an "id" field at the top level
+     * - Notifications have a "method" field but no "id" field at the top level
+     */
+    private boolean isNotification(Document doc) {
+        try {
+            if (!doc.isType(ShapeType.STRUCTURE) && !doc.isType(ShapeType.MAP)) {
+                return false;
+            }
+
+            Map<String, Document> obj = doc.asStringMap();
+
+            // If it has an "id" field at the top level, it's a response
+            if (obj.containsKey("id")) {
+                return false;
+            }
+
+            // If it has a "method" field but no "id", it's a notification
+            return obj.containsKey("method");
+        } catch (Exception e) {
+            LOG.warn("Failed to determine if notification from Document", e);
+            return false;
         }
     }
 
