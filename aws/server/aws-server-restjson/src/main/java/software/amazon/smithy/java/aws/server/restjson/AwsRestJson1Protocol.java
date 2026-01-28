@@ -60,7 +60,6 @@ final class AwsRestJson1Protocol extends ServerProtocol {
                 if (httpTrait == null) {
                     continue;
                 }
-
                 String method = httpTrait.getMethod();
                 String pattern = httpTrait
                         .getUri()
