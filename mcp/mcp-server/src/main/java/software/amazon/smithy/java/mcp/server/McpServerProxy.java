@@ -27,6 +27,7 @@ public abstract class McpServerProxy {
     private static final AtomicInteger ID_GENERATOR = new AtomicInteger(0);
 
     private final AtomicReference<Consumer<JsonRpcResponse>> notificationConsumer = new AtomicReference<>();
+    private final AtomicReference<Consumer<JsonRpcRequest>> requestNotificationConsumer = new AtomicReference<>();
     private final AtomicReference<ProtocolVersion> protocolVersion =
             new AtomicReference<>(ProtocolVersion.defaultVersion());
 
@@ -116,6 +117,25 @@ public abstract class McpServerProxy {
         if (nc != null) {
             nc.accept(response);
         }
+    }
+
+    /**
+     * Forwards a notification request by converting it to a response format.
+     * Notifications have a method field but no id.
+     */
+    protected void notifyRequest(JsonRpcRequest notification) {
+        var rnc = requestNotificationConsumer.get();
+        if (rnc != null) {
+            rnc.accept(notification);
+        }
+    }
+
+    /**
+     * Updates the request notification consumer for this proxy.
+     * This allows forwarding notifications that have a method field.
+     */
+    public void updateRequestNotificationConsumer(Consumer<JsonRpcRequest> consumer) {
+        requestNotificationConsumer.set(consumer);
     }
 
     public abstract String name();

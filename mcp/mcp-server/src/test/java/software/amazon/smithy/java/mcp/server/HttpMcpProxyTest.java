@@ -187,6 +187,188 @@ class HttpMcpProxyTest {
         });
     }
 
+    @Test
+    void testSseStreamingResponse() throws IOException {
+        // Set up SSE handler
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", new SseStreamingHandler());
+
+        JsonRpcRequest request = JsonRpcRequest.builder()
+                .method("test/streaming")
+                .id(Document.of(1))
+                .jsonrpc("2.0")
+                .build();
+
+        CompletableFuture<JsonRpcResponse> future = proxy.rpc(request);
+        JsonRpcResponse response = future.join();
+
+        assertNotNull(response);
+        assertEquals("2.0", response.getJsonrpc());
+        assertEquals(1, response.getId().asInteger());
+        assertEquals("final result", response.getResult().asString());
+    }
+
+    @Test
+    void testSseStreamingWithNotifications() throws IOException {
+        // Track notifications
+        final JsonRpcRequest[] capturedNotification = {null};
+
+        // Set up SSE handler
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", new SseStreamingWithNotificationsHandler());
+
+        // Initialize proxy with notification consumer
+        JsonRpcRequest initRequest = JsonRpcRequest.builder()
+                .method("initialize")
+                .id(Document.of(0))
+                .jsonrpc("2.0")
+                .build();
+
+        proxy.initialize(
+                notification -> {}, // Old-style consumer (not used)
+                initRequest,
+                ProtocolVersion.defaultVersion());
+
+        // Set up the request notification consumer (new style)
+        proxy.updateRequestNotificationConsumer(notification -> capturedNotification[0] = notification);
+
+        JsonRpcRequest request = JsonRpcRequest.builder()
+                .method("test/streaming")
+                .id(Document.of(1))
+                .jsonrpc("2.0")
+                .build();
+
+        CompletableFuture<JsonRpcResponse> future = proxy.rpc(request);
+        JsonRpcResponse response = future.join();
+
+        // Verify final response
+        assertNotNull(response);
+        assertEquals("2.0", response.getJsonrpc());
+        assertEquals(1, response.getId().asInteger());
+        assertEquals("final result", response.getResult().asString());
+
+        // Verify notification was captured (notifications don't have an id field)
+        assertNotNull(capturedNotification[0]);
+        assertNull(capturedNotification[0].getId());
+    }
+
+    @Test
+    void testSseStreamingWithoutFinalResponse() throws IOException {
+        // Set up SSE handler that doesn't send a final response
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", new SseStreamingNoFinalResponseHandler());
+
+        JsonRpcRequest request = JsonRpcRequest.builder()
+                .method("test/streaming")
+                .id(Document.of(1))
+                .jsonrpc("2.0")
+                .build();
+
+        CompletableFuture<JsonRpcResponse> future = proxy.rpc(request);
+        JsonRpcResponse response = future.join();
+
+        // Should return an error response
+        assertNotNull(response);
+        assertNotNull(response.getError());
+        assertEquals(-32001, response.getError().getCode());
+        assertTrue(response.getError().getMessage().contains("SSE parsing error"));
+    }
+
+    @Test
+    void testSseStreamingMalformedJson() throws IOException {
+        // Set up SSE handler with malformed JSON
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", new SseMalformedJsonHandler());
+
+        JsonRpcRequest request = JsonRpcRequest.builder()
+                .method("test/streaming")
+                .id(Document.of(1))
+                .jsonrpc("2.0")
+                .build();
+
+        CompletableFuture<JsonRpcResponse> future = proxy.rpc(request);
+        JsonRpcResponse response = future.join();
+
+        // Should return an error response
+        assertNotNull(response);
+        assertNotNull(response.getError());
+        assertEquals(-32001, response.getError().getCode());
+    }
+
+    private static class SseStreamingHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String sseResponse = "data: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"final result\"}\n\n";
+
+            exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, sseResponse.getBytes(StandardCharsets.UTF_8).length);
+
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(sseResponse.getBytes(StandardCharsets.UTF_8));
+            } finally {
+                exchange.close();
+            }
+        }
+    }
+
+    private static class SseStreamingWithNotificationsHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            StringBuilder sseResponse = new StringBuilder();
+
+            // Send a notification first
+            sseResponse.append(
+                    "data: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\",\"params\":{\"progress\":50}}\n\n");
+
+            // Then send the final response
+            sseResponse.append("data: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"final result\"}\n\n");
+
+            exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
+            byte[] responseBytes = sseResponse.toString().getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, responseBytes.length);
+
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(responseBytes);
+            } finally {
+                exchange.close();
+            }
+        }
+    }
+
+    private static class SseStreamingNoFinalResponseHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            // Only send notifications, no final response
+            String sseResponse =
+                    "data: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\",\"params\":{\"progress\":100}}\n\n";
+
+            exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, sseResponse.getBytes(StandardCharsets.UTF_8).length);
+
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(sseResponse.getBytes(StandardCharsets.UTF_8));
+            } finally {
+                exchange.close();
+            }
+        }
+    }
+
+    private static class SseMalformedJsonHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String sseResponse = "data: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":malformed\n\n";
+
+            exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, sseResponse.getBytes(StandardCharsets.UTF_8).length);
+
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(sseResponse.getBytes(StandardCharsets.UTF_8));
+            } finally {
+                exchange.close();
+            }
+        }
+    }
+
     private static class MockMcpHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
