@@ -94,6 +94,7 @@ public final class McpService {
     private final AtomicReference<Boolean> proxiesInitialized = new AtomicReference<>(false);
     private final McpMetricsObserver metricsObserver;
     private final SchemaIndex schemaIndex;
+    private Consumer<JsonRpcRequest> notificationWriter;
 
     McpService(
             Map<String, Service> services,
@@ -312,6 +313,40 @@ public final class McpService {
     }
 
     /**
+     * Sets the notification writer for forwarding notifications from proxies.
+     */
+    public void setNotificationWriter(Consumer<JsonRpcRequest> notificationWriter) {
+        this.notificationWriter = notificationWriter;
+    }
+
+    /**
+     * Creates a notification writer for a specific proxy that handles cache invalidation
+     * for only that proxy's tools.
+     */
+    private Consumer<JsonRpcRequest> createProxyNotificationWriter(
+            McpServerProxy proxy,
+            Consumer<JsonRpcRequest> baseNotificationWriter
+    ) {
+        return notification -> {
+            // Check if this is a tools/list_changed notification
+            if ("notifications/tools/list_changed".equals(notification.getMethod())) {
+                LOG.debug("Received tools/list_changed notification from proxy: {}", proxy.name());
+                // Remove only this proxy's tools
+                tools.entrySet().removeIf(entry -> entry.getValue().proxy() == proxy);
+                // Re-fetch tools from only this proxy
+                List<ToolInfo> proxyTools = proxy.listTools();
+                for (var toolInfo : proxyTools) {
+                    tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
+                }
+            }
+            // Forward the notification
+            if (baseNotificationWriter != null) {
+                baseNotificationWriter.accept(notification);
+            }
+        };
+    }
+
+    /**
      * Starts proxies without initializing them.
      */
     public void startProxies() {
@@ -343,7 +378,8 @@ public final class McpService {
 
             for (McpServerProxy proxy : proxies.values()) {
                 if (initRequest != null) {
-                    proxy.initialize(responseWriter, initRequest, protocolVersion);
+                    var proxyNotificationWriter = createProxyNotificationWriter(proxy, notificationWriter);
+                    proxy.initialize(responseWriter, proxyNotificationWriter, initRequest, protocolVersion);
                 }
 
                 List<ToolInfo> proxyTools = proxy.listTools();
@@ -382,11 +418,28 @@ public final class McpService {
         tools.putAll(createTools(Map.of(id, service)));
     }
 
-    /**
-     * Adds a new proxy and initializes it.
-     */
-    public void addNewProxy(McpServerProxy mcpServerProxy, Consumer<JsonRpcResponse> responseWriter) {
+    public void addNewProxy(
+            McpServerProxy mcpServerProxy,
+            Consumer<JsonRpcResponse> responseWriter,
+            Consumer<JsonRpcRequest> notificationWriter
+    ) {
         proxies.put(mcpServerProxy.name(), mcpServerProxy);
+
+        // Initialize the proxy if we have an initialize request
+        JsonRpcRequest initRequest = initializeRequest.get();
+        if (initRequest != null) {
+            var protocolVersion = ProtocolVersion.defaultVersion();
+            var maybeVersion = initRequest.getParams().getMember("protocolVersion");
+            if (maybeVersion != null) {
+                var pv = ProtocolVersion.version(maybeVersion.asString());
+                if (!(pv instanceof ProtocolVersion.UnknownVersion)) {
+                    protocolVersion = pv;
+                }
+            }
+            var proxyNotificationWriter = createProxyNotificationWriter(mcpServerProxy, notificationWriter);
+            mcpServerProxy.initialize(responseWriter, proxyNotificationWriter, initRequest, protocolVersion);
+        }
+
         mcpServerProxy.start();
 
         try {
