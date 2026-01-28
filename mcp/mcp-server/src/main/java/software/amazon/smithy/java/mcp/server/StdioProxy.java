@@ -9,6 +9,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -53,6 +54,11 @@ public final class StdioProxy extends McpServerProxy {
             processBuilder.environment().putAll(builder.environmentVariables);
         }
 
+        // Set working directory if provided
+        if (builder.workingDirectory != null) {
+            processBuilder.directory(builder.workingDirectory);
+        }
+
         this.name = builder.name;
 
         processBuilder.redirectErrorStream(false); // Keep stderr separate
@@ -63,6 +69,7 @@ public final class StdioProxy extends McpServerProxy {
         private String name;
         private List<String> arguments;
         private Map<String, String> environmentVariables;
+        private File workingDirectory;
 
         public Builder name(String name) {
             this.name = name;
@@ -81,6 +88,11 @@ public final class StdioProxy extends McpServerProxy {
 
         public Builder environmentVariables(Map<String, String> environmentVariables) {
             this.environmentVariables = environmentVariables;
+            return this;
+        }
+
+        public Builder workingDirectory(File workingDirectory) {
+            this.workingDirectory = workingDirectory;
             return this;
         }
 
