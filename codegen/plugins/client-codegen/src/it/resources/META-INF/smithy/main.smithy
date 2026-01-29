@@ -11,6 +11,7 @@ use smithy.test.auth#testAuthScheme
 )
 @restJson1
 @testAuthScheme
+@httpApiKeyAuth(name: "X-Api-Key", in: "header")
 service TestService {
     version: "today"
     operations: [
