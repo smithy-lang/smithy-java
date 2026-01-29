@@ -131,6 +131,7 @@ public final class McpServer implements Server {
     private void writeNotification(JsonRpcRequest notification) {
         synchronized (os) {
             try {
+                LOG.debug("Writing notification to stdout: method={}", notification.getMethod());
                 os.write(CODEC.serializeToString(notification).getBytes(StandardCharsets.UTF_8));
                 os.write('\n');
                 os.flush();

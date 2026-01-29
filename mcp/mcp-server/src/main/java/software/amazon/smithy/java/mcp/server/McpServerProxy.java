@@ -16,6 +16,7 @@ import java.util.function.Consumer;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
 import software.amazon.smithy.java.mcp.model.ListToolsResult;
@@ -24,6 +25,7 @@ import software.amazon.smithy.java.mcp.model.ToolInfo;
 
 public abstract class McpServerProxy {
 
+    private static final InternalLogger LOG = InternalLogger.getLogger(McpServerProxy.class);
     private static final AtomicInteger ID_GENERATOR = new AtomicInteger(0);
 
     private final AtomicReference<Consumer<JsonRpcResponse>> notificationConsumer = new AtomicReference<>();
@@ -126,7 +128,11 @@ public abstract class McpServerProxy {
     protected void notifyRequest(JsonRpcRequest notification) {
         var rnc = requestNotificationConsumer.get();
         if (rnc != null) {
+            LOG.debug("Forwarding notification to consumer: method={}", notification.getMethod());
             rnc.accept(notification);
+        } else {
+            LOG.warn("No request notification consumer set, dropping notification: method={}",
+                    notification.getMethod());
         }
     }
 

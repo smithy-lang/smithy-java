@@ -8,12 +8,14 @@ package software.amazon.smithy.java.mcp.server;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.http.HttpContext;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.ByteBufferUtils;
@@ -24,6 +26,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.model.JsonRpcErrorResponse;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
+import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
@@ -38,6 +41,7 @@ public final class HttpMcpProxy extends McpServerProxy {
     private final String name;
     private final Signer<HttpRequest, ?> signer;
     private final Duration timeout;
+    private volatile String sessionId;
 
     private HttpMcpProxy(Builder builder) {
         this.transport = builder.transport != null ? builder.transport : new JavaHttpClientTransport();
@@ -106,12 +110,25 @@ public final class HttpMcpProxy extends McpServerProxy {
 
             String protocolVersionHeader = getProtocolVersion().identifier();
 
-            HttpRequest httpRequest = HttpRequest.builder()
+            HttpRequest.Builder requestBuilder = HttpRequest.builder()
                     .uri(endpoint)
                     .method("POST")
                     .withAddedHeader("Content-Type", "application/json")
                     .withAddedHeader("Accept", "application/json, text/event-stream")
-                    .withAddedHeader("MCP-Protocol-Version", protocolVersionHeader)
+                    .withAddedHeader("MCP-Protocol-Version", protocolVersionHeader);
+
+            // Include session ID if we have one
+            String currentSessionId = sessionId;
+            if (currentSessionId != null) {
+                requestBuilder.withAddedHeader("Mcp-Session-Id", currentSessionId);
+                LOG.debug("Including session ID in request: method={}, sessionId={}",
+                        request.getMethod(),
+                        currentSessionId);
+            } else {
+                LOG.debug("No session ID available for request: method={}", request.getMethod());
+            }
+
+            HttpRequest httpRequest = requestBuilder
                     .body(DataStream.ofBytes(body, "application/json"))
                     .build();
 
@@ -124,6 +141,13 @@ public final class HttpMcpProxy extends McpServerProxy {
 
             HttpResponse response = transport.send(context, httpRequest);
             LOG.trace("Received HTTP response with status: {}", response.statusCode());
+
+            // Extract and store session ID from response
+            String responseSessionId = response.headers().firstValue("Mcp-Session-Id");
+            if (responseSessionId != null) {
+                sessionId = responseSessionId;
+                LOG.debug("Stored session ID from response: {}", responseSessionId);
+            }
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 return CompletableFuture.completedFuture(handleErrorResponse(response));
@@ -165,11 +189,13 @@ public final class HttpMcpProxy extends McpServerProxy {
                     }
 
                     try {
-                        // Check if it's a notification by looking for "method" field
-                        if (jsonData.contains("\"method\"")) {
+                        // Check if it's a notification by checking for top-level "id" field
+                        // Notifications have "method" but no "id", responses have "id"
+                        if (isNotification(jsonData)) {
                             // This is a notification - parse as JsonRpcRequest and forward
                             JsonRpcRequest notification =
                                     JSON_CODEC.deserializeShape(jsonData, JsonRpcRequest.builder());
+                            LOG.debug("Received notification from SSE stream: method={}", notification.getMethod());
                             notifyRequest(notification);
                         } else {
                             // This is a response - parse as JsonRpcResponse
@@ -187,10 +213,13 @@ public final class HttpMcpProxy extends McpServerProxy {
                 String jsonData = dataBuffer.toString().trim();
                 if (!jsonData.isEmpty()) {
                     try {
-                        // Check if it's a notification by looking for "method" field
-                        if (jsonData.contains("\"method\"")) {
+                        // Check if it's a notification by checking for top-level "id" field
+                        // Notifications have "method" but no "id", responses have "id"
+                        if (isNotification(jsonData)) {
                             JsonRpcRequest notification =
                                     JSON_CODEC.deserializeShape(jsonData, JsonRpcRequest.builder());
+                            LOG.debug("Received notification from remaining SSE buffer: method={}",
+                                    notification.getMethod());
                             notifyRequest(notification);
                         } else {
                             JsonRpcResponse message = JSON_CODEC.deserializeShape(jsonData, JsonRpcResponse.builder());
@@ -232,6 +261,37 @@ public final class HttpMcpProxy extends McpServerProxy {
                             .message("SSE parsing error: " + e.getMessage())
                             .build())
                     .build();
+        }
+    }
+
+    /**
+     * Determines if a JSON string represents a notification (has "method" but no "id")
+     * rather than a response (has "id").
+     * 
+     * - Responses have an "id" field at the top level
+     * - Notifications have a "method" field but no "id" field at the top level
+     */
+    private boolean isNotification(String jsonData) {
+        try {
+            Document doc = JSON_CODEC.createDeserializer(jsonData.getBytes(StandardCharsets.UTF_8))
+                    .readDocument();
+
+            if (!doc.isType(ShapeType.STRUCTURE) && !doc.isType(ShapeType.MAP)) {
+                return false;
+            }
+
+            Map<String, Document> obj = doc.asStringMap();
+
+            // If it has an "id" field at the top level, it's a response
+            if (obj.containsKey("id")) {
+                return false;
+            }
+
+            // If it has a "method" field but no "id", it's a notification
+            return obj.containsKey("method");
+        } catch (Exception e) {
+            LOG.warn("Failed to parse JSON to determine if notification: {}", jsonData, e);
+            return false;
         }
     }
 
