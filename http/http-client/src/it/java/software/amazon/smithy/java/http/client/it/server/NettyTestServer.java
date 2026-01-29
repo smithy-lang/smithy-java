@@ -15,7 +15,14 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import java.net.InetSocketAddress;
 import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.http.client.it.server.h1.Http11ClientHandlerFactory;
+import software.amazon.smithy.java.http.client.it.server.h2.Http2ClientHandlerFactory;
 
+/**
+ * Netty-based test server for HTTP client integration tests.
+ *
+ * <p>Supports HTTP/1.1 and HTTP/2 with optional TLS and ALPN negotiation.
+ */
 public class NettyTestServer {
     private static final NettyTestLogger LOGGER = NettyTestLogger.getLogger(NettyTestServer.class);
     private final EventLoopGroup bossGroup;

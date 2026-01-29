@@ -21,7 +21,20 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.net.ssl.SSLException;
 import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.http.client.it.server.h1.Http11ClientHandler;
+import software.amazon.smithy.java.http.client.it.server.h1.Http11ClientHandlerFactory;
+import software.amazon.smithy.java.http.client.it.server.h1.Http11Handler;
+import software.amazon.smithy.java.http.client.it.server.h2.Http2ClientHandler;
+import software.amazon.smithy.java.http.client.it.server.h2.Http2ClientHandlerFactory;
+import software.amazon.smithy.java.http.client.it.server.h2.Http2ConnectionFrameHandler;
+import software.amazon.smithy.java.http.client.it.server.h2.Http2StreamFrameHandler;
 
+/**
+ * Netty channel initializer for the test server.
+ *
+ * <p>Configures the pipeline for HTTP/1.1 or HTTP/2 based on the server configuration,
+ * with optional TLS and ALPN support.
+ */
 public class ServerInitializer extends ChannelInitializer<SocketChannel> {
     private final Http2ClientHandlers h2ClientHandlers;
     private final Http11ClientHandlers h11ClientHandlers;
@@ -78,7 +91,7 @@ public class ServerInitializer extends ChannelInitializer<SocketChannel> {
         }
     }
 
-    public static class Http2ClientHandlers {
+    public static final class Http2ClientHandlers {
         private final Http2ClientHandlerFactory factory;
         private final Map<ChannelId, Http2ClientHandler> h2ClientHandlers = new ConcurrentHashMap<>();
 
@@ -97,7 +110,7 @@ public class ServerInitializer extends ChannelInitializer<SocketChannel> {
         }
     }
 
-    public static class Http11ClientHandlers {
+    public static final class Http11ClientHandlers {
         private final Http11ClientHandlerFactory factory;
         private final Map<ChannelId, Http11ClientHandler> h11ClientHandlers = new ConcurrentHashMap<>();
 
