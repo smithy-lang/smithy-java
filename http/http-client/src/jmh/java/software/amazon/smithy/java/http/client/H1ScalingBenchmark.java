@@ -11,11 +11,14 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.util.Timeout;
 import org.openjdk.jmh.annotations.AuxCounters;
@@ -199,5 +202,21 @@ public class H1ScalingBenchmark {
         }, request, counter);
 
         counter.logErrors("Smithy H1 POST");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void apachePost(Counter counter) throws InterruptedException {
+        var target = BenchmarkSupport.H1_URL + "/post";
+
+        BenchmarkSupport.runBenchmark(concurrency, 1000, (String url) -> {
+            var post = new HttpPost(url);
+            post.setEntity(new ByteArrayEntity(BenchmarkSupport.POST_PAYLOAD, ContentType.APPLICATION_OCTET_STREAM));
+            try (var response = apacheClient.execute(post)) {
+                EntityUtils.consume(response.getEntity());
+            }
+        }, target, counter);
+
+        counter.logErrors("Apache H1 POST");
     }
 }

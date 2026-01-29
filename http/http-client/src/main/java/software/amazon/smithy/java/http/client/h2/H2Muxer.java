@@ -291,12 +291,15 @@ final class H2Muxer implements AutoCloseable {
 
     // ==================== FLOW CONTROL ====================
 
-    void acquireConnectionWindow(int requestedBytes, long timeoutMs)
-            throws SocketTimeoutException, InterruptedException {
-        if (!connectionSendWindow.tryAcquire(requestedBytes, timeoutMs)) {
-            throw new SocketTimeoutException(
-                    "Write timed out after " + timeoutMs + "ms waiting for connection flow control window");
-        }
+    /**
+     * Acquire up to the requested bytes from the connection flow control window.
+     *
+     * @param maxBytes maximum bytes to acquire
+     * @param timeoutMs timeout if window is empty
+     * @return bytes acquired (0 if timeout)
+     */
+    int acquireConnectionWindowUpTo(int maxBytes, long timeoutMs) throws SocketTimeoutException, InterruptedException {
+        return connectionSendWindow.tryAcquireUpTo(maxBytes, timeoutMs);
     }
 
     void releaseConnectionWindow(int bytes) {
@@ -353,10 +356,6 @@ final class H2Muxer implements AutoCloseable {
 
     void queueTrailers(int streamId, HttpHeaders trailers) {
         enqueue(new H2MuxerWorkItem.WriteTrailers(streamId, trailers));
-    }
-
-    void queueData(int streamId, byte[] data, int offset, int length, int flags) {
-        enqueue(new H2MuxerWorkItem.WriteData(streamId, data, offset, length, flags));
     }
 
     /**
@@ -523,14 +522,16 @@ final class H2Muxer implements AutoCloseable {
                     processBatch(batch);
                 }
 
-                dataWorkPending.set(false);
-
                 boolean processedData = false;
                 H2Exchange exchange;
                 while ((exchange = dataWorkQueue.poll()) != null) {
                     processExchangePendingWrites(exchange);
                     processedData = true;
                 }
+
+                // Reset flag only after draining to avoid race where VT signals while we're still processing,
+                // causing extra wake-ups and flushes
+                dataWorkPending.set(false);
 
                 if (processedData) {
                     try {
@@ -544,6 +545,8 @@ final class H2Muxer implements AutoCloseable {
                 // Check for timeouts periodically using tick-based system
                 long now = System.currentTimeMillis();
                 if (now - lastTimeoutCheck >= TIMEOUT_POLL_INTERVAL_MS) {
+                    // Single-writer (muxer thread) / multi-reader pattern. Only this thread increments.
+                    @SuppressWarnings("NonAtomicOperationOnVolatileField")
                     int tick = ++timeoutTick;
                     checkReadTimeouts(tick);
                     checkWriteTimeouts(tick);
@@ -566,8 +569,6 @@ final class H2Muxer implements AutoCloseable {
     }
 
     private void processExchangePendingWrites(H2Exchange exchange) {
-        exchange.inWorkQueue = false;
-
         int streamId = exchange.getStreamId();
         PendingWrite pw;
         while ((pw = exchange.pendingWrites.poll()) != null) {
@@ -588,6 +589,10 @@ final class H2Muxer implements AutoCloseable {
             exchange.returnBuffer(buffer);
             pw.reset();
         }
+
+        // Reset inWorkQueue only after draining to avoid race where VT adds writes
+        // and re-enqueues while still processing.
+        exchange.inWorkQueue = false;
 
         if (!exchange.pendingWrites.isEmpty() && !exchange.inWorkQueue) {
             exchange.inWorkQueue = true;
