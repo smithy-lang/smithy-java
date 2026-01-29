@@ -5,7 +5,9 @@
 
 package software.amazon.smithy.java.io;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -74,6 +76,17 @@ public final class ByteBufferUtils {
             len = Math.min(len, b.remaining());
             b.get(bytes, off, len);
             return len;
+        }
+
+        @Override
+        public long transferTo(OutputStream out) throws IOException {
+            // Skip buffering used in the default implementation.
+            int remaining = b.remaining();
+            if (remaining > 0 && b.hasArray()) {
+                out.write(b.array(), b.arrayOffset() + b.position(), remaining);
+                b.position(b.limit());
+            }
+            return remaining;
         }
     }
 }

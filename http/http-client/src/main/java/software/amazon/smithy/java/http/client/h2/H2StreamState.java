@@ -89,6 +89,7 @@ final class H2StreamState {
     }
 
     // Initial: SS_IDLE, RS_WAITING, no flags, status=0
+    @SuppressWarnings("FieldMayBeFinal") // it's mutated with a VarHandle
     private volatile int packedState = (SS_IDLE << SHIFT_STREAM_STATE) | (RS_WAITING << SHIFT_READ_STATE);
 
     /**

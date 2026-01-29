@@ -64,6 +64,9 @@ public final class H2Exchange implements HttpExchange {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(H2Exchange.class);
 
+    // Max frames to acquire flow control for in a single batch (64 frames = 1MB at default 16KB frame size)
+    private static final int FLOW_CONTROL_BATCH_FRAMES = 64;
+
     // VarHandle for atomic inWorkQueue CAS
     private static final VarHandle IN_WORK_QUEUE_HANDLE;
 
@@ -905,13 +908,16 @@ public final class H2Exchange implements HttpExchange {
     }
 
     /**
-     * Write DATA frame for request body with flow control.
+     * Write DATA frames for request body with flow control.
      *
-     * <p>Uses the SPSC (single-producer, single-consumer) pattern:
+     * <p>Uses batched flow control acquisition to prevent connection window starvation under high concurrency.
+     * Acquires up to {@value #FLOW_CONTROL_BATCH_FRAMES} frames worth of window at a time.
+     *
+     * <p>Flow:
      * <ol>
-     *   <li>VT acquires flow control (blocks naturally via FlowControlWindow monitor)</li>
-     *   <li>VT copies data to pooled buffer and adds to pendingWrites queue</li>
-     *   <li>VT signals writer thread via muxer</li>
+     *   <li>VT acquires stream and connection flow control in batches</li>
+     *   <li>VT copies data to pooled buffers and adds to pendingWrites queue</li>
+     *   <li>VT signals writer thread once after all frames are queued</li>
      *   <li>Writer thread drains pendingWrites and writes frames</li>
      * </ol>
      *
@@ -921,65 +927,74 @@ public final class H2Exchange implements HttpExchange {
         // If trailers are set and this is the last data, don't set END_STREAM on DATA frame
         // - trailers will carry END_STREAM instead
         boolean hasTrailers = requestTrailers != null;
+        int maxFrameSize = muxer.getRemoteMaxFrameSize();
 
         while (length > 0) {
-            // Determine how much we can send based on frame size limit
-            int maxFrameSize = muxer.getRemoteMaxFrameSize();
-            int toSend = Math.min(length, maxFrameSize);
-
-            // Acquire stream-level flow control (uses tick-based timeout)
+            // Acquire as much stream-level flow control as we can (up to remaining length)
+            int batchSize = Math.min(length, maxFrameSize * FLOW_CONTROL_BATCH_FRAMES);
+            int streamAcquired;
             try {
-                if (!sendWindow.tryAcquire(toSend, writeTimeoutMs)) {
-                    throw new SocketTimeoutException(
-                            "Write timed out after " + writeTimeoutMs + "ms waiting for stream flow control window");
+                streamAcquired = sendWindow.tryAcquireUpTo(batchSize, writeTimeoutMs);
+                if (streamAcquired == 0) {
+                    throw new SocketTimeoutException(String.format(
+                            "Write timed out after %dms waiting for stream flow control window",
+                            writeTimeoutMs));
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new IOException("Interrupted waiting for stream flow control window", e);
             }
 
-            // Acquire connection-level flow control
+            // Acquire connection-level flow control for what we got from stream
+            int connAcquired;
             try {
-                muxer.acquireConnectionWindow(toSend, writeTimeoutMs);
+                connAcquired = muxer.acquireConnectionWindowUpTo(streamAcquired, writeTimeoutMs);
+                if (connAcquired == 0) {
+                    sendWindow.release(streamAcquired);
+                    throw new SocketTimeoutException(String.format(
+                            "Write timed out after %dms waiting for connection flow control window",
+                            writeTimeoutMs));
+                }
+                // Release excess stream permits if connection gave us less
+                if (connAcquired < streamAcquired) {
+                    sendWindow.release(streamAcquired - connAcquired);
+                }
             } catch (InterruptedException e) {
-                // Release stream permits we acquired
-                sendWindow.release(toSend);
+                sendWindow.release(streamAcquired);
                 Thread.currentThread().interrupt();
                 throw new IOException("Interrupted waiting for connection flow control window", e);
             } catch (SocketTimeoutException e) {
-                // Release stream permits we acquired
-                sendWindow.release(toSend);
+                sendWindow.release(streamAcquired);
                 throw e;
             }
 
-            boolean isLastChunk = (toSend == length);
-            // Only set END_STREAM on DATA if this is the last chunk AND no trailers
-            int flags = (endStream && isLastChunk && !hasTrailers) ? FLAG_END_STREAM : 0;
+            // Write frames using the acquired window
+            int batchRemaining = connAcquired;
+            while (batchRemaining > 0 && length > 0) {
+                int toSend = Math.min(Math.min(length, maxFrameSize), batchRemaining);
+                boolean isLastChunk = (toSend == length);
+                int flags = (endStream && isLastChunk && !hasTrailers) ? FLAG_END_STREAM : 0;
+                byte[] buf = muxer.borrowBuffer(toSend);
+                System.arraycopy(data, offset, buf, 0, toSend);
 
-            // Copy data to pooled buffer (caller may reuse their buffer)
-            byte[] buf = muxer.borrowBuffer(toSend);
-            System.arraycopy(data, offset, buf, 0, toSend);
+                pendingWrites.add(new PendingWrite().init(buf, 0, toSend, flags));
 
-            // Add to pendingWrites queue (lock-free concurrent queue)
-            PendingWrite pw = new PendingWrite();
-            pw.init(buf, 0, toSend, flags);
-            pendingWrites.add(pw);
-
-            // Signal writer thread if not already in work queue (atomic CAS to avoid races)
-            if (IN_WORK_QUEUE_HANDLE.compareAndSet(this, false, true)) {
-                muxer.signalDataReady(this);
+                offset += toSend;
+                length -= toSend;
+                batchRemaining -= toSend;
             }
+        }
 
-            offset += toSend;
-            length -= toSend;
+        // Signal writer thread once after all data is queued
+        if (IN_WORK_QUEUE_HANDLE.compareAndSet(this, false, true)) {
+            muxer.signalDataReady(this);
         }
 
         if (endStream) {
             if (hasTrailers) {
-                // Send trailers with END_STREAM
                 muxer.queueTrailers(streamId, requestTrailers);
             }
-            state.markEndStreamSent(); // Atomically sets flag and updates stream state
+            state.markEndStreamSent();
         }
     }
 
@@ -989,22 +1004,20 @@ public final class H2Exchange implements HttpExchange {
      * <p>Uses the same pendingWrites queue as writeData() to ensure proper ordering.
      * This prevents END_STREAM from being sent before pending DATA frames.
      */
-    void sendEndStream() throws IOException {
+    void sendEndStream() {
         if (!state.isEndStreamSent()) {
             if (requestTrailers != null) {
                 muxer.queueTrailers(streamId, requestTrailers);
             } else {
                 // Use pendingWrites queue (same as writeData) to ensure ordering
-                PendingWrite pw = new PendingWrite();
-                pw.init(H2Constants.EMPTY_BYTES, 0, 0, FLAG_END_STREAM);
-                pendingWrites.add(pw);
+                pendingWrites.add(new PendingWrite().init(H2Constants.EMPTY_BYTES, 0, 0, FLAG_END_STREAM));
 
                 // Signal writer thread
                 if (IN_WORK_QUEUE_HANDLE.compareAndSet(this, false, true)) {
                     muxer.signalDataReady(this);
                 }
             }
-            state.markEndStreamSent(); // Atomically sets flag and updates stream state
+            state.markEndStreamSent();
         }
     }
 
@@ -1020,7 +1033,7 @@ public final class H2Exchange implements HttpExchange {
         streamRecvWindow -= bytesConsumed;
         if (streamRecvWindow < initialWindowSize / H2Constants.WINDOW_UPDATE_THRESHOLD_DIVISOR) {
             int increment = initialWindowSize - streamRecvWindow;
-            // Queue stream-level WINDOW_UPDATE - writer thread will send it
+            // Queue stream-level WINDOW_UPDATE. Writer thread will send it.
             muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.WINDOW_UPDATE, increment, writeTimeoutMs);
             streamRecvWindow += increment;
         }

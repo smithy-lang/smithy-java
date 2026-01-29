@@ -41,11 +41,12 @@ final class PendingWrite {
      * @param length length to write
      * @param flags  frame flags (see {@link H2Constants#FLAG_END_STREAM})
      */
-    void init(byte[] data, int offset, int length, int flags) {
+    PendingWrite init(byte[] data, int offset, int length, int flags) {
         this.data = data;
         this.offset = offset;
         this.length = length;
         this.flags = flags;
+        return this;
     }
 
     /**

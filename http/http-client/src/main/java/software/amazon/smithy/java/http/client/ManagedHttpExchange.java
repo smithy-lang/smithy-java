@@ -139,6 +139,11 @@ final class ManagedHttpExchange implements HttpExchange {
     }
 
     @Override
+    public HttpHeaders responseTrailerHeaders() {
+        return delegate.responseTrailerHeaders();
+    }
+
+    @Override
     public int responseStatusCode() throws IOException {
         try {
             ensureIntercepted();

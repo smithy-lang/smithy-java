@@ -28,7 +28,7 @@ import software.amazon.smithy.java.http.client.it.server.TestCertificateGenerato
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 public class TestUtils {
-    static final List<String> IPSUM_LOREM = getIpsumLorem();
+    public static final List<String> IPSUM_LOREM = getIpsumLorem();
 
     private TestUtils() {}
 
@@ -54,6 +54,9 @@ public class TestUtils {
             headers.addHeader("content-type", "text/plain");
             if (body.contentLength() >= 0) {
                 headers.addHeader("content-length", Long.toString(body.contentLength()));
+            } else if (version == HttpVersion.HTTP_1_1) {
+                // HTTP/1.1 needs transfer-encoding for streaming bodies
+                headers.addHeader("transfer-encoding", "chunked");
             }
             return HttpRequest.builder()
                     .httpVersion(version)

@@ -63,6 +63,44 @@ final class FlowControlWindow {
     }
 
     /**
+     * Try to acquire up to the requested bytes from the window.
+     *
+     * <p>This method acquires as many bytes as available (up to the requested amount),
+     * waiting only if the window is completely empty.
+     *
+     * @param maxBytes maximum number of bytes to acquire
+     * @param timeoutMs maximum time to wait in milliseconds (only if window is empty)
+     * @return number of bytes acquired (0 if timeout expired with empty window)
+     * @throws InterruptedException if interrupted while waiting
+     */
+    int tryAcquireUpTo(int maxBytes, long timeoutMs) throws InterruptedException {
+        lock.lock();
+        try {
+            // Fast path: window has capacity
+            if (window > 0) {
+                int acquired = (int) Math.min(window, maxBytes);
+                window -= acquired;
+                return acquired;
+            }
+
+            // Slow path: wait for any capacity
+            long remainingNs = TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+            while (window <= 0) {
+                if (remainingNs <= 0) {
+                    return 0;
+                }
+                remainingNs = available.awaitNanos(remainingNs);
+            }
+
+            int acquired = (int) Math.min(window, maxBytes);
+            window -= acquired;
+            return acquired;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
      * Release bytes back to the window.
      *
      * @param bytes number of bytes to release
