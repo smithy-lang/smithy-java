@@ -218,18 +218,33 @@ public final class HttpConnectionPool implements ConnectionPool {
     private HttpConnection acquireH1(Route route) throws IOException {
         int maxConns = getMaxConnectionsForRoute(route);
 
-        // Quick check: try to reuse a pooled connection
-        H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(route, maxConns);
+        // Try to get a permit without blocking
+        if (connectionPermits.tryAcquire()) {
+            // Got a permit, so now try to reuse a pooled connection first
+            H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(route, maxConns);
+            if (pooled != null) {
+                notifyAcquire(pooled.connection(), true);
+                return pooled.connection();
+            } else {
+                // No pooled connection, but we have a permit to create one.
+                return createH1Connection(route);
+            }
+        }
 
+        // No permit available immediately. Block on global capacity with timeout.
+        acquirePermit();
+
+        // Re-check pool after acquiring the permit, since a connection may have been released while waiting.
+        H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(route, maxConns);
         if (pooled != null) {
             notifyAcquire(pooled.connection(), true);
             return pooled.connection();
         }
 
-        // No valid pooled connection available, so block on global capacity with timeout.
-        acquirePermit();
+        return createH1Connection(route);
+    }
 
-        // Create new HTTP/1.1 connection
+    private HttpConnection createH1Connection(Route route) throws IOException {
         HttpConnection conn = null;
         boolean success = false;
         try {
@@ -324,9 +339,10 @@ public final class HttpConnectionPool implements ConnectionPool {
             return;
         }
 
-        // H1 connection handling
         if (!h1Manager.release(route, connection, closed)) {
             closeAndReleasePermit(connection, CloseReason.POOL_FULL);
+        } else {
+            connectionPermits.release();
         }
     }
 
