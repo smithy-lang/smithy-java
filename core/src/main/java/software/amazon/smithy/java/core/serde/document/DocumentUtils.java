@@ -7,10 +7,6 @@ package software.amazon.smithy.java.core.serde.document;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -21,28 +17,6 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 public final class DocumentUtils {
 
     private DocumentUtils() {}
-
-    private static final Map<Class<? extends Number>, Schema> NUMBER_MAPPING = Map.of(
-            AtomicLong.class,
-            PreludeSchemas.LONG,
-            AtomicInteger.class,
-            PreludeSchemas.INTEGER,
-            Byte.class,
-            PreludeSchemas.BYTE,
-            Short.class,
-            PreludeSchemas.SHORT,
-            Integer.class,
-            PreludeSchemas.INTEGER,
-            Long.class,
-            PreludeSchemas.LONG,
-            Float.class,
-            PreludeSchemas.FLOAT,
-            Double.class,
-            PreludeSchemas.DOUBLE,
-            BigInteger.class,
-            PreludeSchemas.BIG_INTEGER,
-            BigDecimal.class,
-            PreludeSchemas.BIG_DECIMAL);
 
     public static void serializeNumber(ShapeSerializer serializer, Schema schema, Number value) {
         switch (schema.type()) {
@@ -79,24 +53,6 @@ public final class DocumentUtils {
             return b.toBigInteger();
         } else {
             return BigInteger.valueOf(number.longValue());
-        }
-    }
-
-    public static Schema getSchemaForNumber(Number value) {
-        var result = NUMBER_MAPPING.get(value.getClass());
-        // Note that BigInteger and BigDecimal can be extended.
-        if (result != null) {
-            return result;
-        } else if (value instanceof BigInteger) {
-            return PreludeSchemas.BIG_INTEGER;
-        } else if (value instanceof BigDecimal) {
-            return PreludeSchemas.BIG_DECIMAL;
-        } else {
-            throw new IllegalArgumentException(
-                    String.format(
-                            "Unsupported Number: %s; expected one of %s",
-                            value.getClass(),
-                            NUMBER_MAPPING.keySet()));
         }
     }
 
