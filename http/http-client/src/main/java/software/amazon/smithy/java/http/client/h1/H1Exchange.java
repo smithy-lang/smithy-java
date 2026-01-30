@@ -102,7 +102,10 @@ public final class H1Exchange implements HttpExchange {
         UnsyncBufferedOutputStream out = connection.getOutputStream();
         writeRequestLine(out);
         writeHeaders(out, request.headers());
-        out.flush();
+        // Only flush if no body - otherwise body write will flush
+        if (request.body() == null || request.body().contentLength() == 0) {
+            out.flush();
+        }
     }
 
     @Override
