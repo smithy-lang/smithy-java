@@ -60,10 +60,10 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 @State(Scope.Benchmark)
 public class H1ScalingBenchmark {
 
-    @Param({"100", "500", "1000", "2000"})
+    @Param({"100", "500"})
     private int concurrency;
 
-    @Param({"50", "100", "200", "500"})
+    @Param({"50", "100"})
     private int maxConnections;
 
     private HttpClient smithyClient;
