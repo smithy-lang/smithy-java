@@ -419,13 +419,26 @@ public final class H2Exchange implements HttpExchange {
      */
     void enqueueData(byte[] data, int length, boolean endStream, boolean moreDataBuffered) {
         boolean shouldSignal;
+        boolean sendWindowUpdate = false;
+        int windowIncrement = 0;
+
         dataLock.lock();
         try {
             int queueSizeBefore = dataQueue.size();
 
             if (data != null && length > 0) {
                 dataQueue.add(new DataChunk(data, length, endStream));
-                // Note: onReadActivity moved to drainChunks (consumer side) for batching
+
+                // Update stream receive window immediately when data arrives.
+                // This allows the server to keep sending without waiting for consumer to read.
+                // Buffering is bounded by initialWindowSize - server cannot send more than
+                // the window allows, so a slow consumer can buffer at most initialWindowSize bytes.
+                streamRecvWindow -= length;
+                if (streamRecvWindow < initialWindowSize / H2Constants.WINDOW_UPDATE_THRESHOLD_DIVISOR) {
+                    windowIncrement = initialWindowSize - streamRecvWindow;
+                    streamRecvWindow += windowIncrement;
+                    sendWindowUpdate = true;
+                }
             } else if (data != null) {
                 // Empty buffer - return to pool immediately
                 muxer.returnBuffer(data);
@@ -453,6 +466,11 @@ public final class H2Exchange implements HttpExchange {
                     || !moreDataBuffered;
         } finally {
             dataLock.unlock();
+        }
+
+        // Send WINDOW_UPDATE outside lock to avoid blocking reader thread
+        if (sendWindowUpdate) {
+            muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.WINDOW_UPDATE, windowIncrement, writeTimeoutMs);
         }
 
         // Signal outside lock - lock-free wakeup
@@ -568,24 +586,13 @@ public final class H2Exchange implements HttpExchange {
     /**
      * Called by H2DataInputStream when data is consumed.
      *
-     * <p>Updates content length tracking and flow control. Sends WINDOW_UPDATE
-     * when the receive window drops below the threshold.
+     * <p>Updates content length tracking. Note: flow control WINDOW_UPDATE is sent
+     * in {@link #enqueueData} when data arrives, not here.
      *
      * @param bytesConsumed number of bytes consumed
      */
     void onDataConsumed(int bytesConsumed) {
         receivedContentLength += bytesConsumed;
-
-        // Update flow control if stream is still open
-        if (state.getReadState() != RS_DONE) {
-            try {
-                updateStreamRecvWindow(bytesConsumed);
-            } catch (IOException e) {
-                // Flow control update failed - best effort, log and continue.
-                // The stream will eventually fail on timeout if this is persistent.
-                LOGGER.debug("Failed to send WINDOW_UPDATE for stream {}: {}", streamId, e.getMessage());
-            }
-        }
     }
 
     /**
@@ -1018,24 +1025,6 @@ public final class H2Exchange implements HttpExchange {
                 }
             }
             state.markEndStreamSent();
-        }
-    }
-
-    /**
-     * Update stream receive window after consuming data.
-     *
-     * <p>Sends WINDOW_UPDATE when the window drops below the threshold defined by
-     * {@link H2Constants#WINDOW_UPDATE_THRESHOLD_DIVISOR}.
-     *
-     * @throws IOException if the write queue is full
-     */
-    private void updateStreamRecvWindow(int bytesConsumed) throws IOException {
-        streamRecvWindow -= bytesConsumed;
-        if (streamRecvWindow < initialWindowSize / H2Constants.WINDOW_UPDATE_THRESHOLD_DIVISOR) {
-            int increment = initialWindowSize - streamRecvWindow;
-            // Queue stream-level WINDOW_UPDATE. Writer thread will send it.
-            muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.WINDOW_UPDATE, increment, writeTimeoutMs);
-            streamRecvWindow += increment;
         }
     }
 
