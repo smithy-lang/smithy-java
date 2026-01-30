@@ -8,6 +8,7 @@ package software.amazon.smithy.java.http.client;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -25,8 +26,8 @@ public final class DelegatedClosingInputStream extends FilterInputStream {
     }
 
     @Override
-    public int read(byte[] b, int off, int len) throws IOException {
-        return in.read(b, off, len);
+    public long transferTo(OutputStream out) throws IOException {
+        return in.transferTo(out);
     }
 
     @Override

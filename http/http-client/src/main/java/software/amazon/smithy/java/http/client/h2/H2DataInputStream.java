@@ -139,6 +139,36 @@ final class H2DataInputStream extends InputStream {
     }
 
     @Override
+    public long skip(long n) throws IOException {
+        if (closed || eof || n <= 0) {
+            return 0;
+        }
+
+        long skipped = 0;
+
+        // Skip from current buffer first
+        if (currentBuffer != null && readPosition < currentLength) {
+            int available = currentLength - readPosition;
+            int toSkip = (int) Math.min(available, n);
+            readPosition += toSkip;
+            exchange.onDataConsumed(toSkip);
+            skipped += toSkip;
+            n -= toSkip;
+        }
+
+        // Skip whole chunks without copying
+        while (n > 0 && pullNextChunk()) {
+            int toSkip = (int) Math.min(currentLength, n);
+            readPosition = toSkip;
+            exchange.onDataConsumed(toSkip);
+            skipped += toSkip;
+            n -= toSkip;
+        }
+
+        return skipped;
+    }
+
+    @Override
     public void close() {
         if (closed) {
             return;
