@@ -92,8 +92,10 @@ public final class McpService {
     private final AtomicReference<JsonRpcRequest> initializeRequest = new AtomicReference<>();
     private final ToolFilter toolFilter;
     private final AtomicReference<Boolean> proxiesInitialized = new AtomicReference<>(false);
+    private final AtomicReference<Boolean> toolsCacheInvalidated = new AtomicReference<>(false);
     private final McpMetricsObserver metricsObserver;
     private final SchemaIndex schemaIndex;
+    private Consumer<JsonRpcRequest> notificationWriter;
 
     McpService(
             Map<String, Service> services,
@@ -249,6 +251,12 @@ public final class McpService {
     }
 
     private JsonRpcResponse handleToolsList(JsonRpcRequest req, ProtocolVersion protocolVersion) {
+        // Refresh tools from proxies only if cache was invalidated
+        if (toolsCacheInvalidated.compareAndSet(true, false)) {
+            LOG.debug("Cache invalidated, refreshing proxy tools");
+            refreshProxyTools();
+        }
+
         var supportsOutputSchema = supportsOutputSchema(protocolVersion);
         var result = ListToolsResult.builder()
                 .tools(tools.values()
@@ -312,6 +320,22 @@ public final class McpService {
     }
 
     /**
+     * Sets the notification writer for forwarding notifications from proxies.
+     */
+    public void setNotificationWriter(Consumer<JsonRpcRequest> notificationWriter) {
+        // Wrap the notification writer to intercept and handle cache invalidation
+        this.notificationWriter = notification -> {
+            // Check if this is a tools/list_changed notification
+            if ("notifications/tools/list_changed".equals(notification.getMethod())) {
+                LOG.debug("Received tools/list_changed notification, invalidating cache");
+                toolsCacheInvalidated.set(true);
+            }
+            // Forward the notification
+            notificationWriter.accept(notification);
+        };
+    }
+
+    /**
      * Starts proxies without initializing them.
      */
     public void startProxies() {
@@ -342,6 +366,11 @@ public final class McpService {
             }
 
             for (McpServerProxy proxy : proxies.values()) {
+                // Set up request notification consumer BEFORE initialization
+                if (notificationWriter != null) {
+                    proxy.updateRequestNotificationConsumer(notificationWriter);
+                }
+
                 if (initRequest != null) {
                     proxy.initialize(responseWriter, initRequest, protocolVersion);
                 }
@@ -386,7 +415,23 @@ public final class McpService {
      * Adds a new proxy and initializes it.
      */
     public void addNewProxy(McpServerProxy mcpServerProxy, Consumer<JsonRpcResponse> responseWriter) {
+        addNewProxy(mcpServerProxy, responseWriter, null);
+    }
+
+    /**
+     * Adds a new proxy and initializes it with optional request notification writer.
+     */
+    public void addNewProxy(
+            McpServerProxy mcpServerProxy,
+            Consumer<JsonRpcResponse> responseWriter,
+            Consumer<JsonRpcRequest> notificationWriter
+    ) {
         proxies.put(mcpServerProxy.name(), mcpServerProxy);
+
+        if (notificationWriter != null) {
+            mcpServerProxy.updateRequestNotificationConsumer(notificationWriter);
+        }
+
         mcpServerProxy.start();
 
         try {
@@ -409,6 +454,27 @@ public final class McpService {
             }
         } catch (Exception e) {
             LOG.error("Failed to fetch prompts from proxy: " + mcpServerProxy.name(), e);
+        }
+    }
+
+    /**
+     * Refreshes tools from all proxies to get the latest list.
+     * This removes existing proxy tools and re-fetches them.
+     */
+    private void refreshProxyTools() {
+        // Remove all proxy tools from the tools map
+        tools.entrySet().removeIf(entry -> entry.getValue().proxy() != null);
+
+        // Re-fetch tools from all proxies
+        for (McpServerProxy proxy : proxies.values()) {
+            try {
+                List<ToolInfo> proxyTools = proxy.listTools();
+                for (var toolInfo : proxyTools) {
+                    tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
+                }
+            } catch (Exception e) {
+                LOG.error("Failed to refresh tools from proxy: " + proxy.name(), e);
+            }
         }
     }
 

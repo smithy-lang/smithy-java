@@ -16,9 +16,12 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -1404,5 +1407,161 @@ public class McpServerTest {
         // Document with @oneOf should have oneOf array generated from trait members
         var oneOf = shapeProperty.get("oneOf").asList();
         assertEquals(2, oneOf.size(), "Document with @oneOf should have 2 oneOf variants");
+    }
+
+    @Test
+    void testToolsListChangedNotificationInvalidatesCache() {
+        var callCounter = new AtomicInteger(0);
+        var mockProxy = new CacheTestProxy(callCounter);
+
+        var service = McpService.builder()
+                .name("test")
+                .proxyList(List.of(mockProxy))
+                .build();
+
+        var notifications = new ArrayList<JsonRpcRequest>();
+        service.setNotificationWriter(notifications::add);
+
+        // Initialize to set up proxies
+        var initRequest = JsonRpcRequest.builder()
+                .method("initialize")
+                .id(Document.of(1))
+                .params(Document.of(Map.of("protocolVersion", Document.of("2024-11-05"))))
+                .jsonrpc("2.0")
+                .build();
+        service.handleRequest(initRequest, r -> {}, ProtocolVersion.defaultVersion());
+
+        // First tools/list - fetches from proxy
+        var toolsRequest = JsonRpcRequest.builder()
+                .method("tools/list")
+                .id(Document.of(2))
+                .params(Document.of(Map.of()))
+                .jsonrpc("2.0")
+                .build();
+        service.handleRequest(toolsRequest, r -> {}, ProtocolVersion.defaultVersion());
+        assertEquals(1, callCounter.get(), "First call should fetch from proxy");
+
+        // Second tools/list - uses cache
+        service.handleRequest(toolsRequest, r -> {}, ProtocolVersion.defaultVersion());
+        assertEquals(1, callCounter.get(), "Second call should use cache");
+
+        // Send tools/list_changed notification
+        var notification = JsonRpcRequest.builder()
+                .method("notifications/tools/list_changed")
+                .params(Document.of(Map.of()))
+                .jsonrpc("2.0")
+                .build();
+        mockProxy.sendNotification(notification);
+
+        // Verify notification was forwarded
+        assertEquals(1, notifications.size());
+        assertEquals("notifications/tools/list_changed", notifications.get(0).getMethod());
+
+        // Third tools/list - should refresh from proxy
+        service.handleRequest(toolsRequest, r -> {}, ProtocolVersion.defaultVersion());
+        assertEquals(2, callCounter.get(), "Third call should refresh after notification");
+
+        // Fourth tools/list - uses cache again (counter should NOT increment)
+        service.handleRequest(toolsRequest, r -> {}, ProtocolVersion.defaultVersion());
+        assertEquals(2, callCounter.get(), "Fourth call should use cache (not increment to 3)");
+    }
+
+    @Test
+    void testOtherNotificationsDoNotInvalidateCache() {
+        var callCounter = new AtomicInteger(0);
+        var mockProxy = new CacheTestProxy(callCounter);
+
+        var service = McpService.builder()
+                .name("test")
+                .proxyList(List.of(mockProxy))
+                .build();
+
+        var notifications = new ArrayList<JsonRpcRequest>();
+        service.setNotificationWriter(notifications::add);
+
+        // Initialize
+        var initRequest = JsonRpcRequest.builder()
+                .method("initialize")
+                .id(Document.of(1))
+                .params(Document.of(Map.of("protocolVersion", Document.of("2024-11-05"))))
+                .jsonrpc("2.0")
+                .build();
+        service.handleRequest(initRequest, r -> {}, ProtocolVersion.defaultVersion());
+
+        // First tools/list
+        var toolsRequest = JsonRpcRequest.builder()
+                .method("tools/list")
+                .id(Document.of(2))
+                .params(Document.of(Map.of()))
+                .jsonrpc("2.0")
+                .build();
+        service.handleRequest(toolsRequest, r -> {}, ProtocolVersion.defaultVersion());
+        assertEquals(1, callCounter.get());
+
+        // Send different notification
+        var notification = JsonRpcRequest.builder()
+                .method("notifications/prompts/list_changed")
+                .params(Document.of(Map.of()))
+                .jsonrpc("2.0")
+                .build();
+        mockProxy.sendNotification(notification);
+
+        assertEquals(1, notifications.size());
+        assertEquals("notifications/prompts/list_changed", notifications.get(0).getMethod());
+
+        // Second tools/list - should still use cache
+        service.handleRequest(toolsRequest, r -> {}, ProtocolVersion.defaultVersion());
+        assertEquals(1, callCounter.get(), "Cache should not be invalidated by other notifications");
+    }
+
+    private static class CacheTestProxy extends McpServerProxy {
+        private final AtomicInteger callCounter;
+
+        CacheTestProxy(AtomicInteger callCounter) {
+            this.callCounter = callCounter;
+        }
+
+        @Override
+        public List<software.amazon.smithy.java.mcp.model.ToolInfo> listTools() {
+            callCounter.incrementAndGet();
+            return List.of(
+                    software.amazon.smithy.java.mcp.model.ToolInfo.builder()
+                            .name("test-tool")
+                            .description("Test")
+                            .inputSchema(software.amazon.smithy.java.mcp.model.JsonObjectSchema.builder().build())
+                            .build());
+        }
+
+        @Override
+        public List<software.amazon.smithy.java.mcp.model.PromptInfo> listPrompts() {
+            return List.of();
+        }
+
+        @Override
+        CompletableFuture<JsonRpcResponse> rpc(JsonRpcRequest request) {
+            return CompletableFuture.completedFuture(
+                    JsonRpcResponse.builder()
+                            .id(request.getId())
+                            .result(Document.of(Map.of()))
+                            .jsonrpc("2.0")
+                            .build());
+        }
+
+        @Override
+        void start() {}
+
+        @Override
+        CompletableFuture<Void> shutdown() {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        @Override
+        public String name() {
+            return "cache-test";
+        }
+
+        void sendNotification(JsonRpcRequest notification) {
+            notifyRequest(notification);
+        }
     }
 }
