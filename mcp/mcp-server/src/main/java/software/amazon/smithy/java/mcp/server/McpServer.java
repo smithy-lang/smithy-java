@@ -108,7 +108,7 @@ public final class McpServer implements Server {
     }
 
     public void addNewProxy(McpServerProxy mcpServerProxy) {
-        mcpService.addNewProxy(mcpServerProxy, this::writeResponse, this::writeNotification);
+        mcpService.addNewProxy(mcpServerProxy, this::writeResponse);
         refreshTools();
     }
 
