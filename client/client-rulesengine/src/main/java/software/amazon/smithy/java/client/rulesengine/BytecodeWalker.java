@@ -78,10 +78,13 @@ final class BytecodeWalker {
                     Opcodes.TEST_REGISTER_NOT_SET, Opcodes.LISTN, Opcodes.MAPN, Opcodes.FN0, Opcodes.FN1, Opcodes.FN2,
                     Opcodes.FN3, Opcodes.FN, Opcodes.GET_INDEX, Opcodes.TEST_REGISTER_IS_TRUE,
                     Opcodes.TEST_REGISTER_IS_FALSE, Opcodes.RETURN_ENDPOINT, Opcodes.LOAD_CONST_W, Opcodes.GET_PROPERTY,
-                    Opcodes.JNN_OR_POP ->
+                    Opcodes.JNN_OR_POP, Opcodes.GET_NEGATIVE_INDEX, Opcodes.JMP_IF_FALSE, Opcodes.JUMP ->
                 1;
-            case Opcodes.GET_PROPERTY_REG, Opcodes.GET_INDEX_REG, Opcodes.RESOLVE_TEMPLATE -> 2;
-            case Opcodes.SUBSTRING -> 3;
+            case Opcodes.GET_PROPERTY_REG, Opcodes.GET_INDEX_REG, Opcodes.RESOLVE_TEMPLATE,
+                    Opcodes.GET_NEGATIVE_INDEX_REG ->
+                2;
+            case Opcodes.SUBSTRING, Opcodes.SPLIT_GET -> 3;
+            case Opcodes.SUBSTRING_EQ -> 5;
             default -> -1;
         };
     }
@@ -151,6 +154,45 @@ final class BytecodeWalker {
                     return code.get(pc + 1 + index) & 0xFF;
                 }
                 break;
+
+            case Opcodes.GET_NEGATIVE_INDEX:
+                if (index == 0) {
+                    return code.get(pc + 1) & 0xFF;
+                }
+                break;
+
+            case Opcodes.GET_NEGATIVE_INDEX_REG:
+                if (index == 0) {
+                    return code.get(pc + 1) & 0xFF; // register
+                } else if (index == 1) {
+                    return code.get(pc + 2) & 0xFF; // index
+                }
+                break;
+
+            case Opcodes.JMP_IF_FALSE:
+            case Opcodes.JUMP:
+                if (index == 0) {
+                    return ((code.get(pc + 1) & 0xFF) << 8) | (code.get(pc + 2) & 0xFF);
+                }
+                break;
+
+            case Opcodes.SUBSTRING_EQ:
+                if (index >= 0 && index < 4) {
+                    return code.get(pc + 1 + index) & 0xFF;
+                } else if (index == 4) {
+                    return ((code.get(pc + 5) & 0xFF) << 8) | (code.get(pc + 6) & 0xFF);
+                }
+                break;
+
+            case Opcodes.SPLIT_GET:
+                if (index == 0) {
+                    return code.get(pc + 1) & 0xFF; // register
+                } else if (index == 1) {
+                    return ((code.get(pc + 2) & 0xFF) << 8) | (code.get(pc + 3) & 0xFF); // delimiter const
+                } else if (index == 2) {
+                    return code.get(pc + 4) & 0xFF; // index (will be cast to signed byte by caller)
+                }
+                break;
         }
 
         throw new IllegalArgumentException("Invalid operand index " + index + " for opcode " + opcode);
@@ -158,9 +200,9 @@ final class BytecodeWalker {
 
     public int getJumpTarget() {
         byte opcode = currentOpcode();
-        if (opcode == Opcodes.JNN_OR_POP) {
+        if (opcode == Opcodes.JNN_OR_POP || opcode == Opcodes.JMP_IF_FALSE || opcode == Opcodes.JUMP) {
             int offset = getOperand(0);
-            return pc + 3 + offset; // pc + instruction_length + offset
+            return pc + getInstructionLength(opcode) + offset;
         }
         throw new IllegalStateException("Not a jump instruction: " + opcode);
     }
@@ -180,10 +222,14 @@ final class BytecodeWalker {
             case Opcodes.LOAD_CONST, Opcodes.SET_REGISTER, Opcodes.LOAD_REGISTER, Opcodes.TEST_REGISTER_ISSET,
                     Opcodes.TEST_REGISTER_NOT_SET, Opcodes.LISTN, Opcodes.MAPN, Opcodes.FN0, Opcodes.FN1, Opcodes.FN2,
                     Opcodes.FN3, Opcodes.FN, Opcodes.GET_INDEX, Opcodes.TEST_REGISTER_IS_TRUE,
-                    Opcodes.TEST_REGISTER_IS_FALSE, Opcodes.RETURN_ENDPOINT ->
+                    Opcodes.TEST_REGISTER_IS_FALSE, Opcodes.RETURN_ENDPOINT, Opcodes.GET_NEGATIVE_INDEX ->
                 2;
-            case Opcodes.LOAD_CONST_W, Opcodes.GET_PROPERTY, Opcodes.JNN_OR_POP, Opcodes.GET_INDEX_REG -> 3;
+            case Opcodes.LOAD_CONST_W, Opcodes.GET_PROPERTY, Opcodes.JNN_OR_POP, Opcodes.GET_INDEX_REG,
+                    Opcodes.GET_NEGATIVE_INDEX_REG, Opcodes.JMP_IF_FALSE, Opcodes.JUMP ->
+                3;
             case Opcodes.RESOLVE_TEMPLATE, Opcodes.GET_PROPERTY_REG, Opcodes.SUBSTRING -> 4;
+            case Opcodes.SPLIT_GET -> 5;
+            case Opcodes.SUBSTRING_EQ -> 7;
             default -> -1;
         };
     }

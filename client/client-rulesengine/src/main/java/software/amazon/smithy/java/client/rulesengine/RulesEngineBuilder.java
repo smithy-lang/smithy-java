@@ -47,6 +47,7 @@ public final class RulesEngineBuilder {
     private final List<RulesExtension> extensions = new ArrayList<>();
     private final Map<String, RulesFunction> functions = new LinkedHashMap<>();
     private final Map<String, Function<Context, Object>> builtinProviders = new HashMap<>();
+    private final Map<String, Context.Key<?>> builtinKeys = new HashMap<>();
 
     public RulesEngineBuilder() {
         for (var ext : EXTENSIONS) {
@@ -96,6 +97,7 @@ public final class RulesEngineBuilder {
 
         extensions.add(extension);
         extension.putBuiltinProviders(builtinProviders);
+        extension.putBuiltinKeys(builtinKeys);
         for (var f : extension.getFunctions()) {
             addFunction(f);
         }
@@ -109,7 +111,7 @@ public final class RulesEngineBuilder {
      * @return the compiled program.
      */
     public Bytecode compile(EndpointBddTrait bdd) {
-        return new BytecodeCompiler(extensions, bdd, functions, builtinProviders).compile();
+        return new BytecodeCompiler(extensions, bdd, functions, builtinProviders, builtinKeys).compile();
     }
 
     /**

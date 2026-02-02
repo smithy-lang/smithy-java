@@ -12,9 +12,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.BooleanNode;
 import software.amazon.smithy.model.node.NullNode;
@@ -142,15 +147,117 @@ class EndpointUtilsTest {
 
     @Test
     void testBytesToShort() {
-        int result = EndpointUtils.bytesToShort(new byte[] {0, 0, 0x12, 0x34, 0, 0}, 2);
+        assertEquals(0x1234, EndpointUtils.bytesToShort(new byte[] {0, 0, 0x12, 0x34, 0, 0}, 2));
+        assertEquals(0xFFFF, EndpointUtils.bytesToShort(new byte[] {(byte) 0xFF, (byte) 0xFF}, 0));
+    }
 
-        assertEquals(0x1234, result);
+    static Stream<Arguments> getPropertyCases() {
+        URI uri = URI.create("https://example.com/foo/bar");
+        Map<String, Object> map = Map.of("key1", "value1", "key2", 42);
+        return Stream.of(
+                Arguments.of(map, "key1", "value1"),
+                Arguments.of(map, "key2", 42),
+                Arguments.of(map, "missing", null),
+                Arguments.of(uri, "scheme", "https"),
+                Arguments.of(uri, "authority", "example.com"),
+                Arguments.of(uri, "path", "/foo/bar"),
+                Arguments.of(uri, "normalizedPath", "/foo/bar/"),
+                Arguments.of(uri, "isIp", false),
+                Arguments.of(uri, "unknown", null),
+                Arguments.of(null, "key", null),
+                Arguments.of("not a map", "key", null));
+    }
+
+    @ParameterizedTest
+    @MethodSource("getPropertyCases")
+    void testGetProperty(Object target, String property, Object expected) {
+        assertEquals(expected, EndpointUtils.getProperty(target, property));
     }
 
     @Test
-    void testBytesToShortMaxValue() {
-        int result = EndpointUtils.bytesToShort(new byte[] {(byte) 0xFF, (byte) 0xFF}, 0);
+    void testGetPropertyIsIpTrue() {
+        URI uri = URI.create("https://192.168.1.1/path");
+        assertEquals(true, EndpointUtils.getProperty(uri, "isIp"));
+    }
 
-        assertEquals(0xFFFF, result);
+    static Stream<Arguments> getIndexCases() {
+        List<String> list = List.of("a", "b", "c");
+        return Stream.of(
+                Arguments.of(list, 0, "a"),
+                Arguments.of(list, 1, "b"),
+                Arguments.of(list, 2, "c"),
+                Arguments.of(list, 3, null),
+                Arguments.of(list, -1, null),
+                Arguments.of(List.of(), 0, null),
+                Arguments.of(null, 0, null),
+                Arguments.of("not a list", 0, null));
+    }
+
+    @ParameterizedTest
+    @MethodSource("getIndexCases")
+    void testGetIndex(Object target, int index, Object expected) {
+        assertEquals(expected, EndpointUtils.getIndex(target, index));
+    }
+
+    static Stream<Arguments> getNegativeIndexCases() {
+        List<String> list = List.of("a", "b", "c");
+        return Stream.of(
+                Arguments.of(list, 1, "c"),
+                Arguments.of(list, 2, "b"),
+                Arguments.of(list, 3, "a"),
+                Arguments.of(list, 4, null),
+                Arguments.of(List.of(), 1, null),
+                Arguments.of(null, 1, null),
+                Arguments.of("not a list", 1, null));
+    }
+
+    @ParameterizedTest
+    @MethodSource("getNegativeIndexCases")
+    void testGetNegativeIndex(Object target, int negIndex, Object expected) {
+        assertEquals(expected, EndpointUtils.getNegativeIndex(target, negIndex));
+    }
+
+    static Stream<Arguments> substringEqualsCases() {
+        return Stream.of(
+                Arguments.of("hello world", 0, 5, false, "hello", true),
+                Arguments.of("hello world", 6, 11, false, "world", true),
+                Arguments.of("hello world", 0, 5, false, "world", false),
+                Arguments.of("hello world", 0, 5, true, "world", true),
+                Arguments.of("hello world", 6, 11, true, "hello", true),
+                Arguments.of(null, 0, 5, false, "hello", false),
+                Arguments.of("hello", 0, 5, false, null, false),
+                Arguments.of("hi", 0, 10, false, "hello", false),
+                Arguments.of("hello", 0, 10, true, "hello", false),
+                Arguments.of("hello", 3, 3, false, "", false));
+    }
+
+    @ParameterizedTest
+    @MethodSource("substringEqualsCases")
+    void testSubstringEquals(String value, int start, int end, boolean reverse, String expected, boolean result) {
+        assertEquals(result, EndpointUtils.substringEquals(value, start, end, reverse, expected));
+    }
+
+    static Stream<Arguments> splitGetCases() {
+        return Stream.of(
+                Arguments.of("a.b.c", ".", 0, "a"),
+                Arguments.of("a.b.c", ".", 1, "b"),
+                Arguments.of("a.b.c", ".", 2, "c"),
+                Arguments.of("a.b.c", ".", -1, "c"),
+                Arguments.of("a.b.c", ".", -2, "b"),
+                Arguments.of("a.b.c", ".", -3, "a"),
+                Arguments.of("a.b.c", ".", 5, null),
+                Arguments.of("a.b.c", ".", -5, null),
+                Arguments.of(null, ".", 0, null),
+                Arguments.of("a.b.c", null, 0, null),
+                Arguments.of("a.b.c", "", 0, null),
+                Arguments.of("a::b::c", "::", 1, "b"),
+                Arguments.of("abc", ".", 0, "abc"),
+                Arguments.of("abc", ".", 1, null));
+    }
+
+    @ParameterizedTest
+    @MethodSource("splitGetCases")
+    void testSplitGet(String value, String delimiter, int index, Object expected) {
+        assertEquals(expected, EndpointUtils.splitGet(value, delimiter, index));
     }
 }

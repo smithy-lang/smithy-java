@@ -9,10 +9,16 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import software.amazon.smithy.java.context.Context;
 
 final class RegisterAllocator {
     private final List<RegisterDefinition> registry = new ArrayList<>();
     private final Map<String, Byte> registryIndex = new HashMap<>();
+    private final Map<String, Context.Key<?>> builtinKeys;
+
+    RegisterAllocator(Map<String, Context.Key<?>> builtinKeys) {
+        this.builtinKeys = builtinKeys;
+    }
 
     // Allocate an input parameter register.
     byte allocate(String name, boolean required, Object defaultValue, String builtin, boolean temp) {
@@ -21,7 +27,9 @@ final class RegisterAllocator {
         } else if (registry.size() >= 256) {
             throw new IllegalStateException("Too many registers: " + registry.size());
         }
-        var register = new RegisterDefinition(name, required, defaultValue, builtin, temp);
+        // Resolve builtin key at compile time
+        Context.Key<?> builtinKey = builtin != null ? builtinKeys.get(builtin) : null;
+        var register = new RegisterDefinition(name, required, defaultValue, builtin, builtinKey, temp);
         byte index = (byte) registry.size();
         registryIndex.put(name, index);
         registry.add(register);

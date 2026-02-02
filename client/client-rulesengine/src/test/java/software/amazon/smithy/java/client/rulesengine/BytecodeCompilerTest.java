@@ -65,7 +65,7 @@ class BytecodeCompilerTest {
     @Test
     void testCompileEmptyBdd() {
         EndpointBddTrait bdd = createEmptyBdd();
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -88,7 +88,7 @@ class BytecodeCompilerTest {
                 .build();
 
         EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -112,7 +112,7 @@ class BytecodeCompilerTest {
                 .build();
 
         EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -147,7 +147,7 @@ class BytecodeCompilerTest {
                 .build();
 
         EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -176,7 +176,7 @@ class BytecodeCompilerTest {
                 .build();
 
         EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -198,7 +198,7 @@ class BytecodeCompilerTest {
                 .build();
 
         EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -214,7 +214,7 @@ class BytecodeCompilerTest {
 
         List<Rule> results = List.of(NoMatchRule.INSTANCE, rule);
         EndpointBddTrait bdd = createBddWithResults(results);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -235,7 +235,7 @@ class BytecodeCompilerTest {
 
         List<Rule> results = List.of(NoMatchRule.INSTANCE, rule);
         EndpointBddTrait bdd = createBddWithResults(results);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -257,7 +257,7 @@ class BytecodeCompilerTest {
 
         List<Rule> results = List.of(NoMatchRule.INSTANCE, rule);
         EndpointBddTrait bdd = createBddWithResults(results);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -270,7 +270,7 @@ class BytecodeCompilerTest {
 
         List<Rule> results = List.of(NoMatchRule.INSTANCE, rule);
         EndpointBddTrait bdd = createBddWithResults(results);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -295,7 +295,7 @@ class BytecodeCompilerTest {
                 .build();
 
         EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -318,7 +318,7 @@ class BytecodeCompilerTest {
                         .build());
 
         EndpointBddTrait bdd = createBddWithResults(List.of(NoMatchRule.INSTANCE, rule));
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -342,7 +342,7 @@ class BytecodeCompilerTest {
                         .build());
 
         EndpointBddTrait bdd = createBddWithResults(List.of(NoMatchRule.INSTANCE, rule));
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -388,7 +388,7 @@ class BytecodeCompilerTest {
                     nc.accept(1, 100000000, -1); // Condition node at index 2
                 }))
                 .build();
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -412,11 +412,35 @@ class BytecodeCompilerTest {
                 .build();
 
         EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
         assertOpcodePresent(bytecode, Opcodes.GET_INDEX_REG);
+    }
+
+    @Test
+    void testCompileGetAttrWithNegativeIndex() {
+        GetAttr getAttr = GetAttr.ofExpressions(
+                Expression.getReference(Identifier.of("array")),
+                Expression.of("[-1]"));
+
+        Condition condition = createConditionWithExpression(getAttr);
+
+        Parameters params = Parameters.builder()
+                .addParameter(Parameter.builder()
+                        .name("array")
+                        .type(ParameterType.STRING_ARRAY)
+                        .required(true)
+                        .build())
+                .build();
+
+        EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
+
+        Bytecode bytecode = compiler.compile();
+
+        assertOpcodePresent(bytecode, Opcodes.GET_NEGATIVE_INDEX_REG);
     }
 
     @Test
@@ -438,7 +462,7 @@ class BytecodeCompilerTest {
                 .build();
 
         EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -465,7 +489,7 @@ class BytecodeCompilerTest {
                 .build();
 
         EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -488,7 +512,7 @@ class BytecodeCompilerTest {
                 .build();
 
         EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -526,7 +550,7 @@ class BytecodeCompilerTest {
 
         builtinProviders.put("SDK::Endpoint", ctx -> "https://custom.endpoint");
 
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -564,7 +588,7 @@ class BytecodeCompilerTest {
                         .build());
 
         EndpointBddTrait bdd = createBddWithResults(List.of(NoMatchRule.INSTANCE, rule));
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -591,7 +615,7 @@ class BytecodeCompilerTest {
                         .build());
 
         EndpointBddTrait bdd = createBddWithResults(List.of(NoMatchRule.INSTANCE, rule));
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -619,7 +643,7 @@ class BytecodeCompilerTest {
                 .build();
 
         EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
@@ -646,14 +670,12 @@ class BytecodeCompilerTest {
                 .build();
 
         EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
-        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
 
         Bytecode bytecode = compiler.compile();
 
         assertOpcodePresent(bytecode, Opcodes.JNN_OR_POP);
     }
-
-    // Note: Negative index test omitted - requires unreleased Smithy version that supports negative indices in GetAttr
 
     private void assertOpcodePresent(Bytecode bytecode, int expectedOpcode) {
         ByteBuffer instructions = bytecode.getInstructions();

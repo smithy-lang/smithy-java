@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.client.rulesengine;
 
-import java.net.URI;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -17,7 +16,6 @@ import software.amazon.smithy.java.client.core.endpoint.EndpointContext;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.io.uri.URLEncoding;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.IsValidHostLabel;
-import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.ParseUrl;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Split;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Substring;
 import software.amazon.smithy.rulesengine.logic.ConditionEvaluator;
@@ -268,27 +266,27 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     int propertyIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     var propertyName = (String) constantPool[propertyIdx];
                     int idx = stackPosition - 1;
-                    stack[idx] = getProperty(stack[idx], propertyName);
+                    stack[idx] = EndpointUtils.getProperty(stack[idx], propertyName);
                     pc += 2;
                 }
                 case Opcodes.GET_INDEX -> {
                     int index = instructions[pc++] & 0xFF;
                     int idx = stackPosition - 1;
-                    stack[idx] = getIndex(stack[idx], index);
+                    stack[idx] = EndpointUtils.getIndex(stack[idx], index);
                 }
                 case Opcodes.GET_PROPERTY_REG -> {
                     int regIndex = instructions[pc++] & 0xFF;
                     int propertyIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     var propertyName = (String) constantPool[propertyIdx];
                     var target = registers[regIndex];
-                    push(getProperty(target, propertyName));
+                    push(EndpointUtils.getProperty(target, propertyName));
                     pc += 2;
                 }
                 case Opcodes.GET_INDEX_REG -> {
                     int regIndex = instructions[pc++] & 0xFF;
                     int index = instructions[pc++] & 0xFF;
                     var target = registers[regIndex];
-                    push(getIndex(target, index));
+                    push(EndpointUtils.getIndex(target, index));
                 }
                 case Opcodes.IS_TRUE -> {
                     // In-place operation
@@ -394,13 +392,13 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                 case Opcodes.GET_NEGATIVE_INDEX -> {
                     int index = instructions[pc++] & 0xFF;
                     int idx = stackPosition - 1;
-                    stack[idx] = getNegativeIndex(stack[idx], index);
+                    stack[idx] = EndpointUtils.getNegativeIndex(stack[idx], index);
                 }
                 case Opcodes.GET_NEGATIVE_INDEX_REG -> {
                     int regIndex = instructions[pc++] & 0xFF;
                     int index = instructions[pc++] & 0xFF;
                     var target = registers[regIndex];
-                    push(getNegativeIndex(target, index));
+                    push(EndpointUtils.getNegativeIndex(target, index));
                 }
                 case Opcodes.JMP_IF_FALSE -> {
                     Object condition = stack[--stackPosition];
@@ -417,47 +415,33 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     pc += 2;
                     pc += offset;
                 }
+                case Opcodes.SUBSTRING_EQ -> {
+                    int seqRegIndex = instructions[pc++] & 0xFF;
+                    int seqStart = instructions[pc++] & 0xFF;
+                    int seqEnd = instructions[pc++] & 0xFF;
+                    int seqFlags = instructions[pc++] & 0xFF;
+                    int seqConstIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                    pc += 2;
+                    boolean seqReverse = (seqFlags & 0x01) != 0;
+                    var seqValue = (String) registers[seqRegIndex];
+                    var seqExpected = (String) constantPool[seqConstIdx];
+                    push(EndpointUtils.substringEquals(seqValue, seqStart, seqEnd, seqReverse, seqExpected)
+                            ? Boolean.TRUE
+                            : Boolean.FALSE);
+                }
+                case Opcodes.SPLIT_GET -> {
+                    int sgRegIndex = instructions[pc++] & 0xFF;
+                    int sgDelimIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                    pc += 2;
+                    int sgIndex = instructions[pc++]; // signed byte
+                    var sgValue = (String) registers[sgRegIndex];
+                    var sgDelimiter = (String) constantPool[sgDelimIdx];
+                    push(EndpointUtils.splitGet(sgValue, sgDelimiter, sgIndex));
+                }
                 default -> throw new RulesEvaluationError("Unknown rules engine instruction: " + opcode, pc);
             }
         }
 
         throw new IllegalArgumentException("Expected to return a value during evaluation");
-    }
-
-    // Get a property from a map or URI, or return null.
-    private Object getProperty(Object target, String propertyName) {
-        return switch (target) {
-            case Map<?, ?> m -> m.get(propertyName);
-            case URI u -> switch (propertyName) {
-                case "scheme" -> u.getScheme();
-                case "path" -> u.getRawPath();
-                case "normalizedPath" -> ParseUrl.normalizePath(u.getRawPath());
-                case "authority" -> u.getAuthority();
-                case "isIp" -> ParseUrl.isIpAddr(u.getHost());
-                default -> null;
-            };
-            case null, default -> null;
-        };
-    }
-
-    // Get a value by index from an object. If not an array, returns null.
-    private Object getIndex(Object target, int index) {
-        if (target instanceof List<?> l) {
-            if (index >= 0 && index < l.size()) {
-                return l.get(index);
-            }
-        }
-        return null;
-    }
-
-    // Get a value by negative index from an object. Index is stored as positive (1 means -1, last element).
-    private Object getNegativeIndex(Object target, int negIndex) {
-        if (target instanceof List<?> l) {
-            int actualIndex = l.size() - negIndex;
-            if (actualIndex >= 0 && actualIndex < l.size()) {
-                return l.get(actualIndex);
-            }
-        }
-        return null;
     }
 }
