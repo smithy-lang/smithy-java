@@ -187,8 +187,9 @@ public final class HttpMcpProxy extends McpServerProxy {
 
             for (String line : lines) {
                 if (line.startsWith("data:")) {
-                    dataBuffer.append(line.substring(5).replaceFirst("^ ", ""));
-                } else if (line.trim().isEmpty() && dataBuffer.length() > 0) {
+                    var value = line.substring(5);
+                    dataBuffer.append(value.startsWith(" ") ? value.substring(1) : value);
+                } else if (line.trim().isEmpty() && !dataBuffer.isEmpty()) {
                     // End of an SSE event
                     String jsonData = dataBuffer.toString().trim();
                     dataBuffer.setLength(0);
@@ -206,16 +207,12 @@ public final class HttpMcpProxy extends McpServerProxy {
                         // Notifications have "method" but no "id", responses have "id"
                         if (isNotification(jsonDocument)) {
                             // This is a notification - convert Document to JsonRpcRequest and forward
-                            JsonRpcRequest notification = JsonRpcRequest.builder()
-                                    .deserialize(jsonDocument.createDeserializer())
-                                    .build();
+                            JsonRpcRequest notification = jsonDocument.asShape(JsonRpcRequest.builder());
                             LOG.debug("Received notification from SSE stream: method={}", notification.getMethod());
                             notifyRequest(notification);
                         } else {
                             // This is a response - convert Document to JsonRpcResponse
-                            JsonRpcResponse message = JsonRpcResponse.builder()
-                                    .deserialize(jsonDocument.createDeserializer())
-                                    .build();
+                            finalResponse = jsonDocument.asShape(JsonRpcResponse.builder());
                             finalResponse = message;
                         }
                     } catch (Exception e) {
@@ -225,7 +222,7 @@ public final class HttpMcpProxy extends McpServerProxy {
             }
 
             // Process any remaining data in buffer (in case stream doesn't end with empty line)
-            if (dataBuffer.length() > 0) {
+            if (!dataBuffer.isEmpty()) {
                 String jsonData = dataBuffer.toString().trim();
                 if (!jsonData.isEmpty()) {
                     try {
@@ -300,15 +297,9 @@ public final class HttpMcpProxy extends McpServerProxy {
                 return false;
             }
 
-            Map<String, Document> obj = doc.asStringMap();
-
-            // If it has an "id" field at the top level, it's a response
-            if (obj.containsKey("id")) {
-                return false;
-            }
-
+            
             // If it has a "method" field but no "id", it's a notification
-            return obj.containsKey("method");
+            return doc.getMember("id") == null && doc.getMember("method") != null;
         } catch (Exception e) {
             LOG.warn("Failed to determine if notification from Document", e);
             return false;
