@@ -8,7 +8,6 @@ package software.amazon.smithy.java.mcp.server;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.client.core.ClientTransport;
@@ -213,7 +212,6 @@ public final class HttpMcpProxy extends McpServerProxy {
                         } else {
                             // This is a response - convert Document to JsonRpcResponse
                             finalResponse = jsonDocument.asShape(JsonRpcResponse.builder());
-                            finalResponse = message;
                         }
                     } catch (Exception e) {
                         LOG.warn("Failed to parse SSE message: {}", jsonData, e);
@@ -297,7 +295,6 @@ public final class HttpMcpProxy extends McpServerProxy {
                 return false;
             }
 
-            
             // If it has a "method" field but no "id", it's a notification
             return doc.getMember("id") == null && doc.getMember("method") != null;
         } catch (Exception e) {
