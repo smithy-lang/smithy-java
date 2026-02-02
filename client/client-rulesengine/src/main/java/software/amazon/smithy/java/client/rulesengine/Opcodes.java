@@ -460,4 +460,31 @@ public final class Opcodes {
      * <p><code>JUMP [offset:ushort]</code>
      */
     public static final byte JUMP = 46;
+
+    /**
+     * Test if a substring of register value equals a constant string.
+     * Returns false if register is null, string too short, or substring doesn't match.
+     *
+     * <p>Stack: [...] => [..., boolean]
+     *
+     * <p><code>SUBSTRING_EQ [register:byte] [start:byte] [end:byte] [flags:byte] [const-index:short]</code>
+     *
+     * <p>Flags:
+     * <ul>
+     *   <li>Bit 0 (0x01): reverse (count from end of string)</li>
+     * </ul>
+     */
+    public static final byte SUBSTRING_EQ = 47;
+
+    /**
+     * Split register value by constant delimiter and get element at index.
+     * Returns null if register is null, split produces fewer elements, or index out of bounds.
+     *
+     * <p>Stack: [...] => [..., element|null]
+     *
+     * <p><code>SPLIT_GET [register:byte] [delimiter-const:short] [index:signed-byte]</code>
+     *
+     * <p>Index is signed: positive = from start, negative = from end (-1 = last)
+     */
+    public static final byte SPLIT_GET = 49;
 }

@@ -23,6 +23,16 @@ public interface RulesExtension {
     default void putBuiltinProviders(Map<String, Function<Context, Object>> providers) {}
 
     /**
+     * Provides direct context key mappings for builtins that are simple Context key lookups.
+     *
+     * <p>This is an optimization. Builtins registered here avoid the overhead of calling a provider function and
+     * instead extract values directly from the context using the key's ID, resolved at compile-time.
+     *
+     * @param keys Map to add builtin name to context key mappings.
+     */
+    default void putBuiltinKeys(Map<String, Context.Key<?>> keys) {}
+
+    /**
      * Gets the custom functions to register with the rules engine.
      *
      * @return the functions to register.

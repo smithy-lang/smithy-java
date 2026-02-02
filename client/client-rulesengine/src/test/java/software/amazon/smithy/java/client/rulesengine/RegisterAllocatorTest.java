@@ -11,13 +11,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class RegisterAllocatorTest {
 
     @Test
     void testAllocateInputParameter() {
-        RegisterAllocator allocator = new RegisterAllocator();
+        RegisterAllocator allocator = new RegisterAllocator(Map.of());
 
         byte index = allocator.allocate("region", true, null, null, false);
 
@@ -34,7 +35,7 @@ class RegisterAllocatorTest {
 
     @Test
     void testAllocateWithDefault() {
-        RegisterAllocator allocator = new RegisterAllocator();
+        RegisterAllocator allocator = new RegisterAllocator(Map.of());
 
         byte index = allocator.allocate("useDualStack", false, false, null, false);
 
@@ -47,7 +48,7 @@ class RegisterAllocatorTest {
 
     @Test
     void testAllocateWithBuiltin() {
-        RegisterAllocator allocator = new RegisterAllocator();
+        RegisterAllocator allocator = new RegisterAllocator(Map.of());
 
         byte index = allocator.allocate("endpoint", false, null, "SDK::Endpoint", false);
 
@@ -59,7 +60,7 @@ class RegisterAllocatorTest {
 
     @Test
     void testAllocateTempRegister() {
-        RegisterAllocator allocator = new RegisterAllocator();
+        RegisterAllocator allocator = new RegisterAllocator(Map.of());
 
         byte index = allocator.allocate("temp_var", false, null, null, true);
 
@@ -70,7 +71,7 @@ class RegisterAllocatorTest {
 
     @Test
     void testMultipleAllocations() {
-        RegisterAllocator allocator = new RegisterAllocator();
+        RegisterAllocator allocator = new RegisterAllocator(Map.of());
 
         byte idx1 = allocator.allocate("var1", true, null, null, false);
         byte idx2 = allocator.allocate("var2", false, "default", null, false);
@@ -84,7 +85,7 @@ class RegisterAllocatorTest {
 
     @Test
     void testDuplicateNameThrows() {
-        RegisterAllocator allocator = new RegisterAllocator();
+        RegisterAllocator allocator = new RegisterAllocator(Map.of());
 
         allocator.allocate("duplicate", true, null, null, false);
 
@@ -93,7 +94,7 @@ class RegisterAllocatorTest {
 
     @Test
     void testGetOrAllocateRegisterExisting() {
-        RegisterAllocator allocator = new RegisterAllocator();
+        RegisterAllocator allocator = new RegisterAllocator(Map.of());
 
         byte first = allocator.allocate("existing", true, null, null, false);
         byte second = allocator.getOrAllocateRegister("existing");
@@ -104,7 +105,7 @@ class RegisterAllocatorTest {
 
     @Test
     void testGetOrAllocateRegisterNew() {
-        RegisterAllocator allocator = new RegisterAllocator();
+        RegisterAllocator allocator = new RegisterAllocator(Map.of());
 
         byte index = allocator.getOrAllocateRegister("new_temp");
 
@@ -121,7 +122,7 @@ class RegisterAllocatorTest {
 
     @Test
     void testGetRegisterExisting() {
-        RegisterAllocator allocator = new RegisterAllocator();
+        RegisterAllocator allocator = new RegisterAllocator(Map.of());
 
         allocator.allocate("test", true, null, null, false);
         byte index = allocator.getRegister("test");
@@ -131,14 +132,14 @@ class RegisterAllocatorTest {
 
     @Test
     void testGetRegisterNonExistentThrows() {
-        RegisterAllocator allocator = new RegisterAllocator();
+        RegisterAllocator allocator = new RegisterAllocator(Map.of());
 
         assertThrows(IllegalStateException.class, () -> allocator.getRegister("nonexistent"));
     }
 
     @Test
     void testMaxRegisters() {
-        RegisterAllocator allocator = new RegisterAllocator();
+        RegisterAllocator allocator = new RegisterAllocator(Map.of());
 
         // Allocate 255 registers (max for byte indexing)
         for (int i = 0; i < 256; i++) {

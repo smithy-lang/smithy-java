@@ -21,8 +21,16 @@ import software.amazon.smithy.java.context.Context;
  * iteration. The selection is made at construction time based on the register count.
  */
 abstract class RegisterFiller {
-    protected final Function<Context, Object>[] providersByRegister;
-    protected final Object[] defaultsByRegister; // Defaults for registers with builtins
+    // Dense arrays for key-based builtins
+    protected final int[] keyBuiltinIndices; // Register indices that use keys
+    protected final Context.Key<?>[] keyBuiltins; // Parallel array of keys
+    protected final Object[] keyDefaults; // Parallel array of defaults
+
+    // Dense arrays for provider-based builtins  
+    protected final int[] providerBuiltinIndices; // Register indices that use providers
+    protected final Function<Context, Object>[] providerBuiltins; // Parallel array of providers
+    protected final Object[] providerDefaults; // Parallel array of defaults
+
     protected final Map<String, Integer> inputRegisterMap;
     protected final RegisterDefinition[] registerDefinitions;
     protected final Object[] registerTemplate;
@@ -46,20 +54,44 @@ abstract class RegisterFiller {
                     registerDefinitions.length));
         }
 
-        // Set up builtin providers and their fallback defaults
-        this.providersByRegister = new Function[registerDefinitions.length];
-        this.defaultsByRegister = new Object[registerDefinitions.length];
+        // Count key vs provider builtins
+        int keyCount = 0, providerCount = 0;
+        for (int regIndex : builtinIndices) {
+            if (registerDefinitions[regIndex].builtinKey() != null) {
+                keyCount++;
+            } else {
+                providerCount++;
+            }
+        }
 
+        // Allocate dense arrays
+        this.keyBuiltinIndices = new int[keyCount];
+        this.keyBuiltins = new Context.Key[keyCount];
+        this.keyDefaults = new Object[keyCount];
+        this.providerBuiltinIndices = new int[providerCount];
+        this.providerBuiltins = new Function[providerCount];
+        this.providerDefaults = new Object[providerCount];
+
+        // Fill dense arrays
+        int ki = 0;
+        int pi = 0;
         for (int regIndex : builtinIndices) {
             RegisterDefinition def = registerDefinitions[regIndex];
-            String builtinName = def.builtin();
-            Function<Context, Object> provider = builtinProviders.get(builtinName);
-            if (provider == null) {
-                throw new IllegalStateException("Missing builtin provider: " + builtinName);
+            if (def.builtinKey() != null) {
+                keyBuiltinIndices[ki] = regIndex;
+                keyBuiltins[ki] = def.builtinKey();
+                keyDefaults[ki] = def.defaultValue();
+                ki++;
+            } else {
+                Function<Context, Object> provider = builtinProviders.get(def.builtin());
+                if (provider == null) {
+                    throw new IllegalStateException("Missing builtin provider: " + def.builtin());
+                }
+                providerBuiltinIndices[pi] = regIndex;
+                providerBuiltins[pi] = provider;
+                providerDefaults[pi] = def.defaultValue();
+                pi++;
             }
-            this.providersByRegister[regIndex] = provider;
-            // Store the default for this builtin (may be null)
-            this.defaultsByRegister[regIndex] = def.defaultValue();
         }
     }
 
@@ -110,7 +142,6 @@ abstract class RegisterFiller {
 
     // Fast implementation for < 64 registers using single long bitmasks.
     private static final class FastRegisterFiller extends RegisterFiller {
-        private final long builtinMask;
         private final long requiredMask;
         private final long defaultMask;
 
@@ -123,7 +154,6 @@ abstract class RegisterFiller {
                 Object[] registerTemplate
         ) {
             super(registerDefinitions, inputRegisterMap, builtinProviders, builtinIndices, registerTemplate);
-            this.builtinMask = makeMask(builtinIndices);
             this.requiredMask = makeMask(hardRequiredIndices);
             this.defaultMask = makeDefaultMask(registerTemplate);
         }
@@ -163,22 +193,32 @@ abstract class RegisterFiller {
                 }
             }
 
-            // Apply builtins for unfilled slots with builtin providers
-            long unfilledBuiltins = builtinMask & ~filled;
-            while (unfilledBuiltins != 0) {
-                int i = Long.numberOfTrailingZeros(unfilledBuiltins);
-                unfilledBuiltins &= unfilledBuiltins - 1; // Clear lowest set bit
+            // Apply key-based builtins
+            for (int j = 0; j < keyBuiltinIndices.length; j++) {
+                int regIdx = keyBuiltinIndices[j];
+                if ((filled & (1L << regIdx)) == 0) {
+                    Object result = context.get(keyBuiltins[j]);
+                    if (result != null) {
+                        sink[regIdx] = result;
+                        filled |= 1L << regIdx;
+                    } else if (keyDefaults[j] != null) {
+                        sink[regIdx] = keyDefaults[j];
+                        filled |= 1L << regIdx;
+                    }
+                }
+            }
 
-                Object result = providersByRegister[i].apply(context);
-                if (result != null) {
-                    sink[i] = result;
-                    filled |= 1L << i;
-                } else {
-                    // Builtin returned null, use default if available
-                    Object defaultValue = defaultsByRegister[i];
-                    if (defaultValue != null) {
-                        sink[i] = defaultValue;
-                        filled |= 1L << i;
+            // Apply provider-based builtins
+            for (int j = 0; j < providerBuiltinIndices.length; j++) {
+                int regIdx = providerBuiltinIndices[j];
+                if ((filled & (1L << regIdx)) == 0) {
+                    Object result = providerBuiltins[j].apply(context);
+                    if (result != null) {
+                        sink[regIdx] = result;
+                        filled |= 1L << regIdx;
+                    } else if (providerDefaults[j] != null) {
+                        sink[regIdx] = providerDefaults[j];
+                        filled |= 1L << regIdx;
                     }
                 }
             }
@@ -195,7 +235,6 @@ abstract class RegisterFiller {
     }
 
     private static final class LargeRegisterFiller extends RegisterFiller {
-        private final int[] builtinIndices;
         private final int[] hardRequiredIndices;
         private final boolean[] hasDefault;
 
@@ -208,7 +247,6 @@ abstract class RegisterFiller {
                 Object[] registerTemplate
         ) {
             super(registerDefinitions, inputRegisterMap, builtinProviders, builtinIndices, registerTemplate);
-            this.builtinIndices = builtinIndices;
             this.hardRequiredIndices = hardRequiredIndices;
 
             // Precompute what registers have defaults
@@ -235,20 +273,32 @@ abstract class RegisterFiller {
                 }
             }
 
-            // Fill builtins (only if not already filled)
-            for (int regIndex : builtinIndices) {
-                if (!filled[regIndex]) {
-                    Object result = providersByRegister[regIndex].apply(context);
+            // Fill key-based builtins using dense arrays
+            for (int j = 0; j < keyBuiltinIndices.length; j++) {
+                int regIdx = keyBuiltinIndices[j];
+                if (!filled[regIdx]) {
+                    Object result = context.get(keyBuiltins[j]);
                     if (result != null) {
-                        sink[regIndex] = result;
-                        filled[regIndex] = true;
-                    } else {
-                        // Builtin returned null, use default if available
-                        Object defaultValue = defaultsByRegister[regIndex];
-                        if (defaultValue != null) {
-                            sink[regIndex] = defaultValue;
-                            filled[regIndex] = true;
-                        }
+                        sink[regIdx] = result;
+                        filled[regIdx] = true;
+                    } else if (keyDefaults[j] != null) {
+                        sink[regIdx] = keyDefaults[j];
+                        filled[regIdx] = true;
+                    }
+                }
+            }
+
+            // Fill provider-based builtins using dense arrays
+            for (int j = 0; j < providerBuiltinIndices.length; j++) {
+                int regIdx = providerBuiltinIndices[j];
+                if (!filled[regIdx]) {
+                    Object result = providerBuiltins[j].apply(context);
+                    if (result != null) {
+                        sink[regIdx] = result;
+                        filled[regIdx] = true;
+                    } else if (providerDefaults[j] != null) {
+                        sink[regIdx] = providerDefaults[j];
+                        filled[regIdx] = true;
                     }
                 }
             }

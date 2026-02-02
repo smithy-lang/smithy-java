@@ -43,9 +43,10 @@ sourceSets {
 
 jmh {
     warmupIterations = 3
-    iterations = 5
+    iterations = 3
     fork = 1
-    profilers.add("async:output=flamegraph")
+    // profilers.add("async:output=flamegraph;dir=build/jmh-profiler")
+    // profilers.add("async:output=collapsed;dir=build/jmh-profiler")
     // profilers.add("gc")
     duplicateClassesStrategy = DuplicatesStrategy.EXCLUDE // don't dump a bunch of warnings.
 }

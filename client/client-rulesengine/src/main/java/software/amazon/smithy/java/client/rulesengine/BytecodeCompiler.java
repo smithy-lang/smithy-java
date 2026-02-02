@@ -16,9 +16,12 @@ import software.amazon.smithy.rulesengine.language.syntax.expressions.Expression
 import software.amazon.smithy.rulesengine.language.syntax.expressions.ExpressionVisitor;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.Reference;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.Template;
+import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Coalesce;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.FunctionDefinition;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.GetAttr;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.IsSet;
+import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Split;
+import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Substring;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.literal.BooleanLiteral;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.literal.IntegerLiteral;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.literal.Literal;
@@ -49,13 +52,14 @@ final class BytecodeCompiler {
             List<RulesExtension> extensions,
             EndpointBddTrait bdd,
             Map<String, RulesFunction> functions,
-            Map<String, Function<Context, Object>> builtinProviders
+            Map<String, Function<Context, Object>> builtinProviders,
+            Map<String, Context.Key<?>> builtinKeys
     ) {
         this.extensions = extensions;
         this.builtinProviders = builtinProviders;
         this.availableFunctions = functions;
         this.bdd = bdd;
-        this.registerAllocator = new RegisterAllocator();
+        this.registerAllocator = new RegisterAllocator(builtinKeys);
 
         // Add parameters as registry values
         for (var param : bdd.getParameters()) {
@@ -213,6 +217,19 @@ final class BytecodeCompiler {
 
             @Override
             public Void visitBoolEquals(Expression left, Expression right) {
+                // Optimize: booleanEquals(coalesce(ref, false), true) -> TEST_REGISTER_IS_TRUE
+                if (right instanceof BooleanLiteral br && br.value().getValue()
+                        && left instanceof Coalesce coalesce) {
+                    var args = coalesce.getArguments();
+                    if (args.size() == 2
+                            && args.get(0) instanceof Reference ref
+                            && args.get(1) instanceof BooleanLiteral bl
+                            && !bl.value().getValue()) {
+                        writer.writeByte(Opcodes.TEST_REGISTER_IS_TRUE);
+                        writer.writeByte(registerAllocator.getRegister(ref.getName().toString()));
+                        return null;
+                    }
+                }
                 if (left instanceof BooleanLiteral b) {
                     compileBooleanOptimization(b, right);
                 } else if (right instanceof BooleanLiteral b) {
@@ -245,6 +262,32 @@ final class BytecodeCompiler {
 
             @Override
             public Void visitStringEquals(Expression left, Expression right) {
+                // Optimize: stringEquals(coalesce(substring(ref, s, e, rev), ""), "xx") -> SUBSTRING_EQ
+                if (right instanceof StringLiteral expectedLit
+                        && left instanceof Coalesce coalesce) {
+                    var coalesceArgs = coalesce.getArguments();
+                    if (coalesceArgs.size() == 2
+                            && coalesceArgs.get(1) instanceof StringLiteral fallback
+                            && fallback.value().getParts().size() == 1
+                            && fallback.value().getParts().get(0).toString().isEmpty()
+                            && coalesceArgs.get(0) instanceof Substring substr) {
+                        var substrArgs = substr.getArguments();
+                        if (substrArgs.size() == 4 && substrArgs.get(0) instanceof Reference ref) {
+                            int start = substrArgs.get(1).toNode().expectNumberNode().getValue().intValue();
+                            int end = substrArgs.get(2).toNode().expectNumberNode().getValue().intValue();
+                            boolean reverse = substrArgs.get(3).toNode().expectBooleanNode().getValue();
+                            String expected = expectedLit.value().getParts().get(0).toString();
+
+                            writer.writeByte(Opcodes.SUBSTRING_EQ);
+                            writer.writeByte(registerAllocator.getRegister(ref.getName().toString()));
+                            writer.writeByte(start);
+                            writer.writeByte(end);
+                            writer.writeByte(reverse ? 0x01 : 0x00);
+                            writer.writeShort(writer.getConstantIndex(expected));
+                            return null;
+                        }
+                    }
+                }
                 compileExpression(left);
                 compileExpression(right);
                 writer.writeByte(Opcodes.STRING_EQUALS);
@@ -368,6 +411,24 @@ final class BytecodeCompiler {
         var path = getAttr.getPath();
         if (path.isEmpty()) {
             throw new UnsupportedOperationException("Invalid getAttr expression: requires at least one part");
+        }
+
+        // Optimize: split(ref, delim, 0)#[index] -> SPLIT_GET
+        if (path.size() == 1 && path.get(0) instanceof GetAttr.Part.Index idx
+                && getAttr.getTarget() instanceof Split split) {
+            var splitArgs = split.getArguments();
+            if (splitArgs.size() == 3
+                    && splitArgs.get(0) instanceof Reference ref
+                    && splitArgs.get(1) instanceof StringLiteral delimLit
+                    && splitArgs.get(2) instanceof IntegerLiteral limitLit
+                    && limitLit.toNode().expectNumberNode().getValue().intValue() == 0) {
+                String delim = delimLit.value().getParts().get(0).toString();
+                writer.writeByte(Opcodes.SPLIT_GET);
+                writer.writeByte(registerAllocator.getRegister(ref.getName().toString()));
+                writer.writeShort(writer.getConstantIndex(delim));
+                writer.writeByte(idx.index()); // signed byte
+                return;
+            }
         }
 
         // Check if we can optimize to register-based access
