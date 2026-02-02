@@ -420,25 +420,9 @@ public final class McpService {
 
     public void addNewProxy(
             McpServerProxy mcpServerProxy,
-            Consumer<JsonRpcResponse> responseWriter,
-            Consumer<JsonRpcRequest> notificationWriter
+            Consumer<JsonRpcResponse> responseWriter
     ) {
         proxies.put(mcpServerProxy.name(), mcpServerProxy);
-
-        // Initialize the proxy if we have an initialize request
-        JsonRpcRequest initRequest = initializeRequest.get();
-        if (initRequest != null) {
-            var protocolVersion = ProtocolVersion.defaultVersion();
-            var maybeVersion = initRequest.getParams().getMember("protocolVersion");
-            if (maybeVersion != null) {
-                var pv = ProtocolVersion.version(maybeVersion.asString());
-                if (!(pv instanceof ProtocolVersion.UnknownVersion)) {
-                    protocolVersion = pv;
-                }
-            }
-            var proxyNotificationWriter = createProxyNotificationWriter(mcpServerProxy, notificationWriter);
-            mcpServerProxy.initialize(responseWriter, proxyNotificationWriter, initRequest, protocolVersion);
-        }
 
         mcpServerProxy.start();
 
