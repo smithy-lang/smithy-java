@@ -11,11 +11,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
-import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.utils.SmithyUnstableApi;
@@ -81,9 +82,9 @@ public final class McpServer implements Server {
             }
         }
 
-        var response = mcpService.handleRequest(req, this::writeResponse, protocolVersion);
+        var response = mcpService.handleRequest(req, this::writeStructToOutput, protocolVersion);
         if (response != null) {
-            writeResponse(response);
+            writeStructToOutput(response);
         }
     }
 
@@ -108,7 +109,7 @@ public final class McpServer implements Server {
     }
 
     public void addNewProxy(McpServerProxy mcpServerProxy) {
-        mcpService.addNewProxy(mcpServerProxy, this::writeResponse);
+        mcpService.addNewProxy(mcpServerProxy, this::writeStructToOutput);
         refreshTools();
     }
 
@@ -116,27 +117,19 @@ public final class McpServer implements Server {
         return mcpService.containsMcpServer(id);
     }
 
-    private void writeResponse(JsonRpcResponse response) {
+    private void writeStructToOutput(SerializableStruct shape) {
         synchronized (os) {
+            var bytes = CODEC.serialize(shape);
             try {
-                os.write(CODEC.serializeToString(response).getBytes(StandardCharsets.UTF_8));
+                if (bytes.hasArray()) {
+                    os.write(bytes.array(), bytes.arrayOffset() + bytes.position(), bytes.remaining());
+                } else {
+                    os.write(ByteBufferUtils.getBytes(bytes));
+                }
                 os.write('\n');
                 os.flush();
             } catch (Exception e) {
-                LOG.error("Error encoding response", e);
-            }
-        }
-    }
-
-    private void writeNotification(JsonRpcRequest notification) {
-        synchronized (os) {
-            try {
-                LOG.debug("Writing notification to stdout: method={}", notification.getMethod());
-                os.write(CODEC.serializeToString(notification).getBytes(StandardCharsets.UTF_8));
-                os.write('\n');
-                os.flush();
-            } catch (Exception e) {
-                LOG.error("Error encoding notification", e);
+                LOG.error("Error writing to output", e);
             }
         }
     }
@@ -144,7 +137,7 @@ public final class McpServer implements Server {
     @Override
     public void start() {
         // Set up notification writer for proxies
-        mcpService.setNotificationWriter(this::writeNotification);
+        mcpService.setNotificationWriter(this::writeStructToOutput);
 
         // Initialize proxies
         mcpService.startProxies();
