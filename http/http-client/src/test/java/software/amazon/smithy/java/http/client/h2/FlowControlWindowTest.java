@@ -6,8 +6,6 @@
 package software.amazon.smithy.java.http.client.h2;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -16,26 +14,33 @@ class FlowControlWindowTest {
     @Test
     void initialWindowIsAvailable() {
         var window = new FlowControlWindow(65535);
-
         assertEquals(65535, window.available());
     }
 
     @Test
-    void tryAcquireReducesWindow() throws Exception {
+    void tryAcquireNonBlockingReducesWindow() {
         var window = new FlowControlWindow(1000);
-        boolean acquired = window.tryAcquire(400, 100);
+        int acquired = window.tryAcquireNonBlocking(400);
 
-        assertTrue(acquired);
+        assertEquals(400, acquired);
         assertEquals(600, window.available());
     }
 
     @Test
-    void tryAcquireBlocksWhenInsufficient() throws Exception {
-        var window = new FlowControlWindow(100);
-        // Try to acquire more than available with short timeout
-        boolean acquired = window.tryAcquire(200, 50);
+    void tryAcquireNonBlockingReturnsZeroWhenEmpty() {
+        var window = new FlowControlWindow(0);
+        int acquired = window.tryAcquireNonBlocking(200);
 
-        assertFalse(acquired, "Should timeout when insufficient");
+        assertEquals(0, acquired);
+    }
+
+    @Test
+    void tryAcquireNonBlockingAcquiresPartial() {
+        var window = new FlowControlWindow(100);
+        int acquired = window.tryAcquireNonBlocking(200);
+
+        assertEquals(100, acquired);
+        assertEquals(0, window.available());
     }
 
     @Test
@@ -44,25 +49,6 @@ class FlowControlWindowTest {
         window.release(500);
 
         assertEquals(1500, window.available());
-    }
-
-    @Test
-    void releaseWakesWaitingThread() throws Exception {
-        var window = new FlowControlWindow(100);
-
-        Thread acquirer = Thread.startVirtualThread(() -> {
-            try {
-                window.tryAcquire(200, 5000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        });
-
-        Thread.sleep(50); // Let acquirer start waiting
-        window.release(200); // Release enough
-        acquirer.join(1000);
-
-        assertEquals(100, window.available()); // 100 + 200 - 200 = 100
     }
 
     @Test
@@ -90,34 +76,22 @@ class FlowControlWindowTest {
     }
 
     @Test
-    void tryAcquireWithZeroTimeoutFailsImmediately() throws Exception {
-        var window = new FlowControlWindow(100);
-        boolean acquired = window.tryAcquire(200, 0);
-
-        assertFalse(acquired);
-    }
-
-    @Test
     void concurrentAcquireAndRelease() throws Exception {
         var window = new FlowControlWindow(1000);
         int threads = 10;
         int iterations = 100;
 
-        Thread[] acquirers = new Thread[threads];
+        Thread[] workers = new Thread[threads];
         for (int i = 0; i < threads; i++) {
-            acquirers[i] = Thread.startVirtualThread(() -> {
-                try {
-                    for (int j = 0; j < iterations; j++) {
-                        window.tryAcquire(10, 1000);
-                        window.release(10);
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+            workers[i] = Thread.startVirtualThread(() -> {
+                for (int j = 0; j < iterations; j++) {
+                    window.tryAcquireNonBlocking(10);
+                    window.release(10);
                 }
             });
         }
 
-        for (Thread t : acquirers) {
+        for (Thread t : workers) {
             t.join(5000);
         }
 
