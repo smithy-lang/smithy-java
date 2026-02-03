@@ -226,7 +226,7 @@ public class H2cScalingBenchmark {
         var uri = URI.create(BenchmarkSupport.H2C_URL + "/get");
         var request = HttpRequest.builder().uri(uri).method("GET").build();
 
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (HttpRequest req) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             try (var res = smithyClient.send(req)) {
                 res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
             }
@@ -238,7 +238,7 @@ public class H2cScalingBenchmark {
     @Benchmark
     @Threads(1)
     public void helidon(Counter counter) throws InterruptedException {
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (Http2Client client) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (Http2Client client) -> {
             try (HttpClientResponse response = client.get("/get").request()) {
                 response.entity().consume();
             }
@@ -257,7 +257,7 @@ public class H2cScalingBenchmark {
                 .body(DataStream.ofBytes(BenchmarkSupport.POST_PAYLOAD))
                 .build();
 
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (HttpRequest req) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             try (var res = smithyClient.send(req)) {
                 res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
             }
@@ -276,7 +276,7 @@ public class H2cScalingBenchmark {
                 .body(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD))
                 .build();
 
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (HttpRequest req) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             try (var res = smithyClient.send(req)) {
                 res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
             }
@@ -291,7 +291,7 @@ public class H2cScalingBenchmark {
         var uri = URI.create(BenchmarkSupport.H2C_URL + "/getmb");
         var request = HttpRequest.builder().uri(uri).method("GET").build();
 
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (HttpRequest req) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             try (var res = smithyClient.send(req)) {
                 res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
             }
@@ -312,7 +312,7 @@ public class H2cScalingBenchmark {
 
         var connectionIndex = new AtomicInteger(0);
 
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (DefaultHttp2Headers h) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (DefaultHttp2Headers h) -> {
             var latch = new CountDownLatch(1);
             var error = new AtomicReference<Throwable>();
 
@@ -370,7 +370,7 @@ public class H2cScalingBenchmark {
 
         var connectionIndex = new AtomicInteger(0);
 
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (DefaultHttp2Headers h) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (DefaultHttp2Headers h) -> {
             var latch = new CountDownLatch(1);
             var error = new AtomicReference<Throwable>();
 
@@ -437,7 +437,7 @@ public class H2cScalingBenchmark {
 
         var connectionIndex = new AtomicInteger(0);
 
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (DefaultHttp2Headers h) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (DefaultHttp2Headers h) -> {
             var latch = new CountDownLatch(1);
             var error = new AtomicReference<Throwable>();
 
@@ -501,7 +501,7 @@ public class H2cScalingBenchmark {
 
         var connectionIndex = new AtomicInteger(0);
 
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (DefaultHttp2Headers h) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (DefaultHttp2Headers h) -> {
             var latch = new CountDownLatch(1);
             var error = new AtomicReference<Throwable>();
 

@@ -7,7 +7,11 @@ package software.amazon.smithy.java.http.client;
 
 import io.helidon.webclient.api.HttpClientResponse;
 import io.helidon.webclient.api.WebClient;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
+import java.net.http.HttpRequest.BodyPublishers;
+import java.net.http.HttpResponse.BodyHandlers;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
@@ -69,6 +73,7 @@ public class H1ScalingBenchmark {
     private HttpClient smithyClient;
     private CloseableHttpClient apacheClient;
     private WebClient helidonClient;
+    private java.net.http.HttpClient javaClient;
 
     @Setup(Level.Iteration)
     public void setupIteration() throws Exception {
@@ -110,6 +115,11 @@ public class H1ScalingBenchmark {
                 .connectionCacheSize(maxConnections)
                 .build();
 
+        // Java HttpClient (HTTP/1.1)
+        javaClient = java.net.http.HttpClient.newBuilder()
+                .version(java.net.http.HttpClient.Version.HTTP_1_1)
+                .build();
+
         BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H1_URL);
     }
 
@@ -137,6 +147,10 @@ public class H1ScalingBenchmark {
             helidonClient.closeResource();
             helidonClient = null;
         }
+        if (javaClient != null) {
+            javaClient.close();
+            javaClient = null;
+        }
     }
 
     @AuxCounters(AuxCounters.Type.EVENTS)
@@ -154,7 +168,7 @@ public class H1ScalingBenchmark {
         var uri = URI.create(BenchmarkSupport.H1_URL + "/get");
         var request = HttpRequest.builder().uri(uri).method("GET").build();
 
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (HttpRequest req) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             smithyClient.send(req).close();
         }, request, counter);
 
@@ -166,7 +180,7 @@ public class H1ScalingBenchmark {
     public void apache(Counter counter) throws InterruptedException {
         var target = BenchmarkSupport.H1_URL + "/get";
 
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (String url) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (String url) -> {
             try (var response = apacheClient.execute(new HttpGet(url))) {
                 EntityUtils.consume(response.getEntity());
             }
@@ -178,13 +192,31 @@ public class H1ScalingBenchmark {
     @Benchmark
     @Threads(1)
     public void helidon(Counter counter) throws InterruptedException {
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (WebClient client) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (WebClient client) -> {
             try (HttpClientResponse response = client.get("/get").request()) {
                 response.entity().consume();
             }
         }, helidonClient, counter);
 
         counter.logErrors("Helidon H1");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void javaHttpClient(Counter counter) throws InterruptedException {
+        var request = java.net.http.HttpRequest.newBuilder()
+                .uri(URI.create(BenchmarkSupport.H1_URL + "/get"))
+                .GET()
+                .build();
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (java.net.http.HttpRequest req) -> {
+            var response = javaClient.send(req, BodyHandlers.ofInputStream());
+            try (InputStream body = response.body()) {
+                body.transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Java HttpClient H1");
     }
 
     @Benchmark
@@ -197,7 +229,7 @@ public class H1ScalingBenchmark {
                 .body(DataStream.ofBytes(BenchmarkSupport.POST_PAYLOAD))
                 .build();
 
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (HttpRequest req) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             smithyClient.send(req).close();
         }, request, counter);
 
@@ -209,7 +241,7 @@ public class H1ScalingBenchmark {
     public void apachePost(Counter counter) throws InterruptedException {
         var target = BenchmarkSupport.H1_URL + "/post";
 
-        BenchmarkSupport.runBenchmark(concurrency, 1000, (String url) -> {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (String url) -> {
             var post = new HttpPost(url);
             post.setEntity(new ByteArrayEntity(BenchmarkSupport.POST_PAYLOAD, ContentType.APPLICATION_OCTET_STREAM));
             try (var response = apacheClient.execute(post)) {
@@ -218,5 +250,23 @@ public class H1ScalingBenchmark {
         }, target, counter);
 
         counter.logErrors("Apache H1 POST");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void javaHttpClientPost(Counter counter) throws InterruptedException {
+        var request = java.net.http.HttpRequest.newBuilder()
+                .uri(URI.create(BenchmarkSupport.H1_URL + "/post"))
+                .POST(BodyPublishers.ofByteArray(BenchmarkSupport.POST_PAYLOAD))
+                .build();
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (java.net.http.HttpRequest req) -> {
+            var response = javaClient.send(req, BodyHandlers.ofInputStream());
+            try (InputStream body = response.body()) {
+                body.transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Java HttpClient H1 POST");
     }
 }
