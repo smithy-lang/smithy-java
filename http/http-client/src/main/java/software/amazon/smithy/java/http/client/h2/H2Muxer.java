@@ -88,6 +88,23 @@ final class H2Muxer implements AutoCloseable {
 
     // === CONNECTION FLOW CONTROL ===
     private final FlowControlWindow connectionSendWindow;
+    private final ConcurrentLinkedQueue<SendWindowWaiter> sendWindowWaiters = new ConcurrentLinkedQueue<>();
+
+    /**
+     * Waiter for connection send window. Used for fair FIFO queuing.
+     */
+    private static final class SendWindowWaiter {
+        final Thread thread;
+        final int maxBytes;
+        volatile int acquired;
+        volatile boolean done;
+        volatile boolean cancelled;
+
+        SendWindowWaiter(Thread thread, int maxBytes) {
+            this.thread = thread;
+            this.maxBytes = maxBytes;
+        }
+    }
 
     // === STATE ===
     private volatile boolean accepting = true;
@@ -293,19 +310,72 @@ final class H2Muxer implements AutoCloseable {
 
     /**
      * Acquire up to the requested bytes from the connection flow control window.
+     * Uses FIFO queuing to prevent thundering herd and starvation.
      *
      * @param maxBytes maximum bytes to acquire
      * @param timeoutMs timeout if window is empty
      * @return bytes acquired (0 if timeout)
      */
     int acquireConnectionWindowUpTo(int maxBytes, long timeoutMs) throws SocketTimeoutException, InterruptedException {
-        return connectionSendWindow.tryAcquireUpTo(maxBytes, timeoutMs);
+        // Fast path: no waiters and window available
+        if (sendWindowWaiters.isEmpty()) {
+            int acquired = connectionSendWindow.tryAcquireNonBlocking(maxBytes);
+            if (acquired > 0) {
+                return acquired;
+            }
+        }
+
+        // Slow path: queue and wait for fair access
+        var waiter = new SendWindowWaiter(Thread.currentThread(), maxBytes);
+        sendWindowWaiters.add(waiter);
+
+        try {
+            int deadlineTick = deadlineTick(timeoutMs);
+            while (!waiter.done) {
+                if (deadlineTick > 0 && timeoutTick >= deadlineTick) {
+                    return 0; // Timeout
+                }
+                LockSupport.parkNanos(TIMEOUT_POLL_INTERVAL_MS * 1_000_000L);
+                if (Thread.interrupted()) {
+                    throw new InterruptedException();
+                }
+            }
+            return waiter.acquired;
+        } finally {
+            waiter.cancelled = true; // wakeWaiters() will skip and remove
+        }
     }
 
     void releaseConnectionWindow(int bytes) {
         int currentWindow = connectionSendWindow.available();
         if ((long) currentWindow + bytes <= Integer.MAX_VALUE) {
             connectionSendWindow.release(bytes);
+        }
+
+        wakeWaiters();
+    }
+
+    /**
+     * Wake queued waiters in FIFO order until window is exhausted.
+     */
+    private void wakeWaiters() {
+        SendWindowWaiter waiter;
+        while ((waiter = sendWindowWaiters.peek()) != null) {
+            // Skip cancelled waiters
+            if (waiter.cancelled) {
+                sendWindowWaiters.poll();
+                continue;
+            }
+            int acquired = connectionSendWindow.tryAcquireNonBlocking(waiter.maxBytes);
+            if (acquired > 0) {
+                waiter.acquired = acquired;
+                waiter.done = true;
+                sendWindowWaiters.poll();
+                LockSupport.unpark(waiter.thread);
+            } else {
+                // No more window available
+                break;
+            }
         }
     }
 

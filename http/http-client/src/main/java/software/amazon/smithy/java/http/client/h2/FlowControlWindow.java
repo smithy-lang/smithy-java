@@ -30,33 +30,20 @@ final class FlowControlWindow {
     }
 
     /**
-     * Try to acquire bytes from the window with a timeout.
+     * Try to acquire up to the requested bytes from the window without blocking.
      *
-     * @param bytes number of bytes to acquire
-     * @param timeoutMs maximum time to wait in milliseconds
-     * @return true if bytes acquired, false if timeout expired
-     * @throws InterruptedException if interrupted while waiting
+     * @param maxBytes maximum number of bytes to acquire
+     * @return number of bytes acquired (0 if window is empty)
      */
-    boolean tryAcquire(int bytes, long timeoutMs) throws InterruptedException {
+    int tryAcquireNonBlocking(int maxBytes) {
         lock.lock();
         try {
-            // Fast path: no waiting needed
-            if (window >= bytes) {
-                window -= bytes;
-                return true;
+            if (window > 0) {
+                int acquired = (int) Math.min(window, maxBytes);
+                window -= acquired;
+                return acquired;
             }
-
-            // Slow path: wait with timeout
-            long remainingNs = TimeUnit.MILLISECONDS.toNanos(timeoutMs);
-            while (window < bytes) {
-                if (remainingNs <= 0) {
-                    return false;
-                }
-                remainingNs = available.awaitNanos(remainingNs);
-            }
-
-            window -= bytes;
-            return true;
+            return 0;
         } finally {
             lock.unlock();
         }
