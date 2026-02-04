@@ -214,6 +214,12 @@ final class H2DataInputStream extends InputStream {
             readPosition = currentLength;
         }
 
+        // Return the last buffer (pullNextChunk returned false but buffer may still be set)
+        if (currentBuffer != null) {
+            bufferReturner.accept(currentBuffer);
+            currentBuffer = null;
+        }
+
         return transferred;
     }
 }

@@ -111,10 +111,6 @@ public final class H2Exchange implements HttpExchange {
     private volatile int readDeadlineTick; // 0 = no deadline, >0 = deadline tick
     private final AtomicBoolean readTimedOut = new AtomicBoolean(); // At-most-once timeout flag
 
-    // Adaptive signaling: batch signals for fast transfers, but don't delay small/slow responses
-    // Signal when: queue was empty (first chunk), threshold reached, or endStream
-    private static final int SIGNAL_THRESHOLD = 4; // Signal when this many chunks are queued
-
     // Response headers (status code is in packedState)
     private volatile HttpHeaders responseHeaders;
 
@@ -418,14 +414,11 @@ public final class H2Exchange implements HttpExchange {
      *                         used to defer signaling when processing a burst of frames
      */
     void enqueueData(byte[] data, int length, boolean endStream, boolean moreDataBuffered) {
-        boolean shouldSignal;
         boolean sendWindowUpdate = false;
         int windowIncrement = 0;
 
         dataLock.lock();
         try {
-            int queueSizeBefore = dataQueue.size();
-
             if (data != null && length > 0) {
                 dataQueue.add(new DataChunk(data, length, endStream));
 
@@ -448,22 +441,6 @@ public final class H2Exchange implements HttpExchange {
                 state.setEndStreamReceivedFlag(); // Just set flag + readState, don't update stream state
                 clearReadDeadline(); // No more data expected, clear timeout
             }
-
-            // Pipelined adaptive signaling: balance batching with parallelism.
-            // With lock-free signaling, wakeup cost is low enough to prioritize parallelism.
-            // Signal if:
-            // 1. endStream - response complete
-            // 2. threshold reached - safety valve for huge buffers
-            // 3. queueWasEmpty - TTFB optimization, enables consumer to process in parallel
-            // 4. buffer empty - we've consumed everything the kernel gave us
-            int queueSize = dataQueue.size();
-            boolean queueWasEmpty = queueSizeBefore == 0 && queueSize > 0;
-            boolean thresholdReached = queueSize >= SIGNAL_THRESHOLD;
-
-            shouldSignal = endStream
-                    || thresholdReached
-                    || queueWasEmpty
-                    || !moreDataBuffered;
         } finally {
             dataLock.unlock();
         }
@@ -473,8 +450,12 @@ public final class H2Exchange implements HttpExchange {
             muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.WINDOW_UPDATE, windowIncrement, writeTimeoutMs);
         }
 
-        // Signal outside lock - lock-free wakeup
-        if (shouldSignal) {
+        // Signal consumer only when necessary to reduce wakeup overhead:
+        // - endStream: response complete, consumer must finish
+        // - !moreDataBuffered: no more data in socket buffer, signal now before reader blocks
+        // When moreDataBuffered=true, defer signaling - H2Connection will call signalDataAvailable()
+        // when switching streams or when buffer empties.
+        if (endStream || !moreDataBuffered) {
             Thread t = waitingThread;
             if (t != null) {
                 LockSupport.unpark(t);
