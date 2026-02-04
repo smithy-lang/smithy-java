@@ -77,7 +77,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Warmup(iterations = 2, time = 3)
 @Measurement(iterations = 3, time = 5)
-@Fork(value = 1, jvmArgs = {"-Xms2g", "-Xmx2g"})
+@Fork(value = 1, jvmArgs = {"-Xms2g", "-Xmx2g", "-Xlog:gc*:stdout:time,level,tags"})
 @State(Scope.Benchmark)
 public class H2cScalingBenchmark {
 
@@ -101,7 +101,7 @@ public class H2cScalingBenchmark {
     private List<Channel> nettyChannels;
     private List<Http2StreamChannelBootstrap> nettyStreamBootstraps;
 
-    @Setup(Level.Iteration)
+    @Setup(Level.Trial)
     public void setupIteration() throws Exception {
         closeClients();
 
@@ -166,15 +166,11 @@ public class H2cScalingBenchmark {
         BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H2C_URL);
     }
 
-    @TearDown(Level.Iteration)
-    public void teardownIteration() throws Exception {
+    @TearDown(Level.Trial)
+    public void teardown() throws Exception {
         String stats = BenchmarkSupport.getServerStats(smithyClient, BenchmarkSupport.H2C_URL);
         System.out.println("H2c stats [c=" + concurrency + ", conn=" + connections
                 + ", streams=" + streamsPerConnection + "]: " + stats);
-    }
-
-    @TearDown
-    public void teardown() throws Exception {
         closeClients();
     }
 
