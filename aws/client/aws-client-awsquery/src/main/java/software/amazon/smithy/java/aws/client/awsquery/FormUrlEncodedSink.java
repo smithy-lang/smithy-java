@@ -8,6 +8,14 @@ package software.amazon.smithy.java.aws.client.awsquery;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+/**
+ * A byte buffer sink for building URL-encoded form data using RFC 3986 percent-encoding.
+ *
+ * <p>This uses RFC 3986 unreserved characters (A-Z, a-z, 0-9, '-', '.', '_', '~') which pass through
+ * unencoded, while all other characters are percent-encoded as UTF-8 bytes. This differs from the
+ * application/x-www-form-urlencoded spec which encodes space as '+', but AWS Query protocol expects
+ * RFC 3986 encoding.
+ */
 final class FormUrlEncodedSink {
     private static final byte[] HEX = {
             '0',
@@ -72,15 +80,13 @@ final class FormUrlEncodedSink {
             } else if (c < 0x800) {
                 writePercentEncoded(0xC0 | (c >> 6));
                 writePercentEncoded(0x80 | (c & 0x3F));
-            } else if (Character.isHighSurrogate(c) && i + 1 < len) {
+            } else if (Character.isHighSurrogate(c) && i + 1 < len && Character.isLowSurrogate(s.charAt(i + 1))) {
                 char low = s.charAt(++i);
-                if (Character.isLowSurrogate(low)) {
-                    int cp = Character.toCodePoint(c, low);
-                    writePercentEncoded(0xF0 | (cp >> 18));
-                    writePercentEncoded(0x80 | ((cp >> 12) & 0x3F));
-                    writePercentEncoded(0x80 | ((cp >> 6) & 0x3F));
-                    writePercentEncoded(0x80 | (cp & 0x3F));
-                }
+                int cp = Character.toCodePoint(c, low);
+                writePercentEncoded(0xF0 | (cp >> 18));
+                writePercentEncoded(0x80 | ((cp >> 12) & 0x3F));
+                writePercentEncoded(0x80 | ((cp >> 6) & 0x3F));
+                writePercentEncoded(0x80 | (cp & 0x3F));
             } else {
                 writePercentEncoded(0xE0 | (c >> 12));
                 writePercentEncoded(0x80 | ((c >> 6) & 0x3F));
