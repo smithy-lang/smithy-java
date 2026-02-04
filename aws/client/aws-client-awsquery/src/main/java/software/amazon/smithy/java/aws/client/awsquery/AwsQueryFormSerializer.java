@@ -11,7 +11,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -21,6 +20,7 @@ import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class AwsQueryFormSerializer implements ShapeSerializer {
@@ -34,7 +34,6 @@ final class AwsQueryFormSerializer implements ShapeSerializer {
     private final FormUrlEncodedSink sink;
 
     private byte[][] prefixCache = new byte[8][];
-    private int[] prefixLengths = new int[8];
     private int prefixDepth = 0;
 
     private final ListItemSerializer listSerializer = new ListItemSerializer();
@@ -79,47 +78,36 @@ final class AwsQueryFormSerializer implements ShapeSerializer {
             if (i > 0) {
                 sink.writeByte('.');
             }
-            sink.writeBytes(prefixCache[i], 0, prefixLengths[i]);
+            sink.writeBytes(prefixCache[i], 0, prefixCache[i].length);
         }
     }
 
     private void pushPrefix(String prefix) {
         if (prefixDepth >= prefixCache.length) {
             prefixCache = Arrays.copyOf(prefixCache, prefixCache.length * 2);
-            prefixLengths = Arrays.copyOf(prefixLengths, prefixLengths.length * 2);
         }
-        byte[] encoded = encodePrefix(prefix);
-        prefixCache[prefixDepth] = encoded;
-        prefixLengths[prefixDepth++] = encoded.length;
+        prefixCache[prefixDepth++] = encodePrefix(prefix);
     }
 
     private void pushPrefix(byte[] prefix) {
         if (prefixDepth >= prefixCache.length) {
             prefixCache = Arrays.copyOf(prefixCache, prefixCache.length * 2);
-            prefixLengths = Arrays.copyOf(prefixLengths, prefixLengths.length * 2);
         }
-        prefixCache[prefixDepth] = prefix;
-        prefixLengths[prefixDepth++] = prefix.length;
+        prefixCache[prefixDepth++] = prefix;
     }
 
     private void pushIndexedPrefix(byte[] base, int index) {
         if (prefixDepth >= prefixCache.length) {
             prefixCache = Arrays.copyOf(prefixCache, prefixCache.length * 2);
-            prefixLengths = Arrays.copyOf(prefixLengths, prefixLengths.length * 2);
         }
-        byte[] encoded = encodeIndexedPrefix(base, index);
-        prefixCache[prefixDepth] = encoded;
-        prefixLengths[prefixDepth++] = encoded.length;
+        prefixCache[prefixDepth++] = encodeIndexedPrefix(base, index);
     }
 
     private void pushIndexPrefix(int index) {
         if (prefixDepth >= prefixCache.length) {
             prefixCache = Arrays.copyOf(prefixCache, prefixCache.length * 2);
-            prefixLengths = Arrays.copyOf(prefixLengths, prefixLengths.length * 2);
         }
-        byte[] encoded = encodeIndex(index);
-        prefixCache[prefixDepth] = encoded;
-        prefixLengths[prefixDepth++] = encoded.length;
+        prefixCache[prefixDepth++] = encodeIndex(index);
     }
 
     private void popPrefix() {
@@ -321,9 +309,7 @@ final class AwsQueryFormSerializer implements ShapeSerializer {
 
         @Override
         public void writeBlob(Schema schema, ByteBuffer value) {
-            byte[] bytes = new byte[value.remaining()];
-            value.duplicate().get(bytes);
-            writeIndexedParam(Base64.getEncoder().encodeToString(bytes));
+            writeIndexedParam(ByteBufferUtils.base64Encode(value));
         }
 
         @Override
@@ -537,9 +523,7 @@ final class AwsQueryFormSerializer implements ShapeSerializer {
 
         @Override
         public void writeBlob(Schema schema, ByteBuffer value) {
-            byte[] bytes = new byte[value.remaining()];
-            value.duplicate().get(bytes);
-            writeValueParam(Base64.getEncoder().encodeToString(bytes));
+            writeValueParam(ByteBufferUtils.base64Encode(value));
         }
 
         @Override
@@ -630,9 +614,7 @@ final class AwsQueryFormSerializer implements ShapeSerializer {
 
     @Override
     public void writeBlob(Schema schema, ByteBuffer value) {
-        byte[] bytes = new byte[value.remaining()];
-        value.duplicate().get(bytes);
-        writeParam(getMemberName(schema), Base64.getEncoder().encodeToString(bytes));
+        writeParam(getMemberName(schema), ByteBufferUtils.base64Encode(value));
     }
 
     @Override
