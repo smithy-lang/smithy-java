@@ -172,6 +172,7 @@ public final class ClientInterfaceGenerator
                             new DefaultProtocolGenerator(
                                     writer,
                                     settings.service(),
+                                    directive.service().getVersion(),
                                     defaultProtocolTrait,
                                     directive.context()));
                     writer.putContext("clientPlugin", ClientPlugin.class);
@@ -388,6 +389,7 @@ public final class ClientInterfaceGenerator
     private record DefaultProtocolGenerator(
             JavaWriter writer,
             ShapeId service,
+            String serviceVersion,
             Trait defaultProtocolTrait,
             CodeGenerationContext context) implements
             Runnable {
@@ -400,6 +402,7 @@ public final class ClientInterfaceGenerator
             var template = """
                     private static final ${protocolSettings:T} protocolSettings = ${protocolSettings:T}.builder()
                             .service(${shapeId:T}.from(${service:S}))
+                            .serviceVersion(${serviceVersion:S})
                             .build();
                     private static final ${trait:T} protocolTrait = ${initializer:C};
                     """;
@@ -409,6 +412,7 @@ public final class ClientInterfaceGenerator
             writer.putContext("initializer", writer.consumer(w -> initializer.accept(w, defaultProtocolTrait)));
             writer.putContext("shapeId", ShapeId.class);
             writer.putContext("service", service);
+            writer.putContext("serviceVersion", serviceVersion);
             writer.write(template);
             writer.popState();
         }
