@@ -242,7 +242,10 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
             if (protocolFactory == null) {
                 continue;
             }
-            var protocolSettings = ProtocolSettings.builder().service(service.getId()).build();
+            var protocolSettings = ProtocolSettings.builder()
+                    .service(service.getId())
+                    .serviceVersion(service.getVersion())
+                    .build();
             var instance = protocolFactory.createProtocol(protocolSettings, protocolTraitEntry.getValue());
             protocols.put(protocolTraitEntry.getKey(), instance);
         }
