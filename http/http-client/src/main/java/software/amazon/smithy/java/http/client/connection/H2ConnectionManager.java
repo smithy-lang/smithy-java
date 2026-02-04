@@ -45,11 +45,15 @@ final class H2ConnectionManager {
         /** Connections for this route. Volatile for lock-free reads. */
         volatile H2Connection[] conns = new H2Connection[0];
 
-        /** Connections currently being created (prevents over-creation). Guarded by sync on this. */
+        /** Connections currently being created (prevents over-creation). Guarded by lock. */
         int pendingCreations = 0;
 
         /** Round-robin index for connection selection. Atomic for concurrent access. */
         final AtomicInteger nextIndex = new AtomicInteger(0);
+        
+        /** Lock for state modifications. ReentrantLock avoids VT pinning unlike synchronized. */
+        final java.util.concurrent.locks.ReentrantLock lock = new java.util.concurrent.locks.ReentrantLock();
+        final java.util.concurrent.locks.Condition available = lock.newCondition();
     }
 
     private static final H2Connection[] EMPTY = new H2Connection[0];
@@ -57,8 +61,8 @@ final class H2ConnectionManager {
     // Soft limit as a fraction of streamsPerConnection. When all connections exceed this threshold,
     // we try to create a new connection (if under max).
     // This prevents overloading a single TCP connection even when the server allows many streams.
-    private static final int SOFT_LIMIT_DIVISOR = 8;
-    private static final int SOFT_LIMIT_FLOOR = 50;
+    private static final int SOFT_LIMIT_DIVISOR = 100;  // Lowered for testing
+    private static final int SOFT_LIMIT_FLOOR = 1;  // Lowered for testing
 
     private final ConcurrentHashMap<Route, RouteState> routes = new ConcurrentHashMap<>();
     private final int streamsPerConnection; // Hard limit from server
@@ -104,7 +108,8 @@ final class H2ConnectionManager {
         RouteState state = stateFor(route);
         long deadline = System.currentTimeMillis() + acquireTimeoutMs;
 
-        synchronized (state) {
+        state.lock.lock();
+        try {
             while (true) {
                 H2Connection[] snapshot = state.conns;
                 int totalConns = snapshot.length + state.pendingCreations;
@@ -137,18 +142,18 @@ final class H2ConnectionManager {
                 }
 
                 try {
-                    state.wait(remaining);
+                    state.available.await(remaining, java.util.concurrent.TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new IOException("Interrupted while waiting for connection", e);
                 }
             }
+        } finally {
+            state.lock.unlock();
         }
 
         return createNewH2Connection(route, state);
     }
-
-    @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
     private H2Connection createNewH2Connection(Route route, RouteState state) throws IOException {
         // Create new connection OUTSIDE the lock to avoid deadlock.
         H2Connection newConn = null;
@@ -159,7 +164,8 @@ final class H2ConnectionManager {
             createException = e;
         } finally {
             // Register under lock (or decrement pending on failure)
-            synchronized (state) {
+            state.lock.lock();
+            try {
                 state.pendingCreations--;
                 if (newConn != null) {
                     H2Connection[] cur = state.conns;
@@ -168,7 +174,9 @@ final class H2ConnectionManager {
                     next[cur.length] = newConn;
                     state.conns = next;
                 }
-                state.notifyAll(); // Wake waiters
+                state.available.signalAll(); // Wake waiters
+            } finally {
+                state.lock.unlock();
             }
         }
 
@@ -245,7 +253,8 @@ final class H2ConnectionManager {
         if (state == null) {
             return;
         }
-        synchronized (state) {
+        state.lock.lock();
+        try {
             H2Connection[] cur = state.conns;
             int n = cur.length;
             int idx = -1;
@@ -261,13 +270,14 @@ final class H2ConnectionManager {
             } else if (n == 1) {
                 state.conns = EMPTY;
             } else {
-                // Compact array: copy elements before and after removed connection
                 H2Connection[] next = new H2Connection[n - 1];
                 System.arraycopy(cur, 0, next, 0, idx);
                 System.arraycopy(cur, idx + 1, next, idx, n - idx - 1);
                 state.conns = next;
             }
-            state.notifyAll(); // Wake threads waiting for capacity
+            state.available.signalAll();
+        } finally {
+            state.lock.unlock();
         }
     }
 
@@ -292,7 +302,8 @@ final class H2ConnectionManager {
         }
 
         // Slow path: actually clean up under lock
-        synchronized (state) {
+        state.lock.lock();
+        try {
             cur = state.conns; // Re-read under lock
             int n = cur.length;
             H2Connection[] tmp = new H2Connection[n];
@@ -315,6 +326,8 @@ final class H2ConnectionManager {
                 System.arraycopy(tmp, 0, next, 0, w);
                 state.conns = next;
             }
+        } finally {
+            state.lock.unlock();
         }
     }
 
@@ -330,7 +343,6 @@ final class H2ConnectionManager {
      * @param maxIdleTimeNanos maximum idle time in nanoseconds
      * @param onRemove         callback for removed connections
      */
-    @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
     void cleanupIdle(long maxIdleTimeNanos, BiConsumer<H2Connection, CloseReason> onRemove) {
         for (RouteState state : routes.values()) {
             H2Connection[] cur = state.conns;
@@ -348,7 +360,8 @@ final class H2ConnectionManager {
             }
 
             // Slow path: clean up under lock
-            synchronized (state) {
+            state.lock.lock();
+            try {
                 cur = state.conns; // Re-read under lock
                 int n = cur.length;
                 H2Connection[] tmp = new H2Connection[n];
@@ -368,6 +381,8 @@ final class H2ConnectionManager {
                     System.arraycopy(tmp, 0, next, 0, w);
                     state.conns = next;
                 }
+            } finally {
+                state.lock.unlock();
             }
         }
     }

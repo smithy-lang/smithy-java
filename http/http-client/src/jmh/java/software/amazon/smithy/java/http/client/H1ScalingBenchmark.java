@@ -64,7 +64,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 @State(Scope.Benchmark)
 public class H1ScalingBenchmark {
 
-    @Param({"100", "500"})
+    @Param({"1", "10", "100"})
     private int concurrency;
 
     @Param({"50", "100"})
