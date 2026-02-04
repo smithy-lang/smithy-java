@@ -57,7 +57,7 @@ public class H2ScalingBenchmark {
     private HttpClient smithyClient;
     private java.net.http.HttpClient javaClient;
 
-    @Setup(Level.Iteration)
+    @Setup(Level.Trial)
     public void setupIteration() throws Exception {
         closeClients();
 
@@ -90,15 +90,11 @@ public class H2ScalingBenchmark {
         BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H2_URL);
     }
 
-    @TearDown(Level.Iteration)
-    public void teardownIteration() throws Exception {
+    @TearDown(Level.Trial)
+    public void teardown() throws Exception {
         String stats = BenchmarkSupport.getServerStats(smithyClient, BenchmarkSupport.H2_URL);
         System.out.println("H2 stats [c=" + concurrency + ", conn=" + connections
                 + ", streams=" + streamsPerConnection + "]: " + stats);
-    }
-
-    @TearDown
-    public void teardown() throws Exception {
         closeClients();
     }
 
@@ -116,7 +112,7 @@ public class H2ScalingBenchmark {
     @AuxCounters(AuxCounters.Type.EVENTS)
     @State(Scope.Thread)
     public static class Counter extends BenchmarkSupport.RequestCounter {
-        @Setup(Level.Iteration)
+        @Setup(Level.Trial)
         public void reset() {
             super.reset();
         }
