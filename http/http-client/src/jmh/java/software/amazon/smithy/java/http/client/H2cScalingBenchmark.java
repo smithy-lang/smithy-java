@@ -54,6 +54,8 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.client.connection.ConnectionPoolListener;
+import software.amazon.smithy.java.http.client.connection.HttpConnection;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -81,16 +83,13 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 @State(Scope.Benchmark)
 public class H2cScalingBenchmark {
 
-    @Param({"5000"})
+    @Param({"10"})
     private int concurrency;
 
-    @Param({"3",
-            "5"
-            //, "10", "20", "50"
-    })
+    @Param({"1", "3", "5", "10"})
     private int connections;
 
-    @Param({"4096"})
+    @Param({"100"})
     private int streamsPerConnection;
 
     private HttpClient smithyClient;
@@ -100,6 +99,7 @@ public class H2cScalingBenchmark {
     private EventLoopGroup nettyGroup;
     private List<Channel> nettyChannels;
     private List<Http2StreamChannelBootstrap> nettyStreamBootstraps;
+    private AtomicInteger smithyConnectionCount;
 
     @Setup(Level.Trial)
     public void setupIteration() throws Exception {
@@ -108,6 +108,8 @@ public class H2cScalingBenchmark {
         System.out.println("H2c setup: concurrency=" + concurrency
                 + ", connections=" + connections
                 + ", streams=" + streamsPerConnection);
+
+        smithyConnectionCount = new AtomicInteger(0);
 
         // Smithy H2c client
         smithyClient = HttpClient.builder()
@@ -119,6 +121,13 @@ public class H2cScalingBenchmark {
                         .maxIdleTime(Duration.ofMinutes(2))
                         .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
                         .dnsResolver(BenchmarkSupport.staticDns())
+                        .addListener(new ConnectionPoolListener() {
+                            @Override
+                            public void onConnected(HttpConnection conn) {
+                                int count = smithyConnectionCount.incrementAndGet();
+                                System.out.println("  [Smithy] New connection #" + count + ": " + conn);
+                            }
+                        })
                         .build())
                 .build();
 
@@ -293,7 +302,6 @@ public class H2cScalingBenchmark {
             }
         }, request, counter);
 
-        System.out.println("Smithy H2c GET 1MB: " + counter.requests + " requests, " + counter.errors + " errors");
         counter.logErrors("Smithy H2c GET 1MB");
     }
 
@@ -417,7 +425,6 @@ public class H2cScalingBenchmark {
             }
         }, headers, counter);
 
-        System.out.println("Netty H2c GET 1MB: " + counter.requests + " requests, " + counter.errors + " errors");
         counter.logErrors("Netty H2c GET 1MB");
     }
 

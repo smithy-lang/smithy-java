@@ -26,6 +26,7 @@ public final class HttpConnectionPoolBuilder {
     int h2StreamsPerConnection = 100;
     int h2InitialWindowSize = 65535; // RFC 9113 default
     int h2MaxFrameSize = 16384; // RFC 9113 default
+    int h2BufferSize = 256 * 1024; // 256KB default
     final Map<String, Integer> perHostLimits = new HashMap<>();
 
     Duration maxIdleTime = Duration.ofMinutes(2);
@@ -480,6 +481,28 @@ public final class HttpConnectionPoolBuilder {
             throw new IllegalArgumentException("h2StreamsPerConnection must be positive: " + streams);
         }
         this.h2StreamsPerConnection = streams;
+        return this;
+    }
+
+    /**
+     * Set HTTP/2 I/O buffer size (default: 256KB).
+     *
+     * <p>This controls the size of the buffered input and output streams used for
+     * reading and writing HTTP/2 frames. Larger buffers reduce syscall overhead
+     * and improve throughput for large payloads.
+     *
+     * <p><b>Memory impact:</b> Each HTTP/2 connection uses 2× this value (input + output).
+     * With 100 connections at 256KB, total buffer memory is ~50MB.
+     *
+     * @param bufferSize buffer size in bytes, must be at least 16KB
+     * @return this builder
+     * @throws IllegalArgumentException if bufferSize is less than 16KB
+     */
+    public HttpConnectionPoolBuilder h2BufferSize(int bufferSize) {
+        if (bufferSize < 16 * 1024) {
+            throw new IllegalArgumentException("h2BufferSize must be at least 16KB: " + bufferSize);
+        }
+        this.h2BufferSize = bufferSize;
         return this;
     }
 

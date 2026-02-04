@@ -85,7 +85,6 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     }
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(H2Connection.class);
-    private static final int BUFFER_SIZE = 65536;
     private static final int SETTINGS_TIMEOUT_MS = 10_000;
     private static final int GRACEFUL_SHUTDOWN_MS = 1000;
 
@@ -126,6 +125,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
      * @param writeTimeout write timeout duration
      * @param initialWindowSize initial flow control window size in bytes
      * @param maxFrameSize maximum frame size to advertise to server
+     * @param bufferSize I/O buffer size in bytes
      */
     public H2Connection(
             Socket socket,
@@ -133,12 +133,13 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
             Duration readTimeout,
             Duration writeTimeout,
             int initialWindowSize,
-            int maxFrameSize
+            int maxFrameSize,
+            int bufferSize
     ) throws IOException {
         this.socket = socket;
         this.maxFrameSize = maxFrameSize;
-        var socketIn = new UnsyncBufferedInputStream(socket.getInputStream(), BUFFER_SIZE);
-        var socketOut = new UnsyncBufferedOutputStream(socket.getOutputStream(), BUFFER_SIZE);
+        var socketIn = new UnsyncBufferedInputStream(socket.getInputStream(), bufferSize);
+        var socketOut = new UnsyncBufferedOutputStream(socket.getOutputStream(), bufferSize);
         this.route = route;
         this.readTimeoutMs = readTimeout.toMillis();
         this.writeTimeoutMs = writeTimeout.toMillis();
@@ -158,6 +159,8 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         try {
             sendConnectionPreface();
             receiveServerPreface();
+            // Try to receive initial connection WINDOW_UPDATE (server often sends this right after SETTINGS)
+            receiveInitialWindowUpdate();
         } catch (IOException e) {
             close();
             throw new IOException("HTTP/2 connection preface failed", e);
@@ -493,6 +496,29 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
 
             frameCodec.writeSettingsAck();
             frameCodec.flush();
+        } finally {
+            socket.setSoTimeout(originalTimeout);
+        }
+    }
+
+    /**
+     * Try to receive the initial connection-level WINDOW_UPDATE that servers typically send
+     * right after SETTINGS to expand the connection flow control window.
+     * Uses a short timeout - if no frame arrives quickly, we proceed anyway.
+     */
+    private void receiveInitialWindowUpdate() throws IOException {
+        int originalTimeout = socket.getSoTimeout();
+        try {
+            socket.setSoTimeout(50); // Short timeout - don't block long if server doesn't send one
+
+            int type = frameCodec.nextFrame();
+            if (type == FRAME_TYPE_WINDOW_UPDATE && frameCodec.frameStreamId() == 0) {
+                int increment = frameCodec.readAndParseWindowUpdate();
+                muxer.releaseConnectionWindow(increment);
+            }
+            // If it's any other frame type, it will be processed by the reader thread
+        } catch (SocketTimeoutException e) {
+            // No initial WINDOW_UPDATE - that's fine, proceed with default window
         } finally {
             socket.setSoTimeout(originalTimeout);
         }

@@ -54,17 +54,13 @@ final class H2FrameCodec {
     private final int maxFrameSize;
 
     // Write header buffer - used by writer thread only.
-    // Read operations use zero-copy direct buffer access from UnsyncBufferedInputStream.
     private final byte[] writeHeaderBuf = new byte[FRAME_HEADER_SIZE];
 
     // Scratch buffer for writing control frames - writer thread only.
-    // Used for WINDOW_UPDATE(4), RST_STREAM(4), and GOAWAY(8+) payloads.
-    // Read operations use zero-copy direct buffer access from UnsyncBufferedInputStream.
     private static final int WRITE_SCRATCH_SIZE = 64;
     private final byte[] writeScratch = new byte[WRITE_SCRATCH_SIZE];
 
     // Reusable buffer for accumulating header blocks when CONTINUATION frames are needed.
-    // Reader thread only. Reset and reused across requests to avoid repeated allocations.
     private final ByteBufferOutputStream headerBlockBuffer = new ByteBufferOutputStream(4096);
 
     // Current frame state (filled by nextFrame()) - stateful parser pattern

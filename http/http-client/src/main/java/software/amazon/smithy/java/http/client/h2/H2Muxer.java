@@ -96,13 +96,15 @@ final class H2Muxer implements AutoCloseable {
     private static final class SendWindowWaiter {
         final Thread thread;
         final int maxBytes;
+        final long deadlineNs;
         volatile int acquired;
         volatile boolean done;
         volatile boolean cancelled;
 
-        SendWindowWaiter(Thread thread, int maxBytes) {
+        SendWindowWaiter(Thread thread, int maxBytes, long deadlineNs) {
             this.thread = thread;
             this.maxBytes = maxBytes;
+            this.deadlineNs = deadlineNs;
         }
     }
 
@@ -326,16 +328,16 @@ final class H2Muxer implements AutoCloseable {
         }
 
         // Slow path: queue and wait for fair access
-        var waiter = new SendWindowWaiter(Thread.currentThread(), maxBytes);
+        long deadlineNs = System.nanoTime() + timeoutMs * 1_000_000L;
+        var waiter = new SendWindowWaiter(Thread.currentThread(), maxBytes, deadlineNs);
         sendWindowWaiters.add(waiter);
 
         try {
-            int deadlineTick = deadlineTick(timeoutMs);
             while (!waiter.done) {
-                if (deadlineTick > 0 && timeoutTick >= deadlineTick) {
+                if (System.nanoTime() >= deadlineNs) {
                     return 0; // Timeout
                 }
-                LockSupport.parkNanos(TIMEOUT_POLL_INTERVAL_MS * 1_000_000L);
+                LockSupport.park(); // Untimed - woken by wakeWaiters() or watchdog
                 if (Thread.interrupted()) {
                     throw new InterruptedException();
                 }
@@ -375,6 +377,18 @@ final class H2Muxer implements AutoCloseable {
             } else {
                 // No more window available
                 break;
+            }
+        }
+    }
+
+    /**
+     * Wake waiters that have timed out so they can check their deadline.
+     */
+    private void wakeTimedOutWaiters() {
+        long now = System.nanoTime();
+        for (SendWindowWaiter waiter : sendWindowWaiters) {
+            if (!waiter.done && !waiter.cancelled && now >= waiter.deadlineNs) {
+                LockSupport.unpark(waiter.thread);
             }
         }
     }
@@ -620,6 +634,7 @@ final class H2Muxer implements AutoCloseable {
                     int tick = ++timeoutTick;
                     checkReadTimeouts(tick);
                     checkWriteTimeouts(tick);
+                    wakeTimedOutWaiters();
                     lastTimeoutCheck = now;
                 }
 
@@ -644,13 +659,7 @@ final class H2Muxer implements AutoCloseable {
         while ((pw = exchange.pendingWrites.poll()) != null) {
             byte[] buffer = pw.data;
             try {
-                frameCodec.writeFrame(
-                        FRAME_TYPE_DATA,
-                        pw.flags,
-                        streamId,
-                        pw.data,
-                        pw.offset,
-                        pw.length);
+                frameCodec.writeFrame(FRAME_TYPE_DATA, pw.flags, streamId, pw.data, pw.offset, pw.length);
             } catch (IOException e) {
                 exchange.returnBuffer(buffer);
                 failWriter(e);

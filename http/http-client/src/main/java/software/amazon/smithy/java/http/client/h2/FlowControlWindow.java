@@ -16,6 +16,9 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 final class FlowControlWindow {
 
+    // Poll interval for timeout checking (avoids ScheduledThreadPoolExecutor contention)
+    private static final long POLL_INTERVAL_NS = TimeUnit.MILLISECONDS.toNanos(10);
+
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition available = lock.newCondition();
     private long window;
@@ -53,11 +56,12 @@ final class FlowControlWindow {
      * Try to acquire up to the requested bytes from the window.
      *
      * <p>This method acquires as many bytes as available (up to the requested amount),
-     * waiting only if the window is completely empty.
+     * waiting only if the window is completely empty. Uses short polling intervals
+     * to avoid contention on the ScheduledThreadPoolExecutor used for long timed waits.
      *
      * @param maxBytes maximum number of bytes to acquire
-     * @param timeoutMs maximum time to wait in milliseconds (only if window is empty)
-     * @return number of bytes acquired (0 if timeout expired with empty window)
+     * @param timeoutMs maximum time to wait in milliseconds
+     * @return number of bytes acquired (0 if timeout expired)
      * @throws InterruptedException if interrupted while waiting
      */
     int tryAcquireUpTo(int maxBytes, long timeoutMs) throws InterruptedException {
@@ -70,13 +74,17 @@ final class FlowControlWindow {
                 return acquired;
             }
 
-            // Slow path: wait for any capacity
+            // Slow path: poll with short intervals to avoid timed-wait contention
             long remainingNs = TimeUnit.MILLISECONDS.toNanos(timeoutMs);
             while (window <= 0) {
                 if (remainingNs <= 0) {
-                    return 0;
+                    return 0; // Timeout
                 }
-                remainingNs = available.awaitNanos(remainingNs);
+                // Use short poll interval instead of full timeout
+                long waitNs = Math.min(remainingNs, POLL_INTERVAL_NS);
+                long before = System.nanoTime();
+                available.awaitNanos(waitNs);
+                remainingNs -= (System.nanoTime() - before);
             }
 
             int acquired = (int) Math.min(window, maxBytes);

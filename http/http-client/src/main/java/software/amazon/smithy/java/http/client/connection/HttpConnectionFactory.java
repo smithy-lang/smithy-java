@@ -44,7 +44,8 @@ record HttpConnectionFactory(
         DnsResolver dnsResolver,
         HttpSocketFactory socketFactory,
         int h2InitialWindowSize,
-        int h2MaxFrameSize) {
+        int h2MaxFrameSize,
+        int h2BufferSize) {
     /**
      * Create a new connection to the given route.
      *
@@ -155,7 +156,7 @@ record HttpConnectionFactory(
 
         try {
             if ("h2".equals(protocol) || "h2c".equals(protocol)) {
-                return new H2Connection(socket, route, readTimeout, writeTimeout, h2InitialWindowSize, h2MaxFrameSize);
+                return new H2Connection(socket, route, readTimeout, writeTimeout, h2InitialWindowSize, h2MaxFrameSize, h2BufferSize);
             } else {
                 return new H1Connection(socket, route, readTimeout);
             }
