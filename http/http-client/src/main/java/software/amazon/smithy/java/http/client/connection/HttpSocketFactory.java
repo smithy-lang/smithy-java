@@ -57,7 +57,6 @@ public interface HttpSocketFactory {
         Socket socket = new Socket();
         socket.setTcpNoDelay(true);
         socket.setKeepAlive(true);
-        // Larger buffers for high throughput
         socket.setSendBufferSize(64 * 1024);
         socket.setReceiveBufferSize(64 * 1024);
         return socket;
