@@ -38,6 +38,7 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
 
     private static final String CONTENT_TYPE = "application/x-www-form-urlencoded";
     private static final List<String> CONTENT_TYPE_LIST = List.of(CONTENT_TYPE);
+    public static final HttpHeaders CONTENT_TYPE_HEADERS = HttpHeaders.of(Map.of("Content-Type", CONTENT_TYPE_LIST));
 
     private final ShapeId service;
     private final String version;
@@ -80,7 +81,7 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
         return HttpRequest.builder()
                 .method("POST")
                 .uri(endpoint)
-                .headers(HttpHeaders.of(Map.of("Content-Type", CONTENT_TYPE_LIST)))
+                .headers(CONTENT_TYPE_HEADERS)
                 .body(DataStream.ofByteBuffer(body, CONTENT_TYPE))
                 .build();
     }
