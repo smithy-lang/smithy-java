@@ -10,6 +10,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
+import io.netty.handler.codec.http2.Http2DataFrame;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.util.CharsetUtil;
 import java.util.Map;
@@ -29,6 +30,19 @@ public class TrailerResponseHttp2ClientHandler implements Http2ClientHandler {
 
     @Override
     public void onHeadersFrame(ChannelHandlerContext ctx, Http2HeadersFrame frame) {
+        if (frame.isEndStream()) {
+            sendResponse(ctx);
+        }
+    }
+
+    @Override
+    public void onDataFrame(ChannelHandlerContext ctx, Http2DataFrame frame) {
+        if (frame.isEndStream()) {
+            sendResponse(ctx);
+        }
+    }
+
+    private void sendResponse(ChannelHandlerContext ctx) {
         // Send response headers (not end of stream)
         var responseHeaders = new DefaultHttp2Headers();
         responseHeaders.status("200");
