@@ -31,6 +31,7 @@ public class TrailerHeadersHttp2Test extends BaseHttpClientIntegTest {
     protected NettyTestServer.Builder configureServer(NettyTestServer.Builder builder) {
         return builder
                 .httpVersion(HttpVersion.HTTP_2)
+                .h2ConnectionMode(NettyTestServer.H2ConnectionMode.PRIOR_KNOWLEDGE)
                 .http2HandlerFactory(ctx -> new TrailerResponseHttp2ClientHandler(RESPONSE_CONTENTS, TRAILERS));
     }
 
