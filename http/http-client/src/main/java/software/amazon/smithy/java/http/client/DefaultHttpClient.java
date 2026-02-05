@@ -161,9 +161,12 @@ final class DefaultHttpClient implements HttpClient {
                     context,
                     resolvedInterceptors,
                     this);
-        } catch (IOException e) {
+        } catch (Exception e) {
             connectionPool.evict(conn, true);
-            throw e;
+            if (e instanceof IOException ioe) {
+                throw ioe;
+            }
+            throw new IOException("Failed to create exchange", e);
         }
     }
 
