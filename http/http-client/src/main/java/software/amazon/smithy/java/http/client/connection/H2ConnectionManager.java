@@ -61,8 +61,8 @@ final class H2ConnectionManager {
     // Soft limit as a fraction of streamsPerConnection. When all connections exceed this threshold,
     // we try to create a new connection (if under max).
     // This prevents overloading a single TCP connection even when the server allows many streams.
-    private static final int SOFT_LIMIT_DIVISOR = 100; // Lowered for testing
-    private static final int SOFT_LIMIT_FLOOR = 1; // Lowered for testing
+    private static final int SOFT_LIMIT_DIVISOR = 4; // Create new connection at 25% utilization
+    private static final int SOFT_LIMIT_FLOOR = 25;
 
     private final ConcurrentHashMap<Route, RouteState> routes = new ConcurrentHashMap<>();
     private final int streamsPerConnection; // Hard limit from server
