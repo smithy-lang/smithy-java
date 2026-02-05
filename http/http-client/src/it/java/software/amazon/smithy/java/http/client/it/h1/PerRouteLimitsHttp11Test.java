@@ -8,12 +8,14 @@ package software.amazon.smithy.java.http.client.it.h1;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.net.InetAddress;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
@@ -102,10 +104,10 @@ public class PerRouteLimitsHttp11Test {
         assertEquals(1, handler2.connectionCount());
     }
 
-    private String readBody(software.amazon.smithy.java.http.api.HttpResponse response) {
+    private String readBody(HttpResponse response) {
         var buf = response.body().asByteBuffer();
         var bytes = new byte[buf.remaining()];
         buf.get(bytes);
-        return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 }
