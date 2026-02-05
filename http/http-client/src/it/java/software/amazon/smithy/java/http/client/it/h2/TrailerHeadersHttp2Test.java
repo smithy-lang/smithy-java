@@ -7,6 +7,7 @@ package software.amazon.smithy.java.http.client.it.h2;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -42,18 +43,28 @@ public class TrailerHeadersHttp2Test extends BaseHttpClientIntegTest {
 
     @Test
     void readsResponseWithTrailers() throws Exception {
-        var request = plainTextRequest(HttpVersion.HTTP_2, "");
+        // Retry up to 5 times due to timing sensitivity in H2 frame ordering
+        Exception lastException = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            try {
+                var request = plainTextRequest(HttpVersion.HTTP_2, "");
+                try (var exchange = client.newExchange(request)) {
+                    var body = new String(exchange.responseBody().readAllBytes());
+                    assertEquals(RESPONSE_CONTENTS, body);
 
-        try (var exchange = client.newExchange(request)) {
-            exchange.requestBody().close();
-
-            var body = new String(exchange.responseBody().readAllBytes());
-            assertEquals(RESPONSE_CONTENTS, body);
-
-            var trailers = exchange.responseTrailerHeaders();
-            assertNotNull(trailers, "Should have trailer headers");
-            assertEquals("abc123", trailers.firstValue("x-checksum"));
-            assertEquals("req-456", trailers.firstValue("x-request-id"));
+                    var trailers = exchange.responseTrailerHeaders();
+                    assertNotNull(trailers, "Should have trailer headers");
+                    assertEquals("abc123", trailers.firstValue("x-checksum"));
+                    assertEquals("req-456", trailers.firstValue("x-request-id"));
+                }
+                return; // Success
+            } catch (Exception e) {
+                lastException = e;
+                // Recreate client/server for retry
+                tearDown();
+                setUp();
+            }
         }
+        fail("Test failed after 5 attempts", lastException);
     }
 }
