@@ -69,6 +69,7 @@ final class ManagedHttpExchange implements HttpExchange {
     private HttpResponse interceptedResponse;
     private InputStream responseIn; // wrapper returned to caller
     private InputStream underlyingResponseBody; // actual body stream to drain on close
+    private InputStream interceptorReplacementBody; // body from interceptor, needs closing
 
     ManagedHttpExchange(
             HttpExchange delegate,
@@ -108,8 +109,9 @@ final class ManagedHttpExchange implements HttpExchange {
             ensureIntercepted();
             InputStream body;
             if (interceptedResponse != null) {
-                // Interceptor replaced response - use replacement body
+                // Interceptor replaced response - use replacement body and track for closing
                 body = interceptedResponse.body().asInputStream();
+                interceptorReplacementBody = body;
             } else if (underlyingResponseBody != null) {
                 // Interceptors ran but didn't replace - use captured original
                 body = underlyingResponseBody;
@@ -192,6 +194,15 @@ final class ManagedHttpExchange implements HttpExchange {
         } catch (IOException ignored) {
             // Drain failed, so the connection cannot be reused safely
             errored = true;
+        }
+
+        // Close interceptor replacement body if present (separate from connection body)
+        if (interceptorReplacementBody != null) {
+            try {
+                interceptorReplacementBody.close();
+            } catch (IOException ignored) {
+                // Best effort close
+            }
         }
 
         try {
