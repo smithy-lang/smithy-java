@@ -516,7 +516,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
                 int increment = frameCodec.readAndParseWindowUpdate();
                 muxer.releaseConnectionWindow(increment);
             }
-            // If it's any other frame type, it will be processed by the reader thread
+            // Any other frame type is ignored - we only act on connection-level WINDOW_UPDATE here.
         } catch (SocketTimeoutException e) {
             // No initial WINDOW_UPDATE - that's fine, proceed with default window
         } finally {
