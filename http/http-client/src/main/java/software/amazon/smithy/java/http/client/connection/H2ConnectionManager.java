@@ -50,7 +50,7 @@ final class H2ConnectionManager {
 
         /** Round-robin index for connection selection. Atomic for concurrent access. */
         final AtomicInteger nextIndex = new AtomicInteger(0);
-        
+
         /** Lock for state modifications. ReentrantLock avoids VT pinning unlike synchronized. */
         final java.util.concurrent.locks.ReentrantLock lock = new java.util.concurrent.locks.ReentrantLock();
         final java.util.concurrent.locks.Condition available = lock.newCondition();
@@ -61,8 +61,8 @@ final class H2ConnectionManager {
     // Soft limit as a fraction of streamsPerConnection. When all connections exceed this threshold,
     // we try to create a new connection (if under max).
     // This prevents overloading a single TCP connection even when the server allows many streams.
-    private static final int SOFT_LIMIT_DIVISOR = 100;  // Lowered for testing
-    private static final int SOFT_LIMIT_FLOOR = 1;  // Lowered for testing
+    private static final int SOFT_LIMIT_DIVISOR = 100; // Lowered for testing
+    private static final int SOFT_LIMIT_FLOOR = 1; // Lowered for testing
 
     private final ConcurrentHashMap<Route, RouteState> routes = new ConcurrentHashMap<>();
     private final int streamsPerConnection; // Hard limit from server
@@ -154,6 +154,7 @@ final class H2ConnectionManager {
 
         return createNewH2Connection(route, state);
     }
+
     private H2Connection createNewH2Connection(Route route, RouteState state) throws IOException {
         // Create new connection OUTSIDE the lock to avoid deadlock.
         H2Connection newConn = null;

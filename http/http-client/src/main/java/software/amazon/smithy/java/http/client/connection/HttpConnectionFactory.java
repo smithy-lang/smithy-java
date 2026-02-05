@@ -156,7 +156,13 @@ record HttpConnectionFactory(
 
         try {
             if ("h2".equals(protocol) || "h2c".equals(protocol)) {
-                return new H2Connection(socket, route, readTimeout, writeTimeout, h2InitialWindowSize, h2MaxFrameSize, h2BufferSize);
+                return new H2Connection(socket,
+                        route,
+                        readTimeout,
+                        writeTimeout,
+                        h2InitialWindowSize,
+                        h2MaxFrameSize,
+                        h2BufferSize);
             } else {
                 return new H1Connection(socket, route, readTimeout);
             }
