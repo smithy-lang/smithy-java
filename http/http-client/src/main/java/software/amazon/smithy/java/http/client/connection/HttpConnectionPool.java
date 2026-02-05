@@ -529,10 +529,7 @@ public final class HttpConnectionPool implements ConnectionPool {
                 Thread.sleep(Duration.ofSeconds(30));
 
                 // Clean up HTTP/1.1 connections
-                int removed = h1Manager.cleanupIdle(this::notifyClosed);
-                if (removed > 0) {
-                    connectionPermits.release(removed);
-                }
+                h1Manager.cleanupIdle(this::notifyClosed);
 
                 // Clean up unhealthy HTTP/2 connections
                 h2Manager.cleanupAllDead(this::closeAndReleasePermit);
