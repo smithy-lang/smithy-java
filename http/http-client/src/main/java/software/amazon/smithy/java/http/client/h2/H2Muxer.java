@@ -23,7 +23,6 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.client.ByteAllocator;
 import software.amazon.smithy.java.http.client.h2.hpack.HpackEncoder;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
 

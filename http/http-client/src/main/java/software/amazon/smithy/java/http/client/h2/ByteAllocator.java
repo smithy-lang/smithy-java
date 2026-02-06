@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.http.client;
+package software.amazon.smithy.java.http.client.h2;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
  *
  * <p>Thread-safe: multiple threads can borrow and release buffers concurrently.
  */
-public final class ByteAllocator {
+final class ByteAllocator {
 
     // LIFO stack of pooled buffers: [0, top) are valid entries.
     private final AtomicReferenceArray<byte[]> stack;
@@ -73,6 +73,9 @@ public final class ByteAllocator {
      * <p><b>Important:</b> The returned buffer may be larger than {@code minSize}.
      * Callers must track the actual data length separately and not rely on
      * {@code buffer.length} to determine data boundaries.
+     *
+     * <p>Note: The pool is LIFO and does not search for a best-fit buffer. If the most recently released buffer
+     * is too small, it is discarded and a new buffer is allocated.
      *
      * @param minSize minimum buffer size needed
      * @return a buffer of at least minSize bytes (may be larger)

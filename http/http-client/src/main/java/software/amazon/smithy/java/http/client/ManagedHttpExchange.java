@@ -45,7 +45,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 final class ManagedHttpExchange implements HttpExchange {
 
     // No need to allocate or track closed with a volatile like the built-in version does.
-    private static final OutputStream VERY_NULL_OUTPUT_STREAM = new OutputStream() {
+    private static final OutputStream NULL_OUTPUT_STREAM = new OutputStream() {
         @Override
         public void write(int b) {}
     };
@@ -140,6 +140,13 @@ final class ManagedHttpExchange implements HttpExchange {
         }
     }
 
+    /**
+     * Returns trailer headers from the underlying connection.
+     *
+     * <p>Trailers are read from the wire after the response body completes and cannot be
+     * replaced by interceptors. This method always returns trailers from the actual HTTP
+     * response, regardless of any interceptor modifications.
+     */
     @Override
     public HttpHeaders responseTrailerHeaders() {
         return delegate.responseTrailerHeaders();
@@ -189,7 +196,7 @@ final class ManagedHttpExchange implements HttpExchange {
         // responseIn's close() callback invokes this method.
         try {
             if (underlyingResponseBody != null) {
-                underlyingResponseBody.transferTo(VERY_NULL_OUTPUT_STREAM);
+                underlyingResponseBody.transferTo(NULL_OUTPUT_STREAM);
             }
         } catch (IOException ignored) {
             // Drain failed, so the connection cannot be reused safely

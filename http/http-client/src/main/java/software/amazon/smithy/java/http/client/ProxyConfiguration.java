@@ -11,7 +11,8 @@ import java.util.Objects;
 /**
  * Proxy configuration for HTTP connections.
  *
- * <p>Supports HTTP and SOCKS proxies with optional authentication.
+ * <p>Currently supports HTTP proxies (CONNECT tunnel for HTTPS targets).
+ * SOCKS proxy types are defined but not yet implemented.
  *
  * @param proxyUri Proxy server URI.
  * @param type Type of proxy.

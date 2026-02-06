@@ -43,7 +43,7 @@ class H1ConnectionManagerTest {
 
         manager.release(TEST_ROUTE, connection, false);
         // Need to ensure pool exists first
-        manager.ensurePool(TEST_ROUTE, 10);
+        manager.getOrCreatePool(TEST_ROUTE, 10);
         manager.release(TEST_ROUTE, connection, false);
 
         var result = manager.tryAcquire(TEST_ROUTE, 10);
@@ -63,7 +63,7 @@ class H1ConnectionManagerTest {
             }
         };
 
-        manager.ensurePool(TEST_ROUTE, 10);
+        manager.getOrCreatePool(TEST_ROUTE, 10);
         manager.release(TEST_ROUTE, connection, false);
 
         Thread.sleep(50); // Wait longer than max idle time
@@ -86,7 +86,7 @@ class H1ConnectionManagerTest {
             }
         };
 
-        manager.ensurePool(TEST_ROUTE, 10);
+        manager.getOrCreatePool(TEST_ROUTE, 10);
         manager.release(TEST_ROUTE, connection, false);
 
         Thread.sleep(1100); // Wait > 1 second (VALIDATION_THRESHOLD_NANOS)
@@ -108,7 +108,7 @@ class H1ConnectionManagerTest {
         };
         var validConnection = new TestConnection();
 
-        manager.ensurePool(TEST_ROUTE, 10);
+        manager.getOrCreatePool(TEST_ROUTE, 10);
         manager.release(TEST_ROUTE, validConnection, false);
         manager.release(TEST_ROUTE, invalidConnection, false);
 
@@ -136,7 +136,7 @@ class H1ConnectionManagerTest {
             }
         };
 
-        manager.ensurePool(TEST_ROUTE, 10);
+        manager.getOrCreatePool(TEST_ROUTE, 10);
         manager.release(TEST_ROUTE, invalidConnection, false);
         // Connection becomes inactive after being pooled
         active.set(false);
@@ -156,7 +156,7 @@ class H1ConnectionManagerTest {
             }
         };
 
-        manager.ensurePool(TEST_ROUTE, 10);
+        manager.getOrCreatePool(TEST_ROUTE, 10);
         boolean released = manager.release(TEST_ROUTE, inactiveConnection, false);
 
         assertFalse(released, "Should not release inactive connection");
@@ -167,7 +167,7 @@ class H1ConnectionManagerTest {
         var manager = new H1ConnectionManager(MAX_IDLE_NANOS);
         var connection = new TestConnection();
 
-        manager.ensurePool(TEST_ROUTE, 10);
+        manager.getOrCreatePool(TEST_ROUTE, 10);
         boolean released = manager.release(TEST_ROUTE, connection, true);
 
         assertFalse(released, "Should not release when pool is closed");
@@ -188,7 +188,7 @@ class H1ConnectionManagerTest {
         var manager = new H1ConnectionManager(MAX_IDLE_NANOS);
         var connection = new TestConnection();
 
-        manager.ensurePool(TEST_ROUTE, 10);
+        manager.getOrCreatePool(TEST_ROUTE, 10);
         manager.release(TEST_ROUTE, connection, false);
         manager.remove(TEST_ROUTE, connection);
 
@@ -202,7 +202,7 @@ class H1ConnectionManagerTest {
         var manager = new H1ConnectionManager(1); // 1 nanosecond max idle
         var connection = new TestConnection();
 
-        manager.ensurePool(TEST_ROUTE, 10);
+        manager.getOrCreatePool(TEST_ROUTE, 10);
         manager.release(TEST_ROUTE, connection, false);
 
         Thread.sleep(10); // Ensure connection is expired
@@ -230,7 +230,7 @@ class H1ConnectionManagerTest {
             }
         };
 
-        manager.ensurePool(TEST_ROUTE, 10);
+        manager.getOrCreatePool(TEST_ROUTE, 10);
         manager.release(TEST_ROUTE, unhealthyConnection, false);
         unhealthyConnection.setInactive();
 
@@ -258,7 +258,7 @@ class H1ConnectionManagerTest {
             }
         };
 
-        manager.ensurePool(TEST_ROUTE, 10);
+        manager.getOrCreatePool(TEST_ROUTE, 10);
         manager.release(TEST_ROUTE, connection1, false);
         manager.release(TEST_ROUTE, connection2, false);
 
@@ -267,6 +267,37 @@ class H1ConnectionManagerTest {
 
         assertEquals(2, closedConnections.get(), "All connections should be closed");
         assertTrue(exceptions.isEmpty(), "No exceptions expected");
+    }
+
+    @Test
+    void getOrCreatePoolThrowsOnInconsistentMaxConnections() {
+        var manager = new H1ConnectionManager(MAX_IDLE_NANOS);
+
+        manager.getOrCreatePool(TEST_ROUTE, 10);
+
+        var ex = org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalStateException.class,
+                () -> manager.getOrCreatePool(TEST_ROUTE, 20));
+
+        assertTrue(ex.getMessage().contains("maxConnections=10"));
+        assertTrue(ex.getMessage().contains("cannot change to 20"));
+    }
+
+    @Test
+    void cleanupIdleRemovesEmptyPools() {
+        var manager = new H1ConnectionManager(1); // 1 nanosecond max idle
+        var connection = new TestConnection();
+
+        manager.getOrCreatePool(TEST_ROUTE, 10);
+        manager.release(TEST_ROUTE, connection, false);
+
+        // First cleanup removes the expired connection
+        manager.cleanupIdle((conn, reason) -> {});
+
+        // Pool should be removed since it's empty
+        // Verify by checking that we can create a new pool with different maxConnections
+        // (would throw if old pool still existed)
+        manager.getOrCreatePool(TEST_ROUTE, 5); // Different maxConnections - should work
     }
 
     // Test connection implementation
