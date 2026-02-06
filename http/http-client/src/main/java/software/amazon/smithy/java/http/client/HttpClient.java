@@ -101,8 +101,26 @@ public interface HttpClient extends AutoCloseable {
      */
     HttpExchange newExchange(HttpRequest request, RequestOptions options) throws IOException;
 
+    /**
+     * Closes the client and its underlying connection pool.
+     *
+     * <p>Active connections are closed immediately. Pending requests may fail with an IOException.
+     *
+     * @throws IOException if an I/O error occurs while closing
+     */
     @Override
     void close() throws IOException;
+
+    /**
+     * Gracefully shuts down the client, waiting for in-flight requests to complete.
+     *
+     * <p>No new requests are accepted after this method is called. Existing requests
+     * are allowed to complete until the timeout expires, after which connections are
+     * forcibly closed.
+     *
+     * @param timeout maximum time to wait for in-flight requests to complete
+     */
+    void shutdown(Duration timeout);
 
     /**
      * Builder to create a new default HTTP client.
@@ -223,7 +241,6 @@ public interface HttpClient extends AutoCloseable {
          * Build the HTTP client.
          *
          * @return a new HTTP client instance
-         * @throws IllegalStateException if the configuration is invalid
          */
         public HttpClient build() {
             if (connectionPool == null) {

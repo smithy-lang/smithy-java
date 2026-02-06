@@ -43,7 +43,7 @@ final class H1ConnectionManager {
      * @return a valid pooled connection, or null if none available
      */
     PooledConnection tryAcquire(Route route, int maxConnections) {
-        HostPool hostPool = pools.computeIfAbsent(route, k -> new HostPool(maxConnections));
+        HostPool hostPool = getOrCreatePool(route, maxConnections);
 
         PooledConnection pooled;
         while ((pooled = hostPool.poll()) != null) {
@@ -64,14 +64,31 @@ final class H1ConnectionManager {
     }
 
     /**
-     * Ensure a pool exists for the route.
+     * Get or create a pool for the route.
+     *
+     * @param route the route
+     * @param maxConnections max pooled connections for this route
+     * @return the pool for the route
+     * @throws IllegalStateException if a pool exists with a different maxConnections
      */
-    void ensurePool(Route route, int maxConnections) {
-        pools.computeIfAbsent(route, k -> new HostPool(maxConnections));
+    HostPool getOrCreatePool(Route route, int maxConnections) {
+        return pools.compute(route, (k, existing) -> {
+            if (existing == null) {
+                return new HostPool(maxConnections);
+            } else if (existing.maxConnections != maxConnections) {
+                throw new IllegalStateException(
+                        "Pool for " + route + " already exists with maxConnections=" + existing.maxConnections
+                                + ", cannot change to " + maxConnections);
+            }
+            return existing;
+        });
     }
 
     /**
      * Release a connection back to the pool.
+     *
+     * <p>This method may block if the pool is temporarily full, allowing short-lived contention to resolve and
+     * keeping the pool warm under bursty workloads.
      *
      * @return true if pooled, false if pool full or closed
      */
@@ -112,7 +129,7 @@ final class H1ConnectionManager {
     }
 
     /**
-     * Clean up idle and unhealthy connections.
+     * Clean up idle and unhealthy connections, and remove empty pools.
      *
      * @param onRemove callback for each removed connection
      * @return total number of connections removed
@@ -122,6 +139,9 @@ final class H1ConnectionManager {
         for (HostPool pool : pools.values()) {
             totalRemoved += pool.removeIdleConnections(maxIdleTimeNanos, onRemove);
         }
+
+        // Remove empty pools to prevent unbounded growth with dynamic routes
+        pools.entrySet().removeIf(e -> e.getValue().isEmpty());
         return totalRemoved;
     }
 
@@ -160,11 +180,17 @@ final class H1ConnectionManager {
     /**
      * Per-route connection pool using blocking deque (LIFO).
      */
-    static final class HostPool {
+    private static final class HostPool {
         private final LinkedBlockingDeque<PooledConnection> available;
+        private final int maxConnections;
 
         HostPool(int maxConnections) {
+            this.maxConnections = maxConnections;
             this.available = new LinkedBlockingDeque<>(maxConnections);
+        }
+
+        boolean isEmpty() {
+            return available.isEmpty();
         }
 
         PooledConnection poll() {

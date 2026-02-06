@@ -264,4 +264,18 @@ final class DefaultHttpClient implements HttpClient {
         executorService.close();
         connectionPool.close();
     }
+
+    @Override
+    public void shutdown(Duration timeout) {
+        executorService.shutdown();
+        try {
+            executorService.awaitTermination(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        executorService.shutdownNow();
+        try {
+            connectionPool.shutdown(timeout);
+        } catch (IOException ignored) {}
+    }
 }

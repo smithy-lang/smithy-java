@@ -33,11 +33,14 @@ public final class BoundedInputStream extends InputStream {
         if (b != -1) {
             remaining--;
         } else if (remaining > 0) {
-            // Server closed connection before sending all Content-Length bytes
-            throw new IOException("Premature EOF: expected " + remaining
-                    + " more bytes based on Content-Length");
+            throw prematureEof();
         }
         return b;
+    }
+
+    private IOException prematureEof() {
+        return new IOException("Premature EOF: expected " + remaining
+                + " more bytes based on Content-Length");
     }
 
     @Override
@@ -52,9 +55,7 @@ public final class BoundedInputStream extends InputStream {
         if (n > 0) {
             remaining -= n;
         } else if (n == -1 && remaining > 0) {
-            // Server closed connection before sending all Content-Length bytes
-            throw new IOException("Premature EOF: expected " + remaining
-                    + " more bytes based on Content-Length");
+            throw prematureEof();
         }
 
         return n;
@@ -100,12 +101,11 @@ public final class BoundedInputStream extends InputStream {
                 int toRead = (int) Math.min(drain.length, remaining);
                 int n = delegate.read(drain, 0, toRead);
                 if (n == -1) {
-                    throw new IOException("Premature EOF while draining response body: expected "
-                            + remaining + " more bytes based on Content-Length");
+                    throw prematureEof();
                 }
                 remaining -= n;
             }
         }
-        // Don't close delegate - connection may be reused
+        // Note: don't close delegate so that connection may be reused
     }
 }

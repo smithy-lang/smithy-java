@@ -8,6 +8,7 @@ package software.amazon.smithy.java.http.client.connection;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.http.client.h2.H2Connection;
@@ -62,6 +63,9 @@ final class H2ConnectionManager {
     // we try to create a new connection (if under max).
     // This prevents overloading a single TCP connection even when the server allows many streams.
     private static final int SOFT_LIMIT_DIVISOR = 4; // Create new connection at 25% utilization
+    // Floor ensures we don't create excessive connections for servers with low max_concurrent_streams.
+    // 25 streams is a reasonable threshold - below this, a single connection handles load well;
+    // above this, spreading load across connections reduces head-of-line blocking.
     private static final int SOFT_LIMIT_FLOOR = 25;
 
     private final ConcurrentHashMap<Route, RouteState> routes = new ConcurrentHashMap<>();
@@ -99,6 +103,10 @@ final class H2ConnectionManager {
      * <p>Connection creation happens outside the synchronized block to prevent deadlock
      * when connection establishment blocks on I/O.
      *
+     * <p>Note: Under high contention, we may create slightly more connections than strictly
+     * necessary. This is intentional - we bias toward expansion to avoid coordination
+     * bottlenecks, accepting minor over-provisioning as a tradeoff.
+     *
      * @param route the target route
      * @param maxConnectionsForRoute maximum connections allowed for this route
      * @return an H2 connection ready for use
@@ -106,7 +114,7 @@ final class H2ConnectionManager {
      */
     H2Connection acquire(Route route, int maxConnectionsForRoute) throws IOException {
         RouteState state = stateFor(route);
-        long deadline = System.currentTimeMillis() + acquireTimeoutMs;
+        long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(acquireTimeoutMs);
 
         state.lock.lock();
         try {
@@ -135,14 +143,14 @@ final class H2ConnectionManager {
                 }
 
                 // Saturation: all connections at hard limit, wait for capacity
-                long remaining = deadline - System.currentTimeMillis();
-                if (remaining <= 0) {
+                long remainingNanos = deadlineNanos - System.nanoTime();
+                if (remainingNanos <= 0) {
                     throw new IOException("Acquire timeout: no connection available after "
                             + acquireTimeoutMs + "ms for " + route);
                 }
 
                 try {
-                    state.available.await(remaining, java.util.concurrent.TimeUnit.MILLISECONDS);
+                    state.available.awaitNanos(remainingNanos);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new IOException("Interrupted while waiting for connection", e);
@@ -211,6 +219,7 @@ final class H2ConnectionManager {
             if (conn == null) {
                 continue;
             }
+            // getActiveStreamCountIfAccepting(): returns active stream count, or <0 if not accepting new streams
             int active = conn.getActiveStreamCountIfAccepting();
             if (active >= 0 && active < limit) {
                 return conn;
@@ -326,6 +335,8 @@ final class H2ConnectionManager {
                 H2Connection[] next = new H2Connection[w];
                 System.arraycopy(tmp, 0, next, 0, w);
                 state.conns = next;
+                // Wake waiters - removed connections free capacity
+                state.available.signalAll();
             }
         } finally {
             state.lock.unlock();
@@ -381,6 +392,8 @@ final class H2ConnectionManager {
                     H2Connection[] next = new H2Connection[w];
                     System.arraycopy(tmp, 0, next, 0, w);
                     state.conns = next;
+                    // Wake waiters - removed connections free capacity
+                    state.available.signalAll();
                 }
             } finally {
                 state.lock.unlock();
@@ -388,6 +401,13 @@ final class H2ConnectionManager {
         }
     }
 
+    /**
+     * Close all connections for shutdown.
+     *
+     * <p>This is a best-effort shutdown. In-flight acquires that already have a cached
+     * RouteState may continue to operate briefly. For hard shutdown semantics, callers
+     * should ensure no new requests are submitted before calling this method.
+     */
     void closeAll(BiConsumer<H2Connection, CloseReason> onClose) {
         for (RouteState state : routes.values()) {
             H2Connection[] snapshot = state.conns;

@@ -308,6 +308,37 @@ class ManagedHttpExchangeTest {
     }
 
     @Test
+    void evictsConnectionWhenDrainFails() throws IOException {
+        var delegate = new TestHttpExchange() {
+            @Override
+            public InputStream responseBody() {
+                return new ByteArrayInputStream("body".getBytes()) {
+                    @Override
+                    public long transferTo(OutputStream out) throws IOException {
+                        throw new IOException("drain failed");
+                    }
+                };
+            }
+        };
+
+        var evicted = new AtomicBoolean(false);
+        var pool = new TestConnectionPool() {
+            @Override
+            public void evict(HttpConnection conn, boolean close) {
+                evicted.set(true);
+            }
+        };
+
+        var exchange = createExchange(pool, List.of(new HttpInterceptor() {}), delegate);
+
+        // Access headers to trigger interception (which captures body stream)
+        exchange.responseHeaders();
+        exchange.close();
+
+        assertTrue(evicted.get(), "Connection should be evicted when drain fails");
+    }
+
+    @Test
     void onErrorInterceptorCanRecoverFromException() throws IOException {
         var interceptor = new HttpInterceptor() {
             @Override
@@ -388,9 +419,9 @@ class ManagedHttpExchangeTest {
             public InputStream responseBody() {
                 return new ByteArrayInputStream("original-body".getBytes()) {
                     @Override
-                    public int read(byte[] b, int off, int len) {
+                    public byte[] readAllBytes() {
                         originalBodyRead.set(true);
-                        return super.read(b, off, len);
+                        return super.readAllBytes();
                     }
                 };
             }

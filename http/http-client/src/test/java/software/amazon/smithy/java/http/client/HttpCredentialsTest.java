@@ -54,4 +54,36 @@ class HttpCredentialsTest {
 
         assertFalse(result);
     }
+
+    @Test
+    void bearerAddsAuthHeader() {
+        var creds = new HttpCredentials.Bearer("my-token");
+        var request = HttpRequest.builder().method("GET").uri(URI.create("http://example.com"));
+        boolean result = creds.authenticate(request, null);
+
+        assertTrue(result);
+        var built = request.build();
+        assertEquals("Bearer my-token", built.headers().firstValue("Authorization"));
+    }
+
+    @Test
+    void bearerForProxyAddsProxyAuthHeader() {
+        var creds = new HttpCredentials.Bearer("my-token", true);
+        var request = HttpRequest.builder().method("GET").uri(URI.create("http://example.com"));
+        boolean result = creds.authenticate(request, null);
+
+        assertTrue(result);
+        var built = request.build();
+        assertEquals("Bearer my-token", built.headers().firstValue("Proxy-Authorization"));
+    }
+
+    @Test
+    void bearerReturnsFalseOnChallenge() {
+        var creds = new HttpCredentials.Bearer("my-token");
+        var request = HttpRequest.builder().method("GET").uri(URI.create("http://example.com"));
+        var priorResponse = HttpResponse.builder().statusCode(401).build();
+        boolean result = creds.authenticate(request, priorResponse);
+
+        assertFalse(result);
+    }
 }

@@ -45,20 +45,14 @@ public interface HttpSocketFactory {
     Socket newSocket(Route route, List<InetAddress> endpoints) throws IOException;
 
     /**
-     * Default factory used to create sockets.
-     *
-     * <p>Creates sockets with TCP_NODELAY=true, SO_KEEPALIVE=true, and 64KB send/receive buffers.
-     *
-     * @param route the target route (unused in default implementation)
-     * @param endpoints the resolved endpoints (unused in default implementation)
-     * @return the created socket
+     * Default factory that creates sockets with TCP_NODELAY=true, SO_KEEPALIVE=true, and 64KB send/receive buffers.
      */
-    static Socket defaultSocketFactory(Route route, List<InetAddress> endpoints) throws IOException {
+    HttpSocketFactory DEFAULT = (route, endpoints) -> {
         Socket socket = new Socket();
         socket.setTcpNoDelay(true);
         socket.setKeepAlive(true);
         socket.setSendBufferSize(64 * 1024);
         socket.setReceiveBufferSize(64 * 1024);
         return socket;
-    }
+    };
 }

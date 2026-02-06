@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.http.client;
 
-import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -15,18 +14,28 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>The close callback is invoked at most once, and can be safely closed from any thread.
  */
-public final class DelegatedClosingOutputStream extends FilterOutputStream {
+public final class DelegatedClosingOutputStream extends OutputStream {
+    private final OutputStream out;
     private final CloseCallback closeCallback;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public DelegatedClosingOutputStream(OutputStream delegate, CloseCallback closeCallback) {
-        super(delegate);
+        this.out = delegate;
         this.closeCallback = closeCallback;
     }
 
     @Override
+    public void write(int b) throws IOException {
+        out.write(b);
+    }
+
+    @Override
+    public void write(byte[] b) throws IOException {
+        out.write(b);
+    }
+
+    @Override
     public void write(byte[] b, int off, int len) throws IOException {
-        // Override to delegate directly - FilterOutputStream's default loops byte-by-byte
         out.write(b, off, len);
     }
 

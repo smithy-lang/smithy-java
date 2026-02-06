@@ -254,14 +254,13 @@ public final class HttpConnectionPool implements ConnectionPool {
             notifyAcquire(conn, false);
             success = true;
             return conn;
-        } catch (Throwable e) {
-            if (e instanceof IOException) {
-                throw (IOException) e;
-            } else if (e instanceof RuntimeException) {
-                throw (RuntimeException) e;
-            } else {
-                throw new RuntimeException(e);
-            }
+        } catch (IOException e) {
+            notifyConnectFailed(route, e);
+            throw e;
+        } catch (Exception e) {
+            IOException ioe = new IOException(e);
+            notifyConnectFailed(route, ioe);
+            throw ioe;
         } finally {
             if (!success) {
                 connectionPermits.release();
@@ -291,14 +290,13 @@ public final class HttpConnectionPool implements ConnectionPool {
             }
             // ALPN negotiated HTTP/1.1 instead of H2 - shouldn't happen with H2C_PRIOR_KNOWLEDGE
             throw new IOException("Expected H2 connection but got " + conn.httpVersion());
-        } catch (Throwable e) {
-            if (e instanceof IOException) {
-                throw (IOException) e;
-            } else if (e instanceof RuntimeException) {
-                throw (RuntimeException) e;
-            } else {
-                throw new RuntimeException(e);
-            }
+        } catch (IOException e) {
+            notifyConnectFailed(route, e);
+            throw e;
+        } catch (Exception e) {
+            IOException ioe = new IOException(e);
+            notifyConnectFailed(route, ioe);
+            throw ioe;
         } finally {
             if (!success) {
                 connectionPermits.release();
@@ -485,6 +483,12 @@ public final class HttpConnectionPool implements ConnectionPool {
     private void notifyConnected(HttpConnection connection) {
         for (ConnectionPoolListener listener : listeners) {
             listener.onConnected(connection);
+        }
+    }
+
+    private void notifyConnectFailed(Route route, IOException cause) {
+        for (ConnectionPoolListener listener : listeners) {
+            listener.onConnectFailed(route, cause);
         }
     }
 

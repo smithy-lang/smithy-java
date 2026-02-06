@@ -172,6 +172,9 @@ public record RequestOptions(Context context, Duration requestTimeout, List<Http
         /**
          * Builds the RequestOptions instance.
          *
+         * <p>The builder's context and interceptors are consumed by this call and reset to
+         * defaults. The request timeout is retained for subsequent builds.
+         *
          * @return a new RequestOptions with the configured settings
          */
         public RequestOptions build() {
