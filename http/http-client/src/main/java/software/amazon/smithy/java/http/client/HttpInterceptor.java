@@ -56,7 +56,7 @@ import software.amazon.smithy.java.http.api.HttpResponse;
  *
  * <h2>Error Handling</h2>
  *
- * <p>If any interceptor throws an {@link java.io.IOException}:
+ * <p>If any interceptor throws an {@link IOException}:
  * <ul>
  *   <li>From {@link #beforeRequest} or {@link #preemptRequest}: propagates directly to caller</li>
  *   <li>From network request: passed to {@link #onError} for recovery</li>
@@ -161,7 +161,7 @@ public interface HttpInterceptor {
      * @param request the original request
      * @param context request-scoped context for passing data between interceptors
      * @param response the response received from the server (or previous interceptor)
-     * @return the non-null replacement response
+     * @return the response to use (same object for no change, different object to replace, or null for no change)
      * @throws IOException if an I/O error occurs (that {@link #onError} did not recover from)
      */
     default HttpResponse interceptResponse(

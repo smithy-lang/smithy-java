@@ -168,7 +168,7 @@ public interface HttpExchange extends AutoCloseable {
      *   <li><b>HTTP/2:</b> Via HEADERS frame after DATA with END_STREAM (RFC 9113 Section 8.1)</li>
      * </ul>
      *
-     * <p><b>IMPORTANT:</b> Trailers are only available after the entire response body has been read.
+     * <p><b>Important:</b> Trailers are only available after the entire response body has been read.
      * Calling this before the body is fully consumed returns null.
      *
      * {@snippet :

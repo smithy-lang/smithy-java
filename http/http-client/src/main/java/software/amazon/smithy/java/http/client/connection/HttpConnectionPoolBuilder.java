@@ -39,7 +39,7 @@ public final class HttpConnectionPoolBuilder {
     SSLParameters sslParameters;
     HttpVersionPolicy versionPolicy = HttpVersionPolicy.AUTOMATIC;
     DnsResolver dnsResolver;
-    HttpSocketFactory socketFactory = HttpSocketFactory::defaultSocketFactory;
+    HttpSocketFactory socketFactory = HttpSocketFactory.DEFAULT;
     final List<ConnectionPoolListener> listeners = new LinkedList<>();
 
     /**
@@ -117,7 +117,7 @@ public final class HttpConnectionPoolBuilder {
     }
 
     /**
-     * Set maximum total connections across all routes (default: 200).
+     * Set maximum total connections across all routes (default: 256).
      *
      * <p>This is a global limit across all routes to prevent unbounded
      * connection growth. When this limit is reached, {@link HttpConnectionPool#acquire(Route)}
@@ -195,6 +195,8 @@ public final class HttpConnectionPoolBuilder {
      * If the connection doesn't complete within this time, the attempt fails
      * and the next resolved IP (if any) is tried.
      *
+     * <p><b>Note:</b> A value of {@link Duration#ZERO} means infinite timeout (wait forever).
+     *
      * @param timeout connection timeout duration, must be non-negative
      * @return this builder
      * @throws IllegalArgumentException if timeout is null or negative
@@ -212,6 +214,9 @@ public final class HttpConnectionPoolBuilder {
      *
      * <p>This is the maximum time to wait for TLS handshake completion.
      * If the handshake doesn't complete within this time, the connection fails.
+     *
+     * <p><b>Note:</b> This timeout applies per read operation during the handshake, not as a total wall-clock
+     * deadline. A value of {@link Duration#ZERO} means infinite timeout (wait forever).
      *
      * <p>Separate from {@link #connectTimeout(Duration)} because TLS handshake
      * happens after TCP connection is established.
@@ -240,6 +245,8 @@ public final class HttpConnectionPoolBuilder {
      * <p>If no data is received within this duration, a
      * {@link java.net.SocketTimeoutException} is thrown.
      *
+     * <p><b>Note:</b> A value of {@link Duration#ZERO} means infinite timeout (wait forever).
+     *
      * @param timeout read timeout duration, must be non-negative
      * @return this builder
      * @throws IllegalArgumentException if timeout is null or negative
@@ -258,6 +265,8 @@ public final class HttpConnectionPoolBuilder {
      * <p>This timeout applies to waiting for flow control window space
      * when sending request body data. If flow control prevents sending
      * within this duration, a {@link java.net.SocketTimeoutException} is thrown.
+     *
+     * <p><b>Note:</b> A value of {@link Duration#ZERO} means infinite timeout (wait forever).
      *
      * @param timeout write timeout duration, must be non-negative
      * @return this builder

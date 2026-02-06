@@ -37,6 +37,10 @@ public interface HttpCredentials {
      * HTTP Basic authentication credentials.
      *
      * <p>Sends credentials preemptively in the Authorization or Proxy-Authorization header.
+     *
+     * @param username Username to send.
+     * @param password Password to send.
+     * @param forProxy True if this is for Proxy-Authorization, false for Authorization.
      */
     record Basic(String username, String password, boolean forProxy) implements HttpCredentials {
 
@@ -63,6 +67,40 @@ public interface HttpCredentials {
                     .encodeToString((username + ':' + password).getBytes(StandardCharsets.UTF_8));
             String header = forProxy ? "Proxy-Authorization" : "Authorization";
             request.withReplacedHeader(header, List.of("Basic " + credentials));
+            return true;
+        }
+    }
+
+    /**
+     * HTTP Bearer token authentication (RFC 6750).
+     *
+     * <p>Sends the token preemptively in the Authorization or Proxy-Authorization header.
+     * The token is sent as-is (no encoding applied).
+     *
+     * @param token Bearer token. Sent as-is on the wire.
+     * @param forProxy True if this is for Proxy-Authorization, false for Authorization.
+     */
+    record Bearer(String token, boolean forProxy) implements HttpCredentials {
+
+        public Bearer {
+            Objects.requireNonNull(token, "token");
+        }
+
+        /**
+         * Create Bearer credentials for server authentication.
+         */
+        public Bearer(String token) {
+            this(token, false);
+        }
+
+        @Override
+        public boolean authenticate(HttpRequest.Builder request, HttpResponse priorResponse) {
+            if (priorResponse != null) {
+                return false;
+            }
+
+            String header = forProxy ? "Proxy-Authorization" : "Authorization";
+            request.withReplacedHeader(header, List.of("Bearer " + token));
             return true;
         }
     }

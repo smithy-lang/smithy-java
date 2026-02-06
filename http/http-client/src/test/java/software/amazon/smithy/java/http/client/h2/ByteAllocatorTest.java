@@ -14,7 +14,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.http.client.ByteAllocator;
 
 class ByteAllocatorTest {
 

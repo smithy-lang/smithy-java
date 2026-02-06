@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.http.client.connection;
 
+import java.io.IOException;
+
 /**
  * Listener for connection pool lifecycle events.
  *
@@ -50,6 +52,17 @@ public interface ConnectionPoolListener {
      * @param reused true if this is a reused pooled connection, false if newly created
      */
     default void onAcquire(HttpConnection connection, boolean reused) {}
+
+    /**
+     * Called when a connection attempt fails.
+     *
+     * <p>This is called when TCP connection, TLS handshake, or protocol negotiation fails.
+     * No connection object exists at this point.
+     *
+     * @param route the route that failed to connect
+     * @param cause the exception that caused the failure
+     */
+    default void onConnectFailed(Route route, IOException cause) {}
 
     /**
      * Called when a user returns a connection to the pool.
