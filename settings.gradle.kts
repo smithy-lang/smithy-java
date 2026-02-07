@@ -46,6 +46,7 @@ include(":client:dynamic-client")
 include(":client:client-mock-plugin")
 include(":client:client-waiters")
 include(":client:client-rulesengine")
+include(":client:client-metrics-otel")
 
 // Server
 include(":server:server-api")
