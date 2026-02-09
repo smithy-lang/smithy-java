@@ -31,7 +31,10 @@ final class H2DataOutputStream extends OutputStream {
     public void write(int b) throws IOException {
         if (closed) {
             throw new IOException("Stream closed");
+        } else if (buffer.length == 0) {
+            throw new IOException("Cannot write body: END_STREAM already sent with headers");
         }
+
         buffer[pos++] = (byte) b;
         if (pos >= buffer.length) {
             flush();
@@ -44,6 +47,10 @@ final class H2DataOutputStream extends OutputStream {
             throw new IndexOutOfBoundsException();
         } else if (closed) {
             throw new IOException("Stream closed");
+        } else if (len == 0) {
+            return;
+        } else if (buffer.length == 0) {
+            throw new IOException("Cannot write body: END_STREAM already sent with headers");
         }
 
         // Fast path: large write - flush buffer if needed, then write directly

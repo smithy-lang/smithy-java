@@ -151,7 +151,7 @@ final class H2StreamState {
      * Atomically set response headers received with status code.
      * Transitions read state from WAITING to READING if appropriate.
      *
-     * @param statusCode the HTTP status code (100-999)
+     * @param statusCode the HTTP status code (100-599)
      */
     void setResponseHeadersReceived(int statusCode) {
         for (;;) {

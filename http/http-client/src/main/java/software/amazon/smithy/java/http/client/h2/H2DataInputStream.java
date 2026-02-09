@@ -207,17 +207,13 @@ final class H2DataInputStream extends InputStream {
         }
 
         // Pull and write chunks directly - no intermediate buffer, no double copy
+        // Note: pullNextChunk() returns the previous buffer to pool before getting next,
+        // so when it returns false (EOF), currentBuffer is already null.
         while (pullNextChunk()) {
             out.write(currentBuffer, 0, currentLength);
             transferred += currentLength;
             exchange.onDataConsumed(currentLength);
             readPosition = currentLength;
-        }
-
-        // Return the last buffer (pullNextChunk returned false but buffer may still be set)
-        if (currentBuffer != null) {
-            bufferReturner.accept(currentBuffer);
-            currentBuffer = null;
         }
 
         return transferred;

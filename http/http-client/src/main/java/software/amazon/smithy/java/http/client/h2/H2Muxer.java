@@ -672,7 +672,10 @@ final class H2Muxer implements AutoCloseable {
         // and re-enqueues while still processing.
         exchange.inWorkQueue = false;
 
-        if (!exchange.pendingWrites.isEmpty() && !exchange.inWorkQueue) {
+        // Check if more writes arrived while we were draining. If so, re-enqueue.
+        // Note: there's a benign race where VT could also enqueue via CAS, causing
+        // a duplicate entry - but processExchangePendingWrites handles empty queues fine.
+        if (!exchange.pendingWrites.isEmpty()) {
             exchange.inWorkQueue = true;
             dataWorkQueue.offer(exchange);
         }
@@ -703,8 +706,6 @@ final class H2Muxer implements AutoCloseable {
     private void processItem(H2MuxerWorkItem item) throws IOException {
         switch (item) {
             case H2MuxerWorkItem.EncodeHeaders h -> processEncodeHeaders(h);
-            case H2MuxerWorkItem.WriteData d ->
-                frameCodec.writeFrame(FRAME_TYPE_DATA, d.flags, d.streamId, d.data, d.offset, d.length);
             case H2MuxerWorkItem.WriteTrailers t -> processWriteTrailers(t);
             case H2MuxerWorkItem.WriteRst r -> frameCodec.writeRstStream(r.streamId, r.errorCode);
             case H2MuxerWorkItem.WriteGoaway g -> frameCodec.writeGoaway(g.lastStreamId, g.errorCode, g.debugData);
