@@ -9,10 +9,13 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /**
- * OutputStream that immediately throws a pre-existing exception on any operation.
+ * OutputStream that immediately throws a pre-existing exception on any write operation.
  * Used when Expect: 100-continue fails before body transmission.
+ *
+ * <p>Close is a no-op since there's nothing to clean up. The exception is thrown when the caller attempts to write,
+ * not when they clean up.
  */
-class FailingOutputStream extends OutputStream {
+final class FailingOutputStream extends OutputStream {
     private final IOException exception;
 
     FailingOutputStream(IOException exception) {
@@ -30,7 +33,7 @@ class FailingOutputStream extends OutputStream {
     }
 
     @Override
-    public void close() throws IOException {
-        throw exception;
+    public void close() {
+        // No-op: nothing to close
     }
 }

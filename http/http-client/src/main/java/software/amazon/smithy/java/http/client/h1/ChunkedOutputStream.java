@@ -7,8 +7,8 @@ package software.amazon.smithy.java.http.client.h1;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 
 /**
  * OutputStream that writes HTTP/1.1 chunked transfer encoding format (RFC 7230 Section 4.1).
@@ -17,7 +17,7 @@ import software.amazon.smithy.java.http.api.HttpHeaders;
  * for subsequent HTTP/1.1 requests. The socket lifecycle is managed by {@link H1Connection}.
  */
 final class ChunkedOutputStream extends OutputStream {
-    private final OutputStream delegate;
+    private final UnsyncBufferedOutputStream delegate;
     private final byte[] buffer;
     private int bufferPos = 0;
     private boolean closed = false;
@@ -29,17 +29,17 @@ final class ChunkedOutputStream extends OutputStream {
     /**
      * Create a ChunkedOutputStream with default chunk size (8KB).
      */
-    ChunkedOutputStream(OutputStream delegate) {
+    ChunkedOutputStream(UnsyncBufferedOutputStream delegate) {
         this(delegate, DEFAULT_CHUNK_SIZE);
     }
 
     /**
      * Create a ChunkedOutputStream with specified chunk size.
      *
-     * @param delegate underlying stream to write chunks to
+     * @param delegate underlying buffered stream to write chunks to
      * @param chunkSize maximum size of each chunk in bytes (must be > 0)
      */
-    ChunkedOutputStream(OutputStream delegate, int chunkSize) {
+    ChunkedOutputStream(UnsyncBufferedOutputStream delegate, int chunkSize) {
         if (delegate == null) {
             throw new NullPointerException("delegate");
         } else if (chunkSize <= 0) {
@@ -156,53 +156,35 @@ final class ChunkedOutputStream extends OutputStream {
     /**
      * Write a chunk with the given data.
      *
-     * <p>Format:
-     *   {size-in-hex}\r\n
-     *   {data}\r\n
+     * <p>Format: {size-in-hex}\r\n{data}\r\n
      */
     private void writeChunk(byte[] data, int off, int len) throws IOException {
-        // Write chunk size in hexadecimal
-        String hexSize = Integer.toHexString(len);
-        delegate.write(hexSize.getBytes(StandardCharsets.US_ASCII));
-        delegate.write('\r');
-        delegate.write('\n');
-
-        // Write chunk data
+        delegate.writeAscii(Integer.toHexString(len));
+        delegate.writeAscii("\r\n");
         delegate.write(data, off, len);
-
-        // Write trailing CRLF
-        delegate.write('\r');
-        delegate.write('\n');
+        delegate.writeAscii("\r\n");
     }
 
     /**
      * Write the final 0-sized chunk with optional trailers.
      *
-     * <p>Format:
-     *   0\r\n
-     *   [trailer-name: trailer-value\r\n]*
-     *   \r\n
+     * <p>Format: 0\r\n[trailer-name: trailer-value\r\n]*\r\n
      */
     private void writeFinalChunk() throws IOException {
-        delegate.write('0');
-        delegate.write('\r');
-        delegate.write('\n');
+        delegate.writeAscii("0\r\n");
 
         if (trailers != null) {
             for (var entry : trailers) {
                 String name = entry.getKey();
                 for (String value : entry.getValue()) {
-                    delegate.write(name.getBytes(StandardCharsets.US_ASCII));
-                    delegate.write(':');
-                    delegate.write(' ');
-                    delegate.write(value.getBytes(StandardCharsets.US_ASCII));
-                    delegate.write('\r');
-                    delegate.write('\n');
+                    delegate.writeAscii(name);
+                    delegate.writeAscii(": ");
+                    delegate.writeAscii(value);
+                    delegate.writeAscii("\r\n");
                 }
             }
         }
 
-        delegate.write('\r');
-        delegate.write('\n');
+        delegate.writeAscii("\r\n");
     }
 }
