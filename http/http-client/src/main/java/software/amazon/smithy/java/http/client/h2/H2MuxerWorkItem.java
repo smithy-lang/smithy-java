@@ -31,22 +31,6 @@ abstract sealed class H2MuxerWorkItem {
         }
     }
 
-    static final class WriteData extends H2MuxerWorkItem {
-        final int streamId;
-        final byte[] data;
-        final int offset;
-        final int length;
-        final int flags;
-
-        WriteData(int streamId, byte[] data, int offset, int length, int flags) {
-            this.streamId = streamId;
-            this.data = data;
-            this.offset = offset;
-            this.length = length;
-            this.flags = flags;
-        }
-    }
-
     static final class WriteTrailers extends H2MuxerWorkItem {
         final int streamId;
         final HttpHeaders trailers;
