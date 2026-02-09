@@ -45,7 +45,7 @@ class ProxyTunnelTest {
 
     @Test
     void tunnelFailsWithForbidden() throws IOException {
-        var socket = new FakeSocket("HTTP/1.1 403 Forbidden\r\n\r\n");
+        var socket = new FakeSocket("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n");
         var result = ProxyTunnel.establish(socket, "example.com", 443, null, TIMEOUT);
 
         assertNull(result.socket());
@@ -67,7 +67,7 @@ class ProxyTunnelTest {
 
     @Test
     void tunnelAuthFailsAfter407() throws IOException {
-        var socket = new FakeSocket("HTTP/1.1 407 Proxy Authentication Required\r\n\r\n");
+        var socket = new FakeSocket("HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n");
         var creds = new HttpCredentials.Basic("user", "pass", true);
         var result = ProxyTunnel.establish(socket, "example.com", 443, creds, TIMEOUT);
 
@@ -78,7 +78,7 @@ class ProxyTunnelTest {
     @Test
     void tunnelWithMultiRoundAuth() throws IOException {
         var socket = new FakeSocket(
-                "HTTP/1.1 407 Proxy Authentication Required\r\n\r\n" +
+                "HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n" +
                         "HTTP/1.1 200 Connection Established\r\n\r\n");
         var creds = new MultiRoundCredentials();
         var result = ProxyTunnel.establish(socket, "example.com", 443, creds, TIMEOUT);
@@ -90,7 +90,7 @@ class ProxyTunnelTest {
 
     @Test
     void tunnelWithoutCredentialsOn407() throws IOException {
-        var socket = new FakeSocket("HTTP/1.1 407 Proxy Authentication Required\r\n\r\n");
+        var socket = new FakeSocket("HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n");
         var result = ProxyTunnel.establish(socket, "example.com", 443, null, TIMEOUT);
 
         assertNull(result.socket());

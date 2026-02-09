@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.http.client.h1;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.Socket;
 import java.net.URI;
 import java.time.Duration;
@@ -87,6 +88,9 @@ public final class ProxyTunnel {
                 conn.releaseExchange();
                 return new Result(proxySocket, status, headers);
             }
+
+            // Drain response body to prepare connection for next request (e.g., 407 retry)
+            exchange.responseBody().transferTo(OutputStream.nullOutputStream());
 
             priorResponse = HttpResponse.builder()
                     .statusCode(status)
