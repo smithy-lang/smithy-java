@@ -96,23 +96,35 @@ public final class UnsyncBufferedOutputStream extends OutputStream {
             return;
         }
 
+        // Fast path: string fits in remaining buffer
+        int available = buf.length - pos;
+        if (len <= available) {
+            s.getBytes(0, len, buf, pos);
+            pos += len;
+            return;
+        }
+
+        // Slow path: string spans buffer boundary
+        writeAsciiSlow(s, len, available);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void writeAsciiSlow(String s, int len, int available) throws IOException {
         int stringPosition = 0;
         int bufLen = buf.length;
 
-        // Work through the string bytes in chunks of bytes that can fit into the buffer.
+        // Work through the string in chunks that fit into the buffer
         while (stringPosition < len) {
-            int available = bufLen - pos;
             if (available == 0) {
-                // We filled up the buffer, so flush and then continue to copy the next chunk
                 flushBuffer();
                 available = bufLen;
             }
 
-            // Copy as many characters as will fit (or remaining string length, whichever is smaller)
             int toCopy = Math.min(available, len - stringPosition);
             s.getBytes(stringPosition, stringPosition + toCopy, buf, pos);
             pos += toCopy;
             stringPosition += toCopy;
+            available = bufLen - pos;
         }
     }
 

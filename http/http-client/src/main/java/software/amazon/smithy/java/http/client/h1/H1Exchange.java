@@ -116,7 +116,7 @@ public final class H1Exchange implements HttpExchange {
     @Override
     public OutputStream requestBody() {
         if (requestOut == null) {
-            OutputStream socketOut = connection.getOutputStream();
+            UnsyncBufferedOutputStream socketOut = connection.getOutputStream();
             var headers = request.headers();
 
             // Handle Expect: 100-continue before creating output stream

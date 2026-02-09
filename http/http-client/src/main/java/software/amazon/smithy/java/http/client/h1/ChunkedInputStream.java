@@ -149,7 +149,6 @@ final class ChunkedInputStream extends InputStream {
 
         // Drain remaining chunks to allow connection reuse (before setting closed flag)
         if (!eof) {
-            // use transferTo from delegate since it's optimized to not allocate
             transferTo(OutputStream.nullOutputStream());
         }
 
@@ -230,6 +229,10 @@ final class ChunkedInputStream extends InputStream {
                 digit = 10 + (b - 'A');
             } else {
                 throw new IOException("Invalid hex character in chunk size: " + (char) b);
+            }
+            // Check for overflow before shifting (top 4 bits must be clear)
+            if ((value & 0xF000_0000_0000_0000L) != 0) {
+                throw new IOException("HTTP/1.1 chunk size overflow");
             }
             value = (value << 4) | digit;
         }

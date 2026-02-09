@@ -310,6 +310,14 @@ class ChunkedInputStreamTest {
     }
 
     @Test
+    void throwsOnChunkSizeOverflow() {
+        // 17 hex digits would overflow a long (max is 16 hex digits = 64 bits)
+        var stream = chunked("FFFFFFFFFFFFFFFFF\r\n");
+
+        assertThrows(IOException.class, stream::read);
+    }
+
+    @Test
     void throwsOnInvalidTrailerLine() {
         // Trailer line without colon is invalid
         var stream = chunked("5\r\nhello\r\n0\r\ninvalidtrailer\r\n\r\n");
