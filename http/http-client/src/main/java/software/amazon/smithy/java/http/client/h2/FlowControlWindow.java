@@ -82,9 +82,7 @@ final class FlowControlWindow {
                 }
                 // Use short poll interval instead of full timeout
                 long waitNs = Math.min(remainingNs, POLL_INTERVAL_NS);
-                long before = System.nanoTime();
-                available.awaitNanos(waitNs);
-                remainingNs -= (System.nanoTime() - before);
+                remainingNs = available.awaitNanos(waitNs);
             }
 
             int acquired = (int) Math.min(window, maxBytes);

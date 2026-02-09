@@ -32,11 +32,11 @@ class FailingOutputStreamTest {
     }
 
     @Test
-    void closeThrowsConfiguredException() {
+    void closeIsNoOp() throws IOException {
         var expected = new IOException("test error");
         var stream = new FailingOutputStream(expected);
-        var thrown = assertThrows(IOException.class, stream::close);
 
-        assertSame(expected, thrown);
+        // close() should not throw - it's a no-op to avoid masking the real error
+        stream.close();
     }
 }

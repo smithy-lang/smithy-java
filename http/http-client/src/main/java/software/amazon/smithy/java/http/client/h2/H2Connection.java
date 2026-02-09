@@ -505,18 +505,34 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
      * Try to receive the initial connection-level WINDOW_UPDATE that servers typically send
      * right after SETTINGS to expand the connection flow control window.
      * Uses a short timeout - if no frame arrives quickly, we proceed anyway.
+     *
+     * <p>At this point in the handshake, the only valid frames the server can send are:
+     * <ul>
+     *   <li>WINDOW_UPDATE - what we're looking for, apply it</li>
+     *   <li>SETTINGS ACK - acknowledgment of our SETTINGS, safe to ignore</li>
+     * </ul>
+     * Any other frame type is a protocol error.
      */
     private void receiveInitialWindowUpdate() throws IOException {
         int originalTimeout = socket.getSoTimeout();
         try {
             socket.setSoTimeout(50); // Short timeout - don't block long if server doesn't send one
-
             int type = frameCodec.nextFrame();
-            if (type == FRAME_TYPE_WINDOW_UPDATE && frameCodec.frameStreamId() == 0) {
-                int increment = frameCodec.readAndParseWindowUpdate();
-                muxer.releaseConnectionWindow(increment);
+            switch (type) {
+                case -1, FRAME_TYPE_SETTINGS:
+                    // EOF or SETTINGS ACK, ignore, we don't wait for it
+                    break;
+                case FRAME_TYPE_WINDOW_UPDATE:
+                    if (frameCodec.frameStreamId() == 0) {
+                        int increment = frameCodec.readAndParseWindowUpdate();
+                        muxer.releaseConnectionWindow(increment);
+                    }
+                    break;
+                default:
+                    throw new H2Exception(
+                            ERROR_PROTOCOL_ERROR,
+                            "Unexpected frame during handshake: " + H2Constants.frameTypeName(type));
             }
-            // Any other frame type is ignored - we only act on connection-level WINDOW_UPDATE here.
         } catch (SocketTimeoutException e) {
             // No initial WINDOW_UPDATE - that's fine, proceed with default window
         } finally {
