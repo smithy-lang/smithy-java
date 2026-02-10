@@ -19,7 +19,7 @@ public interface ApiService {
     /**
      * Name of the Service.
      *
-     * @return Returns the name of the operation.
+     * @return Returns the name of the service.
      */
     default String name() {
         return schema().id().getName();

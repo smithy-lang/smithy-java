@@ -96,12 +96,12 @@ import software.amazon.smithy.java.client.core.ClientPlugin;
  *
  *   <dt>smithy.client.call.serialization_duration (unit: s)</dt>
  *   <dd>
- *     The time it takes to serialize a request message body.
+ *     The time it takes to serialize a request.
  *   </dd>
  *
  *   <dt>smithy.client.call.deserialization_duration (unit: s)</dt>
  *   <dd>
- *     The time it takes to deserialize a response message body.
+ *     The time it takes to deserialize a response.
  *   </dd>
  *
  *   <dt>smithy.client.call.resolve_endpoint_duration (unit: s)</dt>
