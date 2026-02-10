@@ -83,31 +83,28 @@ final class AwsQueryFormSerializer implements ShapeSerializer {
     }
 
     private void pushPrefix(String prefix) {
-        if (prefixDepth >= prefixCache.length) {
-            prefixCache = Arrays.copyOf(prefixCache, prefixCache.length * 2);
-        }
-        prefixCache[prefixDepth++] = encodePrefix(prefix);
+        pushPrefix(encodePrefix(prefix));
     }
 
     private void pushPrefix(byte[] prefix) {
-        if (prefixDepth >= prefixCache.length) {
-            prefixCache = Arrays.copyOf(prefixCache, prefixCache.length * 2);
-        }
+        ensurePrefixCacheCapacity();
         prefixCache[prefixDepth++] = prefix;
     }
 
     private void pushIndexedPrefix(byte[] base, int index) {
-        if (prefixDepth >= prefixCache.length) {
-            prefixCache = Arrays.copyOf(prefixCache, prefixCache.length * 2);
-        }
+        ensurePrefixCacheCapacity();
         prefixCache[prefixDepth++] = encodeIndexedPrefix(base, index);
     }
 
     private void pushIndexPrefix(int index) {
+        ensurePrefixCacheCapacity();
+        prefixCache[prefixDepth++] = encodeIndex(index);
+    }
+
+    private void ensurePrefixCacheCapacity() {
         if (prefixDepth >= prefixCache.length) {
             prefixCache = Arrays.copyOf(prefixCache, prefixCache.length * 2);
         }
-        prefixCache[prefixDepth++] = encodeIndex(index);
     }
 
     private void popPrefix() {
