@@ -31,7 +31,7 @@ public final class DynamicOperation implements ApiOperation<StructDocument, Stru
     private final Schema operationSchema;
     private final Schema inputSchema;
     private final Schema outputSchema;
-    private final Set<Schema> errorSchemas;
+    private final List<Schema> errorSchemas;
     private final TypeRegistry typeRegistry;
     private final List<ShapeId> effectiveAuthSchemes;
 
@@ -49,7 +49,7 @@ public final class DynamicOperation implements ApiOperation<StructDocument, Stru
         this.operationSchema = operationSchema;
         this.inputSchema = inputSchema;
         this.outputSchema = outputSchema;
-        this.errorSchemas = errorSchemas;
+        this.errorSchemas = List.copyOf(errorSchemas);
         this.typeRegistry = typeRegistry;
         validateStreaming(inputSchema);
         validateStreaming(outputSchema);
@@ -101,6 +101,11 @@ public final class DynamicOperation implements ApiOperation<StructDocument, Stru
     @Override
     public List<ShapeId> effectiveAuthSchemes() {
         return effectiveAuthSchemes;
+    }
+
+    @Override
+    public List<Schema> errorSchemas() {
+        return errorSchemas;
     }
 
     public static DynamicOperation create(

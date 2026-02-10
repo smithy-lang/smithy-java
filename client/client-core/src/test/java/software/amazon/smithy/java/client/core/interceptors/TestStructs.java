@@ -57,6 +57,11 @@ public final class TestStructs {
         }
 
         @Override
+        public List<Schema> errorSchemas() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public ApiService service() {
             return null;
         }
