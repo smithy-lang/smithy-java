@@ -66,7 +66,7 @@ final class OperationMetrics {
                 .build();
         this.serializationDuration = meter.histogramBuilder(SERIALIZATION_DURATION)
                 .setUnit("s")
-                .setDescription("The time it takes to serialize a requestg")
+                .setDescription("The time it takes to serialize a request")
                 .build();
         this.deserializationDuration = meter.histogramBuilder(DESERIALIZATION_DURATION)
                 .setUnit("s")
