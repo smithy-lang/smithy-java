@@ -172,7 +172,7 @@ class OperationMetricsInterceptor implements ClientInterceptor {
         }
     }
 
-    static class MetricsCollectingIdentityResolver<I extends Identity> implements IdentityResolver<I> {
+    static final class MetricsCollectingIdentityResolver<I extends Identity> implements IdentityResolver<I> {
         private final IdentityResolver<I> delegate;
         private final OperationMetrics metrics;
         private final Attributes attributes;
