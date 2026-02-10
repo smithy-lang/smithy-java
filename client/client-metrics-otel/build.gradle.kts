@@ -2,7 +2,7 @@ plugins {
     id("smithy-java.module-conventions")
 }
 
-description = "This module provides the client metrics plugin"
+description = "This module provides a client metrics plugin for OpenTelemetry"
 
 extra["displayName"] = "Smithy :: Java :: Client :: Metrics"
 extra["moduleName"] = "software.amazon.smithy.java.client.metrics.otel"
