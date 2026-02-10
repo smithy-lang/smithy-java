@@ -21,6 +21,7 @@ graalvm-native = "0.11.3"
 shadow = "8.3.9"
 jazzer = "0.29.1"
 json-schema-validator = "3.0.0"
+opentelemetry = "1.58.0"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -43,6 +44,11 @@ aws-sdk-retries-spi = {module = "software.amazon.awssdk:retries-spi", version.re
 aws-sdk-retries = {module = "software.amazon.awssdk:retries", version.ref = "aws-sdk"}
 aws-sdk-core = {module = "software.amazon.awssdk:sdk-core", version.ref = "aws-sdk"}
 aws-sdk-auth = {module = "software.amazon.awssdk:auth", version.ref = "aws-sdk"}
+
+# OpenTelemetry
+opentelemetry-bom = {module = "io.opentelemetry:opentelemetry-bom", version.ref = "opentelemetry"}
+opentelemetry-api = {module = "io.opentelemetry:opentelemetry-api", version.ref = "opentelemetry"}
+opentelemetry-test-api = {module = "io.opentelemetry:opentelemetry-sdk-testing", version.ref = "opentelemetry"}
 
 jackson-core = {module = "tools.jackson.core:jackson-core", version.ref = "jackson"}
 
