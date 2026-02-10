@@ -53,7 +53,7 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
         this.service = Objects.requireNonNull(service, "service is required");
         this.version = Objects.requireNonNull(version, "version is required");
         this.errorDeserializer = HttpErrorDeserializer.builder()
-                .codec(XmlCodec.builder().build())
+                .codec(codec)
                 .serviceId(service)
                 .errorPayloadParser(XML_ERROR_PAYLOAD_PARSER)
                 .knownErrorFactory(new XmlKnownErrorFactory())
