@@ -112,9 +112,7 @@ public interface ApiOperation<I extends SerializableStruct, O extends Serializab
      *
      * @return Returns the list of error schemas.
      */
-    default List<Schema> errorSchemas() {
-        return List.of();
-    }
+    List<Schema> errorSchemas();
 
     /**
      * Get the service shape that the operation is contained within.

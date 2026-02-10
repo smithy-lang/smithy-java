@@ -79,6 +79,11 @@ public class HttpErrorDeserializerTest {
                 }
 
                 @Override
+                public List<Schema> errorSchemas() {
+                    return List.of();
+                }
+
+                @Override
                 public ApiService service() {
                     return null;
                 }

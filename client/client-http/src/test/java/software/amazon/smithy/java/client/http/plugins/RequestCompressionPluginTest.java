@@ -263,6 +263,11 @@ public class RequestCompressionPluginTest {
             }
 
             @Override
+            public List<Schema> errorSchemas() {
+                return List.of();
+            }
+
+            @Override
             public Schema inputStreamMember() {
                 return streamMember;
             }

@@ -155,6 +155,11 @@ public class EndpointResolverTest {
         }
 
         @Override
+        public List<Schema> errorSchemas() {
+            return List.of();
+        }
+
+        @Override
         public ApiService service() {
             return null;
         }
@@ -207,6 +212,11 @@ public class EndpointResolverTest {
         @Override
         public List<ShapeId> effectiveAuthSchemes() {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Schema> errorSchemas() {
+            return List.of();
         }
     }
 }
