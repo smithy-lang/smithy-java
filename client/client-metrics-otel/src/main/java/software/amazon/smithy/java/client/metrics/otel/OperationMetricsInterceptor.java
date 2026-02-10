@@ -152,7 +152,7 @@ class OperationMetricsInterceptor implements ClientInterceptor {
         }
     }
 
-    static class MetricsCollectingEndpointResolver implements EndpointResolver {
+    static final class MetricsCollectingEndpointResolver implements EndpointResolver {
         private final EndpointResolver delegate;
         private final OperationMetrics metrics;
         private final Attributes attributes;
