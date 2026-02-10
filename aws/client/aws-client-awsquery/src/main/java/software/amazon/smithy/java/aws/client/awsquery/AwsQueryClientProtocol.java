@@ -10,6 +10,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import software.amazon.smithy.aws.traits.protocols.AwsQueryErrorTrait;
 import software.amazon.smithy.aws.traits.protocols.AwsQueryTrait;
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientProtocolFactory;
@@ -20,8 +21,10 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.schema.Unit;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
@@ -95,7 +98,7 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
             HttpResponse response
     ) {
         if (response.statusCode() >= 300) {
-            throw errorDeserializer.createError(context, operation.schema().id(), typeRegistry, response);
+            throw errorDeserializer.createError(context, operation, typeRegistry, response);
         }
 
         var builder = operation.outputBuilder();
@@ -122,14 +125,29 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
                         HttpErrorDeserializer.KnownErrorFactory knownErrorFactory,
                         ShapeId serviceId,
                         TypeRegistry typeRegistry,
+                        ApiOperation<?, ?> operation,
                         HttpResponse response,
                         ByteBuffer buffer
                 ) {
                     var deserializer = codec.createDeserializer(buffer);
                     String code = XmlUtil.parseErrorCodeName(deserializer);
-                    var nameSpace = serviceId.getNamespace();
-                    var id = ShapeId.fromOptionalNamespace(nameSpace, code);
-                    var builder = typeRegistry.createBuilder(id, ModeledException.class);
+
+                    // First, resolve @awsQueryError custom codes
+                    ShapeBuilder<ModeledException> builder = null;
+                    for (Schema errorSchema : operation.errorSchemas()) {
+                        var trait = errorSchema.getTrait(TraitKey.get(AwsQueryErrorTrait.class));
+                        if (trait != null && code.equals(trait.getCode())) {
+                            builder = typeRegistry.createBuilder(errorSchema.id(), ModeledException.class);
+                            break;
+                        }
+                    }
+
+                    // Fallback: resolve by shape ID
+                    if (builder == null) {
+                        var id = ShapeId.fromOptionalNamespace(serviceId.getNamespace(), code);
+                        builder = typeRegistry.createBuilder(id, ModeledException.class);
+                    }
+
                     if (builder != null) {
                         return knownErrorFactory.createError(context, codec, response, builder);
                     }

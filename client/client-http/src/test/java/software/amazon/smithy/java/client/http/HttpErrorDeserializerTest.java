@@ -19,7 +19,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ModeledException;
+import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
@@ -36,7 +39,55 @@ public class HttpErrorDeserializerTest {
 
     private static final Codec CODEC = JsonCodec.builder().build();
     private static final ShapeId SERVICE = ShapeId.from("com.foo#Example");
-    private static final ShapeId OPERATION = ShapeId.from("com.foo#PutFoo");
+    private static final ShapeId OPERATION_ID = ShapeId.from("com.foo#PutFoo");
+    private static final Schema OPERATION_SCHEMA = Schema.createOperation(OPERATION_ID);
+    private static final ApiOperation<SerializableStruct, SerializableStruct> OPERATION =
+            new ApiOperation<>() {
+                @Override
+                public ShapeBuilder<SerializableStruct> inputBuilder() {
+                    return null;
+                }
+
+                @Override
+                public ShapeBuilder<SerializableStruct> outputBuilder() {
+                    return null;
+                }
+
+                @Override
+                public Schema schema() {
+                    return OPERATION_SCHEMA;
+                }
+
+                @Override
+                public Schema inputSchema() {
+                    return null;
+                }
+
+                @Override
+                public Schema outputSchema() {
+                    return null;
+                }
+
+                @Override
+                public TypeRegistry errorRegistry() {
+                    return TypeRegistry.builder().build();
+                }
+
+                @Override
+                public List<ShapeId> effectiveAuthSchemes() {
+                    return List.of();
+                }
+
+                @Override
+                public ApiService service() {
+                    return null;
+                }
+
+                @Override
+                public String toString() {
+                    return OPERATION_ID.toString();
+                }
+            };
 
     @ParameterizedTest
     @MethodSource("genericErrorCases")

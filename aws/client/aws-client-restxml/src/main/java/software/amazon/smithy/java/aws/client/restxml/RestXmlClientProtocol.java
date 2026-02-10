@@ -20,6 +20,7 @@ import software.amazon.smithy.java.client.http.binding.HttpBindingErrorFactory;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ModeledException;
+import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.InputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.serde.Codec;
@@ -106,6 +107,7 @@ public final class RestXmlClientProtocol extends HttpBindingClientProtocol<AwsEv
                         HttpErrorDeserializer.KnownErrorFactory knownErrorFactory,
                         ShapeId serviceId,
                         TypeRegistry typeRegistry,
+                        ApiOperation<?, ?> operation,
                         HttpResponse response,
                         ByteBuffer buffer
                 ) {

@@ -130,6 +130,11 @@ public final class OperationGenerator
                                         }
 
                                         @Override
+                                        public ${list:T}<${sdkSchema:T}> errorSchemas() {
+                                            return ${list:T}.of(${#exceptions}${value:T}.$$SCHEMA${^key.last}, ${/key.last}${/exceptions});
+                                        }
+
+                                        @Override
                                         public ${list:T}<${shapeId:T}> effectiveAuthSchemes() {
                                             return SCHEMES;
                                         }

@@ -50,7 +50,6 @@ public class AwsQueryProtocolTests {
     @ProtocolTestFilter(
             skipTests = {
                     "AwsQueryClientPopulatesDefaultsValuesWhenMissingInResponse",
-                    "QueryCustomizedError",
             })
     public void responseTest(Runnable test) {
         test.run();

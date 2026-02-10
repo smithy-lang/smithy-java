@@ -11,6 +11,7 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ErrorFault;
 import software.amazon.smithy.java.core.error.ModeledException;
+import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.SerializationException;
@@ -128,6 +129,7 @@ public final class HttpErrorDeserializer {
          * @param knownErrorFactory The knownErrorFactory to create error.
          * @param serviceId The ShapeId of the service.
          * @param typeRegistry The error typeRegistry to retrieve builder for the error.
+         * @param operation The operation being called.
          * @param response Response to parse.
          * @param buffer Bytebuffer of the payload.
          *
@@ -139,6 +141,7 @@ public final class HttpErrorDeserializer {
                 KnownErrorFactory knownErrorFactory,
                 ShapeId serviceId,
                 TypeRegistry typeRegistry,
+                ApiOperation<?, ?> operation,
                 HttpResponse response,
                 ByteBuffer buffer
         ) {
@@ -254,7 +257,7 @@ public final class HttpErrorDeserializer {
 
     public CallException createError(
             Context context,
-            ShapeId operation,
+            ApiOperation<?, ?> operation,
             TypeRegistry typeRegistry,
             HttpResponse response
     ) {
@@ -289,7 +292,7 @@ public final class HttpErrorDeserializer {
 
     private CallException makeErrorFromHeader(
             Context context,
-            ShapeId operation,
+            ApiOperation<?, ?> operation,
             TypeRegistry typeRegistry,
             HttpResponse response
     ) {
@@ -311,7 +314,7 @@ public final class HttpErrorDeserializer {
             KnownErrorFactory knownErrorFactory,
             UnknownErrorFactory unknownErrorFactory,
             ErrorPayloadParser errorPayloadParser,
-            ShapeId operationId,
+            ApiOperation<?, ?> operation,
             ShapeId serviceId,
             TypeRegistry typeRegistry,
             HttpResponse response,
@@ -329,6 +332,7 @@ public final class HttpErrorDeserializer {
                         knownErrorFactory,
                         serviceId,
                         typeRegistry,
+                        operation,
                         response,
                         buffer);
                 if (error != null) {
@@ -339,11 +343,11 @@ public final class HttpErrorDeserializer {
             // Ignore parsing errors here if the service is returning garbage
         }
 
-        return createErrorFromHints(operationId, response, unknownErrorFactory);
+        return createErrorFromHints(operation, response, unknownErrorFactory);
     }
 
     private static CallException createErrorFromHints(
-            ShapeId operationId,
+            ApiOperation<?, ?> operation,
             HttpResponse response,
             UnknownErrorFactory unknownErrorFactory
     ) {
@@ -352,7 +356,7 @@ public final class HttpErrorDeserializer {
             case CLIENT -> "Client ";
             case SERVER -> "Server ";
             default -> "Unknown ";
-        } + response.httpVersion() + ' ' + response.statusCode() + " response from operation " + operationId + ".";
+        } + response.httpVersion() + ' ' + response.statusCode() + " response from operation " + operation + ".";
         return unknownErrorFactory.createError(fault, message, response);
     }
 

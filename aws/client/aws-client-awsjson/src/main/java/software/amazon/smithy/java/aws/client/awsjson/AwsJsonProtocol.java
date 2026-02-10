@@ -98,7 +98,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
     ) {
         // Is it an error?
         if (response.statusCode() != 200) {
-            throw errorDeserializer.createError(context, operation.schema().id(), typeRegistry, response);
+            throw errorDeserializer.createError(context, operation, typeRegistry, response);
         }
 
         var builder = operation.outputBuilder();
