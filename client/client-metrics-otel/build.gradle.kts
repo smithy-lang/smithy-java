@@ -4,7 +4,7 @@ plugins {
 
 description = "This module provides a client metrics plugin for OpenTelemetry"
 
-extra["displayName"] = "Smithy :: Java :: Client :: Metrics"
+extra["displayName"] = "Smithy :: Java :: Client :: Metrics :: OTel"
 extra["moduleName"] = "software.amazon.smithy.java.client.metrics.otel"
 
 dependencies {
