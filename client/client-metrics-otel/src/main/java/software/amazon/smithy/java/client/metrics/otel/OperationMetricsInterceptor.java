@@ -207,7 +207,7 @@ class OperationMetricsInterceptor implements ClientInterceptor {
         return elapsedNs / 1_000_000_000.0;
     }
 
-    static class MetricsState {
+    static final class MetricsState {
         private final OperationMetrics metrics;
         private final Attributes attributes;
         private long callStartNs;
