@@ -140,7 +140,7 @@ public final class DetailedUser implements SerializableStruct, HasFullName {
     /**
      * Builder for {@link DetailedUser}.
      */
-    public static final class Builder implements ShapeBuilder<DetailedUser> {
+    public static final class Builder implements ShapeBuilder<DetailedUser>, HasFullName.Builder<Builder> {
         private final PresenceTracker tracker = PresenceTracker.of($SCHEMA);
         private String name;
         private int id;
@@ -157,6 +157,7 @@ public final class DetailedUser implements SerializableStruct, HasFullName {
         /**
          * @return this builder.
          */
+        @Override
         public Builder name(String name) {
             this.name = name;
             return this;
@@ -166,6 +167,7 @@ public final class DetailedUser implements SerializableStruct, HasFullName {
          * <p><strong>Required</strong>
          * @return this builder.
          */
+        @Override
         public Builder id(int id) {
             this.id = id;
             tracker.setMember($SCHEMA_ID);
@@ -175,6 +177,7 @@ public final class DetailedUser implements SerializableStruct, HasFullName {
         /**
          * @return this builder.
          */
+        @Override
         public Builder lastName(String lastName) {
             this.lastName = lastName;
             return this;

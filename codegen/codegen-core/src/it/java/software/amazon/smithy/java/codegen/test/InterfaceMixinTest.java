@@ -67,4 +67,28 @@ class InterfaceMixinTest {
         assertEquals(1, error.getId());
         assertInstanceOf(Exception.class, error);
     }
+
+    @Test
+    void simpleUserBuilderImplementsMixinBuilder() {
+        assertInstanceOf(HasName.Builder.class, SimpleUser.builder());
+    }
+
+    @Test
+    void detailedUserBuilderImplementsChainedMixinBuilders() {
+        var builder = DetailedUser.builder();
+        assertInstanceOf(HasFullName.Builder.class, builder);
+        assertInstanceOf(HasName.Builder.class, builder);
+    }
+
+    @Test
+    void taggedUserBuilderImplementsMultipleMixinBuilders() {
+        var builder = TaggedUser.builder();
+        assertInstanceOf(HasName.Builder.class, builder);
+        assertInstanceOf(HasTags.Builder.class, builder);
+    }
+
+    @Test
+    void errorBuilderImplementsMixinBuilder() {
+        assertInstanceOf(HasName.Builder.class, UserNotFound.builder());
+    }
 }
