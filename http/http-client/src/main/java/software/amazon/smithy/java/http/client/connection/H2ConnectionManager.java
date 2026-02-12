@@ -9,35 +9,25 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.http.client.h2.H2Connection;
+import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * Manages HTTP/2 connections with adaptive load balancing.
  *
  * <h2>Load Balancing Strategy</h2>
- * <p>Uses a two-tier "watermark" strategy to distribute streams across connections:
- *
- * <ol>
- *   <li><b>Green Zone</b> (streams &lt; soft limit): Uses atomic round-robin to distribute
- *       requests evenly. Each caller atomically increments an index to get a unique starting
- *       position, ensuring fair distribution even under high concurrency.</li>
- *   <li><b>Expansion</b>: When all connections exceed the soft limit, creates a new connection
- *       (if under the maximum). This prevents overloading a single TCP connection.</li>
- *   <li><b>Red Zone</b> (at max connections): Uses least-loaded selection to find the
- *       connection with the fewest active streams, up to the hard limit.</li>
- *   <li><b>Saturation</b>: When all connections are at the hard limit, callers wait
- *       for capacity with a configurable timeout.</li>
- * </ol>
+ * <p>Uses {@link H2LoadBalancer}, which by default uses a high-watermark strategy.
  *
  * <h2>Threading</h2>
  * <p>Uses per-route state with a volatile connection array for lock-free reads in the
  * common case. Connection creation and removal synchronize on the per-route state object.
- * The round-robin index uses {@link AtomicInteger} for visibility and atomicity across
- * thousands of concurrent virtual threads.
  */
 final class H2ConnectionManager {
+
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(H2ConnectionManager.class);
 
     /**
      * Per-route connection state.
@@ -49,28 +39,24 @@ final class H2ConnectionManager {
         /** Connections currently being created (prevents over-creation). Guarded by lock. */
         int pendingCreations = 0;
 
-        /** Round-robin index for connection selection. Atomic for concurrent access. */
-        final AtomicInteger nextIndex = new AtomicInteger(0);
+        /** Scratch buffer for active stream counts, guarded by lock. */
+        int[] activeStreamsBuf = new int[4];
 
         /** Lock for state modifications. ReentrantLock avoids VT pinning unlike synchronized. */
-        final java.util.concurrent.locks.ReentrantLock lock = new java.util.concurrent.locks.ReentrantLock();
-        final java.util.concurrent.locks.Condition available = lock.newCondition();
+        final ReentrantLock lock = new ReentrantLock();
+        final Condition available = lock.newCondition();
     }
 
     private static final H2Connection[] EMPTY = new H2Connection[0];
 
     // Soft limit as a fraction of streamsPerConnection. When all connections exceed this threshold,
     // we try to create a new connection (if under max).
-    // This prevents overloading a single TCP connection even when the server allows many streams.
-    private static final int SOFT_LIMIT_DIVISOR = 4; // Create new connection at 25% utilization
-    // Floor ensures we don't create excessive connections for servers with low max_concurrent_streams.
-    // 25 streams is a reasonable threshold - below this, a single connection handles load well;
-    // above this, spreading load across connections reduces head-of-line blocking.
-    private static final int SOFT_LIMIT_FLOOR = 25;
+    private static final int DEFAULT_SOFT_LIMIT_DIVISOR = 4;
+    private static final int DEFAULT_SOFT_LIMIT_FLOOR = 25;
 
     private final ConcurrentHashMap<Route, RouteState> routes = new ConcurrentHashMap<>();
-    private final int streamsPerConnection; // Hard limit from server
-    private final int softConcurrencyLimit; // Soft limit for load balancing
+    private final int streamsPerConnection;
+    private final H2LoadBalancer loadBalancer;
     private final long acquireTimeoutMs;
     private final List<ConnectionPoolListener> listeners;
     private final ConnectionFactory connectionFactory;
@@ -82,15 +68,23 @@ final class H2ConnectionManager {
 
     H2ConnectionManager(
             int streamsPerConnection,
+            H2LoadBalancer loadBalancer,
             long acquireTimeoutMs,
             List<ConnectionPoolListener> listeners,
             ConnectionFactory connectionFactory
     ) {
         this.streamsPerConnection = streamsPerConnection;
-        this.softConcurrencyLimit = Math.max(SOFT_LIMIT_FLOOR, streamsPerConnection / SOFT_LIMIT_DIVISOR);
         this.acquireTimeoutMs = acquireTimeoutMs;
         this.listeners = listeners;
         this.connectionFactory = connectionFactory;
+
+        if (loadBalancer != null) {
+            this.loadBalancer = loadBalancer;
+        } else {
+            this.loadBalancer = H2LoadBalancer.watermark(
+                    Math.max(DEFAULT_SOFT_LIMIT_FLOOR, streamsPerConnection / DEFAULT_SOFT_LIMIT_DIVISOR),
+                    streamsPerConnection);
+        }
     }
 
     private RouteState stateFor(Route route) {
@@ -120,29 +114,32 @@ final class H2ConnectionManager {
         try {
             while (true) {
                 H2Connection[] snapshot = state.conns;
-                int totalConns = snapshot.length + state.pendingCreations;
+                int connCount = snapshot.length;
+                int totalConns = connCount + state.pendingCreations;
 
-                // Green zone: round-robin among connections under soft limit
-                H2Connection conn = tryAcquireRoundRobin(snapshot, state, softConcurrencyLimit);
-                if (conn != null) {
-                    notifyAcquire(conn, true);
-                    return conn;
+                // Build active stream counts for the load balancer
+                if (state.activeStreamsBuf.length < connCount) {
+                    state.activeStreamsBuf = new int[connCount];
+                }
+                for (int i = 0; i < connCount; i++) {
+                    state.activeStreamsBuf[i] = snapshot[i].getActiveStreamCountIfAccepting();
                 }
 
-                // Expansion: all connections above soft limit, create new if allowed
-                if (totalConns < maxConnectionsForRoute) {
+                boolean canExpand = totalConns < maxConnectionsForRoute;
+                int selected = loadBalancer.select(state.activeStreamsBuf, connCount,
+                        canExpand ? maxConnectionsForRoute : connCount);
+
+                if (selected >= 0) {
+                    notifyAcquire(snapshot[selected], true);
+                    return snapshot[selected];
+                } else if (selected == H2LoadBalancer.CREATE_NEW && canExpand) {
                     state.pendingCreations++;
                     break;
                 }
 
-                // Red zone: at max connections, use least-loaded up to hard limit
-                conn = tryAcquireLeastLoaded(snapshot, streamsPerConnection);
-                if (conn != null) {
-                    notifyAcquire(conn, true);
-                    return conn;
-                }
-
-                // Saturation: all connections at hard limit, wait for capacity
+                // Saturated: wait for capacity
+                LOGGER.debug("All {} connections saturated for route {}, waiting for capacity "
+                        + "(canExpand={}, selected={})", connCount, route, canExpand, selected);
                 long remainingNanos = deadlineNanos - System.nanoTime();
                 if (remainingNanos <= 0) {
                     throw new IOException("Acquire timeout: no connection available after "
@@ -195,64 +192,6 @@ final class H2ConnectionManager {
 
         notifyAcquire(newConn, false);
         return newConn;
-    }
-
-    /**
-     * Round-robin selection: find a connection under the limit, starting from a unique index.
-     *
-     * <p>Each caller atomically claims a starting index, then scans connections from that
-     * position. This ensures even distribution under high concurrency, each gets a different starting point rather
-     * than all hammering connection[0].
-     */
-    private H2Connection tryAcquireRoundRobin(H2Connection[] conns, RouteState state, int limit) {
-        int n = conns.length;
-        if (n == 0) {
-            return null;
-        }
-
-        // Mask with MAX_VALUE handles overflow when counter wraps to negative.
-        int start = (state.nextIndex.getAndIncrement() & Integer.MAX_VALUE) % n;
-
-        for (int i = 0; i < n; i++) {
-            int idx = (start + i) % n;
-            H2Connection conn = conns[idx];
-            if (conn == null) {
-                continue;
-            }
-            // getActiveStreamCountIfAccepting(): returns active stream count, or <0 if not accepting new streams
-            int active = conn.getActiveStreamCountIfAccepting();
-            if (active >= 0 && active < limit) {
-                return conn;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Least-loaded selection: find the connection with the fewest active streams.
-     *
-     * <p>Scans all connections to find the best candidate. Used in the red zone when all connections exceed the
-     * soft limit and we need to balance the load.
-     */
-    private H2Connection tryAcquireLeastLoaded(H2Connection[] conns, int limit) {
-        H2Connection best = null;
-        int bestActive = Integer.MAX_VALUE;
-
-        for (H2Connection conn : conns) {
-            if (conn == null) {
-                continue;
-            }
-            int active = conn.getActiveStreamCountIfAccepting();
-            if (active >= 0 && active < limit && active < bestActive) {
-                best = conn;
-                bestActive = active;
-                if (active == 0) {
-                    break;
-                }
-            }
-        }
-
-        return best;
     }
 
     /**

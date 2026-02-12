@@ -28,6 +28,7 @@ include(":framework-errors")
 include(":http:http-api")
 include(":http:http-binding")
 include(":http:http-client")
+include(":http:http-hpack")
 include(":retries-api")
 include(":tracing-api")
 

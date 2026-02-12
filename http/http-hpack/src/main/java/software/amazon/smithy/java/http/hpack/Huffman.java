@@ -3,12 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.http.client.h2.hpack;
+package software.amazon.smithy.java.http.hpack;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import software.amazon.smithy.java.http.api.HeaderNames;
 
 /**
  * HPACK Huffman encoding/decoding from RFC 7541 Appendix B.
@@ -544,10 +545,6 @@ final class Huffman {
             28
     };
 
-    // EOS (end-of-string) symbol code
-    private static final int EOS_CODE = 0x3fffffff;
-    private static final int EOS_LENGTH = 30;
-
     // Decode flags
     private static final int FLAG_EMIT = 0x01; // Emit a decoded byte
     private static final int FLAG_ACCEPTED = 0x02; // Valid end state
@@ -594,11 +591,9 @@ final class Huffman {
             }
         }
 
-        // Pad with EOS prefix to byte boundary
+        // Pad with EOS (all 1s) to byte boundary
         if (bits > 0) {
-            current <<= (8 - bits);
-            current |= (EOS_CODE >> (EOS_LENGTH - (8 - bits)));
-            out.write((int) current);
+            out.write((int) ((current << (8 - bits)) | (0xFF >> bits)));
         }
     }
 
@@ -629,8 +624,31 @@ final class Huffman {
      * @throws IOException if decoding fails (invalid Huffman sequence)
      */
     static String decode(byte[] data, int offset, int length) throws IOException {
-        // HPACK Huffman expands by at most ~1.6x for typical headers
+        // Safe: shortest HPACK Huffman code is 5 bits, so max expansion is 8/5 = 1.6x < 2x
         byte[] buf = new byte[length * 2];
+        int pos = decodeBytes(data, offset, length, false, buf);
+        return new String(buf, 0, pos, StandardCharsets.ISO_8859_1);
+    }
+
+    /**
+     * Decode a Huffman-encoded header name, validating no uppercase and canonicalizing.
+     */
+    static String decodeHeaderName(byte[] data, int offset, int length) throws IOException {
+        // Safe: shortest HPACK Huffman code is 5 bits, so max expansion is 8/5 = 1.6x < 2x
+        byte[] buf = new byte[length * 2];
+        int pos = decodeBytes(data, offset, length, true, buf);
+        return HeaderNames.canonicalize(buf, 0, pos);
+    }
+
+    /**
+     * Decode Huffman-encoded bytes into the provided buffer.
+     *
+     * @param buf output buffer, must be at least {@code length * 2} bytes
+     * @return number of decoded bytes written to buf
+     */
+    private static int decodeBytes(byte[] data, int offset, int length, boolean validateName, byte[] buf)
+            throws IOException {
+        assert buf.length >= length * 2 : "buffer too small for Huffman decode";
         int pos = 0;
         int state = 0;
         boolean accepted = true;
@@ -643,31 +661,14 @@ final class Huffman {
             state = DECODE_TABLE[index][0];
             int flags = DECODE_TABLE[index][1];
 
-            if ((flags & FLAG_FAIL) != 0) {
-                throw new IOException("Invalid Huffman encoding");
-            }
-            if ((flags & FLAG_EMIT) != 0) {
-                if (pos >= buf.length) {
-                    buf = Arrays.copyOf(buf, buf.length * 2);
-                }
-                buf[pos++] = (byte) DECODE_TABLE[index][2];
-            }
+            pos = processNibble(validateName, buf, pos, index, flags);
 
             // Process low nibble
             index = (state << 4) | (b & 0x0F);
             state = DECODE_TABLE[index][0];
             flags = DECODE_TABLE[index][1];
 
-            if ((flags & FLAG_FAIL) != 0) {
-                throw new IOException("Invalid Huffman encoding");
-            }
-            if ((flags & FLAG_EMIT) != 0) {
-                if (pos >= buf.length) {
-                    buf = Arrays.copyOf(buf, buf.length * 2);
-                }
-                buf[pos++] = (byte) DECODE_TABLE[index][2];
-            }
-            // Final validity depends only on last nibble's state
+            pos = processNibble(validateName, buf, pos, index, flags);
             accepted = (flags & FLAG_ACCEPTED) != 0;
         }
 
@@ -675,7 +676,24 @@ final class Huffman {
             throw new IOException("Invalid Huffman encoding: incomplete sequence");
         }
 
-        return new String(buf, 0, pos, StandardCharsets.ISO_8859_1);
+        return pos;
+    }
+
+    private static int processNibble(boolean validateName, byte[] buf, int pos, int index, int flags)
+            throws IOException {
+        if ((flags & FLAG_FAIL) != 0) {
+            throw new IOException("Invalid Huffman encoding");
+        }
+
+        if ((flags & FLAG_EMIT) != 0) {
+            byte emitted = (byte) DECODE_TABLE[index][2];
+            if (validateName && emitted >= 'A' && emitted <= 'Z') {
+                throw new IOException("Header name contains uppercase");
+            }
+            buf[pos++] = emitted;
+        }
+
+        return pos;
     }
 
     private static int[][] buildDecodeTable() {

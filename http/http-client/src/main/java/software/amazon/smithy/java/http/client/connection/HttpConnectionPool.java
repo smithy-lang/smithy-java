@@ -188,6 +188,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         this.connectionPermits = new Semaphore(builder.maxTotalConnections, false);
         this.listeners = List.copyOf(builder.listeners);
         this.h2Manager = new H2ConnectionManager(builder.h2StreamsPerConnection,
+                builder.h2LoadBalancer,
                 this.acquireTimeoutMs,
                 listeners,
                 this::onNewH2Connection);

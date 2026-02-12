@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.http.client.h2.hpack;
+package software.amazon.smithy.java.http.hpack;
 
 import static org.junit.jupiter.api.Assertions.*;
 

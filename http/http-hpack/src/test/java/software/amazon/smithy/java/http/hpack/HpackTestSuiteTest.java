@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.http.client.h2.hpack;
+package software.amazon.smithy.java.http.hpack;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -81,22 +81,23 @@ class HpackTestSuiteTest {
 
         // Decode this case's wire bytes
         byte[] wireBytes = hexToBytes(wireHex);
-        List<HeaderField> result = decoder.decode(wireBytes);
+        List<String> result = decoder.decode(wireBytes);
 
-        // Verify the decoded headers match expected
+        // Verify the decoded headers match expected (result is flat: name0, value0, name1, value1, ...)
         assertEquals(expectedHeaders.size(),
-                result.size(),
+                result.size() / 2,
                 "Header count mismatch for " + filename + " case " + seqno);
 
         for (int i = 0; i < expectedHeaders.size(); i++) {
             String[] expected = expectedHeaders.get(i);
-            HeaderField actual = result.get(i);
+            String actualName = result.get(i * 2);
+            String actualValue = result.get(i * 2 + 1);
 
             assertEquals(expected[0],
-                    actual.name(),
+                    actualName,
                     "Header name mismatch at index " + i + " for " + filename + " case " + seqno);
             assertEquals(expected[1],
-                    actual.value(),
+                    actualValue,
                     "Header value mismatch at index " + i + " for " + filename + " case " + seqno);
         }
     }

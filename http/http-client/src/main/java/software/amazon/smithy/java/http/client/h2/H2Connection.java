@@ -51,8 +51,7 @@ import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
 import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
 import software.amazon.smithy.java.http.client.connection.Route;
-import software.amazon.smithy.java.http.client.h2.hpack.HeaderField;
-import software.amazon.smithy.java.http.client.h2.hpack.HpackDecoder;
+import software.amazon.smithy.java.http.hpack.HpackDecoder;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -384,7 +383,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         // Note: WINDOW_UPDATE and RST_STREAM are handled in handleNonDataFrame fast path
         switch (type) {
             case FRAME_TYPE_HEADERS -> {
-                List<HeaderField> decoded;
+                List<String> decoded;
                 if (payload != null && length > 0) {
                     decoded = decodeHeaders(payload, length);
                 } else {
@@ -751,16 +750,16 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     }
 
     // Called only from reader thread - no synchronization needed
-    List<HeaderField> decodeHeaders(byte[] headerBlock, int length) throws IOException {
+    List<String> decodeHeaders(byte[] headerBlock, int length) throws IOException {
         int maxHeaderListSize = H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE;
         if (length > maxHeaderListSize) {
             throw new H2Exception(ERROR_ENHANCE_YOUR_CALM,
                     "Header block size " + length + " exceeds limit " + maxHeaderListSize);
         }
 
-        List<HeaderField> headers;
+        List<String> headers;
         try {
-            headers = hpackDecoder.decodeBlock(headerBlock, 0, length);
+            headers = hpackDecoder.decode(headerBlock, 0, length);
         } catch (IOException e) {
             active = false;
             LOGGER.debug("HPACK decoding failed for {}: {}", route, e.getMessage());
@@ -772,8 +771,8 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         }
 
         int decodedSize = 0;
-        for (HeaderField field : headers) {
-            decodedSize += field.name().length() + field.value().length() + 32;
+        for (int i = 0; i < headers.size(); i += 2) {
+            decodedSize += headers.get(i).length() + headers.get(i + 1).length() + 32;
             if (decodedSize > maxHeaderListSize) {
                 throw new H2Exception(ERROR_ENHANCE_YOUR_CALM,
                         "Decoded header list size exceeds limit " + maxHeaderListSize);
