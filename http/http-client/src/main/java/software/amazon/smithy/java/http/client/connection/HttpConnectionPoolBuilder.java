@@ -24,6 +24,7 @@ public final class HttpConnectionPoolBuilder {
     int maxTotalConnections = 256;
     int maxConnectionsPerRoute = 20;
     int h2StreamsPerConnection = 100;
+    H2LoadBalancer h2LoadBalancer = null;
     int h2InitialWindowSize = 65535; // RFC 9113 default
     int h2MaxFrameSize = 16384; // RFC 9113 default
     int h2BufferSize = 256 * 1024; // 256KB default
@@ -490,6 +491,21 @@ public final class HttpConnectionPoolBuilder {
             throw new IllegalArgumentException("h2StreamsPerConnection must be positive: " + streams);
         }
         this.h2StreamsPerConnection = streams;
+        return this;
+    }
+
+    /**
+     * Set the HTTP/2 load balancer strategy for distributing streams across connections.
+     *
+     * <p>Default: watermark strategy at 25% of {@code h2StreamsPerConnection} (floor 25).
+     * Use {@link H2LoadBalancer#watermark(int, int)} to create a watermark balancer with
+     * custom soft/hard limits, or provide a custom implementation.
+     *
+     * @param loadBalancer the load balancer to use
+     * @return this builder
+     */
+    public HttpConnectionPoolBuilder h2LoadBalancer(H2LoadBalancer loadBalancer) {
+        this.h2LoadBalancer = loadBalancer;
         return this;
     }
 

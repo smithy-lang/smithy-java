@@ -3,44 +3,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.http.client.h2.hpack;
+package software.amazon.smithy.java.http.hpack;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
+import java.util.ArrayList;
 
 /**
  * HPACK dynamic table implementation from RFC 7541 Section 2.3.2.
  *
  * <p>The dynamic table is a FIFO queue of header field entries. New entries
- * are added at the front (lowest index), and entries are evicted from the
- * back (highest index) when the table size exceeds the maximum.
+ * are added at index 62 (lowest dynamic index), and older entries are evicted
+ * first when the table size exceeds the maximum.
  *
  * <p>Dynamic table indices start at 62 (after the 61 static table entries).
  * Index 62 is the most recently added entry.
  *
- * <p>This implementation uses linear scans for lookups. The typical dynamic table
- * size is small (< 128 entries with default 4KB limit) so linear scans have good
- * cache locality and avoid the overhead of maintaining index maps that shift on
- * every add operation.
+ * <p>Entries are stored as interleaved name/value pairs. We use an ArrayList
+ * with reverse indexing: new entries append to the end (O(1)), and index 62
+ * maps to the last pair. Eviction removes from the front.
  *
  * <p>Header names must be lowercase as required by HTTP/2 (RFC 7540 Section 8.1.2).
- * Name matching uses case-sensitive String.equals().
  */
 final class DynamicTable {
 
     /**
-     * Each entry has 32 bytes of overhead.
+     * Each entry has 32 bytes of overhead per RFC 7541 Section 4.1.
      */
     private static final int ENTRY_OVERHEAD = 32;
 
-    private final Deque<HeaderField> entries = new ArrayDeque<>();
+    // Interleaved storage: [name0, value0, name1, value1, ...]
+    // Newest entries at the END (reverse of logical HPACK order)
+    private final ArrayList<String> entries = new ArrayList<>();
+    private int numEntries = 0;
     private int currentSize = 0;
     private int maxSize;
-
-    /**
-     * Header field entry with cached size to avoid recomputation during eviction.
-     */
-    record HeaderField(String name, String value, int size) {}
 
     /**
      * Create a dynamic table with the given maximum size.
@@ -57,7 +52,7 @@ final class DynamicTable {
      * @return entry count
      */
     int length() {
-        return entries.size();
+        return numEntries;
     }
 
     /**
@@ -105,7 +100,8 @@ final class DynamicTable {
     void add(String name, String value) {
         int entrySize = entrySize(name, value);
 
-        // If entry does not fit even in empty table, don't add it, but still evict to make room as per spec
+        // RFC 7541 Section 4.4: "an attempt to add an entry larger than the maximum size
+        // causes the table to be emptied of all existing entries and results in an empty table"
         if (entrySize > maxSize) {
             clear();
             return;
@@ -114,35 +110,54 @@ final class DynamicTable {
         // Evict entries until there's room
         evictToSize(maxSize - entrySize);
 
-        // Add new entry at front with cached size
-        entries.addFirst(new HeaderField(name, value, entrySize));
+        // Append to end (newest = highest array index, but lowest HPACK index)
+        entries.add(name);
+        entries.add(value);
         currentSize += entrySize;
+        numEntries++;
     }
 
     /**
-     * Get header field at the given index.
+     * Get header name at the given index.
      *
      * @param index dynamic table index (62 + offset)
-     * @return header field
+     * @return header name
      * @throws IndexOutOfBoundsException if index is out of range
      */
-    HeaderField get(int index) {
-        int offset = index - StaticTable.SIZE - 1; // Convert to 0-based offset
-        if (offset < 0 || offset >= entries.size()) {
+    String getName(int index) {
+        return entries.get(toArrayIndex(index));
+    }
+
+    /**
+     * Get header value at the given index.
+     *
+     * @param index dynamic table index (62 + offset)
+     * @return header value
+     * @throws IndexOutOfBoundsException if index is out of range
+     */
+    String getValue(int index) {
+        return entries.get(toArrayIndex(index) + 1);
+    }
+
+    /**
+     * Convert HPACK index to array index.
+     * HPACK index 62 = newest entry = last pair in array.
+     */
+    private int toArrayIndex(int hpackIndex) {
+        int offset = hpackIndex - StaticTable.SIZE - 1;
+        if (offset < 0 || offset >= numEntries) {
             throw new IndexOutOfBoundsException("Dynamic table index out of range: "
-                    + index + " (table has " + entries.size() + " entries)");
+                    + hpackIndex + " (table has " + numEntries + " entries)");
         }
+        // Reverse: offset 0 -> last pair, offset 1 -> second-to-last, etc.
+        return entries.size() - 2 - (offset * 2);
+    }
 
-        // Linear scan to find entry at offset
-        int i = 0;
-        for (HeaderField field : entries) {
-            if (i++ == offset) {
-                return field;
-            }
-        }
-
-        // Should never reach here given bounds check above
-        throw new AssertionError("Unreachable: offset in range but entry not found");
+    /**
+     * Convert an array index to an HPACK dynamic table index.
+     */
+    private int toHpackIndex(int arrayIndex) {
+        return StaticTable.SIZE + 1 + (entries.size() - 2 - arrayIndex) / 2;
     }
 
     /**
@@ -153,12 +168,11 @@ final class DynamicTable {
      * @return dynamic table index (62+) if found, -1 otherwise
      */
     int findFullMatch(String name, String value) {
-        int index = StaticTable.SIZE + 1;
-        for (HeaderField field : entries) {
-            if (field.name().equals(name) && field.value().equals(value)) {
-                return index;
+        // Search from newest (end) to oldest (start)
+        for (int i = entries.size() - 2; i >= 0; i -= 2) {
+            if (entries.get(i).equals(name) && entries.get(i + 1).equals(value)) {
+                return toHpackIndex(i);
             }
-            index++;
         }
         return -1;
     }
@@ -170,12 +184,10 @@ final class DynamicTable {
      * @return dynamic table index (62+) if found, -1 otherwise
      */
     int findNameMatch(String name) {
-        int index = StaticTable.SIZE + 1;
-        for (HeaderField field : entries) {
-            if (field.name().equals(name)) {
-                return index;
+        for (int i = entries.size() - 2; i >= 0; i -= 2) {
+            if (entries.get(i).equals(name)) {
+                return toHpackIndex(i);
             }
-            index++;
         }
         return -1;
     }
@@ -186,23 +198,35 @@ final class DynamicTable {
     void clear() {
         entries.clear();
         currentSize = 0;
+        numEntries = 0;
     }
 
     /**
      * Calculate the size of an entry per RFC 7541 Section 4.1.
-     * Size = length(name) in octets + length(value) in octets + 32
+     * Size = length(name) + length(value) + 32
      *
-     * <p>HTTP/2 header names are lowercase ASCII, and values are effectively ASCII/Latin-1,
-     * so we count chars as bytes directly (avoids getBytes allocation per insertion).
+     * @param name header name
+     * @param value header value
+     * @return entry size in bytes
      */
     static int entrySize(String name, String value) {
         return name.length() + value.length() + ENTRY_OVERHEAD;
     }
 
     private void evictToSize(int targetSize) {
-        while (currentSize > targetSize && !entries.isEmpty()) {
-            HeaderField evicted = entries.removeLast();
-            currentSize -= evicted.size();
+        int removeCount = 0;
+        int removedSize = 0;
+
+        // Efficiently resize in one-shot.
+        while (currentSize - removedSize > targetSize && removeCount < entries.size()) {
+            removedSize += entrySize(entries.get(removeCount), entries.get(removeCount + 1));
+            removeCount += 2;
+        }
+
+        if (removeCount > 0) {
+            entries.subList(0, removeCount).clear();
+            currentSize -= removedSize;
+            numEntries -= removeCount / 2;
         }
     }
 }

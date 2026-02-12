@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.http.client.h2.hpack;
+package software.amazon.smithy.java.http.hpack;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -24,9 +24,8 @@ class StaticTableTest {
     @ParameterizedTest(name = "index {0}: {1}={2}")
     @MethodSource("staticTableEntries")
     void getReturnsCorrectEntry(int index, String expectedName, String expectedValue) {
-        HeaderField field = StaticTable.get(index);
-        assertEquals(expectedName, field.name());
-        assertEquals(expectedValue, field.value());
+        assertEquals(expectedName, StaticTable.getName(index));
+        assertEquals(expectedValue, StaticTable.getValue(index));
     }
 
     static Stream<Arguments> staticTableEntries() {
@@ -65,7 +64,6 @@ class StaticTableTest {
                 Arguments.of(":status", "200", 8),
                 Arguments.of(":status", "404", 13),
                 Arguments.of("accept-encoding", "gzip, deflate", 16),
-                // No match cases
                 Arguments.of(":method", "PUT", -1),
                 Arguments.of(":status", "201", -1),
                 Arguments.of("x-custom", "value", -1),
@@ -90,14 +88,12 @@ class StaticTableTest {
                 Arguments.of("content-type", 31),
                 Arguments.of("host", 38),
                 Arguments.of("www-authenticate", 61),
-                // No match
                 Arguments.of("x-custom", -1),
                 Arguments.of("x-request-id", -1));
     }
 
     @Test
     void findFullMatchWithHeaderNamesConstant() {
-        // Using HeaderNames constant should enable pointer comparison optimization
         assertEquals(2, StaticTable.findFullMatch(HeaderNames.PSEUDO_METHOD, "GET"));
         assertEquals(8, StaticTable.findFullMatch(HeaderNames.PSEUDO_STATUS, "200"));
     }

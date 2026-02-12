@@ -55,6 +55,7 @@ import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.ConnectionPoolListener;
+import software.amazon.smithy.java.http.client.connection.H2LoadBalancer;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -92,6 +93,9 @@ public class H2cScalingBenchmark {
     @Param({"100"})
     private int streamsPerConnection;
 
+    @Param({"1000"})
+    private int totalRequests;
+
     private HttpClient smithyClient;
     private Http2Client helidonClient;
 
@@ -117,6 +121,7 @@ public class H2cScalingBenchmark {
                         .maxConnectionsPerRoute(connections)
                         .maxTotalConnections(connections)
                         .h2StreamsPerConnection(streamsPerConnection)
+                        .h2LoadBalancer(H2LoadBalancer.watermark(1, streamsPerConnection))
                         .h2InitialWindowSize(1024 * 1024)
                         .maxIdleTime(Duration.ofMinutes(2))
                         .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
@@ -231,7 +236,7 @@ public class H2cScalingBenchmark {
         var uri = URI.create(BenchmarkSupport.H2C_URL + "/get");
         var request = HttpRequest.builder().uri(uri).method("GET").build();
 
-        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+        BenchmarkSupport.runBenchmark(concurrency, totalRequests, (HttpRequest req) -> {
             try (var res = smithyClient.send(req)) {
                 res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
             }
@@ -243,7 +248,7 @@ public class H2cScalingBenchmark {
     @Benchmark
     @Threads(1)
     public void helidon(Counter counter) throws InterruptedException {
-        BenchmarkSupport.runBenchmark(concurrency, concurrency, (Http2Client client) -> {
+        BenchmarkSupport.runBenchmark(concurrency, totalRequests, (Http2Client client) -> {
             try (HttpClientResponse response = client.get("/get").request()) {
                 response.entity().consume();
             }
@@ -262,7 +267,7 @@ public class H2cScalingBenchmark {
                 .body(DataStream.ofBytes(BenchmarkSupport.POST_PAYLOAD))
                 .build();
 
-        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+        BenchmarkSupport.runBenchmark(concurrency, totalRequests, (HttpRequest req) -> {
             try (var res = smithyClient.send(req)) {
                 res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
             }
@@ -281,7 +286,7 @@ public class H2cScalingBenchmark {
                 .body(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD))
                 .build();
 
-        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+        BenchmarkSupport.runBenchmark(concurrency, totalRequests, (HttpRequest req) -> {
             try (var res = smithyClient.send(req)) {
                 res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
             }
@@ -296,7 +301,7 @@ public class H2cScalingBenchmark {
         var uri = URI.create(BenchmarkSupport.H2C_URL + "/getmb");
         var request = HttpRequest.builder().uri(uri).method("GET").build();
 
-        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+        BenchmarkSupport.runBenchmark(concurrency, totalRequests, (HttpRequest req) -> {
             try (var res = smithyClient.send(req)) {
                 res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
             }
@@ -316,7 +321,7 @@ public class H2cScalingBenchmark {
 
         var connectionIndex = new AtomicInteger(0);
 
-        BenchmarkSupport.runBenchmark(concurrency, concurrency, (DefaultHttp2Headers h) -> {
+        BenchmarkSupport.runBenchmark(concurrency, totalRequests, (DefaultHttp2Headers h) -> {
             var latch = new CountDownLatch(1);
             var error = new AtomicReference<Throwable>();
 
@@ -374,7 +379,7 @@ public class H2cScalingBenchmark {
 
         var connectionIndex = new AtomicInteger(0);
 
-        BenchmarkSupport.runBenchmark(concurrency, concurrency, (DefaultHttp2Headers h) -> {
+        BenchmarkSupport.runBenchmark(concurrency, totalRequests, (DefaultHttp2Headers h) -> {
             var latch = new CountDownLatch(1);
             var error = new AtomicReference<Throwable>();
 
@@ -440,7 +445,7 @@ public class H2cScalingBenchmark {
 
         var connectionIndex = new AtomicInteger(0);
 
-        BenchmarkSupport.runBenchmark(concurrency, concurrency, (DefaultHttp2Headers h) -> {
+        BenchmarkSupport.runBenchmark(concurrency, totalRequests, (DefaultHttp2Headers h) -> {
             var latch = new CountDownLatch(1);
             var error = new AtomicReference<Throwable>();
 
@@ -504,7 +509,7 @@ public class H2cScalingBenchmark {
 
         var connectionIndex = new AtomicInteger(0);
 
-        BenchmarkSupport.runBenchmark(concurrency, concurrency, (DefaultHttp2Headers h) -> {
+        BenchmarkSupport.runBenchmark(concurrency, totalRequests, (DefaultHttp2Headers h) -> {
             var latch = new CountDownLatch(1);
             var error = new AtomicReference<Throwable>();
 

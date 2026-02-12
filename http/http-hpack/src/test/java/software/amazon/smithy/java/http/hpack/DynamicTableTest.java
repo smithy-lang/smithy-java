@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.http.client.h2.hpack;
+package software.amazon.smithy.java.http.hpack;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -19,8 +19,8 @@ class DynamicTableTest {
         table.add("name", "value");
 
         assertEquals(1, table.length());
-        assertEquals("name", table.get(62).name());
-        assertEquals("value", table.get(62).value());
+        assertEquals("name", table.getName(62));
+        assertEquals("value", table.getValue(62));
     }
 
     @Test
@@ -54,8 +54,8 @@ class DynamicTableTest {
         // Would be 127, exceeds 100, so evict oldest
 
         assertEquals(2, table.length());
-        assertEquals("third", table.get(62).name());
-        assertEquals("second", table.get(63).name());
+        assertEquals("third", table.getName(62));
+        assertEquals("second", table.getName(63));
     }
 
     @Test
@@ -80,7 +80,7 @@ class DynamicTableTest {
         table.setMaxSize(50); // Only room for 1 entry
 
         assertEquals(1, table.length());
-        assertEquals("name2", table.get(62).name());
+        assertEquals("name2", table.getName(62));
     }
 
     @Test
@@ -98,8 +98,8 @@ class DynamicTableTest {
         var table = new DynamicTable(4096);
         table.add("name", "value");
 
-        assertThrows(IndexOutOfBoundsException.class, () -> table.get(61)); // Below dynamic range
-        assertThrows(IndexOutOfBoundsException.class, () -> table.get(63)); // Only 1 entry at 62
+        assertThrows(IndexOutOfBoundsException.class, () -> table.getName(61)); // Below dynamic range
+        assertThrows(IndexOutOfBoundsException.class, () -> table.getName(63)); // Only 1 entry at 62
     }
 
     @Test
