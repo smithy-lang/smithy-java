@@ -40,6 +40,7 @@ import software.amazon.smithy.model.shapes.StringShape;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
+import software.amazon.smithy.model.traits.MixinTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -299,6 +300,9 @@ public final class SchemasGenerator
 
             @Override
             public Void structureShape(StructureShape shape) {
+                if (MixinTrait.isInterfaceMixin(shape)) {
+                    return null;
+                }
                 generateStructMemberSchemas(shape, "structureBuilder");
                 return null;
             }

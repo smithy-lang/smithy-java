@@ -43,6 +43,7 @@ public final class UnionGenerator
         var shape = directive.shape();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
+
             var template = """
                     public sealed interface ${shape:T} extends ${serializableStruct:T} {
                         ${schemas:C|}
