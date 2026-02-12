@@ -36,7 +36,6 @@ import software.amazon.smithy.java.http.client.DelegatedClosingInputStream;
 import software.amazon.smithy.java.http.client.DelegatedClosingOutputStream;
 import software.amazon.smithy.java.http.client.HttpExchange;
 import software.amazon.smithy.java.http.client.h2.hpack.HeaderField;
-import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * HTTP/2 exchange implementation for a single stream with multiplexing support.
@@ -61,8 +60,6 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * after data is consumed via {@link #onDataConsumed}.
  */
 public final class H2Exchange implements HttpExchange {
-
-    private static final InternalLogger LOGGER = InternalLogger.getLogger(H2Exchange.class);
 
     // Max frames to acquire flow control for in a single batch (64 frames = 1MB at default 16KB frame size)
     private static final int FLOW_CONTROL_BATCH_FRAMES = 64;
