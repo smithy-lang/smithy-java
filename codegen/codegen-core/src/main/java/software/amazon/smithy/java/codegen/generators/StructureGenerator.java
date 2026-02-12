@@ -193,7 +193,9 @@ public final class StructureGenerator<
                             shape,
                             directive.symbolProvider(),
                             directive.model(),
-                            directive.service()));
+                            directive.service(),
+                            interfaceMixinSymbols,
+                            interfaceMixinMemberNames));
             writer.putContext("getMemberValue", new GetMemberValueGenerator(writer, directive.symbolProvider(), shape));
             writer.putContext("toBuilder", new ToBuilderGenerator(writer, shape, directive.symbolProvider()));
             writer.write(template);
@@ -543,15 +545,26 @@ public final class StructureGenerator<
     }
 
     private static final class StructureBuilderGenerator extends BuilderGenerator {
+        private final List<Symbol> interfaceMixinSymbols;
+        private final Set<String> interfaceMixinMemberNames;
 
         StructureBuilderGenerator(
                 JavaWriter writer,
                 Shape shape,
                 SymbolProvider symbolProvider,
                 Model model,
-                ServiceShape service
+                ServiceShape service,
+                List<Symbol> interfaceMixinSymbols,
+                Set<String> interfaceMixinMemberNames
         ) {
             super(writer, shape, symbolProvider, model, service);
+            this.interfaceMixinSymbols = interfaceMixinSymbols;
+            this.interfaceMixinMemberNames = interfaceMixinMemberNames;
+        }
+
+        @Override
+        protected List<Symbol> mixinBuilderInterfaces() {
+            return interfaceMixinSymbols;
         }
 
         // Required shapes marked with clientOptional should not be required to create the type. For these shapes,
@@ -794,10 +807,13 @@ public final class StructureGenerator<
                 writer.putContext("check", CodegenUtils.requiresSetterNullCheck(symbolProvider, member));
                 writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
                 writer.putContext("schemaName", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
+                writer.putContext("hasOverride",
+                        interfaceMixinMemberNames.contains(member.getMemberName()));
 
                 writer.write(
                         """
-                                public Builder ${memberName:L}(${?isNullable}${memberSymbol:B}${/isNullable}${^isNullable}${memberSymbol:N}${/isNullable} ${memberName:L}) {
+                                ${?hasOverride}@Override
+                                ${/hasOverride}public Builder ${memberName:L}(${?isNullable}${memberSymbol:B}${/isNullable}${^isNullable}${memberSymbol:N}${/isNullable} ${memberName:L}) {
                                     this.${memberName:L} = ${?check}${objects:T}.requireNonNull(${/check}${memberName:L}${?check}, "${memberName:L} cannot be null")${/check};${?tracked}
                                     tracker.setMember(${schemaName:L});${/tracked}
                                     return this;

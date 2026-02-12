@@ -10,5 +10,9 @@ import software.amazon.smithy.utils.SmithyGenerated;
 public interface HasFullName extends HasName {
     String getLastName();
 
+    interface Builder<B extends Builder<B>> extends HasName.Builder<B> {
+        B lastName(String lastName);
+
+    }
 }
 

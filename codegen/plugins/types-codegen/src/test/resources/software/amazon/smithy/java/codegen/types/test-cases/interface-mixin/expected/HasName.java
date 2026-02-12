@@ -12,5 +12,11 @@ public interface HasName {
 
     int getId();
 
+    interface Builder<B extends Builder<B>> {
+        B name(String name);
+
+        B id(int id);
+
+    }
 }
 

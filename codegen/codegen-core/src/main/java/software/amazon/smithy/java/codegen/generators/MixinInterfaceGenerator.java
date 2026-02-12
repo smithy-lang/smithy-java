@@ -60,6 +60,8 @@ public final class MixinInterfaceGenerator<
                     """
                             public interface ${shape:T}${?hasParents} extends ${#parents}${value:T}${^key.last}, ${/key.last}${/parents}${/hasParents} {
                                 ${getters:C|}
+
+                                ${builderInterface:C|}
                             }
                             """;
             writer.putContext("shape", directive.symbol());
@@ -67,10 +69,23 @@ public final class MixinInterfaceGenerator<
             writer.putContext("parents", parentInterfaces);
             writer.putContext("getters",
                     new GetterSignatureGenerator(writer, shape, symbolProvider, model, parentInterfaces));
+            writer.putContext("builderInterface",
+                    new BuilderInterfaceGenerator(writer, shape, symbolProvider, model, parentInterfaces));
             writer.write(template);
 
             writer.popState();
         });
+    }
+
+    private static boolean isMemberFromParentInterface(Shape shape, Model model, MemberShape member) {
+        for (ShapeId mixinId : shape.getMixins()) {
+            StructureShape mixinShape = model.expectShape(mixinId, StructureShape.class);
+            if (MixinTrait.isInterfaceMixin(mixinShape)
+                    && mixinShape.getAllMembers().containsKey(member.getMemberName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private record GetterSignatureGenerator(
@@ -82,7 +97,7 @@ public final class MixinInterfaceGenerator<
         @Override
         public void run() {
             for (MemberShape member : shape.members()) {
-                if (isMemberFromParentInterface(member)) {
+                if (isMemberFromParentInterface(shape, model, member)) {
                     continue;
                 }
                 writer.pushState();
@@ -108,16 +123,44 @@ public final class MixinInterfaceGenerator<
                 writer.popState();
             }
         }
+    }
 
-        private boolean isMemberFromParentInterface(MemberShape member) {
-            for (ShapeId mixinId : shape.getMixins()) {
-                StructureShape mixinShape = model.expectShape(mixinId, StructureShape.class);
-                if (MixinTrait.isInterfaceMixin(mixinShape)
-                        && mixinShape.getAllMembers().containsKey(member.getMemberName())) {
-                    return true;
+    private record BuilderInterfaceGenerator(
+            JavaWriter writer,
+            Shape shape,
+            SymbolProvider symbolProvider,
+            Model model,
+            List<Symbol> parentInterfaces) implements Runnable {
+        @Override
+        public void run() {
+            writer.pushState();
+            writer.putContext("hasParentBuilders", !parentInterfaces.isEmpty());
+            writer.putContext("parentBuilders", parentInterfaces);
+            var template =
+                    """
+                            interface Builder<B extends Builder<B>>${?hasParentBuilders} extends ${#parentBuilders}${value:T}.Builder<B>${^key.last}, ${/key.last}${/parentBuilders}${/hasParentBuilders} {
+                                ${setters:C|}
+                            }""";
+            writer.putContext("setters", writer.consumer(this::generateSetterSignatures));
+            writer.write(template);
+            writer.popState();
+        }
+
+        private void generateSetterSignatures(JavaWriter writer) {
+            for (MemberShape member : shape.members()) {
+                if (isMemberFromParentInterface(shape, model, member)) {
+                    continue;
                 }
+                writer.pushState();
+                var memberName = symbolProvider.toMemberName(member);
+                writer.putContext("memberName", memberName);
+                writer.putContext("memberSymbol", symbolProvider.toSymbol(member));
+                writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
+                writer.write(
+                        "B ${memberName:L}(${?isNullable}${memberSymbol:B}${/isNullable}${^isNullable}${memberSymbol:N}${/isNullable} ${memberName:L});");
+                writer.write("");
+                writer.popState();
             }
-            return false;
         }
     }
 }

@@ -126,7 +126,7 @@ public final class SimpleUser implements SerializableStruct, HasName {
     /**
      * Builder for {@link SimpleUser}.
      */
-    public static final class Builder implements ShapeBuilder<SimpleUser> {
+    public static final class Builder implements ShapeBuilder<SimpleUser>, HasName.Builder<Builder> {
         private final PresenceTracker tracker = PresenceTracker.of($SCHEMA);
         private String name;
         private int id;
@@ -142,6 +142,7 @@ public final class SimpleUser implements SerializableStruct, HasName {
         /**
          * @return this builder.
          */
+        @Override
         public Builder name(String name) {
             this.name = name;
             return this;
@@ -151,6 +152,7 @@ public final class SimpleUser implements SerializableStruct, HasName {
          * <p><strong>Required</strong>
          * @return this builder.
          */
+        @Override
         public Builder id(int id) {
             this.id = id;
             tracker.setMember($SCHEMA_ID);
