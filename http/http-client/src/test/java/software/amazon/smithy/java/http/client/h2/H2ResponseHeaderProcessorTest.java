@@ -9,22 +9,24 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.util.List;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.http.client.h2.hpack.HeaderField;
 
 class H2ResponseHeaderProcessorTest {
 
-    private static HeaderField hf(String name, String value) {
-        return new HeaderField(name, value);
+    // Helper to create flat header list
+    private static List<String> headers(String... pairs) {
+        return List.of(pairs);
     }
 
     @Test
     void validResponseHeaders() throws IOException {
-        var fields = List.of(
-                hf(":status", "200"),
-                hf("content-type", "application/json"),
-                hf("content-length", "42"));
+        var fields = headers(
+                ":status",
+                "200",
+                "content-type",
+                "application/json",
+                "content-length",
+                "42");
 
         var result = H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false);
 
@@ -35,7 +37,8 @@ class H2ResponseHeaderProcessorTest {
 
     @Test
     void informationalResponse() throws IOException {
-        var fields = List.of(hf(":status", "100"));
+        var fields = headers(":status", "100");
+
         var result = H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false);
 
         assertTrue(result.isInformational());
@@ -43,16 +46,16 @@ class H2ResponseHeaderProcessorTest {
 
     @Test
     void informationalResponseWithEndStreamThrows() {
-        var fields = List.of(hf(":status", "100"));
+        var fields = headers(":status", "100");
+
         var ex = assertThrows(H2Exception.class,
                 () -> H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, true));
-
         assertTrue(ex.getMessage().contains("1xx response must not have END_STREAM"));
     }
 
     @Test
     void missingStatusThrows() {
-        var fields = List.of(hf("content-type", "text/plain"));
+        var fields = headers("content-type", "text/plain");
 
         assertThrows(IOException.class,
                 () -> H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false));
@@ -60,16 +63,16 @@ class H2ResponseHeaderProcessorTest {
 
     @Test
     void duplicateStatusThrows() {
-        var fields = List.of(hf(":status", "200"), hf(":status", "201"));
+        var fields = headers(":status", "200", ":status", "201");
+
         var ex = assertThrows(H2Exception.class,
                 () -> H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false));
-
         assertTrue(ex.getMessage().contains("single :status"));
     }
 
     @Test
     void invalidStatusValueThrows() {
-        var fields = List.of(hf(":status", "abc"));
+        var fields = headers(":status", "abc");
 
         assertThrows(IOException.class,
                 () -> H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false));
@@ -77,79 +80,92 @@ class H2ResponseHeaderProcessorTest {
 
     @Test
     void pseudoHeaderAfterRegularHeaderThrows() {
-        var fields = List.of(
-                hf(":status", "200"),
-                hf("content-type", "text/plain"),
-                hf(":unknown", "value"));
+        var fields = headers(
+                ":status",
+                "200",
+                "content-type",
+                "text/plain",
+                ":unknown",
+                "value");
+
         var ex = assertThrows(H2Exception.class,
                 () -> H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false));
-
         assertTrue(ex.getMessage().contains("appears after regular header"));
     }
 
     @Test
     void requestPseudoHeaderInResponseThrows() {
-        var fields = List.of(hf(":status", "200"), hf(":method", "GET"));
+        var fields = headers(":status", "200", ":method", "GET");
+
         var ex = assertThrows(H2Exception.class,
                 () -> H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false));
-
         assertTrue(ex.getMessage().contains("Request pseudo-header"));
     }
 
     @Test
     void unknownPseudoHeaderThrows() {
-        var fields = List.of(hf(":status", "200"), hf(":unknown", "value"));
+        var fields = headers(":status", "200", ":unknown", "value");
+
         var ex = assertThrows(H2Exception.class,
                 () -> H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false));
-
         assertTrue(ex.getMessage().contains("Unknown pseudo-header"));
     }
 
     @Test
     void invalidContentLengthThrows() {
-        var fields = List.of(hf(":status", "200"), hf("content-length", "not-a-number"));
+        var fields = headers(":status", "200", "content-length", "not-a-number");
+
         var ex = assertThrows(H2Exception.class,
                 () -> H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false));
-
         assertTrue(ex.getMessage().contains("Invalid Content-Length"));
     }
 
     @Test
     void multipleConflictingContentLengthThrows() {
-        var fields = List.of(
-                hf(":status", "200"),
-                hf("content-length", "100"),
-                hf("content-length", "200"));
+        var fields = headers(
+                ":status",
+                "200",
+                "content-length",
+                "100",
+                "content-length",
+                "200");
+
         var ex = assertThrows(H2Exception.class,
                 () -> H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false));
-
         assertTrue(ex.getMessage().contains("Multiple Content-Length"));
     }
 
     @Test
     void duplicateIdenticalContentLengthAllowed() throws IOException {
-        var fields = List.of(
-                hf(":status", "200"),
-                hf("content-length", "100"),
-                hf("content-length", "100"));
-        var result = H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false);
+        var fields = headers(
+                ":status",
+                "200",
+                "content-length",
+                "100",
+                "content-length",
+                "100");
 
+        var result = H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false);
         assertEquals(100, result.contentLength());
     }
 
     @Test
     void noContentLengthReturnsMinusOne() throws IOException {
-        var fields = List.of(hf(":status", "200"));
-        var result = H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false);
+        var fields = headers(":status", "200");
 
+        var result = H2ResponseHeaderProcessor.processResponseHeaders(fields, 1, false);
         assertEquals(-1, result.contentLength());
     }
 
+    // === processTrailers ===
+
     @Test
     void validTrailers() throws IOException {
-        var fields = List.of(
-                hf("x-checksum", "abc123"),
-                hf("x-request-id", "req-456"));
+        var fields = headers(
+                "x-checksum",
+                "abc123",
+                "x-request-id",
+                "req-456");
 
         var trailers = H2ResponseHeaderProcessor.processTrailers(fields, 1);
 
@@ -159,41 +175,35 @@ class H2ResponseHeaderProcessorTest {
 
     @Test
     void trailerWithPseudoHeaderThrows() {
-        var fields = List.of(hf(":status", "200"));
+        var fields = headers(":status", "200");
+
         var ex = assertThrows(H2Exception.class,
                 () -> H2ResponseHeaderProcessor.processTrailers(fields, 1));
-
         assertTrue(ex.getMessage().contains("Trailer contains pseudo-header"));
     }
 
     @Test
     void emptyTrailersAllowed() throws IOException {
         var trailers = H2ResponseHeaderProcessor.processTrailers(List.of(), 1);
-
         assertTrue(trailers.map().isEmpty());
     }
 
+    // === validateContentLength ===
+
     @Test
-    void contentLengthMatchPasses() {
-        Assertions.assertDoesNotThrow(() -> {
-            H2ResponseHeaderProcessor.validateContentLength(100, 100, 1);
-        });
+    void contentLengthMatchPasses() throws IOException {
+        H2ResponseHeaderProcessor.validateContentLength(100, 100, 1);
     }
 
     @Test
     void contentLengthMismatchThrows() {
         var ex = assertThrows(H2Exception.class,
                 () -> H2ResponseHeaderProcessor.validateContentLength(100, 50, 1));
-
         assertTrue(ex.getMessage().contains("Content-Length mismatch"));
-        assertTrue(ex.getMessage().contains("expected 100"));
-        assertTrue(ex.getMessage().contains("received 50"));
     }
 
     @Test
-    void noContentLengthSkipsValidation() {
-        Assertions.assertDoesNotThrow(() -> {
-            H2ResponseHeaderProcessor.validateContentLength(-1, 999, 1);
-        });
+    void noContentLengthSkipsValidation() throws IOException {
+        H2ResponseHeaderProcessor.validateContentLength(-1, 999, 1);
     }
 }

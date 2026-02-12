@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.http.client.h2.hpack;
+package software.amazon.smithy.java.http.hpack;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -31,11 +31,11 @@ class HpackDecoderTest {
         var out2 = new ByteArrayOutputStream();
         encoder.beginHeaderBlock(out2);
         encoder.encodeHeader(out2, "x-custom-name", "value2", false);
-        List<HeaderField> headers = decoder.decode(out2.toByteArray());
+        List<String> headers = decoder.decode(out2.toByteArray());
 
-        assertEquals(1, headers.size());
-        assertEquals("x-custom-name", headers.getFirst().name());
-        assertEquals("value2", headers.getFirst().value());
+        assertEquals(2, headers.size()); // name, value
+        assertEquals("x-custom-name", headers.get(0));
+        assertEquals("value2", headers.get(1));
     }
 
     @Test
@@ -81,11 +81,6 @@ class HpackDecoderTest {
     @Test
     void throwsOnUppercaseHeaderName() {
         // Craft: literal without indexing (0x00), name length 4, "Test" (uppercase T)
-        // 0x00 = literal without indexing, name index 0
-        // 0x04 = string length 4, no huffman
-        // "Test" = uppercase T
-        // 0x05 = value length 5
-        // "value"
         byte[] malformed = {0x00, 0x04, 'T', 'e', 's', 't', 0x05, 'v', 'a', 'l', 'u', 'e'};
         var decoder = new HpackDecoder(4096);
 
@@ -95,32 +90,26 @@ class HpackDecoderTest {
 
     @Test
     void allowsTableSizeUpdateAtBeginning() throws IOException {
-        // Table size update (0x3f 0x01 = size 32) followed by indexed header
-        // 0x20 | 0x1f = 0x3f means size >= 31, next byte 0x01 means size = 31 + 1 = 32
-        // Actually simpler: 0x20 = table size 0 (just 0x20 with 5-bit prefix)
-        byte[] valid = {0x20, (byte) 0x82}; // table size 0, then :method GET
+        // Table size update (0x20 = size 0) followed by indexed header (0x82 = :method GET)
+        byte[] valid = {0x20, (byte) 0x82};
         var decoder = new HpackDecoder(4096);
-        List<HeaderField> headers = decoder.decode(valid);
+        List<String> headers = decoder.decode(valid);
 
-        assertEquals(1, headers.size());
-        assertEquals(":method", headers.getFirst().name());
-        assertEquals("GET", headers.getFirst().value());
+        assertEquals(2, headers.size());
+        assertEquals(":method", headers.get(0));
+        assertEquals("GET", headers.get(1));
     }
 
     @Test
     void decodesLiteralNeverIndexed() throws IOException {
         // 0x10 = literal never indexed, name index 0
-        // 0x04 = name length 4
-        // "test"
-        // 0x05 = value length 5
-        // "value"
         byte[] data = {0x10, 0x04, 't', 'e', 's', 't', 0x05, 'v', 'a', 'l', 'u', 'e'};
         var decoder = new HpackDecoder(4096);
-        List<HeaderField> headers = decoder.decode(data);
+        List<String> headers = decoder.decode(data);
 
-        assertEquals(1, headers.size());
-        assertEquals("test", headers.getFirst().name());
-        assertEquals("value", headers.getFirst().value());
+        assertEquals(2, headers.size());
+        assertEquals("test", headers.get(0));
+        assertEquals("value", headers.get(1));
     }
 
     @Test
@@ -128,11 +117,11 @@ class HpackDecoderTest {
         // 0x00 = literal without indexing, name index 0
         byte[] data = {0x00, 0x04, 't', 'e', 's', 't', 0x05, 'v', 'a', 'l', 'u', 'e'};
         var decoder = new HpackDecoder(4096);
-        List<HeaderField> headers = decoder.decode(data);
+        List<String> headers = decoder.decode(data);
 
-        assertEquals(1, headers.size());
-        assertEquals("test", headers.getFirst().name());
-        assertEquals("value", headers.getFirst().value());
+        assertEquals(2, headers.size());
+        assertEquals("test", headers.get(0));
+        assertEquals("value", headers.get(1));
     }
 
     @Test

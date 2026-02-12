@@ -22,6 +22,7 @@ val jmhServerImplementation by configurations.getting
 
 dependencies {
     api(project(":http:http-api"))
+    api(project(":http:http-hpack"))
     api(project(":context"))
     api(project(":logging"))
 

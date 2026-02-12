@@ -13,35 +13,21 @@ import java.util.List;
 import java.util.Set;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
-import software.amazon.smithy.java.http.client.h2.hpack.HeaderField;
 
 /**
  * Processes HTTP/2 response headers and trailers with RFC 9113 validation.
  *
- * <p>This class handles the validation and parsing of response HEADERS frames,
- * including pseudo-header validation, Content-Length tracking, and trailer processing.
- *
- * <h2>RFC 9113 Compliance</h2>
- * <ul>
- *   <li>Section 8.3: Pseudo-headers must appear before regular headers</li>
- *   <li>Section 8.3.2: Response must have exactly one :status pseudo-header</li>
- *   <li>Section 8.3: Request pseudo-headers not allowed in responses</li>
- *   <li>Section 8.1: Trailers must not contain pseudo-headers</li>
- *   <li>Section 8.1.1: Content-Length validation, 1xx responses must not have END_STREAM</li>
- * </ul>
+ * <p>Headers are passed as flat List&lt;String&gt;: [name0, value0, name1, value1, ...].
  */
 final class H2ResponseHeaderProcessor {
 
-    /** Request pseudo-headers (only allowed in requests, not responses). */
     private static final Set<String> REQUEST_PSEUDO_HEADERS = Set.of(
             ":method",
             ":scheme",
             ":authority",
             ":path");
 
-    /** Result of processing response headers. */
     record Result(HttpHeaders headers, int statusCode, long contentLength) {
-        /** Indicates an informational (1xx) response that should be skipped. */
         static final Result INFORMATIONAL = new Result(null, -1, -1);
 
         boolean isInformational() {
@@ -52,28 +38,22 @@ final class H2ResponseHeaderProcessor {
     private H2ResponseHeaderProcessor() {}
 
     /**
-     * Process response headers with full RFC 9113 validation.
+     * Process response headers.
      *
-     * @param fields the decoded header fields
-     * @param streamId the stream ID (for error messages)
-     * @param isEndStream whether END_STREAM flag was set
-     * @return the processing result, or {@link Result#INFORMATIONAL} for 1xx responses
-     * @throws H2Exception if headers violate RFC 9113
-     * @throws IOException if headers are malformed
+     * @param fields flat list [name0, value0, name1, value1, ...]
      */
-    static Result processResponseHeaders(List<HeaderField> fields, int streamId, boolean isEndStream)
+    static Result processResponseHeaders(List<String> fields, int streamId, boolean isEndStream)
             throws IOException {
         ModifiableHttpHeaders headers = HttpHeaders.ofModifiable();
         int parsedStatusCode = -1;
         boolean seenRegularHeader = false;
         long contentLength = -1;
 
-        for (HeaderField field : fields) {
-            String name = field.name();
-            String value = field.value();
+        for (int i = 0; i < fields.size(); i += 2) {
+            String name = fields.get(i);
+            String value = fields.get(i + 1);
 
             if (name.startsWith(":")) {
-                // RFC 9113 Section 8.3: All pseudo-headers MUST appear before regular headers
                 if (seenRegularHeader) {
                     throw new H2Exception(ERROR_PROTOCOL_ERROR,
                             streamId,
@@ -81,7 +61,6 @@ final class H2ResponseHeaderProcessor {
                 }
 
                 if (name.equals(PSEUDO_STATUS)) {
-                    // RFC 9113 Section 8.3.2: Response MUST have exactly one :status
                     if (parsedStatusCode != -1) {
                         throw new H2Exception(ERROR_PROTOCOL_ERROR, streamId, "Expected a single :status header");
                     }
@@ -91,20 +70,16 @@ final class H2ResponseHeaderProcessor {
                         throw new IOException("Invalid :status value: " + value);
                     }
                 } else if (REQUEST_PSEUDO_HEADERS.contains(name)) {
-                    // RFC 9113 Section 8.3: Request pseudo-headers are NOT allowed in responses
                     throw new H2Exception(ERROR_PROTOCOL_ERROR,
                             streamId,
                             "Request pseudo-header '" + name + "' in response");
                 } else {
-                    // Unknown pseudo-header - RFC 9113 says endpoints MUST treat as malformed
                     throw new H2Exception(ERROR_PROTOCOL_ERROR,
                             streamId,
                             "Unknown pseudo-header '" + name + "' in response");
                 }
             } else {
-                // Handle a regular header
                 seenRegularHeader = true;
-                // Track Content-Length for validation per RFC 9113 Section 8.1.1
                 if ("content-length".equals(name)) {
                     try {
                         long parsedLength = Long.parseLong(value);
@@ -113,10 +88,9 @@ final class H2ResponseHeaderProcessor {
                         }
                         contentLength = parsedLength;
                     } catch (NumberFormatException e) {
-                        throw new H2Exception(ERROR_PROTOCOL_ERROR, streamId, "Invalid Content-Length value: " + value);
+                        throw new H2Exception(ERROR_PROTOCOL_ERROR, streamId, "Invalid Content-Length: " + value);
                     }
                 }
-
                 headers.addHeader(name, value);
             }
         }
@@ -125,7 +99,6 @@ final class H2ResponseHeaderProcessor {
             throw new IOException("Response missing :status pseudo-header");
         }
 
-        // Check if this is an informational (1xx) response, and skip and wait for final response
         if (parsedStatusCode >= 100 && parsedStatusCode < 200) {
             if (isEndStream) {
                 throw new H2Exception(ERROR_PROTOCOL_ERROR, streamId, "1xx response must not have END_STREAM");
@@ -137,37 +110,22 @@ final class H2ResponseHeaderProcessor {
     }
 
     /**
-     * Process trailer headers per RFC 9113 Section 8.1.
+     * Process trailer headers.
      *
-     * <p>Trailers are HEADERS sent after DATA with END_STREAM. They MUST NOT
-     * contain pseudo-headers.
-     *
-     * @param fields the decoded header fields
-     * @param streamId the stream ID (for error messages)
-     * @return the trailer headers
-     * @throws H2Exception if trailers contain pseudo-headers
+     * @param fields flat list [name0, value0, name1, value1, ...]
      */
-    static HttpHeaders processTrailers(List<HeaderField> fields, int streamId) throws IOException {
+    static HttpHeaders processTrailers(List<String> fields, int streamId) throws IOException {
         ModifiableHttpHeaders trailers = HttpHeaders.ofModifiable();
-        for (HeaderField field : fields) {
-            String name = field.name();
-            // RFC 9113 Section 8.1: Trailers MUST NOT contain pseudo-headers
+        for (int i = 0; i < fields.size(); i += 2) {
+            String name = fields.get(i);
             if (name.startsWith(":")) {
                 throw new H2Exception(ERROR_PROTOCOL_ERROR, streamId, "Trailer contains pseudo-header '" + name + "'");
             }
-            trailers.addHeader(name, field.value());
+            trailers.addHeader(name, fields.get(i + 1));
         }
         return trailers;
     }
 
-    /**
-     * Validate Content-Length matches actual data received per RFC 9113 Section 8.1.1.
-     *
-     * @param expectedContentLength expected content length (-1 if not specified)
-     * @param receivedContentLength actual bytes received
-     * @param streamId the stream ID (for error messages)
-     * @throws H2Exception if there is a mismatch
-     */
     static void validateContentLength(long expectedContentLength, long receivedContentLength, int streamId)
             throws IOException {
         if (expectedContentLength >= 0 && receivedContentLength != expectedContentLength) {

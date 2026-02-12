@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.http.client.h2.hpack;
+package software.amazon.smithy.java.http.hpack;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -24,19 +24,36 @@ public final class HpackEncoder {
             "proxy-authorization",
             "set-cookie");
 
+    // HPACK representation type prefixes (RFC 7541 Section 6)
+    private static final int PREFIX_INDEXED = 0x80; // 1xxxxxxx
+    private static final int PREFIX_LITERAL_INDEXED = 0x40; // 01xxxxxx
+    private static final int PREFIX_SIZE_UPDATE = 0x20; // 001xxxxx
+    private static final int PREFIX_LITERAL_NEVER = 0x10; // 0001xxxx
+
+    private static final int DEFAULT_MAX_TABLE_SIZE = 4096;
+
     private final DynamicTable dynamicTable;
     private final boolean useHuffman;
 
-    // Track pending table size update to emit at start of next header block (RFC 7541 Section 4.2)
-    // -1 means no update pending
+    // Track pending table size updates to emit at start of next header block (RFC 7541 Section 4.2).
+    // If multiple size changes occur before a header block, we must emit the minimum reached
+    // and then the final size, to ensure the decoder evicts the same entries we did.
     private int pendingTableSizeUpdate = -1;
+    private int minPendingTableSize = -1;
 
     // Reusable scratch buffer for string encoding to avoid per-string allocation.
     // Typical header values are < 256 bytes; buffer grows if needed.
     private byte[] stringBuf = new byte[256];
 
     /**
-     * Create an encoder with the given maximum dynamic table size.
+     * Create an encoder with default limits (4096 byte table) and Huffman encoding enabled.
+     */
+    public HpackEncoder() {
+        this(DEFAULT_MAX_TABLE_SIZE, true);
+    }
+
+    /**
+     * Create an encoder with the given maximum dynamic table size and Huffman encoding enabled.
      *
      * @param maxTableSize maximum dynamic table size in bytes
      */
@@ -58,20 +75,23 @@ public final class HpackEncoder {
     /**
      * Set the maximum dynamic table size.
      *
-     * <p>This should be called when receiving a SETTINGS frame with
-     * SETTINGS_HEADER_TABLE_SIZE. Per RFC 7541 Section 4.2, the encoder
-     * MUST signal the change to the decoder at the start of the next header block
-     * (only if the size actually changed).
+     * <p>This should be called when receiving a SETTINGS frame with SETTINGS_HEADER_TABLE_SIZE.
+     * Per RFC 7541 Section 4.2, the encoder MUST signal the change to the decoder at the start of the next
+     * header block (only if the size actually changed).
      *
      * @param maxSize new maximum size in bytes
      */
     public void setMaxTableSize(int maxSize) {
         int currentMaxSize = dynamicTable.maxSize();
-        // Only emit table size update if the size actually changed
+
         if (maxSize != currentMaxSize) {
-            // Apply immediately to dynamic table (evicts entries if needed)
             dynamicTable.setMaxSize(maxSize);
-            // Mark that we need to emit a table size update in the next header block
+            // Track the minimum size reached since last header block
+            if (pendingTableSizeUpdate != -1) {
+                minPendingTableSize = Math.min(minPendingTableSize, maxSize);
+            } else {
+                minPendingTableSize = maxSize;
+            }
             pendingTableSizeUpdate = maxSize;
         }
     }
@@ -79,22 +99,24 @@ public final class HpackEncoder {
     /**
      * Emit any pending dynamic table size update.
      *
-     * <p>Per RFC 7541 Section 4.2, when SETTINGS_HEADER_TABLE_SIZE is received,
-     * the encoder MUST signal the change at the start of the next header block
-     * by emitting a dynamic table size update instruction.
+     * <p>Per RFC 7541 Section 4.2, when SETTINGS_HEADER_TABLE_SIZE is received, the encoder MUST signal the change
+     * at the start of the next header block by emitting a dynamic table size update instruction.
      *
-     * <p>This method MUST be called once at the start of each header block
-     * (before encoding any headers).
+     * <p>This method MUST be called once at the start of each header block (before encoding any headers).
      *
      * @param out output stream to write the update to
      * @throws IOException if writing fails
      */
     public void beginHeaderBlock(OutputStream out) throws IOException {
         if (pendingTableSizeUpdate >= 0) {
-            // Emit dynamic table size update (RFC 7541 Section 6.3)
-            // Format: 001xxxxx (5-bit prefix for max size)
-            encodeInteger(out, pendingTableSizeUpdate, 5, 0x20);
+            // RFC 7541 Section 4.2: If size was reduced then raised, emit the minimum first
+            // to ensure the decoder evicts the same entries we did.
+            if (minPendingTableSize < pendingTableSizeUpdate) {
+                encodeInteger(out, minPendingTableSize, 5, PREFIX_SIZE_UPDATE);
+            }
+            encodeInteger(out, pendingTableSizeUpdate, 5, PREFIX_SIZE_UPDATE);
             pendingTableSizeUpdate = -1;
+            minPendingTableSize = -1;
         }
     }
 
@@ -146,7 +168,7 @@ public final class HpackEncoder {
      * Format: 1xxxxxxx (7-bit prefix)
      */
     private void encodeIndexed(OutputStream out, int index) throws IOException {
-        encodeInteger(out, index, 7, 0x80);
+        encodeInteger(out, index, 7, PREFIX_INDEXED);
     }
 
     /**
@@ -156,10 +178,10 @@ public final class HpackEncoder {
             throws IOException {
         if (nameIndex > 0) {
             // Indexed name
-            encodeInteger(out, nameIndex, 6, 0x40);
+            encodeInteger(out, nameIndex, 6, PREFIX_LITERAL_INDEXED);
         } else {
             // New name
-            out.write(0x40);
+            out.write(PREFIX_LITERAL_INDEXED);
             encodeString(out, name);
         }
         encodeString(out, value);
@@ -171,9 +193,9 @@ public final class HpackEncoder {
     private void encodeLiteralNeverIndexed(OutputStream out, int nameIndex, String name, String value)
             throws IOException {
         if (nameIndex > 0) {
-            encodeInteger(out, nameIndex, 4, 0x10);
+            encodeInteger(out, nameIndex, 4, PREFIX_LITERAL_NEVER);
         } else {
-            out.write(0x10);
+            out.write(PREFIX_LITERAL_NEVER);
             encodeString(out, name);
         }
         encodeString(out, value);
@@ -208,7 +230,6 @@ public final class HpackEncoder {
 
     /**
      * Encode a string, using Huffman encoding if it saves space.
-     * RFC 7541 Section 5.2
      */
     @SuppressWarnings("deprecation")
     private void encodeString(OutputStream out, String str) throws IOException {

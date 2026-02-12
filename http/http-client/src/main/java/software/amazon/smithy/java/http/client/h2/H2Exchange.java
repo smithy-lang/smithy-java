@@ -35,7 +35,6 @@ import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.DelegatedClosingInputStream;
 import software.amazon.smithy.java.http.client.DelegatedClosingOutputStream;
 import software.amazon.smithy.java.http.client.HttpExchange;
-import software.amazon.smithy.java.http.client.h2.hpack.HeaderField;
 
 /**
  * HTTP/2 exchange implementation for a single stream with multiplexing support.
@@ -84,7 +83,7 @@ public final class H2Exchange implements HttpExchange {
     private final H2StreamState state = new H2StreamState();
 
     // Pending headers from reader thread (protected by dataLock)
-    private List<HeaderField> pendingHeaders;
+    private List<String> pendingHeaders;
     private boolean pendingHeadersEndStream;
 
     // === Data chunk queue ===
@@ -350,7 +349,7 @@ public final class H2Exchange implements HttpExchange {
      * @param fields the decoded header fields
      * @param endStream whether END_STREAM flag was set
      */
-    void deliverHeaders(List<HeaderField> fields, boolean endStream) {
+    void deliverHeaders(List<String> fields, boolean endStream) {
         dataLock.lock();
         try {
             pendingHeaders = fields;
@@ -498,7 +497,7 @@ public final class H2Exchange implements HttpExchange {
             while (dataQueue.isEmpty() && state.getReadState() == RS_READING) {
                 // Check for pending trailers
                 if (pendingHeaders != null) {
-                    List<HeaderField> fields = pendingHeaders;
+                    List<String> fields = pendingHeaders;
                     boolean endStream = pendingHeadersEndStream;
                     pendingHeaders = null;
                     handleHeadersEvent(fields, endStream);
@@ -766,7 +765,7 @@ public final class H2Exchange implements HttpExchange {
             dataLock.lock();
             try {
                 if (pendingHeaders != null) {
-                    List<HeaderField> fields = pendingHeaders;
+                    List<String> fields = pendingHeaders;
                     boolean endStream = pendingHeadersEndStream;
                     pendingHeaders = null; // Consume the headers
 
@@ -787,7 +786,7 @@ public final class H2Exchange implements HttpExchange {
      * @param fields the decoded header fields
      * @param isEndStream whether END_STREAM flag was set
      */
-    private void handleHeadersEvent(List<HeaderField> fields, boolean isEndStream) throws IOException {
+    private void handleHeadersEvent(List<String> fields, boolean isEndStream) throws IOException {
         int ss = state.getStreamState();
 
         // Allow processing headers if the stream is CLOSED but closed cleanly (RS_DONE)
@@ -834,7 +833,7 @@ public final class H2Exchange implements HttpExchange {
      * @param fields the decoded header fields
      * @param isEndStream whether this HEADERS frame has END_STREAM flag
      */
-    private void processResponseHeaders(List<HeaderField> fields, boolean isEndStream) throws IOException {
+    private void processResponseHeaders(List<String> fields, boolean isEndStream) throws IOException {
         H2ResponseHeaderProcessor.Result result =
                 H2ResponseHeaderProcessor.processResponseHeaders(fields, streamId, isEndStream);
 
@@ -859,7 +858,7 @@ public final class H2Exchange implements HttpExchange {
      *
      * @param fields the pre-decoded header fields
      */
-    private void processTrailers(List<HeaderField> fields) throws IOException {
+    private void processTrailers(List<String> fields) throws IOException {
         this.trailerHeaders = H2ResponseHeaderProcessor.processTrailers(fields, streamId);
     }
 
