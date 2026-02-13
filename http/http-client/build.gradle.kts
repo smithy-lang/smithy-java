@@ -32,6 +32,10 @@ dependencies {
     // Jackson for HPACK test suite JSON parsing
     testImplementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
 
+    // Jazzer for fuzz testing
+    testImplementation(libs.jazzer.junit)
+    testImplementation(libs.jazzer.api)
+
     // Add Apache HttpClient for benchmarking comparison
     jmh("org.apache.httpcomponents.client5:httpclient5:5.3.1")
 
@@ -149,4 +153,8 @@ jmh {
 tasks.named("jmh") {
     dependsOn(startBenchmarkServer)
     finalizedBy(stopBenchmarkServer)
+}
+
+tasks.test {
+    maxHeapSize = "2g"
 }
