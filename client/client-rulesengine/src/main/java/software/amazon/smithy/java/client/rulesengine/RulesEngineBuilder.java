@@ -184,6 +184,16 @@ public final class RulesEngineBuilder {
             throw new IllegalArgumentException("Invalid counts in bytecode header");
         }
 
+        // Validate counts don't exceed what the data can possibly hold.
+        // Each condition/result offset is 4 bytes, each BDD node is 12 bytes.
+        long minRequiredSize = BYTECODE_HEADER_SIZE
+                + (long) conditionCount * 4
+                + (long) resultCount * 4
+                + (long) bddNodeCount * 12;
+        if (minRequiredSize > data.length) {
+            throw new IllegalArgumentException("Bytecode header counts exceed data length");
+        }
+
         // Read offset tables
         int conditionTableOffset = reader.readInt();
         int resultTableOffset = reader.readInt();
@@ -205,18 +215,35 @@ public final class RulesEngineBuilder {
             throw new IllegalArgumentException("Invalid offsets in bytecode header");
         }
 
+        // Validate that declared counts fit within their respective sections
+        if (conditionTableOffset + (long) conditionCount * 4 > resultTableOffset) {
+            throw new IllegalArgumentException("Condition table overflows into result table");
+        } else if (resultTableOffset + (long) resultCount * 4 > functionTableOffset) {
+            throw new IllegalArgumentException("Result table overflows into function table");
+        } else if (bddTableOffset + (long) bddNodeCount * 12 > constantPoolOffset) {
+            throw new IllegalArgumentException("BDD table overflows into constant pool");
+        }
+
         // Load condition offsets
         reader.offset = conditionTableOffset;
         int[] conditionOffsets = new int[conditionCount];
         for (int i = 0; i < conditionCount; i++) {
-            conditionOffsets[i] = reader.readInt();
+            int offset = reader.readInt();
+            if (offset < 0 || offset >= data.length) {
+                throw new IllegalArgumentException("Condition offset out of bounds: " + offset);
+            }
+            conditionOffsets[i] = offset;
         }
 
         // Load result offsets
         reader.offset = resultTableOffset;
         int[] resultOffsets = new int[resultCount];
         for (int i = 0; i < resultCount; i++) {
-            resultOffsets[i] = reader.readInt();
+            int offset = reader.readInt();
+            if (offset < 0 || offset >= data.length) {
+                throw new IllegalArgumentException("Result offset out of bounds: " + offset);
+            }
+            resultOffsets[i] = offset;
         }
 
         // Load function names and resolve them using this builder's functions

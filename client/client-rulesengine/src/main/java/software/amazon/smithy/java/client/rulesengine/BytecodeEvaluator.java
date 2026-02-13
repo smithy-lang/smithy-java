@@ -102,13 +102,24 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         return tempArray;
     }
 
-    @SuppressWarnings("unchecked")
     private Object run(int start) {
         pc = start;
 
         var instructions = bytecode.getBytecode();
         var functions = bytecode.getFunctions();
         var constantPool = bytecode.getConstantPool();
+
+        try {
+            return runLoop(instructions, functions, constantPool);
+        } catch (ArrayIndexOutOfBoundsException | ClassCastException | NullPointerException e) {
+            throw new RulesEvaluationError(
+                    "Bytecode execution error at pc=" + pc + ": " + e.getMessage(),
+                    pc);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object runLoop(byte[] instructions, RulesFunction[] functions, Object[] constantPool) {
 
         while (pc < instructions.length) {
             int opcode = instructions[pc++] & 0xFF;

@@ -16,4 +16,12 @@ dependencies {
     testImplementation(project(":aws:client:aws-client-awsjson"))
     testImplementation(project(":client:dynamic-client"))
     testImplementation(project(":aws:client:aws-client-rulesengine"))
+
+    // Jazzer for fuzz testing
+    testImplementation(libs.jazzer.junit)
+    testImplementation(libs.jazzer.api)
+}
+
+tasks.test {
+    maxHeapSize = "2g"
 }
