@@ -126,7 +126,8 @@ final class H2ConnectionManager {
                 }
 
                 boolean canExpand = totalConns < maxConnectionsForRoute;
-                int selected = loadBalancer.select(state.activeStreamsBuf, connCount,
+                int selected = loadBalancer.select(state.activeStreamsBuf,
+                        connCount,
                         canExpand ? maxConnectionsForRoute : connCount);
 
                 if (selected >= 0) {

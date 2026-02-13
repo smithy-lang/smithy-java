@@ -114,8 +114,12 @@ public final class HpackDecoder {
                     name = StaticTable.getName(index);
                     value = StaticTable.getValue(index);
                 } else {
-                    name = dynamicTable.getName(index);
-                    value = dynamicTable.getValue(index);
+                    try {
+                        name = dynamicTable.getName(index);
+                        value = dynamicTable.getValue(index);
+                    } catch (IndexOutOfBoundsException e) {
+                        throw new IOException(e.getMessage(), e);
+                    }
                 }
                 headerFieldSeen = true;
             } else if ((b & 0x40) != 0) {
@@ -171,7 +175,11 @@ public final class HpackDecoder {
         if (index <= 0) {
             throw new IOException("Invalid HPACK name index: " + index);
         }
-        return index <= StaticTable.SIZE ? StaticTable.getName(index) : dynamicTable.getName(index);
+        try {
+            return index <= StaticTable.SIZE ? StaticTable.getName(index) : dynamicTable.getName(index);
+        } catch (IndexOutOfBoundsException e) {
+            throw new IOException(e.getMessage(), e);
+        }
     }
 
     /**
