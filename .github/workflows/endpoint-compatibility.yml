@@ -1,0 +1,58 @@
+name: Endpoint Ruleset Compatibility
+
+on:
+  # Run daily at 3 AM UTC
+  schedule:
+    - cron: '0 3 * * *'
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  endpoint-compatibility:
+    runs-on: ubuntu-latest
+    name: AWS Endpoint Ruleset Compatibility
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Checkout api-models-aws
+        uses: actions/checkout@v6
+        with:
+          repository: aws/api-models-aws
+          path: api-models-aws
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: 'corretto'
+
+      - name: Cache compiled buildscripts
+        uses: actions/cache@v5
+        with:
+          key: ${{ runner.os }}-gradle-${{ hashFiles('buildSrc/**/*.kts') }}
+          path: |
+            ./buildSrc/build
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          gradle-home-cache-includes: |
+            caches
+
+      - name: Run endpoint ruleset compatibility tests
+        env:
+          API_MODELS_AWS_DIR: ${{ github.workspace }}/api-models-aws
+        run: |
+          ./gradlew :client:client-rulesengine:integ --tests "*.AwsEndpointRulesetTest" --stacktrace
+
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: endpoint-compatibility-report
+          path: '**/build/reports/tests'
