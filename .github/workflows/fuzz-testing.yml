@@ -53,6 +53,12 @@ jobs:
         run: |
           ./gradlew fuzz -Pfuzz.maxDuration=4h --stacktrace
 
+      - name: Run rules engine bytecode fuzz tests
+        env:
+          JAZZER_FUZZ: "1"
+        run: |
+          ./gradlew :client:client-rulesengine:test --tests "*FuzzTest*" -Djazzer.max_duration=1h --stacktrace
+
       - name: Save fuzz corpus cache
         uses: actions/cache/save@v5
         if: always()
