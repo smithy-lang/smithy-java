@@ -3,150 +3,104 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package softare.amazon.smithy.java.example.eventstreaming;
+package software.amazon.smithy.java.example.eventstreaming;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.client.core.ProtocolSettings;
+import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.client.rpcv2.RpcV2CborProtocol;
+import software.amazon.smithy.java.core.serde.event.EventStream;
+import software.amazon.smithy.java.core.serde.event.EventStreamWriter;
+import software.amazon.smithy.java.example.eventstreaming.client.FizzBuzzServiceClient;
+import software.amazon.smithy.java.example.eventstreaming.model.FizzBuzzInput;
+import software.amazon.smithy.java.example.eventstreaming.model.FizzBuzzOutput;
+import software.amazon.smithy.java.example.eventstreaming.model.FizzBuzzStream;
+import software.amazon.smithy.java.example.eventstreaming.model.Value;
+import software.amazon.smithy.java.example.eventstreaming.model.ValueStream;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.protocol.traits.Rpcv2CborTrait;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.Flow;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
-import software.amazon.smithy.java.example.eventstreaming.client.FizzBuzzServiceClient;
-import software.amazon.smithy.java.example.eventstreaming.model.BuzzEvent;
-import software.amazon.smithy.java.example.eventstreaming.model.FizzBuzzInput;
-import software.amazon.smithy.java.example.eventstreaming.model.FizzBuzzOutput;
-import software.amazon.smithy.java.example.eventstreaming.model.FizzBuzzStream;
-import software.amazon.smithy.java.example.eventstreaming.model.FizzEvent;
-import software.amazon.smithy.java.example.eventstreaming.model.Value;
-import software.amazon.smithy.java.example.eventstreaming.model.ValueStream;
-
 // TODO: Update the test to create and run the server in setup before the test
 @Disabled("This test requires manually running a server locally and then verifies client behavior against it.")
 public class EventStreamTest {
 
-    @Test
-    public void fizzBuzz() throws InterruptedException {
-        var client = FizzBuzzServiceClient.builder()
-                .endpointResolver(EndpointResolver.staticHost("http://localhost:8080"))
-                .build();
-
+    @ParameterizedTest
+    @MethodSource("clients")
+    public void fizzBuzz(FizzBuzzServiceClient client) {
         int range = 100;
-
         FizzBuzzInput input = FizzBuzzInput.builder()
-                .stream(new ValueStreamPublisher(range))
+                .stream(EventStream.newWriter())
                 .build();
+        Thread.ofVirtual().start(() -> {
+            try (EventStreamWriter<ValueStream> writer = input.getStream().asWriter()) {
+                int count = 0;
+                while (count++ < range) {
+                    ValueStream value = ValueStream.builder()
+                            .value(Value.builder().value(count).build())
+                            .build();
+                    writer.write(value);
+                }
+            }
+        });
         FizzBuzzOutput output = client.fizzBuzz(input);
-
         System.out.println("Initial messages done");
 
         AtomicLong receivedEvents = new AtomicLong();
         Set<Long> unbuzzed = new HashSet<>();
-        AtomicBoolean done = new AtomicBoolean();
-        output.getStream().subscribe(new Flow.Subscriber<>() {
-
-            private Flow.Subscription subscription;
-
-            @Override
-            public void onSubscribe(Flow.Subscription subscription) {
-                this.subscription = subscription;
-                subscription.request(1L);
-            }
-
-            @Override
-            public void onNext(FizzBuzzStream item) {
-                receivedEvents.incrementAndGet();
-                long value;
-                switch (item) {
-                    case FizzBuzzStream.FizzMember(var fizz):
-                        value = fizz.getValue();
-                        System.out.println("received fizz: " + value);
-                        assertEquals(0, value % 3);
-                        if (value % 5 == 0) {
-                            assertTrue(unbuzzed.add(value), "Fizz already received for " + value);
-                        }
-                        break;
-                    case FizzBuzzStream.BuzzMember(var buzz):
-                        value = buzz.getValue();
-                        System.out.println("received buzz: " + value);
-                        assertEquals(0, value % 5);
-                        if (value % 3 == 0) {
-                            assertTrue(unbuzzed.remove(value), "No fizz for " + value);
-                        }
-                        break;
-                    default:
-                        fail("Unexpected event: " + item.getClass());
-                        break;
-                }
-                subscription.request(1L);
-            }
-
-            @Override
-            public void onError(Throwable throwable) { }
-
-            @Override
-            public void onComplete() {
-                done.set(true);
-                System.out.println("output stream completed");
+        output.getStream().asReader().forEach(item -> {
+            receivedEvents.incrementAndGet();
+            long value;
+            switch (item) {
+                case FizzBuzzStream.FizzMember(var fizz):
+                    value = fizz.getValue();
+                    System.out.println("received fizz: " + value);
+                    assertEquals(0, value % 3);
+                    if (value % 5 == 0) {
+                        assertTrue(unbuzzed.add(value), "Fizz already received for " + value);
+                    }
+                    break;
+                case FizzBuzzStream.BuzzMember(var buzz):
+                    value = buzz.getValue();
+                    System.out.println("received buzz: " + value);
+                    assertEquals(0, value % 5);
+                    if (value % 3 == 0) {
+                        assertTrue(unbuzzed.remove(value), "No fizz for " + value);
+                    }
+                    break;
+                default:
+                    fail("Unexpected event: " + item.getClass());
+                    break;
             }
         });
-
-        // wait to receive events in the response stream
-        var waits = 10;
-        do {
-            Thread.sleep(100);
-            if (--waits <= 0) {
-                throw new RuntimeException("Timed out waiting for completion");
-            }
-        } while (!done.get());
-
         assertTrue(unbuzzed.isEmpty(), unbuzzed.size() + " unbuzzed fizzes");
         assertEquals((range / 3) + (range / 5), receivedEvents.get());
     }
 
-    private static class ValueStreamPublisher implements Flow.Publisher<ValueStream> {
-        private final int range;
+    public static List<FizzBuzzServiceClient> clients() {
+        return List.of(
+                FizzBuzzServiceClient.builder()
+                        .endpointResolver(EndpointResolver.staticHost("http://localhost:8080"))
+                        .build(),
+                FizzBuzzServiceClient.builder()
+                        .protocol(new RpcV2CborProtocol.Factory()
+                                .createProtocol(ProtocolSettings.builder()
+                                        .service(ShapeId.from("smithy.example#TickService"))
+                                        .build(), Rpcv2CborTrait.builder().build()))
+                        .endpointResolver(EndpointResolver.staticHost("http://localhost:8000"))
+                        .build()
 
-        public ValueStreamPublisher(int range) {
-            this.range = range;
-        }
-
-        @Override
-        public void subscribe(Flow.Subscriber<? super ValueStream> subscriber) {
-            subscriber.onSubscribe(new Flow.Subscription() {
-
-                int count = 0;
-
-                @Override
-                public void request(long n) {
-                    // sleeping between sending request events so there's chance to process response events in parallel
-                    try {
-                        Thread.sleep(10);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                    if (count++ < range) {
-                        ValueStream value = ValueStream.builder()
-                                .value(Value.builder().value(count).build())
-                                .build();
-                        System.out.println("sent: " + value);
-                        subscriber.onNext(value);
-                    } else {
-                        subscriber.onComplete();
-                    }
-                }
-
-                @Override
-                public void cancel() {
-                    subscriber.onComplete();
-                }
-            });
-        }
+        );
     }
 }

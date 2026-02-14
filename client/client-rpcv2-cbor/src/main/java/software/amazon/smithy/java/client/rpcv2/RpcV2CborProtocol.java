@@ -33,6 +33,7 @@ import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
+import software.amazon.smithy.java.core.serde.event.FrameTransformer;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -161,6 +162,7 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
         return AwsEventEncoderFactory.forInputStream(inputOperation,
                 payloadCodec(),
                 PAYLOAD_MEDIA_TYPE,
+                FrameTransformer.identity(),
                 (e) -> new EventStreamingException("InternalServerException", "Internal Server Error"));
     }
 

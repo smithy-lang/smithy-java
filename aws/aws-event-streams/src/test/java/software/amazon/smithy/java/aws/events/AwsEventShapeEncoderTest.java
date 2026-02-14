@@ -20,6 +20,7 @@ import software.amazon.smithy.java.aws.events.model.TestOperation;
 import software.amazon.smithy.java.aws.events.model.TestOperationInput;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
+import software.amazon.smithy.java.core.serde.event.FrameTransformer;
 import software.amazon.smithy.java.json.JsonCodec;
 
 class AwsEventShapeEncoderTest {
@@ -135,6 +136,7 @@ class AwsEventShapeEncoderTest {
                 TestOperation.instance().inputStreamMember(), // event schema
                 createJsonCodec(), // codec
                 "text/json",
+                FrameTransformer.identity(),
                 (e) -> new EventStreamingException("InternalServerException", "Internal Server Error"));
     }
 

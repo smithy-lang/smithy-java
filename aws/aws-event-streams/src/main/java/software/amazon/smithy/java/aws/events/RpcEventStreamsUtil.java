@@ -5,16 +5,14 @@
 
 package software.amazon.smithy.java.aws.events;
 
-import java.nio.ByteBuffer;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Flow;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
-import software.amazon.smithy.java.core.serde.event.EventStreamFrameDecodingProcessor;
-import software.amazon.smithy.java.core.serde.event.EventStreamFrameEncodingProcessor;
+import software.amazon.smithy.java.core.serde.event.EventStream;
+import software.amazon.smithy.java.core.serde.event.InternalEventStreamReader;
+import software.amazon.smithy.java.core.serde.event.InternalEventStreamWriter;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
@@ -24,47 +22,36 @@ public final class RpcEventStreamsUtil {
 
     private RpcEventStreamsUtil() {}
 
-    public static Flow.Publisher<ByteBuffer> bodyForEventStreaming(
+    @SuppressWarnings("unchecked")
+    public static DataStream bodyForEventStreaming(
             EventEncoderFactory<AwsEventFrame> eventStreamEncodingFactory,
             SerializableStruct input
     ) {
-        Flow.Publisher<SerializableStruct> eventStream = input.getMemberValue(streamingMember(input.schema()));
-        return EventStreamFrameEncodingProcessor.create(eventStream, eventStreamEncodingFactory, input);
+        EventStream<SerializableStruct> eventStream = input.getMemberValue(streamingMember(input.schema()));
+        InternalEventStreamWriter<SerializableStruct, SerializableStruct, AwsEventFrame> writer =
+                InternalEventStreamWriter.toInternal(eventStream);
+        writer.bootstrap(new InternalEventStreamWriter.Bootstrap<>() {
+            @Override
+            public EventEncoderFactory<AwsEventFrame> encoder() {
+                return eventStreamEncodingFactory;
+            }
+
+            @Override
+            public SerializableStruct initialEvent() {
+                return input;
+            }
+        });
+        return writer.toDataStream();
     }
 
-    // TODO: Make more synchronous
     public static <O extends SerializableStruct> O deserializeResponse(
             EventDecoderFactory<AwsEventFrame> eventDecoderFactory,
             DataStream bodyDataStream
     ) {
-        var result = new CompletableFuture<O>();
-        var processor = EventStreamFrameDecodingProcessor.create(bodyDataStream, eventDecoderFactory);
-
-        // A subscriber to serialize the initial event.
-        processor.subscribe(new Flow.Subscriber<>() {
-            @Override
-            public void onSubscribe(Flow.Subscription subscription) {
-                subscription.request(1);
-            }
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public void onNext(SerializableStruct item) {
-                result.complete((O) item);
-            }
-
-            @Override
-            public void onError(Throwable throwable) {
-                result.completeExceptionally(throwable);
-            }
-
-            @Override
-            public void onComplete() {
-                result.completeExceptionally(new RuntimeException("Unexpected event stream completion"));
-            }
-        });
-
-        return result.join();
+        var reader = InternalEventStreamReader.<O, SerializableStruct, AwsEventFrame>newReader(bodyDataStream,
+                eventDecoderFactory,
+                true);
+        return reader.readInitialEvent();
     }
 
     private static Schema streamingMember(Schema schema) {
@@ -75,5 +62,4 @@ public final class RpcEventStreamsUtil {
         }
         throw new IllegalArgumentException("No streaming member found");
     }
-
 }

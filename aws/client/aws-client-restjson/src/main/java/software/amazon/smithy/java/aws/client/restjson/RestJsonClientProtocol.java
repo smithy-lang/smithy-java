@@ -27,6 +27,7 @@ import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
+import software.amazon.smithy.java.core.serde.event.FrameTransformer;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.binding.RequestSerializer;
 import software.amazon.smithy.java.json.JsonCodec;
@@ -114,6 +115,7 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
                 inputOperation,
                 payloadCodec(),
                 payloadMediaType(),
+                FrameTransformer.identity(),
                 (e) -> new EventStreamingException("InternalServerException", "Internal Server Error"));
     }
 

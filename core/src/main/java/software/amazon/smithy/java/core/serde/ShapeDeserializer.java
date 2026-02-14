@@ -9,10 +9,10 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.concurrent.Flow;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
@@ -240,7 +240,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param schema Schema of the event stream to read.
      * @return the event stream.
      */
-    default Flow.Publisher<? extends SerializableStruct> readEventStream(Schema schema) {
+    default EventStream<? extends SerializableStruct> readEventStream(Schema schema) {
         throw new UnsupportedOperationException("Cannot read event stream from this deserializer");
     }
 

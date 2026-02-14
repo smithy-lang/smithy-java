@@ -44,6 +44,7 @@ record StructureDeserializerGenerator(
                             private static final $$InnerDeserializer INSTANCE = new $$InnerDeserializer();
 
                             @Override
+                            @SuppressWarnings("unchecked")
                             public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {${?hasMembers}
                                 switch (member.memberIndex()) {
                                     ${cases:C|}

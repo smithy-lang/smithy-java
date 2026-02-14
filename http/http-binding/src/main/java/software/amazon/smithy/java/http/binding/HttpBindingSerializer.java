@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.TreeMap;
-import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -26,6 +25,7 @@ import software.amazon.smithy.java.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
+import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.QueryStringBuilder;
@@ -64,7 +64,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private ShapeSerializer shapeBodySerializer;
     private ByteArrayOutputStream shapeBodyOutput;
     private DataStream httpPayload;
-    private Flow.Publisher<? extends SerializableStruct> eventStream;
+    private EventStream<? extends SerializableStruct> eventStream;
     private int responseStatus;
     private boolean contentTypeHeaderInInput;
 
@@ -225,11 +225,11 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         return responseStatus;
     }
 
-    public Flow.Publisher<? extends SerializableStruct> getEventStream() {
+    public EventStream<? extends SerializableStruct> getEventStream() {
         return eventStream;
     }
 
-    void setEventStream(Flow.Publisher<? extends SerializableStruct> stream) {
+    void setEventStream(EventStream<? extends SerializableStruct> stream) {
         this.eventStream = stream;
     }
 

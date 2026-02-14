@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.aws.events.model;
 
 import java.util.Objects;
-import java.util.concurrent.Flow.Publisher;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -14,6 +13,7 @@ import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.ToStringSerializer;
+import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
@@ -29,7 +29,7 @@ public final class TestOperationOutput implements SerializableStruct {
 
     private final transient Integer intMemberHeader;
     private final transient String stringMember;
-    private final transient Publisher<TestEventStream> outputStream;
+    private final transient EventStream<TestEventStream> outputStream;
 
     private TestOperationOutput(Builder builder) {
         this.intMemberHeader = builder.intMemberHeader;
@@ -45,7 +45,7 @@ public final class TestOperationOutput implements SerializableStruct {
         return stringMember;
     }
 
-    public Publisher<TestEventStream> getOutputStream() {
+    public EventStream<TestEventStream> getOutputStream() {
         return outputStream;
     }
 
@@ -130,7 +130,7 @@ public final class TestOperationOutput implements SerializableStruct {
     public static final class Builder implements ShapeBuilder<TestOperationOutput> {
         private Integer intMemberHeader;
         private String stringMember;
-        private Publisher<TestEventStream> outputStream;
+        private EventStream<TestEventStream> outputStream;
 
         private Builder() {}
 
@@ -158,7 +158,7 @@ public final class TestOperationOutput implements SerializableStruct {
         /**
          * @return this builder.
          */
-        public Builder outputStream(Publisher<TestEventStream> outputStream) {
+        public Builder outputStream(EventStream<TestEventStream> outputStream) {
             this.outputStream = outputStream;
             return this;
         }
@@ -175,7 +175,7 @@ public final class TestOperationOutput implements SerializableStruct {
                 case 0 ->
                     intMemberHeader((Integer) SchemaUtils.validateSameMember($SCHEMA_INT_MEMBER_HEADER, member, value));
                 case 1 -> stringMember((String) SchemaUtils.validateSameMember($SCHEMA_STRING_MEMBER, member, value));
-                case 2 -> outputStream((Publisher<TestEventStream>) SchemaUtils
+                case 2 -> outputStream((EventStream<TestEventStream>) SchemaUtils
                         .validateSameMember($SCHEMA_OUTPUT_STREAM, member, value));
                 default -> ShapeBuilder.super.setMemberValue(member, value);
             }
@@ -201,7 +201,7 @@ public final class TestOperationOutput implements SerializableStruct {
                 switch (member.memberIndex()) {
                     case 0 -> builder.intMemberHeader(de.readInteger(member));
                     case 1 -> builder.stringMember(de.readString(member));
-                    case 2 -> builder.outputStream((Publisher<TestEventStream>) de.readEventStream(member));
+                    case 2 -> builder.outputStream((EventStream<TestEventStream>) de.readEventStream(member));
                     default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
                 }
             }

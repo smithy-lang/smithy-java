@@ -9,11 +9,11 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
@@ -130,7 +130,7 @@ public abstract class InterceptingSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeEventStream(Schema schema, Flow.Publisher<? extends SerializableStruct> value) {
+    public void writeEventStream(Schema schema, EventStream<? extends SerializableStruct> value) {
         before(schema).writeEventStream(schema, value);
         after(schema);
     }

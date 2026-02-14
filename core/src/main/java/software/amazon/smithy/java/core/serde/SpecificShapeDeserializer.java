@@ -9,11 +9,11 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.concurrent.Flow;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
@@ -115,7 +115,7 @@ public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public Flow.Publisher<? extends SerializableStruct> readEventStream(Schema schema) {
+    public EventStream<? extends SerializableStruct> readEventStream(Schema schema) {
         throw throwForInvalidState(schema);
     }
 

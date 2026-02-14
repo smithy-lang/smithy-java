@@ -24,7 +24,7 @@ public final class AwsFrameDecoder implements FrameDecoder<AwsEventFrame> {
     public List<AwsEventFrame> decode(ByteBuffer buffer) {
         decoder.feed(buffer);
         var messages = decoder.getDecodedMessages();
-        var result = new ArrayList<AwsEventFrame>();
+        var result = new ArrayList<AwsEventFrame>(messages.size());
         for (var message : messages) {
             var event = new AwsEventFrame(message);
             var transformed = transformer.apply(event);

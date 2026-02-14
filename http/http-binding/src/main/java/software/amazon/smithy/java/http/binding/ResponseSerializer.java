@@ -7,7 +7,6 @@ package software.amazon.smithy.java.http.binding;
 
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Flow;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -16,7 +15,8 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
-import software.amazon.smithy.java.core.serde.event.EventStreamFrameEncodingProcessor;
+import software.amazon.smithy.java.core.serde.event.Frame;
+import software.amazon.smithy.java.core.serde.event.InternalEventStreamWriter;
 import software.amazon.smithy.java.http.api.HttpResponse;
 
 /**
@@ -28,7 +28,7 @@ public final class ResponseSerializer {
     private String payloadMediaType;
     private ApiOperation<?, ?> operation;
     private SerializableShape shapeValue;
-    private EventEncoderFactory<?> eventEncoderFactory;
+    private EventEncoderFactory<Frame<?>> eventEncoderFactory;
     private Schema errorSchema;
     private boolean omitEmptyPayload = false;
     private final ConcurrentMap<Schema, BindingMatcher> bindingCache;
@@ -88,7 +88,7 @@ public final class ResponseSerializer {
      * @return Returns the serializer.
      */
     public ResponseSerializer eventEncoderFactory(
-            EventEncoderFactory<?> encoderFactory
+            EventEncoderFactory<Frame<?>> encoderFactory
     ) {
         this.eventEncoderFactory = encoderFactory;
         return this;
@@ -151,9 +151,22 @@ public final class ResponseSerializer {
         var builder = HttpResponse.builder()
                 .statusCode(serializer.getResponseStatus());
 
-        var eventStream = (Flow.Publisher<SerializableStruct>) serializer.getEventStream();
+        var eventStream = serializer.getEventStream();
         if (eventStream != null && operation instanceof OutputEventStreamingApiOperation<?, ?, ?>) {
-            builder.body(EventStreamFrameEncodingProcessor.create(eventStream, eventEncoderFactory));
+            InternalEventStreamWriter<SerializableStruct, SerializableStruct, Frame<?>> writer =
+                    InternalEventStreamWriter.toInternal(eventStream);
+            writer.bootstrap(new InternalEventStreamWriter.Bootstrap<>() {
+                @Override
+                public EventEncoderFactory<Frame<?>> encoder() {
+                    return eventEncoderFactory;
+                }
+
+                @Override
+                public SerializableStruct initialEvent() {
+                    return null;
+                }
+            });
+            builder.body(writer.toDataStream());
             serializer.setContentType(eventEncoderFactory.contentType());
         } else if (serializer.hasBody()) {
             builder.body(serializer.getBody());

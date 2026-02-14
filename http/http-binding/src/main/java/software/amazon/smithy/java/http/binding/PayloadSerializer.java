@@ -12,7 +12,6 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -23,6 +22,7 @@ import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 final class PayloadSerializer implements ShapeSerializer {
@@ -49,10 +49,10 @@ final class PayloadSerializer implements ShapeSerializer {
     @Override
     public void writeEventStream(
             Schema schema,
-            Flow.Publisher<? extends SerializableStruct> value
+            EventStream<? extends SerializableStruct> value
     ) {
         payloadWritten = true;
-        serializer.setEventStream(value);
+        serializer.setEventStream(value.asWriter());
     }
 
     private void write(byte[] bytes) {

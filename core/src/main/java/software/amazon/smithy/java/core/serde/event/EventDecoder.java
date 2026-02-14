@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.core.serde.event;
 
-import java.util.concurrent.Flow;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 
 public interface EventDecoder<F extends Frame<?>> {
@@ -13,12 +12,12 @@ public interface EventDecoder<F extends Frame<?>> {
     SerializableStruct decode(F frame);
 
     /**
-     * Called once after building the publisher to allow the decoder to do any one-time setup prior to start processing
-     * events.
+     * Decodes the frame into an initial event using the given even stream
+     * to set to the corresponding member.
      *
-     * @param publisher The events publisher.
+     * @param frame The frame to that contains the initial event
+     * @param stream the event stream value to be set in the member
+     * @return the initial event struct.
      */
-    default void onPrepare(Flow.Publisher<SerializableStruct> publisher) {
-        // does nothing by default.
-    }
+    SerializableStruct decodeInitialEvent(F frame, EventStream<?> stream);
 }

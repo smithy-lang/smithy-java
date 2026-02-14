@@ -10,12 +10,12 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
@@ -179,7 +179,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  Event Stream value.
      */
-    default void writeEventStream(Schema schema, Flow.Publisher<? extends SerializableStruct> value) {
+    default void writeEventStream(Schema schema, EventStream<? extends SerializableStruct> value) {
         // by default, do nothing
     }
 

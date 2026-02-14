@@ -9,7 +9,6 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Flow;
 import java.util.function.Supplier;
 import software.amazon.eventstream.HeaderValue;
 import software.amazon.eventstream.Message;
@@ -21,6 +20,7 @@ import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeDeserializer;
 import software.amazon.smithy.java.core.serde.event.EventDecoder;
+import software.amazon.smithy.java.core.serde.event.EventStream;
 
 /**
  * A decoder for AWS events
@@ -36,7 +36,6 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends
     private final Supplier<ShapeBuilder<E>> eventBuilder;
     private final Schema eventSchema;
     private final Codec codec;
-    private volatile Flow.Publisher<SerializableStruct> publisher;
 
     AwsEventShapeDecoder(
             InitialEventType initialEventType,
@@ -54,17 +53,7 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends
 
     @Override
     public SerializableStruct decode(AwsEventFrame frame) {
-        var message = frame.unwrap();
-        var eventType = getEventType(message);
-        if (initialEventType.value().equals(eventType)) {
-            return decodeInitialResponse(frame);
-        }
         return decodeEvent(frame);
-    }
-
-    @Override
-    public void onPrepare(Flow.Publisher<SerializableStruct> publisher) {
-        this.publisher = publisher;
     }
 
     private E decodeEvent(AwsEventFrame frame) {
@@ -85,12 +74,13 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends
         return builder.build();
     }
 
-    private IR decodeInitialResponse(AwsEventFrame frame) {
+    @Override
+    public IR decodeInitialEvent(AwsEventFrame frame, EventStream<?> eventStream) {
         var message = frame.unwrap();
         var builder = initialEventBuilder.get();
-        var publisherMember = getPublisherMember(builder.schema());
+        var publisherMember = getEventStreamMember(builder.schema());
         // Set the publisher member
-        var responseDeserializer = new InitialResponseDeserializer(publisherMember, publisher);
+        var responseDeserializer = new InitialResponseDeserializer(publisherMember, eventStream);
         builder.deserialize(responseDeserializer);
         // Deserialize the rest of the members if any
         var headers = message.getHeaders();
@@ -100,7 +90,7 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends
         return builder.build();
     }
 
-    private Schema getPublisherMember(Schema schema) {
+    private Schema getEventStreamMember(Schema schema) {
         for (var member : schema.members()) {
             if (member.memberTarget().hasTrait(TraitKey.STREAMING_TRAIT)) {
                 return member;
@@ -115,16 +105,16 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends
 
     static class InitialResponseDeserializer extends SpecificShapeDeserializer {
         private final Schema publisherMember;
-        private final Flow.Publisher<? extends SerializableStruct> publisher;
+        private final EventStream<?> eventStream;
 
-        InitialResponseDeserializer(Schema publisherMember, Flow.Publisher<? extends SerializableStruct> publisher) {
+        InitialResponseDeserializer(Schema publisherMember, EventStream<?> eventStream) {
             this.publisherMember = publisherMember;
-            this.publisher = publisher;
+            this.eventStream = eventStream;
         }
 
         @Override
-        public Flow.Publisher<? extends SerializableStruct> readEventStream(Schema schema) {
-            return publisher;
+        public EventStream<? extends SerializableStruct> readEventStream(Schema schema) {
+            return eventStream;
         }
 
         @Override

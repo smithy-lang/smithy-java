@@ -10,6 +10,8 @@ dependencies {
     smithyBuild("software.amazon.smithy.java:plugins:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:client-core:$smithyJavaVersion")
+    implementation("software.amazon.smithy.java:client-rpcv2-cbor:${smithyJavaVersion}")
+    implementation(project(":framework-errors"))
 
     // Test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.2")

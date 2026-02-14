@@ -657,6 +657,7 @@ public sealed interface UnionType extends SerializableStruct {
             private static final $InnerDeserializer INSTANCE = new $InnerDeserializer();
 
             @Override
+            @SuppressWarnings("unchecked")
             public void accept(Builder builder, Schema member, ShapeDeserializer de) {
                 switch (member.memberIndex()) {
                     case 0 -> builder.blobValue(de.readBlob(member));
