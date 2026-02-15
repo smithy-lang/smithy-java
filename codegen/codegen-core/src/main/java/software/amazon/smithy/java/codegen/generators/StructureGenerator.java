@@ -17,7 +17,9 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
+import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.ShapeDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -69,6 +71,7 @@ import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.ClientOptionalTrait;
 import software.amazon.smithy.model.traits.DefaultTrait;
 import software.amazon.smithy.model.traits.ErrorTrait;
+import software.amazon.smithy.model.traits.MixinTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
@@ -90,9 +93,19 @@ public final class StructureGenerator<
         var shape = directive.shape();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
+
+            // Compute interface mixin symbols for implements clause
+            List<Symbol> interfaceMixinSymbols = new ArrayList<>();
+            for (var mixinId : shape.getMixins()) {
+                Shape mixinShape = directive.model().expectShape(mixinId);
+                if (MixinTrait.isInterfaceMixin(mixinShape)) {
+                    interfaceMixinSymbols.add(directive.symbolProvider().toSymbol(mixinShape));
+                }
+            }
+
             var template =
                     """
-                            public final class ${shape:T} ${^isError}implements ${serializableStruct:T}${/isError}${?isError}extends ${sdkException:T}${/isError} {
+                            public final class ${shape:T} ${^isError}implements ${serializableStruct:T}${#mixinInterfaces}, ${value:T}${/mixinInterfaces}${/isError}${?isError}extends ${sdkException:T}${?hasMixinInterfaces} implements ${#mixinInterfaces}${value:T}${^key.last}, ${/key.last}${/mixinInterfaces}${/hasMixinInterfaces}${/isError} {
 
                                 ${schemas:C|}
 
@@ -120,6 +133,8 @@ public final class StructureGenerator<
                             }
                             """;
             writer.putContext("isError", shape.hasTrait(ErrorTrait.class));
+            writer.putContext("hasMixinInterfaces", !interfaceMixinSymbols.isEmpty());
+            writer.putContext("mixinInterfaces", interfaceMixinSymbols);
             writer.putContext("shape", directive.symbol());
             writer.putContext("serializableStruct", SerializableStruct.class);
 
@@ -139,9 +154,24 @@ public final class StructureGenerator<
             writer.putContext(
                     "constructor",
                     new ConstructorGenerator(writer, shape, directive.symbolProvider(), directive.model()));
+            // Collect member names defined in interface mixins for @Override annotations
+            Set<String> interfaceMixinMemberNames = new LinkedHashSet<>();
+            for (var mixinId : shape.getMixins()) {
+                Shape mixinShape = directive.model().expectShape(mixinId);
+                if (MixinTrait.isInterfaceMixin(mixinShape)) {
+                    for (MemberShape m : mixinShape.members()) {
+                        interfaceMixinMemberNames.add(m.getMemberName());
+                    }
+                }
+            }
             writer.putContext(
                     "getters",
-                    new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model()));
+                    new GetterGenerator(
+                            writer,
+                            shape,
+                            directive.symbolProvider(),
+                            directive.model(),
+                            interfaceMixinMemberNames));
             writer.putContext(
                     "equals",
                     new EqualsGenerator(writer, shape, directive.symbolProvider(), directive.model()));
@@ -163,7 +193,9 @@ public final class StructureGenerator<
                             shape,
                             directive.symbolProvider(),
                             directive.model(),
-                            directive.service()));
+                            directive.service(),
+                            interfaceMixinSymbols,
+                            interfaceMixinMemberNames));
             writer.putContext("getMemberValue", new GetMemberValueGenerator(writer, directive.symbolProvider(), shape));
             writer.putContext("toBuilder", new ToBuilderGenerator(writer, shape, directive.symbolProvider()));
             writer.write(template);
@@ -265,18 +297,21 @@ public final class StructureGenerator<
         private final Shape shape;
         private final SymbolProvider symbolProvider;
         private final Model model;
+        private final Set<String> interfaceMixinMemberNames;
         private MemberShape member;
 
         private GetterGenerator(
                 JavaWriter writer,
                 Shape shape,
                 SymbolProvider symbolProvider,
-                Model model
+                Model model,
+                Set<String> interfaceMixinMemberNames
         ) {
             this.writer = writer;
             this.symbolProvider = symbolProvider;
             this.model = model;
             this.shape = shape;
+            this.interfaceMixinMemberNames = interfaceMixinMemberNames;
         }
 
         @Override
@@ -292,6 +327,8 @@ public final class StructureGenerator<
                 writer.putContext("member", symbolProvider.toSymbol(member));
                 writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
                 writer.putContext("getterName", CodegenUtils.toGetterName(member, model));
+                writer.putContext("hasOverride",
+                        interfaceMixinMemberNames.contains(member.getMemberName()));
                 this.member = member;
                 member.accept(this);
                 writer.popState();
@@ -305,7 +342,8 @@ public final class StructureGenerator<
 
             writer.write(
                     """
-                            public ${?isNullable}${member:B}${/isNullable}${^isNullable}${member:N}${/isNullable} ${getterName:L}() {
+                            ${?hasOverride}@Override
+                            ${/hasOverride}public ${?isNullable}${member:B}${/isNullable}${^isNullable}${member:N}${/isNullable} ${getterName:L}() {
                                 return ${memberName:L};
                             }
                             """);
@@ -332,7 +370,8 @@ public final class StructureGenerator<
             writer.putContext("collections", Collections.class);
             writer.write(
                     """
-                            public ${member:T} ${getterName:L}() {${?isNullable}
+                            ${?hasOverride}@Override
+                            ${/hasOverride}public ${member:T} ${getterName:L}() {${?isNullable}
                                 if (${memberName:L} == null) {
                                     return ${collections:T}.${empty:L};
                                 }${/isNullable}
@@ -343,7 +382,8 @@ public final class StructureGenerator<
             // Write has-er to allow users to check if a given collection was set. Required collections must be set.
             writer.write(
                     """
-                            public boolean has${memberName:U}() {
+                            ${?hasOverride}@Override
+                            ${/hasOverride}public boolean has${memberName:U}() {
                                 return ${?isNullable}${memberName:L} != null${/isNullable}${^isNullable}true${/isNullable};
                             }
                             """);
@@ -505,15 +545,26 @@ public final class StructureGenerator<
     }
 
     private static final class StructureBuilderGenerator extends BuilderGenerator {
+        private final List<Symbol> interfaceMixinSymbols;
+        private final Set<String> interfaceMixinMemberNames;
 
         StructureBuilderGenerator(
                 JavaWriter writer,
                 Shape shape,
                 SymbolProvider symbolProvider,
                 Model model,
-                ServiceShape service
+                ServiceShape service,
+                List<Symbol> interfaceMixinSymbols,
+                Set<String> interfaceMixinMemberNames
         ) {
             super(writer, shape, symbolProvider, model, service);
+            this.interfaceMixinSymbols = interfaceMixinSymbols;
+            this.interfaceMixinMemberNames = interfaceMixinMemberNames;
+        }
+
+        @Override
+        protected List<Symbol> mixinBuilderInterfaces() {
+            return interfaceMixinSymbols;
         }
 
         // Required shapes marked with clientOptional should not be required to create the type. For these shapes,
@@ -756,10 +807,13 @@ public final class StructureGenerator<
                 writer.putContext("check", CodegenUtils.requiresSetterNullCheck(symbolProvider, member));
                 writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
                 writer.putContext("schemaName", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
+                writer.putContext("hasOverride",
+                        interfaceMixinMemberNames.contains(member.getMemberName()));
 
                 writer.write(
                         """
-                                public Builder ${memberName:L}(${?isNullable}${memberSymbol:B}${/isNullable}${^isNullable}${memberSymbol:N}${/isNullable} ${memberName:L}) {
+                                ${?hasOverride}@Override
+                                ${/hasOverride}public Builder ${memberName:L}(${?isNullable}${memberSymbol:B}${/isNullable}${^isNullable}${memberSymbol:N}${/isNullable} ${memberName:L}) {
                                     this.${memberName:L} = ${?check}${objects:T}.requireNonNull(${/check}${memberName:L}${?check}, "${memberName:L} cannot be null")${/check};${?tracked}
                                     tracker.setMember(${schemaName:L});${/tracked}
                                     return this;

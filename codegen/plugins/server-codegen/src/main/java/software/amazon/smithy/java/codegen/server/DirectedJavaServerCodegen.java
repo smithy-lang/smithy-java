@@ -27,6 +27,7 @@ import software.amazon.smithy.java.codegen.generators.ApiServiceGenerator;
 import software.amazon.smithy.java.codegen.generators.EnumGenerator;
 import software.amazon.smithy.java.codegen.generators.ListGenerator;
 import software.amazon.smithy.java.codegen.generators.MapGenerator;
+import software.amazon.smithy.java.codegen.generators.MixinInterfaceGenerator;
 import software.amazon.smithy.java.codegen.generators.OperationGenerator;
 import software.amazon.smithy.java.codegen.generators.ResourceGenerator;
 import software.amazon.smithy.java.codegen.generators.SchemaIndexGenerator;
@@ -37,6 +38,7 @@ import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.java.codegen.generators.UnionGenerator;
 import software.amazon.smithy.java.codegen.server.generators.OperationInterfaceGenerator;
 import software.amazon.smithy.java.codegen.server.generators.ServiceGenerator;
+import software.amazon.smithy.model.traits.MixinTrait;
 
 final class DirectedJavaServerCodegen
         implements DirectedCodegen<CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration> {
@@ -64,7 +66,11 @@ final class DirectedJavaServerCodegen
     @Override
     public void generateStructure(GenerateStructureDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         if (!directive.settings().useExternalTypes()) {
-            new StructureGenerator<>().accept(directive);
+            if (MixinTrait.isInterfaceMixin(directive.shape())) {
+                new MixinInterfaceGenerator<>().accept(directive);
+            } else {
+                new StructureGenerator<>().accept(directive);
+            }
         }
     }
 

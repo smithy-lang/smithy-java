@@ -25,6 +25,7 @@ import software.amazon.smithy.java.codegen.generators.ApiServiceGenerator;
 import software.amazon.smithy.java.codegen.generators.EnumGenerator;
 import software.amazon.smithy.java.codegen.generators.ListGenerator;
 import software.amazon.smithy.java.codegen.generators.MapGenerator;
+import software.amazon.smithy.java.codegen.generators.MixinInterfaceGenerator;
 import software.amazon.smithy.java.codegen.generators.OperationGenerator;
 import software.amazon.smithy.java.codegen.generators.ResourceGenerator;
 import software.amazon.smithy.java.codegen.generators.SchemasGenerator;
@@ -33,6 +34,7 @@ import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.java.codegen.generators.UnionGenerator;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.traits.MixinTrait;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
@@ -101,7 +103,11 @@ public class TestJavaCodegen implements
 
     @Override
     public void generateStructure(GenerateStructureDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new StructureGenerator<>().accept(directive);
+        if (MixinTrait.isInterfaceMixin(directive.shape())) {
+            new MixinInterfaceGenerator<>().accept(directive);
+        } else {
+            new StructureGenerator<>().accept(directive);
+        }
     }
 
     @Override
