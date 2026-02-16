@@ -207,6 +207,14 @@ final class BytecodeDisassembler {
     }
 
     private void disassembleSection(StringBuilder s, int startOffset, String indent) {
+        try {
+            disassembleSectionUnsafe(s, startOffset, indent);
+        } catch (IndexOutOfBoundsException | IllegalArgumentException | IllegalStateException e) {
+            s.append(indent).append("(error disassembling section: ").append(e.getMessage()).append(")\n");
+        }
+    }
+
+    private void disassembleSectionUnsafe(StringBuilder s, int startOffset, String indent) {
         BytecodeWalker walker = new BytecodeWalker(bytecode.getBytecode(), startOffset);
 
         if (!walker.hasNext()) {

@@ -55,7 +55,11 @@ final class BytecodeWalker {
         if (length < 0) {
             return false; // Unknown opcode
         }
-        pc += length;
+        int next = pc + length;
+        if (next > code.limit()) {
+            return false; // Instruction extends past end
+        }
+        pc = next;
         return true;
     }
 
@@ -63,10 +67,19 @@ final class BytecodeWalker {
         if (!hasNext()) {
             return -1;
         }
-        return getInstructionLength(code.get(pc));
+        int length = getInstructionLength(code.get(pc));
+        // Validate the full instruction fits within the buffer
+        if (length > 0 && pc + length > code.limit()) {
+            return -1;
+        }
+        return length;
     }
 
     public int getOperandCount() {
+        // If the instruction doesn't fully fit in the buffer, report 0 operands
+        if (getInstructionLength() < 0) {
+            return 0;
+        }
         byte opcode = currentOpcode();
         return switch (opcode) {
             case Opcodes.NOT, Opcodes.ISSET, Opcodes.LIST0, Opcodes.LIST1, Opcodes.LIST2, Opcodes.MAP0, Opcodes.MAP1,

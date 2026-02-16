@@ -15,4 +15,13 @@ public interface ApiService {
      * @return Returns the service schema, including the shape ID and relevant traits.
      */
     Schema schema();
+
+    /**
+     * Name of the Service.
+     *
+     * @return Returns the name of the service.
+     */
+    default String name() {
+        return schema().id().getName();
+    }
 }

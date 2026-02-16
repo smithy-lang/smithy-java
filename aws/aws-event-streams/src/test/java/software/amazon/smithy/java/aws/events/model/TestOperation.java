@@ -101,6 +101,11 @@ public final class TestOperation
     }
 
     @Override
+    public List<Schema> errorSchemas() {
+        return List.of();
+    }
+
+    @Override
     public Schema idempotencyTokenMember() {
         return null;
     }

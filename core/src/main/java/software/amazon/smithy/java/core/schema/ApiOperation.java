@@ -108,6 +108,13 @@ public interface ApiOperation<I extends SerializableStruct, O extends Serializab
     }
 
     /**
+     * Get the schemas of all errors that can be thrown by the operation.
+     *
+     * @return Returns the list of error schemas.
+     */
+    List<Schema> errorSchemas();
+
+    /**
      * Get the service shape that the operation is contained within.
      *
      * @return the service shape of the operation.

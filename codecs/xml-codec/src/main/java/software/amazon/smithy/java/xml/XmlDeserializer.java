@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import javax.xml.stream.XMLEventFactory;
 import javax.xml.stream.XMLStreamException;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -29,13 +30,23 @@ final class XmlDeserializer implements ShapeDeserializer {
     private final XMLEventFactory eventFactory;
     private final InnerDeserializer innerDeserializer;
     private final boolean isTopLevel;
+    private final List<String> wrapperElements;
 
     static XmlDeserializer topLevel(
             XmlInfo xmlInfo,
             XMLEventFactory eventFactory,
             XmlReader reader
     ) throws XMLStreamException {
-        return new XmlDeserializer(xmlInfo, eventFactory, reader, true);
+        return new XmlDeserializer(xmlInfo, eventFactory, reader, true, List.of());
+    }
+
+    static XmlDeserializer topLevel(
+            XmlInfo xmlInfo,
+            XMLEventFactory eventFactory,
+            XmlReader reader,
+            List<String> wrapperElements
+    ) throws XMLStreamException {
+        return new XmlDeserializer(xmlInfo, eventFactory, reader, true, wrapperElements);
     }
 
     static XmlDeserializer flattened(
@@ -43,14 +54,20 @@ final class XmlDeserializer implements ShapeDeserializer {
             XMLEventFactory eventFactory,
             XmlReader reader
     ) throws XMLStreamException {
-        return new XmlDeserializer(xmlInfo, eventFactory, reader, false);
+        return new XmlDeserializer(xmlInfo, eventFactory, reader, false, List.of());
     }
 
-    private XmlDeserializer(XmlInfo xmlInfo, XMLEventFactory eventFactory, XmlReader reader, boolean isTopLevel)
-            throws XMLStreamException {
+    private XmlDeserializer(
+            XmlInfo xmlInfo,
+            XMLEventFactory eventFactory,
+            XmlReader reader,
+            boolean isTopLevel,
+            List<String> wrapperElements
+    ) throws XMLStreamException {
         this.xmlInfo = xmlInfo;
         this.reader = reader;
         this.isTopLevel = isTopLevel;
+        this.wrapperElements = wrapperElements;
         this.eventFactory = eventFactory;
         this.innerDeserializer = new InnerDeserializer();
     }
@@ -83,6 +100,12 @@ final class XmlDeserializer implements ShapeDeserializer {
                 return;
             }
 
+            if (!wrapperElements.isEmpty()) {
+                // Skip wrapper elements (exact match), then deserialize content without root validation.
+                skipWrapperElements();
+                return;
+            }
+
             var name = reader.nextMemberElement();
             String expected;
             var trait = schema.getTrait(TraitKey.XML_NAME_TRAIT);
@@ -103,6 +126,24 @@ final class XmlDeserializer implements ShapeDeserializer {
         } catch (XMLStreamException e) {
             throw new SerializationException(e);
         }
+    }
+
+    private void skipWrapperElements() throws XMLStreamException {
+        // Navigate through wrapper elements (exact match)
+        // After this, we should be positioned so the next nextMemberElement returns content
+        for (String wrapperName : wrapperElements) {
+            var name = reader.nextMemberElement();
+            if (name == null) {
+                return;
+            }
+            if (!name.equals(wrapperName)) {
+                // Not the expected wrapper element - protocol mismatch
+                throw new SerializationException(
+                        "Expected wrapper element '" + wrapperName + "', found '" + name + "'");
+            }
+            // Continue to next wrapper level
+        }
+        // Now positioned inside the innermost wrapper, ready for readStruct to read members
     }
 
     private void exit() {

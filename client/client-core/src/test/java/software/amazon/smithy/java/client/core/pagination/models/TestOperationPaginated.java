@@ -60,6 +60,11 @@ public final class TestOperationPaginated implements ApiOperation<GetFoosInput, 
     }
 
     @Override
+    public List<Schema> errorSchemas() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public ApiService service() {
         return new PaginationService();
     }

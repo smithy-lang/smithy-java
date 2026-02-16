@@ -151,6 +151,11 @@ public class UserAgentPluginTest {
             public List<ShapeId> effectiveAuthSchemes() {
                 return List.of();
             }
+
+            @Override
+            public List<Schema> errorSchemas() {
+                return List.of();
+            }
         };
     }
 }

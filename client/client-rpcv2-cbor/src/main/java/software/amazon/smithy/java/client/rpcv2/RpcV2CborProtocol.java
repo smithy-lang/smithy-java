@@ -105,7 +105,7 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
             HttpResponse response
     ) {
         if (response.statusCode() != 200) {
-            throw errorDeserializer.createError(context, operation.schema().id(), typeRegistry, response);
+            throw errorDeserializer.createError(context, operation, typeRegistry, response);
         }
 
         if (operation instanceof OutputEventStreamingApiOperation<I, O, ?> o) {

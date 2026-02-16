@@ -145,6 +145,6 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
             HttpRequest request,
             HttpResponse response
     ) {
-        return getErrorDeserializer(context).createError(context, operation.schema().id(), typeRegistry, response);
+        return getErrorDeserializer(context).createError(context, operation, typeRegistry, response);
     }
 }

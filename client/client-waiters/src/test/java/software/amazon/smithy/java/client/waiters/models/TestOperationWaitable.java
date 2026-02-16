@@ -52,6 +52,11 @@ public final class TestOperationWaitable implements ApiOperation<GetFoosInput, G
     }
 
     @Override
+    public List<Schema> errorSchemas() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public ApiService service() {
         return new WaiterApiService();
     }
