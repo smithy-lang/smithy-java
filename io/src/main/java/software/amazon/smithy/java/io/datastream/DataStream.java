@@ -7,6 +7,7 @@ package software.amazon.smithy.java.io.datastream;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
@@ -83,6 +84,22 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      * @return Returns the future that contains the blocking {@code InputStream}.
      */
     InputStream asInputStream();
+
+    /**
+     * Write the contents of this stream to the given output stream.
+     *
+     * <p>This is the preferred way to transfer data from a DataStream to an OutputStream.
+     * Implementations may override this to avoid intermediate InputStream allocation
+     * (e.g., writing directly from a byte array or ByteBuffer).
+     *
+     * @param out the output stream to write to
+     * @throws IOException if an I/O error occurs
+     */
+    default void writeTo(OutputStream out) throws IOException {
+        try (var is = asInputStream()) {
+            is.transferTo(out);
+        }
+    }
 
     /**
      * Read the contents of the stream into a ByteBuffer by reading all bytes from {@link #asInputStream()}.

@@ -55,7 +55,6 @@ import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.ConnectionPoolListener;
-import software.amazon.smithy.java.http.client.connection.H2LoadBalancer;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -121,7 +120,6 @@ public class H2cScalingBenchmark {
                         .maxConnectionsPerRoute(connections)
                         .maxTotalConnections(connections)
                         .h2StreamsPerConnection(streamsPerConnection)
-                        .h2LoadBalancer(H2LoadBalancer.watermark(1, streamsPerConnection))
                         .h2InitialWindowSize(1024 * 1024)
                         .maxIdleTime(Duration.ofMinutes(2))
                         .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
