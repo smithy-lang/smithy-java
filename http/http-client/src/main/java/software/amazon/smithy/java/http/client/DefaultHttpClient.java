@@ -59,7 +59,7 @@ final class DefaultHttpClient implements HttpClient {
             DataStream requestBody = effectiveRequest.body();
             if (requestBody != null && requestBody.contentLength() != 0) {
                 try (OutputStream out = exchange.requestBody()) {
-                    requestBody.asInputStream().transferTo(out);
+                    requestBody.writeTo(out);
                 }
             } else {
                 exchange.requestBody().close();
