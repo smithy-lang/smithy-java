@@ -7,20 +7,22 @@ package software.amazon.smithy.java.core.serde.event;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Objects;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * Bridges an event stream producer to an InputStream consumer.
  *
- * <p>Thread Safety: The {@link #write(byte[])} and {@link #complete()} methods
- * can be called from one or more producer threads. The {@link #read()} methods
- * must only be called from a single consumer thread.
+ * <p>Thread Safety: The {@link #write(ByteBuffer)} and {@link #complete()} methods
+ * should be called by one VT producer thread. The {@link #read()} methods must only
+ * be called from a single consumer thread.
  *
- * <p>Backpressure: The internal queue has a fixed capacity (default 64). If the
- * queue fills up, {@code write()} will block until the consumer reads data.
+ * <p>Backpressure: There is no backpressure built in this class, {@code write()} will
+ * block until the consumer reads data, and similarly {@link #read()} will block until
+ * the producers writes data.
  *
  * <p>Termination: The writer must call {@link #complete()} to signal the
  * consumer that the writing has finished. Failing to do so will block the reader
@@ -29,23 +31,16 @@ import software.amazon.smithy.java.logging.InternalLogger;
 final class EventPipeStream extends InputStream {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(EventPipeStream.class);
     /**
-     * Default queue size, intentionally small and not configurable. This class is designed
-     * to work with virtual threads, so let threads block cheaply rather than
-     * buffering excessively.
-     */
-    private static final int DEFAULT_QUEUE_SIZE = 64;
-    /**
      * Poison pill used to signal the end of the stream.
      */
-    private static final byte[] POISON_PILL = new byte[0];
+    private static final ByteBuffer POISON_PILL = ByteBuffer.allocate(0);
 
     /**
      * A bounded queue to connect the thread making the event writes to the thread
      * consuming them.
      */
-    private final BlockingQueue<byte[]> queue;
-    private volatile byte[] current = null;
-    private volatile int offset = 0;
+    private final BlockingQueue<ByteBuffer> queue;
+    private volatile ByteBuffer current = null;
     private volatile boolean completed = false;
     private volatile Throwable lastError = null;
     private volatile boolean closed = false;
@@ -54,28 +49,28 @@ final class EventPipeStream extends InputStream {
      * Creates a new EventInputStream with the default queue size of 64.
      */
     public EventPipeStream() {
-        this.queue = new LinkedBlockingQueue<>(DEFAULT_QUEUE_SIZE);
+        this.queue = new ArrayBlockingQueue<>(1);
     }
 
     /**
      * Writes a message to the stream. This method blocks if the internal queue is full.
      *
-     * @param message the byte array to write (must not be null or empty)
+     * @param message the ByteBuffer to write (must not be null or empty)
      * @throws NullPointerException     if message is null
-     * @throws IllegalArgumentException if message is empty
+     * @throws IllegalArgumentException if message has no remaining bytes
      * @throws IllegalStateException    if stream is already completed or closed
      * @throws RuntimeException         wrapping InterruptedException if interrupted while waiting
      */
-    public void write(byte[] message) {
+    public void write(ByteBuffer message) {
         Objects.requireNonNull(message, "message");
-        if (message.length == 0) {
-            throw new IllegalArgumentException("message must not be empty");
+        if (!message.hasRemaining()) {
+            throw new IllegalArgumentException("message must have remaining bytes");
         }
         if (completed || closed) {
             throw new IllegalStateException("Stream is already completed or closed");
         }
 
-        LOGGER.debug("Writing event to stream with {} bytes", message.length);
+        LOGGER.debug("Writing event to stream with {} bytes", message.remaining());
 
         try {
             queue.put(message);
@@ -139,10 +134,14 @@ final class EventPipeStream extends InputStream {
             return -1;
         }
 
-        int available = Math.min(len, current.length - offset);
-        System.arraycopy(current, offset, b, off, available);
-        advanceOffset(available);
+        int available = Math.min(len, current.remaining());
+        current.get(b, off, available);
         LOGGER.debug("Read fulfilled, bytes {} (req: {})", available, (len - off));
+
+        if (!current.hasRemaining()) {
+            current = null;
+        }
+
         return available;
     }
 
@@ -152,8 +151,12 @@ final class EventPipeStream extends InputStream {
             return -1;
         }
         LOGGER.debug("Read requested");
-        byte b = current[offset];
-        advanceOffset(1);
+        byte b = current.get();
+
+        if (!current.hasRemaining()) {
+            current = null;
+        }
+
         return b & 0xFF;
     }
 
@@ -162,7 +165,7 @@ final class EventPipeStream extends InputStream {
         checkError();
 
         if (current != null && current != POISON_PILL) {
-            return current.length - offset;
+            return current.remaining();
         }
 
         return 0;
@@ -218,18 +221,6 @@ final class EventPipeStream extends InputStream {
     private void checkError() throws IOException {
         if (lastError != null) {
             throw new IOException("Producer failed", lastError);
-        }
-    }
-
-    /**
-     * Advances the read position and resets state if current buffer is exhausted.
-     */
-    private void advanceOffset(int consumed) {
-        var tmp = offset;
-        offset = tmp + consumed;
-        if (offset >= current.length) {
-            current = null;
-            offset = 0;
         }
     }
 }

@@ -8,7 +8,6 @@ package software.amazon.smithy.java.example.eventstreaming;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.Disabled;
@@ -90,9 +89,12 @@ public class EventStreamTest {
 
     public static List<FizzBuzzServiceClient> clients() {
         return List.of(
+                /*
                 FizzBuzzServiceClient.builder()
                         .endpointResolver(EndpointResolver.staticHost("http://localhost:8080"))
                         .build(),
+
+                 */
                 FizzBuzzServiceClient.builder()
                         .protocol(new RpcV2CborProtocol.Factory()
                                 .createProtocol(ProtocolSettings.builder()

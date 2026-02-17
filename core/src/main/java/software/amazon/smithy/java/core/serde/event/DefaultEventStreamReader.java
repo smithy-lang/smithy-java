@@ -11,8 +11,8 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -53,9 +53,8 @@ final class DefaultEventStreamReader<IE extends SerializableStruct, T extends Se
     private final InputStream inputStream;
     private final EventDecoder<F> eventDecoder;
     private final FrameDecoder<F> frameDecoder;
-    private volatile boolean inputConsumed = false;
-    private volatile boolean closed = false;
-    private volatile boolean initialEventConsumed;
+    private static final AtomicBoolean inputClosed = new AtomicBoolean(false);
+    private volatile State state;
 
     /**
      * Creates a new DefaultEventStreamReader.
@@ -73,7 +72,7 @@ final class DefaultEventStreamReader<IE extends SerializableStruct, T extends Se
         this.inputStream = Objects.requireNonNull(dataStream, "dataStream").asInputStream();
         Objects.requireNonNull(eventDecoderFactory, "eventDecoderFactory");
 
-        this.initialEventConsumed = !expectInitialEvent;
+        this.state = (expectInitialEvent ? State.READING_INITIAL_EVENT : State.READING_EVENTS);
         this.queue = new ArrayDeque<>();
         this.eventDecoder = eventDecoderFactory.newEventDecoder();
         this.frameDecoder = eventDecoderFactory.newFrameDecoder();
@@ -91,18 +90,17 @@ final class DefaultEventStreamReader<IE extends SerializableStruct, T extends Se
      */
     @Override
     public T read() {
-        if (closed) {
-            throw new IllegalStateException("Reader is closed");
-        }
-        if (!initialEventConsumed) {
-            throw new IllegalStateException("Initial event is expected but readInitialEvent was not called");
-        }
-        if (inputConsumed) {
-            return null;
+        switch (state) {
+            case READING_INITIAL_EVENT, CLOSED:
+                throw new IllegalStateException("Reader is not in reading events state, current: " + state);
+            case READING_EVENTS:
+                break;
+            case READING_COMPLETED:
+                return null;
         }
 
         if (queue.isEmpty()) {
-            if (!enqueueEvents()) {
+            if (!enqueueEvent()) {
                 LOGGER.debug("No more events available, end of stream reached");
                 return null;
             }
@@ -126,12 +124,8 @@ final class DefaultEventStreamReader<IE extends SerializableStruct, T extends Se
      */
     @SuppressWarnings("unchecked")
     public IE readInitialEvent() {
-        if (closed) {
-            throw new IllegalStateException("Reader is closed");
-        }
-
-        if (initialEventConsumed) {
-            throw new IllegalStateException("Initial event was not expected of readInitialEvent has been called");
+        if (state != State.READING_INITIAL_EVENT) {
+            throw new IllegalStateException("Reader is not in reading events state, current: " + state);
         }
 
         IE result = null;
@@ -141,7 +135,7 @@ final class DefaultEventStreamReader<IE extends SerializableStruct, T extends Se
                 int read = inputStream.read(buffer);
 
                 if (read == -1) {
-                    inputConsumed = true;
+                    state = State.READING_COMPLETED;
                     throw new RuntimeException("Unexpected end of stream while reading initial event");
                 }
 
@@ -176,7 +170,7 @@ final class DefaultEventStreamReader<IE extends SerializableStruct, T extends Se
                 throw new RuntimeException("Initial event type mismatch", e);
             }
         }
-        initialEventConsumed = true;
+        state = State.READING_EVENTS;
         return result;
     }
 
@@ -197,17 +191,15 @@ final class DefaultEventStreamReader<IE extends SerializableStruct, T extends Se
      */
     @Override
     public void close() {
-        if (closed) {
-            return;
-        }
-        closed = true;
-        inputConsumed = true;
-        try {
-            inputStream.close();
-        } catch (IOException e) {
-            throw new UncheckedIOException("Error closing input stream", e);
-        } finally {
-            queue.clear();
+        if (inputClosed.compareAndSet(false, true)) {
+            try {
+                inputStream.close();
+            } catch (IOException e) {
+                throw new UncheckedIOException("Error closing input stream", e);
+            } finally {
+                queue.clear();
+            }
+            state = State.CLOSED;
         }
     }
 
@@ -220,11 +212,6 @@ final class DefaultEventStreamReader<IE extends SerializableStruct, T extends Se
     @Override
     public void closeWithError(Exception e) {
         Objects.requireNonNull(e, "exception must not be null");
-
-        if (closed) {
-            return;
-        }
-
         LOGGER.error("Closing reader due to error", e);
         close();
     }
@@ -236,8 +223,8 @@ final class DefaultEventStreamReader<IE extends SerializableStruct, T extends Se
      * @throws UncheckedIOException if an I/O error occurs
      */
     @SuppressWarnings("unchecked")
-    private boolean enqueueEvents() {
-        if (inputConsumed) {
+    private boolean enqueueEvent() {
+        if (state == State.READING_COMPLETED) {
             return false;
         }
 
@@ -250,7 +237,7 @@ final class DefaultEventStreamReader<IE extends SerializableStruct, T extends Se
 
                 if (read == -1) {
                     LOGGER.debug("End of stream reached");
-                    inputConsumed = true;
+                    state = State.READING_COMPLETED;
                     return false;
                 }
 
@@ -261,7 +248,7 @@ final class DefaultEventStreamReader<IE extends SerializableStruct, T extends Se
 
                 // Decode frames from the bytes read
                 // FrameDecoder is stateful, accumulates bytes until complete frames available
-                List<F> frames = frameDecoder.decode(ByteBuffer.wrap(buffer, 0, read));
+                var frames = frameDecoder.decode(ByteBuffer.wrap(buffer, 0, read));
 
                 // Decode each frame into an event and add to queue
                 for (F frame : frames) {
@@ -279,5 +266,9 @@ final class DefaultEventStreamReader<IE extends SerializableStruct, T extends Se
             closeWithError(e);
             throw new RuntimeException("Event type mismatch during decode", e);
         }
+    }
+
+    enum State {
+        READING_INITIAL_EVENT, READING_EVENTS, READING_COMPLETED, CLOSED
     }
 }

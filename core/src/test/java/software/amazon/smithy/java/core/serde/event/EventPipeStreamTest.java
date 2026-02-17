@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -66,7 +67,7 @@ class EventPipeStreamTest {
         var eventInputStream = new EventPipeStream();
         Thread.ofVirtual().start(() -> {
             for (var idx = 0; idx < source.length(); idx++) {
-                eventInputStream.write(charToUtf8Bytes(source.charAt(idx)));
+                eventInputStream.write(ByteBuffer.wrap(charToUtf8Bytes(source.charAt(idx))));
             }
             eventInputStream.complete();
         });

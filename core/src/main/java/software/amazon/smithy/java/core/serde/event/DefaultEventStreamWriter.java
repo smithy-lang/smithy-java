@@ -5,10 +5,9 @@
 
 package software.amazon.smithy.java.core.serde.event;
 
-import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -23,8 +22,8 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * thread-safe for producer-consumer patterns.
  *
  * @param <IE> the initial event ype
- * @param <T> the event type
- * @param <F> tye frame type
+ * @param <T>  the event type
+ * @param <F>  tye frame type
  */
 final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends SerializableStruct,
         F extends Frame<?>>
@@ -41,10 +40,10 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
      * to send them over the wire.
      */
     private final EventPipeStream pipeStream;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
     private EventEncoder<F> eventEncoder;
     private FrameEncoder<F> frameEncoder;
     private volatile Throwable lastError;
-    private volatile boolean closed = false;
 
     /**
      * Creates a new DefaultEventStreamWriter.
@@ -66,9 +65,7 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
         checkState();
 
         try {
-            LOGGER.debug("Writing event {} (latch count: {})",
-                    event.getClass().getSimpleName(),
-                    readyLatch.getCount());
+            LOGGER.debug("write event {}", event);
 
             // Wait for writer to be fully setup and the initial event to be written.
             readyLatch.await();
@@ -83,6 +80,7 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
 
     @Override
     public void bootstrap(Bootstrap<IE, F> bootstrap) {
+        // Make sure that the protocol handler doesn't call bootstrap twice.
         if (readyLatch.getCount() == 0) {
             throw new IllegalStateException("bootstrap has been already called");
         }
@@ -96,10 +94,7 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
     private void writeInitialEvent(SerializableStruct event) {
         checkState();
 
-        LOGGER.debug("write initial event {} (count: {})", event, readyLatch.getCount());
-        if (readyLatch.getCount() == 0) {
-            throw new IllegalStateException("Initial event already written");
-        }
+        LOGGER.debug("write initial event {}", event);
         try {
             // Some protocols, notably REST, encode their initial event in the
             // http request. Callers pass a null value to allow the writing
@@ -136,41 +131,8 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
         var frame = eventEncoder.encode(event);
         var encoded = frameEncoder.encode(frame);
 
-        // Copy to byte array for EventInputStream
-        var bytes = extractBytes(encoded);
-
         // Write to the stream (may block if queue is full)
-        var startNs = System.nanoTime();
-        LOGGER.debug("Writing event {} (latch count: {})", event, readyLatch.getCount());
-        pipeStream.write(bytes);
-        LOGGER.trace("Writing event completed, elapsed time: {} ms",
-                TimeUnit.MILLISECONDS.convert((System.nanoTime() - startNs), TimeUnit.NANOSECONDS));
-    }
-
-    /**
-     * Extracts bytes from a ByteBuffer, using backing array if available.
-     */
-    private byte[] extractBytes(ByteBuffer buffer) {
-        if (buffer.hasArray()) {
-            byte[] array = buffer.array();
-            int arrayOffset = buffer.arrayOffset() + buffer.position();
-            int length = buffer.remaining();
-
-            // If the buffer uses the entire backing array, return it directly
-            if (arrayOffset == 0 && length == array.length) {
-                return array;
-            }
-
-            // Otherwise, copy the relevant portion
-            byte[] bytes = new byte[length];
-            System.arraycopy(array, arrayOffset, bytes, 0, length);
-            return bytes;
-        }
-
-        // No backing array, must copy via ByteBuffer
-        byte[] bytes = new byte[buffer.remaining()];
-        buffer.get(bytes);
-        return bytes;
+        pipeStream.write(encoded);
     }
 
     /**
@@ -182,7 +144,7 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
         if (lastError != null) {
             throw new IllegalStateException("Producer failed", lastError);
         }
-        if (closed) {
+        if (closed.get()) {
             throw new IllegalStateException("EventStreamWriter is closed");
         }
     }
@@ -206,8 +168,7 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
     @Override
     public void closeWithError(Exception e) {
         Objects.requireNonNull(e, "exception");
-        if (!closed) {
-            closed = true;
+        if (closed.compareAndSet(false, true)) {
             pipeStream.completeWithError(e);
             lastError = e;
         }
@@ -218,8 +179,7 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
      */
     @Override
     public void close() {
-        if (!closed) {
-            closed = true;
+        if (closed.compareAndSet(false, true)) {
             pipeStream.complete();
         }
     }
