@@ -24,6 +24,7 @@ import software.amazon.smithy.java.example.eventstreaming.model.FizzBuzzOutput;
 import software.amazon.smithy.java.example.eventstreaming.model.FizzBuzzStream;
 import software.amazon.smithy.java.example.eventstreaming.model.Value;
 import software.amazon.smithy.java.example.eventstreaming.model.ValueStream;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.protocol.traits.Rpcv2CborTrait;
 
@@ -35,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 @Disabled("This test requires manually running a server locally and then verifies client behavior against it.")
 public class EventStreamTest {
 
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(EventStreamTest.class);
     @ParameterizedTest
     @MethodSource("clients")
     public void fizzBuzz(FizzBuzzServiceClient client) {
@@ -53,8 +55,9 @@ public class EventStreamTest {
                 }
             }
         });
+        LOGGER.info("sending request");
         FizzBuzzOutput output = client.fizzBuzz(input);
-        System.out.println("Initial messages done");
+        LOGGER.info("Initial messages done");
 
         AtomicLong receivedEvents = new AtomicLong();
         Set<Long> unbuzzed = new HashSet<>();
@@ -64,7 +67,7 @@ public class EventStreamTest {
             switch (item) {
                 case FizzBuzzStream.FizzMember(var fizz):
                     value = fizz.getValue();
-                    System.out.println("received fizz: " + value);
+                    LOGGER.info("received fizz: {}", value);
                     assertEquals(0, value % 3);
                     if (value % 5 == 0) {
                         assertTrue(unbuzzed.add(value), "Fizz already received for " + value);
@@ -72,7 +75,7 @@ public class EventStreamTest {
                     break;
                 case FizzBuzzStream.BuzzMember(var buzz):
                     value = buzz.getValue();
-                    System.out.println("received buzz: " + value);
+                    LOGGER.info("received buzz: {}",  value);
                     assertEquals(0, value % 5);
                     if (value % 3 == 0) {
                         assertTrue(unbuzzed.remove(value), "No fizz for " + value);
@@ -89,12 +92,9 @@ public class EventStreamTest {
 
     public static List<FizzBuzzServiceClient> clients() {
         return List.of(
-                /*
                 FizzBuzzServiceClient.builder()
                         .endpointResolver(EndpointResolver.staticHost("http://localhost:8080"))
                         .build(),
-
-                 */
                 FizzBuzzServiceClient.builder()
                         .protocol(new RpcV2CborProtocol.Factory()
                                 .createProtocol(ProtocolSettings.builder()
