@@ -106,7 +106,7 @@ public interface HttpExchange extends AutoCloseable {
      */
     default void writeRequestBody() throws IOException {
         try (OutputStream out = requestBody()) {
-            request().body().asInputStream().transferTo(out);
+            request().body().writeTo(out);
         }
     }
 
@@ -175,6 +175,7 @@ public interface HttpExchange extends AutoCloseable {
      * try (InputStream in = exchange.responseBody()) {
      *     in.readAllBytes(); // must fully consume body first
      * }
+     *
      * HttpHeaders trailers = exchange.responseTrailerHeaders();
      * if (trailers != null) {
      *     String checksum = trailers.firstValue("checksum").orElse(null);
