@@ -1,5 +1,5 @@
 [versions]
-junit5 = "6.0.2"
+junit5 = "6.0.3"
 hamcrest = "3.0"
 smithy = "1.67.0"
 jmh = "0.7.3"
@@ -11,7 +11,7 @@ assertj = "3.27.7"
 jackson = "3.0.4"
 netty = "4.2.10.Final"
 dep-analysis = "3.5.1"
-aws-sdk = "2.41.26"
+aws-sdk = "2.41.31"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 jreleaser = "1.21.0"
