@@ -207,6 +207,11 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
         };
     }
 
+    @Override
+    public void close() {
+        client.close();
+    }
+
     public static final class Factory implements ClientTransportFactory<HttpRequest, HttpResponse> {
         @Override
         public String name() {
@@ -216,15 +221,15 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
         @Override
         public JavaHttpClientTransport createTransport(Document node) {
             setHostProperties();
-            var versionNode = node.asStringMap().get("version");
-            HttpClient httpClient;
-            if (versionNode != null) {
-                var version = HttpVersion.from(versionNode.asString());
-                httpClient = HttpClient.newBuilder().version(smithyToHttpVersion(version)).build();
-            } else {
-                httpClient = HttpClient.newHttpClient();
+            var config = new HttpTransportConfig().fromDocument(node);
+            var builder = HttpClient.newBuilder();
+            if (config.httpVersion() != null) {
+                builder.version(smithyToHttpVersion(config.httpVersion()));
             }
-            return new JavaHttpClientTransport(httpClient);
+            if (config.connectTimeout() != null) {
+                builder.connectTimeout(config.connectTimeout());
+            }
+            return new JavaHttpClientTransport(builder.build());
         }
 
         @Override
