@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.List;
+import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -61,7 +62,7 @@ abstract class BuilderGenerator implements Runnable {
                         /**
                          * Builder for {@link ${shape:T}}.
                          */
-                        ${^inInterface}public static ${/inInterface}final class Builder implements ${sdkShapeBuilder:T}<${shape:T}>${?isStaged}, ${#stages}${value:L}${^key.last}, ${/key.last}${/stages}${/isStaged} {
+                        ${^inInterface}public static ${/inInterface}final class Builder implements ${sdkShapeBuilder:T}<${shape:T}>${?isStaged}, ${#stages}${value:L}${^key.last}, ${/key.last}${/stages}${/isStaged}${?hasMixinBuilders}${#mixinBuilders}, ${value:T}.Builder<Builder>${/mixinBuilders}${/hasMixinBuilders} {
                             ${builderProperties:C|}
 
                             ${builderConstructor:C|}
@@ -97,6 +98,9 @@ abstract class BuilderGenerator implements Runnable {
             writer.putContext("stages", this.stageInterfaces());
             writer.putContext("stageGen", writer.consumer(this::generateStages));
         }
+        var mixinBuilders = mixinBuilderInterfaces();
+        writer.putContext("hasMixinBuilders", !mixinBuilders.isEmpty());
+        writer.putContext("mixinBuilders", mixinBuilders);
         writer.write(template);
         writer.popState();
     }
@@ -134,6 +138,10 @@ abstract class BuilderGenerator implements Runnable {
 
     protected boolean inInterface() {
         return false;
+    }
+
+    protected List<Symbol> mixinBuilderInterfaces() {
+        return List.of();
     }
 
     protected String getMemberSchemaName(MemberShape member) {
