@@ -9,7 +9,12 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -86,5 +91,24 @@ public class InputStreamDataStreamTest {
 
         ds.asInputStream();
         assertThat(ds.isAvailable(), is(false));
+    }
+
+    @Test
+    public void writeTo() throws IOException {
+        var data = "from input stream".getBytes(StandardCharsets.UTF_8);
+        var ds = DataStream.ofInputStream(new ByteArrayInputStream(data));
+        var out = new ByteArrayOutputStream();
+
+        ds.writeTo(out);
+
+        assertArrayEquals(data, out.toByteArray());
+    }
+
+    @Test
+    public void writeToNotReplayable() throws IOException {
+        var ds = DataStream.ofInputStream(new ByteArrayInputStream(new byte[] {1, 2, 3}));
+        ds.writeTo(new ByteArrayOutputStream());
+
+        assertThrows(IllegalStateException.class, () -> ds.writeTo(new ByteArrayOutputStream()));
     }
 }

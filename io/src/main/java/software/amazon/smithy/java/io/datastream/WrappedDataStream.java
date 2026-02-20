@@ -5,7 +5,9 @@
 
 package software.amazon.smithy.java.io.datastream;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Flow;
 
@@ -31,6 +33,11 @@ final class WrappedDataStream implements DataStream {
     @Override
     public InputStream asInputStream() {
         return delegate.asInputStream();
+    }
+
+    @Override
+    public void writeTo(OutputStream out) throws IOException {
+        delegate.writeTo(out);
     }
 
     @Override

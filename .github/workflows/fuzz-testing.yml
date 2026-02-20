@@ -59,6 +59,17 @@ jobs:
         run: |
           ./gradlew :client:client-rulesengine:test --tests "*FuzzTest*" -Djazzer.max_duration=1h --stacktrace
 
+      - name: Run HPACK fuzz tests
+        env:
+          JAZZER_FUZZ: "1"
+        run: |
+          ./gradlew :http:http-hpack:test --tests "*FuzzTest*" -Djazzer.max_duration=1h --stacktrace
+
+      - name: Run HTTP client fuzz tests
+        env:
+          JAZZER_FUZZ: "1"
+        run: |
+          ./gradlew :http:http-client:test --tests "*FuzzTest*" -Djazzer.max_duration=1h --stacktrace
       - name: Save fuzz corpus cache
         uses: actions/cache/save@v5
         if: always()

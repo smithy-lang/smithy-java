@@ -14,7 +14,7 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
     private URI uri;
     private String method;
     private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
-    private ModifiableHttpHeaders headers = new SimpleModifiableHttpHeaders();
+    private ModifiableHttpHeaders headers = new ArrayHttpHeaders();
     private DataStream body = DataStream.ofEmpty();
 
     ModifiableHttpRequestImpl() {}

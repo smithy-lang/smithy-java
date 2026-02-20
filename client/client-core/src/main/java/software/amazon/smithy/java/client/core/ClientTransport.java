@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.client.core;
 
+import java.io.Closeable;
 import java.net.ConnectException;
 import java.net.ProtocolException;
 import java.net.SocketException;
@@ -25,7 +26,7 @@ import software.amazon.smithy.java.core.error.CallException;
  * @implNote To be discoverable by dynamic clients and client code generators,
  * ClientTransport's should implement a {@link ClientTransportFactory} service provider.
  */
-public interface ClientTransport<RequestT, ResponseT> {
+public interface ClientTransport<RequestT, ResponseT> extends Closeable {
     /**
      * Send a prepared request.
      *

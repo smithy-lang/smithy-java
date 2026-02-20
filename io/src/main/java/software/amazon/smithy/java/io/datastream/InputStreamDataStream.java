@@ -7,6 +7,7 @@ package software.amazon.smithy.java.io.datastream;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 
 final class InputStreamDataStream implements DataStream {
@@ -30,6 +31,11 @@ final class InputStreamDataStream implements DataStream {
         }
         consumed = true;
         return inputStream;
+    }
+
+    @Override
+    public void writeTo(OutputStream out) throws IOException {
+        asInputStream().transferTo(out);
     }
 
     @Override
