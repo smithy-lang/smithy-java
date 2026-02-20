@@ -47,7 +47,7 @@ public final class HttpMcpProxy extends McpServerProxy {
         this.endpoint = URI.create(builder.endpoint);
         this.name = builder.name != null ? builder.name : sanitizeName(endpoint.getHost());
         this.signer = builder.signer;
-        this.timeout = builder.timeout != null ? builder.timeout : Duration.ofSeconds(60);
+        this.timeout = builder.timeout != null ? builder.timeout : Duration.ofMinutes(5);
     }
 
     private static String sanitizeName(String host) {
