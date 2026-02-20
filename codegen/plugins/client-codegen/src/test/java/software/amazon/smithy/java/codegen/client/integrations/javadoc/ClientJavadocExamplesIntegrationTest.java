@@ -28,8 +28,7 @@ public class ClientJavadocExamplesIntegrationTest extends AbstractCodegenFileTes
         var expected = """
                      * <h4>Examples</h4>
                      * <h5>Basic Example</h5>
-                     * <pre>
-                     * {@code
+                     * {@snippet :
                      * var input = ExamplesOperationInput.builder()
                      *                 .foo("foo")
                      *                 .build();
@@ -39,11 +38,9 @@ public class ClientJavadocExamplesIntegrationTest extends AbstractCodegenFileTes
                      *                   .bar("bar")
                      *                   .build());
                      * }
-                     * </pre>
                      *
                      * <h5>Error Example</h5>
-                     * <pre>
-                     * {@code
+                     * {@snippet :
                      * var input = ExamplesOperationInput.builder()
                      *                 .foo("bar")
                      *                 .build();
@@ -56,7 +53,6 @@ public class ClientJavadocExamplesIntegrationTest extends AbstractCodegenFileTes
                      *                  .build());
                      * }
                      * }
-                     * </pre>
                 """;
         assertThat(fileContents, containsString(expected));
     }

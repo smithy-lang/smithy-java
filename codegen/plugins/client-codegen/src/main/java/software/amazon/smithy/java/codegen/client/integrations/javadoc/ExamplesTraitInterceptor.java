@@ -64,11 +64,9 @@ public class ExamplesTraitInterceptor implements CodeInterceptor.Appender<Javado
 
                     ${?docs}<p>${docs:L}
                     ${/docs}
-                    <pre>
-                    {@code
+                    {@snippet :
                     ${C|}
                     }
-                    </pre>
                     """, writer.consumer(w -> writeExampleSnippet(writer, operation, example)));
             writer.popState();
         }
