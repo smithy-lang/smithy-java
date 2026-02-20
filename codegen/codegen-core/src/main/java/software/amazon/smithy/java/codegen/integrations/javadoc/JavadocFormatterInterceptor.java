@@ -25,6 +25,8 @@ import software.amazon.smithy.utils.StringUtils;
 final class JavadocFormatterInterceptor implements CodeInterceptor<JavadocSection, JavaWriter> {
     private static final int MAX_LINE_LENGTH = 100;
     private static final Pattern PATTERN = Pattern.compile("<([a-z]+)*>.*?</\\1>", Pattern.DOTALL);
+    // Matches the start of an {@snippet ...} inline Javadoc tag (JDK 18+, JEP 413).
+    private static final Pattern SNIPPET_START_PATTERN = Pattern.compile("\\{@snippet\\b[^:}]*:");
     // HTML tags supported by javadocs for Java17. Note: this list is not directly documented in JavaDocs documentation
     // and is instead found by inspecting the JDK doclint/HtmlTag.java file.
     private static final Set<String> SUPPORTED_TAGS = Set.of(
@@ -125,6 +127,63 @@ final class JavadocFormatterInterceptor implements CodeInterceptor<JavadocSectio
     }
 
     private void writeDocstringBody(JavaWriter writer, String contents, int nestingLevel) {
+        // Split out any {@snippet ...} inline tags first so their contents
+        // are not line-wrapped or have characters escaped.
+        Matcher snippetMatcher = SNIPPET_START_PATTERN.matcher(contents);
+        int lastSnippetPos = 0;
+        StringBuilder nonSnippetContents = new StringBuilder();
+        while (snippetMatcher.find()) {
+            nonSnippetContents.append(contents, lastSnippetPos, snippetMatcher.start());
+            // Flush any accumulated non-snippet content through HTML tag processing
+            if (!nonSnippetContents.isEmpty()) {
+                writeDocstringBodyHtml(writer, nonSnippetContents.toString(), nestingLevel);
+                nonSnippetContents.setLength(0);
+            }
+            // Find the matching closing brace using balanced brace counting,
+            // since snippet bodies contain Java code with its own braces.
+            int snippetEnd = findMatchingBrace(contents, snippetMatcher.start());
+            // Write snippet block verbatim - no wrapping, no escaping
+            writeSnippetBlock(writer, contents.substring(snippetMatcher.start(), snippetEnd));
+            lastSnippetPos = snippetEnd;
+        }
+        nonSnippetContents.append(contents.substring(lastSnippetPos));
+        if (!nonSnippetContents.isEmpty()) {
+            writeDocstringBodyHtml(writer, nonSnippetContents.toString(), nestingLevel);
+        }
+    }
+
+    /**
+     * Finds the position after the closing brace that matches the opening brace of
+     * an inline Javadoc tag starting at {@code start}. Uses balanced brace counting
+     * to skip over braces in the snippet body (e.g. Java code blocks).
+     */
+    private static int findMatchingBrace(String contents, int start) {
+        int depth = 0;
+        for (int i = start; i < contents.length(); i++) {
+            char c = contents.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return i + 1;
+                }
+            }
+        }
+        // If no matching brace found, return end of contents
+        return contents.length();
+    }
+
+    private void writeSnippetBlock(JavaWriter writer, String snippet) {
+        for (Scanner it = new Scanner(snippet); it.hasNextLine();) {
+            writer.writeInlineWithNoFormatting(it.nextLine());
+            if (it.hasNextLine()) {
+                writer.writeInlineWithNoFormatting(writer.getNewline() + " * ");
+            }
+        }
+    }
+
+    private void writeDocstringBodyHtml(JavaWriter writer, String contents, int nestingLevel) {
         // Split out any HTML-tag wrapped sections as we do not want to wrap
         // any customer documentation with tags
         Matcher matcher = PATTERN.matcher(contents);
@@ -139,7 +198,7 @@ final class JavadocFormatterInterceptor implements CodeInterceptor<JavadocSectio
                 writer.writeInlineWithNoFormatting("<" + htmlTag + ">");
                 var offsetForTagStart = 2 + htmlTag.length();
                 var tagContents = contents.substring(matcher.start() + offsetForTagStart, matcher.end());
-                writeDocstringBody(writer, tagContents, nestingLevel + 1);
+                writeDocstringBodyHtml(writer, tagContents, nestingLevel + 1);
             }
 
             lastMatchPos = matcher.end();
