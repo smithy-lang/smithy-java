@@ -35,7 +35,7 @@ class AwsEventShapeDecoderTest {
         var frame = new AwsEventFrame(message);
 
         // Act
-        var struct = createDecoder().decode(frame);
+        var struct = createDecoder().decodeInitialEvent(frame, null);
 
         // Assert
         assertInstanceOf(TestOperationOutput.class, struct);

@@ -9,7 +9,6 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Flow;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -18,7 +17,8 @@ import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeDeserializer;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
-import software.amazon.smithy.java.core.serde.event.EventStreamFrameDecodingProcessor;
+import software.amazon.smithy.java.core.serde.event.EventStreamReader;
+import software.amazon.smithy.java.core.serde.event.InternalEventStreamReader;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.QueryStringParser;
@@ -114,8 +114,8 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                     if (isEventStream(member)) {
                         structMemberConsumer.accept(state, member, new SpecificShapeDeserializer() {
                             @Override
-                            public Flow.Publisher<? extends SerializableStruct> readEventStream(Schema schema) {
-                                return EventStreamFrameDecodingProcessor.create(body, eventDecoderFactory);
+                            public EventStreamReader<? extends SerializableStruct> readEventStream(Schema schema) {
+                                return InternalEventStreamReader.newReader(body, eventDecoderFactory, false);
                             }
                         });
                     } else if (member.hasTrait(TraitKey.STREAMING_TRAIT)) {
@@ -179,11 +179,11 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
      * starts with the expected media type and is either an exact match or is followed by a semicolon
      * (parameter separator) or whitespace.
      *
-     * @param actual the actual media type received (e.g., from a Content-Type header), or null
+     * @param actual   the actual media type received (e.g., from a Content-Type header), or null
      * @param expected the expected media type, or null to skip validation
      * @return 1 if the media types match or no validation is needed because `expected` is null,
-     *         0 if actual is null but expected is not (missing Content-Type),
-     *         -1 if the media types do not match
+     * 0 if actual is null but expected is not (missing Content-Type),
+     * -1 if the media types do not match
      */
     static int compareMediaType(String actual, String expected) {
         if (expected == null) {

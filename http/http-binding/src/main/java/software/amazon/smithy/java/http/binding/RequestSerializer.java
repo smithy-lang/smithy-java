@@ -8,7 +8,6 @@ package software.amazon.smithy.java.http.binding;
 import java.net.URI;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Flow;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.InputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -17,8 +16,8 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
-import software.amazon.smithy.java.core.serde.event.EventStreamFrameEncodingProcessor;
 import software.amazon.smithy.java.core.serde.event.Frame;
+import software.amazon.smithy.java.core.serde.event.InternalEventStreamWriter;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.uri.URIBuilder;
 
@@ -130,6 +129,7 @@ public final class RequestSerializer {
      *
      * @return Returns the created request.
      */
+    @SuppressWarnings("unchecked")
     public HttpRequest serializeRequest() {
         Objects.requireNonNull(shapeValue, "shapeValue is not set");
         Objects.requireNonNull(operation, "operation is not set");
@@ -165,14 +165,33 @@ public final class RequestSerializer {
                 .method(httpTrait.getMethod())
                 .uri(targetEndpoint);
 
-        var eventStream = (Flow.Publisher<SerializableStruct>) serializer.getEventStream();
+        var eventStream = serializer.getEventStream();
         if (eventStream != null && operation instanceof InputEventStreamingApiOperation<?, ?, ?>) {
-            builder.body(EventStreamFrameEncodingProcessor.create(eventStream, eventStreamEncodingFactory));
+            InternalEventStreamWriter<SerializableStruct, SerializableStruct, Frame<?>> writer =
+                    InternalEventStreamWriter.toInternal(eventStream);
+
+            writer.bootstrap(new InternalEventStreamWriter.Bootstrap<>() {
+                @Override
+                @SuppressWarnings("unchecked")
+                public EventEncoderFactory<Frame<?>> encoder() {
+                    return (EventEncoderFactory) eventStreamEncodingFactory;
+                }
+
+                @Override
+                public SerializableStruct initialEvent() {
+                    return null;
+                }
+            });
+            builder.body(writer.toDataStream());
             serializer.setContentType(eventStreamEncodingFactory.contentType());
         } else if (serializer.hasBody()) {
             builder.body(serializer.getBody());
         }
 
         return builder.headers(serializer.getHeaders()).build();
+    }
+
+    private static <T> T doCast(Class<T> xclass, Object value) {
+        return xclass.cast(value);
     }
 }

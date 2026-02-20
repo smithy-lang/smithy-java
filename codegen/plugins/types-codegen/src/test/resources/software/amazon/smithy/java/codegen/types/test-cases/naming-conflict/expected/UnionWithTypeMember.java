@@ -151,6 +151,7 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
             private static final $InnerDeserializer INSTANCE = new $InnerDeserializer();
 
             @Override
+            @SuppressWarnings("unchecked")
             public void accept(Builder builder, Schema member, ShapeDeserializer de) {
                 switch (member.memberIndex()) {
                     case 0 -> builder.type(Type.builder().deserializeMember(de, member).build());

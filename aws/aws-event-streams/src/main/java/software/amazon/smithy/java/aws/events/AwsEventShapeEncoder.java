@@ -26,6 +26,7 @@ import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.event.EventEncoder;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
+import software.amazon.smithy.java.core.serde.event.FrameTransformer;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
@@ -35,6 +36,7 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
     private final String payloadMediaType;
     private final Map<String, BiFunction<OutputStream, Map<String, HeaderValue>, ShapeSerializer>> possibleTypes;
     private final Map<ShapeId, Schema> possibleExceptions;
+    private final FrameTransformer<AwsEventFrame> frameTransformer;
     private final Function<Throwable, EventStreamingException> exceptionHandler;
 
     public AwsEventShapeEncoder(
@@ -42,6 +44,7 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
             Schema eventSchema,
             Codec codec,
             String payloadMediaType,
+            FrameTransformer<AwsEventFrame> frameTransformer,
             Function<Throwable, EventStreamingException> exceptionHandler
     ) {
         this.initialEventType = Objects.requireNonNull(initialEventType, "initialEventType");
@@ -51,6 +54,7 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
                 codec,
                 initialEventType.value());
         this.possibleExceptions = possibleExceptions(Objects.requireNonNull(eventSchema, "eventSchema"));
+        this.frameTransformer = Objects.requireNonNull(frameTransformer, "frameTransformer");
         this.exceptionHandler = Objects.requireNonNull(exceptionHandler, "exceptionHandler");
     }
 
@@ -62,7 +66,8 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
         headers.put(":message-type", HeaderValue.fromString("event"));
         headers.put(":event-type", HeaderValue.fromString(typeHolder.get()));
         headers.put(":content-type", HeaderValue.fromString(payloadMediaType));
-        return new AwsEventFrame(new Message(headers, payload));
+        var frame = new AwsEventFrame(new Message(headers, payload));
+        return frameTransformer.apply(frame);
     }
 
     private byte[] encodeInput(

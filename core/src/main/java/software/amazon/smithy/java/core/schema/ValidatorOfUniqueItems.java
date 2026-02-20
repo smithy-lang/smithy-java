@@ -14,12 +14,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.document.DocumentParser;
+import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
@@ -135,7 +135,7 @@ final class ValidatorOfUniqueItems implements ShapeSerializer {
     }
 
     @Override
-    public void writeEventStream(Schema schema, Flow.Publisher<? extends SerializableStruct> value) {
+    public void writeEventStream(Schema schema, EventStream<? extends SerializableStruct> value) {
         addError("Event stream found in unique items");
     }
 

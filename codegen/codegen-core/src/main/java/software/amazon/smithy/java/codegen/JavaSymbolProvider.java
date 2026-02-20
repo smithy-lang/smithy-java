@@ -15,12 +15,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Flow;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.core.schema.Unit;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.Model;
@@ -194,7 +194,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
                                         + memberShape));
 
         if (CodegenUtils.isEventStream(target)) {
-            return CodegenUtils.fromClass(Flow.Publisher.class)
+            return CodegenUtils.fromClass(EventStream.class)
                     .toBuilder()
                     .addReference(toSymbol(target))
                     .build();

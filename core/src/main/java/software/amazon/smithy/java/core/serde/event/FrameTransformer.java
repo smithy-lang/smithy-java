@@ -16,4 +16,15 @@ import java.util.function.Function;
  * @param <F> the frame type
  */
 @FunctionalInterface
-public interface FrameTransformer<F extends Frame<?>> extends Function<F, F> {}
+public interface FrameTransformer<F extends Frame<?>> extends Function<F, F> {
+
+    /**
+     * An identity transformer that returns the same frame as given.
+     *
+     * @param <F> the frame type
+     * @return an identity frame transformer
+     */
+    static <F extends Frame<?>> FrameTransformer<F> identity() {
+        return (F frame) -> frame;
+    }
+}

@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.core.serde.event;
 
+// TODO javadoc
 public interface EventEncoderFactory<F extends Frame<?>> {
 
     EventEncoder<F> newEventEncoder();

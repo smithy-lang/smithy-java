@@ -5,11 +5,11 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-import java.util.concurrent.Flow;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.BigDecimalShape;
 import software.amazon.smithy.model.shapes.BigIntegerShape;
@@ -190,11 +190,11 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     @Override
     public Void unionShape(UnionShape unionShape) {
         if (unionShape.hasTrait(StreamingTrait.class)) {
-            Symbol flowPublisherType = CodegenUtils.fromClass(Flow.Publisher.class)
+            Symbol eventStreamType = CodegenUtils.fromClass(EventStream.class)
                     .toBuilder()
                     .addReference(symbolProvider.toSymbol(unionShape))
                     .build();
-            writer.write("($T) ${deserializer:L}.readEventStream(${schemaName:L})", flowPublisherType);
+            writer.write("($T) ${deserializer:L}.readEventStream(${schemaName:L})", eventStreamType);
         } else {
             delegateDeser();
         }

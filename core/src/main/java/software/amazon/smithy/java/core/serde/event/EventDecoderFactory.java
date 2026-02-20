@@ -10,5 +10,4 @@ public interface EventDecoderFactory<F extends Frame<?>> {
     EventDecoder<F> newEventDecoder();
 
     FrameDecoder<F> newFrameDecoder();
-
 }
