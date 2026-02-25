@@ -22,6 +22,7 @@ import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
 import software.amazon.smithy.java.mcp.model.ListToolsResult;
 import software.amazon.smithy.java.mcp.model.PromptInfo;
 import software.amazon.smithy.java.mcp.model.ToolInfo;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 public abstract class McpServerProxy {
 
@@ -81,6 +82,14 @@ public abstract class McpServerProxy {
         if (result.getError() != null) {
             throw new RuntimeException("Error during initialization: " + result.getError().getMessage());
         }
+
+        // Send the initialized notification per MCP protocol spec
+        JsonRpcRequest initializedNotification = JsonRpcRequest.builder()
+                .method("notifications/initialized")
+                .jsonrpc("2.0")
+                .build();
+        rpc(initializedNotification);
+
         this.notificationConsumer.set(notificationConsumer);
         this.requestNotificationConsumer.set(requestNotificationConsumer);
         this.protocolVersion.set(protocolVersion);
@@ -127,7 +136,7 @@ public abstract class McpServerProxy {
      * Forwards a notification request by converting it to a response format.
      * Notifications have a method field but no id.
      */
-    protected void notifyRequest(JsonRpcRequest notification) {
+    protected void notify(JsonRpcRequest notification) {
         var rnc = requestNotificationConsumer.get();
         if (rnc != null) {
             LOG.debug("Forwarding notification to consumer: method={}", notification.getMethod());
@@ -135,6 +144,27 @@ public abstract class McpServerProxy {
         } else {
             LOG.warn("No request notification consumer set, dropping notification: method={}",
                     notification.getMethod());
+        }
+    }
+
+    /**
+     * Determines if a Document represents a notification (has "method" but no "id")
+     * rather than a response (has "id").
+     *
+     * - Responses have an "id" field at the top level
+     * - Notifications have a "method" field but no "id" field at the top level
+     */
+    protected static boolean isNotification(Document doc) {
+        try {
+            if (!doc.isType(ShapeType.STRUCTURE) && !doc.isType(ShapeType.MAP)) {
+                return false;
+            }
+
+            // If it has a "method" field but no "id", it's a notification
+            return doc.getMember("id") == null && doc.getMember("method") != null;
+        } catch (Exception e) {
+            LOG.warn("Failed to determine if notification from Document", e);
+            return false;
         }
     }
 

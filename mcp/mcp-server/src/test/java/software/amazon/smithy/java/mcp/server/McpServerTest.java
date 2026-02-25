@@ -1431,6 +1431,10 @@ public class McpServerTest {
                 .build();
         service.handleRequest(initRequest, r -> {}, ProtocolVersion.defaultVersion());
 
+        // Verify notifications/initialized was sent during initialization
+        assertTrue(mockProxy.getSentNotifications().contains("notifications/initialized"),
+                "notifications/initialized should be sent during initialization");
+
         // First tools/list - fetches from proxy
         var toolsRequest = JsonRpcRequest.builder()
                 .method("tools/list")
@@ -1488,6 +1492,10 @@ public class McpServerTest {
                 .build();
         service.handleRequest(initRequest, r -> {}, ProtocolVersion.defaultVersion());
 
+        // Verify notifications/initialized was sent during initialization
+        assertTrue(mockProxy.getSentNotifications().contains("notifications/initialized"),
+                "notifications/initialized should be sent during initialization");
+
         // First tools/list
         var toolsRequest = JsonRpcRequest.builder()
                 .method("tools/list")
@@ -1516,6 +1524,7 @@ public class McpServerTest {
 
     private static class CacheTestProxy extends McpServerProxy {
         private final AtomicInteger callCounter;
+        private final List<String> sentNotifications = new ArrayList<>();
 
         CacheTestProxy(AtomicInteger callCounter) {
             this.callCounter = callCounter;
@@ -1539,12 +1548,21 @@ public class McpServerTest {
 
         @Override
         CompletableFuture<JsonRpcResponse> rpc(JsonRpcRequest request) {
+            // Notifications have no ID
+            if (request.getId() == null) {
+                sentNotifications.add(request.getMethod());
+                return CompletableFuture.completedFuture(null);
+            }
             return CompletableFuture.completedFuture(
                     JsonRpcResponse.builder()
                             .id(request.getId())
                             .result(Document.of(Map.of()))
                             .jsonrpc("2.0")
                             .build());
+        }
+
+        List<String> getSentNotifications() {
+            return sentNotifications;
         }
 
         @Override
@@ -1561,7 +1579,7 @@ public class McpServerTest {
         }
 
         void sendNotification(JsonRpcRequest notification) {
-            notifyRequest(notification);
+            notify(notification);
         }
     }
 }

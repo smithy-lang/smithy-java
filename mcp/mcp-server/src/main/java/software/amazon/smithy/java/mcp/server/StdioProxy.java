@@ -116,6 +116,25 @@ public final class StdioProxy extends McpServerProxy {
             return future;
         }
 
+        // Notifications don't have an ID and don't expect a response
+        if (request.getId() == null) {
+            try {
+                writeLock.lock();
+                String serializedRequest = JSON_CODEC.serializeToString(request);
+                LOG.debug("Sending notification: {}", serializedRequest);
+                writer.write(serializedRequest);
+                writer.newLine();
+                writer.flush();
+            } catch (IOException e) {
+                LOG.error("Error sending notification to MCP server", e);
+                return CompletableFuture.failedFuture(
+                        new RuntimeException("Failed to send notification to MCP server: " + e.getMessage(), e));
+            } finally {
+                writeLock.unlock();
+            }
+            return CompletableFuture.completedFuture(null);
+        }
+
         String requestId = getStringRequestId(request.getId());
         CompletableFuture<JsonRpcResponse> responseFuture = new CompletableFuture<>();
         pendingRequests.put(requestId, responseFuture);
@@ -185,20 +204,23 @@ public final class StdioProxy extends McpServerProxy {
                                 }
 
                                 LOG.debug("Received response: {}", responseLine);
-                                JsonRpcResponse response = JsonRpcResponse.builder()
-                                        .deserialize(
-                                                JSON_CODEC.createDeserializer(
-                                                        responseLine.getBytes(StandardCharsets.UTF_8)))
-                                        .build();
-
-                                String responseId = getStringRequestId(response.getId());
-                                LOG.debug("Processing response ID: {}", responseId);
-
-                                CompletableFuture<JsonRpcResponse> future = pendingRequests.remove(responseId);
-                                if (future != null) {
-                                    future.complete(response);
+                                var output =
+                                        JSON_CODEC.createDeserializer(responseLine.getBytes(StandardCharsets.UTF_8))
+                                                .readDocument();
+                                if (isNotification(output)) {
+                                    notify(output.asShape(JsonRpcRequest.builder()));
                                 } else {
-                                    notify(response);
+                                    JsonRpcResponse response = output.asShape(JsonRpcResponse.builder());
+
+                                    String responseId = getStringRequestId(response.getId());
+                                    LOG.debug("Processing response ID: {}", responseId);
+
+                                    CompletableFuture<JsonRpcResponse> future = pendingRequests.remove(responseId);
+                                    if (future != null) {
+                                        future.complete(response);
+                                    } else {
+                                        notify(response);
+                                    }
                                 }
                             } catch (IOException e) {
                                 if (running) {

@@ -25,7 +25,6 @@ import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.model.JsonRpcErrorResponse;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
-import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
@@ -208,7 +207,7 @@ public final class HttpMcpProxy extends McpServerProxy {
                             // This is a notification - convert Document to JsonRpcRequest and forward
                             JsonRpcRequest notification = jsonDocument.asShape(JsonRpcRequest.builder());
                             LOG.debug("Received notification from SSE stream: method={}", notification.getMethod());
-                            notifyRequest(notification);
+                            notify(notification);
                         } else {
                             // This is a response - convert Document to JsonRpcResponse
                             finalResponse = jsonDocument.asShape(JsonRpcResponse.builder());
@@ -236,14 +235,14 @@ public final class HttpMcpProxy extends McpServerProxy {
                                     .build();
                             LOG.debug("Received notification from remaining SSE buffer: method={}",
                                     notification.getMethod());
-                            notifyRequest(notification);
+                            notify(notification);
                         } else {
                             JsonRpcResponse message = JsonRpcResponse.builder()
                                     .deserialize(jsonDocument.createDeserializer())
                                     .build();
 
                             if (message.getId() == null) {
-                                notifyRequest(JsonRpcRequest.builder()
+                                notify(JsonRpcRequest.builder()
                                         .jsonrpc("2.0")
                                         .method("notifications/unknown")
                                         .build());
@@ -279,27 +278,6 @@ public final class HttpMcpProxy extends McpServerProxy {
                             .message("SSE parsing error: " + e.getMessage())
                             .build())
                     .build();
-        }
-    }
-
-    /**
-     * Determines if a Document represents a notification (has "method" but no "id")
-     * rather than a response (has "id").
-     * 
-     * - Responses have an "id" field at the top level
-     * - Notifications have a "method" field but no "id" field at the top level
-     */
-    private boolean isNotification(Document doc) {
-        try {
-            if (!doc.isType(ShapeType.STRUCTURE) && !doc.isType(ShapeType.MAP)) {
-                return false;
-            }
-
-            // If it has a "method" field but no "id", it's a notification
-            return doc.getMember("id") == null && doc.getMember("method") != null;
-        } catch (Exception e) {
-            LOG.warn("Failed to determine if notification from Document", e);
-            return false;
         }
     }
 
