@@ -5,8 +5,13 @@
 
 package software.amazon.smithy.java.core.serde.event;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Flow;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -14,16 +19,16 @@ import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * Default implementation of EventStreamWriter that encodes events and writes them
- * to an internal EventPipeStream. This event bridges the user facing {@link EventStreamWriter}
+ * to an internal {@link WriterDataStream}. This bridges the user facing {@link EventStreamWriter}
  * with the added functionality needed by the protocol implementation.
  *
  * <p>Thread Safety: This class is NOT thread-safe for concurrent writes. Only one
- * thread should call write methods at a time. The underlying EventPipeStream is
+ * thread should call write methods at a time. The underlying WriterDataStream is
  * thread-safe for producer-consumer patterns.
  *
- * @param <IE> the initial event ype
+ * @param <IE> the initial event type
  * @param <T>  the event type
- * @param <F>  tye frame type
+ * @param <F>  the frame type
  */
 final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends SerializableStruct,
         F extends Frame<?>>
@@ -35,11 +40,7 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
      * to unlatch the writer by bootstrapping it with a null value.
      */
     private final CountDownLatch readyLatch = new CountDownLatch(1);
-    /**
-     * Pipes bytes written by this writer to an input stream used
-     * to send them over the wire.
-     */
-    private final EventPipeStream pipeStream;
+    private final WriterDataStream dataStream;
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private EventEncoder<F> eventEncoder;
     private FrameEncoder<F> frameEncoder;
@@ -49,7 +50,7 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
      * Creates a new DefaultEventStreamWriter.
      */
     public DefaultEventStreamWriter() {
-        this.pipeStream = new EventPipeStream();
+        this.dataStream = new WriterDataStream();
     }
 
     /**
@@ -85,6 +86,7 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
             throw new IllegalStateException("bootstrap has been already called");
         }
         setEventStreamEncodingFactory(Objects.requireNonNull(encoderFactory, "encoderFactory"));
+        dataStream.setContentType(encoderFactory.contentType());
         writeInitialEvent(initialEvent);
     }
 
@@ -131,8 +133,8 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
         var frame = eventEncoder.encode(event);
         var encoded = frameEncoder.encode(frame);
 
-        // Write to the stream (may block if queue is full)
-        pipeStream.write(encoded);
+        // Write to the data stream (may block via rendezvous)
+        dataStream.put(encoded);
     }
 
     /**
@@ -169,7 +171,7 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
     public void closeWithError(Exception e) {
         Objects.requireNonNull(e, "exception");
         if (closed.compareAndSet(false, true)) {
-            pipeStream.completeWithError(e);
+            dataStream.completeWithError(e);
             lastError = e;
         }
     }
@@ -180,7 +182,7 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
-            pipeStream.complete();
+            dataStream.complete();
         }
     }
 
@@ -192,6 +194,186 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
      */
     @Override
     public DataStream toDataStream() {
-        return DataStream.ofInputStream(pipeStream);
+        return dataStream;
+    }
+
+    /**
+     * A DataStream implementation that bridges event writes to a Flow.Publisher
+     * using a zero-buffer SynchronousQueue rendezvous.
+     *
+     * <p>This eliminates the intermediate EventPipeStream and InputStream layers
+     * by handing ByteBuffers directly to the HttpClient's reactive subscriber.
+     */
+    private static final class WriterDataStream implements DataStream {
+        private static final ByteBuffer POISON_PILL = ByteBuffer.allocate(0);
+
+        private final SynchronousQueue<ByteBuffer> queue = new SynchronousQueue<>();
+        private volatile String contentType;
+        private volatile boolean completed = false;
+        private volatile Throwable lastError = null;
+
+        void setContentType(String contentType) {
+            this.contentType = contentType;
+        }
+
+        /**
+         * Puts a ByteBuffer into the rendezvous queue, blocking until a consumer takes it.
+         */
+        void put(ByteBuffer buffer) {
+            try {
+                queue.put(buffer);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted while writing", e);
+            }
+        }
+
+        /**
+         * Signals normal completion of the stream.
+         */
+        void complete() {
+            if (completed) {
+                return;
+            }
+            completed = true;
+            try {
+                queue.put(POISON_PILL);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted while completing", e);
+            }
+        }
+
+        /**
+         * Signals error completion of the stream.
+         */
+        void completeWithError(Throwable error) {
+            Objects.requireNonNull(error, "error must not be null");
+            if (completed) {
+                return;
+            }
+            this.lastError = error;
+            complete();
+        }
+
+        @Override
+        public long contentLength() {
+            return -1;
+        }
+
+        @Override
+        public String contentType() {
+            return contentType;
+        }
+
+        @Override
+        public boolean isReplayable() {
+            return false;
+        }
+
+        @Override
+        public boolean isAvailable() {
+            return true;
+        }
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
+            subscriber.onSubscribe(new Flow.Subscription() {
+                private final AtomicBoolean started = new AtomicBoolean(false);
+                private volatile boolean cancelled = false;
+
+                @Override
+                public void request(long n) {
+                    if (n <= 0) {
+                        subscriber.onError(new IllegalArgumentException("non-positive subscription request"));
+                        return;
+                    }
+                    // Start the draining thread on first request
+                    if (started.compareAndSet(false, true)) {
+                        Thread.ofVirtual().name("event-stream-publisher").start(() -> drain(subscriber));
+                    }
+                }
+
+                @Override
+                public void cancel() {
+                    cancelled = true;
+                }
+
+                private void drain(Flow.Subscriber<? super ByteBuffer> sub) {
+                    try {
+                        while (!cancelled) {
+                            ByteBuffer buf = queue.take();
+                            if (buf == POISON_PILL) {
+                                if (lastError != null) {
+                                    sub.onError(new IOException("Producer failed", lastError));
+                                } else {
+                                    sub.onComplete();
+                                }
+                                return;
+                            }
+                            sub.onNext(buf);
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        sub.onError(e);
+                    }
+                }
+            });
+        }
+
+        @Override
+        public InputStream asInputStream() {
+            return new InputStream() {
+                private ByteBuffer current = null;
+                private boolean eof = false;
+
+                @Override
+                public int read() throws IOException {
+                    if (!ensureCurrent()) {
+                        return -1;
+                    }
+                    return current.get() & 0xFF;
+                }
+
+                @Override
+                public int read(byte[] b, int off, int len) throws IOException {
+                    Objects.checkFromIndexSize(off, len, b.length);
+                    if (len == 0) {
+                        return 0;
+                    }
+                    if (!ensureCurrent()) {
+                        return -1;
+                    }
+                    int available = Math.min(len, current.remaining());
+                    current.get(b, off, available);
+                    if (!current.hasRemaining()) {
+                        current = null;
+                    }
+                    return available;
+                }
+
+                private boolean ensureCurrent() throws IOException {
+                    if (eof) {
+                        return false;
+                    }
+                    if (current == null || !current.hasRemaining()) {
+                        try {
+                            current = queue.take();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            throw new IOException("Interrupted while reading", e);
+                        }
+                        if (current == POISON_PILL) {
+                            eof = true;
+                            if (lastError != null) {
+                                throw new IOException("Producer failed", lastError);
+                            }
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            };
+        }
     }
 }

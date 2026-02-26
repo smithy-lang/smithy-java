@@ -119,7 +119,7 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
                 bodyPublisher = BodyPublishers.ofByteArray(ByteBufferUtils.getBytes(request.body().asByteBuffer()));
             }
         } else {
-            bodyPublisher = BodyPublishers.ofInputStream(() -> request.body().asInputStream());
+            bodyPublisher = BodyPublishers.fromPublisher(request.body());
         }
 
         var httpRequestBuilder = java.net.http.HttpRequest.newBuilder()

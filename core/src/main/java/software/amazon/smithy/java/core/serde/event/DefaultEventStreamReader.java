@@ -53,7 +53,7 @@ final class DefaultEventStreamReader<IE extends SerializableStruct, T extends Se
     private final InputStream inputStream;
     private final EventDecoder<F> eventDecoder;
     private final FrameDecoder<F> frameDecoder;
-    private static final AtomicBoolean inputClosed = new AtomicBoolean(false);
+    private final AtomicBoolean inputClosed = new AtomicBoolean(false);
     private volatile State state;
 
     /**
