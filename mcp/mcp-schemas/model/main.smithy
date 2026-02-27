@@ -129,8 +129,6 @@ structure JsonArraySchema {
     uniqueItems: PrimitiveBoolean = false
 
     description: String
-
-    default: Document
 }
 
 structure JsonPrimitiveSchema {
