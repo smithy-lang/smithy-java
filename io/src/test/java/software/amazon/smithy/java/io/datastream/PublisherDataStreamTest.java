@@ -27,13 +27,31 @@ class PublisherDataStreamTest {
         var ds = DataStream.ofPublisher(publisher, null, -1);
         var out = new ByteArrayOutputStream();
 
-        Thread.startVirtualThread(() -> {
-            publisher.submit(ByteBuffer.wrap(chunk1));
-            publisher.submit(ByteBuffer.wrap(chunk2));
-            publisher.close();
+        // Run writeTo on a virtual thread so it subscribes to the publisher
+        // before items are submitted, avoiding a race where close() fires
+        // before the subscription is established.
+        var writeThread = Thread.startVirtualThread(() -> {
+            try {
+                ds.writeTo(out);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         });
 
-        ds.writeTo(out);
+        // Wait for writeTo's subscriber to be registered.
+        while (publisher.getNumberOfSubscribers() < 1) {
+            Thread.onSpinWait();
+        }
+
+        publisher.submit(ByteBuffer.wrap(chunk1));
+        publisher.submit(ByteBuffer.wrap(chunk2));
+        publisher.close();
+
+        try {
+            writeThread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
 
         assertArrayEquals("hello world".getBytes(StandardCharsets.UTF_8), out.toByteArray());
     }

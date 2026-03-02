@@ -83,8 +83,8 @@ public final class H2Exchange implements HttpExchange {
     private final H2StreamState state = new H2StreamState();
 
     // Pending headers from reader thread (protected by dataLock)
-    private List<String> pendingHeaders;
-    private boolean pendingHeadersEndStream;
+    private record PendingHeadersEvent(List<String> fields, boolean endStream) {}
+    private final ArrayDeque<PendingHeadersEvent> pendingHeadersQueue = new ArrayDeque<>();
 
     // === Data chunk queue ===
     // Queue of DataChunks received from reader thread. Each chunk contains one DATA frame payload.
@@ -352,8 +352,7 @@ public final class H2Exchange implements HttpExchange {
     void deliverHeaders(List<String> fields, boolean endStream) {
         dataLock.lock();
         try {
-            pendingHeaders = fields;
-            pendingHeadersEndStream = endStream;
+            pendingHeadersQueue.add(new PendingHeadersEvent(fields, endStream));
         } finally {
             dataLock.unlock();
         }
@@ -496,11 +495,9 @@ public final class H2Exchange implements HttpExchange {
             // Wait for data, EOF, or error
             while (dataQueue.isEmpty() && state.getReadState() == RS_READING) {
                 // Check for pending trailers
-                if (pendingHeaders != null) {
-                    List<String> fields = pendingHeaders;
-                    boolean endStream = pendingHeadersEndStream;
-                    pendingHeaders = null;
-                    handleHeadersEvent(fields, endStream);
+                PendingHeadersEvent headerEvent = pendingHeadersQueue.poll();
+                if (headerEvent != null) {
+                    handleHeadersEvent(headerEvent.fields(), headerEvent.endStream());
                     if (state.getReadState() == RS_DONE) {
                         break;
                     }
@@ -726,7 +723,7 @@ public final class H2Exchange implements HttpExchange {
         try {
             // Wait for headers, error, or data (which also signals)
             int rs;
-            while (pendingHeaders == null && (rs = state.getReadState()) != RS_ERROR && rs != RS_DONE) {
+            while (pendingHeadersQueue.isEmpty() && (rs = state.getReadState()) != RS_ERROR && rs != RS_DONE) {
                 // Wait using lock-free signaling
                 waitingThread = Thread.currentThread();
                 dataLock.unlock();
@@ -764,13 +761,10 @@ public final class H2Exchange implements HttpExchange {
 
             dataLock.lock();
             try {
-                if (pendingHeaders != null) {
-                    List<String> fields = pendingHeaders;
-                    boolean endStream = pendingHeadersEndStream;
-                    pendingHeaders = null; // Consume the headers
-
+                PendingHeadersEvent headerEvent = pendingHeadersQueue.poll();
+                if (headerEvent != null) {
                     // Process headers (can throw)
-                    handleHeadersEvent(fields, endStream);
+                    handleHeadersEvent(headerEvent.fields(), headerEvent.endStream());
                 } else if (state.getReadState() == RS_DONE) {
                     throw new IOException("Stream ended before response headers received");
                 }

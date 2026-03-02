@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.core;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.net.ConnectException;
 import java.net.ProtocolException;
 import java.net.SocketException;
@@ -46,6 +47,14 @@ public interface ClientTransport<RequestT, ResponseT> extends Closeable {
      * @return the message exchange.
      */
     MessageExchange<RequestT, ResponseT> messageExchange();
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Default implementation is a no-op.
+     */
+    @Override
+    default void close() throws IOException {}
 
     /**
      * Remaps a thrown exception to an appropriate {@link TransportException} or {@link CallException}.
