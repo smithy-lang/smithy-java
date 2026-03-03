@@ -126,7 +126,8 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                                 return body;
                             }
                         });
-                    } else if (member.type() == ShapeType.STRUCTURE || member.type() == ShapeType.UNION) {
+                    } else if (member.type() == ShapeType.STRUCTURE || member.type() == ShapeType.UNION
+                            || member.type() == ShapeType.LIST) {
                         // Read the payload into a byte buffer to deserialize a shape in the body.
                         ByteBuffer bb = bodyAsByteBuffer();
                         if (bb.remaining() > 0) {
