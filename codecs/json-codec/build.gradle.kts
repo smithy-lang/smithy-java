@@ -37,7 +37,8 @@ tasks {
     }
 }
 
-(components["shadow"] as AdhocComponentWithVariants).addVariantsFromConfiguration(configurations.apiElements.get()) {
+configurations {
+    shadow.get().extendsFrom(api.get())
 }
 
 configurePublishing {
