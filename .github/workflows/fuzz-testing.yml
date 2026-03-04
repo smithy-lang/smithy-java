@@ -69,14 +69,14 @@ jobs:
             **/src/fuzz/resources/corpus/
 
       - name: Upload fuzz test reports
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: fuzz-test-reports
           path: '**/build/reports/fuzz-coverage/**'
 
       - name: Upload crash artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: fuzz-crashes
