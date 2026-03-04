@@ -39,8 +39,7 @@ final class SigningResources {
     }
 
     /**
-     * Shrink the string builder to a max size of 512 to keep it always at or below this
-     * when returned to the pool.
+     * Shrink the string builder to a fixed size to prevent the cached buffers grow too large.
      */
     void shrink() {
         if (sb.length() > BUFFER_SIZE) {
