@@ -100,6 +100,11 @@ public final class TestMessage {
         public TestFrame encodeFailure(Throwable exception) {
             return null;
         }
+
+        @Override
+        public TestFrame closingFrame() {
+            return null;
+        }
     }
 
     static class TestEvent implements SerializableStruct {
@@ -159,6 +164,11 @@ public final class TestMessage {
         @Override
         public String contentType() {
             return "text/plain";
+        }
+
+        @Override
+        public EventEncoderFactory<TestFrame> withFrameProcessor(FrameProcessor<TestFrame> frameProcessor) {
+            return this;
         }
     }
 }

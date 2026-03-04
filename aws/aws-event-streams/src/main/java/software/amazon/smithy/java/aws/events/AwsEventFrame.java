@@ -12,7 +12,7 @@ public final class AwsEventFrame implements Frame<Message> {
 
     private final Message message;
 
-    AwsEventFrame(Message message) {
+    public AwsEventFrame(Message message) {
         this.message = message;
     }
 

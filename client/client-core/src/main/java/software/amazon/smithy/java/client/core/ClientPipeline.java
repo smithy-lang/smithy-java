@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.StringJoiner;
+import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
@@ -28,6 +29,8 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.event.Frame;
+import software.amazon.smithy.java.core.serde.event.FrameProcessor;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.retries.api.AcquireInitialTokenRequest;
 import software.amazon.smithy.java.retries.api.RecordSuccessRequest;
@@ -60,7 +63,7 @@ final class ClientPipeline<RequestT, ResponseT> {
     private final ClientTransport<RequestT, ResponseT> transport;
 
     /**
-     * @param protocol Protocol used to serialize requests and deserialize responses.
+     * @param protocol  Protocol used to serialize requests and deserialize responses.
      * @param transport Transport used to send requests and return responses.
      */
     ClientPipeline(ClientProtocol<RequestT, ResponseT> protocol, ClientTransport<RequestT, ResponseT> transport) {
@@ -71,7 +74,7 @@ final class ClientPipeline<RequestT, ResponseT> {
     /**
      * Attempt to create a ClientTransport from the given protocol and transport.
      *
-     * @param protocol Protocol used to serialize requests and deserialize responses.
+     * @param protocol  Protocol used to serialize requests and deserialize responses.
      * @param transport Transport used to send requests and return responses.
      * @throws IllegalStateException if the protocol and transport are incompatible.
      */
@@ -88,7 +91,7 @@ final class ClientPipeline<RequestT, ResponseT> {
      * Ensures that the given protocol and transport are compatible by comparing their {@link MessageExchange} class
      * for instance equality.
      *
-     * @param protocol Protocol to check.
+     * @param protocol  Protocol to check.
      * @param transport Transport to check.
      * @throws IllegalStateException if the protocol and transport use different request or response classes.
      */
@@ -191,7 +194,12 @@ final class ClientPipeline<RequestT, ResponseT> {
         call.context.put(CallContext.ENDPOINT, endpoint);
 
         RequestT req = protocol.setServiceEndpoint(requestHook.request(), endpoint);
-        req = resolvedAuthScheme.sign(req);
+        var signResult = resolvedAuthScheme.sign(req);
+        req = signResult.signedRequest();
+        if (call.writer != null) {
+            var eventSigner = resolvedAuthScheme.eventSigner(signResult);
+            call.writer.setSigner(eventSigner);
+        }
 
         var updatedHook = requestHook.withRequest(req);
         call.interceptor.readAfterSigning(updatedHook);
@@ -278,12 +286,17 @@ final class ClientPipeline<RequestT, ResponseT> {
             Context signerProperties,
             AuthScheme<RequestT, IdentityT> authScheme,
             IdentityResult<IdentityT> identity) {
-        public RequestT sign(RequestT request) {
+        public SignResult<RequestT> sign(RequestT request) {
             // Throws when no identity is found.
             var resolvedIdentity = identity.unwrap();
             try (var signer = authScheme.signer()) {
                 return signer.sign(request, resolvedIdentity, signerProperties);
             }
+        }
+
+        public FrameProcessor<Frame<?>> eventSigner(SignResult<RequestT> result) {
+            var resolvedIdentity = identity.unwrap();
+            return authScheme.eventSigner(resolvedIdentity, signerProperties, result.signature());
         }
     }
 

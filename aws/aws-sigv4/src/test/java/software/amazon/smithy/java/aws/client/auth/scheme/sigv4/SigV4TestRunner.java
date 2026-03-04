@@ -159,7 +159,7 @@ public class SigV4TestRunner {
         Result createResult(
                 Signer<HttpRequest, AwsCredentialsIdentity> signer
         ) throws ExecutionException, InterruptedException {
-            var signedRequest = signer.sign(request, context.identity, context.properties);
+            var signedRequest = signer.sign(request, context.identity, context.properties).signedRequest();
             boolean isValid = signedRequest.headers().equals(expected.headers())
                     && signedRequest.uri().equals(expected.uri())
                     && signedRequest.method().equals(expected.method());

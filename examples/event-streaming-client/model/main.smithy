@@ -2,9 +2,11 @@ $version: "2.0"
 
 namespace smithy.example.eventstreaming
 
+use aws.auth#sigv4
 use aws.protocols#restJson1
 
 @restJson1
+@sigv4(name: "tickservice")
 service FizzBuzzService {
     operations: [
         FizzBuzz

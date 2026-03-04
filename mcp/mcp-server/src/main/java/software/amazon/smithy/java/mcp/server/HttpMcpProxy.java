@@ -134,7 +134,7 @@ public final class HttpMcpProxy extends McpServerProxy {
             context.put(HttpContext.HTTP_REQUEST_TIMEOUT, timeout);
 
             if (signer != null) {
-                httpRequest = signer.sign(httpRequest, null, context);
+                httpRequest = signer.sign(httpRequest, null, context).signedRequest();
             }
 
             HttpResponse response = transport.send(context, httpRequest);
@@ -149,7 +149,7 @@ public final class HttpMcpProxy extends McpServerProxy {
                 }
             }
 
-            // "When a client receives HTTP 404 in response to a request containing an Mcp-Session-Id, 
+            // "When a client receives HTTP 404 in response to a request containing an Mcp-Session-Id,
             // it MUST start a new session by sending a new InitializeRequest without a session ID attached."
             if (response.statusCode() == 404 && sessionId != null) {
                 LOG.debug("Received 404 with active session ID. Clearing session to force restart.");

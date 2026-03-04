@@ -16,7 +16,7 @@ import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.event.EventDecoder;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.FrameDecoder;
-import software.amazon.smithy.java.core.serde.event.FrameTransformer;
+import software.amazon.smithy.java.core.serde.event.FrameProcessor;
 
 /**
  * A {@link EventDecoderFactory} for AWS events.
@@ -32,7 +32,7 @@ public final class AwsEventDecoderFactory<E extends SerializableStruct, IR exten
     private final Schema eventSchema;
     private final Codec codec;
     private final Supplier<ShapeBuilder<E>> eventBuilder;
-    private final FrameTransformer<AwsEventFrame> transformer;
+    private final FrameProcessor<AwsEventFrame> frameProcessor;
 
     private AwsEventDecoderFactory(
             InitialEventType initialEventType,
@@ -40,7 +40,7 @@ public final class AwsEventDecoderFactory<E extends SerializableStruct, IR exten
             Schema eventSchema,
             Codec codec,
             Supplier<ShapeBuilder<E>> eventBuilder,
-            FrameTransformer<AwsEventFrame> transformer
+            FrameProcessor<AwsEventFrame> frameProcessor
     ) {
         this.initialEventType = Objects.requireNonNull(initialEventType, "initialEventType");
         this.initialEventBuilder = Objects.requireNonNull(initialEventBuilder, "initialEventBuilder");
@@ -48,22 +48,22 @@ public final class AwsEventDecoderFactory<E extends SerializableStruct, IR exten
                 : eventSchema;
         this.codec = Objects.requireNonNull(codec, "codec");
         this.eventBuilder = Objects.requireNonNull(eventBuilder, "eventBuilder");
-        this.transformer = Objects.requireNonNull(transformer, "transformer");
+        this.frameProcessor = Objects.requireNonNull(frameProcessor, "transformer");
     }
 
     /**
      * Creates a new input stream decoder factory.
      *
-     * @param operation   The input operation for the factory
-     * @param codec       The protocol codec to decode the payload
-     * @param transformer The frame transformer
-     * @param <IE>        The output event type
+     * @param operation      The input operation for the factory
+     * @param codec          The protocol codec to decode the payload
+     * @param frameProcessor The frame frameProcessor
+     * @param <IE>           The output event type
      * @return A new event decoder factory
      */
     public static <IE extends SerializableStruct> AwsEventDecoderFactory<IE, ?> forInputStream(
             InputEventStreamingApiOperation<?, ?, IE> operation,
             Codec codec,
-            FrameTransformer<AwsEventFrame> transformer
+            FrameProcessor<AwsEventFrame> frameProcessor
     ) {
         return new AwsEventDecoderFactory<>(
                 InitialEventType.INITIAL_REQUEST,
@@ -71,22 +71,22 @@ public final class AwsEventDecoderFactory<E extends SerializableStruct, IR exten
                 operation.inputStreamMember(),
                 codec,
                 operation.inputEventBuilderSupplier(),
-                transformer);
+                frameProcessor);
     }
 
     /**
      * Creates a new output stream decoder factory.
      *
-     * @param operation   The output operation for the factory
-     * @param codec       The protocol codec to decode the payload
-     * @param transformer The frame transformer
-     * @param <OE>        The output event type
+     * @param operation      The output operation for the factory
+     * @param codec          The protocol codec to decode the payload
+     * @param frameProcessor The frame frameProcessor
+     * @param <OE>           The output event type
      * @return A new event decoder factory
      */
     public static <OE extends SerializableStruct> AwsEventDecoderFactory<OE, ?> forOutputStream(
             OutputEventStreamingApiOperation<?, ?, OE> operation,
             Codec codec,
-            FrameTransformer<AwsEventFrame> transformer
+            FrameProcessor<AwsEventFrame> frameProcessor
     ) {
         return new AwsEventDecoderFactory<>(
                 InitialEventType.INITIAL_RESPONSE,
@@ -94,7 +94,7 @@ public final class AwsEventDecoderFactory<E extends SerializableStruct, IR exten
                 operation.outputStreamMember(),
                 codec,
                 operation.outputEventBuilderSupplier(),
-                transformer);
+                frameProcessor);
     }
 
     @Override
@@ -104,6 +104,6 @@ public final class AwsEventDecoderFactory<E extends SerializableStruct, IR exten
 
     @Override
     public FrameDecoder<AwsEventFrame> newFrameDecoder() {
-        return new AwsFrameDecoder(transformer);
+        return new AwsFrameDecoder(frameProcessor);
     }
 }

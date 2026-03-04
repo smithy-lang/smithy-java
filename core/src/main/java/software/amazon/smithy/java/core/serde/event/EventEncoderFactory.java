@@ -33,4 +33,11 @@ public interface EventEncoderFactory<F extends Frame<?>> {
      */
     String contentType();
 
+    /**
+     * Returns a new factory configured with the given frameProcessor.
+     *
+     * @param frameProcessor the frameProcessor for the factory
+     * @return a new factory configured with the given frameProcessor.
+     */
+    EventEncoderFactory<F> withFrameProcessor(FrameProcessor<F> frameProcessor);
 }

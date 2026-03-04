@@ -53,6 +53,7 @@ class DefaultEventStreamReaderTest {
         var writer = new DefaultEventStreamWriter<TestMessage.TestEvent, TestMessage.TestEvent,
                 TestMessage.TestFrame>();
         writer.bootstrap(new TestMessage.TestEventEncoderFactory(), null);
+        writer.setSigner(FrameProcessor.identity());
         return writer;
     }
 }

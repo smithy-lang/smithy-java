@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.client;
 
+import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
@@ -52,8 +53,9 @@ public final class TestAuthScheme implements AuthScheme<HttpRequest, Identity> {
 
     private static final class TestSigner implements Signer<HttpRequest, Identity> {
         @Override
-        public HttpRequest sign(HttpRequest request, Identity identity, Context properties) {
-            return request.toBuilder().withAddedHeader(SIGNATURE_HEADER, "smithy-test-signature").build();
+        public SignResult<HttpRequest> sign(HttpRequest request, Identity identity, Context properties) {
+            return new SignResult<>(
+                    request.toBuilder().withAddedHeader(SIGNATURE_HEADER, "smithy-test-signature").build());
         }
     }
 

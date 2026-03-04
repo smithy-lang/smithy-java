@@ -27,7 +27,7 @@ public class HttpBearerAuthSignerTest {
                 .uri(URI.create("https://www.example.com"))
                 .build();
 
-        var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, Context.empty());
+        var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, Context.empty()).signedRequest();
         var authHeader = signedRequest.headers().firstValue("authorization");
         assertEquals(authHeader, "Bearer token");
     }
@@ -43,7 +43,7 @@ public class HttpBearerAuthSignerTest {
                 .build();
 
         var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, Context.empty());
-        var authHeader = signedRequest.headers().firstValue("authorization");
+        var authHeader = signedRequest.signedRequest().headers().firstValue("authorization");
         assertEquals(authHeader, "Bearer token");
     }
 }

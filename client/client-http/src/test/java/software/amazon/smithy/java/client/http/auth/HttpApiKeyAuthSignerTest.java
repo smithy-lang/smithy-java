@@ -31,7 +31,8 @@ public class HttpApiKeyAuthSignerTest {
         authProperties.put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.HEADER);
         authProperties.put(HttpApiKeyAuthScheme.NAME, "x-api-key");
 
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties);
+        var signedRequest =
+                HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties).signedRequest();
         var authHeader = signedRequest.headers().firstValue("x-api-key");
         assertEquals(authHeader, API_KEY);
     }
@@ -43,7 +44,8 @@ public class HttpApiKeyAuthSignerTest {
         authProperties.put(HttpApiKeyAuthScheme.NAME, "x-api-key");
         authProperties.put(HttpApiKeyAuthScheme.SCHEME, "SCHEME");
 
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties);
+        var signedRequest =
+                HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties).signedRequest();
         var authHeader = signedRequest.headers().firstValue("x-api-key");
         assertEquals(authHeader, "SCHEME " + API_KEY);
     }
@@ -56,7 +58,8 @@ public class HttpApiKeyAuthSignerTest {
         authProperties.put(HttpApiKeyAuthScheme.SCHEME, "SCHEME");
 
         var updateRequest = TEST_REQUEST.toBuilder().withAddedHeader("x-api-key", "foo").build();
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updateRequest, TEST_IDENTITY, authProperties);
+        var signedRequest =
+                HttpApiKeyAuthSigner.INSTANCE.sign(updateRequest, TEST_IDENTITY, authProperties).signedRequest();
         var authHeader = signedRequest.headers().firstValue("x-api-key");
         assertEquals(authHeader, "SCHEME " + API_KEY);
     }
@@ -67,7 +70,8 @@ public class HttpApiKeyAuthSignerTest {
         authProperties.put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.QUERY);
         authProperties.put(HttpApiKeyAuthScheme.NAME, "apiKey");
 
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties);
+        var signedRequest =
+                HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties).signedRequest();
         var queryParam = signedRequest.uri().getQuery();
         assertNotNull(queryParam);
         assertEquals(queryParam, "apiKey=my-api-key");
@@ -80,7 +84,8 @@ public class HttpApiKeyAuthSignerTest {
         authProperties.put(HttpApiKeyAuthScheme.NAME, "apiKey");
         authProperties.put(HttpApiKeyAuthScheme.SCHEME, "SCHEME");
 
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties);
+        var signedRequest =
+                HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties).signedRequest();
         var queryParam = signedRequest.uri().getQuery();
         assertNotNull(queryParam);
         assertEquals(queryParam, "apiKey=my-api-key");
@@ -94,7 +99,8 @@ public class HttpApiKeyAuthSignerTest {
 
         var updatedRequest = TEST_REQUEST.toBuilder().uri(URI.create("https://www.example.com?x=1")).build();
 
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties);
+        var signedRequest =
+                HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties).signedRequest();
         var queryParam = signedRequest.uri().getQuery();
         assertNotNull(queryParam);
         assertEquals(queryParam, "x=1&apiKey=my-api-key");
@@ -108,7 +114,8 @@ public class HttpApiKeyAuthSignerTest {
 
         var updatedRequest = TEST_REQUEST.toBuilder().uri(URI.create("https://www.example.com?x=1&apiKey=foo")).build();
 
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties);
+        var signedRequest =
+                HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties).signedRequest();
         var queryParam = signedRequest.uri().getQuery();
         assertNotNull(queryParam);
         assertEquals(queryParam, "x=1&apiKey=my-api-key");

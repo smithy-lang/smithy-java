@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
@@ -86,7 +87,7 @@ class HttpMcpProxyTest {
                     var h = r.headers().toModifiable();
                     headers.forEach(h::setHeader);
                     r.setHeaders(h);
-                    return r;
+                    return new SignResult<>(r);
                 })
                 .build();
 
@@ -104,7 +105,7 @@ class HttpMcpProxyTest {
                     var h = r.headers().toModifiable();
                     h.setHeader("X-Request-Count", String.valueOf(++counter[0]));
                     r.setHeaders(h);
-                    return r;
+                    return new SignResult<>(r);
                 })
                 .build();
 

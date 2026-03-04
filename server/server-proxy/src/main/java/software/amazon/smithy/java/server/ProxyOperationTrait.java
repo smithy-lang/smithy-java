@@ -27,12 +27,12 @@ import software.amazon.smithy.model.traits.Trait;
  * <h3>Additional Input Access</h3>
  * <p>The additional input data can be accessed in Dynamic client interceptors 
  * using the {@code ProxyService.PROXY_INPUT} context key. This enables 
- * interceptors to process the extra data before the request is forwarded 
+ * interceptors to process the extra data before the request is forwarded
  * to the delegate service.</p>
  * 
  * <h3>Input Stripping</h3>
  * <p>The proxy service automatically strips out the additional input before 
- * sending the request to the delegate service, ensuring that only the 
+ * sending the request to the delegate service, ensuring that only the
  * expected input parameters are forwarded to the original operation.</p>
  * 
  * @see ProxyService#PROXY_INPUT

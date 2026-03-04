@@ -58,6 +58,7 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends
 
     private E decodeEvent(AwsEventFrame frame) {
         var message = frame.unwrap();
+        // TODO Add support for :message-type other than "event".
         var eventType = getEventType(message);
         var memberSchema = eventSchema.member(eventType);
         if (memberSchema == null) {
@@ -97,6 +98,10 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends
             }
         }
         throw new IllegalArgumentException("cannot find streaming member");
+    }
+
+    private String getMessageType(Message message) {
+        return message.getHeaders().get(":message-type").getString();
     }
 
     private String getEventType(Message message) {

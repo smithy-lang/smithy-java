@@ -20,6 +20,8 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
+import software.amazon.smithy.java.core.serde.event.Frame;
+import software.amazon.smithy.java.core.serde.event.ProtocolEventStreamWriter;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.retries.api.RetryStrategy;
 import software.amazon.smithy.java.retries.api.RetryToken;
@@ -37,13 +39,14 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
     final I input;
     final EndpointResolver endpointResolver;
     final ApiOperation<I, O> operation;
+
     final Context context;
     final TypeRegistry typeRegistry;
     final ClientInterceptor interceptor;
     final AuthSchemeResolver authSchemeResolver;
     final Map<ShapeId, AuthScheme<?, ?>> supportedAuthSchemes;
     final IdentityResolvers identityResolvers;
-
+    final ProtocolEventStreamWriter<SerializableStruct, SerializableStruct, Frame<?>> writer;
     final RetryStrategy retryStrategy;
     final String retryScope;
     RetryToken retryToken;
@@ -52,6 +55,7 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
     private ClientCall(Builder<I, O> builder) {
         input = Objects.requireNonNull(builder.input, "input is null");
         operation = Objects.requireNonNull(builder.operation, "operation is null");
+        writer = builder.writer;
         context = Objects.requireNonNull(builder.context, "context is null");
         typeRegistry = Objects.requireNonNull(builder.typeRegistry, "typeRegistry is null");
         endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
@@ -94,6 +98,7 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
         I input;
         EndpointResolver endpointResolver;
         ApiOperation<I, O> operation;
+        ProtocolEventStreamWriter<SerializableStruct, SerializableStruct, Frame<?>> writer;
         Context context;
         TypeRegistry typeRegistry;
         ClientInterceptor interceptor;

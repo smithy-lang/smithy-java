@@ -88,7 +88,9 @@ public class AmzSdkRequestPluginTest {
 
         var requests = mock.getRequests();
         assertThat(requests, hasSize(2));
-        assertThat(requests.get(0).request().headers().firstValue("amz-sdk-request"), equalTo("attempt=1; max=3"));
-        assertThat(requests.get(1).request().headers().firstValue("amz-sdk-request"), equalTo("attempt=2; max=3"));
+        assertThat(requests.get(0).request().headers().firstValue("amz-sdk-request"),
+                equalTo("attempt=1; max=3"));
+        assertThat(requests.get(1).request().headers().firstValue("amz-sdk-request"),
+                equalTo("attempt=2; max=3"));
     }
 }

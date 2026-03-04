@@ -11,6 +11,8 @@ import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.auth.api.identity.TokenIdentity;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.core.serde.event.Frame;
+import software.amazon.smithy.java.core.serde.event.FrameProcessor;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -21,7 +23,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
  *     <li>An identity resolver - An API that can be queried to acquire the customer's identity.</li>
  *     <li>A signer - An API that can be used to sign requests.</li>
  * </ol>
- *
+ * <p>
  * See example auth schemes defined <a href="https://smithy.io/2.0/spec/authentication-traits.html">here</a>.
  *
  * @param <IdentityT> The {@link Identity} used by this authentication scheme.
@@ -96,15 +98,32 @@ public interface AuthScheme<RequestT, IdentityT extends Identity> {
     Signer<RequestT, IdentityT> signer();
 
     /**
+     * Creates a signer used to sign event stream frames.
+     *
+     * @param identity      the identity used to sign
+     * @param context       the singer context
+     * @param seedSignature the seed signature
+     * @param <F>           the type of the frame
+     * @return the auth-scheme event signer
+     */
+    default <F extends Frame<?>> FrameProcessor<F> eventSigner(
+            IdentityT identity,
+            Context context,
+            String seedSignature
+    ) {
+        return FrameProcessor.identity();
+    }
+
+    /**
      * Create a simple AuthScheme.
      *
      * @param schemeId      Auth scheme shape ID.
      * @param requestClass  Request class supported by the auth scheme.
      * @param identityClass Identity class supported by the auth scheme.
      * @param signer        Signed used with this auth scheme.
+     * @param <RequestT>    Request type.
+     * @param <IdentityT>   Identity type.
      * @return the created AuthScheme.
-     * @param <RequestT> Request type.
-     * @param <IdentityT> Identity type.
      */
     static <RequestT, IdentityT extends Identity> AuthScheme<RequestT, IdentityT> of(
             ShapeId schemeId,

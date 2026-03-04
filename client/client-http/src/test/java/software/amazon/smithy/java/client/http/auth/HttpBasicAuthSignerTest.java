@@ -33,7 +33,7 @@ public class HttpBasicAuthSignerTest {
 
         var expectedHeader = "Basic " + Base64.getEncoder()
                 .encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, Context.empty());
+        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, Context.empty()).signedRequest();
         var authHeader = signedRequest.headers().firstValue("authorization");
         assertEquals(authHeader, expectedHeader);
     }
@@ -52,7 +52,7 @@ public class HttpBasicAuthSignerTest {
 
         var expectedHeader = "Basic " + Base64.getEncoder()
                 .encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, Context.empty());
+        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, Context.empty()).signedRequest();
         var authHeader = signedRequest.headers().firstValue("authorization");
         assertEquals(authHeader, expectedHeader);
     }

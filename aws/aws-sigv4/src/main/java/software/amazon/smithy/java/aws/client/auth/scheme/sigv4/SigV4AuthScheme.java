@@ -8,9 +8,11 @@ package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.aws.events.AwsEventFrame;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeFactory;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.core.serde.event.FrameProcessor;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -70,6 +72,16 @@ public final class SigV4AuthScheme implements AuthScheme<HttpRequest, AwsCredent
     @Override
     public Signer<HttpRequest, AwsCredentialsIdentity> signer() {
         return SigV4Signer.create();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public FrameProcessor<AwsEventFrame> eventSigner(
+            AwsCredentialsIdentity identity,
+            Context context,
+            String seedSignature
+    ) {
+        return new SigV4EventSigner(identity, context, seedSignature);
     }
 
     public static final class Factory implements AuthSchemeFactory<SigV4Trait> {

@@ -30,7 +30,7 @@ final class NullSigner implements Signer {
      * @return the request as-is.
      */
     @Override
-    public Object sign(Object request, Identity identity, Context properties) {
-        return request;
+    public SignResult<Object> sign(Object request, Identity identity, Context properties) {
+        return new SignResult<>(request);
     }
 }

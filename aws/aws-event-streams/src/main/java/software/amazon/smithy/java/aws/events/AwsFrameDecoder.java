@@ -10,14 +10,14 @@ import java.util.ArrayList;
 import java.util.List;
 import software.amazon.eventstream.MessageDecoder;
 import software.amazon.smithy.java.core.serde.event.FrameDecoder;
-import software.amazon.smithy.java.core.serde.event.FrameTransformer;
+import software.amazon.smithy.java.core.serde.event.FrameProcessor;
 
 public final class AwsFrameDecoder implements FrameDecoder<AwsEventFrame> {
     private final MessageDecoder decoder = new MessageDecoder();
-    private final FrameTransformer<AwsEventFrame> transformer;
+    private final FrameProcessor<AwsEventFrame> frameProcessor;
 
-    public AwsFrameDecoder(FrameTransformer<AwsEventFrame> transformer) {
-        this.transformer = transformer;
+    public AwsFrameDecoder(FrameProcessor<AwsEventFrame> frameProcessor) {
+        this.frameProcessor = frameProcessor;
     }
 
     @Override
@@ -27,7 +27,7 @@ public final class AwsFrameDecoder implements FrameDecoder<AwsEventFrame> {
         var result = new ArrayList<AwsEventFrame>(messages.size());
         for (var message : messages) {
             var event = new AwsEventFrame(message);
-            var transformed = transformer.apply(event);
+            var transformed = frameProcessor.transformFrame(event);
             if (transformed != null) {
                 result.add(transformed);
             }

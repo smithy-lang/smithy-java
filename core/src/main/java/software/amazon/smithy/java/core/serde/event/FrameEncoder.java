@@ -13,6 +13,7 @@ import java.nio.ByteBuffer;
 public interface FrameEncoder<F extends Frame<?>> {
     /**
      * Encode a frame into a buffer
+     *
      * @param frame the frame to encode.
      * @return a bytebuffer with the encoded frame's bytes
      */

@@ -13,7 +13,13 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.smithy.java.aws.client.auth.scheme.sigv4.SigV4AuthScheme;
+import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
+import software.amazon.smithy.java.aws.sdkv2.auth.SdkCredentialsResolver;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
+import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.rpcv2.RpcV2CborProtocol;
 import software.amazon.smithy.java.core.serde.event.EventStream;
@@ -33,10 +39,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 // TODO: Update the test to create and run the server in setup before the test
-@Disabled("This test requires manually running a server locally and then verifies client behavior against it.")
+//@Disabled("This test requires manually running a server locally and then verifies client behavior against it.")
 public class EventStreamTest {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(EventStreamTest.class);
+
     @ParameterizedTest
     @MethodSource("clients")
     public void fizzBuzz(FizzBuzzServiceClient client) {
@@ -75,7 +82,7 @@ public class EventStreamTest {
                     break;
                 case FizzBuzzStream.BuzzMember(var buzz):
                     value = buzz.getValue();
-                    LOGGER.info("received buzz: {}",  value);
+                    LOGGER.info("received buzz: {}", value);
                     assertEquals(0, value % 5);
                     if (value % 3 == 0) {
                         assertTrue(unbuzzed.remove(value), "No fizz for " + value);
@@ -91,16 +98,23 @@ public class EventStreamTest {
     }
 
     public static List<FizzBuzzServiceClient> clients() {
+        var credentials = AwsBasicCredentials.create("1REF0RPQBH0B9Q5T83R2", "ba1VyImxA8GbypNix6E1g1ar1ziwVsg2RxMo9sj8");
         return List.of(
+                /*
                 FizzBuzzServiceClient.builder()
                         .endpointResolver(EndpointResolver.staticHost("http://localhost:8080"))
                         .build(),
+                 */
                 FizzBuzzServiceClient.builder()
                         .protocol(new RpcV2CborProtocol.Factory()
                                 .createProtocol(ProtocolSettings.builder()
                                         .service(ShapeId.from("smithy.example#TickService"))
                                         .build(), Rpcv2CborTrait.builder().build()))
-                        .endpointResolver(EndpointResolver.staticHost("http://localhost:8000"))
+                        .endpointResolver(EndpointResolver.staticHost("http://localhost:8443"))
+                        .putSupportedAuthSchemes(new SigV4AuthScheme("tickservice"))
+                        .authSchemeResolver(AuthSchemeResolver.DEFAULT)
+                        .putConfig(RegionSetting.REGION, "us-west-2")
+                        .addIdentityResolver(new SdkCredentialsResolver(StaticCredentialsProvider.create(credentials)))
                         .build()
 
         );

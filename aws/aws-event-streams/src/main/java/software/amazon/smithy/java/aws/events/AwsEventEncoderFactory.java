@@ -15,7 +15,7 @@ import software.amazon.smithy.java.core.serde.event.EventEncoder;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
 import software.amazon.smithy.java.core.serde.event.FrameEncoder;
-import software.amazon.smithy.java.core.serde.event.FrameTransformer;
+import software.amazon.smithy.java.core.serde.event.FrameProcessor;
 
 /**
  * A {@link EventEncoderFactory} for AWS events.
@@ -25,7 +25,7 @@ public final class AwsEventEncoderFactory implements EventEncoderFactory<AwsEven
     private final Schema schema;
     private final Codec codec;
     private final String payloadMediaType;
-    private final FrameTransformer<AwsEventFrame> transformer;
+    private final FrameProcessor<AwsEventFrame> frameProcessor;
     private final Function<Throwable, EventStreamingException> exceptionHandler;
 
     private AwsEventEncoderFactory(
@@ -33,14 +33,14 @@ public final class AwsEventEncoderFactory implements EventEncoderFactory<AwsEven
             Schema schema,
             Codec codec,
             String payloadMediaType,
-            FrameTransformer<AwsEventFrame> transformer,
+            FrameProcessor<AwsEventFrame> frameProcessor,
             Function<Throwable, EventStreamingException> exceptionHandler
     ) {
         this.initialEventType = Objects.requireNonNull(initialEventType, "initialEventType");
         this.schema = Objects.requireNonNull(schema, "schema").isMember() ? schema.memberTarget() : schema;
         this.codec = Objects.requireNonNull(codec, "codec");
         this.payloadMediaType = Objects.requireNonNull(payloadMediaType, "payloadMediaType");
-        this.transformer = Objects.requireNonNull(transformer, "transformer");
+        this.frameProcessor = Objects.requireNonNull(frameProcessor, "frameProcessor");
         this.exceptionHandler = Objects.requireNonNull(exceptionHandler, "exceptionHandler");
     }
 
@@ -57,7 +57,7 @@ public final class AwsEventEncoderFactory implements EventEncoderFactory<AwsEven
             InputEventStreamingApiOperation<?, ?, ?> operation,
             Codec codec,
             String payloadMediaType,
-            FrameTransformer<AwsEventFrame> transformer,
+            FrameProcessor<AwsEventFrame> transformer,
             Function<Throwable, EventStreamingException> exceptionHandler
     ) {
         return new AwsEventEncoderFactory(InitialEventType.INITIAL_REQUEST,
@@ -81,7 +81,7 @@ public final class AwsEventEncoderFactory implements EventEncoderFactory<AwsEven
             OutputEventStreamingApiOperation<?, ?, ?> operation,
             Codec codec,
             String payloadMediaType,
-            FrameTransformer<AwsEventFrame> transformer,
+            FrameProcessor<AwsEventFrame> transformer,
             Function<Throwable, EventStreamingException> exceptionHandler
     ) {
         return new AwsEventEncoderFactory(InitialEventType.INITIAL_RESPONSE,
@@ -98,7 +98,7 @@ public final class AwsEventEncoderFactory implements EventEncoderFactory<AwsEven
                 schema,
                 codec,
                 payloadMediaType,
-                transformer,
+                frameProcessor,
                 exceptionHandler);
     }
 
@@ -110,5 +110,15 @@ public final class AwsEventEncoderFactory implements EventEncoderFactory<AwsEven
     @Override
     public String contentType() {
         return "application/vnd.amazon.eventstream";
+    }
+
+    @Override
+    public EventEncoderFactory<AwsEventFrame> withFrameProcessor(FrameProcessor<AwsEventFrame> frameProcessor) {
+        return new AwsEventEncoderFactory(initialEventType,
+                schema,
+                codec,
+                payloadMediaType,
+                frameProcessor,
+                exceptionHandler);
     }
 }

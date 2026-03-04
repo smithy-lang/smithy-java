@@ -47,6 +47,8 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
      */
     private final EventPipeStream pipeStream;
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    private EventEncoderFactory<F> encoderFactory;
+    private IE initialEvent;
     private EventEncoder<F> eventEncoder;
     private FrameEncoder<F> frameEncoder;
     private volatile Throwable lastError;
@@ -94,7 +96,14 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
         if (readyLatch.getCount() == 0) {
             throw new IllegalStateException("bootstrap has been already called");
         }
-        setEventStreamEncodingFactory(Objects.requireNonNull(encoderFactory, "encoderFactory"));
+        this.encoderFactory = encoderFactory;
+        this.initialEvent = initialEvent;
+    }
+
+    @Override
+    public void setSigner(FrameProcessor<F> eventSigner) {
+        this.encoderFactory = encoderFactory.withFrameProcessor(eventSigner);
+        setEventStreamEncodingFactory();
         writeInitialEvent(initialEvent);
     }
 
@@ -115,19 +124,20 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
         } finally {
             // Always count down, even if write fails, to unblock waiting threads
             readyLatch.countDown();
+            // allow initial event to be garbage collected.
+            initialEvent = null;
         }
     }
 
     /**
-     * Sets the event encoder factory used to get the event and frame encoders used
+     * Sets the event encoders from the factory used to get the event and frame encoders used
      * for encoding the events.
-     *
-     * @param factory the event encoder factory
      */
-    private void setEventStreamEncodingFactory(EventEncoderFactory<F> factory) {
-        Objects.requireNonNull(factory, "eventEncoderFactory");
-        this.eventEncoder = factory.newEventEncoder();
-        this.frameEncoder = factory.newFrameEncoder();
+    private void setEventStreamEncodingFactory() {
+        this.eventEncoder = encoderFactory.newEventEncoder();
+        this.frameEncoder = encoderFactory.newFrameEncoder();
+        // No need to hold on to the reference, allow it to be garbage collected
+        this.encoderFactory = null;
     }
 
     /**
@@ -190,6 +200,14 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
+            // Check if the event encoder requires to send a closing frame, and if so encode it and send
+            // it before closing the stream. The closing frame is defined by the protocol and/or the
+            // auth scheme used to sign the frames, e.g., SigV4 requires to send an empty trailing frame.
+            var frame = eventEncoder.closingFrame();
+            if (frame != null) {
+                var encoded = frameEncoder.encode(frame);
+                pipeStream.write(encoded);
+            }
             pipeStream.complete();
         }
     }

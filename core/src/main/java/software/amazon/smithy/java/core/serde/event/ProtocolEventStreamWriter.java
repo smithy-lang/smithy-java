@@ -16,6 +16,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  *
  * @param <T>  The event type
  * @param <IE> The initial event type
+ *             // ProtocolEventStreamWriter
  */
 public sealed interface ProtocolEventStreamWriter<T extends SerializableStruct, IE extends SerializableStruct,
         F extends Frame<?>> extends EventStreamWriter<T> permits DefaultEventStreamWriter {
@@ -37,9 +38,16 @@ public sealed interface ProtocolEventStreamWriter<T extends SerializableStruct, 
      * Writes will be blocked until this method is called.
      *
      * @param encoderFactory the event encoder factory to serialize events and encode to frames.
-     * @param initialEvent the initial event, can be null if the protocol does not send the initial event in the stream
+     * @param initialEvent   the initial event, can be null if the protocol does not send the initial event in the stream
      */
     void bootstrap(EventEncoderFactory<F> encoderFactory, IE initialEvent);
+
+    /**
+     * Sets the signer to sign events in the stream
+     *
+     * @param eventSigner the signer to sign events in the stream
+     */
+    void setSigner(FrameProcessor<F> eventSigner);
 
     /**
      * Utility method to convert a {@link EventStreamWriter} to a {@link ProtocolEventStreamWriter}.

@@ -24,7 +24,7 @@ public interface Signer<RequestT, IdentityT extends Identity> extends AutoClosea
      * @param properties Signing properties.
      * @return the signed request.
      */
-    RequestT sign(RequestT request, IdentityT identity, Context properties);
+    SignResult<RequestT> sign(RequestT request, IdentityT identity, Context properties);
 
     @SuppressWarnings("unchecked")
     static <RequestT, IdentityT extends Identity> Signer<RequestT, IdentityT> nullSigner() {

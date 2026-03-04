@@ -16,6 +16,10 @@ dependencies {
     // Test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation(project(":aws:aws-sigv4"))
+    testImplementation(project(":aws:sdkv2:aws-sdkv2-auth"))
+    testImplementation(libs.aws.sdk.auth)
+    testImplementation(libs.opentelemetry.test.api)
 }
 
 // Add generated Java sources to the main sourceset

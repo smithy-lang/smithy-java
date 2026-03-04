@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.client.http.auth;
 
+import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.LoginIdentity;
 import software.amazon.smithy.java.context.Context;
@@ -19,7 +20,7 @@ final class HttpDigestAuthSigner implements Signer<HttpRequest, LoginIdentity> {
     private HttpDigestAuthSigner() {}
 
     @Override
-    public HttpRequest sign(HttpRequest request, LoginIdentity identity, Context properties) {
+    public SignResult<HttpRequest> sign(HttpRequest request, LoginIdentity identity, Context properties) {
         throw new UnsupportedOperationException();
     }
 }
