@@ -16,6 +16,10 @@ dependencies {
     testRuntimeOnly(libs.jackson.core)
 }
 
+configurations {
+    shadow.get().extendsFrom(api.get())
+}
+
 tasks {
     shadowJar {
         archiveClassifier.set("")
@@ -44,9 +48,6 @@ configurePublishing {
 // Ensure sources and javadocs jars are included in shadow component
 afterEvaluate {
     val shadowComponent = components["shadow"] as AdhocComponentWithVariants
-
-    // Add API dependencies to shadowRuntimeElements so consumers get transitive deps
-    configurations["shadowRuntimeElements"].extendsFrom(configurations["api"])
 
     shadowComponent.addVariantsFromConfiguration(configurations.sourcesElements.get()) {
         mapToMavenScope("runtime")
