@@ -163,7 +163,7 @@ public final class SnippetGenerator {
                 return false;
             }
             try {
-                Base64.getDecoder().decode(value.getBytes(StandardCharsets.UTF_8));
+                Base64.getDecoder().decode(value);
                 return true;
             } catch (IllegalArgumentException e) {
                 return false;
