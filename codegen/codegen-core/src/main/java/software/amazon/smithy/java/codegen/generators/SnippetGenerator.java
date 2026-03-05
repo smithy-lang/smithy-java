@@ -11,7 +11,6 @@ import static software.amazon.smithy.java.core.serde.TimestampFormatter.Prelude.
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Base64;
