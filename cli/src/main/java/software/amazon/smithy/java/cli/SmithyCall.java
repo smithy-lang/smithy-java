@@ -284,7 +284,7 @@ final class SmithyCall implements Callable<Integer> {
                                 .profileName(auth.awsProfile);
                         builder.addIdentityResolver(new SdkCredentialsResolver(profileBuilder.build()));
                     } else {
-                        builder.addIdentityResolver(new EnvironmentVariableIdentityResolver());
+                        builder.addIdentityResolver(EnvironmentVariableIdentityResolver.INSTANCE);
                     }
                     break;
                 case "none":

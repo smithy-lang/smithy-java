@@ -27,6 +27,8 @@ import software.amazon.smithy.java.context.Context;
  * @see <a href="https://docs.oracle.com/javase/tutorial/essential/environment/sysprop.html">Java System Properties</a>
  */
 public final class SystemPropertiesIdentityResolver implements AwsCredentialsResolver {
+    public static final SystemPropertiesIdentityResolver INSTANCE = new SystemPropertiesIdentityResolver();
+
     private static final String ACCESS_KEY_PROPERTY = "aws.accessKeyId";
     private static final String SECRET_KEY_PROPERTY = "aws.secretAccessKey";
     private static final String SESSION_TOKEN_PROPERTY = "aws.sessionToken";

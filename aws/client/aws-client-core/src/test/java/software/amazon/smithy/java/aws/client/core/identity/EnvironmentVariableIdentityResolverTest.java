@@ -15,7 +15,7 @@ public class EnvironmentVariableIdentityResolverTest {
 
     @Test
     void resolverReturnsExpectedIdentity() {
-        var resolver = new EnvironmentVariableIdentityResolver();
+        var resolver = EnvironmentVariableIdentityResolver.INSTANCE;
         var value = resolver.resolveIdentity(Context.empty());
         var expected = AwsCredentialsIdentity.create(
                 "env_access_key",

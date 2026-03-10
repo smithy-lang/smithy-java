@@ -14,7 +14,7 @@ import software.amazon.smithy.java.context.Context;
 public class SystemPropertiesIdentityResolverTest {
     @Test
     void resolverReturnsExpectedIdentity() {
-        var resolver = new SystemPropertiesIdentityResolver();
+        var resolver = SystemPropertiesIdentityResolver.INSTANCE;
         var value = resolver.resolveIdentity(Context.empty());
         var expected = AwsCredentialsIdentity.create(
                 "property_access_key",

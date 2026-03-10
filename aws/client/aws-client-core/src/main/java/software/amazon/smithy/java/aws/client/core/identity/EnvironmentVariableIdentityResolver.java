@@ -25,6 +25,8 @@ import software.amazon.smithy.java.context.Context;
  * </dl>
  */
 public final class EnvironmentVariableIdentityResolver implements AwsCredentialsResolver {
+    public static final EnvironmentVariableIdentityResolver INSTANCE = new EnvironmentVariableIdentityResolver();
+
     private static final String ACCESS_KEY_PROPERTY = "AWS_ACCESS_KEY_ID";
     private static final String SECRET_KEY_PROPERTY = "AWS_SECRET_ACCESS_KEY";
     private static final String SESSION_TOKEN_PROPERTY = "AWS_SESSION_TOKEN";
