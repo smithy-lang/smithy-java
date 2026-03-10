@@ -25,6 +25,7 @@ import software.amazon.smithy.java.codegen.JavaSymbolProvider;
 import software.amazon.smithy.java.codegen.generators.EnumGenerator;
 import software.amazon.smithy.java.codegen.generators.ListGenerator;
 import software.amazon.smithy.java.codegen.generators.MapGenerator;
+import software.amazon.smithy.java.codegen.generators.MixinInterfaceGenerator;
 import software.amazon.smithy.java.codegen.generators.SchemaIndexGenerator;
 import software.amazon.smithy.java.codegen.generators.SchemasGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
@@ -33,6 +34,7 @@ import software.amazon.smithy.java.codegen.generators.UnionGenerator;
 import software.amazon.smithy.java.codegen.types.generators.TypeMappingGenerator;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.traits.MixinTrait;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
@@ -63,8 +65,13 @@ final class DirectedJavaTypeCodegen
     @Override
     public void generateStructure(GenerateStructureDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         if (!isSynthetic(directive.shape())) {
-            LOGGER.debug("Generating Java Class for structure: {}", directive.shape());
-            new StructureGenerator<>().accept(directive);
+            if (MixinTrait.isInterfaceMixin(directive.shape())) {
+                LOGGER.debug("Generating Java Interface for interface mixin: {}", directive.shape());
+                new MixinInterfaceGenerator<>().accept(directive);
+            } else {
+                LOGGER.debug("Generating Java Class for structure: {}", directive.shape());
+                new StructureGenerator<>().accept(directive);
+            }
         }
     }
 
