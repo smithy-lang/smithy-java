@@ -35,6 +35,7 @@ public final class SchemaBuilder {
     final TraitMap traits;
     final List<MemberSchemaBuilder> members;
     private Supplier<ShapeBuilder<?>> builderSupplier;
+    private Class<?> shapeClass;
     private Schema builtShape;
 
     SchemaBuilder(ShapeId id, ShapeType type, Trait... traits) {
@@ -83,6 +84,17 @@ public final class SchemaBuilder {
      */
     public SchemaBuilder builderSupplier(Supplier<ShapeBuilder<?>> builderSupplier) {
         this.builderSupplier = builderSupplier;
+        return this;
+    }
+
+    /**
+     * Sets the Java class associated with this schema's shape.
+     *
+     * @param shapeClass The class for this schema's shape.
+     * @return the builder.
+     */
+    public SchemaBuilder shapeClass(Class<?> shapeClass) {
+        this.shapeClass = shapeClass;
         return this;
     }
 
@@ -155,7 +167,8 @@ public final class SchemaBuilder {
                     Set.of(),
                     Set.of(),
                     builderSupplier,
-                    this);
+                    this,
+                    shapeClass);
         } else {
             builtShape = new RootSchema(
                     type,
@@ -164,7 +177,8 @@ public final class SchemaBuilder {
                     new ArrayList<>(members),
                     Set.of(),
                     Set.of(),
-                    builderSupplier);
+                    builderSupplier,
+                    shapeClass);
         }
 
         return builtShape;

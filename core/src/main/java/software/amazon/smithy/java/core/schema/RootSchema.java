@@ -49,9 +49,10 @@ final class RootSchema extends Schema {
             List<MemberSchemaBuilder> memberBuilders,
             Set<String> stringEnumValues,
             Set<Integer> intEnumValues,
-            Supplier<ShapeBuilder<?>> builderSupplier
+            Supplier<ShapeBuilder<?>> builderSupplier,
+            Class<?> shapeClass
     ) {
-        super(type, id, traits, memberBuilders, stringEnumValues, builderSupplier);
+        super(type, id, traits, memberBuilders, stringEnumValues, builderSupplier, shapeClass);
         this.stringEnumValues = Collections.unmodifiableSet(stringEnumValues);
         this.intEnumValues = Collections.unmodifiableSet(intEnumValues);
 
@@ -80,9 +81,21 @@ final class RootSchema extends Schema {
             TraitMap traits,
             List<MemberSchemaBuilder> memberBuilders,
             Set<String> stringEnumValues,
+            Set<Integer> intEnumValues,
+            Supplier<ShapeBuilder<?>> builderSupplier
+    ) {
+        this(type, id, traits, memberBuilders, stringEnumValues, intEnumValues, builderSupplier, null);
+    }
+
+    RootSchema(
+            ShapeType type,
+            ShapeId id,
+            TraitMap traits,
+            List<MemberSchemaBuilder> memberBuilders,
+            Set<String> stringEnumValues,
             Set<Integer> intEnumValues
     ) {
-        this(type, id, traits, memberBuilders, stringEnumValues, intEnumValues, null);
+        this(type, id, traits, memberBuilders, stringEnumValues, intEnumValues, null, null);
     }
 
     @Override

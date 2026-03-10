@@ -2,11 +2,12 @@
   "version": "1.0",
   "sources" : ["src/main/resources/software/amazon/smithy/java/example/server/mcp"],
   "plugins": {
-    "java-server-codegen": {
+    "java-codegen": {
       "service": "smithy.example.mcp#EmployeeService",
       "namespace": "software.amazon.smithy.java.example.server.mcp",
       "headerFile": "license.txt",
-      "runtimeTraits": ["smithy.api#documentation", "smithy.api#examples", "smithy.ai#prompts" ]
+      "runtimeTraits": ["smithy.api#documentation", "smithy.api#examples", "smithy.ai#prompts" ],
+      "modes": ["server"]
     }
   }
 }

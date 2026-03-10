@@ -10,7 +10,7 @@ extra["displayName"] = "Smithy :: Java :: Model Bundle"
 extra["moduleName"] = "software.amazon.smithy.java.modelbundle.api"
 
 dependencies {
-    smithyBuild(project(":codegen:plugins:types-codegen"))
+    smithyBuild(project(":codegen:codegen-plugin"))
 
     implementation(project(":core"))
     implementation(project(":logging"))
@@ -23,7 +23,7 @@ dependencies {
 }
 
 afterEvaluate {
-    val typePath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-type-codegen")
+    val typePath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen")
     sourceSets {
         main {
             java {

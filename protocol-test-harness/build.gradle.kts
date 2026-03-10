@@ -11,8 +11,7 @@ extra["moduleName"] = "software.amazon.smithy.java.protocoltests"
 
 dependencies {
     implementation(project(":logging"))
-    implementation(project(":codegen:plugins"))
-    implementation(project(":codegen:codegen-core"))
+    implementation(project(":codegen:codegen-plugin"))
     implementation(libs.smithy.codegen)
     implementation(project(":client:client-core"))
     implementation(libs.smithy.protocol.test.traits)

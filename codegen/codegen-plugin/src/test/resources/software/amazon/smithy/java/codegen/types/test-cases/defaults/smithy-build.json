@@ -1,0 +1,9 @@
+{
+  "version": "1.0",
+  "plugins": {
+    "java-codegen": {
+      "namespace": "software.amazon.smithy.java.example.defaults",
+      "modes": ["types"]
+    }
+  }
+}

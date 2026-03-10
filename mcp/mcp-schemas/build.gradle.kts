@@ -12,9 +12,10 @@ dependencies {
     api(project(":core"))
     api(libs.smithy.model)
     api(project(":server:server-api"))
+    api(project(":framework-errors"))
     api(project(":smithy-ai-traits"))
-    smithyBuild(project(":codegen:plugins:types-codegen"))
-    smithyBuild(project(":codegen:plugins:server-codegen"))
+    smithyBuild(project(":codegen:codegen-plugin"))
+    smithyBuild(project(":server:server-api"))
     smithyBuild(libs.smithy.traitcodegen)
 }
 
@@ -27,20 +28,17 @@ sourceSets {
 }
 
 afterEvaluate {
-    val typePath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-type-codegen")
-    val serverPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-server-codegen")
+    val codegenPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen")
     val traitsPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "trait-codegen")
     sourceSets {
         main {
             java {
-                srcDir(typePath)
-                srcDir(serverPath)
+                srcDir(codegenPath)
                 srcDir(traitsPath)
                 include("software/**")
             }
             resources {
-                srcDir(typePath)
-                srcDir(serverPath)
+                srcDir(codegenPath)
                 srcDir(traitsPath)
                 exclude("**/*.java")
                 exclude("META-INF/services/**") // Exclude original service files, use merged ones instead
@@ -71,8 +69,7 @@ val serviceFilesMerger =
             // Use hardcoded paths because of https://docs.gradle.org/8.14.3/userguide/configuration_cache.html#config_cache:requirements:disallowed_types
             val sourceServiceDirs =
                 listOf(
-                    File(projectDir, "build/smithyprojections/mcp-schemas/source/java-type-codegen/META-INF/services"),
-                    File(projectDir, "build/smithyprojections/mcp-schemas/source/java-server-codegen/META-INF/services"),
+                    File(projectDir, "build/smithyprojections/mcp-schemas/source/java-codegen/META-INF/services"),
                     File(projectDir, "build/smithyprojections/mcp-schemas/source/trait-codegen/META-INF/services"),
                 )
 

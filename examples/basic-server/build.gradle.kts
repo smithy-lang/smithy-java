@@ -7,7 +7,8 @@ plugins {
 dependencies {
     val smithyJavaVersion: String by project
 
-    smithyBuild("software.amazon.smithy.java:plugins:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:codegen-plugin:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:server-api:$smithyJavaVersion")
 
     implementation("software.amazon.smithy.java:server-netty:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-server-restjson:$smithyJavaVersion")
@@ -20,7 +21,7 @@ application {
 
 // Add generated Java files to the main sourceSet
 afterEvaluate {
-    val serverPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-server-codegen")
+    val serverPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen")
     sourceSets {
         main {
             java {

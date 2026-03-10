@@ -24,6 +24,46 @@ import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public class TestStructs {
+    public static class MockStruct implements SerializableStruct {
+        @Override
+        public Schema schema() {
+            return Schema.createString(ShapeId.from("smithy.api#String"));
+        }
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {}
+
+        @Override
+        public <T> T getMemberValue(Schema member) {
+            return null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static Operation<MockStruct, MockStruct> createMockOperation(String name) {
+        var apiOp = new TestApiOperation() {
+            @Override
+            public Schema schema() {
+                return Schema.createOperation(ShapeId.from("test.mock#" + name));
+            }
+
+            @Override
+            public Schema inputSchema() {
+                return Schema.createString(ShapeId.from("test.mock#" + name + "Input"));
+            }
+
+            @Override
+            public Schema outputSchema() {
+                return Schema.createString(ShapeId.from("test.mock#" + name + "Output"));
+            }
+        };
+        return Operation.of(
+                name,
+                (input, ctx) -> input,
+                apiOp,
+                null);
+    }
+
     public static abstract class TestInput implements SerializableStruct {
         @Override
         public Schema schema() {

@@ -1,14 +1,15 @@
 {
   "version": "1.0",
   "plugins": {
-    "java-client-codegen": {
+    "java-codegen": {
       "service": "smithy.example#PersonDirectory",
       "namespace": "software.amazon.smithy.java.example.restjson",
       "headerFile": "license.txt",
       "protocol": "aws.protocols#restJson1",
       "transport": {
         "http-java": {}
-      }
+      },
+      "modes": ["client"]
     }
   }
 }

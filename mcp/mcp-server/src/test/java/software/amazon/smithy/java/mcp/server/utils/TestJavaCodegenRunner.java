@@ -15,8 +15,9 @@ import java.nio.file.Paths;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.build.SmithyBuildPlugin;
-import software.amazon.smithy.java.codegen.server.JavaServerCodegenPlugin;
+import software.amazon.smithy.java.codegen.JavaCodegenPlugin;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.ObjectNode;
 
 /**
@@ -28,7 +29,7 @@ public final class TestJavaCodegenRunner {
     }
 
     public static void main(String[] args) {
-        SmithyBuildPlugin plugin = new JavaServerCodegenPlugin();
+        SmithyBuildPlugin plugin = new JavaCodegenPlugin();
         Model model = Model.assembler(TestJavaCodegenRunner.class.getClassLoader())
                 .discoverModels(TestJavaCodegenRunner.class.getClassLoader())
                 .assemble()
@@ -39,6 +40,7 @@ public final class TestJavaCodegenRunner {
                         ObjectNode.builder()
                                 .withMember("service", "smithy.java.mcp.test#TestService")
                                 .withMember("namespace", "software.amazon.smithy.java.mcp.test")
+                                .withMember("modes", ArrayNode.fromStrings("server"))
                                 .withMember("runtimeTraits",
                                         fromStrings("smithy.api#documentation",
                                                 "smithy.api#examples",

@@ -1,9 +1,10 @@
 {
   "version": "1.0",
   "plugins": {
-    "java-type-codegen": {
+    "java-codegen": {
       "namespace": "software.amazon.smithy.modelbundle.api",
-      "headerFile": "license.txt"
+      "headerFile": "license.txt",
+      "modes": ["types"]
     }
   }
 }

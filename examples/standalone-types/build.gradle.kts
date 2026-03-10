@@ -7,7 +7,7 @@ plugins {
 dependencies {
     val smithyJavaVersion: String by project
 
-    smithyBuild("software.amazon.smithy.java:plugins:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:codegen-plugin:$smithyJavaVersion")
     api("software.amazon.smithy.java:core:$smithyJavaVersion")
     api("software.amazon.smithy.java:framework-errors:$smithyJavaVersion")
 
@@ -18,7 +18,7 @@ dependencies {
 }
 
 afterEvaluate {
-    val typePath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-type-codegen")
+    val typePath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen")
     sourceSets {
         main {
             java {

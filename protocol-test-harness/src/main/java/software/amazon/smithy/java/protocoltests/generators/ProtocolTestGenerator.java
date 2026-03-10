@@ -10,9 +10,9 @@ import java.util.Objects;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.build.SmithyBuildPlugin;
-import software.amazon.smithy.java.codegen.client.JavaClientCodegenPlugin;
-import software.amazon.smithy.java.codegen.server.JavaServerCodegenPlugin;
+import software.amazon.smithy.java.codegen.JavaCodegenPlugin;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -21,11 +21,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 public final class ProtocolTestGenerator {
     public static void main(String[] args) {
         String mode = Objects.requireNonNull(System.getenv("mode"));
-        SmithyBuildPlugin plugin = switch (mode) {
-            case "client" -> new JavaClientCodegenPlugin();
-            case "server" -> new JavaServerCodegenPlugin();
-            default -> throw new IllegalStateException("Unknown mode '" + mode + "'. Expect 'client' or 'server'.");
-        };
+        SmithyBuildPlugin plugin = new JavaCodegenPlugin();
         Model model = Model.assembler(ProtocolTestGenerator.class.getClassLoader())
                 .discoverModels(ProtocolTestGenerator.class.getClassLoader())
                 .assemble()
@@ -37,6 +33,7 @@ public final class ProtocolTestGenerator {
                         ObjectNode.builder()
                                 .withMember("service", serviceId.toString())
                                 .withMember("namespace", serviceId.getNamespace())
+                                .withMember("modes", ArrayNode.fromStrings(mode))
                                 .build())
                 .model(model)
                 .build();
