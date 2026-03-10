@@ -10,6 +10,7 @@ extra["moduleName"] = "software.amazon.smithy.java.dynamicclient"
 dependencies {
     api(project(":dynamic-schemas"))
     api(project(":client:client-core"))
+    implementation(project(":logging"))
 
     testImplementation(project(":client:client-rulesengine"))
     testImplementation(project(":aws:client:aws-client-restjson"))
