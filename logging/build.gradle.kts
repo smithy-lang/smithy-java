@@ -28,7 +28,7 @@ val jclTestConfiguration: Configuration by configurations.creating {
 val log4j2 = "2.25.3"
 val slf4j = "2.0.17"
 val logBack = "1.5.32"
-val jcl = "1.3.5"
+val jcl = "1.3.6"
 
 dependencies {
     compileOnly("org.apache.logging.log4j:log4j-api:$log4j2")
