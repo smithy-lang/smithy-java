@@ -170,6 +170,21 @@ structure Echo {
     // Helper to make CircleWithNested reachable for schema generation
     circleWithNested: CircleWithNested
 
+    // Recursive @oneOf document (for testing cycle detection in schema generation)
+    recursiveTreeNode: TreeNode
+
+    // Helpers to make recursive @oneOf targets reachable for schema generation
+    recNodeA: RecNodeA
+    recNodeB: RecNodeB
+    recNodeC: RecNodeC
+    recNodeD: RecNodeD
+    recNodeE: RecNodeE
+    recNodeF: RecNodeF
+    recNodeG: RecNodeG
+    recNodeH: RecNodeH
+    recNodeI: RecNodeI
+    recNodeJ: RecNodeJ
+
     // Required field to test required validation
     @required
     requiredField: String
@@ -255,3 +270,29 @@ map ShapeWithOneOfMap {
     key: String
     value: ShapeWithOneOf
 }
+
+/// A recursive @oneOf document where multiple members cycle back, causing O(N!) schema blowup
+@oneOf(discriminator: "__type", members: [
+    {name: "nodeA", target: RecNodeA},
+    {name: "nodeB", target: RecNodeB},
+    {name: "nodeC", target: RecNodeC},
+    {name: "nodeD", target: RecNodeD},
+    {name: "nodeE", target: RecNodeE},
+    {name: "nodeF", target: RecNodeF},
+    {name: "nodeG", target: RecNodeG},
+    {name: "nodeH", target: RecNodeH},
+    {name: "nodeI", target: RecNodeI},
+    {name: "nodeJ", target: RecNodeJ}
+])
+document TreeNode
+
+structure RecNodeA { value: String, child: TreeNode }
+structure RecNodeB { value: String, child: TreeNode }
+structure RecNodeC { value: String, child: TreeNode }
+structure RecNodeD { value: String, child: TreeNode }
+structure RecNodeE { value: String, child: TreeNode }
+structure RecNodeF { value: String, child: TreeNode }
+structure RecNodeG { value: String, child: TreeNode }
+structure RecNodeH { value: String, child: TreeNode }
+structure RecNodeI { value: String, child: TreeNode }
+structure RecNodeJ { value: String, child: TreeNode }

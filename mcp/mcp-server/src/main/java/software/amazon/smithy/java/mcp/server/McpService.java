@@ -694,11 +694,16 @@ public final class McpService {
         }
     }
 
-    private JsonOneOfSchema createJsonOneOfSchema(
+    private SerializableShape createJsonOneOfSchema(
             OneOfTrait oneOfTrait,
             Schema documentMember,
             Set<ShapeId> visited
     ) {
+        var targetId = (documentMember.isMember() ? documentMember.memberTarget() : documentMember).id();
+        if (!visited.add(targetId)) {
+            return JsonObjectSchema.builder().build();
+        }
+
         var oneOfVariants = new ArrayList<Document>();
 
         for (var memberDef : oneOfTrait.getMembers()) {
@@ -711,6 +716,7 @@ public final class McpService {
             oneOfVariants.add(createUnionVariant(memberName, memberSchema));
         }
 
+        visited.remove(targetId);
         return JsonOneOfSchema.builder()
                 .oneOf(oneOfVariants)
                 .description(memberDescription(documentMember))

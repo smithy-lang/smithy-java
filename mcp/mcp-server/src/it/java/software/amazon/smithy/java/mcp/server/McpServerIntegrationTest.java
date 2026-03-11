@@ -2182,6 +2182,24 @@ class McpServerIntegrationTest {
         assertEquals(3, memberNames.size(), "Should have exactly 3 members");
     }
 
+    @Test
+    void testRecursiveOneOfSchemaTerminatesWithoutInfiniteLoop() {
+        initializeLatestProtocol();
+        var schemas = getMcpEchoToolSchemas();
+        var inputSchemaNode = schemas.inputSchema().getSchemaNode();
+
+        // The recursiveTreeNode field should exist and have a oneOf array
+        var treeNodeSchema = inputSchemaNode.path("properties")
+                .path("echo")
+                .path("properties")
+                .path("recursiveTreeNode");
+        assertFalse(treeNodeSchema.isMissingNode(), "recursiveTreeNode should be in the schema");
+
+        var oneOf = treeNodeSchema.path("oneOf");
+        assertFalse(oneOf.isMissingNode(), "recursiveTreeNode should have oneOf");
+        assertEquals(10, oneOf.size(), "Recursive @oneOf should have 10 variants");
+    }
+
     // ========== Helper Methods ==========
 
     private void initializeWithProtocolVersion(ProtocolVersion protocolVersion) {
