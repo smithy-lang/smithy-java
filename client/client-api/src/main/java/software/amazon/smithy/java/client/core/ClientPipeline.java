@@ -189,9 +189,11 @@ final class ClientPipeline<RequestT, ResponseT> {
         var identity = identityResult.unwrap();
         call.context.put(CallContext.IDENTITY, identity);
 
-        // TODO: what to do with supportedAuthSchemes of an endpoint?
         Endpoint endpoint = resolveEndpoint(call);
         call.context.put(CallContext.ENDPOINT, endpoint);
+
+        // Augment signer properties with endpoint auth scheme overrides if present.
+        resolvedAuthScheme = applyEndpointAuthSchemeOverrides(endpoint, resolvedAuthScheme);
 
         RequestT req = protocol.setServiceEndpoint(requestHook.request(), endpoint);
         var signResult = resolvedAuthScheme.sign(req);
@@ -309,6 +311,34 @@ final class ClientPipeline<RequestT, ResponseT> {
                 .context(Context.unmodifiableView(call.context))
                 .build();
         return call.endpointResolver.resolveEndpoint(request);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <IdentityT extends Identity> ResolvedScheme<IdentityT, RequestT> applyEndpointAuthSchemeOverrides(
+            Endpoint endpoint,
+            ResolvedScheme<IdentityT, RequestT> resolvedScheme
+    ) {
+        var endpointAuthSchemes = endpoint.authSchemes();
+        if (!endpointAuthSchemes.isEmpty()) {
+            var schemeId = resolvedScheme.authScheme().schemeId().toString();
+            for (var endpointAuthScheme : endpointAuthSchemes) {
+                if (schemeId.equals(endpointAuthScheme.authSchemeId())) {
+                    var overrides = endpointAuthScheme.properties();
+                    if (overrides.isEmpty()) {
+                        return resolvedScheme;
+                    }
+                    // Apply the found overrides for the auth scheme.
+                    var merged = Context.create();
+                    resolvedScheme.signerProperties().copyTo(merged);
+                    for (var key : overrides) {
+                        merged.put((Context.Key<Object>) key, endpointAuthScheme.property(key));
+                    }
+                    return new ResolvedScheme<>(merged, resolvedScheme.authScheme(), resolvedScheme.identity());
+                }
+            }
+        }
+
+        return resolvedScheme;
     }
 
     private <I extends SerializableStruct, O extends SerializableStruct> O deserialize(
