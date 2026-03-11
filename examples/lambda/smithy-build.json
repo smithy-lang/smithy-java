@@ -1,9 +1,10 @@
 {
   "version": "1.0",
   "plugins": {
-    "java-server-codegen": {
+    "java-codegen": {
       "service": "smithy.example#BeerService",
-      "namespace": "software.amazon.smithy.java.example.lambda"
+      "namespace": "software.amazon.smithy.java.example.lambda",
+      "modes": ["server"]
     }
   }
 }

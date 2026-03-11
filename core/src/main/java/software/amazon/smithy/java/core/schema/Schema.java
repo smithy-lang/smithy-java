@@ -64,6 +64,8 @@ public abstract sealed class Schema implements MemberLookup
 
     final Supplier<ShapeBuilder<?>> shapeBuilder;
 
+    final Class<?> shapeClass;
+
     private final int hash;
 
     Schema(
@@ -72,13 +74,15 @@ public abstract sealed class Schema implements MemberLookup
             TraitMap traits,
             List<MemberSchemaBuilder> members,
             Set<String> stringEnumValues,
-            Supplier<ShapeBuilder<?>> shapeBuilder
+            Supplier<ShapeBuilder<?>> shapeBuilder,
+            Class<?> shapeClass
     ) {
         this.type = type;
         this.id = id;
         this.traits = traits;
         this.memberName = null;
         this.shapeBuilder = shapeBuilder;
+        this.shapeClass = shapeClass;
 
         // Structure shapes need to sort members so that required members come before optional members.
         if (type == ShapeType.STRUCTURE) {
@@ -118,7 +122,7 @@ public abstract sealed class Schema implements MemberLookup
             List<MemberSchemaBuilder> members,
             Set<String> stringEnumValues
     ) {
-        this(type, id, traits, members, stringEnumValues, null);
+        this(type, id, traits, members, stringEnumValues, null, null);
     }
 
     Schema(MemberSchemaBuilder builder) {
@@ -129,6 +133,7 @@ public abstract sealed class Schema implements MemberLookup
         this.memberIndex = builder.memberIndex;
         this.isRequiredByValidation = builder.isRequiredByValidation;
         this.shapeBuilder = null;
+        this.shapeClass = null;
 
         this.minLengthConstraint = builder.validationState.minLengthConstraint();
         this.maxLengthConstraint = builder.validationState.maxLengthConstraint();
@@ -180,6 +185,18 @@ public abstract sealed class Schema implements MemberLookup
                 values);
     }
 
+    public static Schema createIntEnum(ShapeId id, Set<Integer> values, Class<?> shapeClass, Trait... traits) {
+        return new RootSchema(
+                ShapeType.INT_ENUM,
+                id,
+                TraitMap.create(traits),
+                Collections.emptyList(),
+                Collections.emptySet(),
+                values,
+                null,
+                shapeClass);
+    }
+
     public static Schema createLong(ShapeId id, Trait... traits) {
         return new RootSchema(ShapeType.LONG, id, TraitMap.create(traits));
     }
@@ -212,6 +229,18 @@ public abstract sealed class Schema implements MemberLookup
                 Collections.emptyList(),
                 values,
                 Collections.emptySet());
+    }
+
+    public static Schema createEnum(ShapeId id, Set<String> values, Class<?> shapeClass, Trait... traits) {
+        return new RootSchema(
+                ShapeType.ENUM,
+                id,
+                TraitMap.create(traits),
+                Collections.emptyList(),
+                values,
+                Collections.emptySet(),
+                null,
+                shapeClass);
     }
 
     public static Schema createBlob(ShapeId id, Trait... traits) {
@@ -481,11 +510,20 @@ public abstract sealed class Schema implements MemberLookup
      *
      * @return A new shape builder for this schema.
      */
-    public final ShapeBuilder<?> shapeBuilder() {
+    public final ShapeBuilder<? extends SerializableShape> shapeBuilder() {
         if (shapeBuilder == null) {
             throw new IllegalStateException("Schema does not have a shape builder");
         }
         return shapeBuilder.get();
+    }
+
+    /**
+     * Get the Java class associated with this schema, if any.
+     *
+     * @return the shape class, or null if not set.
+     */
+    public final Class<?> shapeClass() {
+        return shapeClass;
     }
 
     /**

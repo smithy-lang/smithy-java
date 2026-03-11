@@ -11,7 +11,7 @@ dependencies {
     implementation(project(":smithy-ai-traits"))
     
     // Standard Smithy dependencies
-    smithyBuild("software.amazon.smithy.java:plugins:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:codegen-plugin:$smithyJavaVersion")
     implementation("software.amazon.smithy:smithy-model:$smithyVersion")
 }
 

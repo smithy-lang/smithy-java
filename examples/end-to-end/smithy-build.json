@@ -1,17 +1,12 @@
 {
   "version": "1.0",
   "plugins": {
-    "java-client-codegen": {
+    "java-codegen": {
       "service": "com.example#CoffeeShop",
       "namespace": "software.amazon.smithy.java.example.etoe",
       "headerFile": "license.txt",
-      "protocol": "aws.protocols#restJson1"
-    },
-    "java-server-codegen": {
-      "service": "com.example#CoffeeShop",
-      "namespace": "software.amazon.smithy.java.example.etoe",
-      "headerFile": "license.txt",
-      "useExternalTypes": true
+      "protocol": "aws.protocols#restJson1",
+      "modes": ["client", "server"]
     }
   }
 }

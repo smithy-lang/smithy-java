@@ -23,7 +23,7 @@ dependencies {
     testRuntimeOnly(project(":aws:client:aws-client-awsjson"))
     testImplementation(project(":server:server-proxy"))
 
-    testImplementation(project(":codegen:plugins:server-codegen"))
+    testImplementation(project(":codegen:codegen-plugin"))
     testImplementation(libs.json.schema.validator)
 }
 

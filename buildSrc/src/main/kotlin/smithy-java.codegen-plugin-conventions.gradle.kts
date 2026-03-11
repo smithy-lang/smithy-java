@@ -13,9 +13,9 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":logging"))
 
-    // Avoid circular dependency in codegen core
-    if (project.name != "codegen-core") {
-        api(project(":codegen:codegen-core"))
+    // Avoid circular dependency in codegen plugin
+    if (project.name != "codegen-plugin") {
+        api(project(":codegen:codegen-plugin"))
     }
 }
 

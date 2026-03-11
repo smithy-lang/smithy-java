@@ -8,13 +8,13 @@ extra["displayName"] = "Smithy :: Java :: AWS MCP types"
 extra["moduleName"] = "software.amazon.smithy.java.awsmcp.types"
 
 dependencies {
-    smithyBuild(project(":codegen:plugins:types-codegen"))
+    smithyBuild(project(":codegen:codegen-plugin"))
     api(project(":core"))
     api(libs.smithy.model)
 }
 
 afterEvaluate {
-    val typePath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-type-codegen")
+    val typePath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen")
     sourceSets {
         main {
             java {

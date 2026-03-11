@@ -33,9 +33,10 @@ final class DeferredRootSchema extends Schema {
             Set<String> stringEnumValues,
             Set<Integer> intEnumValues,
             Supplier<ShapeBuilder<?>> builderSupplier,
-            SchemaBuilder schemaBuilder
+            SchemaBuilder schemaBuilder,
+            Class<?> shapeClass
     ) {
-        super(type, id, traits, memberBuilders, stringEnumValues, builderSupplier);
+        super(type, id, traits, memberBuilders, stringEnumValues, builderSupplier, shapeClass);
         this.stringEnumValues = Collections.unmodifiableSet(stringEnumValues);
         this.intEnumValues = Collections.unmodifiableSet(intEnumValues);
         this.memberBuilders = memberBuilders;

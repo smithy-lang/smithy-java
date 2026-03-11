@@ -9,6 +9,7 @@ extra["moduleName"] = "software.amazon.smithy.java.server.core"
 
 dependencies {
     api(project(":server:server-api"))
+    api(project(":framework-errors"))
     api(project(":http:http-api"))
     api(project(":core"))
     api(project(":context"))

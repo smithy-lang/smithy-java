@@ -21,10 +21,10 @@ import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeFactory;
+import software.amazon.smithy.java.codegen.CodegenMode;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaSymbolProvider;
-import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
-import software.amazon.smithy.java.codegen.server.ServiceJavaSymbolProvider;
+import software.amazon.smithy.java.codegen.ServerSymbolProperties;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -120,10 +120,11 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
             }
             case SERVER -> {
                 var symbolProvider = SymbolProvider.cache(
-                        new ServiceJavaSymbolProvider(serviceModel,
+                        new JavaSymbolProvider(serviceModel,
                                 service,
                                 serviceId.getNamespace(),
-                                serviceId.getName()));
+                                serviceId.getName(),
+                                java.util.Set.of(CodegenMode.SERVER)));
                 Map<Class<?>, MockOperation> mockOperationMap = new HashMap<>();
                 var serverTestOperations = new ArrayList<ServerTestOperation>();
                 for (var testOperation : testOperations) {
@@ -294,7 +295,12 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                 .map(ap -> ap.equals(testType.appliesTo))
                 .orElse(true);
 
-        var symbolProvider = new JavaSymbolProvider(serviceModel, service, service.toShapeId().getNamespace());
+        var symbolProvider = new JavaSymbolProvider(
+                serviceModel,
+                service,
+                service.toShapeId().getNamespace(),
+                service.toShapeId().getName(),
+                Set.of());
         for (var operationId : service.getOperations()) {
             var operationShape = serviceModel.getShape(operationId);
             if (operationShape.isPresent() && operationShape.get().isOperationShape()) {

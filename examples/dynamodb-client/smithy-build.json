@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "plugins": {
-    "java-client-codegen": {
+    "java-codegen": {
       "service": "com.amazonaws.dynamodb#DynamoDB_20120810",
       "name": "DynamoDB",
       "namespace": "software.amazon.smithy.java.example.dynamodb",
@@ -11,7 +11,8 @@
       ],
       "transport": {
         "http-java": {}
-      }
+      },
+      "modes": ["client"]
     }
   }
 }
