@@ -41,6 +41,7 @@ import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.model.traits.UniqueItemsTrait;
+import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.model.traits.XmlAttributeTrait;
 import software.amazon.smithy.model.traits.XmlFlattenedTrait;
 import software.amazon.smithy.model.traits.XmlNameTrait;
@@ -108,6 +109,7 @@ public final class TraitKey<T extends Trait> {
     public static final TraitKey<CorsTrait> CORS_TRAIT = TraitKey.get(CorsTrait.class);
     public static final TraitKey<EventHeaderTrait> EVENT_HEADER_TRAIT = TraitKey.get(EventHeaderTrait.class);
     public static final TraitKey<EventPayloadTrait> EVENT_PAYLOAD_TRAIT = TraitKey.get(EventPayloadTrait.class);
+    public static final TraitKey<UnitTypeTrait> UNIT_TYPE_TRAIT = TraitKey.get(UnitTypeTrait.class);
 
     private final Class<T> traitClass;
     final int id;

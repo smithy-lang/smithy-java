@@ -25,7 +25,6 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.TraitKey;
-import software.amazon.smithy.java.core.schema.Unit;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -75,7 +74,7 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
         String operationName = operation.schema().id().getName();
         AwsQueryFormSerializer serializer = new AwsQueryFormSerializer(operationName, version);
 
-        if (!Unit.ID.equals(operation.inputSchema().id())) {
+        if (!operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
             input.serializeMembers(serializer);
         }
 

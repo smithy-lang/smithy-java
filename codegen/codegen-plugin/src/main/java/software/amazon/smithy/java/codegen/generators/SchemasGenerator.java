@@ -40,6 +40,8 @@ import software.amazon.smithy.model.shapes.StringShape;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
+import software.amazon.smithy.model.traits.Trait;
+import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -134,11 +136,15 @@ public final class SchemasGenerator
                 }
                 writer.pushState();
                 writer.putContext("schemaClass", Schema.class);
-                writer.putContext("id", CodegenUtils.getOriginalId(schemaField.shape()));
+                var originalId = CodegenUtils.getOriginalId(schemaField.shape());
+                var isUnit = UnitTypeTrait.UNIT.equals(originalId);
+                writer.putContext("id", isUnit ? schemaField.shape().getId() : originalId);
                 writer.putContext("shapeId", ShapeId.class);
                 writer.putContext("schemaBuilder", SchemaBuilder.class);
                 writer.putContext("name", schemaField.fieldName());
-                writer.putContext("traits", new TraitInitializerGenerator(writer, schemaField.shape(), context));
+                List<Trait> extraTraits = isUnit ? List.of(new UnitTypeTrait()) : List.of();
+                var traitGen = new TraitInitializerGenerator(writer, schemaField.shape(), context, extraTraits);
+                writer.putContext("traits", traitGen);
                 schemaField.shape().accept(new StaticSchemaFieldGenerator(writer, schemaField, directive));
                 writer.popState();
             }
