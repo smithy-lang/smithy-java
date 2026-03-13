@@ -12,7 +12,7 @@ final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
 
     private int statusCode = 200;
     private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
-    private ModifiableHttpHeaders headers = new SimpleModifiableHttpHeaders();
+    private ModifiableHttpHeaders headers = new ArrayHttpHeaders();
     private DataStream body = DataStream.ofEmpty();
 
     ModifiableHttpResponseImpl() {}
