@@ -39,6 +39,7 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaHttpClientTransport.class);
     private final HttpClient client;
+    private final Duration defaultRequestTimeout;
 
     static {
         // For some reason, this can't just be done in the constructor to always take effect.
@@ -67,14 +68,24 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
     }
 
     public JavaHttpClientTransport() {
-        this(HttpClient.newHttpClient());
+        this(HttpClient.newHttpClient(), null);
     }
 
     /**
      * @param client Java client to use.
      */
     public JavaHttpClientTransport(HttpClient client) {
+        this(client, null);
+    }
+
+    /**
+     * @param client Java client to use.
+     * @param defaultRequestTimeout Default per-request timeout. Used when {@link HttpContext#HTTP_REQUEST_TIMEOUT}
+     *                              is not set in the request context. Null means no default.
+     */
+    public JavaHttpClientTransport(HttpClient client, Duration defaultRequestTimeout) {
         this.client = client;
+        this.defaultRequestTimeout = defaultRequestTimeout;
         setHostProperties();
     }
 
@@ -128,7 +139,9 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
                 .uri(request.uri());
 
         Duration requestTimeout = context.get(HttpContext.HTTP_REQUEST_TIMEOUT);
-
+        if (requestTimeout == null) {
+            requestTimeout = defaultRequestTimeout;
+        }
         if (requestTimeout != null) {
             httpRequestBuilder.timeout(requestTimeout);
         }
@@ -216,15 +229,15 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
         @Override
         public JavaHttpClientTransport createTransport(Document node) {
             setHostProperties();
-            var versionNode = node.asStringMap().get("version");
-            HttpClient httpClient;
-            if (versionNode != null) {
-                var version = HttpVersion.from(versionNode.asString());
-                httpClient = HttpClient.newBuilder().version(smithyToHttpVersion(version)).build();
-            } else {
-                httpClient = HttpClient.newHttpClient();
+            var config = new HttpTransportConfig().fromDocument(node);
+            var builder = HttpClient.newBuilder();
+            if (config.httpVersion() != null) {
+                builder.version(smithyToHttpVersion(config.httpVersion()));
             }
-            return new JavaHttpClientTransport(httpClient);
+            if (config.connectTimeout() != null) {
+                builder.connectTimeout(config.connectTimeout());
+            }
+            return new JavaHttpClientTransport(builder.build(), config.requestTimeout());
         }
 
         @Override
