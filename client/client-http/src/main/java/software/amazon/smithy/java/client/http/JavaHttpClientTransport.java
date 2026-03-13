@@ -207,6 +207,11 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
         };
     }
 
+    @Override
+    public void close() {
+        client.close();
+    }
+
     public static final class Factory implements ClientTransportFactory<HttpRequest, HttpResponse> {
         @Override
         public String name() {
