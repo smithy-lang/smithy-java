@@ -7,6 +7,7 @@ package software.amazon.smithy.java.http.binding;
 
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
@@ -30,6 +31,8 @@ public final class ResponseSerializer {
     private EventEncoderFactory<Frame<?>> eventEncoderFactory;
     private Schema errorSchema;
     private boolean omitEmptyPayload = false;
+    private HeaderErrorSerializer headerErrorSerializer = HeaderErrorSerializer.AMZN_ERROR_HEADER;
+    private Context context = Context.empty();
     private final ConcurrentMap<Schema, BindingMatcher> bindingCache;
 
     ResponseSerializer(ConcurrentMap<Schema, BindingMatcher> bindingCache) {
@@ -105,6 +108,30 @@ public final class ResponseSerializer {
     }
 
     /**
+     * Set the strategy for writing the error type discriminator header on error responses.
+     *
+     * <p>Defaults to {@link HeaderErrorSerializer#AMZN_ERROR_HEADER}.
+     *
+     * @param headerErrorSerializer Strategy for writing the error type header.
+     * @return the serializer.
+     */
+    public ResponseSerializer headerErrorSerializer(HeaderErrorSerializer headerErrorSerializer) {
+        this.headerErrorSerializer = headerErrorSerializer;
+        return this;
+    }
+
+    /**
+     * Set the context for the current request.
+     *
+     * @param context Request context.
+     * @return the serializer.
+     */
+    public ResponseSerializer context(Context context) {
+        this.context = context;
+        return this;
+    }
+
+    /**
      * Used to serialize an error instead of the response.
      *
      * @param errorSchema Schema of the error to serialize.
@@ -143,7 +170,9 @@ public final class ResponseSerializer {
                 bindingCache.computeIfAbsent(schema, BindingMatcher::responseMatcher),
                 omitEmptyPayload,
                 isFailure,
-                false);
+                false,
+                headerErrorSerializer,
+                context);
         shapeValue.serialize(serializer);
         serializer.flush();
 

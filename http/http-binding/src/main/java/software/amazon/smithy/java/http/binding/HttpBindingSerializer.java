@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.function.BiConsumer;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -55,6 +56,8 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private final boolean omitEmptyPayload;
     private final boolean isFailure;
     private final boolean allowEmptyStructPayload;
+    private final HeaderErrorSerializer headerErrorSerializer;
+    private final Context context;
 
     private final Map<String, String> labels = new LinkedHashMap<>();
     private final Map<String, List<String>> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
@@ -81,7 +84,9 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             BindingMatcher bindingMatcher,
             boolean omitEmptyPayload,
             boolean isFailure,
-            boolean allowEmptyStructPayload
+            boolean allowEmptyStructPayload,
+            HeaderErrorSerializer headerErrorSerializer,
+            Context context
     ) {
         uriPattern = httpTrait.getUri();
         responseStatus = httpTrait.getCode();
@@ -91,6 +96,8 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         this.omitEmptyPayload = omitEmptyPayload;
         this.isFailure = isFailure;
         this.allowEmptyStructPayload = allowEmptyStructPayload;
+        this.headerErrorSerializer = headerErrorSerializer;
+        this.context = context;
         headerSerializer = new HttpHeaderSerializer(headerConsumer);
         querySerializer = new HttpQuerySerializer(queryStringParams::add);
         labelSerializer = new HttpLabelSerializer(labels::put);
@@ -131,9 +138,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
         if (isFailure) {
             responseStatus = ModeledException.getHttpStatusCode(schema);
-            // TODO: Update this to only use the full ID if the schema namespace is outside the
-            //       service namespace
-            headers.put("X-Amzn-Errortype", List.of(schema.id().toString()));
+            headerErrorSerializer.writeErrorType(schema, headers, context);
         }
 
         struct.serializeMembers(new BindingSerializer(this));

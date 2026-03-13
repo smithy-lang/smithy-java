@@ -8,6 +8,7 @@ package software.amazon.smithy.java.http.binding;
 import java.net.URI;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
@@ -145,7 +146,9 @@ public final class RequestSerializer {
                 matcher,
                 omitEmptyPayload,
                 false,
-                allowEmptyStructPayload);
+                allowEmptyStructPayload,
+                HeaderErrorSerializer.NONE,
+                Context.empty());
         shapeValue.serialize(serializer);
         serializer.flush();
 
