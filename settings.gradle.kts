@@ -28,7 +28,6 @@ include(":framework-errors")
 include(":http:http-api")
 include(":http:http-binding")
 include(":retries-api")
-include(":tracing-api")
 
 
 // Codecs
