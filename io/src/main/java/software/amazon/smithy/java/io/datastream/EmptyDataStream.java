@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.io.datastream;
 
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Flow;
@@ -24,6 +25,11 @@ final class EmptyDataStream implements DataStream {
     @Override
     public InputStream asInputStream() {
         return InputStream.nullInputStream();
+    }
+
+    @Override
+    public void writeTo(OutputStream out) {
+        // No-op
     }
 
     @Override

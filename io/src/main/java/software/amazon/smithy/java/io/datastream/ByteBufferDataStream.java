@@ -5,7 +5,9 @@
 
 package software.amazon.smithy.java.io.datastream;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Flow;
@@ -43,7 +45,14 @@ final class ByteBufferDataStream implements DataStream {
 
     @Override
     public InputStream asInputStream() {
-        return ByteBufferUtils.byteBufferInputStream(buffer);
+        // Use duplicate() to avoid mutating the original buffer's position,
+        // allowing the DataStream to be replayed (isReplayable() returns true)
+        return ByteBufferUtils.byteBufferInputStream(buffer.duplicate());
+    }
+
+    @Override
+    public void writeTo(OutputStream out) throws IOException {
+        out.write(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());
     }
 
     @Override
