@@ -5,6 +5,9 @@
 
 package software.amazon.smithy.java.client.core;
 
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.function.Predicate;
@@ -29,7 +32,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 /**
  * Base Smithy client class.
  */
-public abstract class Client {
+public abstract class Client implements Closeable {
 
     private final ClientConfig config;
     private final ClientPipeline<?, ?> pipeline;
@@ -128,6 +131,18 @@ public abstract class Client {
      */
     public ClientConfig config() {
         return config;
+    }
+
+    /**
+     * Closes the transport used by this client.
+     */
+    @Override
+    public void close() {
+        try {
+            config.transport().close();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /**
