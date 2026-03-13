@@ -16,7 +16,7 @@ import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.java.jmespath.JMESPathDocumentQuery;
+import software.amazon.smithy.java.jmespath.JmesPathQueries;
 import software.amazon.smithy.jmespath.JmespathExpression;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -101,15 +101,18 @@ sealed interface ContextProvider {
     }
 
     // Find the smithy.rules#operationContextParams trait on the operation and each JMESPath to extract.
-    // TODO: Converting input to Document for JMESPath is expensive. Implementing something like JMESPathStructQuery
-    //       that operates directly on SerializableStruct to avoid intermediate Document conversion could help.
     record ContextPathProvider(String name, JmespathExpression jp) implements ContextProvider {
         @Override
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params) {
-            var doc = Document.of(input);
-            var result = JMESPathDocumentQuery.query(jp, doc);
+            Object result;
+            if (input instanceof Document doc) {
+                var docResult = JmesPathQueries.query(jp, doc);
+                result = docResult != null ? docResult.asObject() : null;
+            } else {
+                result = JmesPathQueries.query(jp, input);
+            }
             if (result != null) {
-                params.put(name, result.asObject());
+                params.put(name, result);
             }
         }
 

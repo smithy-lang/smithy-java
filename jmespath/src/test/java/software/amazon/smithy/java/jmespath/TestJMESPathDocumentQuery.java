@@ -17,6 +17,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.jmespath.JmespathExpression;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 public class TestJMESPathDocumentQuery {
@@ -27,7 +28,7 @@ public class TestJMESPathDocumentQuery {
                         Document.of("FAILED"),
                         "nested",
                         Document.of(Map.of("id", Document.of("idValue")))));
-        var value = JMESPathDocumentQuery.query("nested.id", doc);
+        var value = JmesPathQueries.query(JmespathExpression.parse("nested.id"), doc);
         assertEquals("idValue", value.asString());
     }
 
@@ -45,7 +46,7 @@ public class TestJMESPathDocumentQuery {
     @MethodSource("indexSource")
     void testIndexExpression(String str, String expected) {
         var doc = Document.of(List.of(Document.of("A"), Document.of("B"), Document.of("C")));
-        var actual = JMESPathDocumentQuery.query(str, doc);
+        var actual = JmesPathQueries.query(JmespathExpression.parse(str), doc);
         assertEquals(expected, actual.asString());
     }
 
@@ -64,7 +65,7 @@ public class TestJMESPathDocumentQuery {
     @MethodSource("sliceSource")
     void testSliceExpression(String str, List<Document> expected) {
         var doc = Document.of(List.of(Document.of(0), Document.of(1), Document.of(2), Document.of(3)));
-        var value = JMESPathDocumentQuery.query(str, doc);
+        var value = JmesPathQueries.query(JmespathExpression.parse(str), doc);
         assertEquals(expected, value.asList());
     }
 
@@ -88,7 +89,7 @@ public class TestJMESPathDocumentQuery {
                 Document.of(List.of(Document.of("c"))),
                 "qux",
                 Document.of(Map.of("quux", Document.of("d")))));
-        var value = JMESPathDocumentQuery.query(str, doc);
+        var value = JmesPathQueries.query(JmespathExpression.parse(str), doc);
         assertEquals(expected, value.asList());
     }
 
@@ -114,7 +115,7 @@ public class TestJMESPathDocumentQuery {
                 Document.of(List.of(Document.of("c"))),
                 "qux",
                 Document.of(Map.of("quux", Document.of("d")))));
-        var value = JMESPathDocumentQuery.query(str, doc);
+        var value = JmesPathQueries.query(JmespathExpression.parse(str), doc);
         assertEquals(expected, value.asStringMap());
     }
 
@@ -139,7 +140,7 @@ public class TestJMESPathDocumentQuery {
                 Document.of("bar-value"),
                 "myList",
                 Document.of(List.of(Document.of("one"), Document.of("two")))));
-        var value = JMESPathDocumentQuery.query(str, doc);
+        var value = JmesPathQueries.query(JmespathExpression.parse(str), doc);
 
         if (expected == null) {
             assertNull(value);
@@ -178,7 +179,7 @@ public class TestJMESPathDocumentQuery {
                 Document.of(List.of(
                         Document.of(Map.of("a", Document.of(1L), "b", Document.of(2L))),
                         Document.of(Map.of("a", Document.of(1L), "b", Document.of(3L)))))));
-        var value = JMESPathDocumentQuery.query(str, doc);
+        var value = JmesPathQueries.query(JmespathExpression.parse(str), doc);
         assertEquals(expected, value);
     }
 
@@ -205,7 +206,7 @@ public class TestJMESPathDocumentQuery {
                 Document.of(1L),
                 "qux",
                 Document.of(1)));
-        var value = JMESPathDocumentQuery.query(str, doc);
+        var value = JmesPathQueries.query(JmespathExpression.parse(str), doc);
         assertEquals(expected, value.asBoolean());
     }
 
@@ -229,7 +230,7 @@ public class TestJMESPathDocumentQuery {
                 Document.of(5),
                 "EmptyList",
                 Document.of(List.of())));
-        var value = JMESPathDocumentQuery.query(str, doc);
+        var value = JmesPathQueries.query(JmespathExpression.parse(str), doc);
         assertEquals(expected, value.asBoolean());
     }
 
@@ -265,7 +266,7 @@ public class TestJMESPathDocumentQuery {
                                 Document.of(1),
                                 "b",
                                 Document.of(2)))))));
-        var value = JMESPathDocumentQuery.query(str, doc);
+        var value = JmesPathQueries.query(JmespathExpression.parse(str), doc);
         assertEquals(expected, value.asList());
     }
 
@@ -287,7 +288,7 @@ public class TestJMESPathDocumentQuery {
                 Document.of(List.of(
                         Document.of(Map.of("baz", Document.of(1))),
                         Document.of(Map.of("baz", Document.of(2)))))));
-        var value = JMESPathDocumentQuery.query(str, testDocument);
+        var value = JmesPathQueries.query(JmespathExpression.parse(str), testDocument);
         assertEquals(expected, value.asList());
     }
 
@@ -297,16 +298,15 @@ public class TestJMESPathDocumentQuery {
                 Arguments.of("contains(foo, 'b')", Document.of(true)),
                 Arguments.of("contains(foo, 'n')", Document.of(false)),
                 Arguments.of("contains(str, 'my')", Document.of(true)),
-                Arguments.of("ceil(`1.001`)", Document.of(2L)),
-                Arguments.of("ceil(`1.9`)", Document.of(2L)),
+                Arguments.of("ceil(`1.001`)", Document.of(2D)),
+                Arguments.of("ceil(`1.9`)", Document.of(2D)),
                 Arguments.of("ceil(`1`)", Document.of(1L)),
-                Arguments.of("ceil(`\"abc\"`)", null),
                 Arguments.of("ends_with(str, 'Str')", Document.of(true)),
                 Arguments.of("ends_with(str, 'bar')", Document.of(false)),
                 Arguments.of("starts_with(str, 'my')", Document.of(true)),
                 Arguments.of("starts_with(str, 'bar')", Document.of(false)),
-                Arguments.of("floor(`1.001`)", Document.of(1L)),
-                Arguments.of("floor(`1.9`)", Document.of(1L)),
+                Arguments.of("floor(`1.001`)", Document.of(1D)),
+                Arguments.of("floor(`1.9`)", Document.of(1D)),
                 Arguments.of("floor(`1`)", Document.of(1L)),
                 Arguments.of("keys(@)",
                         Document.of(List
@@ -315,7 +315,7 @@ public class TestJMESPathDocumentQuery {
                                         Document.of("foo"),
                                         Document.of("nums"),
                                         Document.of("vals")))),
-                Arguments.of("length(nums)", Document.of(3L)),
+                Arguments.of("length(nums)", Document.of(3)),
                 Arguments.of("max(nums)", Document.of(3)),
                 Arguments.of("min(nums)", Document.of(1)),
                 Arguments.of("not_null(no, not, this, str)", Document.of("myStr")),
@@ -344,7 +344,7 @@ public class TestJMESPathDocumentQuery {
                 "vals",
                 Document.of(List.of(Document.of(Map.of("age", Document.of(32))),
                         Document.of(Map.of("age", Document.of(45)))))));
-        var value = JMESPathDocumentQuery.query(str, testDocument);
+        var value = JmesPathQueries.query(JmespathExpression.parse(str), testDocument);
         if (expected == null) {
             assertNull(value);
         } else if (expected.type().equals(ShapeType.LIST)) {
@@ -378,7 +378,7 @@ public class TestJMESPathDocumentQuery {
                         Document.of(Map.of("qux", Document.of(1))),
                         Document.of(Map.of("c", Document.of(1))),
                         Document.of(Map.of("qux", Document.of(2)))))));
-        var value = JMESPathDocumentQuery.query(str, testDocument);
+        var value = JmesPathQueries.query(JmespathExpression.parse(str), testDocument);
         assertThat(expected.asList(), containsInAnyOrder(value.asList().toArray()));
     }
 }

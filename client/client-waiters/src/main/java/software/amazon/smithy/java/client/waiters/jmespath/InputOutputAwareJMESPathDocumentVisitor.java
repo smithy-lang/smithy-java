@@ -7,7 +7,7 @@ package software.amazon.smithy.java.client.waiters.jmespath;
 
 import java.util.Objects;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.java.jmespath.JMESPathDocumentQuery;
+import software.amazon.smithy.java.jmespath.JmesPathQueries;
 import software.amazon.smithy.jmespath.ExpressionVisitor;
 import software.amazon.smithy.jmespath.ast.AndExpression;
 import software.amazon.smithy.jmespath.ast.ComparatorExpression;
@@ -44,27 +44,27 @@ record InputOutputAwareJMESPathDocumentVisitor(Document input, Document output) 
 
     @Override
     public Document visitComparator(ComparatorExpression comparatorExpression) {
-        return JMESPathDocumentQuery.query(comparatorExpression, output);
+        return JmesPathQueries.query(comparatorExpression, output);
     }
 
     @Override
     public Document visitCurrentNode(CurrentExpression currentExpression) {
-        return JMESPathDocumentQuery.query(currentExpression, output);
+        return JmesPathQueries.query(currentExpression, output);
     }
 
     @Override
     public Document visitExpressionType(ExpressionTypeExpression expressionTypeExpression) {
-        return JMESPathDocumentQuery.query(expressionTypeExpression, output);
+        return JmesPathQueries.query(expressionTypeExpression, output);
     }
 
     @Override
     public Document visitFlatten(FlattenExpression flattenExpression) {
-        return JMESPathDocumentQuery.query(flattenExpression, output);
+        return JmesPathQueries.query(flattenExpression, output);
     }
 
     @Override
     public Document visitFunction(FunctionExpression functionExpression) {
-        return JMESPathDocumentQuery.query(functionExpression, output);
+        return JmesPathQueries.query(functionExpression, output);
     }
 
     @Override
@@ -74,67 +74,67 @@ record InputOutputAwareJMESPathDocumentVisitor(Document input, Document output) 
         } else if (OUTPUT_NAME.equals(fieldExpression.getName())) {
             return output;
         }
-        return JMESPathDocumentQuery.query(fieldExpression, output);
+        return JmesPathQueries.query(fieldExpression, output);
     }
 
     @Override
     public Document visitIndex(IndexExpression indexExpression) {
-        return JMESPathDocumentQuery.query(indexExpression, output);
+        return JmesPathQueries.query(indexExpression, output);
     }
 
     @Override
     public Document visitLiteral(LiteralExpression literalExpression) {
-        return JMESPathDocumentQuery.query(literalExpression, output);
+        return JmesPathQueries.query(literalExpression, output);
     }
 
     @Override
     public Document visitMultiSelectList(MultiSelectListExpression multiSelectListExpression) {
-        return JMESPathDocumentQuery.query(multiSelectListExpression, output);
+        return JmesPathQueries.query(multiSelectListExpression, output);
     }
 
     @Override
     public Document visitMultiSelectHash(MultiSelectHashExpression multiSelectHashExpression) {
-        return JMESPathDocumentQuery.query(multiSelectHashExpression, output);
+        return JmesPathQueries.query(multiSelectHashExpression, output);
     }
 
     @Override
     public Document visitAnd(AndExpression andExpression) {
-        return JMESPathDocumentQuery.query(andExpression, output);
+        return JmesPathQueries.query(andExpression, output);
     }
 
     @Override
     public Document visitOr(OrExpression orExpression) {
-        return JMESPathDocumentQuery.query(orExpression, output);
+        return JmesPathQueries.query(orExpression, output);
     }
 
     @Override
     public Document visitNot(NotExpression notExpression) {
-        return JMESPathDocumentQuery.query(notExpression, output);
+        return JmesPathQueries.query(notExpression, output);
     }
 
     @Override
     public Document visitProjection(ProjectionExpression projectionExpression) {
-        return JMESPathDocumentQuery.query(projectionExpression, output);
+        return JmesPathQueries.query(projectionExpression, output);
     }
 
     @Override
     public Document visitFilterProjection(FilterProjectionExpression filterProjectionExpression) {
-        return JMESPathDocumentQuery.query(filterProjectionExpression, output);
+        return JmesPathQueries.query(filterProjectionExpression, output);
     }
 
     @Override
     public Document visitObjectProjection(ObjectProjectionExpression objectProjectionExpression) {
-        return JMESPathDocumentQuery.query(objectProjectionExpression, output);
+        return JmesPathQueries.query(objectProjectionExpression, output);
     }
 
     @Override
     public Document visitSlice(SliceExpression sliceExpression) {
-        return JMESPathDocumentQuery.query(sliceExpression, output);
+        return JmesPathQueries.query(sliceExpression, output);
     }
 
     @Override
     public Document visitSubexpression(Subexpression subexpression) {
         var left = subexpression.getLeft().accept(this);
-        return JMESPathDocumentQuery.query(subexpression.getRight(), left);
+        return JmesPathQueries.query(subexpression.getRight(), left);
     }
 }

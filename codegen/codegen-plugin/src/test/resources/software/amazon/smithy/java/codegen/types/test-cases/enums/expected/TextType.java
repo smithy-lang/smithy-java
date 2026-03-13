@@ -7,6 +7,7 @@ import java.util.Set;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.schema.SmithyEnum;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.ToStringSerializer;
@@ -14,7 +15,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
 @SmithyGenerated
-public sealed interface TextType extends SerializableShape {
+public sealed interface TextType extends SmithyEnum, SerializableShape {
     TextType TEXT = new TextTypeValue();
     List<TextType> $TYPES = List.of(TEXT);
 
