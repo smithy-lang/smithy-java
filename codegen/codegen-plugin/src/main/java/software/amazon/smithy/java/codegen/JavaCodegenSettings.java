@@ -43,6 +43,7 @@ public final class JavaCodegenSettings {
     private static final String TRANSPORT = "transport";
     private static final String DEFAULT_PLUGINS = "defaultPlugins";
     private static final String DEFAULT_SETTINGS = "defaultSettings";
+    private static final String HTTP_CONFIG = "httpConfig";
     private static final String RELATIVE_DATE = "relativeDate";
     private static final String RELATIVE_VERSION = "relativeVersion";
     private static final String EDITION = "edition";
@@ -60,6 +61,7 @@ public final class JavaCodegenSettings {
             TRANSPORT,
             DEFAULT_PLUGINS,
             DEFAULT_SETTINGS,
+            HTTP_CONFIG,
             RELATIVE_DATE,
             RELATIVE_VERSION,
             EDITION,
@@ -84,6 +86,7 @@ public final class JavaCodegenSettings {
     private final boolean useExternalTypes;
     private final List<ShapeId> runtimeTraits;
     private final Selector runtimeTraitsSelector;
+    private final ObjectNode httpConfig;
     private final Map<String, Set<Symbol>> generatedSymbols = new HashMap<>();
 
     private JavaCodegenSettings(Builder builder) {
@@ -103,6 +106,7 @@ public final class JavaCodegenSettings {
         this.useExternalTypes = builder.useExternalTypes;
         this.runtimeTraits = Collections.unmodifiableList(builder.runtimeTraits);
         this.runtimeTraitsSelector = builder.runtimeTraitsSelector;
+        this.httpConfig = builder.httpConfig;
     }
 
     /**
@@ -128,7 +132,8 @@ public final class JavaCodegenSettings {
                 .getStringMember(EDITION, builder::edition)
                 .getBooleanMember(USE_EXTERNAL_TYPES, builder::useExternalTypes)
                 .getArrayMember(RUNTIME_TRAITS, n -> n.expectStringNode().expectShapeId(), builder::runtimeTraits)
-                .getStringMember(RUNTIME_TRAITS_SELECTOR, builder::runtimeTraitsSelector);
+                .getStringMember(RUNTIME_TRAITS_SELECTOR, builder::runtimeTraitsSelector)
+                .getObjectMember(HTTP_CONFIG, builder::httpConfig);
 
         builder.sourceLocation(settingsNode.getSourceLocation().getFilename());
 
@@ -203,6 +208,10 @@ public final class JavaCodegenSettings {
         return runtimeTraitsSelector;
     }
 
+    public ObjectNode httpConfig() {
+        return httpConfig;
+    }
+
     @SmithyInternalApi
     public void addSymbol(Symbol symbol) {
         var symbols = generatedSymbols.computeIfAbsent(symbol.getNamespace(), k -> new HashSet<>());
@@ -262,6 +271,7 @@ public final class JavaCodegenSettings {
         private final List<ShapeId> runtimeTraits = new ArrayList<>();
         private Selector runtimeTraitsSelector;
         private boolean useExternalTypes;
+        private ObjectNode httpConfig;
 
         public Builder service(String string) {
             this.service = ShapeId.from(string);
@@ -363,6 +373,11 @@ public final class JavaCodegenSettings {
 
         public Builder runtimeTraitsSelector(String selector) {
             this.runtimeTraitsSelector = Selector.parse(selector);
+            return this;
+        }
+
+        public Builder httpConfig(ObjectNode httpConfig) {
+            this.httpConfig = httpConfig;
             return this;
         }
 

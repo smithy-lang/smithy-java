@@ -133,7 +133,8 @@ public final class ClientInterfaceGenerator
                                             ${?hasDefaults}${defaultPlugins:C|}
                                             ${/hasDefaults}${?hasDefaultProtocol}${defaultProtocol:C|}
                                             ${/hasDefaultProtocol}${?hasTransportSettings}${transportSettings:C|}
-                                            ${/hasTransportSettings}${?defaultSchemes}
+                                            ${/hasTransportSettings}${?hasHttpConfig}${httpConfig:C|}
+                                            ${/hasHttpConfig}${?defaultSchemes}
                                             ${defaultAuth:C|}${/defaultSchemes}
 
                                             private Builder() {
@@ -151,7 +152,7 @@ public final class ClientInterfaceGenerator
                                                     configBuilder().protocol(${protocolFactory:C}.createProtocol(protocolSettings, protocolTrait));
                                                 }
                                                 ${/hasDefaultProtocol}${?hasDefaultTransport}if (configBuilder().transport() == null) {
-                                                    configBuilder().transport(${transportFactory:C}.createTransport(${?hasTransportSettings}transportSettings${/hasTransportSettings}));
+                                                    configBuilder().transport(${transportFactory:C}.createTransport(${?hasTransportSettings}transportSettings${/hasTransportSettings}${^hasTransportSettings}${document:T}.EMPTY_MAP${/hasTransportSettings}, ${?hasHttpConfig}httpConfig${/hasHttpConfig}${^hasHttpConfig}${document:T}.EMPTY_MAP${/hasHttpConfig}));
                                                 }${/hasDefaultTransport}
                                                 ${?hasBdd}${loadBddInfo:C|}${/hasBdd}
                                                 return new ${impl:T}(this);
@@ -199,6 +200,10 @@ public final class ClientInterfaceGenerator
                     writer.putContext(
                             "transportSettings",
                             new TransportSettingsGenerator(writer, settings.transportSettings()));
+                    var hasHttpConfig = settings.httpConfig() != null && !settings.httpConfig().isEmpty();
+                    writer.putContext("hasHttpConfig", hasHttpConfig);
+                    writer.putContext("httpConfig", new HttpConfigGenerator(writer, settings.httpConfig()));
+                    writer.putContext("document", Document.class);
                     writer.putContext(
                             "operations",
                             new OperationMethodGenerator(
@@ -245,6 +250,20 @@ public final class ClientInterfaceGenerator
             writer.putContext("document", Document.class);
             writer.putContext("nodeWriter", new NodeDocumentWriter(writer, settings));
             writer.write("private static final ${document:T} transportSettings = ${nodeWriter:C};");
+            writer.popState();
+        }
+    }
+
+    private record HttpConfigGenerator(JavaWriter writer, ObjectNode settings) implements Runnable {
+        @Override
+        public void run() {
+            if (settings == null) {
+                return;
+            }
+            writer.pushState();
+            writer.putContext("document", Document.class);
+            writer.putContext("nodeWriter", new NodeDocumentWriter(writer, settings));
+            writer.write("private static final ${document:T} httpConfig = ${nodeWriter:C};");
             writer.popState();
         }
     }

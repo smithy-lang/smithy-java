@@ -227,9 +227,12 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
         }
 
         @Override
-        public JavaHttpClientTransport createTransport(Document node) {
+        public JavaHttpClientTransport createTransport(Document node, Document pluginSettings) {
             setHostProperties();
-            var config = new HttpTransportConfig().fromDocument(node);
+            // Start with httpConfig from plugin settings as baseline, then apply transport-specific settings on top.
+            var config = new HttpTransportConfig().fromDocument(pluginSettings.asStringMap()
+                    .getOrDefault("httpConfig", Document.EMPTY_MAP));
+            config.fromDocument(node);
             var builder = HttpClient.newBuilder();
             if (config.httpVersion() != null) {
                 builder.version(smithyToHttpVersion(config.httpVersion()));

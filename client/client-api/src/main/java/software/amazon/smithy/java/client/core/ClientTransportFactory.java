@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.client.core;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.ServiceLoader;
@@ -52,15 +51,17 @@ public interface ClientTransportFactory<RequestT, ResponseT> {
      * <p>Transports must be able to be instantiated without any arguments for use in dynamic clients.
      */
     default ClientTransport<RequestT, ResponseT> createTransport() {
-        return createTransport(Document.of(Collections.emptyMap()));
+        return createTransport(Document.EMPTY_MAP, Document.EMPTY_MAP);
     }
 
     /**
-     * Create a {@link ClientTransport} with a user-provided configuration.
+     * Create a {@link ClientTransport} with transport-specific settings and the full plugin settings.
      *
-     * <p>Configurations are typically specified in the configuration of the client-codegen plugin.
+     * <p>The {@code pluginSettings} document contains the full codegen plugin configuration, allowing
+     * transports to read shared settings (e.g., {@code httpConfig}) that are not transport-specific.
+     * Transport-specific settings should take precedence over shared settings.
      */
-    ClientTransport<RequestT, ResponseT> createTransport(Document settings);
+    ClientTransport<RequestT, ResponseT> createTransport(Document settings, Document pluginSettings);
 
     /**
      * Loads all {@link ClientTransportFactory} implementations and sorts them by priority.

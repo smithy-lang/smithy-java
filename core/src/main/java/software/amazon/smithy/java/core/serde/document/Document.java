@@ -10,6 +10,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +69,11 @@ import software.amazon.smithy.model.shapes.ShapeType;
  * itself was serialized or deserialized directly.
  */
 public interface Document extends SerializableShape {
+    /**
+     * An empty map document.
+     */
+    Document EMPTY_MAP = of(Collections.emptyMap());
+
     /**
      * Get the Smithy data model type for the underlying contents of the document.
      *
