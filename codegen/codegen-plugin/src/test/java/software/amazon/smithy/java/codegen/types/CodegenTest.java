@@ -51,14 +51,14 @@ public class CodegenTest {
         assertThat(manifest.getFiles())
                 .hasSize(8)
                 .containsExactlyInAnyOrder(
-                        Path.of("/test/smithy/codegen/types/test/model/EnumShape.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/IntEnumShape.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/Schemas.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/UnionShape.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
-                        Path.of("/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"));
+                        Path.of("/java/test/smithy/codegen/types/test/model/EnumShape.java"),
+                        Path.of("/java/test/smithy/codegen/types/test/model/IntEnumShape.java"),
+                        Path.of("/java/test/smithy/codegen/types/test/model/Schemas.java"),
+                        Path.of("/java/test/smithy/codegen/types/test/model/SharedSerde.java"),
+                        Path.of("/java/test/smithy/codegen/types/test/model/StructureShape.java"),
+                        Path.of("/java/test/smithy/codegen/types/test/model/UnionShape.java"),
+                        Path.of("/java/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
+                        Path.of("/resources/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"));
     }
 
     @Test
@@ -71,11 +71,11 @@ public class CodegenTest {
         assertThat(manifest.getFiles())
                 .hasSize(5)
                 .containsExactlyInAnyOrder(
-                        Path.of("/test/smithy/codegen/types/test/model/Schemas.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
-                        Path.of("/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"));
+                        Path.of("/java/test/smithy/codegen/types/test/model/Schemas.java"),
+                        Path.of("/java/test/smithy/codegen/types/test/model/SharedSerde.java"),
+                        Path.of("/java/test/smithy/codegen/types/test/model/StructureShape.java"),
+                        Path.of("/java/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
+                        Path.of("/resources/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"));
     }
 
     @Test
@@ -90,12 +90,12 @@ public class CodegenTest {
         assertThat(manifest.getFiles())
                 .hasSize(6)
                 .containsExactlyInAnyOrder(
-                        Path.of("/test/smithy/codegen/types/test/model/Schemas.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/UnionShape.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
-                        Path.of("/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"));
+                        Path.of("/java/test/smithy/codegen/types/test/model/Schemas.java"),
+                        Path.of("/java/test/smithy/codegen/types/test/model/SharedSerde.java"),
+                        Path.of("/java/test/smithy/codegen/types/test/model/StructureShape.java"),
+                        Path.of("/java/test/smithy/codegen/types/test/model/UnionShape.java"),
+                        Path.of("/java/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
+                        Path.of("/resources/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"));
     }
 
 }

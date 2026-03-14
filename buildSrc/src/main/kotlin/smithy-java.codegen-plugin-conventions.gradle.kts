@@ -25,7 +25,10 @@ val generatedSrcDir = layout.buildDirectory.dir("generated-src").get()
 sourceSets {
     named("it") {
         java {
-            srcDir(generatedSrcDir)
+            srcDir("$generatedSrcDir/java")
+        }
+        resources {
+            srcDir("$generatedSrcDir/resources")
         }
     }
 }

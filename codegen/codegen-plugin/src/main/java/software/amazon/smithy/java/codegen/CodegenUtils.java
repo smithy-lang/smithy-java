@@ -95,7 +95,7 @@ public final class CodegenUtils {
     /**
      * Gets a Symbol for a class with both a boxed and unboxed variant.
      *
-     * @param boxed Boxed variant of class
+     * @param boxed   Boxed variant of class
      * @param unboxed Unboxed variant of class
      * @return Symbol representing java class
      */
@@ -162,9 +162,8 @@ public final class CodegenUtils {
     /**
      * Determines if a given member represents a nullable type.
      *
-     * @param model Model to use for resolving Nullable index.
+     * @param model  Model to use for resolving Nullable index.
      * @param member member to check for nullability.
-     *
      * @return if the shape is a nullable type
      */
     public static boolean isNullableMember(Model model, MemberShape member) {
@@ -242,8 +241,8 @@ public final class CodegenUtils {
      *
      * <p>Documents are also not set because they use a null default for error correction.
      *
-     * @see <a href="https://smithy.io/2.0/spec/aggregate-types.html#client-error-correction">client error correction</a>
      * @return true if the member shape has a builtin default
+     * @see <a href="https://smithy.io/2.0/spec/aggregate-types.html#client-error-correction">client error correction</a>
      */
     public static boolean hasBuiltinDefault(SymbolProvider provider, Model model, MemberShape memberShape) {
         var target = model.expectShape(memberShape.getTarget());
@@ -267,7 +266,7 @@ public final class CodegenUtils {
      * Gets the name to use when defining a member as instance variable in a class.
      *
      * @param memberShape MemberShape
-     * @param model Model
+     * @param model       Model
      * @return Instance variable name of a member.
      */
     public static String toMemberName(MemberShape memberShape, Model model) {
@@ -277,7 +276,7 @@ public final class CodegenUtils {
     /**
      * Gets the name to use when defining the getter method of a member.
      *
-     * @param  memberShape memberShape.
+     * @param memberShape memberShape.
      * @return Getter method name of a member.
      */
     public static String toGetterName(MemberShape memberShape, Model model) {
@@ -296,7 +295,7 @@ public final class CodegenUtils {
      * @return serde file name
      */
     public static String getSerdeFileName(JavaCodegenSettings settings) {
-        return String.format("./%s/model/SharedSerde.java", settings.packageNamespace().replace(".", "/"));
+        return getJavaFilePath(settings, "model", "SharedSerde");
     }
 
     /**
@@ -306,7 +305,7 @@ public final class CodegenUtils {
      * @return shared registry file name
      */
     public static String getSharedRegistryFileName(JavaCodegenSettings settings) {
-        return String.format("./%s/model/SharedTypeRegistry.java", settings.packageNamespace().replace(".", "/"));
+        return getJavaFilePath(settings, "model", "SharedTypeRegistry");
     }
 
     /**
@@ -359,11 +358,11 @@ public final class CodegenUtils {
      * <p><strong>NOTE</strong>: The provided class must have a public, no-arg constructor.
      *
      * @param clazz interface to get implementation of
-     * @param name fully-qualified class name
+     * @param name  fully-qualified class name
+     * @param <T>   Type to get implementation for.
      * @return Class instance.
-     * @param <T> Type to get implementation for.
      * @throws CodegenException if no valid implementation with a public no-arg constructor could be found on the
-     * classpath for the given class name.
+     *                          classpath for the given class name.
      */
     @SuppressWarnings("unchecked")
     public static <T> Class<? extends T> getImplementationByName(Class<T> clazz, String name) {
@@ -419,9 +418,9 @@ public final class CodegenUtils {
      * created, and property is found).
      *
      * @param directive Directive to get the service from.
-     * @param prop Property to get from the symbol of the service.
+     * @param prop      Property to get from the symbol of the service.
+     * @param <T>       the property type.
      * @return the property if found, or null.
-     * @param <T> the property type.
      */
     public static <T> T tryGetServiceProperty(ShapeDirective<?, ?, ?> directive, Property<T> prop) {
         var service = directive.service();
@@ -441,12 +440,12 @@ public final class CodegenUtils {
      * code generated to extend from this exception.
      *
      * @param packageNamespace The package namespace to use for the service exception.
-     * @param serviceName The name of the service to use for the service exception.
+     * @param serviceName      The name of the service to use for the service exception.
      * @return the service exception symbol.
      */
     public static Symbol getServiceExceptionSymbol(String packageNamespace, String serviceName) {
         var name = serviceName + "Exception";
-        var filename = String.format("./%s/model/%s.java", packageNamespace.replace(".", "/"), name);
+        var filename = getJavaFilePath(packageNamespace, "model", name);
         return Symbol.builder()
                 .name(name)
                 .namespace(packageNamespace + ".model", ".")
@@ -459,18 +458,43 @@ public final class CodegenUtils {
      * Returns the class used as the {@link ApiService} for the service.
      *
      * @param packageNamespace The package namespace to use for the service.
-     * @param serviceName The name of the service to use for the service.
+     * @param serviceName      The name of the service to use for the service.
      * @return the service ApiService symbol.
      */
     public static Symbol getServiceApiSymbol(String packageNamespace, String serviceName) {
         var name = serviceName + "ApiService";
-        var filename = String.format("./%s/model/%s.java", packageNamespace.replace(".", "/"), name);
+        var filename = getJavaFilePath(packageNamespace, "model", name);
         return Symbol.builder()
                 .name(name)
                 .namespace(packageNamespace + ".model", ".")
                 .putProperty(SymbolProperties.IS_PRIMITIVE, false)
                 .declarationFile(filename)
                 .build();
+    }
+
+    /**
+     * Returns the file path for the java file with simple name using the configure package in settings.
+     *
+     * @param settings      The settings to get the package namespace
+     * @param packageSuffix The suffix for the namespace for the file
+     * @param simpleName    The simple name of the java file
+     * @return the file path for the java file
+     */
+    public static String getJavaFilePath(JavaCodegenSettings settings, String packageSuffix, String simpleName) {
+        return getJavaFilePath(settings.packageNamespace(), packageSuffix, simpleName);
+    }
+
+    /**
+     * Returns the file path for the java file with simple name using the configure package in settings.
+     *
+     * @param packageNamespace The package namespace for the file
+     * @param packageSuffix    The suffix for the namespace for the file
+     * @param simpleName       The simple name of the java file
+     * @return the file path for the java file
+     */
+    public static String getJavaFilePath(String packageNamespace, String packageSuffix, String simpleName) {
+        var packagePath = packageNamespace.replace(".", "/");
+        return String.format("java/%s/%s/%s.java", packagePath, packageSuffix, simpleName);
     }
 
     private static String getMemberName(MemberShape shape, Model model, boolean escape) {

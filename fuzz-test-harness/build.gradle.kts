@@ -28,16 +28,14 @@ dependencies {
 }
 
 afterEvaluate {
-    val typePath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen")
+    val typePath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
     sourceSets {
         main {
             java {
-                srcDir(typePath)
-                include("software/**")
+                srcDir("$typePath/java")
             }
             resources {
-                srcDir(typePath)
-                include("META-INF/**")
+                srcDir("$typePath/resources")
             }
         }
     }

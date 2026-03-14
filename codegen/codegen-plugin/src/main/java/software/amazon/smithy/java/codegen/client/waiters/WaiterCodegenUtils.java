@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.client.waiters;
 import static java.lang.String.format;
 
 import software.amazon.smithy.codegen.core.Symbol;
+import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 
@@ -25,9 +26,8 @@ public final class WaiterCodegenUtils {
                 .name(waiterName)
                 .namespace(format("%s.client", settings.packageNamespace()), ".")
                 .putProperty(SymbolProperties.IS_PRIMITIVE, false)
-                .definitionFile(format("./%s/client/%s.java",
-                        settings.packageNamespace().replace(".", "/"),
-                        waiterName))
+                .definitionFile(
+                        CodegenUtils.getJavaFilePath(settings.packageNamespace(), "client", waiterName))
                 .build();
     }
 }

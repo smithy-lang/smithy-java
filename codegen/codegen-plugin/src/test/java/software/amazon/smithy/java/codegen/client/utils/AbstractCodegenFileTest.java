@@ -51,7 +51,7 @@ public abstract class AbstractCodegenFileTest {
 
     protected String getFileStringForClass(String className) {
         var fileStringOptional = manifest.getFileString(
-                Paths.get(String.format("/test/smithy/codegen/%s.java", className)));
+                Paths.get(String.format("java/test/smithy/codegen/%s.java", className)));
         assertTrue(fileStringOptional.isPresent());
         return fileStringOptional.get();
     }

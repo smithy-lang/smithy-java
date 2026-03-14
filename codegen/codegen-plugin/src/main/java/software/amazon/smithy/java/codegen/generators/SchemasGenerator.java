@@ -54,8 +54,7 @@ public final class SchemasGenerator
         var order = directive.context().schemaFieldOrder();
         for (var shapeOrder : order.partitions()) {
             var className = shapeOrder.get(0).className();
-            var fileName = String
-                    .format("./%s/model/%s.java", directive.settings().packageNamespace().replace(".", "/"), className);
+            var fileName = CodegenUtils.getJavaFilePath(directive.settings(), "model", className);
             directive.context()
                     .writerDelegator()
                     .useFileWriter(fileName, CodegenUtils.getModelNamespace(directive.settings()), writer -> {

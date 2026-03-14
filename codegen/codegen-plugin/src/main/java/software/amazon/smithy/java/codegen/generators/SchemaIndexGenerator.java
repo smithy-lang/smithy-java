@@ -28,8 +28,7 @@ public final class SchemaIndexGenerator
     @Override
     public void accept(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         var className = "GeneratedSchemaIndex";
-        var fileName = String
-                .format("./%s/model/%s.java", directive.settings().packageNamespace().replace(".", "/"), className);
+        var fileName = CodegenUtils.getJavaFilePath(directive.settings(), "model", className);
 
         directive.context()
                 .writerDelegator()
@@ -38,7 +37,7 @@ public final class SchemaIndexGenerator
                         writer -> generateSchemaIndexClass(writer, className, directive));
 
         // Generate META-INF/services file
-        var serviceFileName = "./META-INF/services/" + SchemaIndex.class.getName();
+        var serviceFileName = "./resources/META-INF/services/" + SchemaIndex.class.getName();
         var schemaIndexClassName = CodegenUtils.getModelNamespace(directive.settings()) + "." + className;
 
         directive.context()

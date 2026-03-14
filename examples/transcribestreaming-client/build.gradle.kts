@@ -13,8 +13,8 @@ dependencies {
     implementation("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:client-core:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-sigv4:$smithyJavaVersion")
-    implementation("software.amazon.smithy.java:client-rulesengine:${smithyJavaVersion}")
-    implementation("software.amazon.smithy.java:aws-client-rulesengine:${smithyJavaVersion}")
+    implementation("software.amazon.smithy.java:client-rulesengine:$smithyJavaVersion")
+    implementation("software.amazon.smithy.java:aws-client-rulesengine:$smithyJavaVersion")
     implementation("org.slf4j:slf4j-simple:1.7.36")
     implementation(libs.smithy.aws.endpoints)
     implementation(libs.smithy.aws.smoke.test.model)
@@ -28,15 +28,14 @@ dependencies {
 
 // Add generated Java sources to the main sourceset
 afterEvaluate {
-    val clientPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen")
+    val clientPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
     sourceSets {
         main {
             java {
-                srcDir(clientPath)
+                srcDir("$clientPath/java")
             }
             resources {
-                srcDir("${clientPath.get()}/META-INF")
-                srcDir("${clientPath.get()}/resources")
+                srcDir("$clientPath/resources")
             }
         }
         create("it") {

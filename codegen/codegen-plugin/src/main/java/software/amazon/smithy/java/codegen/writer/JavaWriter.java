@@ -76,7 +76,7 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
     @Override
     public String toString() {
         // Do not add headers or attempt symbol resolution for resource files
-        if (filename.startsWith("META-INF")) {
+        if (filename.contains("META-INF")) {
             return super.toString();
         }
 

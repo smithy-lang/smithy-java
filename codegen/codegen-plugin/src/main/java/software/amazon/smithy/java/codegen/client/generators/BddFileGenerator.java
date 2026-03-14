@@ -7,8 +7,7 @@ package software.amazon.smithy.java.codegen.client.generators;
 
 import static java.lang.String.format;
 
-import java.io.IOException;
-import java.nio.file.Files;
+import java.io.ByteArrayInputStream;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
 import software.amazon.smithy.java.client.rulesengine.Bytecode;
@@ -23,19 +22,11 @@ public class BddFileGenerator
         implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
     @Override
     public void accept(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        try {
-            var baseDir = directive.fileManifest().getBaseDir();
-            var serviceName = directive.service().toShapeId().getName();
-            var fileDir = baseDir.resolve(format("resources/META-INF/endpoints/%s.bdd", serviceName));
-            var parentDir = fileDir.getParent();
-            if (parentDir != null) {
-                Files.createDirectories(parentDir);
-            }
-            var bytecode = compileBytecode(directive.service());
-            Files.write(fileDir, bytecode.getBytecode());
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to write BDD bytecode binary file", e);
-        }
+        var fileManifest = directive.fileManifest();
+        var serviceName = directive.service().toShapeId().getName();
+        var bytecode = compileBytecode(directive.service());
+        fileManifest.writeFile(format("resources/META-INF/endpoints/%s.bdd", serviceName),
+                new ByteArrayInputStream(bytecode.getBytecode()));
     }
 
     private Bytecode compileBytecode(ServiceShape serviceShape) {

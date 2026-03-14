@@ -37,11 +37,11 @@ tasks {
 
 // Add generated Java files to the main sourceSet
 afterEvaluate {
-    val serverPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen")
+    val serverPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
     sourceSets {
         main {
             java {
-                srcDir(serverPath)
+                srcDir("$serverPath/java")
             }
         }
     }

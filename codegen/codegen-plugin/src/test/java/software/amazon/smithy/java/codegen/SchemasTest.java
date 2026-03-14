@@ -94,7 +94,7 @@ public class SchemasTest {
 
     private String getFileString(String fileName) {
         var fileStringOptional = manifest.getFileString(
-                Paths.get(String.format("/t/s/c/model/%s", fileName)));
+                Paths.get(String.format("/java/t/s/c/model/%s", fileName)));
         assertThat(fileStringOptional).isPresent();
         return fileStringOptional.get();
     }

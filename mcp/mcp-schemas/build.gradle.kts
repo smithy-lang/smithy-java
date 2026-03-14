@@ -35,13 +35,13 @@ afterEvaluate {
             java {
                 srcDir(codegenPath)
                 srcDir(traitsPath)
-                include("software/**")
+                include("software/**", "java/software/**")
             }
             resources {
                 srcDir(codegenPath)
                 srcDir(traitsPath)
                 exclude("**/*.java")
-                exclude("META-INF/services/**") // Exclude original service files, use merged ones instead
+                exclude("resources/META-INF/services/**") // Exclude original service files, use merged ones instead
             }
 
             smithy {

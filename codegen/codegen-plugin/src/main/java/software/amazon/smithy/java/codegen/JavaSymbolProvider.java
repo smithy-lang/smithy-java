@@ -299,14 +299,14 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
                     .putProperty(SymbolProperties.IS_PRIMITIVE, false)
                     .namespace(format("%s.service", packageNamespace), ".")
                     .declarationFile(
-                            format("./%s/service/%s.java", packageNamespace.replace(".", "/"), stubName))
+                            CodegenUtils.getJavaFilePath(packageNamespace, "service", stubName))
                     .build();
             var asyncStubSymbol = Symbol.builder()
                     .name(asyncStubName)
                     .putProperty(SymbolProperties.IS_PRIMITIVE, false)
                     .namespace(format("%s.service", packageNamespace), ".")
                     .declarationFile(
-                            format("./%s/service/%s.java", packageNamespace.replace(".", "/"), asyncStubName))
+                            CodegenUtils.getJavaFilePath(packageNamespace, "service", asyncStubName))
                     .build();
             return baseSymbol.toBuilder()
                     .putProperty(SymbolProperties.IS_PRIMITIVE, false)
@@ -380,7 +380,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
                 .putProperty(SymbolProperties.IS_PRIMITIVE, false)
                 .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, true)
                 .namespace(format("%s.model", packageNamespace), ".")
-                .declarationFile(format("./%s/model/%s.java", packageNamespace.replace(".", "/"), name))
+                .declarationFile(CodegenUtils.getJavaFilePath(packageNamespace, "model", name))
                 .build();
     }
 
@@ -394,7 +394,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
                 .putProperty(SymbolProperties.SERVICE_API_SERVICE,
                         CodegenUtils.getServiceApiSymbol(packageNamespace, serviceName))
                 .namespace(format("%s.client", packageNamespace), ".")
-                .definitionFile(format("./%s/client/%s.java", packageNamespace.replace(".", "/"), name))
+                .definitionFile(CodegenUtils.getJavaFilePath(packageNamespace, "client", name))
                 .build();
 
         return symbol.toBuilder()
@@ -403,7 +403,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
                         symbol.toBuilder()
                                 .name(name + "Impl")
                                 .definitionFile(
-                                        format("./%s/client/%sImpl.java", packageNamespace.replace(".", "/"), name))
+                                        CodegenUtils.getJavaFilePath(packageNamespace, "client", name + "Impl"))
                                 .build())
                 .build();
     }
@@ -419,7 +419,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
                 .putProperty(ServerSymbolProperties.TYPES_NAMESPACE, format("%s.model", packageNamespace))
                 .namespace(format("%s.service", packageNamespace), ".")
                 .declarationFile(
-                        format("./%s/service/%s.java", packageNamespace.replace(".", "/"), serviceName))
+                        CodegenUtils.getJavaFilePath(packageNamespace, "service", serviceName))
                 .build();
     }
 }
