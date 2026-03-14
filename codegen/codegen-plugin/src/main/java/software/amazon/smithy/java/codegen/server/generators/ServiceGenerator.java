@@ -252,10 +252,11 @@ public final class ServiceGenerator implements
                 Symbol syncOperation = operation.expectProperty(ServerSymbolProperties.STUB_OPERATION);
                 Symbol asyncOperation = operation.expectProperty(ServerSymbolProperties.ASYNC_STUB_OPERATION);
                 writer.putContext("operation", operation);
+                writer.putContext("operationName", operation.getName());
                 writer.write("""
                         public interface ${curStage:L} {
-                            ${nextStage:L} add${operation:T}Operation($T operation);
-                            ${nextStage:L} add${operation:T}Operation($T operation);
+                            ${nextStage:L} add${operationName:L}Operation($T operation);
+                            ${nextStage:L} add${operationName:L}Operation($T operation);
                         }
                         """, syncOperation, asyncOperation);
                 writer.popState();
@@ -303,13 +304,13 @@ public final class ServiceGenerator implements
                 var template =
                         """
                                 @Override
-                                public ${nextStage:L} add${operation:T}Operation(${asyncOperationType:T} operation) {
+                                public ${nextStage:L} add${operationName:L}Operation(${asyncOperationType:T} operation) {
                                     this.${operationFieldName:L} = s -> ${operationClass:T}.ofAsync("${operation:T}", operation::${operationFieldName:L}, ${apiOperationClass:T}.instance(), s);
                                     return this;
                                 }
 
                                 @Override
-                                public ${nextStage:L} add${operation:T}Operation(${syncOperationType:T} operation) {
+                                public ${nextStage:L} add${operationName:L}Operation(${syncOperationType:T} operation) {
                                     this.${operationFieldName:L} = s -> ${operationClass:T}.of("${operation:T}", operation::${operationFieldName:L}, ${apiOperationClass:T}.instance(), s);
                                     return this;
                                 }
@@ -317,6 +318,7 @@ public final class ServiceGenerator implements
                 writer.putContext("operationFieldName", operationFieldName);
                 writer.putContext("nextStage", nextStage);
                 writer.putContext("operation", operation);
+                writer.putContext("operationName", operation.getName());
                 writer.putContext("asyncOperationType", asyncOperation);
                 writer.putContext("syncOperationType", syncOperation);
                 writer.putContext("apiOperationClass", apiOperation);

@@ -36,6 +36,14 @@ dependencies {
     itImplementation(project(":codecs:json-codec", configuration = "shadow"))
     itImplementation(libs.smithy.aws.traits)
     itImplementation(libs.smithy.rules)
+
+    // Additional deps for AWS model codegen compilation test
+    itImplementation(project(":aws:aws-sigv4"))
+    itImplementation(project(":aws:aws-auth-api"))
+    itImplementation(project(":aws:client:aws-client-core"))
+    itImplementation(project(":aws:client:aws-client-http"))
+    itImplementation(project(":aws:client:aws-client-rulesengine"))
+    itImplementation(libs.smithy.aws.endpoints)
 }
 
 // Core codegen test runner
@@ -63,4 +71,15 @@ listOf("generateSourcesClient", "generateSourcesServer", "generateSourcesTypes")
 
 tasks.test {
     failOnNoDiscoveredTests = false
+}
+
+// If API_MODELS_AWS_DIR is set, add it as a task input so Gradle doesn't cache results.
+System.getenv("API_MODELS_AWS_DIR")?.let { modelsDir ->
+    val dir = file(modelsDir)
+    if (dir.isDirectory) {
+        tasks.named<Test>("integ") {
+            inputs.dir(dir).withPathSensitivity(PathSensitivity.RELATIVE)
+            maxHeapSize = "4g"
+        }
+    }
 }

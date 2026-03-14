@@ -115,7 +115,7 @@ public class CodeGenerationContext
             CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive,
             String plugin
     ) {
-        this(directive, plugin, 64000);
+        this(directive, plugin, 500);
     }
 
     //Visible for testing

@@ -22,11 +22,12 @@ public class BddFileGenerator
         implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
     @Override
     public void accept(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        var fileManifest = directive.fileManifest();
         var serviceName = directive.service().toShapeId().getName();
         var bytecode = compileBytecode(directive.service());
-        fileManifest.writeFile(format("resources/META-INF/endpoints/%s.bdd", serviceName),
-                new ByteArrayInputStream(bytecode.getBytecode()));
+        directive.fileManifest()
+                .writeFile(
+                        format("./resources/META-INF/endpoints/%s.bdd", serviceName),
+                        new ByteArrayInputStream(bytecode.getBytecode()));
     }
 
     private Bytecode compileBytecode(ServiceShape serviceShape) {
