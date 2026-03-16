@@ -90,39 +90,51 @@ final class DirectedJavaCodegen
 
     @Override
     public void generateStructure(GenerateStructureDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        if (!isSynthetic(directive.shape())) {
+        if (!isSynthetic(directive.shape()) && !directive.settings().useExternalTypes()) {
             new StructureGenerator<>().accept(directive);
         }
     }
 
     @Override
     public void generateError(GenerateErrorDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new StructureGenerator<>().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new StructureGenerator<>().accept(directive);
+        }
     }
 
     @Override
     public void generateUnion(GenerateUnionDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new UnionGenerator().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new UnionGenerator().accept(directive);
+        }
     }
 
     @Override
     public void generateList(GenerateListDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new ListGenerator().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new ListGenerator().accept(directive);
+        }
     }
 
     @Override
     public void generateMap(GenerateMapDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new MapGenerator().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new MapGenerator().accept(directive);
+        }
     }
 
     @Override
     public void generateEnumShape(GenerateEnumDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new EnumGenerator<>().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new EnumGenerator<>().accept(directive);
+        }
     }
 
     @Override
     public void generateIntEnumShape(GenerateIntEnumDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new EnumGenerator<>().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new EnumGenerator<>().accept(directive);
+        }
     }
 
     @Override
@@ -130,10 +142,12 @@ final class DirectedJavaCodegen
         if (isSynthetic(directive.shape())) {
             return;
         }
-        if (modes.contains(CodegenMode.SERVER)) {
-            new OperationInterfaceGenerator().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            if (modes.contains(CodegenMode.SERVER)) {
+                new OperationInterfaceGenerator().accept(directive);
+            }
+            new OperationGenerator().accept(directive);
         }
-        new OperationGenerator().accept(directive);
     }
 
     @Override
@@ -153,8 +167,10 @@ final class DirectedJavaCodegen
             new ServiceGenerator().accept(directive);
         }
 
-        new ApiServiceGenerator().accept(directive);
-        new ServiceExceptionGenerator<>().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new ApiServiceGenerator().accept(directive);
+            new ServiceExceptionGenerator<>().accept(directive);
+        }
 
         if (modes.contains(CodegenMode.CLIENT)) {
             var service = directive.service();
@@ -167,14 +183,18 @@ final class DirectedJavaCodegen
 
     @Override
     public void generateResource(GenerateResourceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new ResourceGenerator().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new ResourceGenerator().accept(directive);
+        }
     }
 
     @Override
     public void customizeBeforeIntegrations(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new SchemasGenerator().accept(directive);
-        new SharedSerdeGenerator().accept(directive);
-        new SchemaIndexGenerator().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new SchemasGenerator().accept(directive);
+            new SharedSerdeGenerator().accept(directive);
+            new SchemaIndexGenerator().accept(directive);
+        }
     }
 
     @Override
