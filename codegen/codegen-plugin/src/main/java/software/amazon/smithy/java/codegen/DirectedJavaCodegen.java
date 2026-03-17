@@ -130,6 +130,13 @@ final class DirectedJavaCodegen
         if (isSynthetic(directive.shape())) {
             return;
         }
+        // In types-only mode, skip OperationGenerator. Operation input/output types are still
+        // generated via generateStructure(). OperationGenerator creates operation wiring classes
+        // and invokes EventStreamIndex, which fails on models built by SyntheticServiceTransform
+        // when @mixin shapes are present (incomplete transitive closure).
+        if (isTypesOnly()) {
+            return;
+        }
         if (modes.contains(CodegenMode.SERVER)) {
             new OperationInterfaceGenerator().accept(directive);
         }
@@ -139,8 +146,7 @@ final class DirectedJavaCodegen
     @Override
     public void generateService(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         // In TYPES-only mode, generateService is a no-op (the synthetic service has no real service shape)
-        if (modes.contains(CodegenMode.TYPES) && !modes.contains(CodegenMode.CLIENT)
-                && !modes.contains(CodegenMode.SERVER)) {
+        if (isTypesOnly()) {
             return;
         }
 
@@ -187,5 +193,11 @@ final class DirectedJavaCodegen
 
     private static boolean isSynthetic(Shape shape) {
         return shape.getId().getNamespace().equals(SyntheticServiceTransform.SYNTHETIC_NAMESPACE);
+    }
+
+    private boolean isTypesOnly() {
+        return modes.contains(CodegenMode.TYPES)
+                && !modes.contains(CodegenMode.CLIENT)
+                && !modes.contains(CodegenMode.SERVER);
     }
 }
