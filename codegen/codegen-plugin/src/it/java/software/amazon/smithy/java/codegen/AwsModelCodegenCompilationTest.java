@@ -58,8 +58,7 @@ class AwsModelCodegenCompilationTest {
     private static final Set<String> IGNORED_SDK_IDS = Set.of(
             "timestream-write",
             "timestream-query",
-            "clouddirectory",
-            "ec2"
+            "clouddirectory"
 
     );
 

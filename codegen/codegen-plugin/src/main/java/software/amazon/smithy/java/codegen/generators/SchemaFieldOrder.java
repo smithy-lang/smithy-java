@@ -21,6 +21,7 @@ import java.util.stream.Stream;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.TopologicalIndex;
 import software.amazon.smithy.codegen.core.directed.Directive;
+import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -36,6 +37,11 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 @SmithyInternalApi
 public final class SchemaFieldOrder {
 
+    private static final int FAST_PATH_THRESHOLD = 500;
+    //The default JVM limit for a class file is 64KB, we use 50KB as a safe limit
+    // because there will be other things in the class too like imports, etc.
+    private static final int SCHEMA_FILE_SIZE_THRESHOLD = 50_000;
+
     private static final EnumSet<ShapeType> EXCLUDED_TYPES = EnumSet.of(
             ShapeType.SERVICE,
             ShapeType.RESOURCE,
@@ -48,7 +54,8 @@ public final class SchemaFieldOrder {
     private final Map<ShapeId, SchemaField> reverseMapping;
     private final SymbolProvider symbolProvider;
 
-    public SchemaFieldOrder(Directive<?> directive, long partitionThreshold, SymbolProvider symbolProvider) {
+    public SchemaFieldOrder(Directive<?> directive, CodeGenerationContext context) {
+        this.symbolProvider = context.symbolProvider();
         var connectedShapes = new HashSet<>(directive.connectedShapes().values());
         var index = TopologicalIndex.of(directive.model());
         var allShapes = Stream.concat(index.getOrderedShapes().stream(), index.getRecursiveShapes().stream())
@@ -57,47 +64,70 @@ public final class SchemaFieldOrder {
                 .filter(s -> !EXCLUDED_TYPES.contains(s.getType()))
                 .filter(not(Prelude::isPreludeShape))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        List<List<SchemaField>> computedPartitions = new ArrayList<>();
-        int curIndex = 0;
-        var curParition = new ArrayList<SchemaField>();
-        var curFieldNames = new HashSet<String>();
-        computedPartitions.add(curParition);
-        int curClassNumber = 0;
-        String curClassName = "Schemas";
+
+        // Phase 1: Assign field names and default className "Schemas"
+        var allFields = new ArrayList<SchemaField>();
+        var usedFieldNames = new HashSet<String>();
         for (var shape : allShapes) {
-            if (curIndex >= partitionThreshold) {
-                curIndex = 0;
-                curClassNumber++;
-                curClassName = "Schemas" + curClassNumber;
-                curFieldNames.clear();
-                curParition = new ArrayList<>();
-                computedPartitions.add(curParition);
-            }
             var shapeFieldName = toSchemaName(shape);
-            if (curFieldNames.contains(shapeFieldName) || shape.getId().getName().equals(shapeFieldName)) {
+            if (usedFieldNames.contains(shapeFieldName) || shape.getId().getName().equals(shapeFieldName)) {
                 shapeFieldName = toFullQualifiedSchemaName(shape);
             }
             boolean isShapeRecursive = CodegenUtils.recursiveShape(directive.model(), shape);
             boolean isExternal =
                     symbolProvider.toSymbol(shape).getProperty(SymbolProperties.EXTERNAL_TYPE).orElse(false);
-            var shapeField = new SchemaField(shape, shapeFieldName, curClassName, isShapeRecursive, isExternal);
-            curParition.add(shapeField);
-            curFieldNames.add(shapeFieldName);
-            if (isShapeRecursive) {
-                curIndex++;
-            }
-            curIndex++;
+            allFields.add(
+                    new SchemaField(shape, shapeFieldName, SchemaClassRef.placeholder(), isShapeRecursive, isExternal));
+            usedFieldNames.add(shapeFieldName);
         }
-        computedPartitions.removeIf(List::isEmpty);
-        this.partitions = Collections.unmodifiableList(computedPartitions);
+
+        // Build reverseMapping so getSchemaFieldName() works during measurement
         Map<ShapeId, SchemaField> map = new HashMap<>();
-        for (var partition : this.partitions) {
-            for (var schemaField : partition) {
-                map.put(schemaField.shape.getId(), schemaField);
-            }
+        for (var field : allFields) {
+            map.put(field.shape().getId(), field);
         }
         this.reverseMapping = map;
-        this.symbolProvider = symbolProvider;
+
+        // Phase 2: Partition
+        if (allFields.size() < FAST_PATH_THRESHOLD) {
+            // Fast path: keep all shapes in a single "Schemas" partition
+            this.partitions = allFields.isEmpty()
+                    ? Collections.emptyList()
+                    : List.of(List.copyOf(allFields));
+        } else {
+            // Measure actual generated sizes and partition based on content size
+            int[] sizes = SchemasGenerator.measureShapeSizes(allFields, directive.model(), context, this);
+            this.partitions = computePartitions(allFields, sizes);
+        }
+    }
+
+    private static List<List<SchemaField>> computePartitions(
+            List<SchemaField> allFields,
+            int[] sizes
+    ) {
+        List<List<SchemaField>> result = new ArrayList<>();
+        var currentPartition = new ArrayList<SchemaField>();
+        result.add(currentPartition);
+        int currentSize = 0;
+        int classNumber = 0;
+        String className = "Schemas";
+
+        for (int i = 0; i < allFields.size(); i++) {
+            var field = allFields.get(i);
+            int shapeSize = sizes[i];
+            if (currentSize + shapeSize > SCHEMA_FILE_SIZE_THRESHOLD && !currentPartition.isEmpty()) {
+                classNumber++;
+                className = "Schemas" + classNumber;
+                currentPartition = new ArrayList<>();
+                result.add(currentPartition);
+                currentSize = 0;
+            }
+            field.classRef.update(className);
+            currentPartition.add(field);
+            currentSize += shapeSize;
+        }
+        result.removeIf(List::isEmpty);
+        return Collections.unmodifiableList(result);
     }
 
     public SchemaField getSchemaField(ShapeId shape) {
@@ -115,7 +145,7 @@ public final class SchemaFieldOrder {
         } else if (schemaField.isExternal()) {
             return writer.format("$L.$$SCHEMA", symbolProvider.toSymbol(shape));
         }
-        return writer.format("$L.$L", schemaField.className(), schemaField.fieldName());
+        return writer.format("$L.$L", schemaField.classRef().className(), schemaField.fieldName());
     }
 
     private static String getSchemaType(
@@ -133,7 +163,8 @@ public final class SchemaFieldOrder {
                     "$T.$$SCHEMA",
                     provider.toSymbol(shape));
         }
-        return writer.format("Schemas.$L", toSchemaName(shape));
+        throw new IllegalStateException(
+                "Shape " + shape.getId() + " is not in schema field order and has no known schema fallback");
     }
 
     private static String toSchemaName(Shape shape) {
@@ -145,5 +176,50 @@ public final class SchemaFieldOrder {
                 .toUpperCase(Locale.ENGLISH);
     }
 
-    record SchemaField(Shape shape, String fieldName, String className, boolean isRecursive, boolean isExternal) {}
+    /**
+     * Represents a shape's schema field assignment in a Schemas partition class.
+     * Uses a class instead of a record so className can be updated during partitioning.
+     */
+    public record SchemaField(
+            Shape shape,
+            String fieldName,
+            SchemaClassRef classRef,
+            boolean isRecursive,
+            boolean isExternal) {}
+
+    public static final class SchemaClassRef {
+        private String className;
+        private boolean isPlaceholder;
+
+        private SchemaClassRef(String className, boolean isPlaceholder) {
+            this.className = className;
+            this.isPlaceholder = isPlaceholder;
+        }
+
+        public static SchemaClassRef placeholder() {
+            return new SchemaClassRef("Schemas", true);
+        }
+
+        public static SchemaClassRef of(String className) {
+            return new SchemaClassRef(className, false);
+        }
+
+        public void update(String className) {
+            if (!isPlaceholder) {
+                throw new IllegalStateException("Trying to update a non-place holder SchemaClassRef. Existing : "
+                        + this.className + ", Update Attempted With : " + className);
+            }
+            this.className = className;
+            this.isPlaceholder = false;
+        }
+
+        public boolean isPlaceholder() {
+            return isPlaceholder;
+        }
+
+        public String className() {
+            return className;
+        }
+
+    }
 }

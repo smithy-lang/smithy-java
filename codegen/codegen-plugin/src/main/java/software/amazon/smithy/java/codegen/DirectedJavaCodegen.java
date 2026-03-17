@@ -41,6 +41,7 @@ import software.amazon.smithy.java.codegen.server.generators.OperationInterfaceG
 import software.amazon.smithy.java.codegen.server.generators.ServiceGenerator;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
@@ -51,6 +52,9 @@ final class DirectedJavaCodegen
         implements DirectedCodegen<CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration> {
 
     private final Set<CodegenMode> modes;
+    //Visible For Testing
+    @SmithyInternalApi
+    CodeGenerationContext context;
 
     DirectedJavaCodegen(Set<CodegenMode> modes) {
         this.modes = modes;
@@ -73,7 +77,8 @@ final class DirectedJavaCodegen
             CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive
     ) {
         String pluginName = getPluginName();
-        return new CodeGenerationContext(directive, pluginName);
+        this.context = new CodeGenerationContext(directive, pluginName);
+        return context;
     }
 
     private String getPluginName() {

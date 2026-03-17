@@ -3,16 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.codegen.utils;
+package software.amazon.smithy.java.codegen;
 
+import java.util.Set;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.build.SmithyBuildPlugin;
 import software.amazon.smithy.codegen.core.directed.CodegenDirector;
-import software.amazon.smithy.java.codegen.CodeGenerationContext;
-import software.amazon.smithy.java.codegen.DefaultTransforms;
-import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
-import software.amazon.smithy.java.codegen.JavaCodegenSettings;
-import software.amazon.smithy.java.codegen.TestJavaCodegen;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 
 public class TestJavaCodegenPlugin implements SmithyBuildPlugin {
@@ -30,7 +26,7 @@ public class TestJavaCodegenPlugin implements SmithyBuildPlugin {
 
         var settings = JavaCodegenSettings.fromNode(context.getSettings());
         runner.settings(settings);
-        TestJavaCodegen directedCodegen = new TestJavaCodegen();
+        DirectedJavaCodegen directedCodegen = new DirectedJavaCodegen(Set.of(CodegenMode.CLIENT, CodegenMode.SERVER));
         runner.directedCodegen(directedCodegen);
         runner.fileManifest(context.getFileManifest());
         runner.service(settings.service());
