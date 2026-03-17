@@ -130,10 +130,6 @@ final class DirectedJavaCodegen
         if (isSynthetic(directive.shape())) {
             return;
         }
-        // In types-only mode, skip OperationGenerator. Operation input/output types are still
-        // generated via generateStructure(). OperationGenerator creates operation wiring classes
-        // and invokes EventStreamIndex, which fails on models built by SyntheticServiceTransform
-        // when @mixin shapes are present (incomplete transitive closure).
         if (isTypesOnly()) {
             return;
         }
