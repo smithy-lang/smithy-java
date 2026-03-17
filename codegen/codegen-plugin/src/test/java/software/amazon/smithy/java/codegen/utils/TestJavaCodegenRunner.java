@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.utils;
 import java.nio.file.Paths;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.build.PluginContext;
+import software.amazon.smithy.java.codegen.TestJavaCodegenPlugin;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.ObjectNode;
 

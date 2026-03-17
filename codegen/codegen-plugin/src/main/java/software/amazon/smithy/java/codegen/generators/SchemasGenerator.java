@@ -9,7 +9,6 @@ import static java.util.function.Predicate.not;
 
 import java.util.List;
 import java.util.function.Consumer;
-import software.amazon.smithy.codegen.core.directed.ContextualDirective;
 import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
@@ -53,7 +52,7 @@ public final class SchemasGenerator
 
         var order = directive.context().schemaFieldOrder();
         for (var shapeOrder : order.partitions()) {
-            var className = shapeOrder.get(0).className();
+            var className = shapeOrder.getFirst().classRef().className();
             var fileName = CodegenUtils.getJavaFilePath(directive.settings(), "model", className);
             directive.context()
                     .writerDelegator()
@@ -87,7 +86,12 @@ public final class SchemasGenerator
                         var resolvers = recursiveShapes.stream()
                                 .map(s -> new ResolverGenerator(writer, s))
                                 .toList();
-                        var schemas = new StaticSchemaFieldsGenerator(directive, shapeOrder, writer);
+                        var schemas = new StaticSchemaFieldsGenerator(
+                                writer,
+                                shapeOrder,
+                                directive.model(),
+                                directive.context(),
+                                directive.context().schemaFieldOrder());
                         writer.pushState();
                         writer.putContext("className", className);
                         writer.putContext("schemas", schemas);
@@ -100,22 +104,102 @@ public final class SchemasGenerator
 
     }
 
+    /**
+     * Measures the generated code size for each shape in the list.
+     * Used during partitioning to estimate per-shape contribution to class file size.
+     *
+     * @param shapes ordered list of schema fields
+     * @param model the Smithy model
+     * @param context code generation context
+     * @param order the schema field order (may still be under construction)
+     * @return array of content sizes in characters, one per shape
+     */
+    static int[] measureShapeSizes(
+            List<SchemaField> shapes,
+            Model model,
+            CodeGenerationContext context,
+            SchemaFieldOrder order
+    ) {
+        int[] sizes = new int[shapes.size()];
+        String namespace = CodegenUtils.getModelNamespace(context.settings());
+        for (int i = 0; i < shapes.size(); i++) {
+            var field = shapes.get(i);
+            if (field.isExternal()) {
+                sizes[i] = 0;
+                continue;
+            }
+            var writer = new JavaWriter(context.settings(), namespace, "measurement");
+            generateSingleShape(writer, field, model, context, order);
+            sizes[i] = writer.toContentString().length();
+        }
+        return sizes;
+    }
+
+    /**
+     * Generates all code for a single shape (builder + field + resolver) into the given writer.
+     * Used for measurement during partitioning.
+     */
+    private static void generateSingleShape(
+            JavaWriter writer,
+            SchemaField schemaField,
+            Model model,
+            CodeGenerationContext context,
+            SchemaFieldOrder order
+    ) {
+        // Builder (if recursive)
+        if (schemaField.isRecursive()) {
+            new SchemaBuilderGenerator(writer, schemaField, model, context).run();
+        }
+        // Schema field
+        writeSchemaField(writer, schemaField, model, context, order);
+        // Resolver (if recursive)
+        if (schemaField.isRecursive()) {
+            new ResolverGenerator(writer, schemaField).run();
+        }
+    }
+
+    private static void writeSchemaField(
+            JavaWriter writer,
+            SchemaField schemaField,
+            Model model,
+            CodeGenerationContext context,
+            SchemaFieldOrder order
+    ) {
+        writer.pushState();
+        writer.putContext("schemaClass", Schema.class);
+        var originalId = CodegenUtils.getOriginalId(schemaField.shape());
+        var isUnit = UnitTypeTrait.UNIT.equals(originalId);
+        writer.putContext("id", isUnit ? schemaField.shape().getId() : originalId);
+        writer.putContext("shapeId", ShapeId.class);
+        writer.putContext("schemaBuilder", SchemaBuilder.class);
+        writer.putContext("name", schemaField.fieldName());
+        List<Trait> extraTraits = isUnit ? List.of(new UnitTypeTrait()) : List.of();
+        var traitGen = new TraitInitializerGenerator(writer, schemaField.shape(), context, extraTraits);
+        writer.putContext("traits", traitGen);
+        schemaField.shape().accept(new StaticSchemaFieldGenerator(writer, schemaField, model, context, order));
+        writer.popState();
+    }
+
     private static final class StaticSchemaFieldsGenerator implements Runnable {
         private final JavaWriter writer;
         private final List<SchemaField> schemaFields;
         private final CodeGenerationContext context;
-        private final ContextualDirective<CodeGenerationContext, ?> directive;
+        private final Model model;
+        private final SchemaFieldOrder order;
         private boolean insideStaticBlock;
 
         private StaticSchemaFieldsGenerator(
-                ContextualDirective<CodeGenerationContext, ?> directive,
+                JavaWriter writer,
                 List<SchemaField> schemaFields,
-                JavaWriter writer
+                Model model,
+                CodeGenerationContext context,
+                SchemaFieldOrder order
         ) {
-            this.directive = directive;
             this.writer = writer;
             this.schemaFields = schemaFields;
-            this.context = directive.context();
+            this.model = model;
+            this.context = context;
+            this.order = order;
             this.insideStaticBlock = false;
         }
 
@@ -133,247 +217,236 @@ public final class SchemasGenerator
                     insideStaticBlock = false;
                     writer.closeBlock("}\n");
                 }
-                writer.pushState();
-                writer.putContext("schemaClass", Schema.class);
-                var originalId = CodegenUtils.getOriginalId(schemaField.shape());
-                var isUnit = UnitTypeTrait.UNIT.equals(originalId);
-                writer.putContext("id", isUnit ? schemaField.shape().getId() : originalId);
-                writer.putContext("shapeId", ShapeId.class);
-                writer.putContext("schemaBuilder", SchemaBuilder.class);
-                writer.putContext("name", schemaField.fieldName());
-                List<Trait> extraTraits = isUnit ? List.of(new UnitTypeTrait()) : List.of();
-                var traitGen = new TraitInitializerGenerator(writer, schemaField.shape(), context, extraTraits);
-                writer.putContext("traits", traitGen);
-                schemaField.shape().accept(new StaticSchemaFieldGenerator(writer, schemaField, directive));
-                writer.popState();
+                writeSchemaField(writer, schemaField, model, context, order);
             }
             if (insideStaticBlock) {
                 writer.closeBlock("}\n");
             }
             writer.popState();
         }
+    }
 
-        private static final class StaticSchemaFieldGenerator extends ShapeVisitor.Default<Void> {
+    private static final class StaticSchemaFieldGenerator extends ShapeVisitor.Default<Void> {
 
-            private final JavaWriter writer;
-            private final SchemaField schemaField;
-            private final ContextualDirective<CodeGenerationContext, ?> directive;
-            private final Model model;
-            private final CodeGenerationContext context;
+        private final JavaWriter writer;
+        private final SchemaField schemaField;
+        private final Model model;
+        private final CodeGenerationContext context;
+        private final SchemaFieldOrder order;
 
-            private StaticSchemaFieldGenerator(
-                    JavaWriter writer,
-                    SchemaField schemaField,
-                    ContextualDirective<CodeGenerationContext, ?> directive
-            ) {
-                this.writer = writer;
-                this.schemaField = schemaField;
-                this.directive = directive;
-                this.model = directive.model();
-                this.context = directive.context();
-            }
-
-            @Override
-            protected Void getDefault(Shape shape) {
-                throw new IllegalStateException("Tried to create schema field for invalid shape: " + shape);
-            }
-
-            @Override
-            public Void blobShape(BlobShape blobShape) {
-                writer.write(
-                        "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBlob(${shapeId:T}.from(${id:S})${traits:C});");
-                return null;
-            }
-
-            @Override
-            public Void booleanShape(BooleanShape booleanShape) {
-                writer.write(
-                        "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBoolean(${shapeId:T}.from(${id:S})${traits:C});");
-                return null;
-            }
-
-            @Override
-            public Void listShape(ListShape shape) {
-                String template;
-                if (schemaField.isRecursive()) {
-                    template = """
-                                ${name:L}_BUILDER
-                                    ${C|}
-                                    .build();
-                            """;
-                } else {
-                    template =
-                            """
-                                    static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.listBuilder(${shapeId:T}.from(${id:S})${traits:C})
-                                        ${C|}
-                                        .build();
-                                    """;
-                }
-                writer.write(template, (Runnable) () -> shape.getMember().accept(this));
-
-                return null;
-            }
-
-            @Override
-            public Void mapShape(MapShape shape) {
-                String template;
-                if (schemaField.isRecursive()) {
-                    template = """
-                                ${name:L}_BUILDER
-                                    ${C|}
-                                    ${C|}
-                                    .build();
-                            """;
-                } else {
-                    template =
-                            """
-                                    static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.mapBuilder(${shapeId:T}.from(${id:S})${traits:C})
-                                        ${C|}
-                                        ${C|}
-                                        .build();
-                                    """;
-                }
-                writer.write(template,
-                        (Runnable) () -> shape.getKey().accept(this),
-                        (Runnable) () -> shape.getValue().accept(this));
-                return null;
-            }
-
-            @Override
-            public Void byteShape(ByteShape byteShape) {
-                writer.write(
-                        "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createByte(${shapeId:T}.from(${id:S})${traits:C});");
-                return null;
-            }
-
-            @Override
-            public Void shortShape(ShortShape shortShape) {
-                writer.write(
-                        "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createShort(${shapeId:T}.from(${id:S})${traits:C});");
-                return null;
-            }
-
-            @Override
-            public Void integerShape(IntegerShape integerShape) {
-                writer.write(
-                        "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createInteger(${shapeId:T}.from(${id:S})${traits:C});");
-                return null;
-            }
-
-            @Override
-            public Void longShape(LongShape longShape) {
-                writer.write(
-                        "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createLong(${shapeId:T}.from(${id:S})${traits:C});");
-                return null;
-            }
-
-            @Override
-            public Void floatShape(FloatShape floatShape) {
-                writer.write(
-                        "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createFloat(${shapeId:T}.from(${id:S})${traits:C});");
-                return null;
-            }
-
-            @Override
-            public Void documentShape(DocumentShape documentShape) {
-                writer.write(
-                        "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createDocument(${shapeId:T}.from(${id:S})${traits:C});");
-                return null;
-            }
-
-            @Override
-            public Void doubleShape(DoubleShape doubleShape) {
-                writer.write(
-                        "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createDouble(${shapeId:T}.from(${id:S})${traits:C});");
-                return null;
-            }
-
-            @Override
-            public Void bigIntegerShape(BigIntegerShape bigIntegerShape) {
-                writer.write(
-                        "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBigInteger(${shapeId:T}.from(${id:S})${traits:C});");
-                return null;
-            }
-
-            @Override
-            public Void bigDecimalShape(BigDecimalShape bigDecimalShape) {
-                writer.write(
-                        "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBigDecimal(${shapeId:T}.from(${id:S})${traits:C});");
-                return null;
-            }
-
-            @Override
-            public Void structureShape(StructureShape shape) {
-                generateStructMemberSchemas(shape, "structureBuilder");
-                return null;
-            }
-
-            @Override
-            public Void unionShape(UnionShape shape) {
-                generateStructMemberSchemas(shape, "unionBuilder");
-                return null;
-            }
-
-            private void generateStructMemberSchemas(Shape shape, String builderMethod) {
-                String template;
-                if (schemaField.isRecursive()) {
-                    template = """
-                                ${name:L}_BUILDER${?hasMembers}
-                                    ${C|}
-                                    ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder)
-                                    .shapeClass(${schemaTypeClass:T}.class)
-                                    .build();
-                            """;
-                } else {
-                    template =
-                            """
-                                    static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.${builderMethod:L}(${shapeId:T}.from(${id:S})${traits:C})${?hasMembers}
-                                             ${C|}
-                                             ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder)
-                                             .shapeClass(${schemaTypeClass:T}.class)
-                                             .build();
-                                    """;
-                }
-                writer.pushState();
-                writer.putContext("hasMembers", !shape.members().isEmpty());
-                writer.putContext("builderMethod", builderMethod);
-                writer.putContext("schemaTypeClass", context.symbolProvider().toSymbol(shape));
-
-                writer.write(
-                        template,
-                        (Runnable) () -> shape.members().forEach(m -> m.accept(this)));
-
-                writer.popState();
-            }
-
-            @Override
-            public Void memberShape(MemberShape shape) {
-                var target = model.expectShape(shape.getTarget());
-                writer.pushState();
-                writer.putContext("memberName", shape.getMemberName());
-                writer.putContext("schema", directive.context().schemaFieldOrder().getSchemaFieldName(target, writer));
-                writer.putContext("traits", new TraitInitializerGenerator(writer, shape, context));
-                writer.putContext("recursive", CodegenUtils.recursiveShape(model, target));
-                writer.write(".putMember(${memberName:S}, ${schema:L}${?recursive}_BUILDER${/recursive}${traits:C})");
-                writer.popState();
-                return null;
-            }
-
-            @Override
-            public Void timestampShape(TimestampShape timestampShape) {
-                writer.write(
-                        "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createTimestamp(${shapeId:T}.from(${id:S})${traits:C});");
-                return null;
-            }
-
-            @Override
-            public Void stringShape(StringShape stringShape) {
-                writer.write(
-                        "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createString(${shapeId:T}.from(${id:S})${traits:C});");
-                return null;
-            }
+        private StaticSchemaFieldGenerator(
+                JavaWriter writer,
+                SchemaField schemaField,
+                Model model,
+                CodeGenerationContext context,
+                SchemaFieldOrder order
+        ) {
+            this.writer = writer;
+            this.schemaField = schemaField;
+            this.model = model;
+            this.context = context;
+            this.order = order;
         }
 
+        @Override
+        protected Void getDefault(Shape shape) {
+            throw new IllegalStateException("Tried to create schema field for invalid shape: " + shape);
+        }
+
+        @Override
+        public Void blobShape(BlobShape blobShape) {
+            writer.write(
+                    "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBlob(${shapeId:T}.from(${id:S})${traits:C});");
+            return null;
+        }
+
+        @Override
+        public Void booleanShape(BooleanShape booleanShape) {
+            writer.write(
+                    "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBoolean(${shapeId:T}.from(${id:S})${traits:C});");
+            return null;
+        }
+
+        @Override
+        public Void listShape(ListShape shape) {
+            String template;
+            if (schemaField.isRecursive()) {
+                template = """
+                            ${name:L}_BUILDER
+                                ${C|}
+                                .build();
+                        """;
+            } else {
+                template =
+                        """
+                                static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.listBuilder(${shapeId:T}.from(${id:S})${traits:C})
+                                    ${C|}
+                                    .build();
+                                """;
+            }
+            writer.write(template, (Runnable) () -> shape.getMember().accept(this));
+
+            return null;
+        }
+
+        @Override
+        public Void mapShape(MapShape shape) {
+            String template;
+            if (schemaField.isRecursive()) {
+                template = """
+                            ${name:L}_BUILDER
+                                ${C|}
+                                ${C|}
+                                .build();
+                        """;
+            } else {
+                template =
+                        """
+                                static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.mapBuilder(${shapeId:T}.from(${id:S})${traits:C})
+                                    ${C|}
+                                    ${C|}
+                                    .build();
+                                """;
+            }
+            writer.write(template,
+                    (Runnable) () -> shape.getKey().accept(this),
+                    (Runnable) () -> shape.getValue().accept(this));
+            return null;
+        }
+
+        @Override
+        public Void byteShape(ByteShape byteShape) {
+            writer.write(
+                    "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createByte(${shapeId:T}.from(${id:S})${traits:C});");
+            return null;
+        }
+
+        @Override
+        public Void shortShape(ShortShape shortShape) {
+            writer.write(
+                    "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createShort(${shapeId:T}.from(${id:S})${traits:C});");
+            return null;
+        }
+
+        @Override
+        public Void integerShape(IntegerShape integerShape) {
+            writer.write(
+                    "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createInteger(${shapeId:T}.from(${id:S})${traits:C});");
+            return null;
+        }
+
+        @Override
+        public Void longShape(LongShape longShape) {
+            writer.write(
+                    "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createLong(${shapeId:T}.from(${id:S})${traits:C});");
+            return null;
+        }
+
+        @Override
+        public Void floatShape(FloatShape floatShape) {
+            writer.write(
+                    "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createFloat(${shapeId:T}.from(${id:S})${traits:C});");
+            return null;
+        }
+
+        @Override
+        public Void documentShape(DocumentShape documentShape) {
+            writer.write(
+                    "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createDocument(${shapeId:T}.from(${id:S})${traits:C});");
+            return null;
+        }
+
+        @Override
+        public Void doubleShape(DoubleShape doubleShape) {
+            writer.write(
+                    "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createDouble(${shapeId:T}.from(${id:S})${traits:C});");
+            return null;
+        }
+
+        @Override
+        public Void bigIntegerShape(BigIntegerShape bigIntegerShape) {
+            writer.write(
+                    "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBigInteger(${shapeId:T}.from(${id:S})${traits:C});");
+            return null;
+        }
+
+        @Override
+        public Void bigDecimalShape(BigDecimalShape bigDecimalShape) {
+            writer.write(
+                    "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBigDecimal(${shapeId:T}.from(${id:S})${traits:C});");
+            return null;
+        }
+
+        @Override
+        public Void structureShape(StructureShape shape) {
+            generateStructMemberSchemas(shape, "structureBuilder");
+            return null;
+        }
+
+        @Override
+        public Void unionShape(UnionShape shape) {
+            generateStructMemberSchemas(shape, "unionBuilder");
+            return null;
+        }
+
+        private void generateStructMemberSchemas(Shape shape, String builderMethod) {
+            String template;
+            if (schemaField.isRecursive()) {
+                template = """
+                            ${name:L}_BUILDER${?hasMembers}
+                                ${C|}
+                                ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder)
+                                .shapeClass(${schemaTypeClass:T}.class)
+                                .build();
+                        """;
+            } else {
+                template =
+                        """
+                                static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.${builderMethod:L}(${shapeId:T}.from(${id:S})${traits:C})${?hasMembers}
+                                         ${C|}
+                                         ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder)
+                                         .shapeClass(${schemaTypeClass:T}.class)
+                                         .build();
+                                """;
+            }
+            writer.pushState();
+            writer.putContext("hasMembers", !shape.members().isEmpty());
+            writer.putContext("builderMethod", builderMethod);
+            writer.putContext("schemaTypeClass", context.symbolProvider().toSymbol(shape));
+
+            writer.write(
+                    template,
+                    (Runnable) () -> shape.members().forEach(m -> m.accept(this)));
+
+            writer.popState();
+        }
+
+        @Override
+        public Void memberShape(MemberShape shape) {
+            var target = model.expectShape(shape.getTarget());
+            writer.pushState();
+            writer.putContext("memberName", shape.getMemberName());
+            writer.putContext("schema", order.getSchemaFieldName(target, writer));
+            writer.putContext("traits", new TraitInitializerGenerator(writer, shape, context));
+            writer.putContext("recursive", CodegenUtils.recursiveShape(model, target));
+            writer.write(".putMember(${memberName:S}, ${schema:L}${?recursive}_BUILDER${/recursive}${traits:C})");
+            writer.popState();
+            return null;
+        }
+
+        @Override
+        public Void timestampShape(TimestampShape timestampShape) {
+            writer.write(
+                    "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createTimestamp(${shapeId:T}.from(${id:S})${traits:C});");
+            return null;
+        }
+
+        @Override
+        public Void stringShape(StringShape stringShape) {
+            writer.write(
+                    "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createString(${shapeId:T}.from(${id:S})${traits:C});");
+            return null;
+        }
     }
 
     private static final class SchemaBuilderGenerator extends ShapeVisitor.Default<Void> implements Runnable {

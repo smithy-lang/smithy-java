@@ -18,7 +18,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.build.MockManifest;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
-import software.amazon.smithy.java.codegen.utils.TestJavaCodegenPlugin;
+import software.amazon.smithy.java.codegen.TestJavaCodegenPlugin;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;

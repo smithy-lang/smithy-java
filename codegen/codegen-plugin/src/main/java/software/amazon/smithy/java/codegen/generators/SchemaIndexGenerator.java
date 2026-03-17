@@ -57,29 +57,53 @@ public final class SchemaIndexGenerator
         writer.putContext("map", Map.class);
         writer.putContext("hashMap", HashMap.class);
 
-        var template = """
-                /**
-                 * Generated SchemaIndex implementation that provides access to all schemas in the model.
-                 */
-                public final class ${className:L} extends ${schemaIndex:T} {
-
-                    private static final ${map:T}<${shapeId:T}, ${schema:T}> SCHEMA_MAP = new ${hashMap:T}<>();
-
-                    static {
-                        ${schemaInitializers:C|}
-                    }
-
-                    @Override
-                    public ${schema:T} getSchema(${shapeId:T} id) {
-                        return SCHEMA_MAP.get(id);
-                    }
-
-                    @Override
-                    public void visit(${consumer:T}<${schema:T}> visitor) {
-                        SCHEMA_MAP.values().forEach(visitor);
-                    }
+        // Count total entries for pre-sizing the HashMap
+        var order = directive.context().schemaFieldOrder();
+        int totalCount = 0;
+        for (var shapeOrder : order.partitions()) {
+            for (var schemaField : shapeOrder) {
+                if (!schemaField.isExternal()) {
+                    totalCount++;
                 }
-                """;
+            }
+        }
+        for (var shape : directive.connectedShapes().values()) {
+            if ((shape.getType() == ShapeType.ENUM || shape.getType() == ShapeType.INT_ENUM)
+                    && !Prelude.isPreludeShape(shape)
+                    && !shape.hasTrait(SyntheticTrait.class)) {
+                var symbol = directive.symbolProvider().toSymbol(shape);
+                if (!symbol.getProperty(SymbolProperties.EXTERNAL_TYPE).orElse(false)) {
+                    totalCount++;
+                }
+            }
+        }
+
+        var template =
+                """
+                        /**
+                         * Generated SchemaIndex implementation that provides access to all schemas in the model.
+                         */
+                        public final class ${className:L} extends ${schemaIndex:T} {
+
+                            private static final ${map:T}<${shapeId:T}, ${schema:T}> SCHEMA_MAP = new ${hashMap:T}<>(${mapCapacity:L});
+
+                            static {
+                                ${staticInitCalls:C|}
+                            }
+
+                            ${initMethods:C|}
+
+                            @Override
+                            public ${schema:T} getSchema(${shapeId:T} id) {
+                                return SCHEMA_MAP.get(id);
+                            }
+
+                            @Override
+                            public void visit(${consumer:T}<${schema:T}> visitor) {
+                                SCHEMA_MAP.values().forEach(visitor);
+                            }
+                        }
+                        """;
 
         writer.pushState();
         writer.putContext("className", className);
@@ -87,12 +111,17 @@ public final class SchemaIndexGenerator
         writer.putContext("schema", Schema.class);
         writer.putContext("shapeId", ShapeId.class);
         writer.putContext("consumer", Consumer.class);
-        writer.putContext("schemaInitializers", new SchemaInitializersGenerator(writer, directive));
+        writer.putContext("mapCapacity", (int) (totalCount / 0.75f) + 1);
+        writer.putContext("staticInitCalls", new StaticInitCallsGenerator(writer, directive));
+        writer.putContext("initMethods", new InitMethodsGenerator(writer, directive));
         writer.write(template);
         writer.popState();
     }
 
-    private record SchemaInitializersGenerator(
+    /**
+     * Generates the calls to partition init methods within the static {} block.
+     */
+    private record StaticInitCallsGenerator(
             JavaWriter writer,
             CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive)
             implements Runnable {
@@ -100,36 +129,80 @@ public final class SchemaIndexGenerator
         @Override
         public void run() {
             var order = directive.context().schemaFieldOrder();
+            var partitions = order.partitions();
+            for (int i = 0; i < partitions.size(); i++) {
+                writer.write("_init$L();", i);
+            }
+            // Enums get their own init method
+            boolean hasEnums = directive.connectedShapes()
+                    .values()
+                    .stream()
+                    .anyMatch(shape -> (shape.getType() == ShapeType.ENUM || shape.getType() == ShapeType.INT_ENUM)
+                            && !Prelude.isPreludeShape(shape)
+                            && !shape.hasTrait(SyntheticTrait.class));
+            if (hasEnums) {
+                writer.write("_initEnums();");
+            }
+        }
+    }
 
-            for (var shapeOrder : order.partitions()) {
-                for (var schemaField : shapeOrder) {
+    /**
+     * Generates the private static init method definitions.
+     */
+    private record InitMethodsGenerator(
+            JavaWriter writer,
+            CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive)
+            implements Runnable {
+
+        @Override
+        public void run() {
+            var order = directive.context().schemaFieldOrder();
+            var partitions = order.partitions();
+
+            // One method per schema partition
+            for (int i = 0; i < partitions.size(); i++) {
+                writer.openBlock("private static void _init$L() {", i);
+                for (var schemaField : partitions.get(i)) {
                     if (schemaField.isExternal()) {
                         continue;
                     }
-
-                    var schemaReference = schemaField.className() + "." + schemaField.fieldName();
-
+                    var schemaReference = schemaField.classRef().className() + "." + schemaField.fieldName();
                     writer.pushState();
                     writer.putContext("schemaReference", schemaReference);
                     writer.write("SCHEMA_MAP.put(${schemaReference:L}.id(), ${schemaReference:L});");
                     writer.popState();
                 }
+                writer.closeBlock("}");
+                writer.write("");
             }
 
-            // Register enum and intEnum schemas (excluded from SchemaFieldOrder partitions)
+            // Enums init method
+            boolean hasEnums = false;
             for (var shape : directive.connectedShapes().values()) {
                 if ((shape.getType() == ShapeType.ENUM || shape.getType() == ShapeType.INT_ENUM)
                         && !Prelude.isPreludeShape(shape)
                         && !shape.hasTrait(SyntheticTrait.class)) {
-                    var symbol = directive.symbolProvider().toSymbol(shape);
-                    if (symbol.getProperty(SymbolProperties.EXTERNAL_TYPE).orElse(false)) {
-                        continue;
-                    }
-                    writer.pushState();
-                    writer.putContext("enumClass", symbol);
-                    writer.write("SCHEMA_MAP.put(${enumClass:T}.$$SCHEMA.id(), ${enumClass:T}.$$SCHEMA);");
-                    writer.popState();
+                    hasEnums = true;
+                    break;
                 }
+            }
+            if (hasEnums) {
+                writer.openBlock("private static void _initEnums() {");
+                for (var shape : directive.connectedShapes().values()) {
+                    if ((shape.getType() == ShapeType.ENUM || shape.getType() == ShapeType.INT_ENUM)
+                            && !Prelude.isPreludeShape(shape)
+                            && !shape.hasTrait(SyntheticTrait.class)) {
+                        var symbol = directive.symbolProvider().toSymbol(shape);
+                        if (symbol.getProperty(SymbolProperties.EXTERNAL_TYPE).orElse(false)) {
+                            continue;
+                        }
+                        writer.pushState();
+                        writer.putContext("enumClass", symbol);
+                        writer.write("SCHEMA_MAP.put(${enumClass:T}.$$SCHEMA.id(), ${enumClass:T}.$$SCHEMA);");
+                        writer.popState();
+                    }
+                }
+                writer.closeBlock("}");
             }
         }
     }

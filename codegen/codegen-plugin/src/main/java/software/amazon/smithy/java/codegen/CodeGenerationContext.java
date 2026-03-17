@@ -54,7 +54,6 @@ import software.amazon.smithy.model.traits.XmlAttributeTrait;
 import software.amazon.smithy.model.traits.XmlFlattenedTrait;
 import software.amazon.smithy.model.traits.XmlNameTrait;
 import software.amazon.smithy.model.traits.XmlNamespaceTrait;
-import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
@@ -115,16 +114,6 @@ public class CodeGenerationContext
             CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive,
             String plugin
     ) {
-        this(directive, plugin, 64000);
-    }
-
-    //Visible for testing
-    @SmithyInternalApi
-    CodeGenerationContext(
-            CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive,
-            String plugin,
-            int schemaPartitionThreshold
-    ) {
         this.model = directive.model();
         this.settings = directive.settings();
         this.fileManifest = directive.fileManifest();
@@ -137,7 +126,7 @@ public class CodeGenerationContext
         this.runtimeTraits = collectRuntimeTraits();
         this.traitInitializers = collectTraitInitializers();
         this.plugin = plugin;
-        this.schemaFieldOrder = new SchemaFieldOrder(directive, schemaPartitionThreshold, symbolProvider);
+        this.schemaFieldOrder = new SchemaFieldOrder(directive, this);
     }
 
     @Override
