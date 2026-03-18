@@ -15,7 +15,7 @@ dependencies {
     implementation("software.amazon.smithy.java:aws-sigv4:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:client-rulesengine:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-client-rulesengine:$smithyJavaVersion")
-    implementation("org.slf4j:slf4j-simple:1.7.36")
+    implementation("org.slf4j:slf4j-simple:2.0.17")
     implementation(libs.smithy.aws.endpoints)
     implementation(libs.smithy.aws.smoke.test.model)
     implementation(libs.smithy.aws.traits)
