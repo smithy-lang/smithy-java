@@ -9,6 +9,7 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.ContextualDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
+import software.amazon.smithy.java.codegen.sections.MemberSerializerSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Unit;
 import software.amazon.smithy.model.Model;
@@ -66,9 +67,10 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public void run() {
-        writer.pushState();
+        var shapeSchemaVariable = "$SCHEMA";
+        writer.pushState(new MemberSerializerSection(shape, state, shapeSchemaVariable));
         writer.putContext("state", state);
-        writer.putContext("schema", "$SCHEMA");
+        writer.putContext("schema", shapeSchemaVariable);
         shape.accept(this);
         writer.popState();
     }

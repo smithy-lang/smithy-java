@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.generators;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
+import software.amazon.smithy.java.codegen.sections.MemberDeserializerSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.model.Model;
@@ -66,7 +67,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
 
     @Override
     public void run() {
-        writer.pushState();
+        writer.pushState(new MemberDeserializerSection(shape, schemaName, deserializer));
         writer.putContext("schemaName", schemaName);
         writer.putContext("deserializer", deserializer);
         shape.accept(this);
