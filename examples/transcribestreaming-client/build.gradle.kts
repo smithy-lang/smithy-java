@@ -7,7 +7,7 @@ dependencies {
     val smithyJavaVersion: String by project
 
     smithyBuild("software.amazon.smithy.java:codegen-plugin:$smithyJavaVersion")
-    smithyBuild("software.amazon.smithy.java:client-api:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:client-core:$smithyJavaVersion")
 
     implementation("software.amazon.api.models:transcribe-streaming:1.0.7")
     implementation("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")

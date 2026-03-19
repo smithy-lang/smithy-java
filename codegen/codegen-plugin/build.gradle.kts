@@ -9,13 +9,12 @@ extra["displayName"] = "Smithy :: Java :: Codegen :: Plugin"
 extra["moduleName"] = "software.amazon.smithy.java.codegen.plugin"
 
 dependencies {
-    api(libs.smithy.codegen)
-    compileOnly(project(":client:client-api"))
+    api(project(":codegen:codegen-core"))
+    compileOnly(project(":client:client-core"))
     compileOnly(project(":client:client-rulesengine"))
     compileOnly(project(":client:client-waiters"))
     compileOnly(project(":server:server-api"))
     // Test deps (needed to compile and run generated code in tests)
-    testImplementation(project(":client:client-api"))
     testImplementation(project(":client:client-core"))
     testImplementation(project(":client:client-rulesengine"))
     testImplementation(project(":client:client-waiters"))

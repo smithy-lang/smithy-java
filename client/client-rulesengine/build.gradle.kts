@@ -8,7 +8,7 @@ extra["displayName"] = "Smithy :: Java :: Client :: Endpoint Rules"
 extra["moduleName"] = "software.amazon.smithy.java.client.endpointrules"
 
 dependencies {
-    api(project(":client:client-api"))
+    api(project(":client:client-core"))
     api(project(":jmespath"))
     api(libs.smithy.rules)
     implementation(project(":logging"))

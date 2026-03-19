@@ -35,7 +35,6 @@ include(":codecs:json-codec")
 include(":codecs:xml-codec")
 
 // Client
-include(":client:client-api")
 include(":client:client-core")
 include(":client:client-auth-api")
 include(":client:client-http")
@@ -55,6 +54,7 @@ include(":server:server-rpcv2-cbor")
 include(":server:server-proxy")
 
 // Codegen
+include(":codegen:codegen-core")
 include(":codegen:codegen-plugin")
 include(":codegen:test-utils")
 

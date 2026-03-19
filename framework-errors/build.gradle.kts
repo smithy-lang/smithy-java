@@ -9,7 +9,7 @@ extra["displayName"] = "Smithy :: Framework Errors"
 extra["moduleName"] = "software.amazon.smithy.framework"
 
 dependencies {
-    smithyBuild(project(":codegen:codegen-plugin"))
+    smithyBuild(project(path = ":codegen:codegen-core", configuration = "internalElements"))
     api(project(":core"))
 
     // Validation error is imported separately, b/c it is used a bit uniquely in protocol tests.
@@ -21,7 +21,7 @@ dependencies {
 
 // Add generated Java sources to the main sourceSet
 afterEvaluate {
-    val typesPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
+    val typesPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "internal-types-only").get()
     sourceSets {
         main {
             java {

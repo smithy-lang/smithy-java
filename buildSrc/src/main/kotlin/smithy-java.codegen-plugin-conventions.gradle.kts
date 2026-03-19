@@ -9,6 +9,8 @@ plugins {
 val Project.libs get() = the<org.gradle.accessors.dm.LibrariesForLibs>()
 
 dependencies {
+    // These deps overlap with codegen-core's transitive deps for codegen-plugin,
+    // but are kept here for other consumers of this convention plugin (e.g., AWS codegen modules).
     implementation(libs.smithy.codegen)
     implementation(project(":core"))
     implementation(project(":logging"))

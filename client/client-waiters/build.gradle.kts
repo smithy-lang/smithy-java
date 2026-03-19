@@ -11,5 +11,5 @@ dependencies {
     api(libs.smithy.waiters)
     implementation(project(":jmespath"))
     implementation(project(":logging"))
-    implementation(project(":client:client-api"))
+    implementation(project(":client:client-core"))
 }

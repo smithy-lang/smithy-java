@@ -1,14 +1,13 @@
 {
   "version": "1.0",
   "plugins": {
-    "java-codegen": {
+    "internal-types-only": {
       "namespace": "software.amazon.smithy.java.framework",
       "selector": "[id|namespace = 'smithy.framework']",
       // Include all traits in generated models as we do not know which
       // protocol will be used. This will not add any additional dependencies
       // as all traits on framework errors are prelude traits.
-      "runtimeTraitsSelector": "*",
-      "modes": ["types"]
+      "runtimeTraitsSelector": "*"
     }
   }
 }
