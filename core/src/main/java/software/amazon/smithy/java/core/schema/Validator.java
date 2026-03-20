@@ -398,7 +398,35 @@ public final class Validator {
         @Override
         public void writeString(Schema schema, String value) {
             switch (schema.type()) {
-                case STRING, ENUM -> schema.stringValidation.apply(schema, value, this);
+                case STRING, ENUM -> {
+                    int flags = schema.stringValidationFlags;
+                    if (flags != 0) {
+                        if ((flags & Schema.STRING_VALIDATE_LENGTH) != 0) {
+                            var length = value.codePointCount(0, value.length());
+                            if (length < schema.minLengthConstraint || length > schema.maxLengthConstraint) {
+                                addError(new ValidationError.LengthValidationFailure(createPath(), length, schema));
+                            }
+                        }
+                        if ((flags & Schema.STRING_VALIDATE_ENUM) != 0) {
+                            if (!schema.stringEnumValues().contains(value)) {
+                                addError(new ValidationError.EnumValidationFailure(createPath(), value, schema));
+                            }
+                        }
+                        if ((flags & Schema.STRING_VALIDATE_PATTERN) != 0) {
+                            try {
+                                if (!schema.stringPattern.matcher(value).find()) {
+                                    addError(new ValidationError.PatternValidationFailure(createPath(), value, schema));
+                                }
+                            } catch (StackOverflowError e) {
+                                throw new StackOverflowError(
+                                        String.format(
+                                                "Pattern '%s' is too expensive to evaluate against given input."
+                                                        + " Please refactor your pattern to be more performant",
+                                                schema.stringPattern));
+                            }
+                        }
+                    }
+                }
                 default -> checkType(schema, ShapeType.STRING); // it's invalid, and calling this adds an error.
             }
         }
