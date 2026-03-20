@@ -13,6 +13,7 @@ import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.directed.CodegenDirector;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
+import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.Prelude;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -72,12 +73,11 @@ public final class JavaTypesCodegenPlugin implements SmithyBuildPlugin {
         LOGGER.info("Successfully generated Java class files.");
     }
 
-    private static Set<Shape> getClosure(software.amazon.smithy.model.Model model, TypeCodegenSettings settings) {
+    private static Set<Shape> getClosure(Model model, TypeCodegenSettings settings) {
         Set<Shape> closure = new HashSet<>();
-        settings.shapes()
-                .stream()
-                .map(model::expectShape)
-                .forEach(closure::add);
+        for (var shapeId : settings.shapes()) {
+            closure.add(model.expectShape(shapeId));
+        }
         settings.selector()
                 .shapes(model)
                 .filter(s -> !s.isMemberShape())
