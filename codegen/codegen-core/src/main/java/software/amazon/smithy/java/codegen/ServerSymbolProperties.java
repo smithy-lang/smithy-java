@@ -7,12 +7,14 @@ package software.amazon.smithy.java.codegen;
 
 import software.amazon.smithy.codegen.core.Property;
 import software.amazon.smithy.codegen.core.Symbol;
+import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
  * Contains server-specific properties that may be added to symbols by smithy-java.
  *
  * @see software.amazon.smithy.java.codegen.SymbolProperties for other properties that may be added to symbols.
  */
+@SmithyUnstableApi
 public final class ServerSymbolProperties {
 
     private ServerSymbolProperties() {}

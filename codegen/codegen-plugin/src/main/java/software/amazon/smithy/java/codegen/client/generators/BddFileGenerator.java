@@ -17,8 +17,10 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.rulesengine.traits.EndpointBddTrait;
 import software.amazon.smithy.rulesengine.traits.EndpointRuleSetTrait;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
-public class BddFileGenerator
+@SmithyInternalApi
+public final class BddFileGenerator
         implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
     @Override
     public void accept(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {

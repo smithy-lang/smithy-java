@@ -1,4 +1,4 @@
-@SmithyUnstableApi
+/**
+ * HTTP binding serialization and deserialization.
+ */
 package software.amazon.smithy.java.http.binding;
-
-import software.amazon.smithy.utils.SmithyUnstableApi;

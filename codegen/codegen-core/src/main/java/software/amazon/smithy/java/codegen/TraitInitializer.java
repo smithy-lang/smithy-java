@@ -9,6 +9,7 @@ import java.util.function.BiConsumer;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.model.traits.Trait;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Writes an initializer for a trait when adding that trait to a {@link Schema}.
@@ -27,6 +28,7 @@ import software.amazon.smithy.model.traits.Trait;
  * {@code TraitService} service provider interface to identify the correct trait provider class for a given trait ID.
  * The trait is then initialized using the trait provider and a {@code Node}.
  */
+@SmithyInternalApi
 public interface TraitInitializer<T extends Trait> extends BiConsumer<JavaWriter, T> {
     Class<T> traitClass();
 }

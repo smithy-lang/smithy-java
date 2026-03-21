@@ -10,6 +10,5 @@ extra["moduleName"] = "software.amazon.smithy.java.aws.sdkv2.retries"
 dependencies {
     api(project(":retries-api"))
     implementation(libs.aws.sdk.retries.spi)
-
     testImplementation(libs.aws.sdk.retries)
 }

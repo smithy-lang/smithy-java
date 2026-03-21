@@ -6,11 +6,13 @@
 package software.amazon.smithy.java.codegen;
 
 import software.amazon.smithy.codegen.core.Symbol;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Pre-built Symbol objects for types from modules that are NOT on the compile classpath
  * of codegen-plugin (e.g., framework-errors generated types).
  */
+@SmithyInternalApi
 public final class ExternalSymbols {
     private ExternalSymbols() {}
 

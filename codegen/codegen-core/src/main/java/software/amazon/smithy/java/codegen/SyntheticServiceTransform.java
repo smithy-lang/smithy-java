@@ -21,6 +21,7 @@ import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.traits.ErrorTrait;
 import software.amazon.smithy.model.traits.PrivateTrait;
 import software.amazon.smithy.model.transform.ModelTransformer;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Generates a synthetic service for a set of shapes.
@@ -33,6 +34,7 @@ import software.amazon.smithy.model.transform.ModelTransformer;
  * provides renames for a set of shapes as well as the list of protocols the shapes should support. This
  * transform creates a synthetic service that Directed codegen can use to generate the provided set of shapes.
  */
+@SmithyInternalApi
 public final class SyntheticServiceTransform {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(SyntheticServiceTransform.class);
     public static final String SYNTHETIC_NAMESPACE = "smithy.synthetic";
