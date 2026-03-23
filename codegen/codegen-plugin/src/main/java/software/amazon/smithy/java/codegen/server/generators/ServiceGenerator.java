@@ -15,7 +15,6 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
 import software.amazon.smithy.framework.knowledge.ImplicitErrorIndex;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
-import software.amazon.smithy.java.codegen.ExternalSymbols;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.ServerSymbolProperties;
 import software.amazon.smithy.java.codegen.SyntheticServiceTransform;
@@ -28,6 +27,7 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
+import software.amazon.smithy.java.framework.model.UnknownOperationException;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.Model;
@@ -346,7 +346,7 @@ public final class ServiceGenerator implements
                 }
                 writer.write(
                         "default -> throw $T.builder().message(\"Unknown operation name: \" + operationName).build();",
-                        ExternalSymbols.UNKNOWN_OPERATION_EXCEPTION);
+                        UnknownOperationException.class);
             });
 
         }
