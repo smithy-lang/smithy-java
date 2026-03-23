@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
+import java.util.regex.Pattern;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.LengthTrait;
@@ -231,7 +232,8 @@ public final class SchemaBuilder {
             long maxLongConstraint,
             double minDoubleConstraint,
             double maxDoubleConstraint,
-            ValidatorOfString stringValidation,
+            int stringValidationFlags,
+            Pattern stringPattern,
             boolean hasRangeConstraint) {
         static ValidationState of(ShapeType type, TraitMap traits, Set<String> stringEnum) {
             long minLengthConstraint;
@@ -242,7 +244,8 @@ public final class SchemaBuilder {
             long maxLongConstraint;
             double minDoubleConstraint;
             double maxDoubleConstraint;
-            ValidatorOfString stringValidation;
+            int stringValidationFlags = 0;
+            Pattern stringPattern = null;
 
             // Precompute an allowed range, setting Long.MIN and Long.MAX when missing.
             LengthTrait lengthTrait = traits.get(TraitKey.LENGTH_TRAIT);
@@ -254,14 +257,19 @@ public final class SchemaBuilder {
                 maxLengthConstraint = lengthTrait.getMax().orElse(Long.MAX_VALUE);
             }
 
-            // If the shape is a string or enum, pre-compute necessary validation (or no-op if not a string/enum).
+            // If the shape is a string or enum, pre-compute string validation flags.
             if (type == ShapeType.STRING || type == ShapeType.ENUM) {
-                stringValidation = createStringValidator(
-                        stringEnum,
-                        lengthTrait,
-                        traits.get(TraitKey.PATTERN_TRAIT));
-            } else {
-                stringValidation = ValidatorOfString.of(List.of());
+                if (lengthTrait != null) {
+                    stringValidationFlags |= Schema.STRING_VALIDATE_LENGTH;
+                }
+                if (!stringEnum.isEmpty()) {
+                    stringValidationFlags |= Schema.STRING_VALIDATE_ENUM;
+                }
+                PatternTrait patternTrait = traits.get(TraitKey.PATTERN_TRAIT);
+                if (patternTrait != null) {
+                    stringValidationFlags |= Schema.STRING_VALIDATE_PATTERN;
+                    stringPattern = patternTrait.getPattern();
+                }
             }
 
             // Range traits use BigDecimal, so use null when missing rather than any kind of default.
@@ -340,34 +348,10 @@ public final class SchemaBuilder {
                     maxLongConstraint,
                     minDoubleConstraint,
                     maxDoubleConstraint,
-                    stringValidation,
+                    stringValidationFlags,
+                    stringPattern,
                     hasRangeConstraint);
         }
-    }
-
-    static ValidatorOfString createStringValidator(
-            Set<String> enumValues,
-            LengthTrait lengthTrait,
-            PatternTrait patternTrait
-    ) {
-        List<ValidatorOfString> stringValidators = new ArrayList<>();
-
-        if (lengthTrait != null) {
-            stringValidators.add(
-                    new ValidatorOfString.LengthStringValidator(
-                            lengthTrait.getMin().orElse(Long.MIN_VALUE),
-                            lengthTrait.getMax().orElse(Long.MAX_VALUE)));
-        }
-
-        if (!enumValues.isEmpty()) {
-            stringValidators.add(ValidatorOfString.EnumStringValidator.INSTANCE);
-        }
-
-        if (patternTrait != null) {
-            stringValidators.add(new ValidatorOfString.PatternStringValidator(patternTrait.getPattern()));
-        }
-
-        return ValidatorOfString.of(stringValidators);
     }
 
     static void sortMembers(List<MemberSchemaBuilder> members) {

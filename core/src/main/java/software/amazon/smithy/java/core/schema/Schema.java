@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.Trait;
@@ -25,6 +26,10 @@ import software.amazon.smithy.model.traits.Trait;
  */
 public abstract sealed class Schema implements MemberLookup
         permits RootSchema, MemberSchema, DeferredRootSchema, DeferredMemberSchema, ResolvedRootSchema {
+
+    static final int STRING_VALIDATE_LENGTH = 1;
+    static final int STRING_VALIDATE_ENUM = 2;
+    static final int STRING_VALIDATE_PATTERN = 4;
 
     private final ShapeType type;
     private final ShapeId id;
@@ -54,7 +59,8 @@ public abstract sealed class Schema implements MemberLookup
     final long maxLongConstraint;
     final double minDoubleConstraint;
     final double maxDoubleConstraint;
-    final ValidatorOfString stringValidation;
+    final int stringValidationFlags;
+    final Pattern stringPattern;
     final boolean uniqueItemsConstraint;
     final boolean hasRangeConstraint;
 
@@ -106,7 +112,8 @@ public abstract sealed class Schema implements MemberLookup
         this.maxDoubleConstraint = validationState.maxDoubleConstraint();
         this.minRangeConstraint = validationState.minRangeConstraint();
         this.maxRangeConstraint = validationState.maxRangeConstraint();
-        this.stringValidation = validationState.stringValidation();
+        this.stringValidationFlags = validationState.stringValidationFlags();
+        this.stringPattern = validationState.stringPattern();
         this.uniqueItemsConstraint = type == ShapeType.LIST && hasTrait(TraitKey.UNIQUE_ITEMS_TRAIT);
         this.hasRangeConstraint = validationState.hasRangeConstraint();
 
@@ -139,7 +146,8 @@ public abstract sealed class Schema implements MemberLookup
         this.maxLengthConstraint = builder.validationState.maxLengthConstraint();
         this.minRangeConstraint = builder.validationState.minRangeConstraint();
         this.maxRangeConstraint = builder.validationState.maxRangeConstraint();
-        this.stringValidation = builder.validationState.stringValidation();
+        this.stringValidationFlags = builder.validationState.stringValidationFlags();
+        this.stringPattern = builder.validationState.stringPattern();
         this.minLongConstraint = builder.validationState.minLongConstraint();
         this.maxLongConstraint = builder.validationState.maxLongConstraint();
         this.minDoubleConstraint = builder.validationState.minDoubleConstraint();
