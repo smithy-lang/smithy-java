@@ -7,8 +7,6 @@ package software.amazon.smithy.java.client.core;
 
 import java.time.Duration;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.endpoints.Endpoint;
-import software.amazon.smithy.java.endpoints.EndpointResolver;
 
 /**
  * Context parameters that can be provided on a client config and take effect on each request.
@@ -16,15 +14,6 @@ import software.amazon.smithy.java.endpoints.EndpointResolver;
  * <p>Other per/call settings can be found in {@link CallContext}.
  */
 public final class ClientContext {
-    /**
-     * A custom endpoint used in each request.
-     *
-     * <p>This can be used in lieu of setting something like {@link EndpointResolver#staticEndpoint}, allowing
-     * endpoint resolvers like the Smithy Rules Engine resolver to still process and validate endpoints even when a
-     * custom endpoint is provided.
-     */
-    public static final Context.Key<Endpoint> CUSTOM_ENDPOINT = Context.key("Custom endpoint to use with requests");
-
     /**
      * The name of the application, used in things like user-agent headers.
      *

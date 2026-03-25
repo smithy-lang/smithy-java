@@ -8,7 +8,7 @@ package software.amazon.smithy.java.aws.client.rulesengine;
 import java.util.AbstractMap;
 import java.util.Map;
 import java.util.Set;
-import software.amazon.smithy.java.client.rulesengine.RulesFunction;
+import software.amazon.smithy.java.rulesengine.RulesFunction;
 import software.amazon.smithy.rulesengine.aws.language.functions.AwsArn;
 import software.amazon.smithy.rulesengine.aws.language.functions.AwsPartition;
 import software.amazon.smithy.rulesengine.aws.language.functions.IsVirtualHostableS3Bucket;

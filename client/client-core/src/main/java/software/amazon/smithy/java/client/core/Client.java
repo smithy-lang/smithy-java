@@ -25,6 +25,7 @@ import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.event.Frame;
 import software.amazon.smithy.java.core.serde.event.ProtocolEventStreamWriter;
 import software.amazon.smithy.java.endpoints.Endpoint;
+import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.retries.api.RetryStrategy;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -249,7 +250,7 @@ public abstract class Client implements Closeable {
          */
         @SuppressWarnings("unchecked")
         public B endpoint(Endpoint customEndpoint) {
-            putConfig(ClientContext.CUSTOM_ENDPOINT, customEndpoint);
+            putConfig(EndpointContext.CUSTOM_ENDPOINT, customEndpoint);
             return (B) this;
         }
 
@@ -262,7 +263,7 @@ public abstract class Client implements Closeable {
          */
         @SuppressWarnings("unchecked")
         public B endpoint(String customEndpoint) {
-            putConfig(ClientContext.CUSTOM_ENDPOINT, Endpoint.builder().uri(customEndpoint).build());
+            putConfig(EndpointContext.CUSTOM_ENDPOINT, Endpoint.builder().uri(customEndpoint).build());
             return (B) this;
         }
 

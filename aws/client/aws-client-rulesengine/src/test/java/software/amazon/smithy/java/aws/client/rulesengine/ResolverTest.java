@@ -21,18 +21,18 @@ import software.amazon.smithy.java.aws.client.core.settings.S3EndpointSettings;
 import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
-import software.amazon.smithy.java.endpoints.Endpoint;
-import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.rulesengine.EndpointRulesPlugin;
-import software.amazon.smithy.java.client.rulesengine.EndpointUtils;
-import software.amazon.smithy.java.client.rulesengine.RulesEngineBuilder;
-import software.amazon.smithy.java.client.rulesengine.RulesEngineSettings;
-import software.amazon.smithy.java.client.rulesengine.RulesEvaluationError;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
+import software.amazon.smithy.java.endpoints.Endpoint;
+import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.rulesengine.EndpointUtils;
+import software.amazon.smithy.java.rulesengine.RulesEngineBuilder;
+import software.amazon.smithy.java.rulesengine.RulesEngineSettings;
+import software.amazon.smithy.java.rulesengine.RulesEvaluationError;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.pattern.UriPattern;
@@ -197,7 +197,7 @@ public class ResolverTest {
         });
 
         overrideMap = (Map<String, Object>) EndpointUtils.convertNode(test.getParams(), true);
-        override.putConfig(EndpointRulesPlugin.ADDITIONAL_ENDPOINT_PARAMS, overrideMap);
+        override.putConfig(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS, overrideMap);
 
         try {
             var document = Document.ofObject(inputParams);

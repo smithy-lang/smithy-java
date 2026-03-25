@@ -5,39 +5,24 @@
 
 package software.amazon.smithy.java.client.rulesengine;
 
-import java.util.Map;
 import software.amazon.smithy.java.client.core.AutoClientPlugin;
 import software.amazon.smithy.java.client.core.ClientConfig;
-import software.amazon.smithy.java.client.core.ClientContext;
-import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.logging.InternalLogger;
-import software.amazon.smithy.rulesengine.traits.ContextParamTrait;
-import software.amazon.smithy.rulesengine.traits.EndpointBddTrait;
-import software.amazon.smithy.rulesengine.traits.EndpointRuleSetTrait;
-import software.amazon.smithy.rulesengine.traits.OperationContextParamsTrait;
-import software.amazon.smithy.rulesengine.traits.StaticContextParamsTrait;
+import software.amazon.smithy.java.rulesengine.BytecodeEndpointResolver;
+import software.amazon.smithy.java.rulesengine.DecisionTreeEndpointResolver;
+import software.amazon.smithy.java.rulesengine.RulesEngineBuilder;
+import software.amazon.smithy.java.rulesengine.RulesEngineSettings;
+import software.amazon.smithy.java.rulesengine.RulesEngineTraits;
 
 /**
  * Attempts to resolve endpoints using smithy.rules#bdd, smithy.rules#endpointRuleSet, or a precompiled
- * {@link Bytecode}.
+ * {@link software.amazon.smithy.java.rulesengine.Bytecode}.
  */
 public final class EndpointRulesPlugin implements AutoClientPlugin {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(EndpointRulesPlugin.class);
-
-    public static final Context.Key<Map<String, Object>> ADDITIONAL_ENDPOINT_PARAMS = Context.key(
-            "Additional endpoint parameters to pass to the rules engine");
-
-    public static final TraitKey<StaticContextParamsTrait> STATIC_CONTEXT_PARAMS_TRAIT = TraitKey.get(
-            StaticContextParamsTrait.class);
-    public static final TraitKey<OperationContextParamsTrait> OPERATION_CONTEXT_PARAMS_TRAIT = TraitKey.get(
-            OperationContextParamsTrait.class);
-    public static final TraitKey<ContextParamTrait> CONTEXT_PARAM_TRAIT = TraitKey.get(ContextParamTrait.class);
-    public static final TraitKey<EndpointRuleSetTrait> ENDPOINT_RULESET_TRAIT = TraitKey.get(
-            EndpointRuleSetTrait.class);
-    public static final TraitKey<EndpointBddTrait> BDD_TRAIT = TraitKey.get(EndpointBddTrait.class);
 
     @Override
     public Phase getPluginPhase() {
@@ -52,7 +37,7 @@ public final class EndpointRulesPlugin implements AutoClientPlugin {
         if (config.endpointResolver() == null) {
             usePlugin = true;
             LOGGER.debug("Trying to use EndpointRulesPlugin resolver because endpointResolver is null");
-        } else if (config.context().get(ClientContext.CUSTOM_ENDPOINT) != null) {
+        } else if (config.context().get(EndpointContext.CUSTOM_ENDPOINT) != null) {
             usePlugin = true;
             LOGGER.debug("Trying to use EndpointRulesPlugin resolver because CUSTOM_ENDPOINT is set");
         }
@@ -76,14 +61,14 @@ public final class EndpointRulesPlugin implements AutoClientPlugin {
             LOGGER.debug("Using explicitly provided bytecode: {}", config.service());
             resolver = new BytecodeEndpointResolver(bytecode, e.getExtensions(), e.getBuiltinProviders());
         } else if (config.service() != null) {
-            var bddTrait = config.service().schema().getTrait(BDD_TRAIT);
+            var bddTrait = config.service().schema().getTrait(RulesEngineTraits.BDD_TRAIT);
             if (bddTrait != null) {
                 LOGGER.debug("Found endpoint BDD trait on service: {}", config.service());
                 bytecode = e.compile(bddTrait);
                 resolver = new BytecodeEndpointResolver(bytecode, e.getExtensions(), e.getBuiltinProviders());
                 context.put(RulesEngineSettings.BYTECODE, bytecode);
             } else {
-                var rs = config.service().schema().getTrait(ENDPOINT_RULESET_TRAIT);
+                var rs = config.service().schema().getTrait(RulesEngineTraits.ENDPOINT_RULESET_TRAIT);
                 if (rs != null) {
                     LOGGER.debug("Using decision tree based endpoint resolver for service: {}", config.service());
                     resolver = new DecisionTreeEndpointResolver(

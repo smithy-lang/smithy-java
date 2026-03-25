@@ -16,14 +16,14 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import software.amazon.smithy.java.aws.client.core.settings.EndpointSettings;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
-import software.amazon.smithy.java.endpoints.EndpointResolver;
-import software.amazon.smithy.java.endpoints.EndpointResolverParams;
 import software.amazon.smithy.java.client.rulesengine.EndpointRulesPlugin;
-import software.amazon.smithy.java.client.rulesengine.RulesEngineBuilder;
-import software.amazon.smithy.java.client.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
+import software.amazon.smithy.java.endpoints.EndpointResolver;
+import software.amazon.smithy.java.endpoints.EndpointResolverParams;
+import software.amazon.smithy.java.rulesengine.RulesEngineBuilder;
+import software.amazon.smithy.java.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.pattern.UriPattern;
@@ -75,7 +75,7 @@ public class Bench {
 
         var ctx = Context.create();
         ctx.put(EndpointSettings.REGION, "us-east-1");
-        //ctx.put(EndpointRulesPlugin.ADDITIONAL_ENDPOINT_PARAMS, Map.of("UseFIPS", true, "UseDualStack", true));
+        //ctx.put(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS, Map.of("UseFIPS", true, "UseDualStack", true));
 
         endpointParams = EndpointResolverParams.builder()
                 .context(ctx)

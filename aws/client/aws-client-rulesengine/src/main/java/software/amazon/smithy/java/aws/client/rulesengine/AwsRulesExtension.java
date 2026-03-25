@@ -12,9 +12,9 @@ import software.amazon.smithy.java.aws.client.core.settings.EndpointSettings;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
 import software.amazon.smithy.java.aws.client.core.settings.S3EndpointSettings;
 import software.amazon.smithy.java.aws.client.core.settings.StsEndpointSettings;
-import software.amazon.smithy.java.client.rulesengine.RulesExtension;
-import software.amazon.smithy.java.client.rulesengine.RulesFunction;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.rulesengine.RulesExtension;
+import software.amazon.smithy.java.rulesengine.RulesFunction;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**

@@ -18,6 +18,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.rulesengine.Bytecode;
+import software.amazon.smithy.java.rulesengine.RulesEngineBuilder;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.shapes.ServiceShape;

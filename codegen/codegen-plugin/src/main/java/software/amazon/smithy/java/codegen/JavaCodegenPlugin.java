@@ -184,7 +184,7 @@ public final class JavaCodegenPlugin implements SmithyBuildPlugin {
             if (service.hasTrait(ShapeId.from("smithy.rules#endpointBdd"))
                     || service.hasTrait(ShapeId.from("smithy.rules#endpointRuleSet"))) {
                 requireDependency(
-                        "software.amazon.smithy.java.client.rulesengine.RulesEngineBuilder",
+                        "software.amazon.smithy.java.rulesengine.RulesEngineBuilder",
                         "client-rulesengine",
                         "client (with endpoint rules)");
             }

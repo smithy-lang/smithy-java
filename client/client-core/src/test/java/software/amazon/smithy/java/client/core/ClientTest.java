@@ -40,6 +40,7 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.dynamicclient.plugins.DetectProtocolPlugin;
 import software.amazon.smithy.java.dynamicclient.plugins.SimpleAuthDetectionPlugin;
+import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.model.Model;
@@ -290,7 +291,7 @@ public class ClientTest {
                 .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
                     @Override
                     public void readBeforeExecution(InputHook<?, ?> hook) {
-                        assertThat(hook.context().get(ClientContext.CUSTOM_ENDPOINT).uri().toString(),
+                        assertThat(hook.context().get(EndpointContext.CUSTOM_ENDPOINT).uri().toString(),
                                 equalTo("https://example.com"));
                     }
                 }))

@@ -23,6 +23,7 @@ import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.plugins.DefaultPlugin;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiService;
+import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.retries.api.RetryStrategy;
@@ -71,8 +72,8 @@ public final class ClientConfig {
             // Things like the Smithy rules engine based resolver look for this property to know if a custom endpoint
             // was provided in this manner.
             var customEndpoint = Objects.requireNonNull(
-                    builder.context.get(ClientContext.CUSTOM_ENDPOINT),
-                    "One of endpointResolver or ClientContext.CUSTOM_ENDPOINT must be set");
+                    builder.context.get(EndpointContext.CUSTOM_ENDPOINT),
+                    "One of endpointResolver or EndpointContext.CUSTOM_ENDPOINT must be set");
             this.endpointResolver = EndpointResolver.staticEndpoint(customEndpoint);
         }
 

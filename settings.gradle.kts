@@ -61,6 +61,7 @@ include(":codegen:test-utils")
 
 // Utilities
 include(":jmespath")
+include(":rulesengine")
 include(":protocol-test-harness")
 include(":fuzz-test-harness")
 

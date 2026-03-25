@@ -14,11 +14,15 @@ import static org.hamcrest.Matchers.sameInstance;
 
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.ClientConfig;
-import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.endpoints.Endpoint;
+import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
+import software.amazon.smithy.java.rulesengine.BytecodeEndpointResolver;
+import software.amazon.smithy.java.rulesengine.DecisionTreeEndpointResolver;
+import software.amazon.smithy.java.rulesengine.RulesEngineBuilder;
+import software.amazon.smithy.java.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.ServiceShape;
@@ -70,7 +74,7 @@ public class EndpointRulesPluginTest {
         var plugin = new EndpointRulesPlugin();
         var builder = ClientConfig.builder()
                 .endpointResolver(EndpointResolver.staticHost("foo.com"))
-                .putConfig(ClientContext.CUSTOM_ENDPOINT, Endpoint.builder().uri("https://example.com").build())
+                .putConfig(EndpointContext.CUSTOM_ENDPOINT, Endpoint.builder().uri("https://example.com").build())
                 .putConfig(RulesEngineSettings.BYTECODE, program);
         plugin.configureClient(builder);
 
@@ -85,7 +89,7 @@ public class EndpointRulesPluginTest {
         var program = new RulesEngineBuilder().compile(bdd);
         var plugin = new EndpointRulesPlugin();
         var builder = ClientConfig.builder()
-                .putConfig(ClientContext.CUSTOM_ENDPOINT, Endpoint.builder().uri("https://example.com").build())
+                .putConfig(EndpointContext.CUSTOM_ENDPOINT, Endpoint.builder().uri("https://example.com").build())
                 .putConfig(RulesEngineSettings.BYTECODE, program);
 
         assertThat(builder.endpointResolver(), nullValue());

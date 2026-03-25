@@ -15,8 +15,6 @@ import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.bddTest.client.ServiceWithEndpointBddClient;
 import smithy.java.codegen.server.bddTest.client.ServiceWithEndpointRuleSetClient;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
-import software.amazon.smithy.java.endpoints.EndpointResolverParams;
-import software.amazon.smithy.java.client.rulesengine.EndpointRulesPlugin;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.ApiService;
@@ -26,6 +24,8 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
+import software.amazon.smithy.java.endpoints.EndpointResolverParams;
+import software.amazon.smithy.java.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public class BddTest {
@@ -71,7 +71,7 @@ public class BddTest {
             endpointParams.put("UseFips", UseFips);
         }
         Context context = Context.create();
-        Context fullContext = context.put(EndpointRulesPlugin.ADDITIONAL_ENDPOINT_PARAMS, endpointParams);
+        Context fullContext = context.put(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS, endpointParams);
 
         TestOperation operation = new TestOperation();
         TestInput input = new TestInput();
