@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
-import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.client.rpcv2.RpcV2CborProtocol;
 import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.java.core.serde.event.EventStreamWriter;

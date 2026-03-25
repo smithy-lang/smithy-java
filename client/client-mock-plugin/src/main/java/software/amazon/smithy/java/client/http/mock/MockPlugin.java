@@ -19,7 +19,7 @@ import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.MessageExchange;
-import software.amazon.smithy.java.client.core.endpoint.Endpoint;
+import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;

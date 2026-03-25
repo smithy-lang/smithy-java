@@ -7,7 +7,7 @@ package software.amazon.smithy.java.client.http;
 
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.MessageExchange;
-import software.amazon.smithy.java.client.core.endpoint.Endpoint;
+import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.uri.URIBuilder;

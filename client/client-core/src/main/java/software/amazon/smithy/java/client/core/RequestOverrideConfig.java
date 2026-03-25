@@ -12,9 +12,9 @@ import java.util.Objects;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
-import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.retries.api.RetryStrategy;
 
 /**

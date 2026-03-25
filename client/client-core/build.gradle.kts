@@ -10,6 +10,7 @@ extra["moduleName"] = "software.amazon.smithy.java.client.core"
 dependencies {
     api(project(":context"))
     api(project(":core"))
+    api(project(":endpoints"))
     api(project(":auth-api"))
     api(project(":client:client-auth-api"))
     api(project(":retries-api"))

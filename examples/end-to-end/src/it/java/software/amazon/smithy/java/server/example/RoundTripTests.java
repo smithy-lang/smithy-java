@@ -19,7 +19,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.example.etoe.client.CoffeeShopClient;
 import software.amazon.smithy.java.example.etoe.model.CoffeeType;
 import software.amazon.smithy.java.example.etoe.model.CreateOrderInput;

@@ -29,8 +29,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.client.core.ClientConfig;
-import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public class JavaHttpClientTest {

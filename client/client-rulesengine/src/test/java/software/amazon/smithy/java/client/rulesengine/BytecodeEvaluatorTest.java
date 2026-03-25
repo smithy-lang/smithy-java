@@ -19,8 +19,8 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.endpoints.Endpoint;
 
 class BytecodeEvaluatorTest {
 

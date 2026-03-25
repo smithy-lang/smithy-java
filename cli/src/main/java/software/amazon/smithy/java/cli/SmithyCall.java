@@ -35,7 +35,7 @@ import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.aws.client.restxml.RestXmlClientProtocol;
 import software.amazon.smithy.java.aws.sdkv2.auth.SdkCredentialsResolver;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
-import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.client.rpcv2.RpcV2CborProtocol;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;

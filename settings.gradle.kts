@@ -24,6 +24,7 @@ include(":cli")
 
 // Common components
 include(":auth-api")
+include(":endpoints")
 include(":framework-errors")
 include(":http:http-api")
 include(":http:http-binding")

@@ -8,9 +8,9 @@ package software.amazon.smithy.java.client.core;
 import java.util.HashSet;
 import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
-import software.amazon.smithy.java.client.core.endpoint.Endpoint;
-import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.endpoints.Endpoint;
+import software.amazon.smithy.java.endpoints.EndpointResolver;
 
 /**
  * Context parameters made available to underlying transports like HTTP clients.

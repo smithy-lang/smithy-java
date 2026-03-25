@@ -8,8 +8,8 @@ package software.amazon.smithy.java.client.rulesengine;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.endpoints.Endpoint;
 
 /**
  * An SPI used to extend the rules engine with custom builtins and functions.

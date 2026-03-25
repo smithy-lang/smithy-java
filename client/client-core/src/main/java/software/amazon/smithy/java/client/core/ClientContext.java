@@ -6,9 +6,9 @@
 package software.amazon.smithy.java.client.core;
 
 import java.time.Duration;
-import software.amazon.smithy.java.client.core.endpoint.Endpoint;
-import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.endpoints.Endpoint;
+import software.amazon.smithy.java.endpoints.EndpointResolver;
 
 /**
  * Context parameters that can be provided on a client config and take effect on each request.

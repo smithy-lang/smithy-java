@@ -12,7 +12,7 @@ import static org.hamcrest.Matchers.is;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
-import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;

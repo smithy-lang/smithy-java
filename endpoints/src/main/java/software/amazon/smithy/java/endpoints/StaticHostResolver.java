@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.client.core.endpoint;
+package software.amazon.smithy.java.endpoints;
 
 /**
  * An endpoint resolver that always returns the same endpoint.

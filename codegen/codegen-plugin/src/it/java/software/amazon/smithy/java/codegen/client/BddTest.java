@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.bddTest.client.ServiceWithEndpointBddClient;
 import smithy.java.codegen.server.bddTest.client.ServiceWithEndpointRuleSetClient;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
-import software.amazon.smithy.java.client.core.endpoint.EndpointResolverParams;
+import software.amazon.smithy.java.endpoints.EndpointResolverParams;
 import software.amazon.smithy.java.client.rulesengine.EndpointRulesPlugin;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;

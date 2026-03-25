@@ -14,8 +14,8 @@ import java.util.Map;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.ClientContext;
-import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.endpoints.Endpoint;
 
 class StdExtensionTest {
 

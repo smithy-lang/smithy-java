@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.client.http;
 
 import java.time.Duration;
-import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 
 /**
