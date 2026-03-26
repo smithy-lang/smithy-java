@@ -391,6 +391,28 @@ public class CborDocumentTest {
                 Arguments.of("{\"foo\":\"foo\"}", "{\"foo\":\"bar\"}", false));
     }
 
+    @ParameterizedTest
+    @MethodSource("bigDecimalDocumentSource")
+    public void convertsBigDecimalToDocument(BigDecimal bigDecimal) {
+        var codec = Rpcv2CborCodec.builder().build();
+        var ser = codec.serialize(Document.of(bigDecimal));
+        var document = codec.createDeserializer(ser).readDocument();
+
+        assertThat(document.type(), is(ShapeType.BIG_DECIMAL));
+        assertThat(document.asBigDecimal(), comparesEqualTo(bigDecimal));
+        assertEquals(document, Document.of(bigDecimal));
+    }
+
+    public static List<Arguments> bigDecimalDocumentSource() {
+        return List.of(
+                Arguments.of(new BigDecimal("12345.6789")),
+                Arguments.of(new BigDecimal("0.00001")),
+                Arguments.of(new BigDecimal("9999999999999999999999999999.123456789")),
+                Arguments.of(new BigDecimal("3.14159")),
+                Arguments.of(new BigDecimal("-42.5")),
+                Arguments.of(BigDecimal.ZERO));
+    }
+
     @Test
     public void canNormalizeCborDocuments() {
         var de = toCbor("true");

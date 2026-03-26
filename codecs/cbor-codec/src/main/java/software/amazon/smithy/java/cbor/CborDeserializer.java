@@ -316,6 +316,7 @@ final class CborDeserializer implements ShapeDeserializer {
                 }
             }
             case Token.POS_BIGINT, Token.NEG_BIGINT -> Document.of(readBigInteger(null));
+            case Token.BIG_DECIMAL -> Document.of(readBigDecimal(null));
             case Token.START_ARRAY -> {
                 List<Document> values = new ArrayList<>();
                 for (token = parser.advance(); token != Token.END_ARRAY; token = parser.advance()) {
