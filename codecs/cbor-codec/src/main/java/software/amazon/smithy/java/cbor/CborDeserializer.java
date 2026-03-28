@@ -357,6 +357,10 @@ final class CborDeserializer implements ShapeDeserializer {
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> consumer) {
         byte token = parser.currentToken();
+        if (token == Token.FINISHED) {
+            // Empty input — treat as empty struct with no members.
+            return;
+        }
         if (token != Token.START_OBJECT) {
             throw badType("struct", token);
         }
