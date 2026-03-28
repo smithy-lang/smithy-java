@@ -2182,6 +2182,135 @@ class McpServerIntegrationTest {
         assertEquals(3, memberNames.size(), "Should have exactly 3 members");
     }
 
+    // ========== Member Description Tests ==========
+
+    @Test
+    void testMemberDescriptionsPreservedForSharedTargets() {
+        initializeLatestProtocol();
+        var schemas = getMcpEchoToolSchemas();
+        var echoProps = schemas.inputSchema()
+                .getSchemaNode()
+                .path("properties")
+                .path("echo")
+                .path("properties");
+
+        var containerProps = echoProps.path("sharedNodeContainer").path("properties");
+        assertEquals("The left node. A shared node structure",
+                containerProps.path("left").path("description").asString());
+        assertEquals("The right node. A shared node structure",
+                containerProps.path("right").path("description").asString());
+
+        // Both should be objects with a "value" property
+        assertEquals("object", containerProps.path("left").path("type").asString());
+        assertTrue(containerProps.path("left").path("properties").has("value"));
+        assertEquals("object", containerProps.path("right").path("type").asString());
+        assertTrue(containerProps.path("right").path("properties").has("value"));
+    }
+
+    @Test
+    void testDiamondDependencySchemaCorrectness() {
+        initializeLatestProtocol();
+        var schemas = getMcpEchoToolSchemas();
+        var echoProps = schemas.inputSchema()
+                .getSchemaNode()
+                .path("properties")
+                .path("echo")
+                .path("properties");
+
+        var diamondProps = echoProps.path("diamondTop").path("properties");
+        assertEquals("Path A to the shared node",
+                diamondProps.path("pathA").path("description").asString());
+        assertEquals("Path B to the shared node",
+                diamondProps.path("pathB").path("description").asString());
+
+        // Navigate into each path's shared property
+        var pathAShared = diamondProps.path("pathA").path("properties").path("shared");
+        var pathBShared = diamondProps.path("pathB").path("properties").path("shared");
+        assertEquals("Shared node via path A. A shared node structure",
+                pathAShared.path("description").asString());
+        assertEquals("Shared node via path B. A shared node structure",
+                pathBShared.path("description").asString());
+
+        // Both should have correct SharedNode structure
+        assertEquals("object", pathAShared.path("type").asString());
+        assertTrue(pathAShared.path("properties").has("value"));
+        assertEquals("object", pathBShared.path("type").asString());
+        assertTrue(pathBShared.path("properties").has("value"));
+
+        // Check required fields
+        var pathARequired = pathAShared.path("required");
+        boolean hasValue = false;
+        for (var r : pathARequired) {
+            if ("value".equals(r.asString())) {
+                hasValue = true;
+                break;
+            }
+        }
+        assertTrue(hasValue, "SharedNode should have 'value' in required");
+    }
+
+    @Test
+    void testCollectionMemberDescriptions() {
+        initializeLatestProtocol();
+        var schemas = getMcpEchoToolSchemas();
+        var echoProps = schemas.inputSchema()
+                .getSchemaNode()
+                .path("properties")
+                .path("echo")
+                .path("properties");
+
+        var collectionProps = echoProps.path("collectionContainer").path("properties");
+        assertEquals("Primary list of nodes. List targeting SharedNode for testing collection member descriptions",
+                collectionProps.path("primaryNodes").path("description").asString());
+        assertEquals("Secondary list of nodes. List targeting SharedNode for testing collection member descriptions",
+                collectionProps.path("secondaryNodes").path("description").asString());
+        assertEquals("Node lookup map. Map targeting SharedNode for testing map member descriptions",
+                collectionProps.path("nodeMap").path("description").asString());
+
+        // Both list members should be arrays
+        assertEquals("array", collectionProps.path("primaryNodes").path("type").asString());
+        assertEquals("array", collectionProps.path("secondaryNodes").path("type").asString());
+    }
+
+    @Test
+    void testRecursiveStructureDescriptions() {
+        initializeLatestProtocol();
+        var schemas = getMcpEchoToolSchemas();
+        var echoProps = schemas.inputSchema()
+                .getSchemaNode()
+                .path("properties")
+                .path("echo")
+                .path("properties");
+
+        // nested member should have member-level description combined with target description
+        var nestedSchema = echoProps.path("nested");
+        assertEquals("A nested echo structure for testing. A nested structure for testing recursive types",
+                nestedSchema.path("description").asString());
+
+        // Navigate to recursive - it should exist and be an object
+        var recursiveSchema = nestedSchema.path("properties").path("recursive");
+        assertFalse(recursiveSchema.isMissingNode(), "recursive should exist in NestedEcho");
+        assertEquals("object", recursiveSchema.path("type").asString());
+    }
+
+    @Test
+    void testExponentialBlowupDoesNotOccur() {
+        initializeLatestProtocol();
+        // This test verifies that schema generation with 10 recursive nodes completes quickly
+        var schemas = assertTimeoutPreemptively(Duration.ofSeconds(5),
+                this::getMcpEchoToolSchemas,
+                "Schema generation should complete within 5 seconds");
+        var echoProps = schemas.inputSchema()
+                .getSchemaNode()
+                .path("properties")
+                .path("echo")
+                .path("properties");
+
+        var treeNodeSchema = echoProps.path("recursiveTreeNode");
+        assertFalse(treeNodeSchema.isMissingNode(), "recursiveTreeNode should be in the schema");
+        assertTrue(treeNodeSchema.has("oneOf"), "recursiveTreeNode should have oneOf");
+    }
+
     @Test
     void testRecursiveOneOfSchemaTerminatesWithoutInfiniteLoop() {
         initializeLatestProtocol();

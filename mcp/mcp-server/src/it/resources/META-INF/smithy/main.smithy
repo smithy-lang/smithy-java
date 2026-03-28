@@ -138,6 +138,7 @@ structure Echo {
     nestedMap: NestedEchoMap
 
     // Nested structure
+    /// A nested echo structure for testing
     nested: NestedEcho
 
     // Document type (arbitrary JSON)
@@ -184,6 +185,11 @@ structure Echo {
     recNodeH: RecNodeH
     recNodeI: RecNodeI
     recNodeJ: RecNodeJ
+
+    // Shared target member description tests
+    sharedNodeContainer: SharedNodeContainer
+    diamondTop: DiamondTop
+    collectionContainer: CollectionContainer
 
     // Required field to test required validation
     @required
@@ -296,3 +302,56 @@ structure RecNodeG { value: String, child: TreeNode }
 structure RecNodeH { value: String, child: TreeNode }
 structure RecNodeI { value: String, child: TreeNode }
 structure RecNodeJ { value: String, child: TreeNode }
+
+/// A shared node structure
+structure SharedNode {
+    @required
+    value: String
+}
+
+/// Container with two members targeting SharedNode with different docs
+structure SharedNodeContainer {
+    /// The left node
+    left: SharedNode
+    /// The right node
+    right: SharedNode
+}
+
+/// Diamond structure: two paths lead to the same nested shape
+structure DiamondTop {
+    /// Path A to the shared node
+    pathA: DiamondMiddleA
+    /// Path B to the shared node
+    pathB: DiamondMiddleB
+}
+
+structure DiamondMiddleA {
+    /// Shared node via path A
+    shared: SharedNode
+}
+
+structure DiamondMiddleB {
+    /// Shared node via path B
+    shared: SharedNode
+}
+
+/// List targeting SharedNode for testing collection member descriptions
+list SharedNodeList {
+    member: SharedNode
+}
+
+/// Map targeting SharedNode for testing map member descriptions
+map SharedNodeMap {
+    key: String
+    value: SharedNode
+}
+
+/// Structure with shared collections
+structure CollectionContainer {
+    /// Primary list of nodes
+    primaryNodes: SharedNodeList
+    /// Secondary list of nodes
+    secondaryNodes: SharedNodeList
+    /// Node lookup map
+    nodeMap: SharedNodeMap
+}
