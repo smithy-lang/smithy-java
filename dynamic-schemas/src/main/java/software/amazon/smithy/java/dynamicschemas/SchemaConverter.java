@@ -69,11 +69,18 @@ public final class SchemaConverter {
      * @return the converted schema.
      */
     public Schema getSchema(Shape shape) {
-        // Aggregate shapes are re-entrant and may need to recursively set values in the CHM.
+        var result = schemas.get(shape);
+        if (result != null) {
+            return result;
+        }
+        return getSchema(shape, new HashSet<>());
+    }
+
+    private Schema getSchema(Shape shape, Set<Shape> building) {
         var result = schemas.get(shape);
 
         if (result == null) {
-            result = createSchema(shape);
+            result = createSchema(shape, building);
             var previous = schemas.putIfAbsent(shape, result);
             if (previous != null) {
                 result = previous;
@@ -83,41 +90,11 @@ public final class SchemaConverter {
         return result;
     }
 
-    private Schema createSchema(Shape shape) {
-        return isRecursive(shape)
-                ? getOrCreateRecursiveSchemaBuilder(shape).build()
-                : createNonRecursiveSchema(shape);
-    }
-
-    private boolean isRecursive(Shape shape) {
-        if (shape.getType().getCategory() == ShapeType.Category.SIMPLE) {
-            return false;
-        } else {
-            return isRecursive(new HashSet<>(), shape);
+    private Schema createSchema(Shape shape, Set<Shape> building) {
+        if (shape.getType().getCategory() == ShapeType.Category.AGGREGATE) {
+            return getOrCreateRecursiveSchemaBuilder(shape, building).build();
         }
-    }
-
-    private boolean isRecursive(Set<ShapeId> visited, Shape shape) {
-        if (!visited.add(shape.getId())) {
-            return true;
-        }
-
-        var result = switch (shape.getType().getCategory()) {
-            case SIMPLE, SERVICE -> false;
-            case MEMBER -> isRecursive(visited, model.expectShape(shape.asMemberShape().orElseThrow().getTarget()));
-            case AGGREGATE -> {
-                for (var member : shape.members()) {
-                    if (isRecursive(visited, member)) {
-                        yield true;
-                    }
-                }
-                yield false;
-            }
-        };
-
-        // "Pop" the current node off the "stack" -- other branches are still allowed to contain this shape.
-        visited.remove(shape.getId());
-        return result;
+        return createNonRecursiveSchema(shape);
     }
 
     private Schema createNonRecursiveSchema(Shape shape) {
@@ -143,7 +120,6 @@ public final class SchemaConverter {
                     shape.getId(),
                     new HashSet<>(shape.asIntEnumShape().orElseThrow().getEnumValues().values()),
                     convertTraits(shape));
-            case LIST, SET, MAP, STRUCTURE, UNION -> getOrCreateRecursiveSchemaBuilder(shape).build();
             case OPERATION -> Schema.createOperation(shape.getId(), convertTraits(shape));
             case SERVICE -> Schema.createService(shape.getId(), convertTraits(shape));
             default -> throw new UnsupportedOperationException("Unexpected shape: " + shape);
@@ -156,7 +132,7 @@ public final class SchemaConverter {
         return traits;
     }
 
-    private SchemaBuilder getOrCreateRecursiveSchemaBuilder(Shape shape) {
+    private SchemaBuilder getOrCreateRecursiveSchemaBuilder(Shape shape, Set<Shape> building) {
         SchemaBuilder builder;
         builder = recursiveBuilders.get(shape);
 
@@ -172,25 +148,26 @@ public final class SchemaConverter {
             if (previous != null) {
                 builder = previous;
             } else {
-                // Recursion happens at this point, and more schemas are added.
-                addMembers(shape, builder);
+                building.add(shape);
+                addMembers(shape, builder, building);
+                building.remove(shape);
             }
         }
 
         return builder;
     }
 
-    private void addMembers(Shape shape, SchemaBuilder builder) {
+    private void addMembers(Shape shape, SchemaBuilder builder, Set<Shape> building) {
         for (var member : shape.members()) {
             var memberTraits = new Trait[member.getAllTraits().size()];
             member.getAllTraits().values().toArray(memberTraits);
             var targetShape = model.expectShape(member.getTarget());
-            // Recursive members stay as builders for now to avoid infinite recursion in recursive schemas.
-            if (isRecursive(targetShape)) {
-                SchemaBuilder targetBuilder = getOrCreateRecursiveSchemaBuilder(targetShape);
+            if (building.contains(targetShape)) {
+                // Target is currently being built — cycle detected, use deferred builder
+                SchemaBuilder targetBuilder = getOrCreateRecursiveSchemaBuilder(targetShape, building);
                 builder.putMember(member.getMemberName(), targetBuilder, memberTraits);
             } else {
-                Schema targetSchema = getSchema(model.expectShape(member.getTarget()));
+                Schema targetSchema = getSchema(targetShape, building);
                 builder.putMember(member.getMemberName(), targetSchema, memberTraits);
             }
         }
