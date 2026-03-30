@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.aws.client.awsjson;
 
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +27,7 @@ import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -78,7 +78,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
             ApiOperation<I, O> operation,
             I input,
             Context context,
-            URI endpoint
+            SmithyUri endpoint
     ) {
         var target = service.getName() + "." + operation.schema().id().getName();
         var builder = HttpRequest.builder();

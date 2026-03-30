@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.client.http.binding;
 
-import java.net.URI;
 import software.amazon.smithy.java.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
 import software.amazon.smithy.java.context.Context;
@@ -22,6 +21,7 @@ import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.binding.HttpBinding;
 import software.amazon.smithy.java.http.binding.RequestSerializer;
 import software.amazon.smithy.java.http.binding.ResponseDeserializer;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -66,7 +66,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
             ApiOperation<I, O> operation,
             I input,
             Context context,
-            URI endpoint
+            SmithyUri endpoint
     ) {
         RequestSerializer serializer = httpBinding.requestSerializer()
                 .operation(operation)

@@ -136,7 +136,7 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         var httpRequestBuilder = java.net.http.HttpRequest.newBuilder()
                 .version(smithyToHttpVersion(request.httpVersion()))
                 .method(request.method(), bodyPublisher)
-                .uri(request.uri());
+                .uri(request.uri().toURI());
 
         Duration requestTimeout = context.get(HttpContext.HTTP_REQUEST_TIMEOUT);
         if (requestTimeout == null) {

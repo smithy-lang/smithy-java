@@ -41,7 +41,7 @@ final class ServerTestClient {
                     default -> throw new UnsupportedOperationException(request.httpVersion() + " is not supported");
                 })
                 .method(request.method(), bodyPublisher)
-                .uri(request.uri());
+                .uri(request.uri().toURI());
 
         for (var entry : request.headers()) {
             for (var value : entry.getValue()) {

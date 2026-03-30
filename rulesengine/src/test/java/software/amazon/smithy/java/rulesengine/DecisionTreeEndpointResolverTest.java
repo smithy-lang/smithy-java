@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +25,7 @@ import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.endpoints.EndpointResolverParams;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.rulesengine.language.Endpoint;
 import software.amazon.smithy.rulesengine.language.EndpointRuleSet;
@@ -74,7 +74,7 @@ public class DecisionTreeEndpointResolverTest {
         var endpoint = resolver.resolveEndpoint(params);
 
         assertNotNull(endpoint);
-        assertEquals(URI.create(url), endpoint.uri());
+        assertEquals(SmithyUri.of(url), endpoint.uri());
     }
 
     @Test
@@ -98,7 +98,7 @@ public class DecisionTreeEndpointResolverTest {
         var params = createParams(operation, input, context);
         var endpoint = resolver.resolveEndpoint(params);
 
-        assertEquals(URI.create("us-east-1"), endpoint.uri());
+        assertEquals(SmithyUri.of("us-east-1"), endpoint.uri());
     }
 
     @Test
@@ -126,7 +126,7 @@ public class DecisionTreeEndpointResolverTest {
         var params = createParams(operation, input, context);
         var endpoint = resolver.resolveEndpoint(params);
 
-        assertEquals(URI.create("us-west-2"), endpoint.uri());
+        assertEquals(SmithyUri.of("us-west-2"), endpoint.uri());
     }
 
     @Test
@@ -157,7 +157,7 @@ public class DecisionTreeEndpointResolverTest {
         var params = createParams(operation, input, context);
         var endpoint = resolver.resolveEndpoint(params);
 
-        assertEquals(URI.create("https://custom.example.com"), endpoint.uri());
+        assertEquals(SmithyUri.of("https://custom.example.com"), endpoint.uri());
     }
 
     @Test
@@ -184,7 +184,7 @@ public class DecisionTreeEndpointResolverTest {
         var params = createParams(operation, input, context);
         var endpoint = resolver.resolveEndpoint(params);
 
-        assertEquals(URI.create("https://default.com"), endpoint.uri());
+        assertEquals(SmithyUri.of("https://default.com"), endpoint.uri());
     }
 
     @Test
@@ -230,7 +230,7 @@ public class DecisionTreeEndpointResolverTest {
         var endpoint = resolver.resolveEndpoint(params);
 
         assertNotNull(endpoint);
-        assertEquals(URI.create("https://example.com"), endpoint.uri());
+        assertEquals(SmithyUri.of("https://example.com"), endpoint.uri());
     }
 
     @Test
@@ -288,7 +288,7 @@ public class DecisionTreeEndpointResolverTest {
         var params = createParams(operation, input, context);
         var endpoint = resolver.resolveEndpoint(params);
 
-        assertEquals(URI.create("supplied-region"), endpoint.uri());
+        assertEquals(SmithyUri.of("supplied-region"), endpoint.uri());
     }
 
     @Test

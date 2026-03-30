@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.http.binding;
 
-import java.net.URI;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import software.amazon.smithy.java.context.Context;
@@ -19,7 +18,7 @@ import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.Frame;
 import software.amazon.smithy.java.core.serde.event.ProtocolEventStreamWriter;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.io.uri.URIBuilder;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 
 /**
  * Serializes an HTTP request from an input shape that uses HTTP binding traits.
@@ -29,7 +28,7 @@ public final class RequestSerializer {
     private Codec payloadCodec;
     private ApiOperation<?, ?> operation;
     private String payloadMediaType;
-    private URI endpoint;
+    private SmithyUri endpoint;
     private SerializableShape shapeValue;
     private EventEncoderFactory<?> eventStreamEncodingFactory;
     private boolean omitEmptyPayload = false;
@@ -79,7 +78,7 @@ public final class RequestSerializer {
      * @param endpoint Request endpoint.
      * @return Returns the serializer.
      */
-    public RequestSerializer endpoint(URI endpoint) {
+    public RequestSerializer endpoint(SmithyUri endpoint) {
         this.endpoint = endpoint;
         return this;
     }
@@ -152,20 +151,15 @@ public final class RequestSerializer {
         shapeValue.serialize(serializer);
         serializer.flush();
 
-        var uriBuilder = URIBuilder.of(endpoint);
-
-        // Append the path using simple concatenation, not using RFC 3986 resolution.
-        uriBuilder.concatPath(serializer.getPath());
+        var resolvedUri = endpoint.withConcatPath(serializer.getPath());
 
         if (serializer.hasQueryString()) {
-            uriBuilder.query(serializer.getQueryString());
+            resolvedUri = resolvedUri.withQuery(serializer.getQueryString());
         }
-
-        var targetEndpoint = uriBuilder.build();
 
         HttpRequest.Builder builder = HttpRequest.builder()
                 .method(httpTrait.getMethod())
-                .uri(targetEndpoint);
+                .uri(resolvedUri);
 
         var eventStream = serializer.getEventStream();
         if (eventStream != null && operation.inputEventBuilderSupplier() != null) {

@@ -5,11 +5,11 @@
 
 package software.amazon.smithy.java.rulesengine;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.BooleanNode;
 import software.amazon.smithy.model.node.Node;
@@ -90,11 +90,11 @@ public final class EndpointUtils {
     static Object getProperty(Object target, String propertyName) {
         return switch (target) {
             case Map<?, ?> m -> m.get(propertyName);
-            case URI u -> switch (propertyName) {
+            case SmithyUri u -> switch (propertyName) {
                 case "scheme" -> u.getScheme();
-                case "path" -> u.getRawPath();
-                case "normalizedPath" -> ParseUrl.normalizePath(u.getRawPath());
-                case "authority" -> u.getAuthority();
+                case "path" -> u.getPath();
+                case "normalizedPath" -> ParseUrl.normalizePath(u.getPath());
+                case "authority" -> u.getPort() >= 0 ? u.getHost() + ":" + u.getPort() : u.getHost();
                 case "isIp" -> ParseUrl.isIpAddr(u.getHost());
                 default -> null;
             };

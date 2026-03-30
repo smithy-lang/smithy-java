@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.endpoints;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.Locale;
 import software.amazon.smithy.java.core.schema.TraitKey;
 
@@ -28,16 +26,10 @@ record HostLabelEndpointResolver(EndpointResolver delegate) implements EndpointR
     }
 
     private static Endpoint prefix(Endpoint endpoint, String prefix) {
-        try {
-            var updatedUri = new URI(
-                    endpoint.uri().getScheme().toLowerCase(Locale.US),
-                    prefix + endpoint.uri().getHost(),
-                    endpoint.uri().getPath(),
-                    endpoint.uri().getQuery(),
-                    endpoint.uri().getFragment());
-            return endpoint.toBuilder().uri(updatedUri).build();
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
+        var uri = endpoint.uri();
+        var updatedUri = uri
+                .withScheme(uri.getScheme().toLowerCase(Locale.ROOT))
+                .withHost(prefix + uri.getHost());
+        return endpoint.toBuilder().uri(updatedUri).build();
     }
 }

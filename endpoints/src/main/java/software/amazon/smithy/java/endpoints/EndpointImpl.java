@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.endpoints;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -15,10 +13,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 
 final class EndpointImpl implements Endpoint {
 
-    private final URI uri;
+    private final SmithyUri uri;
     private final List<EndpointAuthScheme> authSchemes;
     private final Map<Context.Key<?>, Object> properties;
 
@@ -32,7 +31,7 @@ final class EndpointImpl implements Endpoint {
     }
 
     @Override
-    public URI uri() {
+    public SmithyUri uri() {
         return uri;
     }
 
@@ -77,23 +76,14 @@ final class EndpointImpl implements Endpoint {
 
     static final class Builder implements Endpoint.Builder {
 
-        private URI uri;
+        private SmithyUri uri;
         private List<EndpointAuthScheme> authSchemes;
         private Map<Context.Key<?>, Object> properties;
 
         @Override
-        public Builder uri(URI uri) {
+        public Builder uri(SmithyUri uri) {
             this.uri = uri;
             return this;
-        }
-
-        @Override
-        public Builder uri(String uri) {
-            try {
-                return uri(new URI(uri));
-            } catch (URISyntaxException e) {
-                throw new RuntimeException(e);
-            }
         }
 
         @Override

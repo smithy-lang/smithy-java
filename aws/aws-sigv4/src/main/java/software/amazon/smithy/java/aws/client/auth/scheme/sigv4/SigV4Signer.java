@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
@@ -29,6 +28,7 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.io.uri.URLEncoding;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.utils.Pair;
@@ -109,7 +109,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     private Pair<String, Map<String, List<String>>> createSignedHeaders(
             String method,
-            URI uri,
+            SmithyUri uri,
             HttpHeaders httpHeaders,
             String payloadHash,
             String regionName,
@@ -210,7 +210,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         sb.append(value);
     }
 
-    private static boolean uriUsingStandardPort(URI uri) {
+    private static boolean uriUsingStandardPort(SmithyUri uri) {
         return switch (uri.getPort()) {
             case 80 -> uri.getScheme().equals("http");
             case 443 -> uri.getScheme().equals("https");
@@ -252,7 +252,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     private byte[] getCanonicalRequest(
             String method,
-            URI uri,
+            SmithyUri uri,
             Map<String, List<String>> headers,
             Set<String> sortedHeaderKeys,
             String signedHeaders,
@@ -273,8 +273,8 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    private static void addCanonicalizedResourcePath(URI uri, StringBuilder builder) {
-        String path = uri.normalize().getRawPath();
+    private static void addCanonicalizedResourcePath(SmithyUri uri, StringBuilder builder) {
+        String path = uri.getNormalizedPath();
         if (path == null || path.isEmpty()) {
             builder.append('/');
             return;
@@ -285,8 +285,8 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         URLEncoding.encodeUnreserved(path, builder, true);
     }
 
-    private static void addCanonicalizedQueryString(URI uri, StringBuilder builder) {
-        var query = uri.getRawQuery();
+    private static void addCanonicalizedQueryString(SmithyUri uri, StringBuilder builder) {
+        var query = uri.getQuery();
         if (query == null) {
             return;
         }

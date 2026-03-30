@@ -63,7 +63,7 @@ public final class RequestDeserializer {
     public RequestDeserializer request(HttpRequest request) {
         DataStream bodyDataStream = request.body();
         deserBuilder.headers(request.headers())
-                .requestRawQueryString(request.uri().getRawQuery())
+                .requestRawQueryString(request.uri().getQuery())
                 .body(bodyDataStream);
         return this;
     }

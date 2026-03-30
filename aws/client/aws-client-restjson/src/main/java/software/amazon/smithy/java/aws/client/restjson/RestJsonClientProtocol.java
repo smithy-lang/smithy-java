@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.aws.client.restjson;
 
-import java.net.URI;
 import software.amazon.smithy.aws.traits.protocols.RestJson1Trait;
 import software.amazon.smithy.java.aws.events.AwsEventDecoderFactory;
 import software.amazon.smithy.java.aws.events.AwsEventEncoderFactory;
@@ -27,6 +26,7 @@ import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.binding.RequestSerializer;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -65,7 +65,7 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
             ApiOperation<I, O> operation,
             I input,
             Context context,
-            URI endpoint
+            SmithyUri endpoint
     ) {
         RequestSerializer serializer = httpBinding().requestSerializer()
                 .operation(operation)

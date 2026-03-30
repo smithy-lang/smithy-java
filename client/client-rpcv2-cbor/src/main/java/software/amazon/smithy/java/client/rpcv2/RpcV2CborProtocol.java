@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.client.rpcv2;
 
-import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -37,6 +36,7 @@ import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.protocol.traits.Rpcv2CborTrait;
 
@@ -72,10 +72,10 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
             ApiOperation<I, O> operation,
             I input,
             Context context,
-            URI endpoint
+            SmithyUri endpoint
     ) {
         var target = "/service/" + service.getName() + "/operation/" + operation.schema().id().getName();
-        var builder = HttpRequest.builder().method("POST").uri(endpoint.resolve(target));
+        var builder = HttpRequest.builder().method("POST").uri(endpoint.withConcatPath(target));
 
         builder.httpVersion(HttpVersion.HTTP_2);
         if (operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {

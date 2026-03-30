@@ -8,12 +8,12 @@ package software.amazon.smithy.java.client.http.auth;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import java.net.URI;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.auth.api.identity.ApiKeyIdentity;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.traits.HttpApiKeyAuthTrait;
 
 public class HttpApiKeyAuthSignerTest {
@@ -22,7 +22,7 @@ public class HttpApiKeyAuthSignerTest {
     private static final HttpRequest TEST_REQUEST = HttpRequest.builder()
             .httpVersion(HttpVersion.HTTP_1_1)
             .method("PUT")
-            .uri(URI.create("https://www.example.com"))
+            .uri(SmithyUri.of("https://www.example.com"))
             .build();
 
     @Test
@@ -97,7 +97,7 @@ public class HttpApiKeyAuthSignerTest {
         authProperties.put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.QUERY);
         authProperties.put(HttpApiKeyAuthScheme.NAME, "apiKey");
 
-        var updatedRequest = TEST_REQUEST.toBuilder().uri(URI.create("https://www.example.com?x=1")).build();
+        var updatedRequest = TEST_REQUEST.toBuilder().uri(SmithyUri.of("https://www.example.com?x=1")).build();
 
         var signedRequest =
                 HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties).signedRequest();
@@ -112,7 +112,8 @@ public class HttpApiKeyAuthSignerTest {
         authProperties.put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.QUERY);
         authProperties.put(HttpApiKeyAuthScheme.NAME, "apiKey");
 
-        var updatedRequest = TEST_REQUEST.toBuilder().uri(URI.create("https://www.example.com?x=1&apiKey=foo")).build();
+        var updatedRequest =
+                TEST_REQUEST.toBuilder().uri(SmithyUri.of("https://www.example.com?x=1&apiKey=foo")).build();
 
         var signedRequest =
                 HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties).signedRequest();

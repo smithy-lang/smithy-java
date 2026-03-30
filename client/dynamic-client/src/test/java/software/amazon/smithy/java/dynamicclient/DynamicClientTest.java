@@ -10,7 +10,6 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 
-import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -44,6 +43,7 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -387,7 +387,7 @@ public class DynamicClientTest {
                 ApiOperation<I, O> operation,
                 I input,
                 Context context,
-                URI endpoint
+                SmithyUri endpoint
         ) {
             throw new UnsupportedOperationException();
         }
