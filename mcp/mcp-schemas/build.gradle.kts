@@ -28,19 +28,18 @@ sourceSets {
 }
 
 afterEvaluate {
-    val codegenPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen")
+    val codegenPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
     val traitsPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "trait-codegen")
     sourceSets {
         main {
             java {
-                srcDir(codegenPath)
+                srcDir("$codegenPath/java")
                 srcDir(traitsPath)
-                include("software/**", "java/software/**")
             }
             resources {
-                srcDir(codegenPath)
+                srcDir("$codegenPath/resources")
                 srcDir(traitsPath)
-                exclude("**/*.java")
+                exclude("**/*.java") // This is still required because of trait-codegen.
                 exclude("resources/META-INF/services/**") // Exclude original service files, use merged ones instead
             }
 
