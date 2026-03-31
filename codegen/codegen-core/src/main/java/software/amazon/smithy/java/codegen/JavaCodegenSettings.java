@@ -47,7 +47,6 @@ public final class JavaCodegenSettings {
     private static final String RELATIVE_DATE = "relativeDate";
     private static final String RELATIVE_VERSION = "relativeVersion";
     private static final String EDITION = "edition";
-    private static final String USE_EXTERNAL_TYPES = "useExternalTypes";
     private static final String RUNTIME_TRAITS = "runtimeTraits";
     private static final String RUNTIME_TRAITS_SELECTOR = "runtimeTraitsSelector";
     private static final String MODES = "modes";
@@ -65,7 +64,6 @@ public final class JavaCodegenSettings {
             RELATIVE_DATE,
             RELATIVE_VERSION,
             EDITION,
-            USE_EXTERNAL_TYPES,
             RUNTIME_TRAITS,
             RUNTIME_TRAITS_SELECTOR,
             MODES);
@@ -83,7 +81,6 @@ public final class JavaCodegenSettings {
     private final String relativeDate;
     private final String relativeVersion;
     private final SmithyJavaCodegenEdition edition;
-    private final boolean useExternalTypes;
     private final List<ShapeId> runtimeTraits;
     private final Selector runtimeTraitsSelector;
     private final ObjectNode httpConfig;
@@ -103,7 +100,6 @@ public final class JavaCodegenSettings {
         this.relativeDate = builder.relativeDate;
         this.relativeVersion = builder.relativeVersion;
         this.edition = Objects.requireNonNullElse(builder.edition, SmithyJavaCodegenEdition.LATEST);
-        this.useExternalTypes = builder.useExternalTypes;
         this.runtimeTraits = Collections.unmodifiableList(builder.runtimeTraits);
         this.runtimeTraitsSelector = builder.runtimeTraitsSelector;
         this.httpConfig = builder.httpConfig;
@@ -130,7 +126,6 @@ public final class JavaCodegenSettings {
                 .getStringMember(RELATIVE_DATE, builder::relativeDate)
                 .getStringMember(RELATIVE_VERSION, builder::relativeVersion)
                 .getStringMember(EDITION, builder::edition)
-                .getBooleanMember(USE_EXTERNAL_TYPES, builder::useExternalTypes)
                 .getArrayMember(RUNTIME_TRAITS, n -> n.expectStringNode().expectShapeId(), builder::runtimeTraits)
                 .getStringMember(RUNTIME_TRAITS_SELECTOR, builder::runtimeTraitsSelector)
                 .getObjectMember(HTTP_CONFIG, builder::httpConfig);
@@ -196,10 +191,6 @@ public final class JavaCodegenSettings {
         return edition;
     }
 
-    public boolean useExternalTypes() {
-        return useExternalTypes;
-    }
-
     public List<ShapeId> runtimeTraits() {
         return runtimeTraits;
     }
@@ -256,7 +247,6 @@ public final class JavaCodegenSettings {
         private SmithyJavaCodegenEdition edition;
         private final List<ShapeId> runtimeTraits = new ArrayList<>();
         private Selector runtimeTraitsSelector;
-        private boolean useExternalTypes;
         private ObjectNode httpConfig;
 
         public Builder service(String string) {
@@ -344,11 +334,6 @@ public final class JavaCodegenSettings {
 
         public Builder edition(String string) {
             this.edition = SmithyJavaCodegenEdition.valueOf(string.toUpperCase(Locale.ENGLISH));
-            return this;
-        }
-
-        public Builder useExternalTypes(boolean useExternalTypes) {
-            this.useExternalTypes = useExternalTypes;
             return this;
         }
 
