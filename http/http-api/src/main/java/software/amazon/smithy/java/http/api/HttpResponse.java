@@ -24,6 +24,13 @@ public interface HttpResponse extends HttpMessage {
     ModifiableHttpResponse toModifiable();
 
     /**
+     * Creates a modifiable copy of the response, even if the current response is modifiable.
+     *
+     * @return the modifiable copy of this response.
+     */
+    ModifiableHttpResponse toModifiableCopy();
+
+    /**
      * Creates an unmodifiable copy of the request, or returns it as is if it is already unmodifiable.
      *
      * @return the unmodifiable version of this request.

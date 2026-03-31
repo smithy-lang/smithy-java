@@ -26,6 +26,11 @@ record HttpResponseImpl(
 
     @Override
     public ModifiableHttpResponse toModifiable() {
+        return toModifiableCopy();
+    }
+
+    @Override
+    public ModifiableHttpResponse toModifiableCopy() {
         var mod = new ModifiableHttpResponseImpl();
         mod.setHttpVersion(httpVersion);
         mod.setStatusCode(statusCode);
@@ -94,7 +99,7 @@ record HttpResponseImpl(
 
         @Override
         public ModifiableHttpResponse buildModifiable() {
-            return modifiableResponse.copy();
+            return modifiableResponse.toModifiableCopy();
         }
     }
 }

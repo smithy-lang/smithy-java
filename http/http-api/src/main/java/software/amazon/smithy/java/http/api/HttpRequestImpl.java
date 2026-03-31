@@ -31,6 +31,11 @@ record HttpRequestImpl(
 
     @Override
     public ModifiableHttpRequest toModifiable() {
+        return toModifiableCopy();
+    }
+
+    @Override
+    public ModifiableHttpRequest toModifiableCopy() {
         var mod = new ModifiableHttpRequestImpl();
         mod.setHttpVersion(httpVersion);
         mod.setMethod(method);
@@ -113,7 +118,7 @@ record HttpRequestImpl(
         @Override
         public ModifiableHttpRequest buildModifiable() {
             beforeBuild();
-            return modifiableHttpRequest.copy();
+            return modifiableHttpRequest.toModifiableCopy();
         }
     }
 }

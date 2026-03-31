@@ -150,7 +150,7 @@ public class SmithyHttpResponseImplTest {
                 .withAddedHeader("foo", "bar")
                 .buildModifiable();
 
-        var copy = modifiable.copy();
+        var copy = modifiable.toModifiableCopy();
         copy.headers().addHeader("foo", "baz");
 
         assertThat(modifiable.headers().allValues("foo"), contains("bar"));

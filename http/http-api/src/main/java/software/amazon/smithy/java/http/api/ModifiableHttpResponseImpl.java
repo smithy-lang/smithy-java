@@ -86,7 +86,7 @@ final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
     }
 
     @Override
-    public ModifiableHttpResponse copy() {
+    public ModifiableHttpResponse toModifiableCopy() {
         return new ModifiableHttpResponseImpl(this);
     }
 

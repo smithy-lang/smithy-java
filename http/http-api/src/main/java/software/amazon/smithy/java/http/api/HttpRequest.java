@@ -27,11 +27,18 @@ public interface HttpRequest extends HttpMessage {
     SmithyUri uri();
 
     /**
-     * Get a modifiable version of the request.
+     * Get a modifiable version of the request, or returns the current request if it's already modifiable.
      *
-     * @return the modifiable request.
+     * @return the modifiable request or current request.
      */
     ModifiableHttpRequest toModifiable();
+
+    /**
+     * Creates a modifiable copy of the request, even if the current request is modifiable.
+     *
+     * @return the modifiable copy of this request.
+     */
+    ModifiableHttpRequest toModifiableCopy();
 
     /**
      * Creates an unmodifiable copy of the request, or returns it as is if it is already unmodifiable.
