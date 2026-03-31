@@ -8,7 +8,6 @@ package software.amazon.smithy.java.client.http;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
-import java.net.URI;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
@@ -18,6 +17,7 @@ import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public class HttpClientProtocolTest {
@@ -34,7 +34,7 @@ public class HttpClientProtocolTest {
                     ApiOperation<I, O> operation,
                     I input,
                     Context context,
-                    URI endpoint
+                    SmithyUri endpoint
             ) {
                 return null;
             }
@@ -55,7 +55,7 @@ public class HttpClientProtocolTest {
         var endpoint = Endpoint.builder().uri("https://example.com/foo%20/bar").build();
         var request = HttpRequest.builder()
                 .method("GET")
-                .uri(new URI("/bam%20"))
+                .uri(SmithyUri.of(null, null, -1, "/bam%20", null))
                 .build();
         var merged = hcp.setServiceEndpoint(request, endpoint);
 

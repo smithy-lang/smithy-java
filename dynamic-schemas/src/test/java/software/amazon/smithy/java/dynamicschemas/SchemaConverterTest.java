@@ -13,6 +13,7 @@ import static org.hamcrest.Matchers.not;
 
 import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -93,6 +94,29 @@ public class SchemaConverterTest {
                         structure RecursiveStructure {
                             foo: RecursiveStructure
                         }
+
+                        structure MutualA {
+                            toB: MutualB
+                            name: String
+                        }
+
+                        structure MutualB {
+                            toA: MutualA
+                            count: Integer
+                        }
+
+                        structure ContainsRecursive {
+                            recursive: RecursiveStructure
+                            label: String
+                            size: Integer
+                        }
+
+                        structure RecursiveWithPrimitives {
+                            self: RecursiveWithPrimitives
+                            name: String
+                            age: Integer
+                            tags: SimpleList
+                        }
                         """)
                 .assemble()
                 .unwrap();
@@ -148,7 +172,11 @@ public class SchemaConverterTest {
                 Arguments.of(ShapeType.UNION, "SimpleUnion"),
                 Arguments.of(ShapeType.LIST, "RecursiveList"),
                 Arguments.of(ShapeType.MAP, "RecursiveMap"),
-                Arguments.of(ShapeType.STRUCTURE, "RecursiveStructure"));
+                Arguments.of(ShapeType.STRUCTURE, "RecursiveStructure"),
+                Arguments.of(ShapeType.STRUCTURE, "MutualA"),
+                Arguments.of(ShapeType.STRUCTURE, "MutualB"),
+                Arguments.of(ShapeType.STRUCTURE, "ContainsRecursive"),
+                Arguments.of(ShapeType.STRUCTURE, "RecursiveWithPrimitives"));
     }
 
     @MethodSource("detectsRecursiveSchemasSource")
@@ -164,9 +192,8 @@ public class SchemaConverterTest {
 
     static List<Arguments> detectsRecursiveSchemasSource() {
         return List.of(
-                Arguments.of("RecursiveList"),
-                Arguments.of("RecursiveMap"),
-                Arguments.of("RecursiveStructure"));
+                Arguments.of("RecursiveStructure"),
+                Arguments.of("RecursiveWithPrimitives"));
     }
 
     @MethodSource("detectsNonRecursiveSchemasSource")
@@ -201,7 +228,90 @@ public class SchemaConverterTest {
                 Arguments.of("SimpleMap"),
                 Arguments.of("SimpleStruct"),
                 Arguments.of("NestedStruct"),
+                Arguments.of("RecursiveList"),
+                Arguments.of("RecursiveMap"),
                 Arguments.of("ParentStruct"),
-                Arguments.of("SimpleUnion"));
+                Arguments.of("SimpleUnion"),
+                Arguments.of("ContainsRecursive"),
+                Arguments.of("MutualA"),
+                Arguments.of("MutualB"));
+    }
+
+    @Test
+    public void mutuallyRecursiveStructures() {
+        var converter = new SchemaConverter(model);
+        var schemaA = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#MutualA")));
+
+        assertThat(schemaA.type(), is(ShapeType.STRUCTURE));
+        assertThat(schemaA.members().size(), is(2));
+
+        // Check MutualA.toB — MutualB is the inner shape that references back, so it is DeferredRootSchema
+        var toB = schemaA.member("toB");
+        assertThat(toB.isMember(), is(true));
+        assertThat(toB.memberTarget().type(), is(ShapeType.STRUCTURE));
+        assertThat(toB.memberTarget().id().getName(), equalTo("MutualB"));
+        assertThat(toB.memberTarget().getClass().getSimpleName(), is("DeferredRootSchema"));
+
+        // Check MutualA.name
+        var name = schemaA.member("name");
+        assertThat(name.memberTarget().type(), is(ShapeType.STRING));
+
+        // Navigate MutualA -> toB -> toA -> back to MutualA
+        var backToA = toB.memberTarget().member("toA").memberTarget();
+        assertThat(backToA.id().getName(), equalTo("MutualA"));
+        assertThat(backToA.type(), is(ShapeType.STRUCTURE));
+        assertThat(backToA.member("name").memberTarget().type(), is(ShapeType.STRING));
+
+        // Navigate MutualA -> toB -> count
+        var count = toB.memberTarget().member("count");
+        assertThat(count.memberTarget().type(), is(ShapeType.INTEGER));
+    }
+
+    @Test
+    public void structureContainingRecursiveStructure() {
+        var converter = new SchemaConverter(model);
+        var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#ContainsRecursive")));
+
+        assertThat(schema.getClass().getSimpleName(), not("DeferredRootSchema"));
+        assertThat(schema.members().size(), is(3));
+
+        // Check recursive member
+        var recursive = schema.member("recursive").memberTarget();
+        assertThat(recursive.type(), is(ShapeType.STRUCTURE));
+        assertThat(recursive.id().getName(), equalTo("RecursiveStructure"));
+        assertThat(recursive.getClass().getSimpleName(), is("DeferredRootSchema"));
+
+        // Check primitive members
+        assertThat(schema.member("label").memberTarget().type(), is(ShapeType.STRING));
+        assertThat(schema.member("size").memberTarget().type(), is(ShapeType.INTEGER));
+
+        // Navigate into the recursive structure
+        var inner = schema.member("recursive").memberTarget().member("foo").memberTarget();
+        assertThat(inner.id().getName(), equalTo("RecursiveStructure"));
+    }
+
+    @Test
+    public void recursiveStructureWithPrimitiveMembers() {
+        var converter = new SchemaConverter(model);
+        var schema = converter.getSchema(
+                model.expectShape(ShapeId.from("smithy.example#RecursiveWithPrimitives")));
+
+        assertThat(schema.getClass().getSimpleName(), is("DeferredRootSchema"));
+        assertThat(schema.members().size(), is(4));
+
+        // Check self-referencing member
+        var self = schema.member("self").memberTarget();
+        assertThat(self.id().getName(), equalTo("RecursiveWithPrimitives"));
+        assertThat(self.type(), is(ShapeType.STRUCTURE));
+
+        // Check primitive members
+        assertThat(schema.member("name").memberTarget().type(), is(ShapeType.STRING));
+        assertThat(schema.member("age").memberTarget().type(), is(ShapeType.INTEGER));
+
+        // Check list member
+        var tags = schema.member("tags").memberTarget();
+        assertThat(tags.type(), is(ShapeType.LIST));
+        assertThat(tags.id().getName(), equalTo("SimpleList"));
+        assertThat(tags.listMember().memberTarget().type(), is(ShapeType.STRING));
     }
 }

@@ -14,7 +14,6 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.uri.QueryStringBuilder;
-import software.amazon.smithy.java.io.uri.URIBuilder;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 final class HttpApiKeyAuthSigner implements Signer<HttpRequest, ApiKeyIdentity> {
@@ -42,7 +41,6 @@ final class HttpApiKeyAuthSigner implements Signer<HttpRequest, ApiKeyIdentity> 
                 yield new SignResult<>(request.toBuilder().headers(HttpHeaders.of(updated)).build());
             }
             case QUERY -> {
-                var uriBuilder = URIBuilder.of(request.uri());
                 var queryBuilder = new QueryStringBuilder();
                 queryBuilder.add(name, identity.apiKey());
                 var stringBuilder = new StringBuilder();
@@ -50,7 +48,7 @@ final class HttpApiKeyAuthSigner implements Signer<HttpRequest, ApiKeyIdentity> 
                 addExistingQueryParams(stringBuilder, existingQuery, name);
                 queryBuilder.write(stringBuilder);
                 yield new SignResult<>(
-                        request.toBuilder().uri(uriBuilder.query(stringBuilder.toString()).build()).build());
+                        request.toBuilder().uri(request.uri().withQuery(stringBuilder.toString())).build());
             }
         };
     }

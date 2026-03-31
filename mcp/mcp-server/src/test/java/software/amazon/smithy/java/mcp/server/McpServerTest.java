@@ -952,7 +952,8 @@ public class McpServerTest {
         assertEquals("string", bigDecimalField.get("type").asString());
 
         validateNestedWithBigNumbers(properties.get("nestedWithBigNumbers").asStringMap());
-        validateNestedStructure(properties.get("nested").asStringMap());
+        validateNestedStructure(properties.get("nested").asStringMap(),
+                "The nested member. A structure that can be nested");
         validateNestedList(properties.get("list").asStringMap());
         validateDoubleNestedList(properties.get("doubleNestedList").asStringMap());
     }
@@ -989,7 +990,7 @@ public class McpServerTest {
         assertFalse(listSchema.get("uniqueItems").asBoolean());
 
         var listItems = listSchema.get("items").asStringMap();
-        validateNestedStructure(listItems);
+        validateNestedStructure(listItems, "A structure that can be nested");
     }
 
     private void validateDoubleNestedList(Map<String, Document> doubleListSchema) {
@@ -1001,12 +1002,12 @@ public class McpServerTest {
         assertFalse(outerItems.get("uniqueItems").asBoolean());
 
         var innerItems = outerItems.get("items").asStringMap();
-        validateNestedStructure(innerItems);
+        validateNestedStructure(innerItems, "A structure that can be nested");
     }
 
-    private void validateNestedStructure(Map<String, Document> nestedSchema) {
+    private void validateNestedStructure(Map<String, Document> nestedSchema, String expectedDescription) {
         assertEquals("object", nestedSchema.get("type").asString());
-        assertEquals("A structure that can be nested", nestedSchema.get("description").asString());
+        assertEquals(expectedDescription, nestedSchema.get("description").asString());
         assertEquals("http://json-schema.org/draft-07/schema#", nestedSchema.get("$schema").asString());
         assertTrue(nestedSchema.get("required").asList().isEmpty());
 
@@ -1029,7 +1030,8 @@ public class McpServerTest {
 
         var recursive = properties.get("recursive").asStringMap();
         assertEquals("object", recursive.get("type").asString());
-        assertEquals("A structure that references itself recursively", recursive.get("description").asString());
+        assertEquals("A field that recurses back into us. A structure that references itself recursively",
+                recursive.get("description").asString());
         assertEquals("http://json-schema.org/draft-07/schema#", recursive.get("$schema").asString());
         assertTrue(recursive.get("required").asList().isEmpty());
 

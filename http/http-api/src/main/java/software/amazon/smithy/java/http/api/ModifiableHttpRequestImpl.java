@@ -5,13 +5,13 @@
 
 package software.amazon.smithy.java.http.api;
 
-import java.net.URI;
 import java.util.Objects;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 
 final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
 
-    private URI uri;
+    private SmithyUri uri;
     private String method;
     private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
     private ModifiableHttpHeaders headers = new SimpleModifiableHttpHeaders();
@@ -38,12 +38,12 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
     }
 
     @Override
-    public URI uri() {
+    public SmithyUri uri() {
         return uri;
     }
 
     @Override
-    public void setUri(URI uri) {
+    public void setUri(SmithyUri uri) {
         this.uri = Objects.requireNonNull(uri);
     }
 

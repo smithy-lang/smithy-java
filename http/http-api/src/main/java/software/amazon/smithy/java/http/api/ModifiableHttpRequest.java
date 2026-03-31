@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.http.api;
 
 import java.net.URI;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 
 /**
  * A modifiable HTTP request.
@@ -21,9 +22,18 @@ public interface ModifiableHttpRequest extends ModifiableHttpMessage, HttpReques
     /**
      * Set the request URI.
      *
+     * @param uri SmithyUri to set.
+     */
+    void setUri(SmithyUri uri);
+
+    /**
+     * Set the request URI.
+     *
      * @param uri URI to set.
      */
-    void setUri(URI uri);
+    default void setUri(URI uri) {
+        setUri(SmithyUri.of(uri));
+    }
 
     @Override
     default ModifiableHttpRequest toModifiable() {

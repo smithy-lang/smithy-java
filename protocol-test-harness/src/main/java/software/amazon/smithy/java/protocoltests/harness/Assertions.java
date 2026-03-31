@@ -8,7 +8,6 @@ package software.amazon.smithy.java.protocoltests.harness;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import java.net.URI;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +15,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.http.api.HttpMessage;
 import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 
 /**
@@ -43,11 +43,11 @@ final class Assertions {
             '{',
             '}');
 
-    static void assertUriEquals(HttpRequestTestCase testCase, URI uri) {
-        assertEquals(testCase.getUri(), uri.getRawPath());
+    static void assertUriEquals(HttpRequestTestCase testCase, SmithyUri uri) {
+        assertEquals(testCase.getUri(), uri.getPath());
         // Only evaluate query params when params are expected in test case.
         if (!testCase.getQueryParams().isEmpty()) {
-            assertQueryParamsEquals(testCase.getQueryParams(), uri.getRawQuery());
+            assertQueryParamsEquals(testCase.getQueryParams(), uri.getQuery());
         }
     }
 
@@ -77,7 +77,8 @@ final class Assertions {
     }
 
     static void assertHostEquals(HttpRequest request, String expected) {
-        var hostValue = request.uri().getAuthority();
+        var uri = request.uri();
+        var hostValue = uri.getPort() >= 0 ? uri.getHost() + ":" + uri.getPort() : uri.getHost();
         assertEquals(hostValue, expected);
     }
 

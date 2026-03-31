@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.aws.client.awsquery;
 
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +31,7 @@ import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.xml.XmlCodec;
 import software.amazon.smithy.java.xml.XmlUtil;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -69,7 +69,7 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
             ApiOperation<I, O> operation,
             I input,
             Context context,
-            URI endpoint
+            SmithyUri endpoint
     ) {
         String operationName = operation.schema().id().getName();
         AwsQueryFormSerializer serializer = new AwsQueryFormSerializer(operationName, version);

@@ -6,10 +6,10 @@
 package software.amazon.smithy.java.endpoints;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Set;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 
 /**
  * A resolved endpoint.
@@ -18,9 +18,9 @@ public interface Endpoint {
     /**
      * The endpoint URI.
      *
-     * @return URI of the endpoint.
+     * @return SmithyUri of the endpoint.
      */
-    URI uri();
+    SmithyUri uri();
 
     /**
      * Get the value of a property for the endpoint.
@@ -81,23 +81,29 @@ public interface Endpoint {
         /**
          * Set the URI of the endpoint.
          *
-         * @param uri URI to set.
+         * @param uri SmithyUri to set.
          * @return the builder.
          */
-        Builder uri(URI uri);
+        Builder uri(SmithyUri uri);
 
         /**
-         * Set the URI of the endpoint.
+         * Set the URI of the endpoint from a {@link URI}.
          *
          * @param uri URI to set.
          * @return the builder.
          */
+        default Builder uri(URI uri) {
+            return uri(SmithyUri.of(uri));
+        }
+
+        /**
+         * Set the URI of the endpoint from a string.
+         *
+         * @param uri URI string to set.
+         * @return the builder.
+         */
         default Builder uri(String uri) {
-            try {
-                return uri(new URI(uri));
-            } catch (URISyntaxException e) {
-                throw new RuntimeException(e);
-            }
+            return uri(SmithyUri.of(uri));
         }
 
         /**

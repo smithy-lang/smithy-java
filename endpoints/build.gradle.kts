@@ -10,5 +10,6 @@ extra["moduleName"] = "software.amazon.smithy.java.endpoints"
 dependencies {
     api(project(":context"))
     api(project(":core"))
+    api(project(":io"))
     api(libs.smithy.model)
 }

@@ -569,6 +569,7 @@ public final class McpService {
             var id = entry.getKey();
             var service = entry.getValue();
             var serviceName = service.schema().id().getName();
+            var cache = new HashMap<ShapeId, SerializableShape>();
             for (var operation : service.getAllOperations()) {
                 var operationName = operation.name();
                 Schema schema = operation.getApiOperation().schema();
@@ -577,9 +578,16 @@ public final class McpService {
                         .description(createDescription(serviceName,
                                 operationName,
                                 schema))
-                        .inputSchema(createJsonObjectSchema(operation.getApiOperation().inputSchema(), new HashSet<>()))
-                        .outputSchema(
-                                createJsonObjectSchema(operation.getApiOperation().outputSchema(), new HashSet<>()))
+                        .inputSchema(createJsonObjectSchema(
+                                operation.getApiOperation().inputSchema(),
+                                operation.getApiOperation().inputSchema(),
+                                new HashSet<>(),
+                                cache))
+                        .outputSchema(createJsonObjectSchema(
+                                operation.getApiOperation().outputSchema(),
+                                operation.getApiOperation().outputSchema(),
+                                new HashSet<>(),
+                                cache))
                         .build();
                 tools.put(operationName, new Tool(toolInfo, id, operation));
             }
@@ -587,8 +595,19 @@ public final class McpService {
         return tools;
     }
 
-    private JsonObjectSchema createJsonObjectSchema(Schema schema, Set<ShapeId> visited) {
-        var targetId = schema.id();
+    private JsonObjectSchema createJsonObjectSchema(
+            Schema member,
+            Schema target,
+            Set<ShapeId> visited,
+            Map<ShapeId, SerializableShape> cache
+    ) {
+        var targetId = target.id();
+
+        var cached = cache.get(targetId);
+        if (cached != null) {
+            return (JsonObjectSchema) withDescription(cached, memberDescription(member));
+        }
+
         if (!visited.add(targetId)) {
             // if we're in a recursive cycle, just say "type": "object" and bail
             return JsonObjectSchema.builder().build();
@@ -596,34 +615,41 @@ public final class McpService {
 
         var properties = new HashMap<String, Document>();
         var requiredProperties = new ArrayList<String>();
-        boolean isMember = schema.isMember();
-        var members = isMember ? schema.memberTarget().members() : schema.members();
-        for (var member : members) {
-            var name = member.memberName();
-            if (member.hasTrait(TraitKey.REQUIRED_TRAIT)) {
+        for (var m : target.members()) {
+            var name = m.memberName();
+            if (m.hasTrait(TraitKey.REQUIRED_TRAIT)) {
                 requiredProperties.add(name);
             }
 
-            var jsonSchema = createMemberSchema(member, visited);
+            var jsonSchema = createMemberSchema(m, visited, cache);
 
             properties.put(name, Document.of(jsonSchema));
         }
 
         visited.remove(targetId);
-        return JsonObjectSchema.builder()
+
+        // Cache without description so it can be reused with different member descriptions
+        var result = JsonObjectSchema.builder()
                 .properties(properties)
                 .required(requiredProperties)
-                .description(memberDescription(schema))
                 .build();
+        cache.put(targetId, result);
+
+        return (JsonObjectSchema) withDescription(result, memberDescription(member));
     }
 
-    private JsonArraySchema createJsonArraySchema(Schema schema, Set<ShapeId> visited) {
-        var listMember = schema.listMember();
-        var items = createMemberSchema(listMember, visited);
+    private JsonArraySchema createJsonArraySchema(
+            Schema member,
+            Schema target,
+            Set<ShapeId> visited,
+            Map<ShapeId, SerializableShape> cache
+    ) {
+        var listMember = target.listMember();
+        var items = createMemberSchema(listMember, visited, cache);
 
         // For sparse lists, allow null items using anyOf
         Document itemsSchema;
-        if (schema.hasTrait(TraitKey.SPARSE_TRAIT)) {
+        if (target.hasTrait(TraitKey.SPARSE_TRAIT)) {
             var nullSchema = Map.of("type", Document.of("null"));
             itemsSchema = Document.of(Map.of(
                     "anyOf",
@@ -633,7 +659,7 @@ public final class McpService {
         }
 
         return JsonArraySchema.builder()
-                .description(memberDescription(schema))
+                .description(memberDescription(member))
                 .items(itemsSchema)
                 .build();
     }
@@ -683,12 +709,16 @@ public final class McpService {
                 .build();
     }
 
-    private SerializableShape createJsonDocumentSchema(Schema member, Set<ShapeId> visited) {
+    private SerializableShape createJsonDocumentSchema(
+            Schema member,
+            Set<ShapeId> visited,
+            Map<ShapeId, SerializableShape> cache
+    ) {
         var targetSchema = member.isMember() ? member.memberTarget() : member;
         var oneOfTrait = targetSchema.getTrait(ONE_OF_TRAIT);
 
         if (oneOfTrait != null) {
-            return createJsonOneOfSchema(oneOfTrait, member, visited);
+            return createJsonOneOfSchema(oneOfTrait, member, visited, cache);
         } else {
             return createJsonDocumentSchema(member);
         }
@@ -697,9 +727,16 @@ public final class McpService {
     private SerializableShape createJsonOneOfSchema(
             OneOfTrait oneOfTrait,
             Schema documentMember,
-            Set<ShapeId> visited
+            Set<ShapeId> visited,
+            Map<ShapeId, SerializableShape> cache
     ) {
         var targetId = (documentMember.isMember() ? documentMember.memberTarget() : documentMember).id();
+
+        var cached = cache.get(targetId);
+        if (cached != null) {
+            return withDescription(cached, memberDescription(documentMember));
+        }
+
         if (!visited.add(targetId)) {
             return JsonObjectSchema.builder().build();
         }
@@ -711,38 +748,55 @@ public final class McpService {
             var targetShapeId = memberDef.getTarget();
 
             var targetSchema = schemaIndex.getSchema(targetShapeId);
-            var memberSchema = createJsonObjectSchema(targetSchema, visited);
+            var memberSchema = createJsonObjectSchema(targetSchema, targetSchema, visited, cache);
 
             oneOfVariants.add(createUnionVariant(memberName, memberSchema));
         }
 
         visited.remove(targetId);
-        return JsonOneOfSchema.builder()
+
+        var result = JsonOneOfSchema.builder()
                 .oneOf(oneOfVariants)
-                .description(memberDescription(documentMember))
                 .build();
+        cache.put(targetId, result);
+
+        return withDescription(result, memberDescription(documentMember));
     }
 
-    private SerializableShape createJsonUnionSchema(Schema schema, Set<ShapeId> visited) {
-        var targetId = schema.id();
+    private SerializableShape createJsonUnionSchema(
+            Schema member,
+            Schema target,
+            Set<ShapeId> visited,
+            Map<ShapeId, SerializableShape> cache
+    ) {
+        var targetId = target.id();
+
+        var cached = cache.get(targetId);
+        if (cached != null) {
+            return withDescription(cached, memberDescription(member));
+        }
+
         if (!visited.add(targetId)) {
             return JsonObjectSchema.builder().build();
         }
 
         var variants = new ArrayList<Document>();
 
-        for (var member : schema.members()) {
-            var memberName = member.memberName();
-            var memberSchema = createMemberSchema(member, visited);
+        for (var m : target.members()) {
+            var memberName = m.memberName();
+            var memberSchema = createMemberSchema(m, visited, cache);
 
             variants.add(createUnionVariant(memberName, memberSchema));
         }
 
         visited.remove(targetId);
-        return JsonOneOfSchema.builder()
+
+        var result = JsonOneOfSchema.builder()
                 .oneOf(variants)
-                .description(memberDescription(schema))
                 .build();
+        cache.put(targetId, result);
+
+        return withDescription(result, memberDescription(member));
     }
 
     private static Document createUnionVariant(String memberName, SerializableShape memberSchema) {
@@ -754,24 +808,33 @@ public final class McpService {
         return Document.of(wrapperSchema);
     }
 
-    private SerializableShape createMemberSchema(Schema member, Set<ShapeId> visited) {
+    private SerializableShape createMemberSchema(
+            Schema member,
+            Set<ShapeId> visited,
+            Map<ShapeId, SerializableShape> cache
+    ) {
         return switch (member.type()) {
-            case LIST, SET -> createJsonArraySchema(member.memberTarget(), visited);
-            case MAP -> createJsonMapSchema(member.memberTarget(), visited);
-            case STRUCTURE -> createJsonObjectSchema(member.memberTarget(), visited);
-            case UNION -> createJsonUnionSchema(member.memberTarget(), visited);
-            case DOCUMENT -> createJsonDocumentSchema(member, visited);
+            case LIST, SET -> createJsonArraySchema(member, member.memberTarget(), visited, cache);
+            case MAP -> createJsonMapSchema(member, member.memberTarget(), visited, cache);
+            case STRUCTURE -> createJsonObjectSchema(member, member.memberTarget(), visited, cache);
+            case UNION -> createJsonUnionSchema(member, member.memberTarget(), visited, cache);
+            case DOCUMENT -> createJsonDocumentSchema(member, visited, cache);
             default -> createJsonPrimitiveSchema(member);
         };
     }
 
-    private JsonObjectSchema createJsonMapSchema(Schema schema, Set<ShapeId> visited) {
-        var mapValueMember = schema.mapValueMember();
-        var valueSchema = createMemberSchema(mapValueMember, visited);
+    private JsonObjectSchema createJsonMapSchema(
+            Schema member,
+            Schema target,
+            Set<ShapeId> visited,
+            Map<ShapeId, SerializableShape> cache
+    ) {
+        var mapValueMember = target.mapValueMember();
+        var valueSchema = createMemberSchema(mapValueMember, visited, cache);
 
         // For sparse maps, allow null values using anyOf
         Document additionalPropertiesSchema;
-        if (schema.hasTrait(TraitKey.SPARSE_TRAIT)) {
+        if (target.hasTrait(TraitKey.SPARSE_TRAIT)) {
             var nullSchema = Map.of("type", Document.of("null"));
             additionalPropertiesSchema = Document.of(Map.of(
                     "anyOf",
@@ -781,14 +844,18 @@ public final class McpService {
         }
 
         return JsonObjectSchema.builder()
-                .description(memberDescription(schema))
+                .description(memberDescription(member))
                 .additionalProperties(additionalPropertiesSchema)
                 .build();
     }
 
     private static String memberDescription(Schema schema) {
         String description = null;
-        var trait = schema.getTrait(TraitKey.DOCUMENTATION_TRAIT);
+        // Use getDirectTrait for members to avoid inheriting the target's documentation trait
+        // (getTrait on a member merges member + target traits, which would cause doubling)
+        var trait = schema.isMember()
+                ? schema.getDirectTrait(TraitKey.DOCUMENTATION_TRAIT)
+                : schema.getTrait(TraitKey.DOCUMENTATION_TRAIT);
         if (trait != null) {
             description = trait.getValue();
         }
@@ -838,6 +905,19 @@ public final class McpService {
             first = first + ". ";
         }
         return first + second;
+    }
+
+    private static SerializableShape withDescription(SerializableShape schema, String description) {
+        if (description == null) {
+            return schema;
+        }
+        if (schema instanceof JsonObjectSchema s) {
+            return s.toBuilder().description(description).build();
+        }
+        if (schema instanceof JsonOneOfSchema s) {
+            return s.toBuilder().description(description).build();
+        }
+        return schema;
     }
 
     private Document adaptDocument(Document doc, Schema schema) {

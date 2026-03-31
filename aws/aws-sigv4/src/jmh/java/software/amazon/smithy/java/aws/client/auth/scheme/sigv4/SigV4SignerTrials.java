@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.Security;
 import java.util.Collections;
@@ -28,6 +27,7 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.QueryStringBuilder;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -131,7 +131,7 @@ public class SigV4SignerTrials {
         return HttpRequest.builder()
                 .method("POST")
                 .httpVersion(HttpVersion.HTTP_1_1)
-                .uri(URI.create(uriString))
+                .uri(SmithyUri.of(uriString))
                 .headers(httpHeaders)
                 .body(body != null ? DataStream.ofBytes(body.getBytes(StandardCharsets.UTF_8)) : null)
                 .build();

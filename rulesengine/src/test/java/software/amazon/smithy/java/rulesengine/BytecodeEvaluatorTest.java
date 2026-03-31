@@ -11,7 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.net.URI;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -21,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 
 class BytecodeEvaluatorTest {
 
@@ -270,7 +270,7 @@ class BytecodeEvaluatorTest {
 
         Endpoint endpoint = evaluator.resolveResult(0);
         assertNotNull(endpoint);
-        assertEquals(URI.create("https://example.com"), endpoint.uri());
+        assertEquals(SmithyUri.of("https://example.com"), endpoint.uri());
     }
 
     @Test

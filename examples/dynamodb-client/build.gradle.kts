@@ -17,8 +17,17 @@ dependencies {
 
 // Add generated Java sources to the main sourceset
 afterEvaluate {
-    val clientPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen")
-    sourceSets.main.get().java.srcDir(clientPath)
+    val clientPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
+    sourceSets {
+        main {
+            java {
+                srcDir("$clientPath/java")
+            }
+            resources {
+                srcDir("$clientPath/resources")
+            }
+        }
+    }
 }
 
 tasks {
@@ -42,6 +51,14 @@ sourceSets {
             srcDir("model")
         }
     }
+}
+
+tasks.compileJava {
+    dependsOn(tasks.smithyBuild)
+}
+
+tasks.processResources {
+    dependsOn(tasks.compileJava)
 }
 
 repositories {

@@ -25,10 +25,10 @@ import software.amazon.smithy.java.cbor.Rpcv2CborCodec;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
-import software.amazon.smithy.java.example.model.AllFieldsOptional;
-import software.amazon.smithy.java.example.model.AttributeUpdates;
-import software.amazon.smithy.java.example.model.CodegenStruct;
-import software.amazon.smithy.java.example.model.SendMessageRequest;
+import software.amazon.smithy.java.example.restjson.model.AllFieldsOptional;
+import software.amazon.smithy.java.example.restjson.model.AttributeUpdates;
+import software.amazon.smithy.java.example.restjson.model.CodegenStruct;
+import software.amazon.smithy.java.example.restjson.model.SendMessageRequest;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.utils.IoUtils;
 

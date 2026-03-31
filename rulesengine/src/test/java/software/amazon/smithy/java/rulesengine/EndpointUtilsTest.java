@@ -12,7 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -20,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.BooleanNode;
 import software.amazon.smithy.model.node.NullNode;
@@ -152,7 +152,7 @@ class EndpointUtilsTest {
     }
 
     static Stream<Arguments> getPropertyCases() {
-        URI uri = URI.create("https://example.com/foo/bar");
+        SmithyUri uri = SmithyUri.of("https://example.com/foo/bar");
         Map<String, Object> map = Map.of("key1", "value1", "key2", 42);
         return Stream.of(
                 Arguments.of(map, "key1", "value1"),
@@ -176,7 +176,7 @@ class EndpointUtilsTest {
 
     @Test
     void testGetPropertyIsIpTrue() {
-        URI uri = URI.create("https://192.168.1.1/path");
+        SmithyUri uri = SmithyUri.of("https://192.168.1.1/path");
         assertEquals(true, EndpointUtils.getProperty(uri, "isIp"));
     }
 

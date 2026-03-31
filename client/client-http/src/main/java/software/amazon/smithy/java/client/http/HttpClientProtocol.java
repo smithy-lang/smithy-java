@@ -10,7 +10,6 @@ import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
-import software.amazon.smithy.java.io.uri.URIBuilder;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -36,27 +35,7 @@ public abstract class HttpClientProtocol implements ClientProtocol<HttpRequest, 
 
     @Override
     public HttpRequest setServiceEndpoint(HttpRequest request, Endpoint endpoint) {
-        var uri = endpoint.uri();
-        URIBuilder builder = URIBuilder.of(request.uri());
-
-        if (uri.getScheme() != null) {
-            builder.scheme(uri.getScheme());
-        }
-
-        if (uri.getHost() != null) {
-            builder.host(uri.getHost());
-        }
-
-        if (uri.getPort() > -1) {
-            builder.port(uri.getPort());
-        }
-
-        // If a path is set on the service endpoint, concatenate it with the path of the request.
-        if (uri.getRawPath() != null && !uri.getRawPath().isEmpty()) {
-            builder.path(uri.getRawPath());
-            builder.concatPath(request.uri().getRawPath());
-        }
-
+        var merged = request.uri().withEndpoint(endpoint.uri());
         var requestBuilder = request.toBuilder();
 
         // Merge in any HTTP headers found on the endpoint.
@@ -64,6 +43,6 @@ public abstract class HttpClientProtocol implements ClientProtocol<HttpRequest, 
             requestBuilder.withAddedHeaders(endpoint.property(HttpContext.ENDPOINT_RESOLVER_HTTP_HEADERS));
         }
 
-        return requestBuilder.uri(builder.build()).build();
+        return requestBuilder.uri(merged).build();
     }
 }

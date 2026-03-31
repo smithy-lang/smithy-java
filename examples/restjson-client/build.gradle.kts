@@ -13,6 +13,10 @@ dependencies {
     implementation("software.amazon.smithy.java:client-core:$smithyJavaVersion")
     api("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
 
+    // JMH benchmark dependencies
+    jmhImplementation("software.amazon.smithy.java:client-mock-plugin:$smithyJavaVersion")
+    jmhImplementation("software.amazon.smithy.java:cbor-codec:$smithyJavaVersion")
+
     // Test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -56,7 +60,12 @@ jmh {
     warmupIterations = 2
     iterations = 5
     fork = 1
-    // profilers.add("async:output=flamegraph")
+    // Allow filtering for specific benchmarks
+    includes.addAll(providers.gradleProperty("jmh.includes")
+        .map { listOf(it) }
+        .orElse(emptyList()))
+    // profilers.add("async:output=flamegraph;direction=forward")
+    // profilers.add("async:output=collapsed;dir=build/jmh-profiler")
     // profilers.add("gc")
 }
 

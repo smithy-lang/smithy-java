@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.client.core;
 
-import java.net.URI;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
@@ -13,6 +12,7 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.endpoints.Endpoint;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -56,7 +56,7 @@ public interface ClientProtocol<RequestT, ResponseT> {
             ApiOperation<I, O> operation,
             I input,
             Context context,
-            URI endpoint
+            SmithyUri endpoint
     );
 
     /**

@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.client.core;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.Objects;
@@ -31,6 +29,7 @@ import software.amazon.smithy.java.core.serde.event.Frame;
 import software.amazon.smithy.java.core.serde.event.FrameProcessor;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointResolverParams;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.retries.api.AcquireInitialTokenRequest;
 import software.amazon.smithy.java.retries.api.RecordSuccessRequest;
@@ -49,15 +48,7 @@ import software.amazon.smithy.java.retries.api.TokenAcquisitionFailedException;
 final class ClientPipeline<RequestT, ResponseT> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientPipeline.class);
-    private static final URI UNRESOLVED;
-
-    static {
-        try {
-            UNRESOLVED = new URI("/");
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    private static final SmithyUri UNRESOLVED = SmithyUri.of(null, null, -1, "/", null);
 
     private final ClientProtocol<RequestT, ResponseT> protocol;
     private final ClientTransport<RequestT, ResponseT> transport;

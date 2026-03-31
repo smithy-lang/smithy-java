@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.client.http.mock;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,6 +28,7 @@ import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.HttpJob;
@@ -177,7 +177,7 @@ public final class MockPlugin implements ClientPlugin {
                 ApiOperation<I, O> operation,
                 I input,
                 Context context,
-                URI endpoint
+                SmithyUri endpoint
         ) {
             var serviceOperation = Operation.of(
                     operation.schema().id().getName(),
@@ -275,7 +275,7 @@ public final class MockPlugin implements ClientPlugin {
         var cRequest = currentRequest.request().request();
         var serverRequest = new software.amazon.smithy.java.server.core.HttpRequest(
                 cRequest.headers(),
-                cRequest.uri(),
+                cRequest.uri().toURI(),
                 cRequest.method());
 
         // Use the explicitly provided protocol if set, otherwise try to find the matching server protocol.

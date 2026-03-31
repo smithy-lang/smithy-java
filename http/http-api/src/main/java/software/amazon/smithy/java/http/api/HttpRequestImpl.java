@@ -5,18 +5,18 @@
 
 package software.amazon.smithy.java.http.api;
 
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 
 record HttpRequestImpl(
         HttpVersion httpVersion,
         String method,
-        URI uri,
+        SmithyUri uri,
         HttpHeaders headers,
         DataStream body) implements HttpRequest {
 
@@ -55,7 +55,7 @@ record HttpRequestImpl(
             return this;
         }
 
-        public Builder uri(URI uri) {
+        public Builder uri(SmithyUri uri) {
             modifiableHttpRequest.setUri(uri);
             return this;
         }

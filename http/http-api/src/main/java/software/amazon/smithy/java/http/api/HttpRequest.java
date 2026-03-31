@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.http.api;
 
 import java.net.URI;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 
 /**
  * HTTP request.
@@ -23,7 +24,7 @@ public interface HttpRequest extends HttpMessage {
      *
      * @return the request URI.
      */
-    URI uri();
+    SmithyUri uri();
 
     /**
      * Get a modifiable version of the request.
@@ -92,9 +93,19 @@ public interface HttpRequest extends HttpMessage {
         /**
          * Set the URI of the message.
          *
+         * @param uri SmithyUri to set.
+         * @return the builder.
+         */
+        Builder uri(SmithyUri uri);
+
+        /**
+         * Set the URI of the message from a {@link URI}.
+         *
          * @param uri URI to set.
          * @return the builder.
          */
-        Builder uri(URI uri);
+        default Builder uri(URI uri) {
+            return uri(SmithyUri.of(uri));
+        }
     }
 }

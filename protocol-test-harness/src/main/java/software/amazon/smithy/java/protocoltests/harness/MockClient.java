@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.protocoltests.harness;
 
-import java.net.URI;
 import java.util.Objects;
 import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.ClientProtocol;
@@ -25,6 +24,7 @@ import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -106,7 +106,7 @@ final class MockClient extends Client {
                 ApiOperation<I, O> operation,
                 I input,
                 Context context,
-                URI endpoint
+                SmithyUri endpoint
         ) {
             throw new UnsupportedOperationException("Placeholder protocol must be overridden");
         }
