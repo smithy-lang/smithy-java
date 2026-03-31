@@ -25,14 +25,14 @@ public class RequestHookTest {
     }
 
     @Test
-    public void mapsValueIfExpectedType() {
+    public void castsRequestType() {
         var foo = new TestStructs.Foo();
         var context = Context.create();
         var request = new MyRequest();
         var hook = new RequestHook<>(TestStructs.OPERATION, context, foo, request);
 
-        assertThat(hook.mapRequest(TestStructs.Bar.class, RequestHook::request), sameInstance(request));
-        assertThat(hook.mapRequest(MyRequest.class, f -> new MyRequest()), not(sameInstance(request)));
+        var newRequest = new MyRequest();
+        assertThat(hook.asRequestType(newRequest), sameInstance(newRequest));
     }
 
     private static final class MyRequest {}

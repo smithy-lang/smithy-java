@@ -78,9 +78,11 @@ public class RecursionDetectionPluginTest {
         var headers = getSentHeaders(recursionDetectionPlugin, new ClientInterceptor() {
             @Override
             public <RequestT> RequestT modifyBeforeSigning(RequestHook<?, ?, RequestT> hook) {
-                return hook.mapRequest(HttpRequest.class, h -> {
-                    return h.request().toBuilder().withReplacedHeader("x-amzn-trace-id", List.of("hi")).build();
-                });
+                if (hook.request() instanceof HttpRequest req) {
+                    return hook.asRequestType(
+                            req.toBuilder().withReplacedHeader("x-amzn-trace-id", List.of("hi")).build());
+                }
+                return hook.request();
             }
         });
 

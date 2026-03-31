@@ -6,8 +6,6 @@
 package software.amazon.smithy.java.client.core.interceptors;
 
 import java.util.Objects;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -50,38 +48,21 @@ public sealed class RequestHook<I extends SerializableStruct, O extends Serializ
     }
 
     /**
-     * Provides a type-safe convenience method to modify the request if it is of a specific class.
+     * Casts the given request value to the request type of this hook.
      *
-     * @param predicateType Request type to map over.
-     * @param mapper Mapper that accepts the request and a state value.
-     * @return the updated request.
-     * @param <R> Expected request class.
+     * <p>This is useful when modifying the request using {@code instanceof} pattern matching:
+     * {@snippet :
+     * if (hook.request() instanceof HttpRequest req) {
+     *     return hook.asRequestType(req.toBuilder().withAddedHeader("X-Foo", "Bar").build());
+     * }
+     * return hook.request();
+     * }
+     *
+     * @param request Request value to cast.
+     * @return the request value cast to the request type.
      */
     @SuppressWarnings("unchecked")
-    public <R> RequestT mapRequest(Class<R> predicateType, Function<RequestHook<?, ?, R>, R> mapper) {
-        if (predicateType.isInstance(request)) {
-            return (RequestT) mapper.apply((RequestHook<?, ?, R>) this);
-        } else {
-            return request;
-        }
-    }
-
-    /**
-     * Provides a type-safe convenience method to modify the request if it is of a specific class.
-     *
-     * @param predicateType Request type to map over.
-     * @param state State to pass to the mapper.
-     * @param mapper Mapper that accepts the request and a state value.
-     * @return the updated request.
-     * @param <R> Expected request class.
-     * @param <T> State value class.
-     */
-    @SuppressWarnings("unchecked")
-    public <R, T> RequestT mapRequest(Class<R> predicateType, T state, BiFunction<RequestHook<?, ?, R>, T, R> mapper) {
-        if (predicateType.isInstance(request)) {
-            return (RequestT) mapper.apply((RequestHook<?, ?, R>) this, state);
-        } else {
-            return request;
-        }
+    public RequestT asRequestType(Object request) {
+        return (RequestT) request;
     }
 }

@@ -26,15 +26,15 @@ public class ResponseHookTest {
     }
 
     @Test
-    public void mapsValueIfExpectedType() {
+    public void castsResponseType() {
         var foo = new TestStructs.Foo();
         var context = Context.create();
         var request = new MyRequest();
         var response = new MyResponse();
         var hook = new ResponseHook<>(TestStructs.OPERATION, context, foo, request, response);
 
-        assertThat(hook.mapResponse(TestStructs.Bar.class, ResponseHook::response), sameInstance(response));
-        assertThat(hook.mapResponse(MyResponse.class, f -> new MyResponse()), not(sameInstance(response)));
+        var newResponse = new MyResponse();
+        assertThat(hook.asResponseType(newResponse), sameInstance(newResponse));
     }
 
     private static final class MyRequest {}

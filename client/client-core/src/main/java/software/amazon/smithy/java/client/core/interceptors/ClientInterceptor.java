@@ -6,8 +6,6 @@
 package software.amazon.smithy.java.client.core.interceptors;
 
 import java.util.List;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -93,8 +91,8 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If a hook raises an error, execution will jump to {@link #modifyBeforeCompletion} with the
      * raised error as the {@code result}.
      *
-     * <p>If attempting to modify a specific kind of input, it can be modified using
-     * {@link InputHook#mapInput(Class, Function)} or {@link InputHook#mapInput(Class, Object, BiFunction)}.
+     * <p>If attempting to modify a specific kind of input, use {@code instanceof} pattern matching with
+     * {@link InputHook#asInputType}.
      *
      * @param hook Hook data.
      * @return the updated input.
@@ -148,8 +146,8 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises an error, execution will jump to {@link #modifyBeforeCompletion} with
      * the raised error as the {@code result}.
      *
-     * <p>If attempting to modify a specific kind of request, it can be modified using
-     * {@link RequestHook#mapRequest(Class, Function)} or {@link RequestHook#mapRequest(Class, Object, BiFunction)}.
+     * <p>If attempting to modify a specific kind of request, use {@code instanceof} pattern matching with
+     * {@link RequestHook#asRequestType}.
      *
      * @param hook Hook data.
      * @return the updated protocol-specific request entry to send.
@@ -190,8 +188,8 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises an error, execution will jump to {@link #modifyBeforeAttemptCompletion}
      * with the raised error as the {@code result}.
      *
-     * <p>If attempting to modify a specific kind of request, it can be modified using
-     * {@link RequestHook#mapRequest(Class, Function)} or {@link RequestHook#mapRequest(Class, Object, BiFunction)}.
+     * <p>If attempting to modify a specific kind of request, use {@code instanceof} pattern matching with
+     * {@link RequestHook#asRequestType}.
      *
      * @param hook Hook data.
      * @return the protocol-specific request.
@@ -248,8 +246,8 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises an error, execution will jump to {@link #modifyBeforeAttemptCompletion}
      * with the raised error as the {@code result}.
      *
-     * <p>If attempting to modify a specific kind of request, it can be modified using
-     * {@link RequestHook#mapRequest(Class, Function)} or {@link RequestHook#mapRequest(Class, Object, BiFunction)}.
+     * <p>If attempting to modify a specific kind of request, use {@code instanceof} pattern matching with
+     * {@link RequestHook#asRequestType}.
      *
      * @param hook Hook data.
      * @return the protocol-specific request.
@@ -310,8 +308,8 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises an error, execution will jump to {@link #modifyBeforeAttemptCompletion}
      * with the raised error as the {@code result}.
      *
-     * <p>If attempting to modify a specific kind of response, it can be modified using
-     * {@link ResponseHook#mapResponse(Class, Function)} or {@link ResponseHook#mapResponse(Class, Object, BiFunction)}.
+     * <p>If attempting to modify a specific kind of response, use {@code instanceof} pattern matching with
+     * {@link ResponseHook#asResponseType}.
      *
      * @param hook Hook data.
      * @return the protocol-specific response.
@@ -369,9 +367,8 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises or returns an exception, execution will jump to {@link #readAfterAttempt}
      * with the error as the result.
      *
-     * <p>If attempting to modify a specific kind of output, it can be modified using
-     * {@link OutputHook#mapOutput(RuntimeException, Class, Function)} or
-     * {@link OutputHook#mapOutput(RuntimeException, Class, Object, BiFunction)}.
+     * <p>If attempting to modify a specific kind of output, use {@code instanceof} pattern matching with
+     * {@link OutputHook#asOutputType}.
      *
      * @param hook Hook data.
      * @param error Error to be thrown, present.
@@ -418,9 +415,8 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises or returns an error, execution will jump to {@link #readAfterExecution}
      * with the raised error as the result.
      *
-     * <p>If attempting to modify a specific kind of output, it can be modified using
-     * {@link OutputHook#mapOutput(RuntimeException, Class, Function)}
-     * or {@link OutputHook#mapOutput(RuntimeException, Class, Object, BiFunction)}.
+     * <p>If attempting to modify a specific kind of output, use {@code instanceof} pattern matching with
+     * {@link OutputHook#asOutputType}.
      *
      * @param hook Hook data.
      * @param error Error to be thrown, present.

@@ -40,12 +40,9 @@ public final class HttpChecksumPlugin implements AutoClientPlugin {
 
         @Override
         public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
-            return hook.mapRequest(HttpRequest.class, HttpChecksumInterceptor::processRequest);
-        }
-
-        private static HttpRequest processRequest(RequestHook<?, ?, HttpRequest> hook) {
-            if (hook.operation().schema().hasTrait(CHECKSUM_REQUIRED_TRAIT_KEY)) {
-                return addContentMd5Header(hook.request());
+            if (hook.request() instanceof HttpRequest req
+                    && hook.operation().schema().hasTrait(CHECKSUM_REQUIRED_TRAIT_KEY)) {
+                return hook.asRequestType(addContentMd5Header(req));
             }
             return hook.request();
         }

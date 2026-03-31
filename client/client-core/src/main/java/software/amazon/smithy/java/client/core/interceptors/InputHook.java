@@ -6,8 +6,6 @@
 package software.amazon.smithy.java.client.core.interceptors;
 
 import java.util.Objects;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -67,41 +65,21 @@ public sealed class InputHook<I extends SerializableStruct, O extends Serializab
     }
 
     /**
-     * Provides a type-safe convenience method to modify the input if it is of a specific class.
+     * Casts the given input value to the input type of this hook.
      *
-     * @param predicateType Type to map over.
-     * @param mapper Mapper that accepts the value if it matches the expected class.
-     * @return the updated value.
-     * @param <R> Class to map over.
+     * <p>This is useful when modifying the input using {@code instanceof} pattern matching:
+     * {@snippet :
+     * if (hook.input() instanceof MyInput myInput) {
+     *     return hook.asInputType(myInput.toBuilder().foo("bar").build());
+     * }
+     * return hook.input();
+     * }
+     *
+     * @param input Input value to cast.
+     * @return the input value cast to the input type.
      */
     @SuppressWarnings("unchecked")
-    public <R extends SerializableStruct> I mapInput(Class<R> predicateType, Function<InputHook<R, ?>, R> mapper) {
-        if (predicateType.isInstance(input)) {
-            return (I) mapper.apply((InputHook<R, ?>) this);
-        } else {
-            return input;
-        }
-    }
-
-    /**
-     * Provides a type-safe convenience method to modify the input if it is of a specific class.
-     *
-     * @param predicateType Type to map over.
-     * @param state State to provide to the mapper.
-     * @param mapper Mapper that accepts the value if it matches the expected class.
-     * @return the updated value.
-     * @param <R> Class to map over.
-     */
-    @SuppressWarnings("unchecked")
-    public <R extends SerializableStruct, T> I mapInput(
-            Class<R> predicateType,
-            T state,
-            BiFunction<InputHook<R, ?>, T, R> mapper
-    ) {
-        if (predicateType.isInstance(input)) {
-            return (I) mapper.apply((InputHook<R, ?>) this, state);
-        } else {
-            return input;
-        }
+    public I asInputType(SerializableStruct input) {
+        return (I) input;
     }
 }

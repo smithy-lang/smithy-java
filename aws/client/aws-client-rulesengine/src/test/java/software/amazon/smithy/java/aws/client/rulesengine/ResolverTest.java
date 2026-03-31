@@ -150,10 +150,9 @@ public class ResolverTest {
                     @Override
                     public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
                         resolvedEndpoint[0] = hook.context().get(CallContext.ENDPOINT);
-                        hook.mapRequest(HttpRequest.class, r -> {
-                            resolvedEndpoint[1] = r.request().uri();
-                            return r.request();
-                        });
+                        if (hook.request() instanceof HttpRequest req) {
+                            resolvedEndpoint[1] = req.uri();
+                        }
                         throw new RulesEvaluationError("foo");
                     }
                 })

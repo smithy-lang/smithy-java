@@ -24,12 +24,12 @@ public class InputHookTest {
     }
 
     @Test
-    public void mapsValueIfExpectedType() {
+    public void castsInputType() {
         var foo = new TestStructs.Foo();
         var context = Context.create();
         var hook = new InputHook<>(TestStructs.OPERATION, context, foo);
 
-        assertThat(hook.mapInput(TestStructs.Bar.class, InputHook::input), sameInstance(foo));
-        assertThat(hook.mapInput(TestStructs.Foo.class, f -> new TestStructs.Foo()), not(sameInstance(foo)));
+        var newFoo = new TestStructs.Foo();
+        assertThat(hook.asInputType(newFoo), sameInstance(newFoo));
     }
 }
