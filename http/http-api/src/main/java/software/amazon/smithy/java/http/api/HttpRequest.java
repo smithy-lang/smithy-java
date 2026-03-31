@@ -48,20 +48,6 @@ public interface HttpRequest extends HttpMessage {
     HttpRequest toUnmodifiable();
 
     /**
-     * Create a builder configured with the values of the request.
-     *
-     * @return the created builder.
-     */
-    default Builder toBuilder() {
-        return builder()
-                .method(method())
-                .uri(uri())
-                .headers(headers())
-                .body(body())
-                .httpVersion(httpVersion());
-    }
-
-    /**
      * Create a builder.
      *
      * @return the created builder.

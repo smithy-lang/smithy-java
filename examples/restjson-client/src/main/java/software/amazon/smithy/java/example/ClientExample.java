@@ -130,7 +130,9 @@ public final class ClientExample {
             @Override
             public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
                 if (hook.request() instanceof HttpRequest req) {
-                    return hook.asRequestType(req.toBuilder().withAddedHeader("X-Foo", "Bar").build());
+                    var r = req.toModifiable();
+                    r.headers().setHeader("x-foo", "Bar");
+                    return hook.asRequestType(r);
                 }
                 return hook.request();
             }

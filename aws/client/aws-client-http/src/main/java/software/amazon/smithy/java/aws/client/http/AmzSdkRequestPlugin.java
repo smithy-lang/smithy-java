@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.aws.client.http;
 
-import java.util.List;
 import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientPlugin;
@@ -38,9 +37,7 @@ public final class AmzSdkRequestPlugin implements ClientPlugin {
                         value.append("; max=").append(max);
                     }
                     return hook.asRequestType(
-                            req.toBuilder()
-                                    .withReplacedHeader("amz-sdk-request", List.of(value.toString()))
-                                    .build());
+                            req.toModifiableCopy().setHeader("amz-sdk-request", value.toString()));
                 }
             }
             return hook.request();

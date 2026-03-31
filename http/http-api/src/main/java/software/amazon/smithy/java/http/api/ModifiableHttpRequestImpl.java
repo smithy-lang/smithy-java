@@ -33,8 +33,9 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
     }
 
     @Override
-    public void setMethod(String method) {
+    public ModifiableHttpRequest setMethod(String method) {
         this.method = Objects.requireNonNull(method);
+        return this;
     }
 
     @Override
@@ -43,8 +44,9 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
     }
 
     @Override
-    public void setUri(SmithyUri uri) {
+    public ModifiableHttpRequest setUri(SmithyUri uri) {
         this.uri = Objects.requireNonNull(uri);
+        return this;
     }
 
     @Override
@@ -53,8 +55,9 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
     }
 
     @Override
-    public void setHttpVersion(HttpVersion httpVersion) {
+    public ModifiableHttpRequest setHttpVersion(HttpVersion httpVersion) {
         this.httpVersion = Objects.requireNonNull(httpVersion);
+        return this;
     }
 
     @Override
@@ -63,8 +66,9 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
     }
 
     @Override
-    public void setHeaders(ModifiableHttpHeaders headers) {
+    public ModifiableHttpRequest setHeaders(ModifiableHttpHeaders headers) {
         this.headers = Objects.requireNonNull(headers);
+        return this;
     }
 
     @Override
@@ -73,13 +77,14 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
     }
 
     @Override
-    public void setBody(DataStream body) {
+    public ModifiableHttpRequest setBody(DataStream body) {
         if (body == null) {
             this.body = DataStream.ofEmpty();
         } else {
             this.body = body;
             ModifiableHttpResponseImpl.addBodyHeaders(body, headers);
         }
+        return this;
     }
 
     @Override

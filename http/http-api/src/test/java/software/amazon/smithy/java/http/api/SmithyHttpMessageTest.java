@@ -22,11 +22,10 @@ public class SmithyHttpMessageTest {
                 .headers(HttpHeaders.of(Map.of("foo", List.of("bar"))))
                 .build();
 
-        var builder = r.toBuilder();
-        builder.withAddedHeader("foo", "bar2");
-        builder.withAddedHeaders(HttpHeaders.of(Map.of("foo", List.of("bar3"))));
-        var updated = builder.build();
+        var mod = r.toModifiableCopy();
+        mod.headers().addHeader("foo", "bar2");
+        mod.headers().addHeaders(HttpHeaders.of(Map.of("foo", List.of("bar3"))));
 
-        assertThat(updated.headers().allValues("foo"), contains("bar", "bar2", "bar3"));
+        assertThat(mod.headers().allValues("foo"), contains("bar", "bar2", "bar3"));
     }
 }

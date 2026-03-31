@@ -38,19 +38,6 @@ public interface HttpResponse extends HttpMessage {
     HttpResponse toUnmodifiable();
 
     /**
-     * Create a builder configured with the values of the response.
-     *
-     * @return the created builder.
-     */
-    default Builder toBuilder() {
-        return builder()
-                .httpVersion(httpVersion())
-                .statusCode(statusCode())
-                .headers(headers())
-                .body(body());
-    }
-
-    /**
      * Create a builder.
      *
      * @return the created builder.

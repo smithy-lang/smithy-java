@@ -25,8 +25,9 @@ final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
     }
 
     @Override
-    public void setStatusCode(int statusCode) {
+    public ModifiableHttpResponse setStatusCode(int statusCode) {
         this.statusCode = statusCode;
+        return this;
     }
 
     @Override
@@ -40,8 +41,9 @@ final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
     }
 
     @Override
-    public void setHttpVersion(HttpVersion httpVersion) {
+    public ModifiableHttpResponse setHttpVersion(HttpVersion httpVersion) {
         this.httpVersion = Objects.requireNonNull(httpVersion);
+        return this;
     }
 
     @Override
@@ -50,8 +52,9 @@ final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
     }
 
     @Override
-    public void setHeaders(ModifiableHttpHeaders headers) {
+    public ModifiableHttpResponse setHeaders(ModifiableHttpHeaders headers) {
         this.headers = Objects.requireNonNull(headers);
+        return this;
     }
 
     @Override
@@ -60,13 +63,14 @@ final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
     }
 
     @Override
-    public void setBody(DataStream body) {
+    public ModifiableHttpResponse setBody(DataStream body) {
         if (body == null) {
             this.body = DataStream.ofEmpty();
         } else {
             this.body = body;
             addBodyHeaders(body, headers);
         }
+        return this;
     }
 
     // Shared helper method with ModifiableHttpRequestImpl to set headers based on the provided body.

@@ -54,8 +54,8 @@ public final class TestAuthScheme implements AuthScheme<HttpRequest, Identity> {
     private static final class TestSigner implements Signer<HttpRequest, Identity> {
         @Override
         public SignResult<HttpRequest> sign(HttpRequest request, Identity identity, Context properties) {
-            return new SignResult<>(
-                    request.toBuilder().withAddedHeader(SIGNATURE_HEADER, "smithy-test-signature").build());
+            var mod = request.toModifiableCopy().addHeader(SIGNATURE_HEADER, "smithy-test-signature");
+            return new SignResult<>(mod);
         }
     }
 

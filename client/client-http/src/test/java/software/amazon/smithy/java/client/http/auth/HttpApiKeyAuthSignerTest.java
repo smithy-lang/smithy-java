@@ -57,7 +57,8 @@ public class HttpApiKeyAuthSignerTest {
         authProperties.put(HttpApiKeyAuthScheme.NAME, "x-api-key");
         authProperties.put(HttpApiKeyAuthScheme.SCHEME, "SCHEME");
 
-        var updateRequest = TEST_REQUEST.toBuilder().withAddedHeader("x-api-key", "foo").build();
+        var updateRequest = TEST_REQUEST.toModifiableCopy();
+        updateRequest.headers().addHeader("x-api-key", "foo");
         var signedRequest =
                 HttpApiKeyAuthSigner.INSTANCE.sign(updateRequest, TEST_IDENTITY, authProperties).signedRequest();
         var authHeader = signedRequest.headers().firstValue("x-api-key");
@@ -97,7 +98,8 @@ public class HttpApiKeyAuthSignerTest {
         authProperties.put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.QUERY);
         authProperties.put(HttpApiKeyAuthScheme.NAME, "apiKey");
 
-        var updatedRequest = TEST_REQUEST.toBuilder().uri(SmithyUri.of("https://www.example.com?x=1")).build();
+        var updatedRequest = TEST_REQUEST.toModifiableCopy();
+        updatedRequest.setUri(SmithyUri.of("https://www.example.com?x=1"));
 
         var signedRequest =
                 HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties).signedRequest();
@@ -112,8 +114,8 @@ public class HttpApiKeyAuthSignerTest {
         authProperties.put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.QUERY);
         authProperties.put(HttpApiKeyAuthScheme.NAME, "apiKey");
 
-        var updatedRequest =
-                TEST_REQUEST.toBuilder().uri(SmithyUri.of("https://www.example.com?x=1&apiKey=foo")).build();
+        var updatedRequest = TEST_REQUEST.toModifiableCopy();
+        updatedRequest.setUri(SmithyUri.of("https://www.example.com?x=1&apiKey=foo"));
 
         var signedRequest =
                 HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties).signedRequest();

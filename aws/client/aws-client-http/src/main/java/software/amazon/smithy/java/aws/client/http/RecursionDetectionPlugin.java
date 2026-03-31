@@ -48,8 +48,9 @@ public final class RecursionDetectionPlugin implements ClientPlugin {
         public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
             if (hook.request() instanceof HttpRequest req) {
                 if (!req.headers().hasHeader("x-amzn-trace-id")) {
-                    return hook.asRequestType(
-                            req.toBuilder().withReplacedHeader("x-amzn-trace-id", traceIdHeader).build());
+                    var mod = req.toModifiableCopy();
+                    mod.headers().setHeader("x-amzn-trace-id", traceIdHeader);
+                    return hook.asRequestType(mod);
                 }
             }
             return hook.request();
