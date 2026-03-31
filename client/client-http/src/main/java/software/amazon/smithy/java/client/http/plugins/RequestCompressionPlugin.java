@@ -48,23 +48,18 @@ public final class RequestCompressionPlugin implements AutoClientPlugin {
 
         @Override
         public <RequestT> RequestT modifyBeforeRetryLoop(RequestHook<?, ?, RequestT> hook) {
-            return hook.mapRequest(HttpRequest.class, RequestCompressionInterceptor::processRequest);
-        }
-
-        private static HttpRequest processRequest(RequestHook<?, ?, HttpRequest> hook) {
-            if (shouldCompress(hook)) {
+            if (hook.request() instanceof HttpRequest req && shouldCompress(hook, req)) {
                 var compressionTrait =
                         hook.operation().schema().getTrait(REQUEST_COMPRESSION_TRAIT_KEY);
-                var request = hook.request();
-                // Will pick the first supported algorithm to compress the body.
                 for (var algorithmId : compressionTrait.getEncodings()) {
                     for (var algorithm : supportedAlgorithms) {
                         if (algorithmId.equals(algorithm.algorithmId())) {
-                            var compressed = algorithm.compress(request.body());
-                            return request.toBuilder()
-                                    .body(compressed)
-                                    .withAddedHeader(CONTENT_ENCODING_HEADER, algorithmId)
-                                    .build();
+                            var compressed = algorithm.compress(req.body());
+                            return hook.asRequestType(
+                                    req.toBuilder()
+                                            .body(compressed)
+                                            .withAddedHeader(CONTENT_ENCODING_HEADER, algorithmId)
+                                            .build());
                         }
                     }
                 }
@@ -72,15 +67,14 @@ public final class RequestCompressionPlugin implements AutoClientPlugin {
             return hook.request();
         }
 
-        private static boolean shouldCompress(RequestHook<?, ?, HttpRequest> hook) {
+        private static boolean shouldCompress(RequestHook<?, ?, ?> hook, HttpRequest request) {
             var context = hook.context();
             var operation = hook.operation();
             if (!operation.schema().hasTrait(REQUEST_COMPRESSION_TRAIT_KEY)
                     || context.getOrDefault(HttpContext.DISABLE_REQUEST_COMPRESSION, false)) {
                 return false;
             }
-            var requestBody = hook.request().body();
-            // Streaming should not have known length
+            var requestBody = request.body();
             if (operation.inputStreamMember() != null && !requestBody.hasKnownLength()) {
                 return true;
             }

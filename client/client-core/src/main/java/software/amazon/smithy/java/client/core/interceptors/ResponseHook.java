@@ -6,8 +6,6 @@
 package software.amazon.smithy.java.client.core.interceptors;
 
 import java.util.Objects;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -52,42 +50,21 @@ public sealed class ResponseHook<I extends SerializableStruct, O extends Seriali
     }
 
     /**
-     * Provides a type-safe convenience method to modify the response if it is of a specific class.
+     * Casts the given response value to the response type of this hook.
      *
-     * @param predicateType Response type to map over.
-     * @param mapper Mapper that accepts the response.
-     * @return the updated response.
-     * @param <R> Expected response class.
+     * <p>This is useful when modifying the response using {@code instanceof} pattern matching:
+     * {@snippet :
+     * if (hook.response() instanceof HttpResponse resp) {
+     *     return hook.asResponseType(resp.toBuilder().withAddedHeader("X-Foo", "Bar").build());
+     * }
+     * return hook.response();
+     * }
+     *
+     * @param response Response value to cast.
+     * @return the response value cast to the response type.
      */
     @SuppressWarnings("unchecked")
-    public <R> ResponseT mapResponse(Class<R> predicateType, Function<ResponseHook<?, ?, ?, R>, R> mapper) {
-        if (predicateType.isInstance(response)) {
-            return (ResponseT) mapper.apply((ResponseHook<?, ?, ?, R>) this);
-        } else {
-            return response;
-        }
-    }
-
-    /**
-     * Provides a type-safe convenience method to modify the response if it is of a specific class.
-     *
-     * @param predicateType Response type to map over.
-     * @param state State to pass to the mapper.
-     * @param mapper Mapper that accepts the response.
-     * @return the updated response.
-     * @param <R> Expected response class.
-     * @param <T> State value class.
-     */
-    @SuppressWarnings("unchecked")
-    public <R, T> ResponseT mapResponse(
-            Class<R> predicateType,
-            T state,
-            BiFunction<ResponseHook<?, ?, ?, R>, T, R> mapper
-    ) {
-        if (predicateType.isInstance(response)) {
-            return (ResponseT) mapper.apply((ResponseHook<?, ?, ?, R>) this, state);
-        } else {
-            return response;
-        }
+    public ResponseT asResponseType(Object response) {
+        return (ResponseT) response;
     }
 }

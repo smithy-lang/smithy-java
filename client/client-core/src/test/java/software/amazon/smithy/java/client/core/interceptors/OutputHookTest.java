@@ -25,25 +25,23 @@ public class OutputHookTest {
     }
 
     @Test
-    public void mapsValueIfExpectedType() {
+    public void castsOutputType() {
         var foo = new TestStructs.Foo();
         var context = Context.create();
         var hook = new OutputHook<>(TestStructs.OPERATION, context, foo, null, null, foo);
 
-        assertThat(hook.mapOutput(null, TestStructs.Bar.class, OutputHook::output), sameInstance(foo));
-        assertThat(hook.mapOutput(null, TestStructs.Foo.class, f -> new TestStructs.Foo()), not(sameInstance(foo)));
+        var newFoo = new TestStructs.Foo();
+        assertThat(hook.asOutputType(newFoo), sameInstance(newFoo));
     }
 
     @Test
-    public void throwsErrorIfNotNull() {
+    public void forwardThrowsErrorIfNotNull() {
         var foo = new TestStructs.Foo();
         var context = Context.create();
         var hook = new OutputHook<>(TestStructs.OPERATION, context, foo, null, null, foo);
         var err = new RuntimeException("a");
 
-        var e = Assertions.assertThrows(RuntimeException.class, () -> {
-            hook.mapOutput(err, TestStructs.Bar.class, OutputHook::output);
-        });
+        var e = Assertions.assertThrows(RuntimeException.class, () -> hook.forward(err));
 
         assertThat(e, sameInstance(err));
     }

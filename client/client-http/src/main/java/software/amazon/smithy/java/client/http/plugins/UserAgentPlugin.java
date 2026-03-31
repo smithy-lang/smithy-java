@@ -77,15 +77,13 @@ public final class UserAgentPlugin implements AutoClientPlugin {
 
         @Override
         public <RequestT> RequestT modifyBeforeSigning(RequestHook<?, ?, RequestT> hook) {
-            return hook.mapRequest(HttpRequest.class, h -> {
-                if (!h.request().headers().hasHeader("user-agent")) {
-                    return h.request()
-                            .toBuilder()
-                            .withReplacedHeader("user-agent", List.of(createUa(h.context())))
-                            .build();
-                }
-                return h.request();
-            });
+            if (hook.request() instanceof HttpRequest req && !req.headers().hasHeader("user-agent")) {
+                return hook.asRequestType(
+                        req.toBuilder()
+                                .withReplacedHeader("user-agent", List.of(createUa(hook.context())))
+                                .build());
+            }
+            return hook.request();
         }
 
         private static String createUa(Context context) {

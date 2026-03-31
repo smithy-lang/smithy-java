@@ -6,8 +6,6 @@
 package software.amazon.smithy.java.client.core.interceptors;
 
 import java.util.Objects;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -72,52 +70,21 @@ public final class OutputHook<I extends SerializableStruct, O extends Serializab
     }
 
     /**
-     * Provides a type-safe convenience method to modify the output if it is of a specific class.
+     * Casts the given output value to the output type of this hook.
      *
-     * @param e Error to throw if not null.
-     * @param predicateType Type to map over.
-     * @param mapper Mapper that accepts the value if it matches the expected class.
-     * @return the updated value.
-     * @param <R> Class to map over.
+     * <p>This is useful when modifying the output using {@code instanceof} pattern matching:
+     * {@snippet :
+     * if (hook.output() instanceof MyOutput myOutput) {
+     *     return hook.asOutputType(myOutput.toBuilder().foo("bar").build());
+     * }
+     * return hook.forward(e);
+     * }
+     *
+     * @param output Output value to cast.
+     * @return the output value cast to the output type.
      */
     @SuppressWarnings("unchecked")
-    public <R extends SerializableStruct> O mapOutput(
-            RuntimeException e,
-            Class<R> predicateType,
-            Function<OutputHook<?, R, ?, ?>, R> mapper
-    ) {
-        if (e != null) {
-            throw e;
-        } else if (predicateType.isInstance(output)) {
-            return (O) mapper.apply((OutputHook<?, R, ?, ?>) this);
-        } else {
-            return output;
-        }
-    }
-
-    /**
-     * Provides a type-safe convenience method to modify the output if it is of a specific class.
-     *
-     * @param e Error to throw if not null.
-     * @param predicateType Type to map over.
-     * @param state State to provide to the mapper.
-     * @param mapper Mapper that accepts the value if it matches the expected class.
-     * @return the updated value.
-     * @param <R> Class to map over.
-     */
-    @SuppressWarnings("unchecked")
-    public <R extends SerializableStruct, T> O mapOutput(
-            RuntimeException e,
-            Class<R> predicateType,
-            T state,
-            BiFunction<OutputHook<?, R, ?, ?>, T, R> mapper
-    ) {
-        if (e != null) {
-            throw e;
-        } else if (predicateType.isInstance(output)) {
-            return (O) mapper.apply((OutputHook<?, R, ?, ?>) this, state);
-        } else {
-            return output;
-        }
+    public O asOutputType(SerializableStruct output) {
+        return (O) output;
     }
 }

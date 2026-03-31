@@ -46,13 +46,13 @@ public final class RecursionDetectionPlugin implements ClientPlugin {
     private record Interceptor(List<String> traceIdHeader) implements ClientInterceptor {
         @Override
         public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
-            return hook.mapRequest(HttpRequest.class, h -> {
-                if (h.request().headers().hasHeader("x-amzn-trace-id")) {
-                    return h.request();
-                } else {
-                    return h.request().toBuilder().withReplacedHeader("x-amzn-trace-id", traceIdHeader).build();
+            if (hook.request() instanceof HttpRequest req) {
+                if (!req.headers().hasHeader("x-amzn-trace-id")) {
+                    return hook.asRequestType(
+                            req.toBuilder().withReplacedHeader("x-amzn-trace-id", traceIdHeader).build());
                 }
-            });
+            }
+            return hook.request();
         }
     }
 }
