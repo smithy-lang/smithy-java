@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
  * Canonical HTTP header name constants with fast case-insensitive lookup.
  *
  * <p>All constants are pre-allocated lowercase strings. After canonicalization,
- * known headers can be compared with {@code ==} for O(1) lookup.
+ * known headers can be compared with {@code ==}.
  */
 public final class HeaderNames {
 
@@ -83,7 +83,7 @@ public final class HeaderNames {
     public static final String X_AMZ_REQUEST_ID = "x-amz-request-id";
 
     // Direct-indexed by header name length. GROUPS[len] is the candidate array for that length, or null.
-    private static final String[][] GROUPS = new String[29][];
+    private static final String[][] GROUPS = new String[28][];
 
     static {
         GROUPS[3] = new String[] {AGE, VIA};
@@ -112,7 +112,7 @@ public final class HeaderNames {
                 IF_NONE_MATCH,
                 LAST_MODIFIED
         };
-        GROUPS[14] = new String[] {CONTENT_LENGTH};
+        GROUPS[14] = new String[] {CONTENT_LENGTH, ACCEPT_CHARSET};
         GROUPS[15] = new String[] {ACCEPT_ENCODING, ACCEPT_LANGUAGE};
         GROUPS[16] = new String[] {
                 CONTENT_ENCODING,
@@ -127,27 +127,7 @@ public final class HeaderNames {
         GROUPS[18] = new String[] {PROXY_AUTHENTICATE};
         GROUPS[19] = new String[] {CONTENT_DISPOSITION, IF_UNMODIFIED_SINCE, PROXY_AUTHORIZATION};
         GROUPS[25] = new String[] {STRICT_TRANSPORT_SECURITY};
-        GROUPS[28] = new String[] {ACCESS_CONTROL_ALLOW_ORIGIN};
-    }
-
-    /**
-     * Canonicalize a header name to its canonical lowercase form.
-     *
-     * <p>Returns a canonical constant if the name matches a known header (case-insensitive).
-     * For unknown headers, returns a new lowercased String.
-     *
-     * @param name the header name to canonicalize
-     * @return canonical constant for known headers, lowercased string for unknown
-     */
-    public static String canonicalize(String name) {
-        int len = name.length();
-        if (len < GROUPS.length) {
-            String[] candidates = GROUPS[len];
-            if (candidates != null) {
-                return match(name, candidates);
-            }
-        }
-        return HeaderUtils.normalizeName(name);
+        GROUPS[27] = new String[] {ACCESS_CONTROL_ALLOW_ORIGIN};
     }
 
     /**
@@ -169,15 +149,6 @@ public final class HeaderNames {
             }
         }
         return newLowerString(buf, offset, length);
-    }
-
-    private static String match(String input, String[] candidates) {
-        for (String candidate : candidates) {
-            if (input.regionMatches(true, 0, candidate, 0, candidate.length())) {
-                return candidate;
-            }
-        }
-        return HeaderUtils.normalizeName(input);
     }
 
     private static String match(byte[] buf, int offset, int length, String[] candidates) {
@@ -231,5 +202,432 @@ public final class HeaderNames {
             lower[i] = (b >= 'A' && b <= 'Z') ? (byte) (b + 32) : b;
         }
         return new String(lower, 0, length, StandardCharsets.US_ASCII);
+    }
+
+    // ----- Generated bucket-based string canonicalization.
+    // the bucket methods should always be updated to match the GROUPS array.
+
+    /**
+     * Canonicalize a header name to its canonical lowercase form.
+     *
+     * <p>Returns a canonical constant if the name matches a known header (case-insensitive).
+     * For unknown headers, returns a new lowercased String.
+     *
+     * @param name the header name to canonicalize
+     * @return canonical constant for known headers, lowercased string for unknown
+     */
+    public static String canonicalize(String name) {
+        return switch (name.length()) {
+            case 3 -> matchBucket3(name);
+            case 4 -> matchBucket4(name);
+            case 5 -> matchBucket5(name);
+            case 6 -> matchBucket6(name);
+            case 7 -> matchBucket7(name);
+            case 8 -> matchBucket8(name);
+            case 10 -> matchBucket10(name);
+            case 11 -> matchBucket11(name);
+            case 12 -> matchBucket12(name);
+            case 13 -> matchBucket13(name);
+            case 14 -> matchBucket14(name);
+            case 15 -> matchBucket15(name);
+            case 16 -> matchBucket16(name);
+            case 17 -> matchBucket17(name);
+            case 18 -> matchBucket18(name);
+            case 19 -> matchBucket19(name);
+            case 25 -> matchBucket25(name);
+            case 27 -> matchBucket27(name);
+            default -> HeaderUtils.normalizeName(name);
+        };
+    }
+
+    private static String matchBucket3(String name) {
+        switch (name.charAt(0) | 0x20) {
+            case 'a': // [a]ge
+                if (name.regionMatches(true, 0, AGE, 0, 3)) {
+                    return AGE;
+                }
+                break;
+            case 'v': // [v]ia
+                if (name.regionMatches(true, 0, VIA, 0, 3)) {
+                    return VIA;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket4(String name) {
+        switch (name.charAt(0) | 0x20) {
+            case 'h': // [h]ost
+                if (name.regionMatches(true, 0, HOST, 0, 4)) {
+                    return HOST;
+                }
+                break;
+            case 'd': // [d]ate
+                if (name.regionMatches(true, 0, DATE, 0, 4)) {
+                    return DATE;
+                }
+                break;
+            case 'e': // [e]tag
+                if (name.regionMatches(true, 0, ETAG, 0, 4)) {
+                    return ETAG;
+                }
+                break;
+            case 'f': // [f]rom
+                if (name.regionMatches(true, 0, FROM, 0, 4)) {
+                    return FROM;
+                }
+                break;
+            case 'l': // [l]ink
+                if (name.regionMatches(true, 0, LINK, 0, 4)) {
+                    return LINK;
+                }
+                break;
+            case 'v': // [v]ary
+                if (name.regionMatches(true, 0, VARY, 0, 4)) {
+                    return VARY;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket5(String name) {
+        switch (name.charAt(0) | 0x20) {
+            case ':': // [:path]
+                if (name.regionMatches(true, 0, PSEUDO_PATH, 0, 5)) {
+                    return PSEUDO_PATH;
+                }
+                break;
+            case 'a': // [a]llow
+                if (name.regionMatches(true, 0, ALLOW, 0, 5)) {
+                    return ALLOW;
+                }
+                break;
+            case 'r': // [r]ange
+                if (name.regionMatches(true, 0, RANGE, 0, 5)) {
+                    return RANGE;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket6(String name) {
+        switch (name.charAt(0) | 0x20) {
+            case 'a': // [a]ccept
+                if (name.regionMatches(true, 0, ACCEPT, 0, 6)) {
+                    return ACCEPT;
+                }
+                break;
+            case 'c': // [c]ookie
+                if (name.regionMatches(true, 0, COOKIE, 0, 6)) {
+                    return COOKIE;
+                }
+                break;
+            case 'e': // [e]xpect
+                if (name.regionMatches(true, 0, EXPECT, 0, 6)) {
+                    return EXPECT;
+                }
+                break;
+            case 's': // [s]erver
+                if (name.regionMatches(true, 0, SERVER, 0, 6)) {
+                    return SERVER;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket7(String name) {
+        switch (name.charAt(2) | 0x20) {
+            case 'a': // tr[a]iler
+                if (name.regionMatches(true, 0, TRAILER, 0, 7)) {
+                    return TRAILER;
+                }
+                break;
+            case 'c': // ":s[c]heme"
+                if (name.regionMatches(true, 0, PSEUDO_SCHEME, 0, 7)) {
+                    return PSEUDO_SCHEME;
+                }
+                break;
+            case 'e': // ":m[e]thod"
+                if (name.regionMatches(true, 0, PSEUDO_METHOD, 0, 7)) {
+                    return PSEUDO_METHOD;
+                }
+                break;
+            case 'f': // "re[f]erer" / "re[f]resh"
+                switch (name.charAt(3) | 0x20) {
+                    case 'e': // "ref(e)rer"
+                        if (name.regionMatches(true, 0, REFERER, 0, 7)) {
+                            return REFERER;
+                        }
+                        break;
+                    case 'r': // "ref[r]esh"
+                        if (name.regionMatches(true, 0, REFRESH, 0, 7)) {
+                            return REFRESH;
+                        }
+                        break;
+                }
+                break;
+            case 'g': // "up[g]rade"
+                if (name.regionMatches(true, 0, UPGRADE, 0, 7)) {
+                    return UPGRADE;
+                }
+                break;
+            case 'p': // "ex[p]ires"
+                if (name.regionMatches(true, 0, EXPIRES, 0, 7)) {
+                    return EXPIRES;
+                }
+                break;
+            case 't': // ":s[t]atus"
+                if (name.regionMatches(true, 0, PSEUDO_STATUS, 0, 7)) {
+                    return PSEUDO_STATUS;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket8(String name) {
+        switch (name.charAt(3) | 0x20) {
+            case 'a': // loc[a]tion
+                if (name.regionMatches(true, 0, LOCATION, 0, 8)) {
+                    return LOCATION;
+                }
+                break;
+            case 'm': // if-[m]atch
+                if (name.regionMatches(true, 0, IF_MATCH, 0, 8)) {
+                    return IF_MATCH;
+                }
+                break;
+            case 'r': // if-[r]ange
+                if (name.regionMatches(true, 0, IF_RANGE, 0, 8)) {
+                    return IF_RANGE;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket10(String name) {
+        switch (name.charAt(0) | 0x20) {
+            case ':': // [:]authority
+                if (name.regionMatches(true, 0, PSEUDO_AUTHORITY, 0, 10)) {
+                    return PSEUDO_AUTHORITY;
+                }
+                break;
+            case 'c': // [c]onnection
+                if (name.regionMatches(true, 0, CONNECTION, 0, 10)) {
+                    return CONNECTION;
+                }
+                break;
+            case 'k': // [k]eep-alive
+                if (name.regionMatches(true, 0, KEEP_ALIVE, 0, 10)) {
+                    return KEEP_ALIVE;
+                }
+                break;
+            case 's': // [s]et-cookie
+                if (name.regionMatches(true, 0, SET_COOKIE, 0, 10)) {
+                    return SET_COOKIE;
+                }
+                break;
+            case 'u': // [u]ser-agent
+                if (name.regionMatches(true, 0, USER_AGENT, 0, 10)) {
+                    return USER_AGENT;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket11(String name) {
+        if (name.regionMatches(true, 0, RETRY_AFTER, 0, 11)) {
+            return RETRY_AFTER;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket12(String name) {
+        switch (name.charAt(0) | 0x20) {
+            case 'c': // [c]ontent-type
+                if (name.regionMatches(true, 0, CONTENT_TYPE, 0, 12)) {
+                    return CONTENT_TYPE;
+                }
+                break;
+            case 'm': // [m]ax-forwards
+                if (name.regionMatches(true, 0, MAX_FORWARDS, 0, 12)) {
+                    return MAX_FORWARDS;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket13(String name) {
+        switch (name.charAt(6) | 0x20) {
+            case '-': // accept[-]ranges
+                if (name.regionMatches(true, 0, ACCEPT_RANGES, 0, 13)) {
+                    return ACCEPT_RANGES;
+                }
+                break;
+            case 'c': // cache-[c]ontrol
+                if (name.regionMatches(true, 0, CACHE_CONTROL, 0, 13)) {
+                    return CACHE_CONTROL;
+                }
+                break;
+            case 'e': // if-non[e]-match
+                if (name.regionMatches(true, 0, IF_NONE_MATCH, 0, 13)) {
+                    return IF_NONE_MATCH;
+                }
+                break;
+            case 'i': // author[i]zation
+                if (name.regionMatches(true, 0, AUTHORIZATION, 0, 13)) {
+                    return AUTHORIZATION;
+                }
+                break;
+            case 'o': // last-m[o]dified
+                if (name.regionMatches(true, 0, LAST_MODIFIED, 0, 13)) {
+                    return LAST_MODIFIED;
+                }
+                break;
+            case 't': // conten[t]-range
+                if (name.regionMatches(true, 0, CONTENT_RANGE, 0, 13)) {
+                    return CONTENT_RANGE;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket14(String name) {
+        switch (name.charAt(0) | 0x20) {
+            case 'c': // [c]ontent-length
+                if (name.regionMatches(true, 0, CONTENT_LENGTH, 0, 14)) {
+                    return CONTENT_LENGTH;
+                }
+                break;
+            case 'a': // [a]ccept-charset
+                if (name.regionMatches(true, 0, ACCEPT_CHARSET, 0, 14)) {
+                    return ACCEPT_CHARSET;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket15(String name) {
+        switch (name.charAt(7) | 0x20) {
+            case 'e': // accept-[e]ncoding
+                if (name.regionMatches(true, 0, ACCEPT_ENCODING, 0, 15)) {
+                    return ACCEPT_ENCODING;
+                }
+                break;
+            case 'l': // accept-[l]anguage
+                if (name.regionMatches(true, 0, ACCEPT_LANGUAGE, 0, 15)) {
+                    return ACCEPT_LANGUAGE;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket16(String name) {
+        switch (name.charAt(11) | 0x20) {
+            case 'a': // content-loc[a]tion
+                if (name.regionMatches(true, 0, CONTENT_LOCATION, 0, 16)) {
+                    return CONTENT_LOCATION;
+                }
+                break;
+            case 'c': // proxy-conne[c]tion
+                if (name.regionMatches(true, 0, PROXY_CONNECTION, 0, 16)) {
+                    return PROXY_CONNECTION;
+                }
+                break;
+            case 'e': // x-amzn-requ[e]stid
+                if (name.regionMatches(true, 0, X_AMZN_REQUESTID, 0, 16)) {
+                    return X_AMZN_REQUESTID;
+                }
+                break;
+            case 'g': // content-lan[g]uage
+                if (name.regionMatches(true, 0, CONTENT_LANGUAGE, 0, 16)) {
+                    return CONTENT_LANGUAGE;
+                }
+                break;
+            case 'i': // www-authent[i]cate
+                if (name.regionMatches(true, 0, WWW_AUTHENTICATE, 0, 16)) {
+                    return WWW_AUTHENTICATE;
+                }
+                break;
+            case 'o': // content-enc[o]ding
+                if (name.regionMatches(true, 0, CONTENT_ENCODING, 0, 16)) {
+                    return CONTENT_ENCODING;
+                }
+                break;
+            case 's': // x-amz-reque[s]t-id
+                if (name.regionMatches(true, 0, X_AMZ_REQUEST_ID, 0, 16)) {
+                    return X_AMZ_REQUEST_ID;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket17(String name) {
+        switch (name.charAt(0) | 0x20) {
+            case 'i': // [i]f-modified-since
+                if (name.regionMatches(true, 0, IF_MODIFIED_SINCE, 0, 17)) {
+                    return IF_MODIFIED_SINCE;
+                }
+                break;
+            case 't': // [t]ransfer-encoding
+                if (name.regionMatches(true, 0, TRANSFER_ENCODING, 0, 17)) {
+                    return TRANSFER_ENCODING;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket18(String name) {
+        if (name.regionMatches(true, 0, PROXY_AUTHENTICATE, 0, 18)) {
+            return PROXY_AUTHENTICATE;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket19(String name) {
+        switch (name.charAt(0) | 0x20) {
+            case 'c': // [c]ontent-disposition
+                if (name.regionMatches(true, 0, CONTENT_DISPOSITION, 0, 19)) {
+                    return CONTENT_DISPOSITION;
+                }
+                break;
+            case 'i': // [i]f-unmodified-since
+                if (name.regionMatches(true, 0, IF_UNMODIFIED_SINCE, 0, 19)) {
+                    return IF_UNMODIFIED_SINCE;
+                }
+                break;
+            case 'p': // [p]roxy-authorization
+                if (name.regionMatches(true, 0, PROXY_AUTHORIZATION, 0, 19)) {
+                    return PROXY_AUTHORIZATION;
+                }
+                break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket25(String name) {
+        if (name.regionMatches(true, 0, STRICT_TRANSPORT_SECURITY, 0, 25)) {
+            return STRICT_TRANSPORT_SECURITY;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket27(String name) {
+        if (name.regionMatches(true, 0, ACCESS_CONTROL_ALLOW_ORIGIN, 0, 27)) {
+            return ACCESS_CONTROL_ALLOW_ORIGIN;
+        }
+        return HeaderUtils.normalizeName(name);
     }
 }
