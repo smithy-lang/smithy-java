@@ -173,7 +173,7 @@ public final class HeaderNames {
 
     private static String match(String input, String[] candidates) {
         for (String candidate : candidates) {
-            if (equalsIgnoreCase(input, candidate)) {
+            if (input.regionMatches(true, 0, candidate, 0, candidate.length())) {
                 return candidate;
             }
         }
@@ -189,26 +189,22 @@ public final class HeaderNames {
         return newLowerString(buf, offset, length);
     }
 
-    private static boolean equalsIgnoreCase(String input, String candidate) {
-        for (int i = 0; i < candidate.length(); i++) {
-            char c = input.charAt(i);
-            if (c >= 'A' && c <= 'Z') {
-                c = (char) (c + 32);
-            }
-            if (c != candidate.charAt(i)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
+    // ASCII-only case-insensitive comparison using `| 0x20` instead of branching.
+    //
+    // Safe for the canonical header names in this class because every candidate contains
+    // only [a-z], [0-9], '-' or ':'.
+    //
+    // The `| 0x20` trick maps 'A'-'Z' -> 'a'-'z', but it also remaps some other ASCII
+    // characters, for example: '@' -> '`', '[' -> '{', '\' -> '|', ']' -> '}', '^' -> '~'
+    //
+    // A false positive would require one of those remapped characters to appear in a canonical candidate at the
+    // same position. That cannot happen here because none of '`', '{', '|', '}', or '~' appear in any canonical
+    // header name in this table.
+    //
+    // If a future canonical header name contains one of those characters, this optimization must be revisited.
     private static boolean equalsIgnoreCase(byte[] buf, int offset, String candidate) {
         for (int i = 0; i < candidate.length(); i++) {
-            byte b = buf[offset + i];
-            if (b >= 'A' && b <= 'Z') {
-                b = (byte) (b + 32);
-            }
-            if (b != candidate.charAt(i)) {
+            if ((buf[offset + i] | 0x20) != candidate.charAt(i)) {
                 return false;
             }
         }
