@@ -93,6 +93,12 @@ record HttpRequestImpl(
             return this;
         }
 
+        @Override
+        public HttpRequest.Builder withReplacedHeader(String name, String value) {
+            modifiableHttpRequest.headers().setHeader(name, value);
+            return this;
+        }
+
         private void beforeBuild() {
             Objects.requireNonNull(modifiableHttpRequest.method(), "method not set");
             Objects.requireNonNull(modifiableHttpRequest.uri(), "uri not set");

@@ -82,6 +82,12 @@ record HttpResponseImpl(
         }
 
         @Override
+        public HttpResponse.Builder withReplacedHeader(String name, String value) {
+            modifiableResponse.headers().setHeader(name, value);
+            return this;
+        }
+
+        @Override
         public HttpResponse build() {
             return modifiableResponse.toUnmodifiable();
         }

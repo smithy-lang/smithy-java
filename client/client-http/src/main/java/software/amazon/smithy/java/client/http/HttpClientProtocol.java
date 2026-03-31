@@ -36,13 +36,14 @@ public abstract class HttpClientProtocol implements ClientProtocol<HttpRequest, 
     @Override
     public HttpRequest setServiceEndpoint(HttpRequest request, Endpoint endpoint) {
         var merged = request.uri().withEndpoint(endpoint.uri());
-        var requestBuilder = request.toBuilder();
+        var modifiableRequest = request.toModifiable();
+        modifiableRequest.setUri(merged);
 
         // Merge in any HTTP headers found on the endpoint.
         if (endpoint.property(HttpContext.ENDPOINT_RESOLVER_HTTP_HEADERS) != null) {
-            requestBuilder.withAddedHeaders(endpoint.property(HttpContext.ENDPOINT_RESOLVER_HTTP_HEADERS));
+            modifiableRequest.headers().addHeaders(endpoint.property(HttpContext.ENDPOINT_RESOLVER_HTTP_HEADERS));
         }
 
-        return requestBuilder.uri(merged).build();
+        return modifiableRequest;
     }
 }

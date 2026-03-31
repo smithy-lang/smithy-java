@@ -150,8 +150,10 @@ public interface HttpMessage extends AutoCloseable {
          * @param headers Headers to add and merge in.
          * @return the builder.
          */
+        @SuppressWarnings("unchecked")
         default B withAddedHeaders(HttpHeaders headers) {
-            return withAddedHeaders(headers.map());
+            headers.forEachEntry(this::withAddedHeader);
+            return (B) this;
         }
 
         /**
@@ -168,15 +170,26 @@ public interface HttpMessage extends AutoCloseable {
          * @param headers Headers to put.
          * @return the builder.
          */
+        @SuppressWarnings("unchecked")
         default B withReplacedHeaders(HttpHeaders headers) {
-            return withReplacedHeaders(headers.map());
+            headers.forEachEntry(this::withReplacedHeader);
+            return (B) this;
         }
 
         /**
          * Replaces a header.
          *
          * @param name  Header name to replace.
-         * @param values Header value to replace.
+         * @param value Header value to replace.
+         * @return the builder.
+         */
+        B withReplacedHeader(String name, String value);
+
+        /**
+         * Replaces a header.
+         *
+         * @param name  Header name to replace.
+         * @param values Header values to replace.
          * @return the builder.
          */
         default B withReplacedHeader(String name, List<String> values) {

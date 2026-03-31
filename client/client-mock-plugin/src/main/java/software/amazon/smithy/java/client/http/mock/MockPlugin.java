@@ -242,7 +242,7 @@ public final class MockPlugin implements ClientPlugin {
             // Track the request here rather than when the request is created because this method is called
             // more often than the request creation method when retries happen.
             if (trackRequests) {
-                requests.add(currentRequest.request());
+                requests.add(currentRequest.request().withRequest(request.toUnmodifiable()));
             }
 
             MockedResult result = null;

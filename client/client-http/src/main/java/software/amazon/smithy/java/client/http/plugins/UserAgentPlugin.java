@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.client.http.plugins;
 
-import java.util.List;
 import java.util.Locale;
 import software.amazon.smithy.java.client.core.AutoClientPlugin;
 import software.amazon.smithy.java.client.core.CallContext;
@@ -78,10 +77,9 @@ public final class UserAgentPlugin implements AutoClientPlugin {
         @Override
         public <RequestT> RequestT modifyBeforeSigning(RequestHook<?, ?, RequestT> hook) {
             if (hook.request() instanceof HttpRequest req && !req.headers().hasHeader("user-agent")) {
-                return hook.asRequestType(
-                        req.toBuilder()
-                                .withReplacedHeader("user-agent", List.of(createUa(hook.context())))
-                                .build());
+                var updated = req.toModifiable();
+                updated.headers().setHeader("user-agent", createUa(hook.context()));
+                return hook.asRequestType(updated);
             }
             return hook.request();
         }
