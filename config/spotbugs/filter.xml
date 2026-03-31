@@ -91,4 +91,13 @@
         <Bug pattern="SF_SWITCH_NO_DEFAULT" />
     </Match>
 
+    <Match>
+        <Class name="software.amazon.smithy.java.mcp.server.McpServerIntegrationTest" />
+        <Bug pattern="CNT_ROUGH_CONSTANT_VALUE" />
+    </Match>
+
+    <Match classregex="software\.amazon\.smithy\.java\.mcp\.server\.ProtocolVersion\$.*">
+        <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS" />
+    </Match>
+
 </FindBugsFilter>

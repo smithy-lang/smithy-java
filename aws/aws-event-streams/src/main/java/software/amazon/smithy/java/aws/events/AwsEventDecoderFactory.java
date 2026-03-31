@@ -59,6 +59,7 @@ public final class AwsEventDecoderFactory<E extends SerializableStruct, IR exten
      * @param <IE>        The output event type
      * @return A new event decoder factory
      */
+    @SuppressWarnings("unchecked")
     public static <IE extends SerializableStruct> AwsEventDecoderFactory<IE, ?> forInputStream(
             ApiOperation<?, ?> operation,
             Codec codec,
@@ -82,6 +83,7 @@ public final class AwsEventDecoderFactory<E extends SerializableStruct, IR exten
      * @param <OE>        The output event type
      * @return A new event decoder factory
      */
+    @SuppressWarnings("unchecked")
     public static <OE extends SerializableStruct> AwsEventDecoderFactory<OE, ?> forOutputStream(
             ApiOperation<?, ?> operation,
             Codec codec,

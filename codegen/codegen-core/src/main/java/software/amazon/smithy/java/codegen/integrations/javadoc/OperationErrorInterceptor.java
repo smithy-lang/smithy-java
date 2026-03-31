@@ -5,9 +5,12 @@
 
 package software.amazon.smithy.java.codegen.integrations.javadoc;
 
+import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.sections.JavadocSection;
 import software.amazon.smithy.java.codegen.sections.OperationSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.traits.TitleTrait;
 import software.amazon.smithy.utils.CodeInterceptor;
 
@@ -18,11 +21,12 @@ final class OperationErrorInterceptor implements CodeInterceptor.Appender<Javado
 
     @Override
     public void append(JavaWriter writer, JavadocSection section) {
-        if (section.parent() instanceof OperationSection os) {
-            for (var error : os.targetedShape().getErrors()) {
+        if (section
+                .parent() instanceof OperationSection(OperationShape targetedShape, SymbolProvider symbolProvider, Model model)) {
+            for (var error : targetedShape.getErrorsSet()) {
                 writer.pushState();
-                var errorShape = os.model().expectShape(error);
-                var errorSymbol = os.symbolProvider().toSymbol(errorShape);
+                var errorShape = model.expectShape(error);
+                var errorSymbol = symbolProvider.toSymbol(errorShape);
                 var hasTitle = errorShape.hasTrait(TitleTrait.class);
                 writer.putContext("hasTitle", hasTitle);
                 if (hasTitle) {

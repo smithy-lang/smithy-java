@@ -136,7 +136,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
         try {
             return switch (parser.currentToken()) {
                 case VALUE_NUMBER_FLOAT, VALUE_NUMBER_INT -> parser.getDoubleValue();
-                case VALUE_STRING -> switch (parser.getText()) {
+                case VALUE_STRING -> switch (parser.getString()) {
                     case "Infinity" -> Double.POSITIVE_INFINITY;
                     case "-Infinity" -> Double.NEGATIVE_INFINITY;
                     case "NaN" -> Double.NaN;
@@ -172,7 +172,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     @Override
     public String readString(Schema schema) {
         try {
-            return parser.getText();
+            return parser.getString();
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -196,7 +196,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
             }
             return switch (token) {
                 case VALUE_NULL -> null;
-                case VALUE_STRING -> JsonDocuments.of(parser.getText(), settings);
+                case VALUE_STRING -> JsonDocuments.of(parser.getString(), settings);
                 case VALUE_TRUE -> JsonDocuments.of(true, settings);
                 case VALUE_FALSE -> JsonDocuments.of(false, settings);
                 case VALUE_NUMBER_INT, VALUE_NUMBER_FLOAT -> JsonDocuments.of(
@@ -234,7 +234,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
             var format = settings.timestampResolver().resolve(schema);
             return switch (parser.currentToken()) {
                 case VALUE_NUMBER_FLOAT, VALUE_NUMBER_INT -> format.readFromNumber(parser.getNumberValue());
-                case VALUE_STRING -> format.readFromString(parser.getText(), true);
+                case VALUE_STRING -> format.readFromString(parser.getString(), true);
                 default -> throw new SerializationException("Expected a timestamp, but found " + describeToken());
             };
         } catch (Exception e) {

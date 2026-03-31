@@ -27,6 +27,7 @@ import software.amazon.smithy.model.traits.Trait;
  * <p>If a transport is already manually defined, then this plugin only picks a protocol that matches the transport
  * based on the presence of a protocol trait and a {@link ClientProtocolFactory}.
  */
+@SuppressWarnings("unchecked")
 public final class DetectProtocolPlugin implements ClientPlugin {
 
     public static final DetectProtocolPlugin INSTANCE = new DetectProtocolPlugin();
@@ -35,7 +36,7 @@ public final class DetectProtocolPlugin implements ClientPlugin {
     static {
         for (var protocolImpl : ServiceLoader.load(ClientProtocolFactory.class,
                 ClientProtocolFactory.class.getClassLoader())) {
-            PROTOCOL_FACTORIES.add(protocolImpl);
+            PROTOCOL_FACTORIES.add((ClientProtocolFactory<Trait>) protocolImpl);
         }
     }
 

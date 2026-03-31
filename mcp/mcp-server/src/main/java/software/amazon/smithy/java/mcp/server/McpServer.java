@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.mcp.server;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -98,8 +99,8 @@ public final class McpServer implements Server {
                 os.write(TOOLS_CHANGED);
                 os.flush();
             }
-        } catch (Exception e) {
-            LOG.error("Failed to flush tools changed notification");
+        } catch (IOException e) {
+            LOG.error("Failed to flush tools changed notification", e);
         }
     }
 

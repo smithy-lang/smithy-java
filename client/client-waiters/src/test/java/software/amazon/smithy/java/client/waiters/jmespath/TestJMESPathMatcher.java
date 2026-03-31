@@ -38,7 +38,7 @@ public class TestJMESPathMatcher {
             Comparator comparator,
             boolean isMatch
     ) {
-        var matcher = new JMESPathPredicate(path, expected, comparator);
+        var matcher = new JMESPathPredicate<>(path, expected, comparator);
         assertEquals(matcher.test(new GetFoosOutput("DONE")), isMatch);
     }
 
@@ -49,8 +49,9 @@ public class TestJMESPathMatcher {
 
     @ParameterizedTest
     @MethodSource("matchInputSource")
+    // TODO enable or remove
     public void testMatchInput(String path, String expected, Comparator comparator, boolean isMatch) {
-        var matcher = new JMESPathPredicate(path, expected, comparator);
+        var matcher = new JMESPathPredicate<>(path, expected, comparator);
         //assertEquals(matcher.test(INPUT, OUTPUT), isMatch);
     }
 }

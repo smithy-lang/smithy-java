@@ -321,7 +321,7 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                         }
                     }
                 });
-                for (var errorId : operation.getErrors()) {
+                for (var errorId : operation.getErrorsSet()) {
                     var error = serviceModel.getShape(errorId);
                     if (error.isPresent() && error.get().isStructureShape()) {
                         var errorShape = error.get().asStructureShape().get();
@@ -369,6 +369,7 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
         }
     }
 
+    @SuppressWarnings("unchecked")
     private static Supplier<ShapeBuilder<? extends SerializableStruct>> getApiExceptionBuilder(
             SymbolProvider provider,
             Shape shape
