@@ -28,6 +28,7 @@ public final class SmithyUri {
     private String cachedString;
     private URI cachedUri;
     private String cachedNormalizedPath;
+    private int cachedHashcode;
 
     // Assumes all inputs are already validated/encoded.
     SmithyUri(String scheme, String host, int port, String path, String query) {
@@ -269,18 +270,24 @@ public final class SmithyUri {
 
     @Override
     public int hashCode() {
-        return toString().hashCode();
+        var cached = cachedHashcode;
+        if (cached == 0) {
+            cached = Objects.hash(scheme, host, port, path, query);
+            cachedHashcode = cached;
+        }
+        return cached;
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (!(obj instanceof SmithyUri other)) {
+    public boolean equals(Object o) {
+        if (!(o instanceof SmithyUri smithyUri)) {
             return false;
         }
-        return toString().equals(other.toString());
+        return port == smithyUri.port
+                && Objects.equals(scheme, smithyUri.scheme)
+                && Objects.equals(host, smithyUri.host)
+                && path.equals(smithyUri.path)
+                && Objects.equals(query, smithyUri.query);
     }
 
     private String buildString() {
