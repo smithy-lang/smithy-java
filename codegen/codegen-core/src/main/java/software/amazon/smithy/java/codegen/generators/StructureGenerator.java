@@ -166,6 +166,7 @@ public final class StructureGenerator<
                             directive.service()));
             writer.putContext("getMemberValue", new GetMemberValueGenerator(writer, directive.symbolProvider(), shape));
             writer.putContext("toBuilder", new ToBuilderGenerator(writer, shape, directive.symbolProvider()));
+            writer.writeNullMarkedAnnotation();
             writer.write(template);
             writer.popState();
         });
@@ -186,7 +187,7 @@ public final class StructureGenerator<
                 writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
 
                 writer.write(
-                        "private final transient ${?isNullable}$1B${/isNullable}${^isNullable}$1N${/isNullable} $2L;",
+                        "private final transient ${?isNullable}$1B${/isNullable}${^isNullable}$1T${/isNullable} $2L;",
                         symbolProvider.toSymbol(member),
                         memberName);
                 writer.popState();
@@ -305,7 +306,7 @@ public final class StructureGenerator<
 
             writer.write(
                     """
-                            public ${?isNullable}${member:B}${/isNullable}${^isNullable}${member:N}${/isNullable} ${getterName:L}() {
+                            public ${?isNullable}${member:N}${/isNullable}${^isNullable}${member:T}${/isNullable} ${getterName:L}() {
                                 return ${memberName:L};
                             }
                             """);
@@ -759,7 +760,7 @@ public final class StructureGenerator<
 
                 writer.write(
                         """
-                                public Builder ${memberName:L}(${?isNullable}${memberSymbol:B}${/isNullable}${^isNullable}${memberSymbol:N}${/isNullable} ${memberName:L}) {
+                                public Builder ${memberName:L}(${?isNullable}${memberSymbol:N}${/isNullable}${^isNullable}${memberSymbol:T}${/isNullable} ${memberName:L}) {
                                     this.${memberName:L} = ${?check}${objects:T}.requireNonNull(${/check}${memberName:L}${?check}, "${memberName:L} cannot be null")${/check};${?tracked}
                                     tracker.setMember(${schemaName:L});${/tracked}
                                     return this;
@@ -796,7 +797,7 @@ public final class StructureGenerator<
                     shape.members().stream().anyMatch(CodegenUtils::isRequiredWithNoDefault));
             writer.write("""
                     @Override
-                    public ${shape:N} build() {${?hasRequiredMembers}
+                    public ${shape:T} build() {${?hasRequiredMembers}
                         tracker.validate();${/hasRequiredMembers}
                         return new ${shape:T}(this);
                     }

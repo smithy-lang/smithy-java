@@ -38,7 +38,7 @@ public final class JavaCodegenSettings {
     private static final String NAME = "name";
     private static final String NAMESPACE = "namespace";
     private static final String HEADER_FILE = "headerFile";
-    private static final String NON_NULL_ANNOTATION = "nonNullAnnotation";
+    private static final String ADD_NULLNESS_ANNOTATIONS = "addNullnessAnnotations";
     private static final String DEFAULT_PROTOCOL = "protocol";
     private static final String TRANSPORT = "transport";
     private static final String DEFAULT_PLUGINS = "defaultPlugins";
@@ -56,7 +56,7 @@ public final class JavaCodegenSettings {
             NAME,
             NAMESPACE,
             HEADER_FILE,
-            NON_NULL_ANNOTATION,
+            ADD_NULLNESS_ANNOTATIONS,
             DEFAULT_PROTOCOL,
             TRANSPORT,
             DEFAULT_PLUGINS,
@@ -74,7 +74,7 @@ public final class JavaCodegenSettings {
     private final String name;
     private final String packageNamespace;
     private final String header;
-    private final Symbol nonNullAnnotationSymbol;
+    private final boolean addNullnessAnnotations;
     private final ShapeId defaultProtocol;
     private final String transportName;
     private final ObjectNode transportSettings;
@@ -94,7 +94,7 @@ public final class JavaCodegenSettings {
         this.name = StringUtils.capitalize(Objects.requireNonNullElse(builder.name, service.getName()));
         this.packageNamespace = Objects.requireNonNull(builder.packageNamespace);
         this.header = getHeader(builder.headerFilePath, builder.sourceLocation);
-        this.nonNullAnnotationSymbol = buildSymbolFromFullyQualifiedName(builder.nonNullAnnotationFullyQualifiedName);
+        this.addNullnessAnnotations = builder.addNullnessAnnotations;
         this.defaultProtocol = builder.defaultProtocol;
         this.transportName = builder.transportName;
         this.transportSettings = builder.transportSettings;
@@ -122,7 +122,7 @@ public final class JavaCodegenSettings {
                 .getStringMember(NAME, builder::name)
                 .expectStringMember(NAMESPACE, builder::packageNamespace)
                 .getStringMember(HEADER_FILE, builder::headerFilePath)
-                .getStringMember(NON_NULL_ANNOTATION, builder::nonNullAnnotation)
+                .getBooleanMember(ADD_NULLNESS_ANNOTATIONS, builder::addNullnessAnnotations)
                 .getStringMember(DEFAULT_PROTOCOL, builder::defaultProtocol)
                 .getObjectMember(TRANSPORT, builder::transportNode)
                 .getArrayMember(DEFAULT_PLUGINS, n -> n.expectStringNode().getValue(), builder::defaultPlugins)
@@ -156,8 +156,8 @@ public final class JavaCodegenSettings {
         return header;
     }
 
-    public Symbol nonNullAnnotationSymbol() {
-        return nonNullAnnotationSymbol;
+    public boolean addNullnessAnnotations() {
+        return addNullnessAnnotations;
     }
 
     public ShapeId defaultProtocol() {
@@ -223,20 +223,6 @@ public final class JavaCodegenSettings {
         return generatedSymbols.getOrDefault(packageNamespace, Collections.emptySet());
     }
 
-    private static Symbol buildSymbolFromFullyQualifiedName(String fullyQualifiedName) {
-        if (fullyQualifiedName == null || StringUtils.isEmpty(fullyQualifiedName)) {
-            return null;
-        }
-        String[] parts = fullyQualifiedName.split("\\.");
-        String name = parts[parts.length - 1];
-        String namespace = fullyQualifiedName.substring(0, fullyQualifiedName.length() - name.length() - 1);
-        return Symbol.builder()
-                .name(name)
-                .namespace(namespace, ".")
-                .putProperty(SymbolProperties.IS_PRIMITIVE, false)
-                .build();
-    }
-
     private static String getHeader(String headerFile, String sourceLocation) {
         if (headerFile == null) {
             return null;
@@ -259,7 +245,7 @@ public final class JavaCodegenSettings {
         private String packageNamespace;
         private String headerFilePath;
         private String sourceLocation;
-        private String nonNullAnnotationFullyQualifiedName;
+        private boolean addNullnessAnnotations;
         private ShapeId defaultProtocol;
         private String transportName;
         private ObjectNode transportSettings;
@@ -319,8 +305,8 @@ public final class JavaCodegenSettings {
             return this;
         }
 
-        public Builder nonNullAnnotation(String fullyQualifiedName) {
-            this.nonNullAnnotationFullyQualifiedName = fullyQualifiedName;
+        public Builder addNullnessAnnotations(boolean addNullnessAnnotations) {
+            this.addNullnessAnnotations = addNullnessAnnotations;
             return this;
         }
 

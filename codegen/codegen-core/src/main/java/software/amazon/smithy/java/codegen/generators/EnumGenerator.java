@@ -52,7 +52,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
 
                         ${id:C|}
 
-                        ${value:N} getValue();
+                        ${value:T} getValue();
 
                         @Override
                         default void serialize(${shapeSerializer:T} serializer) {
@@ -98,6 +98,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                             directive.symbolProvider(),
                             directive.model(),
                             directive.service()));
+            writer.writeNullMarkedAnnotation();
             writer.write(template);
             writer.popState();
         });
@@ -193,7 +194,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                             private ${className:L}() {}
 
                             @Override
-                            public ${value:N} getValue() {
+                            public ${value:T} getValue() {
                                 return ${?string}${memberValue:S}${/string}${^string}${memberValue:L}${/string};
                             }
 
@@ -217,13 +218,13 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.putContext("objects", Objects.class);
             writer.putContext("toString", new ToStringGenerator(writer));
             var template = """
-                    record $$Unknown(${value:N} value) implements ${shape:T} {${?string}
+                    record $$Unknown(${value:T} value) implements ${shape:T} {${?string}
                         public $$Unknown {
                             ${objects:T}.requireNonNull(value, "Value cannot be null");
                         }${/string}
 
                         @Override
-                        public ${value:N} getValue() {
+                        public ${value:T} getValue() {
                             return value;
                         }
 
@@ -231,7 +232,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
 
                         private final class $$Hidden implements ${shape:T} {
                             @Override
-                            public ${value:N} getValue() {
+                            public ${value:T} getValue() {
                                 return ${?string}null${/string}${^string}0${/string};
                             }
                         }
@@ -267,7 +268,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.write(
                     """
                             @Override
-                            public Builder deserialize(${shapeDeserializer:N} de) {
+                            public Builder deserialize(${shapeDeserializer:T} de) {
                                 return value(de.${?string}readString${/string}${^string}readInteger${/string}($$SCHEMA));
                             }""");
             writer.popState();

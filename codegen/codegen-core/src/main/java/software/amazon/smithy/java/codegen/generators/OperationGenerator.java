@@ -85,7 +85,7 @@ public final class OperationGenerator
                                         private ${shape:T}() {}
 
                                         @Override
-                                        public ${sdkShapeBuilder:N}<${inputType:T}> inputBuilder() {
+                                        public ${sdkShapeBuilder:T}<${inputType:T}> inputBuilder() {
                                             return ${inputType:T}.builder();
                                         }
 
@@ -97,7 +97,7 @@ public final class OperationGenerator
                                         ${/hasInputEventStream}
 
                                         @Override
-                                        public ${sdkShapeBuilder:N}<${outputType:T}> outputBuilder() {
+                                        public ${sdkShapeBuilder:T}<${outputType:T}> outputBuilder() {
                                             return ${outputType:T}.builder();
                                         }
 
@@ -109,22 +109,22 @@ public final class OperationGenerator
                                         ${/hasOutputEventStream}
 
                                         @Override
-                                        public ${sdkSchema:N} schema() {
+                                        public ${sdkSchema:T} schema() {
                                             return $$SCHEMA;
                                         }
 
                                         @Override
-                                        public ${sdkSchema:N} inputSchema() {
+                                        public ${sdkSchema:T} inputSchema() {
                                             return ${inputType:T}.$$SCHEMA;
                                         }
 
                                         @Override
-                                        public ${sdkSchema:N} outputSchema() {
+                                        public ${sdkSchema:T} outputSchema() {
                                             return ${outputType:T}.$$SCHEMA;
                                         }
 
                                         @Override
-                                        public ${typeRegistry:N} errorRegistry() {
+                                        public ${typeRegistry:T} errorRegistry() {
                                             return TYPE_REGISTRY;
                                         }
 
@@ -265,6 +265,7 @@ public final class OperationGenerator
                         writer.putContext("specificApiServiceType", apiService);
                     }
 
+                    writer.writeNullMarkedAnnotation();
                     writer.write(template);
                     writer.popState();
                 });

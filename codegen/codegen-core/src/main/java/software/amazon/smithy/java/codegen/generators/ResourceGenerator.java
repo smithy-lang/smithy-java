@@ -58,7 +58,7 @@ public final class ResourceGenerator
                                 private ${shape:T}() {}
 
                                 @Override
-                                public ${sdkSchema:N} schema() {
+                                public ${sdkSchema:T} schema() {
                                     return $$SCHEMA;
                                 }
 
@@ -127,6 +127,7 @@ public final class ResourceGenerator
                         writer.putContext("specificApiServiceType", apiService);
                     }
 
+                    writer.writeNullMarkedAnnotation();
                     writer.write(template);
                     writer.popState();
                 });

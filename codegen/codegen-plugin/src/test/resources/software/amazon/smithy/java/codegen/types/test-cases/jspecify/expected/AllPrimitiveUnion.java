@@ -2,6 +2,7 @@
 package software.amazon.smithy.java.example.standalone.model;
 
 import java.util.Objects;
+import org.jspecify.annotations.NullMarked;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -12,9 +13,13 @@ import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
+/**
+ * Union where all variants are primitive types
+ */
 @SmithyGenerated
-public sealed interface UnionWithTypeMember extends SerializableStruct {
-    Schema $SCHEMA = Schemas.UNION_WITH_TYPE_MEMBER;
+@NullMarked
+public sealed interface AllPrimitiveUnion extends SerializableStruct {
+    Schema $SCHEMA = Schemas.ALL_PRIMITIVE_UNION;
 
     ShapeId $ID = $SCHEMA.id();
 
@@ -31,19 +36,17 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
     }
 
     @SmithyGenerated
-    record TypeMember(Type type) implements UnionWithTypeMember {
-        private static final Schema $SCHEMA_TYPE = $SCHEMA.member("type");
-        public TypeMember {
-            Objects.requireNonNull(type, "Union value cannot be null");
-        }
+    record IntVariantMember(int intVariant) implements AllPrimitiveUnion {
+        private static final Schema $SCHEMA_INT_VARIANT = $SCHEMA.member("intVariant");
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeStruct($SCHEMA_TYPE, type);
+            serializer.writeInteger($SCHEMA_INT_VARIANT, intVariant);
         }
 
         @Override
-        public Type getValue() {
-            return type;
+        @SuppressWarnings("unchecked")
+        public Integer getValue() {
+            return intVariant;
         }
 
         @Override
@@ -53,7 +56,49 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
 
     }
 
-    record $Unknown(String memberName) implements UnionWithTypeMember {
+    @SmithyGenerated
+    record BoolVariantMember(boolean boolVariant) implements AllPrimitiveUnion {
+        private static final Schema $SCHEMA_BOOL_VARIANT = $SCHEMA.member("boolVariant");
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {
+            serializer.writeBoolean($SCHEMA_BOOL_VARIANT, boolVariant);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public Boolean getValue() {
+            return boolVariant;
+        }
+
+        @Override
+        public String toString() {
+            return ToStringSerializer.serialize(this);
+        }
+
+    }
+
+    @SmithyGenerated
+    record LongVariantMember(long longVariant) implements AllPrimitiveUnion {
+        private static final Schema $SCHEMA_LONG_VARIANT = $SCHEMA.member("longVariant");
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {
+            serializer.writeLong($SCHEMA_LONG_VARIANT, longVariant);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public Long getValue() {
+            return longVariant;
+        }
+
+        @Override
+        public String toString() {
+            return ToStringSerializer.serialize(this);
+        }
+
+    }
+
+    record $Unknown(String memberName) implements AllPrimitiveUnion {
         @Override
         public void serialize(ShapeSerializer serializer) {
             throw new UnsupportedOperationException("Cannot serialize union with unknown member " + this.memberName);
@@ -67,7 +112,7 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
             return memberName;
         }
 
-        private record $Hidden() implements UnionWithTypeMember {
+        private record $Hidden() implements AllPrimitiveUnion {
             @Override
             public void serializeMembers(ShapeSerializer serializer) {}
 
@@ -80,7 +125,7 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
     }
 
     interface BuildStage {
-        UnionWithTypeMember build();
+        AllPrimitiveUnion build();
     }
 
     /**
@@ -91,10 +136,10 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
     }
 
     /**
-     * Builder for {@link UnionWithTypeMember}.
+     * Builder for {@link AllPrimitiveUnion}.
      */
-    final class Builder implements ShapeBuilder<UnionWithTypeMember>, BuildStage {
-        private UnionWithTypeMember value;
+    final class Builder implements ShapeBuilder<AllPrimitiveUnion>, BuildStage {
+        private AllPrimitiveUnion value;
 
         private Builder() {}
 
@@ -103,15 +148,23 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
             return $SCHEMA;
         }
 
-        public BuildStage type(Type value) {
-            return setValue(new TypeMember(value));
+        public BuildStage intVariant(int value) {
+            return setValue(new IntVariantMember(value));
+        }
+
+        public BuildStage boolVariant(boolean value) {
+            return setValue(new BoolVariantMember(value));
+        }
+
+        public BuildStage longVariant(long value) {
+            return setValue(new LongVariantMember(value));
         }
 
         public BuildStage $unknownMember(String memberName) {
             return setValue(new $Unknown(memberName));
         }
 
-        private BuildStage setValue(UnionWithTypeMember value) {
+        private BuildStage setValue(AllPrimitiveUnion value) {
             if (this.value != null) {
                 throw new IllegalArgumentException("Only one value may be set for unions");
             }
@@ -120,7 +173,7 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
         }
 
         @Override
-        public UnionWithTypeMember build() {
+        public AllPrimitiveUnion build() {
             return Objects.requireNonNull(value, "no union value set");
         }
 
@@ -128,7 +181,9 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
         @SuppressWarnings("unchecked")
         public void setMemberValue(Schema member, Object value) {
             switch (member.memberIndex()) {
-                case 0 -> type((Type) SchemaUtils.validateSameMember(TypeMember.$SCHEMA_TYPE, member, value));
+                case 0 -> intVariant((int) SchemaUtils.validateSameMember(IntVariantMember.$SCHEMA_INT_VARIANT, member, value));
+                case 1 -> boolVariant((boolean) SchemaUtils.validateSameMember(BoolVariantMember.$SCHEMA_BOOL_VARIANT, member, value));
+                case 2 -> longVariant((long) SchemaUtils.validateSameMember(LongVariantMember.$SCHEMA_LONG_VARIANT, member, value));
                 default -> ShapeBuilder.super.setMemberValue(member, value);
             }
         }
@@ -152,7 +207,9 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
             @SuppressWarnings("unchecked")
             public void accept(Builder builder, Schema member, ShapeDeserializer de) {
                 switch (member.memberIndex()) {
-                    case 0 -> builder.type(Type.builder().deserializeMember(de, member).build());
+                    case 0 -> builder.intVariant(de.readInteger(member));
+                    case 1 -> builder.boolVariant(de.readBoolean(member));
+                    case 2 -> builder.longVariant(de.readLong(member));
                     default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
                 }
             }

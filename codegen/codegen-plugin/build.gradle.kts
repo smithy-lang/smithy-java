@@ -24,6 +24,7 @@ dependencies {
     testImplementation(libs.smithy.aws.traits)
     testImplementation(libs.smithy.rules)
     testImplementation(project(":codegen:test-utils"))
+    testImplementation(libs.jspecify)
 
     // Integration test deps
     itImplementation(project(":client:client-core"))

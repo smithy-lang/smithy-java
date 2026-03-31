@@ -12,6 +12,7 @@ dependencies {
     api(libs.smithy.codegen)
     implementation(project(":core"))
     implementation(project(":logging"))
+    implementation(libs.jspecify)
 }
 
 // Internal source set for the types-only SmithyBuildPlugin.

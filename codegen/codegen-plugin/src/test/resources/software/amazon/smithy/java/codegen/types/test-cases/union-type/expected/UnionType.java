@@ -50,7 +50,6 @@ public sealed interface UnionType extends SerializableStruct {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public ByteBuffer getValue() {
             return blobValue;
         }
@@ -95,7 +94,6 @@ public sealed interface UnionType extends SerializableStruct {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public List<String> getValue() {
             return listValue;
         }
@@ -119,7 +117,6 @@ public sealed interface UnionType extends SerializableStruct {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public Map<String, String> getValue() {
             return mapValue;
         }
@@ -143,7 +140,6 @@ public sealed interface UnionType extends SerializableStruct {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public BigDecimal getValue() {
             return bigDecimalValue;
         }
@@ -167,7 +163,6 @@ public sealed interface UnionType extends SerializableStruct {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public BigInteger getValue() {
             return bigIntegerValue;
         }
@@ -317,7 +312,6 @@ public sealed interface UnionType extends SerializableStruct {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public String getValue() {
             return stringValue;
         }
@@ -341,7 +335,6 @@ public sealed interface UnionType extends SerializableStruct {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public NestedStruct getValue() {
             return structureValue;
         }
@@ -365,7 +358,6 @@ public sealed interface UnionType extends SerializableStruct {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public Instant getValue() {
             return timestampValue;
         }
@@ -389,7 +381,6 @@ public sealed interface UnionType extends SerializableStruct {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public NestedUnion getValue() {
             return unionValue;
         }
@@ -413,7 +404,6 @@ public sealed interface UnionType extends SerializableStruct {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public NestedEnum getValue() {
             return enumValue;
         }
@@ -437,7 +427,6 @@ public sealed interface UnionType extends SerializableStruct {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public NestedIntEnum getValue() {
             return intEnumValue;
         }
@@ -458,7 +447,6 @@ public sealed interface UnionType extends SerializableStruct {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public Unit getValue() {
             return null;
         }
@@ -480,7 +468,6 @@ public sealed interface UnionType extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {}
 
         @Override
-        @SuppressWarnings("unchecked")
         public String getValue() {
             return memberName;
         }

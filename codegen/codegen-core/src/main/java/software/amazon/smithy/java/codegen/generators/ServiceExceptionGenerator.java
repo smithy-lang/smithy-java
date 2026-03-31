@@ -62,6 +62,7 @@ public final class ServiceExceptionGenerator<
             writer.putContext("modeledException", ModeledException.class);
             writer.putContext("schema", Schema.class);
             writer.putContext("errorFault", ErrorFault.class);
+            writer.writeNullMarkedAnnotation();
             writer.write(template);
             writer.popState();
         });

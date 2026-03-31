@@ -24,7 +24,7 @@ import software.amazon.smithy.utils.StringUtils;
  * <ul>
  *  <li>Use the {@code $T} formatter to refer to {@link Symbol}s.</li>
  *  <li>Use the {@code $B} formatter to use a boxed type (such as {@code Integer}) if applicable.</li>
- *  <li>Use the {@code $N} formatter to render a {@link Symbol} with a non-null annotation added if applicable.</li>
+ *  <li>Use the {@code $N} formatter to render a {@link Symbol} with a {@code @Nullable} annotation when nullness annotations are enabled.</li>
  *  <li>Use the {@code $U} formatter to write a string literal with the first letter capitalized.</li>
  * </ul>
  */
@@ -51,7 +51,7 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
         putFormatter('T', new JavaTypeFormatter());
         putFormatter('B', new BoxedTypeFormatter());
         putFormatter('U', new CapitalizingFormatter());
-        putFormatter('N', new NonNullAnnotationFormatter());
+        putFormatter('N', new NullableAnnotationFormatter());
     }
 
     // Java does not support aliases, so just import normally
@@ -103,6 +103,15 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
         putNameContext();
         setExpressionStart(PLACEHOLDER_FORMAT_CHAR);
         return format("£L", super.toString());
+    }
+
+    /**
+     * Writes the {@code @NullMarked} annotation if {@code addNullnessAnnotations} is enabled.
+     */
+    public void writeNullMarkedAnnotation() {
+        if (settings.addNullnessAnnotations()) {
+            write("@$T", JSpecifyAnnotations.NULL_MARKED);
+        }
     }
 
     public void newLine() {
@@ -184,6 +193,10 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
 
     /**
      * Implements a formatter for {@code $T} that formats Java types.
+     *
+     * <p>For generic types (symbols with references), each reference is checked for the
+     * {@link SymbolProperties#IS_NULLABLE} property. Nullable refs use {@code $N} (which adds
+     * {@code @Nullable} when enabled), non-nullable refs use {@code $B} (boxed for generics).
      */
     private final class JavaTypeFormatter implements BiFunction<Object, String, String> {
         @Override
@@ -194,13 +207,19 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
                 return getPlaceholder(typeSymbol);
             }
 
-            // Add type references as type references (ex. `Map<KeyType, ValueType>`)
-            putContext("refs", typeSymbol.getReferences());
-            String output = format(
-                    "$L<${#refs}${value:B}${^key.last}, ${/key.last}${/refs}>",
-                    getPlaceholder(typeSymbol));
-            removeContext("refs");
-            return output;
+            var refs = typeSymbol.getReferences();
+            var sb = new StringBuilder(getPlaceholder(typeSymbol)).append("<");
+            for (int i = 0; i < refs.size(); i++) {
+                var ref = refs.get(i);
+                boolean nullable = Boolean.TRUE.equals(
+                        ref.getSymbol().getProperty(SymbolProperties.IS_NULLABLE).orElse(false));
+                sb.append(nullable ? format("$N", ref) : format("$B", ref));
+                if (i < refs.size() - 1) {
+                    sb.append(", ");
+                }
+            }
+            sb.append(">");
+            return sb.toString();
         }
 
         private String getPlaceholder(Symbol symbol) {
@@ -260,27 +279,31 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
     }
 
     /**
-     * Implements a formatter for {@code $N} that adds non-null annotation
+     * Implements a formatter for {@code $N} that adds {@code @Nullable} annotation when
+     * {@code addNullnessAnnotations} is enabled. Falls back to boxed type when disabled.
      */
-    private final class NonNullAnnotationFormatter implements BiFunction<Object, String, String> {
-        private final JavaTypeFormatter javaTypeFormatter = new JavaTypeFormatter();
+    private final class NullableAnnotationFormatter implements BiFunction<Object, String, String> {
+        private final BoxedTypeFormatter boxedTypeFormatter = new BoxedTypeFormatter();
 
         @Override
         public String apply(Object type, String indent) {
-
-            Symbol nonNullAnnotationSymbol = settings.nonNullAnnotationSymbol();
-
-            if (nonNullAnnotationSymbol == null) {
-                return javaTypeFormatter.apply(type, indent);
+            if (!settings.addNullnessAnnotations()) {
+                return boxedTypeFormatter.apply(type, indent);
             }
 
             Symbol typeSymbol = getTypeSymbol(type, 'N');
 
-            if (typeSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE)) {
-                return javaTypeFormatter.apply(typeSymbol, indent);
+            // Box primitive types first (e.g., boolean -> Boolean for nullable context)
+            if (typeSymbol.getProperty(SymbolProperties.BOXED_TYPE).isPresent()) {
+                typeSymbol = typeSymbol.expectProperty(SymbolProperties.BOXED_TYPE);
             }
 
-            return format("@$T $T", nonNullAnnotationSymbol, typeSymbol);
+            // If still primitive after boxing attempt, cannot be @Nullable
+            if (typeSymbol.getProperty(SymbolProperties.IS_PRIMITIVE).orElse(false)) {
+                return boxedTypeFormatter.apply(typeSymbol, indent);
+            }
+
+            return format("@$T $T", JSpecifyAnnotations.NULLABLE, typeSymbol);
         }
     }
 }

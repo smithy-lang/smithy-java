@@ -24,7 +24,7 @@ record GetMemberValueGenerator(JavaWriter writer, SymbolProvider symbolProvider,
             template = """
                     @Override
                     @SuppressWarnings("unchecked")
-                    public <T> T getMemberValue(${sdkSchema:N} member) {
+                    public <T> T getMemberValue(${sdkSchema:T} member) {
                         throw new ${iae:T}("Attempted to get non-existent member: " + member.id());
                     }
                     """;
@@ -32,7 +32,7 @@ record GetMemberValueGenerator(JavaWriter writer, SymbolProvider symbolProvider,
             template = """
                     @Override
                     @SuppressWarnings("unchecked")
-                    public <T> T getMemberValue(${sdkSchema:N} member) {
+                    public <T> T getMemberValue(${sdkSchema:T} member) {
                         return switch (member.memberIndex()) {
                             ${cases:C|}
                             default -> throw new ${iae:T}("Attempted to get non-existent member: " + member.id());

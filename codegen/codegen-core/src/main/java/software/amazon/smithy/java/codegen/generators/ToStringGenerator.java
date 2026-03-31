@@ -19,7 +19,7 @@ record ToStringGenerator(JavaWriter writer) implements Runnable {
         writer.putContext("toStringSerializer", ToStringSerializer.class);
         writer.write("""
                 @Override
-                public ${string:N} toString() {
+                public ${string:T} toString() {
                     return ${toStringSerializer:T}.serialize(this);
                 }
                 """);

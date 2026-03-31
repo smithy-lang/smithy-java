@@ -28,14 +28,14 @@ record StructureDeserializerGenerator(
         var template =
                 """
                         @Override
-                        public Builder deserialize(${shapeDeserializer:N} decoder) {${?isError}
+                        public Builder deserialize(${shapeDeserializer:T} decoder) {${?isError}
                             this.$$deserialized = true;${/isError}
                             decoder.readStruct($$SCHEMA, this, $$InnerDeserializer.INSTANCE);
                             return this;
                         }
 
                         @Override
-                        public Builder deserializeMember(${shapeDeserializer:N} decoder, ${sdkSchema:N} schema) {
+                        public Builder deserializeMember(${shapeDeserializer:T} decoder, ${sdkSchema:T} schema) {
                             decoder.readStruct(schema.assertMemberTargetIs($$SCHEMA), this, $$InnerDeserializer.INSTANCE);
                             return this;
                         }

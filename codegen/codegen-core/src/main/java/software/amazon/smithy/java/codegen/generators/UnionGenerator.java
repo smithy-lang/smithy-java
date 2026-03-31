@@ -52,13 +52,13 @@ public final class UnionGenerator
                         <T> T getValue();
 
                         @Override
-                        default ${schemaClass:N} schema() {
+                        default ${schemaClass:T} schema() {
                             return $$SCHEMA;
                         }
 
                         @Override
-                        default <T> T getMemberValue(${sdkSchema:N} member) {
-                            return ${schemaUtils:N}.validateMemberInSchema($$SCHEMA, member, getValue());
+                        default <T> T getMemberValue(${sdkSchema:T} member) {
+                            return ${schemaUtils:T}.validateMemberInSchema($$SCHEMA, member, getValue());
                         }
 
                         ${valueClasses:C|}
@@ -98,6 +98,7 @@ public final class UnionGenerator
                             directive.symbolProvider(),
                             directive.model(),
                             directive.service()));
+            writer.writeNullMarkedAnnotation();
             writer.write(template);
             writer.popState();
         });
@@ -123,10 +124,9 @@ public final class UnionGenerator
                 var isUnit = target.hasTrait(UnitTypeTrait.class);
 
                 // Use memberName as the record field name so the accessor is auto-generated
-                // Use :N formatter for the type to add @NonNull annotation when applicable
                 var template =
                         """
-                                record ${memberName:U}Member(${^unit}${member:N} ${memberName:L}${/unit}) implements ${shape:T} {
+                                record ${memberName:U}Member(${^unit}${member:T} ${memberName:L}${/unit}) implements ${shape:T} {
                                     private static final ${schemaClass:T} ${memberSchema:L} = $$SCHEMA.member(${memberSchemaName:S});
                                     ${?needsConstructor}
                                     public ${memberName:U}Member {
@@ -134,13 +134,13 @@ public final class UnionGenerator
                                     }
                                     ${/needsConstructor}
                                     @Override
-                                    public void serializeMembers(${shapeSerializer:N} serializer) {
+                                    public void serializeMembers(${shapeSerializer:T} serializer) {
                                         ${serializeMember:C};
                                     }
 
-                                    @Override
-                                    @SuppressWarnings("unchecked")
-                                    public ${?hasBoxed}${member:B}${/hasBoxed}${^hasBoxed}${member:N}${/hasBoxed} getValue() {
+                                    @Override${?hasBoxed}
+                                    @SuppressWarnings("unchecked")${/hasBoxed}
+                                    public ${member:B} getValue() {
                                         return ${^unit}${memberName:L}${/unit}${?unit}null${/unit};
                                     }
 
@@ -191,7 +191,6 @@ public final class UnionGenerator
                                 public void serializeMembers(${shapeSerializer:T} serializer) {}
 
                                 @Override
-                                @SuppressWarnings("unchecked")
                                 public String getValue() {
                                     return memberName;
                                 }
@@ -292,7 +291,7 @@ public final class UnionGenerator
         protected void generateBuild(JavaWriter writer) {
             writer.write("""
                     @Override
-                    public ${shape:N} build() {
+                    public ${shape:T} build() {
                         return ${objects:T}.requireNonNull(value, "no union value set");
                     }
                     """);

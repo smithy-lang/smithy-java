@@ -36,13 +36,13 @@ record StructureSerializerGenerator(
         writer.pushState();
         var template = """
                 ${^isError}@Override
-                public ${schemaClass:N} schema() {
+                public ${schemaClass:T} schema() {
                     return $$SCHEMA;
                 }
 
                 ${/isError}
                 @Override
-                public void serializeMembers(${shapeSerializer:N} serializer) {
+                public void serializeMembers(${shapeSerializer:T} serializer) {
                     ${writeMemberSerialization:C|}
                 }
                 """;

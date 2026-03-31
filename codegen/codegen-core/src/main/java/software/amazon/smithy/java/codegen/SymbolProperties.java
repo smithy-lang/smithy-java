@@ -91,5 +91,13 @@ public final class SymbolProperties {
      */
     public static final Property<Symbol> SERVICE_API_SERVICE = Property.named("service-api-service");
 
+    /**
+     * Indicates if a symbol represents a nullable type.
+     *
+     * <p>Used on symbol references within collection types to mark sparse element types
+     * that need {@code @Nullable} annotations in type parameters.
+     */
+    public static final Property<Boolean> IS_NULLABLE = Property.named("is-nullable");
+
     private SymbolProperties() {}
 }

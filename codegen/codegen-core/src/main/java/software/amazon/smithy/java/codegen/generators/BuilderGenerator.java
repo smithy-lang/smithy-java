@@ -149,7 +149,7 @@ abstract class BuilderGenerator implements Runnable {
         var template = """
                 @Override
                 @SuppressWarnings("unchecked")
-                public void setMemberValue(${sdkSchema:N} member, ${object:N} value) {
+                public void setMemberValue(${sdkSchema:T} member, ${object:T} value) {
                     switch (member.memberIndex()) {
                         ${memberSetters:C|}
                         default -> ${shapeBuilderClass:T}.super.setMemberValue(member, value);
@@ -173,7 +173,7 @@ abstract class BuilderGenerator implements Runnable {
             writer.putContext("schemaUtilsClass", SchemaUtils.class);
             writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
             writer.write(
-                    "case $L -> ${memberName:L}((${?isNullable}${type:B}${/isNullable}${^isNullable}${type:N}${/isNullable}) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, value));",
+                    "case $L -> ${memberName:L}((${?isNullable}${type:B}${/isNullable}${^isNullable}${type:T}${/isNullable}) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, value));",
                     idx);
             writer.popState();
         }

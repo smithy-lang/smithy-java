@@ -51,7 +51,7 @@ public final class ApiServiceGenerator
                         private ${serviceApiName:L}() {}
 
                         @Override
-                        public ${sdkSchema:N} schema() {
+                        public ${sdkSchema:T} schema() {
                             return $$SCHEMA;
                         }
                     }""";
@@ -59,6 +59,7 @@ public final class ApiServiceGenerator
             writer.putContext("serviceApiName", apiSymbol.getName());
             writer.putContext("sdkSchema", Schema.class);
             writer.putContext("schema", new SchemaFieldGenerator(directive, writer, shape));
+            writer.writeNullMarkedAnnotation();
             writer.write(template);
             writer.popState();
         });

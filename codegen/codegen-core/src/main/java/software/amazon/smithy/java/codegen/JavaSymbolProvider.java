@@ -115,16 +115,30 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
         return switch (shape) {
             case MemberShape ms when externalTypes.containsKey(ms.getTarget()) ->
                 externalTypes.get(ms.getTarget());
-            case ListShape ls when externalTypes.containsKey(ls.getMember().getTarget()) ->
-                resolveSymbol(shape).toBuilder()
-                        .references(List.of(new SymbolReference(externalTypes.get(ls.getMember().getTarget()))))
+            case ListShape ls when externalTypes.containsKey(ls.getMember().getTarget()) -> {
+                var memberSym = externalTypes.get(ls.getMember().getTarget());
+                if (CodegenUtils.isNullableMember(model, ls.getMember())) {
+                    memberSym = memberSym.toBuilder()
+                            .putProperty(SymbolProperties.IS_NULLABLE, true)
+                            .build();
+                }
+                yield resolveSymbol(shape).toBuilder()
+                        .references(List.of(new SymbolReference(memberSym)))
                         .build();
-            case MapShape ms when externalTypes.containsKey(ms.getValue().getTarget()) ->
-                resolveSymbol(shape).toBuilder()
+            }
+            case MapShape ms when externalTypes.containsKey(ms.getValue().getTarget()) -> {
+                var valueSym = externalTypes.get(ms.getValue().getTarget());
+                if (CodegenUtils.isNullableMember(model, ms.getValue())) {
+                    valueSym = valueSym.toBuilder()
+                            .putProperty(SymbolProperties.IS_NULLABLE, true)
+                            .build();
+                }
+                yield resolveSymbol(shape).toBuilder()
                         .references(List.of(
                                 new SymbolReference(resolveSymbol(ms.getKey())),
-                                new SymbolReference(externalTypes.get(ms.getValue().getTarget()))))
+                                new SymbolReference(valueSym)))
                         .build();
+            }
             default -> resolveSymbol(shape);
         };
     }
@@ -157,18 +171,30 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
 
     @Override
     public Symbol listShape(ListShape listShape) {
+        var memberSymbol = listShape.getMember().accept(this);
+        if (CodegenUtils.isNullableMember(model, listShape.getMember())) {
+            memberSymbol = memberSymbol.toBuilder()
+                    .putProperty(SymbolProperties.IS_NULLABLE, true)
+                    .build();
+        }
         return CodegenUtils.fromClass(List.class)
                 .toBuilder()
                 .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, "unmodifiableList")
                 .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, ArrayList.class)
                 .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptyList()")
                 .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
-                .addReference(listShape.getMember().accept(this))
+                .addReference(memberSymbol)
                 .build();
     }
 
     @Override
     public Symbol mapShape(MapShape mapShape) {
+        var valueSymbol = mapShape.getValue().accept(this);
+        if (CodegenUtils.isNullableMember(model, mapShape.getValue())) {
+            valueSymbol = valueSymbol.toBuilder()
+                    .putProperty(SymbolProperties.IS_NULLABLE, true)
+                    .build();
+        }
         return CodegenUtils.fromClass(Map.class)
                 .toBuilder()
                 .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, "unmodifiableMap")
@@ -176,7 +202,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
                 .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptyMap()")
                 .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
                 .addReference(mapShape.getKey().accept(this))
-                .addReference(mapShape.getValue().accept(this))
+                .addReference(valueSymbol)
                 .build();
     }
 
