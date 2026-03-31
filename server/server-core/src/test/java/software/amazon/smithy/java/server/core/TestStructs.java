@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.server.core;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -217,11 +216,6 @@ public class TestStructs {
         @Override
         public Map<String, List<String>> map() {
             return headers;
-        }
-
-        @Override
-        public Iterator<Map.Entry<String, List<String>>> iterator() {
-            return headers.entrySet().iterator();
         }
     }
 

@@ -53,6 +53,15 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
     }
 
     /**
+     * Adds all entries from the given {@code headers}.
+     *
+     * @param headers HTTP headers to copy from.
+     */
+    default void addHeaders(HttpHeaders headers) {
+        headers.forEachEntry(this::addHeader);
+    }
+
+    /**
      * Sets a header to the given value, overwriting old values if present.
      *
      * <p>Any previously set values for this header are replaced as if {@link #removeHeader(String)} and
@@ -91,7 +100,7 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
      */
     default List<String> setHeaderIfAbsent(String name, List<String> values) {
         var current = allValues(name);
-        if (current != null) {
+        if (!current.isEmpty()) {
             return current;
         } else {
             setHeader(name, values);
@@ -108,7 +117,7 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
      */
     default List<String> setHeaderIfAbsent(String name, String value) {
         var current = allValues(name);
-        if (current != null) {
+        if (!current.isEmpty()) {
             return current;
         } else {
             setHeader(name, List.of(value));
@@ -135,7 +144,6 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
      * @param headers HTTP headers to copy from.
      */
     default void setHeaders(HttpHeaders headers) {
-        // Note: the default implementation is overridden in SimpleModifiableHttpHeaders.
         for (var e : headers.map().entrySet()) {
             setHeader(e.getKey(), e.getValue());
         }
@@ -159,8 +167,12 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
      * @return a copy of the modifiable headers.
      */
     default ModifiableHttpHeaders copy() {
-        var copy = new SimpleModifiableHttpHeaders();
-        copy.setHeaders(this);
-        return copy;
+        if (this instanceof ArrayHttpHeaders ah) {
+            return ah.copy();
+        } else {
+            var copy = new ArrayHttpHeaders(size());
+            copy.setHeaders(this);
+            return copy;
+        }
     }
 }

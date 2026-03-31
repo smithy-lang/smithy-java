@@ -10,6 +10,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
+import software.amazon.smithy.java.http.api.HeaderNames;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -43,13 +44,12 @@ final class ServerTestClient {
                 .method(request.method(), bodyPublisher)
                 .uri(request.uri().toURI());
 
-        for (var entry : request.headers()) {
-            for (var value : entry.getValue()) {
-                if (!entry.getKey().equals("content-length")) {
-                    httpRequestBuilder.header(entry.getKey(), value);
-                }
+        request.headers().forEachEntry(httpRequestBuilder, (b, name, value) -> {
+            // Header names in HttpHeaders from Smithy are always canonicalized, so check by reference
+            if (!name.equals(HeaderNames.CONTENT_LENGTH)) {
+                b.header(name, value);
             }
-        }
+        });
 
         try {
             var response = httpClient.send(

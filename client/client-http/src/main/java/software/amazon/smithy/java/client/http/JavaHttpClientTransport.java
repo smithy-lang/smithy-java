@@ -14,13 +14,13 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
 import java.time.Duration;
-import java.util.HashMap;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.error.ConnectTimeoutException;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.http.api.HeaderNames;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -147,14 +147,12 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         }
 
         // Any explicitly set headers overwrite existing headers, they do not merge.
-        for (var entry : request.headers().map().entrySet()) {
-            // Skip restricted headers
-            if (!entry.getKey().equals("content-length")) {
-                for (var value : entry.getValue()) {
-                    httpRequestBuilder.setHeader(entry.getKey(), value);
-                }
+        request.headers().forEachEntry(httpRequestBuilder, (b, name, value) -> {
+            // Skip restricted headers; Header names in HttpHeaders are always canonicalized, so check by reference.
+            if (name != HeaderNames.CONTENT_LENGTH) {
+                b.setHeader(name, value);
             }
-        }
+        });
 
         return httpRequestBuilder.build();
     }
@@ -186,11 +184,16 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
 
     // package-private for testing
     HttpResponse createSmithyResponse(java.net.http.HttpResponse<InputStream> response) {
-        var headerMap = new HashMap<>(response.headers().map());
-        headerMap.remove(":status");
-        LOGGER.trace("Got response: {}; headers: {}", response, headerMap);
+        var headers = HttpHeaders.ofModifiable();
+        for (var e : response.headers().map().entrySet()) {
+            var name = e.getKey();
+            if (!name.equals(":status")) {
+                headers.addHeader(name, e.getValue());
+            }
+        }
 
-        var headers = HttpHeaders.of(headerMap);
+        LOGGER.trace("Got response: {}; headers: {}", response, response.headers().map());
+
         var length = headers.contentLength();
         var adaptedLength = length == null ? -1 : length;
         var contentType = headers.contentType();

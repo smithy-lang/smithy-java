@@ -16,7 +16,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -175,10 +174,9 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     private static Map<String, List<String>> copyHeaders(HttpHeaders httpHeaders) {
         Map<String, List<String>> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        // Note: httpHeaders.map _should_ always return lowercase key names.
-        for (var entry : httpHeaders.map().entrySet()) {
-            headers.put(entry.getKey().toLowerCase(Locale.ENGLISH), entry.getValue());
-        }
+        httpHeaders.forEachEntry(headers, (h, name, value) -> {
+            h.computeIfAbsent(name, k -> new ArrayList<>(1)).add(value);
+        });
         return headers;
     }
 

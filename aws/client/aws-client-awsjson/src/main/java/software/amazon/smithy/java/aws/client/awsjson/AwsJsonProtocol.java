@@ -6,8 +6,6 @@
 package software.amazon.smithy.java.aws.client.awsjson;
 
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
 import software.amazon.smithy.java.aws.events.AwsEventDecoderFactory;
 import software.amazon.smithy.java.aws.events.AwsEventEncoderFactory;
 import software.amazon.smithy.java.aws.events.AwsEventFrame;
@@ -23,7 +21,6 @@ import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
-import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -88,16 +85,13 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
             // Event streaming
             var encoderFactory = getEventEncoderFactory(operation);
             var body = RpcEventStreamsUtil.bodyForEventStreaming(encoderFactory, input);
-            builder.headers(HttpHeaders.of(headersForEventStreaming(target)))
+            builder.withAddedHeader("x-amz-target", target)
+                    .withAddedHeader("content-type", "application/vnd.amazon.eventstream")
+                    .withAddedHeader("accept", contentType())
                     .body(body);
         } else {
-            builder.headers(
-                    HttpHeaders.of(
-                            Map.of(
-                                    "x-amz-target",
-                                    List.of(target),
-                                    "content-type",
-                                    List.of(contentType()))));
+            builder.withAddedHeader("x-amz-target", target)
+                    .withAddedHeader("content-type", contentType());
         }
         return builder.body(DataStream.ofByteBuffer(codec.serialize(input), contentType())).build();
     }
@@ -141,15 +135,6 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
 
     private EventDecoderFactory<AwsEventFrame> getEventDecoderFactory(ApiOperation<?, ?> operation) {
         return AwsEventDecoderFactory.forOutputStream(operation, payloadCodec(), f -> f);
-    }
-
-    private Map<String, List<String>> headersForEventStreaming(String target) {
-        return Map.of("x-amz-target",
-                List.of(target),
-                "content-type",
-                List.of("application/vnd.amazon.eventstream"),
-                "Accept",
-                List.of(contentType()));
     }
 
     private static DataStream bodyDataStream(HttpResponse response) {

@@ -172,7 +172,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         HttpResponse response = serializer.serializeResponse();
         httpJob.response().setSerializedValue(response.body());
         httpJob.response().setStatusCode(response.statusCode());
-        httpJob.response().headers().addHeaders(response.headers().map());
+        httpJob.response().headers().addHeaders(response.headers());
         return CompletableFuture.completedFuture(null);
     }
 }

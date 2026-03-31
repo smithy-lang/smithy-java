@@ -30,7 +30,7 @@ public class NettHttpHeadersTest {
 
         var wrapped = new NettyHttpHeaders(netty);
         Set<String> names = new HashSet<>();
-        for (var entry : wrapped) {
+        for (var entry : wrapped.map().entrySet()) {
             names.add(entry.getKey());
             if (entry.getKey().equals("content-type")) {
                 assertThat(entry.getValue(), contains("text/plain"));

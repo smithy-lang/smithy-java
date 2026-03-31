@@ -57,7 +57,7 @@ tasks {
 }
 
 jmh {
-    warmupIterations = 2
+    warmupIterations = 4
     iterations = 5
     fork = 1
     // Allow filtering for specific benchmarks

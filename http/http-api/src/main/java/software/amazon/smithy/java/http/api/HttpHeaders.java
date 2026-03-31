@@ -7,13 +7,14 @@ package software.amazon.smithy.java.http.api;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 /**
  * Contains case-insensitive HTTP headers.
  *
  * <p>Implementations must always normalize header names to lowercase.
  */
-public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
+public interface HttpHeaders {
     /**
      * Create an immutable HttpHeaders.
      *
@@ -21,7 +22,7 @@ public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
      * @return the created headers.
      */
     static HttpHeaders of(Map<String, List<String>> headers) {
-        return headers.isEmpty() ? SimpleUnmodifiableHttpHeaders.EMPTY : new SimpleUnmodifiableHttpHeaders(headers);
+        return ArrayUnmodifiableHttpHeaders.of(headers);
     }
 
     /**
@@ -30,7 +31,17 @@ public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
      * @return the created headers.
      */
     static ModifiableHttpHeaders ofModifiable() {
-        return new SimpleModifiableHttpHeaders();
+        return new ArrayHttpHeaders();
+    }
+
+    /**
+     * Creates a mutable headers with expected capacity.
+     *
+     * @param expectedPairs expected number of header name-value pairs
+     * @return the created headers.
+     */
+    static ModifiableHttpHeaders ofModifiable(int expectedPairs) {
+        return new ArrayHttpHeaders(expectedPairs);
     }
 
     /**
@@ -82,9 +93,11 @@ public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
     }
 
     /**
-     * Get the number of header entries (not individual values).
+     * Get the number of header name-value pairs.
      *
-     * @return header entries.
+     * <p>Note: if a header has multiple values, each value is counted separately.
+     *
+     * @return total number of header entries.
      */
     int size();
 
@@ -105,12 +118,58 @@ public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
     Map<String, List<String>> map();
 
     /**
+     * Iterates over each header name-value pair, invoking the consumer for every individual value.
+     *
+     * <p>This is the most efficient way to iterate headers. Unlike {@link #map()}, this method
+     * avoids grouping values by name and does not allocate intermediate collections.
+     *
+     * @param consumer called with each header name and individual value.
+     */
+    default void forEachEntry(BiConsumer<String, String> consumer) {
+        for (var entry : map().entrySet()) {
+            for (var value : entry.getValue()) {
+                consumer.accept(entry.getKey(), value);
+            }
+        }
+    }
+
+    /**
+     * Iterates over each header name-value pair, invoking the consumer for every individual value.
+     *
+     * <p>This is the most efficient way to iterate headers. Unlike {@link #map()}, this method
+     * avoids grouping values by name and does not allocate intermediate collections.
+     *
+     * @param consumer called with a context value and each header name and individual value.
+     */
+    default <C> void forEachEntry(C contextValue, HeaderWithValueConsumer<C> consumer) {
+        for (var entry : map().entrySet()) {
+            for (var value : entry.getValue()) {
+                consumer.accept(contextValue, entry.getKey(), value);
+            }
+        }
+    }
+
+    interface HeaderWithValueConsumer<C> {
+        void accept(C context, String key, String value);
+    }
+
+    /**
      * Get or create a modifiable version of the headers.
      *
      * @return the created modifiable headers.
      */
     default ModifiableHttpHeaders toModifiable() {
-        return SimpleModifiableHttpHeaders.of(this);
+        if (this instanceof ModifiableHttpHeaders m) {
+            return m;
+        } else if (this instanceof ArrayUnmodifiableHttpHeaders) {
+            return ((ArrayUnmodifiableHttpHeaders) this).toModifiable();
+        } else {
+            ModifiableHttpHeaders copy = new ArrayHttpHeaders(size());
+            for (var e : map().entrySet()) {
+                copy.addHeader(e.getKey(), e.getValue());
+            }
+            return copy;
+        }
     }
 
     /**
@@ -119,6 +178,6 @@ public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
      * @return the unmodifiable headers.
      */
     default HttpHeaders toUnmodifiable() {
-        return SimpleUnmodifiableHttpHeaders.of(this);
+        return ArrayUnmodifiableHttpHeaders.of(this);
     }
 }

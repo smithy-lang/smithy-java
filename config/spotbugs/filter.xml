@@ -100,4 +100,16 @@
         <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS" />
     </Match>
 
+    <!-- Intentional pointer comparison (==) for interned header names. -->
+    <Match>
+        <Class name="~software\.amazon\.smithy\.java\.http\.api\..*HttpHeaders" />
+        <Bug pattern="ES_COMPARING_STRINGS_WITH_EQ" />
+    </Match>
+
+    <!-- Intentional pointer comparison (==) for interned header names in transport. -->
+    <Match>
+        <Class name="software.amazon.smithy.java.client.http.JavaHttpClientTransport" />
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ" />
+    </Match>
+
 </FindBugsFilter>

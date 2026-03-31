@@ -13,6 +13,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
 
 final class NettyHttpHeaders implements ModifiableHttpHeaders {
@@ -85,7 +86,20 @@ final class NettyHttpHeaders implements ModifiableHttpHeaders {
                 return new AbstractSet<>() {
                     @Override
                     public Iterator<Entry<String, List<String>>> iterator() {
-                        return NettyHttpHeaders.this.iterator();
+                        return new Iterator<>() {
+                            private final Iterator<String> iter = nettyHeaders.names().iterator();
+
+                            @Override
+                            public boolean hasNext() {
+                                return iter.hasNext();
+                            }
+
+                            @Override
+                            public Map.Entry<String, List<String>> next() {
+                                var next = iter.next();
+                                return new AbstractMap.SimpleImmutableEntry<>(next, nettyHeaders.getAll(next));
+                            }
+                        };
                     }
 
                     @Override
@@ -120,21 +134,10 @@ final class NettyHttpHeaders implements ModifiableHttpHeaders {
     }
 
     @Override
-    public Iterator<Map.Entry<String, List<String>>> iterator() {
-        return new Iterator<>() {
-            private final Iterator<String> iter = nettyHeaders.names().iterator();
-
-            @Override
-            public boolean hasNext() {
-                return iter.hasNext();
-            }
-
-            @Override
-            public Map.Entry<String, List<String>> next() {
-                var next = iter.next();
-                return new AbstractMap.SimpleImmutableEntry<>(next, nettyHeaders.getAll(next));
-            }
-        };
+    public void forEachEntry(BiConsumer<String, String> consumer) {
+        for (var entry : nettyHeaders) {
+            consumer.accept(entry.getKey(), entry.getValue());
+        }
     }
 
     HttpHeaders getNettyHeaders() {
