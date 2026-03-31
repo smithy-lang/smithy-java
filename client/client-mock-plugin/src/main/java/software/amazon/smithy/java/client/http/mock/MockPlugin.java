@@ -65,10 +65,12 @@ public final class MockPlugin implements ClientPlugin {
     private final List<Function<MatcherRequest, MockedResult>> matchers = new ArrayList<>();
     private final List<MockedRequest> requests = Collections.synchronizedList(new ArrayList<>());
     private final Service mockService;
+    private final boolean trackRequests;
 
     private MockPlugin(Builder builder) {
         this.mockService = new MockService();
         this.matchers.addAll(builder.matchers);
+        this.trackRequests = builder.trackRequests;
     }
 
     /**
@@ -108,6 +110,7 @@ public final class MockPlugin implements ClientPlugin {
      */
     public static final class Builder {
         private final List<Function<MatcherRequest, MockedResult>> matchers = new ArrayList<>();
+        private boolean trackRequests = true;
 
         private Builder() {}
 
@@ -118,6 +121,20 @@ public final class MockPlugin implements ClientPlugin {
          */
         public MockPlugin build() {
             return new MockPlugin(this);
+        }
+
+        /**
+         * Set whether to track requests for later retrieval via {@link MockPlugin#getRequests()}.
+         *
+         * <p>Defaults to {@code true}. Set to {@code false} to avoid accumulating requests in
+         * memory, which is useful for benchmarks or long-running tests.
+         *
+         * @param trackRequests whether to track requests.
+         * @return the builder.
+         */
+        public Builder trackRequests(boolean trackRequests) {
+            this.trackRequests = trackRequests;
+            return this;
         }
 
         /**
@@ -224,7 +241,9 @@ public final class MockPlugin implements ClientPlugin {
 
             // Track the request here rather than when the request is created because this method is called
             // more often than the request creation method when retries happen.
-            requests.add(currentRequest.request());
+            if (trackRequests) {
+                requests.add(currentRequest.request());
+            }
 
             MockedResult result = null;
             var matcherRequest = new MatcherRequest(

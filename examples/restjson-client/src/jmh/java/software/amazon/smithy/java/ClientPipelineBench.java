@@ -54,11 +54,14 @@ public class ClientPipelineBench {
                 .body(DataStream.ofBytes(RESPONSE_BODY, "application/json"))
                 .build();
 
+        var mockPlugin = MockPlugin.builder()
+                        .trackRequests(false)
+                        .addMatcher(req -> new MockedResult.Response(mockResponse))
+                        .build();
+
         client = PersonDirectoryClient.builder()
                 .endpointResolver(EndpointResolver.staticEndpoint("https://example.com/v1"))
-                .addPlugin(MockPlugin.builder()
-                        .addMatcher(req -> new MockedResult.Response(mockResponse))
-                        .build())
+                .addPlugin(mockPlugin)
                 .build();
 
         input = PutPersonInput.builder()
