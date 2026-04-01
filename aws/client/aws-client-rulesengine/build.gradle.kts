@@ -21,7 +21,7 @@ dependencies {
     testImplementation(project(":aws:client:aws-client-restjson"))
     testImplementation(project(":client:dynamic-client"))
 
-    s3Model("software.amazon.api.models:s3:1.0.14")
+    s3Model("software.amazon.api.models:s3:1.0.15")
 }
 
 // Add S3 model to test and JMH classpaths

@@ -25,7 +25,7 @@ val jclTestConfiguration: Configuration by configurations.creating {
 }
 
 // These are declared here instead of the version catalog because we don't want other modules to depend on them.
-val log4j2 = "2.25.3"
+val log4j2 = "2.25.4"
 val slf4j = "2.0.17"
 val logBack = "1.5.32"
 val jcl = "1.3.6"
