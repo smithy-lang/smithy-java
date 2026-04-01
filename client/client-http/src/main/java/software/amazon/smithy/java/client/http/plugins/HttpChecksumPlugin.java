@@ -14,6 +14,7 @@ import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.http.api.HeaderNames;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.model.traits.HttpChecksumRequiredTrait;
@@ -55,7 +56,7 @@ public final class HttpChecksumPlugin implements AutoClientPlugin {
                     byte[] hash = MessageDigest.getInstance("MD5").digest(bytes);
                     String base64Hash = Base64.getEncoder().encodeToString(hash);
                     var modifiable = request.toModifiable();
-                    modifiable.headers().setHeader("content-md5", base64Hash);
+                    modifiable.headers().setHeader(HeaderNames.CONTENT_MD5, base64Hash);
                     return modifiable;
                 } catch (NoSuchAlgorithmException e) {
                     throw new IllegalStateException("Unable to fetch message digest instance for MD5", e);

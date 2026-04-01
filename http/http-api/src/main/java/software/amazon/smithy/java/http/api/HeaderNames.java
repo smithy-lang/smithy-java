@@ -41,6 +41,7 @@ public final class HeaderNames {
     public static final String CONTENT_LANGUAGE = "content-language";
     public static final String CONTENT_LENGTH = "content-length";
     public static final String CONTENT_LOCATION = "content-location";
+    public static final String CONTENT_MD5 = "content-md5";
     public static final String CONTENT_RANGE = "content-range";
     public static final String CONTENT_TYPE = "content-type";
     public static final String COOKIE = "cookie";
@@ -60,6 +61,7 @@ public final class HeaderNames {
     public static final String LINK = "link";
     public static final String LOCATION = "location";
     public static final String MAX_FORWARDS = "max-forwards";
+    public static final String ORIGIN = "origin";
     public static final String PROXY_AUTHENTICATE = "proxy-authenticate";
     public static final String PROXY_AUTHORIZATION = "proxy-authorization";
     public static final String PROXY_CONNECTION = "proxy-connection";
@@ -69,6 +71,7 @@ public final class HeaderNames {
     public static final String RETRY_AFTER = "retry-after";
     public static final String SERVER = "server";
     public static final String SET_COOKIE = "set-cookie";
+    public static final String SMITHY_PROTOCOL = "smithy-protocol";
     public static final String STRICT_TRANSPORT_SECURITY = "strict-transport-security";
     public static final String TRAILER = "trailer";
     public static final String TRANSFER_ENCODING = "transfer-encoding";
@@ -82,16 +85,19 @@ public final class HeaderNames {
     public static final String AMZ_SDK_REQUEST = "amz-sdk-request";
     public static final String X_AMZN_REQUESTID = "x-amzn-requestid";
     public static final String X_AMZN_TRACE_ID = "x-amzn-trace-id";
+    public static final String X_AMZ_DATE = "x-amz-date";
     public static final String X_AMZ_REQUEST_ID = "x-amz-request-id";
+    public static final String X_AMZ_SECURITY_TOKEN = "x-amz-security-token";
+    public static final String X_AMZ_TARGET = "x-amz-target";
 
     // Direct-indexed by header name length. GROUPS[len] is the candidate array for that length, or null.
     private static final String[][] GROUPS = new String[28][];
 
     static {
         GROUPS[3] = new String[] {AGE, VIA};
-        GROUPS[4] = new String[] {DATE, ETAG, FROM, HOST, LINK, VARY};
-        GROUPS[5] = new String[] {ALLOW, RANGE, PSEUDO_PATH};
-        GROUPS[6] = new String[] {ACCEPT, COOKIE, EXPECT, SERVER};
+        GROUPS[4] = new String[] {DATE, HOST, ETAG, FROM, LINK, VARY};
+        GROUPS[5] = new String[] {RANGE, ALLOW, PSEUDO_PATH};
+        GROUPS[6] = new String[] {ACCEPT, EXPECT, ORIGIN, SERVER, COOKIE};
         GROUPS[7] = new String[] {
                 EXPIRES,
                 REFERER,
@@ -103,9 +109,9 @@ public final class HeaderNames {
                 PSEUDO_STATUS
         };
         GROUPS[8] = new String[] {IF_MATCH, IF_RANGE, LOCATION};
-        GROUPS[10] = new String[] {CONNECTION, KEEP_ALIVE, SET_COOKIE, USER_AGENT, PSEUDO_AUTHORITY};
-        GROUPS[11] = new String[] {RETRY_AFTER};
-        GROUPS[12] = new String[] {CONTENT_TYPE, MAX_FORWARDS};
+        GROUPS[10] = new String[] {CONNECTION, USER_AGENT, KEEP_ALIVE, X_AMZ_DATE, PSEUDO_AUTHORITY, SET_COOKIE};
+        GROUPS[11] = new String[] {RETRY_AFTER, CONTENT_MD5};
+        GROUPS[12] = new String[] {CONTENT_TYPE, X_AMZ_TARGET, MAX_FORWARDS};
         GROUPS[13] = new String[] {
                 ACCEPT_RANGES,
                 AUTHORIZATION,
@@ -115,19 +121,20 @@ public final class HeaderNames {
                 LAST_MODIFIED
         };
         GROUPS[14] = new String[] {CONTENT_LENGTH, ACCEPT_CHARSET};
-        GROUPS[15] = new String[] {ACCEPT_ENCODING, ACCEPT_LANGUAGE, AMZ_SDK_REQUEST, X_AMZN_TRACE_ID};
+        GROUPS[15] = new String[] {SMITHY_PROTOCOL, ACCEPT_ENCODING, ACCEPT_LANGUAGE, AMZ_SDK_REQUEST, X_AMZN_TRACE_ID};
         GROUPS[16] = new String[] {
+                X_AMZN_REQUESTID,
+                X_AMZ_REQUEST_ID,
                 CONTENT_ENCODING,
                 CONTENT_LANGUAGE,
                 CONTENT_LOCATION,
                 PROXY_CONNECTION,
-                WWW_AUTHENTICATE,
-                X_AMZN_REQUESTID,
-                X_AMZ_REQUEST_ID
+                WWW_AUTHENTICATE
         };
-        GROUPS[17] = new String[] {IF_MODIFIED_SINCE, TRANSFER_ENCODING};
+        GROUPS[17] = new String[] {TRANSFER_ENCODING, IF_MODIFIED_SINCE};
         GROUPS[18] = new String[] {PROXY_AUTHENTICATE};
-        GROUPS[19] = new String[] {CONTENT_DISPOSITION, IF_UNMODIFIED_SINCE, PROXY_AUTHORIZATION};
+        GROUPS[19] = new String[] {PROXY_AUTHORIZATION, CONTENT_DISPOSITION, IF_UNMODIFIED_SINCE};
+        GROUPS[20] = new String[] {X_AMZ_SECURITY_TOKEN};
         GROUPS[25] = new String[] {STRICT_TRANSPORT_SECURITY};
         GROUPS[27] = new String[] {ACCESS_CONTROL_ALLOW_ORIGIN};
     }
@@ -236,6 +243,7 @@ public final class HeaderNames {
             case 17 -> matchBucket17(name);
             case 18 -> matchBucket18(name);
             case 19 -> matchBucket19(name);
+            case 20 -> matchBucket20(name);
             case 25 -> matchBucket25(name);
             case 27 -> matchBucket27(name);
             default -> HeaderUtils.normalizeName(name);
@@ -330,6 +338,11 @@ public final class HeaderNames {
             case 'e': // [e]xpect
                 if (name.regionMatches(true, 0, EXPECT, 0, 6)) {
                     return EXPECT;
+                }
+                break;
+            case 'o': // [o]rigin
+                if (name.regionMatches(true, 0, ORIGIN, 0, 6)) {
+                    return ORIGIN;
                 }
                 break;
             case 's': // [s]erver
@@ -439,17 +452,33 @@ public final class HeaderNames {
                     return USER_AGENT;
                 }
                 break;
+            case 'x': // [x]-amz-date
+                if (name.regionMatches(true, 0, X_AMZ_DATE, 0, 10)) {
+                    return X_AMZ_DATE;
+                }
+                break;
         }
         return HeaderUtils.normalizeName(name);
     }
 
+    // Discriminator: charAt(0)
     private static String matchBucket11(String name) {
-        if (name.regionMatches(true, 0, RETRY_AFTER, 0, 11)) {
-            return RETRY_AFTER;
+        switch (name.charAt(0) | 0x20) {
+            case 'c': // [c]ontent-md5
+                if (name.regionMatches(true, 0, CONTENT_MD5, 0, 11)) {
+                    return CONTENT_MD5;
+                }
+                break;
+            case 'r': // [r]etry-after
+                if (name.regionMatches(true, 0, RETRY_AFTER, 0, 11)) {
+                    return RETRY_AFTER;
+                }
+                break;
         }
         return HeaderUtils.normalizeName(name);
     }
 
+    // Discriminator: charAt(0)
     private static String matchBucket12(String name) {
         switch (name.charAt(0) | 0x20) {
             case 'c': // [c]ontent-type
@@ -460,6 +489,11 @@ public final class HeaderNames {
             case 'm': // [m]ax-forwards
                 if (name.regionMatches(true, 0, MAX_FORWARDS, 0, 12)) {
                     return MAX_FORWARDS;
+                }
+                break;
+            case 'x': // [x]-amz-target
+                if (name.regionMatches(true, 0, X_AMZ_TARGET, 0, 12)) {
+                    return X_AMZ_TARGET;
                 }
                 break;
         }
@@ -528,6 +562,11 @@ public final class HeaderNames {
             case 'l': // accept-[l]anguage
                 if (name.regionMatches(true, 0, ACCEPT_LANGUAGE, 0, 15)) {
                     return ACCEPT_LANGUAGE;
+                }
+                break;
+            case 'p': // smithy-[p]rotocol
+                if (name.regionMatches(true, 0, SMITHY_PROTOCOL, 0, 15)) {
+                    return SMITHY_PROTOCOL;
                 }
                 break;
             case 'r': // amz-sdk-[r]equest
@@ -625,6 +664,13 @@ public final class HeaderNames {
                     return PROXY_AUTHORIZATION;
                 }
                 break;
+        }
+        return HeaderUtils.normalizeName(name);
+    }
+
+    private static String matchBucket20(String name) {
+        if (name.regionMatches(true, 0, X_AMZ_SECURITY_TOKEN, 0, 20)) {
+            return X_AMZ_SECURITY_TOKEN;
         }
         return HeaderUtils.normalizeName(name);
     }

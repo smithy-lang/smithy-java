@@ -30,6 +30,7 @@ import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
+import software.amazon.smithy.java.http.api.HeaderNames;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -138,19 +139,24 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
     }
 
     private Map<String, List<String>> headers() {
-        return Map.of("smithy-protocol", SMITHY_PROTOCOL, "Content-Type", CONTENT_TYPE, "Accept", CONTENT_TYPE);
+        return Map.of(HeaderNames.SMITHY_PROTOCOL,
+                SMITHY_PROTOCOL,
+                HeaderNames.CONTENT_TYPE,
+                CONTENT_TYPE,
+                HeaderNames.ACCEPT,
+                CONTENT_TYPE);
     }
 
     private Map<String, List<String>> headersForEmptyBody() {
-        return Map.of("smithy-protocol", SMITHY_PROTOCOL, "Accept", CONTENT_TYPE);
+        return Map.of(HeaderNames.SMITHY_PROTOCOL, SMITHY_PROTOCOL, HeaderNames.ACCEPT, CONTENT_TYPE);
     }
 
     private Map<String, List<String>> headersForEventStreaming() {
-        return Map.of("smithy-protocol",
+        return Map.of(HeaderNames.SMITHY_PROTOCOL,
                 SMITHY_PROTOCOL,
-                "Content-Type",
+                HeaderNames.CONTENT_TYPE,
                 List.of("application/vnd.amazon.eventstream"),
-                "Accept",
+                HeaderNames.ACCEPT,
                 CONTENT_TYPE);
     }
 

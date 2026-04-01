@@ -15,6 +15,7 @@ import software.amazon.smithy.java.client.http.HttpContext;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.http.api.HeaderNames;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.ByteBufferUtils;
@@ -111,14 +112,14 @@ public final class HttpMcpProxy extends McpServerProxy {
             var requestBuilder = HttpRequest.create()
                     .setUri(endpoint)
                     .setMethod("POST")
-                    .addHeader("Content-Type", "application/json")
-                    .addHeader("Accept", "application/json, text/event-stream")
-                    .addHeader("MCP-Protocol-Version", protocolVersionHeader);
+                    .addHeader(HeaderNames.CONTENT_TYPE, "application/json")
+                    .addHeader(HeaderNames.ACCEPT, "application/json, text/event-stream")
+                    .addHeader("mcp-protocol-version", protocolVersionHeader);
 
             // Include session ID if we have one
             String currentSessionId = sessionId;
             if (currentSessionId != null) {
-                requestBuilder.addHeader("Mcp-Session-Id", currentSessionId);
+                requestBuilder.addHeader("mcp-session-id", currentSessionId);
                 LOG.debug("Including session ID in request: method={}, sessionId={}",
                         request.getMethod(),
                         currentSessionId);

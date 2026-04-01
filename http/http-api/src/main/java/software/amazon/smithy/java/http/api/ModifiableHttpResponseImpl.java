@@ -77,10 +77,10 @@ final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
     static void addBodyHeaders(DataStream body, ModifiableHttpHeaders headers) {
         var ct = body.contentType();
         if (ct != null) {
-            headers.setHeaderIfAbsent("content-type", ct);
+            headers.setHeaderIfAbsent(HeaderNames.CONTENT_TYPE, ct);
         }
         if (body.hasKnownLength()) {
-            headers.setHeaderIfAbsent("content-length", String.valueOf(body.contentLength()));
+            headers.setHeaderIfAbsent(HeaderNames.CONTENT_LENGTH, String.valueOf(body.contentLength()));
         }
     }
 

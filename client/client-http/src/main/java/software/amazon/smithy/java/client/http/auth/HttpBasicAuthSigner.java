@@ -11,13 +11,13 @@ import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.LoginIdentity;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.http.api.HeaderNames;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 final class HttpBasicAuthSigner implements Signer<HttpRequest, LoginIdentity> {
     static final HttpBasicAuthSigner INSTANCE = new HttpBasicAuthSigner();
     private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpBasicAuthSigner.class);
-    private static final String AUTHORIZATION_HEADER = "authorization";
     private static final String SCHEME = "Basic";
 
     private HttpBasicAuthSigner() {}
@@ -27,9 +27,9 @@ final class HttpBasicAuthSigner implements Signer<HttpRequest, LoginIdentity> {
         var identityString = identity.username() + ":" + identity.password();
         var base64Value = Base64.getEncoder().encodeToString(identityString.getBytes(StandardCharsets.UTF_8));
         var mod = request.toModifiable();
-        if (mod.headers().hasHeader(AUTHORIZATION_HEADER)) {
+        if (mod.headers().hasHeader(HeaderNames.AUTHORIZATION)) {
             LOGGER.debug("Replaced existing Authorization header value.");
         }
-        return new SignResult<>(mod.setHeader(AUTHORIZATION_HEADER, SCHEME + " " + base64Value));
+        return new SignResult<>(mod.setHeader(HeaderNames.AUTHORIZATION, SCHEME + " " + base64Value));
     }
 }
