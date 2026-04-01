@@ -48,11 +48,11 @@ public class ClientPipelineBench {
 
     @Setup
     public void setup() {
-        var mockResponse = HttpResponse.builder()
-                .statusCode(200)
-                .headers(HttpHeaders.of(Map.of("content-type", List.of("application/json"))))
-                .body(DataStream.ofBytes(RESPONSE_BODY, "application/json"))
-                .build();
+        var mockResponse = HttpResponse.create()
+                .setStatusCode(200)
+                .setHeaders(HttpHeaders.of(Map.of("content-type", List.of("application/json"))))
+                .setBody(DataStream.ofBytes(RESPONSE_BODY, "application/json"))
+                .toUnmodifiable();
 
         var mockPlugin = MockPlugin.builder()
                         .trackRequests(false)

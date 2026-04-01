@@ -9,34 +9,34 @@ import static software.amazon.smithy.java.core.schema.TraitKey.CORS_TRAIT;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
+import software.amazon.smithy.java.http.api.HeaderName;
 
 public final class CorsHeaders {
 
-    private CorsHeaders() {}
+    private static final HeaderName ACCESS_CONTROL_ALLOW_METHODS = HeaderName.of("access-control-allow-methods");
+    private static final HeaderName ACCESS_CONTROL_ALLOW_HEADERS = HeaderName.of("access-control-allow-headers");
+    private static final HeaderName ACCESS_CONTROL_MAX_AGE = HeaderName.of("access-control-max-age");
 
-    private static final Map<String, List<String>> BASE_CORS_HEADERS = Map.of(
-            "Access-Control-Allow-Methods",
-            List.of("GET, POST, PUT, DELETE, OPTIONS"),
-            "Access-Control-Allow-Headers",
-            List.of("*,Access-Control-Allow-Headers,Access-Control-Allow-Methods,Access-Control-Allow-Origin,Amz-Sdk-Invocation-Id,Amz-Sdk-Request,Authorization,Content-Length,Content-Type,X-Amz-User-Agent,X-Amzn-Trace-Id"),
-            "Access-Control-Max-Age",
-            List.of("600"));
+    private CorsHeaders() {}
 
     public static void addCorsHeaders(HttpJob job) {
         if (!shouldAddCorsHeaders(job)) {
             return;
         }
 
-        String requestOrigin = job.request().headers().firstValue("origin");
+        String requestOrigin = job.request().headers().firstValue(HeaderName.ORIGIN);
         String configuredOrigin = getConfiguredOrigin(job);
 
         if (!isOriginAllowed(configuredOrigin, requestOrigin)) {
             return;
         }
 
-        job.response().headers().addHeaders(BASE_CORS_HEADERS);
-        job.response().headers().addHeader("Access-Control-Allow-Origin", List.of(requestOrigin));
+        var headers = job.response().headers();
+        headers.addHeader(ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, PUT, DELETE, OPTIONS");
+        headers.addHeader(ACCESS_CONTROL_ALLOW_HEADERS,
+                "*,Access-Control-Allow-Headers,Access-Control-Allow-Methods,Access-Control-Allow-Origin,Amz-Sdk-Invocation-Id,Amz-Sdk-Request,Authorization,Content-Length,Content-Type,X-Amz-User-Agent,X-Amzn-Trace-Id");
+        headers.addHeader(ACCESS_CONTROL_MAX_AGE, "600");
+        headers.addHeader(HeaderName.ACCESS_CONTROL_ALLOW_ORIGIN, List.of(requestOrigin));
     }
 
     private static boolean shouldAddCorsHeaders(HttpJob job) {
@@ -46,7 +46,7 @@ public final class CorsHeaders {
                 !job.operation().getApiOperation().service().schema().hasTrait(CORS_TRAIT)) {
             return false;
         }
-        return job.request().headers().hasHeader("origin");
+        return job.request().headers().hasHeader(HeaderName.ORIGIN);
     }
 
     private static String getConfiguredOrigin(HttpJob job) {

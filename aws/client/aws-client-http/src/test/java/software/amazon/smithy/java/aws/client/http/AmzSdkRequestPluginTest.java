@@ -74,15 +74,15 @@ public class AmzSdkRequestPluginTest {
                 .build();
 
         mockQueue.enqueue(
-                HttpResponse.builder()
-                        .statusCode(429)
-                        .body(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
-                        .build());
+                HttpResponse.create()
+                        .setStatusCode(429)
+                        .setBody(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
+                        .toUnmodifiable());
         mockQueue.enqueue(
-                HttpResponse.builder()
-                        .statusCode(200)
-                        .body(DataStream.ofString("{\"id\":\"1\"}"))
-                        .build());
+                HttpResponse.create()
+                        .setStatusCode(200)
+                        .setBody(DataStream.ofString("{\"id\":\"1\"}"))
+                        .toUnmodifiable());
 
         client.call("CreateSprocket");
 

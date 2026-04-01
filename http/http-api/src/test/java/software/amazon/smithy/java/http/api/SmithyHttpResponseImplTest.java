@@ -20,12 +20,12 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 public class SmithyHttpResponseImplTest {
     @Test
     public void addHeaders() {
-        var response = HttpResponse.builder()
-                .statusCode(200)
-                .withAddedHeader("foo", "bar   ")
-                .withAddedHeader("Baz", "bam")
-                .withAddedHeader("FOO", "bar2")
-                .build();
+        var response = HttpResponse.create()
+                .setStatusCode(200)
+                .addHeader("foo", "bar   ")
+                .addHeader("Baz", "bam")
+                .addHeader("FOO", "bar2")
+                .toUnmodifiable();
 
         assertThat(response.headers().allValues("foo"), contains("bar", "bar2"));
         assertThat(response.headers().allValues("baz"), contains("bam"));
@@ -34,13 +34,13 @@ public class SmithyHttpResponseImplTest {
 
     @Test
     public void addHeadersToExistingHeaders() {
-        var response = HttpResponse.builder()
-                .statusCode(200)
-                .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-                .withAddedHeader("foo", "bar   ")
-                .withAddedHeader("Baz", "bam")
-                .withAddedHeader("FOO", "bar2")
-                .build();
+        var response = HttpResponse.create()
+                .setStatusCode(200)
+                .setHeaders(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
+                .addHeader("foo", "bar   ")
+                .addHeader("Baz", "bam")
+                .addHeader("FOO", "bar2")
+                .toUnmodifiable();
 
         assertThat(response.headers().allValues("foo"), contains("bar0", "bar", "bar2"));
         assertThat(response.headers().allValues("baz"), contains("bam"));
@@ -50,58 +50,58 @@ public class SmithyHttpResponseImplTest {
 
     @Test
     public void replacesHeaders() {
-        var response = HttpResponse.builder()
-                .statusCode(200)
-                .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-                .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
-                .build();
+        var response = HttpResponse.create()
+                .setStatusCode(200)
+                .setHeaders(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))));
+        response.headers().placeHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")));
+        var result = response.toUnmodifiable();
 
-        assertThat(response.headers().allValues("foo"), contains("bar"));
-        assertThat(response.headers().allValues("baz"), contains("bam"));
-        assertThat(response.headers().allValues("bam"), contains("A"));
-        assertThat(response.headers().map().keySet(), containsInAnyOrder("foo", "baz", "bam"));
+        assertThat(result.headers().allValues("foo"), contains("bar"));
+        assertThat(result.headers().allValues("baz"), contains("bam"));
+        assertThat(result.headers().allValues("bam"), contains("A"));
+        assertThat(result.headers().map().keySet(), containsInAnyOrder("foo", "baz", "bam"));
     }
 
     @Test
     public void replacesHeadersOnExisting() {
-        var response = HttpResponse.builder()
-                .statusCode(200)
-                .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-                .withAddedHeader("a", "b")
-                .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
-                .build();
+        var response = HttpResponse.create()
+                .setStatusCode(200)
+                .setHeaders(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
+                .addHeader("a", "b");
+        response.headers().placeHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")));
+        var result = response.toUnmodifiable();
 
-        assertThat(response.headers().allValues("foo"), contains("bar"));
-        assertThat(response.headers().allValues("baz"), contains("bam"));
-        assertThat(response.headers().allValues("bam"), contains("A"));
-        assertThat(response.headers().allValues("a"), contains("b"));
-        assertThat(response.headers().map().keySet(), containsInAnyOrder("foo", "baz", "bam", "a"));
+        assertThat(result.headers().allValues("foo"), contains("bar"));
+        assertThat(result.headers().allValues("baz"), contains("bam"));
+        assertThat(result.headers().allValues("bam"), contains("A"));
+        assertThat(result.headers().allValues("a"), contains("b"));
+        assertThat(result.headers().map().keySet(), containsInAnyOrder("foo", "baz", "bam", "a"));
     }
 
     @Test
     public void addsHeadersToReplacements() {
-        var response = HttpResponse.builder()
-                .statusCode(200)
-                .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-                .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
-                .withAddedHeader("a", "b")
-                .withAddedHeader("foo", "bar2")
-                .build();
+        var response = HttpResponse.create()
+                .setStatusCode(200)
+                .setHeaders(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))));
+        response.headers().placeHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")));
+        var result = response.addHeader("a", "b")
+                .addHeader("foo", "bar2")
+                .toUnmodifiable();
 
-        assertThat(response.headers().allValues("foo"), contains("bar", "bar2"));
-        assertThat(response.headers().allValues("baz"), contains("bam"));
-        assertThat(response.headers().allValues("bam"), contains("A"));
-        assertThat(response.headers().allValues("a"), contains("b"));
-        assertThat(response.headers().map().keySet(), containsInAnyOrder("foo", "baz", "bam", "a"));
+        assertThat(result.headers().allValues("foo"), contains("bar", "bar2"));
+        assertThat(result.headers().allValues("baz"), contains("bam"));
+        assertThat(result.headers().allValues("bam"), contains("A"));
+        assertThat(result.headers().allValues("a"), contains("b"));
+        assertThat(result.headers().map().keySet(), containsInAnyOrder("foo", "baz", "bam", "a"));
     }
 
     @Test
     public void bodyAutoAddsContentTypeAndLength() {
         var body = DataStream.ofString("hello", "text/plain");
-        var response = HttpResponse.builder()
-                .statusCode(200)
-                .body(body)
-                .build();
+        var response = HttpResponse.create()
+                .setStatusCode(200)
+                .setBody(body)
+                .toUnmodifiable();
 
         assertEquals("5", response.headers().firstValue("content-length"));
         assertEquals("text/plain", response.headers().firstValue("content-type"));
@@ -110,11 +110,11 @@ public class SmithyHttpResponseImplTest {
     @Test
     public void bodyHeadersCanBeOverridden() {
         var body = DataStream.ofString("hello");
-        var response = HttpResponse.builder()
-                .statusCode(200)
-                .body(body)
-                .withReplacedHeaders(Map.of("content-type", List.of("application/json")))
-                .build();
+        var response = HttpResponse.create()
+                .setStatusCode(200)
+                .setBody(body)
+                .setHeader("content-type", "application/json")
+                .toUnmodifiable();
 
         assertEquals("5", response.headers().firstValue("content-length"));
         assertEquals("application/json", response.headers().firstValue("content-type"));
@@ -122,19 +122,19 @@ public class SmithyHttpResponseImplTest {
 
     @Test
     public void toUnmodifiableReturnsImmutable() {
-        var response = HttpResponse.builder()
-                .statusCode(200)
-                .build();
+        var response = HttpResponse.create()
+                .setStatusCode(200)
+                .toUnmodifiable();
 
         assertSame(response, response.toUnmodifiable());
     }
 
     @Test
     public void toModifiableReturnsCopy() {
-        var response = HttpResponse.builder()
-                .statusCode(200)
-                .withAddedHeader("foo", "bar")
-                .build();
+        var response = HttpResponse.create()
+                .setStatusCode(200)
+                .addHeader("foo", "bar")
+                .toUnmodifiable();
 
         var modifiable = response.toModifiable();
         modifiable.headers().addHeader("foo", "baz");
@@ -145,10 +145,10 @@ public class SmithyHttpResponseImplTest {
 
     @Test
     public void modifiableCopyIsIndependent() {
-        var modifiable = HttpResponse.builder()
-                .statusCode(200)
-                .withAddedHeader("foo", "bar")
-                .buildModifiable();
+        var modifiable = HttpResponse.create()
+                .setStatusCode(200)
+                .addHeader("foo", "bar")
+                .toModifiable();
 
         var copy = modifiable.toModifiableCopy();
         copy.headers().addHeader("foo", "baz");

@@ -21,13 +21,13 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 public class SmithyHttpRequestImplTest {
     @Test
     public void addHeaders() throws Exception {
-        var request = HttpRequest.builder()
-                .method("GET")
-                .uri(new URI("https://localhost"))
-                .withAddedHeader("foo", "bar   ")
-                .withAddedHeader("Baz", "bam")
-                .withAddedHeader("FOO", "bar2")
-                .build();
+        var request = HttpRequest.create()
+                .setMethod("GET")
+                .setUri(new URI("https://localhost"))
+                .addHeader("foo", "bar   ")
+                .addHeader("Baz", "bam")
+                .addHeader("FOO", "bar2")
+                .toUnmodifiable();
 
         assertThat(request.headers().allValues("foo"), contains("bar", "bar2"));
         assertThat(request.headers().allValues("baz"), contains("bam"));
@@ -36,14 +36,14 @@ public class SmithyHttpRequestImplTest {
 
     @Test
     public void addHeadersToExistingHeaders() throws Exception {
-        var request = HttpRequest.builder()
-                .method("GET")
-                .uri(new URI("https://localhost"))
-                .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-                .withAddedHeader("foo", "bar   ")
-                .withAddedHeader("Baz", "bam")
-                .withAddedHeader("FOO", "bar2")
-                .build();
+        var request = HttpRequest.create()
+                .setMethod("GET")
+                .setUri(new URI("https://localhost"))
+                .setHeaders(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
+                .addHeader("foo", "bar   ")
+                .addHeader("Baz", "bam")
+                .addHeader("FOO", "bar2")
+                .toUnmodifiable();
 
         assertThat(request.headers().allValues("foo"), contains("bar0", "bar", "bar2"));
         assertThat(request.headers().allValues("baz"), contains("bam"));
@@ -53,62 +53,62 @@ public class SmithyHttpRequestImplTest {
 
     @Test
     public void replacesHeaders() throws Exception {
-        var request = HttpRequest.builder()
-                .method("GET")
-                .uri(new URI("https://localhost"))
-                .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-                .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
-                .build();
+        var request = HttpRequest.create()
+                .setMethod("GET")
+                .setUri(new URI("https://localhost"))
+                .setHeaders(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))));
+        request.headers().placeHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")));
+        var result = request.toUnmodifiable();
 
-        assertThat(request.headers().allValues("foo"), contains("bar"));
-        assertThat(request.headers().allValues("baz"), contains("bam"));
-        assertThat(request.headers().allValues("bam"), contains("A"));
-        assertThat(request.headers().map().keySet(), containsInAnyOrder("foo", "baz", "bam"));
+        assertThat(result.headers().allValues("foo"), contains("bar"));
+        assertThat(result.headers().allValues("baz"), contains("bam"));
+        assertThat(result.headers().allValues("bam"), contains("A"));
+        assertThat(result.headers().map().keySet(), containsInAnyOrder("foo", "baz", "bam"));
     }
 
     @Test
     public void replacesHeadersOnExisting() throws Exception {
-        var request = HttpRequest.builder()
-                .method("GET")
-                .uri(new URI("https://localhost"))
-                .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-                .withAddedHeader("a", "b")
-                .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
-                .build();
+        var request = HttpRequest.create()
+                .setMethod("GET")
+                .setUri(new URI("https://localhost"))
+                .setHeaders(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
+                .addHeader("a", "b");
+        request.headers().placeHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")));
+        var result = request.toUnmodifiable();
 
-        assertThat(request.headers().allValues("foo"), contains("bar"));
-        assertThat(request.headers().allValues("baz"), contains("bam"));
-        assertThat(request.headers().allValues("bam"), contains("A"));
-        assertThat(request.headers().allValues("a"), contains("b"));
-        assertThat(request.headers().map().keySet(), containsInAnyOrder("foo", "baz", "bam", "a"));
+        assertThat(result.headers().allValues("foo"), contains("bar"));
+        assertThat(result.headers().allValues("baz"), contains("bam"));
+        assertThat(result.headers().allValues("bam"), contains("A"));
+        assertThat(result.headers().allValues("a"), contains("b"));
+        assertThat(result.headers().map().keySet(), containsInAnyOrder("foo", "baz", "bam", "a"));
     }
 
     @Test
     public void addsHeadersToReplacements() throws Exception {
-        var request = HttpRequest.builder()
-                .method("GET")
-                .uri(new URI("https://localhost"))
-                .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-                .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
-                .withAddedHeader("a", "b")
-                .withAddedHeader("foo", "bar2")
-                .build();
+        var request = HttpRequest.create()
+                .setMethod("GET")
+                .setUri(new URI("https://localhost"))
+                .setHeaders(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))));
+        request.headers().placeHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")));
+        var result = request.addHeader("a", "b")
+                .addHeader("foo", "bar2")
+                .toUnmodifiable();
 
-        assertThat(request.headers().allValues("foo"), contains("bar", "bar2"));
-        assertThat(request.headers().allValues("baz"), contains("bam"));
-        assertThat(request.headers().allValues("bam"), contains("A"));
-        assertThat(request.headers().allValues("a"), contains("b"));
-        assertThat(request.headers().map().keySet(), containsInAnyOrder("foo", "baz", "bam", "a"));
+        assertThat(result.headers().allValues("foo"), contains("bar", "bar2"));
+        assertThat(result.headers().allValues("baz"), contains("bam"));
+        assertThat(result.headers().allValues("bam"), contains("A"));
+        assertThat(result.headers().allValues("a"), contains("b"));
+        assertThat(result.headers().map().keySet(), containsInAnyOrder("foo", "baz", "bam", "a"));
     }
 
     @Test
     public void bodyAutoAddsContentTypeAndLength() throws Exception {
         var body = DataStream.ofString("hello", "text/plain");
-        var request = HttpRequest.builder()
-                .method("POST")
-                .uri(new URI("https://localhost"))
-                .body(body)
-                .build();
+        var request = HttpRequest.create()
+                .setMethod("POST")
+                .setUri(new URI("https://localhost"))
+                .setBody(body)
+                .toUnmodifiable();
 
         assertEquals("5", request.headers().firstValue("content-length"));
         assertEquals("text/plain", request.headers().firstValue("content-type"));
@@ -117,12 +117,12 @@ public class SmithyHttpRequestImplTest {
     @Test
     public void bodyHeadersCanBeOverridden() throws Exception {
         var body = DataStream.ofString("hello");
-        var request = HttpRequest.builder()
-                .method("POST")
-                .uri(new URI("https://localhost"))
-                .body(body)
-                .withReplacedHeaders(Map.of("content-type", List.of("application/json")))
-                .build();
+        var request = HttpRequest.create()
+                .setMethod("POST")
+                .setUri(new URI("https://localhost"))
+                .setBody(body)
+                .setHeader("content-type", "application/json")
+                .toUnmodifiable();
 
         assertEquals("5", request.headers().firstValue("content-length"));
         assertEquals("application/json", request.headers().firstValue("content-type"));
@@ -130,21 +130,21 @@ public class SmithyHttpRequestImplTest {
 
     @Test
     public void toUnmodifiableReturnsImmutable() throws Exception {
-        var request = HttpRequest.builder()
-                .method("GET")
-                .uri(new URI("https://localhost"))
-                .build();
+        var request = HttpRequest.create()
+                .setMethod("GET")
+                .setUri(new URI("https://localhost"))
+                .toUnmodifiable();
 
         assertSame(request, request.toUnmodifiable());
     }
 
     @Test
     public void toModifiableReturnsCopy() throws Exception {
-        var request = HttpRequest.builder()
-                .method("GET")
-                .uri(new URI("https://localhost"))
-                .withAddedHeader("foo", "bar")
-                .build();
+        var request = HttpRequest.create()
+                .setMethod("GET")
+                .setUri(new URI("https://localhost"))
+                .addHeader("foo", "bar")
+                .toUnmodifiable();
 
         var modifiable = request.toModifiable();
         modifiable.headers().addHeader("foo", "baz");
@@ -155,11 +155,11 @@ public class SmithyHttpRequestImplTest {
 
     @Test
     public void modifiableCopyIsIndependent() throws Exception {
-        var modifiable = HttpRequest.builder()
-                .method("GET")
-                .uri(new URI("https://localhost"))
-                .withAddedHeader("foo", "bar")
-                .buildModifiable();
+        var modifiable = HttpRequest.create()
+                .setMethod("GET")
+                .setUri(new URI("https://localhost"))
+                .addHeader("foo", "bar")
+                .toModifiable();
 
         var copy = modifiable.toModifiableCopy();
         copy.headers().addHeader("foo", "baz");

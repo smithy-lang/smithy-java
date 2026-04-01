@@ -15,6 +15,7 @@ import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.client.http.compression.CompressionAlgorithm;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.model.traits.RequestCompressionTrait;
@@ -38,7 +39,6 @@ public final class RequestCompressionPlugin implements AutoClientPlugin {
         private static final int DEFAULT_MIN_COMPRESSION_SIZE_BYTES = 10240;
         // This cap matches ApiGateway's spec: https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-openapi-minimum-compression-size.html
         private static final int MIN_COMPRESSION_SIZE_CAP = 10485760;
-        private static final String CONTENT_ENCODING_HEADER = "Content-Encoding";
         private static final ClientInterceptor INSTANCE = new RequestCompressionInterceptor();
         private static final TraitKey<RequestCompressionTrait> REQUEST_COMPRESSION_TRAIT_KEY =
                 TraitKey.get(RequestCompressionTrait.class);
@@ -56,10 +56,9 @@ public final class RequestCompressionPlugin implements AutoClientPlugin {
                         if (algorithmId.equals(algorithm.algorithmId())) {
                             var compressed = algorithm.compress(req.body());
                             return hook.asRequestType(
-                                    req.toBuilder()
-                                            .body(compressed)
-                                            .withAddedHeader(CONTENT_ENCODING_HEADER, algorithmId)
-                                            .build());
+                                    req.toModifiable()
+                                            .setBody(compressed)
+                                            .addHeader(HeaderName.CONTENT_ENCODING, algorithmId));
                         }
                     }
                 }

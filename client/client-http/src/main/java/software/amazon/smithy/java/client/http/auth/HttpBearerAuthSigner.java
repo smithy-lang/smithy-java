@@ -5,31 +5,27 @@
 
 package software.amazon.smithy.java.client.http.auth;
 
-import java.util.LinkedHashMap;
-import java.util.List;
 import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.TokenIdentity;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 final class HttpBearerAuthSigner implements Signer<HttpRequest, TokenIdentity> {
     static final HttpBearerAuthSigner INSTANCE = new HttpBearerAuthSigner();
     private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpBearerAuthSigner.class);
-    private static final String AUTHORIZATION_HEADER = "authorization";
     private static final String SCHEME = "Bearer";
 
     private HttpBearerAuthSigner() {}
 
     @Override
     public SignResult<HttpRequest> sign(HttpRequest request, TokenIdentity identity, Context properties) {
-        var headers = new LinkedHashMap<>(request.headers().map());
-        var existing = headers.put(AUTHORIZATION_HEADER, List.of(SCHEME + " " + identity.token()));
-        if (existing != null) {
+        var mod = request.toModifiable();
+        if (mod.headers().hasHeader(HeaderName.AUTHORIZATION)) {
             LOGGER.debug("Replaced existing Authorization header value.");
         }
-        return new SignResult<>(request.toBuilder().headers(HttpHeaders.of(headers)).build());
+        return new SignResult<>(mod.setHeader(HeaderName.AUTHORIZATION, SCHEME + " " + identity.token()));
     }
 }

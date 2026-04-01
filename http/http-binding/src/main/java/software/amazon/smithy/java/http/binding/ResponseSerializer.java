@@ -176,8 +176,8 @@ public final class ResponseSerializer {
         shapeValue.serialize(serializer);
         serializer.flush();
 
-        var builder = HttpResponse.builder()
-                .statusCode(serializer.getResponseStatus());
+        var builder = HttpResponse.create()
+                .setStatusCode(serializer.getResponseStatus());
 
         var eventStream = serializer.getEventStream();
         if (eventStream != null && operation.outputEventBuilderSupplier() != null) {
@@ -185,12 +185,12 @@ public final class ResponseSerializer {
                     ProtocolEventStreamWriter.of(eventStream);
             writer.setEventEncoderFactory(eventEncoderFactory);
             writer.activate();
-            builder.body(writer.toDataStream());
+            builder.setBody(writer.toDataStream());
             serializer.setContentType(eventEncoderFactory.contentType());
         } else if (serializer.hasBody()) {
-            builder.body(serializer.getBody());
+            builder.setBody(serializer.getBody());
         }
 
-        return builder.headers(serializer.getHeaders()).build();
+        return builder.setHeaders(serializer.getHeaders()).toUnmodifiable();
     }
 }

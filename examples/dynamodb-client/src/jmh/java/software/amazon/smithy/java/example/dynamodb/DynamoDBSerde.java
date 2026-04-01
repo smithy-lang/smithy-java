@@ -95,7 +95,7 @@ public class DynamoDBSerde {
         public void setup() throws URISyntaxException {
             // This isn't actually used, but needed for the protocol implementation.
             endpoint = new URI("https://dynamodb.us-east-1.amazonaws.com");
-            req = HttpRequest.builder().method("POST").uri(endpoint).build();
+            req = HttpRequest.create().setMethod("POST").setUri(endpoint).toUnmodifiable();
             operation = GetItem.instance();
             protocol = new AwsJson1Protocol(ShapeId.from("com.amazonaws.dynamodb#DynamoDB_20120810"));
         }
@@ -144,10 +144,10 @@ public class DynamoDBSerde {
     }
 
     private HttpResponse fullResponse(byte[] itemBytes) {
-        return HttpResponse.builder()
-                .statusCode(200)
-                .body(DataStream.ofBytes(itemBytes))
-                .build();
+        return HttpResponse.create()
+                .setStatusCode(200)
+                .setBody(DataStream.ofBytes(itemBytes))
+                .toUnmodifiable();
     }
 
     static final class ItemFactory {

@@ -11,28 +11,31 @@ import software.amazon.smithy.java.io.uri.SmithyUri;
 /**
  * A modifiable HTTP request.
  */
-public interface ModifiableHttpRequest extends ModifiableHttpMessage, HttpRequest {
+public interface ModifiableHttpRequest extends ModifiableHttpMessage<ModifiableHttpRequest>, HttpRequest {
     /**
      * Set the request method.
      *
      * @param method Method to set.
+     * @return this request.
      */
-    void setMethod(String method);
+    ModifiableHttpRequest setMethod(String method);
 
     /**
      * Set the request URI.
      *
      * @param uri SmithyUri to set.
+     * @return this request.
      */
-    void setUri(SmithyUri uri);
+    ModifiableHttpRequest setUri(SmithyUri uri);
 
     /**
      * Set the request URI.
      *
      * @param uri URI to set.
+     * @return this request.
      */
-    default void setUri(URI uri) {
-        setUri(SmithyUri.of(uri));
+    default ModifiableHttpRequest setUri(URI uri) {
+        return setUri(SmithyUri.of(uri));
     }
 
     @Override

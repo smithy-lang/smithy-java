@@ -6,8 +6,6 @@
 package software.amazon.smithy.java.client.core.interceptors;
 
 import java.util.List;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -15,28 +13,23 @@ import software.amazon.smithy.java.logging.InternalLogger;
 final class ClientInterceptorChain implements ClientInterceptor {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientInterceptorChain.class);
-    private final List<ClientInterceptor> interceptors;
+    private final ClientInterceptor[] interceptors;
 
     public ClientInterceptorChain(List<ClientInterceptor> interceptors) {
         if (interceptors.isEmpty()) {
             throw new IllegalArgumentException("Interceptors cannot be empty");
         }
-        this.interceptors = interceptors;
+        this.interceptors = interceptors.toArray(ClientInterceptor[]::new);
     }
 
     @Override
     public void readBeforeExecution(InputHook<?, ?> hook) {
-        applyToEachThrowLastError("readBeforeExecution", ClientInterceptor::readBeforeExecution, hook);
-    }
-
-    // Many interceptors require running each hook, logging errors, and throwing the last.
-    private <T> void applyToEachThrowLastError(String hookName, BiConsumer<ClientInterceptor, T> consumer, T hook) {
         RuntimeException error = null;
         for (var interceptor : interceptors) {
             try {
-                consumer.accept(interceptor, hook);
+                interceptor.readBeforeExecution(hook);
             } catch (RuntimeException e) {
-                error = swapError(hookName, error, e);
+                error = swapError("readBeforeExecution", error, e);
             }
         }
 
@@ -79,28 +72,36 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <RequestT> RequestT modifyBeforeRetryLoop(RequestHook<?, ?, RequestT> hook) {
-        return modifyRequestHook(ClientInterceptor::modifyBeforeRetryLoop, hook);
-    }
-
-    private <I extends SerializableStruct, RequestT> RequestT modifyRequestHook(
-            BiFunction<ClientInterceptor, RequestHook<I, ?, RequestT>, RequestT> mapper,
-            RequestHook<I, ?, RequestT> hook
-    ) {
         var request = hook.request();
         for (var interceptor : interceptors) {
-            request = mapper.apply(interceptor, hook.withRequest(request));
+            request = interceptor.modifyBeforeRetryLoop(hook.withRequest(request));
         }
         return request;
     }
 
     @Override
     public void readBeforeAttempt(RequestHook<?, ?, ?> hook) {
-        applyToEachThrowLastError("readBeforeAttempt", ClientInterceptor::readBeforeAttempt, hook);
+        RuntimeException error = null;
+        for (var interceptor : interceptors) {
+            try {
+                interceptor.readBeforeAttempt(hook);
+            } catch (RuntimeException e) {
+                error = swapError("readBeforeAttempt", error, e);
+            }
+        }
+
+        if (error != null) {
+            throw error;
+        }
     }
 
     @Override
     public <RequestT> RequestT modifyBeforeSigning(RequestHook<?, ?, RequestT> hook) {
-        return modifyRequestHook(ClientInterceptor::modifyBeforeSigning, hook);
+        var request = hook.request();
+        for (var interceptor : interceptors) {
+            request = interceptor.modifyBeforeSigning(hook.withRequest(request));
+        }
+        return request;
     }
 
     @Override
@@ -119,7 +120,11 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
-        return modifyRequestHook(ClientInterceptor::modifyBeforeTransmit, hook);
+        var request = hook.request();
+        for (var interceptor : interceptors) {
+            request = interceptor.modifyBeforeTransmit(hook.withRequest(request));
+        }
+        return request;
     }
 
     @Override

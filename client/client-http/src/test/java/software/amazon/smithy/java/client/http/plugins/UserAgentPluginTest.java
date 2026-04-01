@@ -35,7 +35,7 @@ public class UserAgentPluginTest {
     public void addsDefaultAgent() throws Exception {
         UserAgentPlugin.UserAgentInterceptor interceptor = new UserAgentPlugin.UserAgentInterceptor();
         var context = Context.create();
-        var req = HttpRequest.builder().uri(new URI("/")).method("GET").build();
+        var req = HttpRequest.create().setUri(new URI("/")).setMethod("GET").toUnmodifiable();
         var foo = new Foo();
         var updated = interceptor.modifyBeforeSigning(new RequestHook<>(createOperation(), context, foo, req));
 
@@ -51,7 +51,7 @@ public class UserAgentPluginTest {
         UserAgentPlugin.UserAgentInterceptor interceptor = new UserAgentPlugin.UserAgentInterceptor();
         var context = Context.create();
         context.put(ClientContext.APPLICATION_ID, "hello there");
-        var req = HttpRequest.builder().uri(new URI("/")).method("GET").build();
+        var req = HttpRequest.create().setUri(new URI("/")).setMethod("GET").toUnmodifiable();
         var foo = new Foo();
         var updated = interceptor.modifyBeforeSigning(new RequestHook<>(createOperation(), context, foo, req));
 
@@ -83,7 +83,7 @@ public class UserAgentPluginTest {
         s.add(Features.BAZ);
         context.put(CallContext.FEATURE_IDS, s);
 
-        var req = HttpRequest.builder().uri(new URI("/")).method("GET").build();
+        var req = HttpRequest.create().setUri(new URI("/")).setMethod("GET").toUnmodifiable();
         var foo = new Foo();
         var updated = interceptor.modifyBeforeSigning(new RequestHook<>(createOperation(), context, foo, req));
 

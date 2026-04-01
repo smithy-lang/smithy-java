@@ -44,11 +44,11 @@ public class RequestCompressionPluginTest {
         var context = Context.create();
         context.put(HttpContext.DISABLE_REQUEST_COMPRESSION, true);
         context.put(HttpContext.REQUEST_MIN_COMPRESSION_SIZE_BYTES, 1);
-        var req = HttpRequest.builder()
-                .uri(new URI("/"))
-                .method("POST")
-                .body(DataStream.ofString(REQUEST_BODY))
-                .build();
+        var req = HttpRequest.create()
+                .setUri(new URI("/"))
+                .setMethod("POST")
+                .setBody(DataStream.ofString(REQUEST_BODY))
+                .toUnmodifiable();
 
         var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req));
@@ -62,11 +62,11 @@ public class RequestCompressionPluginTest {
         var context = Context.create();
         String largeBody = REQUEST_BODY.repeat(10);
         context.put(HttpContext.REQUEST_MIN_COMPRESSION_SIZE_BYTES, 10);
-        var req = HttpRequest.builder()
-                .uri(new URI("/"))
-                .method("POST")
-                .body(DataStream.ofString(largeBody))
-                .build();
+        var req = HttpRequest.create()
+                .setUri(new URI("/"))
+                .setMethod("POST")
+                .setBody(DataStream.ofString(largeBody))
+                .toUnmodifiable();
 
         var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req));
@@ -81,11 +81,11 @@ public class RequestCompressionPluginTest {
         var interceptor = new RequestCompressionPlugin.RequestCompressionInterceptor();
         var context = Context.create();
         context.put(HttpContext.REQUEST_MIN_COMPRESSION_SIZE_BYTES, 10000);
-        var req = HttpRequest.builder()
-                .uri(new URI("/"))
-                .method("POST")
-                .body(DataStream.ofString(REQUEST_BODY))
-                .build();
+        var req = HttpRequest.create()
+                .setUri(new URI("/"))
+                .setMethod("POST")
+                .setBody(DataStream.ofString(REQUEST_BODY))
+                .toUnmodifiable();
 
         var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req));
@@ -98,11 +98,11 @@ public class RequestCompressionPluginTest {
         var interceptor = new RequestCompressionPlugin.RequestCompressionInterceptor();
         var context = Context.create();
         // Body is smaller than default 10240
-        var req = HttpRequest.builder()
-                .uri(new URI("/"))
-                .method("POST")
-                .body(DataStream.ofString(REQUEST_BODY))
-                .build();
+        var req = HttpRequest.create()
+                .setUri(new URI("/"))
+                .setMethod("POST")
+                .setBody(DataStream.ofString(REQUEST_BODY))
+                .toUnmodifiable();
 
         var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req));
@@ -117,11 +117,11 @@ public class RequestCompressionPluginTest {
         context.put(HttpContext.REQUEST_MIN_COMPRESSION_SIZE_BYTES, 999999);
         var original = "small";
         var streamBody = DataStream.ofInputStream(new ByteArrayInputStream(original.getBytes(StandardCharsets.UTF_8)));
-        var req = HttpRequest.builder()
-                .uri(new URI("/"))
-                .method("POST")
-                .body(streamBody)
-                .build();
+        var req = HttpRequest.create()
+                .setUri(new URI("/"))
+                .setMethod("POST")
+                .setBody(streamBody)
+                .toUnmodifiable();
 
         var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithStreamingInput(), context, new TestInput(), req));
@@ -137,11 +137,11 @@ public class RequestCompressionPluginTest {
         var context = Context.create();
         context.put(HttpContext.REQUEST_MIN_COMPRESSION_SIZE_BYTES, -1);
         var largeBody = REQUEST_BODY.repeat(100);
-        var req = HttpRequest.builder()
-                .uri(new URI("/"))
-                .method("POST")
-                .body(DataStream.ofString(largeBody))
-                .build();
+        var req = HttpRequest.create()
+                .setUri(new URI("/"))
+                .setMethod("POST")
+                .setBody(DataStream.ofString(largeBody))
+                .toUnmodifiable();
 
         var hook = new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req);
         Assertions.assertThrows(IllegalArgumentException.class, () -> interceptor.modifyBeforeRetryLoop(hook));
@@ -153,11 +153,11 @@ public class RequestCompressionPluginTest {
         var context = Context.create();
         context.put(HttpContext.REQUEST_MIN_COMPRESSION_SIZE_BYTES, 10485761);
         var largeBody = REQUEST_BODY.repeat(100);
-        var req = HttpRequest.builder()
-                .uri(new URI("/"))
-                .method("POST")
-                .body(DataStream.ofString(largeBody))
-                .build();
+        var req = HttpRequest.create()
+                .setUri(new URI("/"))
+                .setMethod("POST")
+                .setBody(DataStream.ofString(largeBody))
+                .toUnmodifiable();
 
         var hook = new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req);
         Assertions.assertThrows(IllegalArgumentException.class, () -> interceptor.modifyBeforeRetryLoop(hook));
@@ -168,11 +168,11 @@ public class RequestCompressionPluginTest {
         var interceptor = new RequestCompressionPlugin.RequestCompressionInterceptor();
         var context = Context.create();
         context.put(HttpContext.REQUEST_MIN_COMPRESSION_SIZE_BYTES, 1);
-        var req = HttpRequest.builder()
-                .uri(new URI("/"))
-                .method("POST")
-                .body(DataStream.ofString(REQUEST_BODY))
-                .build();
+        var req = HttpRequest.create()
+                .setUri(new URI("/"))
+                .setMethod("POST")
+                .setBody(DataStream.ofString(REQUEST_BODY))
+                .toUnmodifiable();
 
         var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithoutCompressionTrait(), context, new TestInput(), req));
@@ -185,12 +185,12 @@ public class RequestCompressionPluginTest {
         var interceptor = new RequestCompressionPlugin.RequestCompressionInterceptor();
         var context = Context.create();
         context.put(HttpContext.REQUEST_MIN_COMPRESSION_SIZE_BYTES, 10);
-        var req = HttpRequest.builder()
-                .uri(new URI("/"))
-                .method("POST")
-                .body(DataStream.ofString(REQUEST_BODY))
-                .withAddedHeader("Content-Encoding", "custom")
-                .build();
+        var req = HttpRequest.create()
+                .setUri(new URI("/"))
+                .setMethod("POST")
+                .setBody(DataStream.ofString(REQUEST_BODY))
+                .addHeader("Content-Encoding", "custom")
+                .toUnmodifiable();
 
         var result = interceptor.modifyBeforeRetryLoop(
                 new RequestHook<>(createOperationWithCompressionTrait(), context, new TestInput(), req));

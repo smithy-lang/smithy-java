@@ -82,11 +82,11 @@ public class InjectIdempotencyTokenPluginTest {
         var mock = MockPlugin.builder()
                 .addMatcher(
                         request -> new MockedResult.Response(
-                                HttpResponse.builder()
-                                        .statusCode(200)
-                                        .headers(HttpHeaders.of(Map.of("content-type", List.of("application/json"))))
-                                        .body(DataStream.ofString("{}"))
-                                        .build()))
+                                HttpResponse.create()
+                                        .setStatusCode(200)
+                                        .setHeaders(HttpHeaders.of(Map.of("content-type", List.of("application/json"))))
+                                        .setBody(DataStream.ofString("{}"))
+                                        .toUnmodifiable()))
                 .build();
 
         var client = DynamicClient.builder()

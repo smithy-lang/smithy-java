@@ -21,11 +21,11 @@ public class HttpBearerAuthSignerTest {
     @Test
     void testBearerAuthSigner() {
         var tokenIdentity = TokenIdentity.create("token");
-        var request = HttpRequest.builder()
-                .httpVersion(HttpVersion.HTTP_1_1)
-                .method("PUT")
-                .uri(URI.create("https://www.example.com"))
-                .build();
+        var request = HttpRequest.create()
+                .setHttpVersion(HttpVersion.HTTP_1_1)
+                .setMethod("PUT")
+                .setUri(URI.create("https://www.example.com"))
+                .toUnmodifiable();
 
         var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, Context.empty()).signedRequest();
         var authHeader = signedRequest.headers().firstValue("authorization");
@@ -35,12 +35,12 @@ public class HttpBearerAuthSignerTest {
     @Test
     void overwritesExistingHeader() {
         var tokenIdentity = TokenIdentity.create("token");
-        var request = HttpRequest.builder()
-                .httpVersion(HttpVersion.HTTP_1_1)
-                .method("PUT")
-                .headers(HttpHeaders.of(Map.of("Authorization", List.of("FOO", "BAR"))))
-                .uri(URI.create("https://www.example.com"))
-                .build();
+        var request = HttpRequest.create()
+                .setHttpVersion(HttpVersion.HTTP_1_1)
+                .setMethod("PUT")
+                .setHeaders(HttpHeaders.of(Map.of("Authorization", List.of("FOO", "BAR"))))
+                .setUri(URI.create("https://www.example.com"))
+                .toUnmodifiable();
 
         var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, Context.empty());
         var authHeader = signedRequest.signedRequest().headers().firstValue("authorization");

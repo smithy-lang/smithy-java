@@ -20,6 +20,7 @@ import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.retries.api.RetrySafety;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -86,7 +87,7 @@ public final class ApplyHttpRetryInfoPlugin implements AutoClientPlugin {
 
     // If there's a retry-after header, then the server is telling us it's retryable.
     private static boolean applyRetryAfterHeader(HttpResponse response, CallException exception, Context context) {
-        var retryAfter = response.headers().firstValue("retry-after");
+        var retryAfter = response.headers().firstValue(HeaderName.RETRY_AFTER);
         if (retryAfter != null) {
             exception.isThrottle(true);
             exception.isRetrySafe(RetrySafety.YES);

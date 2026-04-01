@@ -138,12 +138,11 @@ final class AwsRestJson1Protocol extends ServerProtocol {
                 .inputShapeBuilder(inputShapeBuilder)
                 .pathLabelValues(labelValues)
                 .request(
-                        HttpRequest.builder()
-                                .headers(headers)
-                                .uri(httpJob.request().uri())
-                                .method(httpJob.request().method())
-                                .body(job.request().getDataStream())
-                                .build())
+                        HttpRequest.create()
+                                .setHeaders(headers)
+                                .setUri(httpJob.request().uri())
+                                .setMethod(httpJob.request().method())
+                                .setBody(job.request().getDataStream()))
                 .payloadCodec(codec)
                 .payloadMediaType("application/json");
 

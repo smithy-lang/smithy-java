@@ -38,52 +38,11 @@ public interface HttpResponse extends HttpMessage {
     HttpResponse toUnmodifiable();
 
     /**
-     * Create a builder configured with the values of the response.
-     *
-     * @return the created builder.
-     */
-    default Builder toBuilder() {
-        return builder()
-                .httpVersion(httpVersion())
-                .statusCode(statusCode())
-                .headers(headers())
-                .body(body());
-    }
-
-    /**
      * Create a builder.
      *
      * @return the created builder.
      */
-    static Builder builder() {
-        return new HttpResponseImpl.Builder();
-    }
-
-    /**
-     * HTTP response message builder.
-     */
-    interface Builder extends HttpMessage.Builder<HttpResponse.Builder> {
-        /**
-         * Create the response.
-         *
-         * @return the created response.
-         * @throws NullPointerException if status code is missing.
-         */
-        HttpResponse build();
-
-        /**
-         * Build a modifiable HTTP response.
-         *
-         * @return the mutable HTTP response.
-         */
-        ModifiableHttpResponse buildModifiable();
-
-        /**
-         * Set the status code of the response.
-         *
-         * @param statusCode Response status code.
-         * @return the builder.
-         */
-        Builder statusCode(int statusCode);
+    static ModifiableHttpResponse create() {
+        return new ModifiableHttpResponseImpl();
     }
 }

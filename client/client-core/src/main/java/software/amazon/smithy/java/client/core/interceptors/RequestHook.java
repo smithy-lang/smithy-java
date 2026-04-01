@@ -53,7 +53,7 @@ public sealed class RequestHook<I extends SerializableStruct, O extends Serializ
      * <p>This is useful when modifying the request using {@code instanceof} pattern matching:
      * {@snippet :
      * if (hook.request() instanceof HttpRequest req) {
-     *     return hook.asRequestType(req.toBuilder().withAddedHeader("X-Foo", "Bar").build());
+     *     return hook.asRequestType(req.toModifiableCopy().addHeader("X-Foo", "Bar"));
      * }
      * return hook.request();
      * }

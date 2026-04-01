@@ -97,10 +97,10 @@ public class HttpBindingErrorDeserializerTest {
         var registry = TypeRegistry.builder()
                 .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
                 .build();
-        var responseBuilder = HttpResponse.builder()
-                .statusCode(400)
-                .body(DataStream.ofString("{\"__type\": \"com.foo#Baz\"}"));
-        var response = responseBuilder.build();
+        var responseBuilder = HttpResponse.create()
+                .setStatusCode(400)
+                .setBody(DataStream.ofString("{\"__type\": \"com.foo#Baz\"}"));
+        var response = responseBuilder.toUnmodifiable();
         var result = deserializer.createError(Context.create(), OPERATION, registry, response);
 
         assertThat(result, instanceOf(Baz.class));
@@ -117,10 +117,10 @@ public class HttpBindingErrorDeserializerTest {
         var registry = TypeRegistry.builder()
                 .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
                 .build();
-        var responseBuilder = HttpResponse.builder()
-                .statusCode(400)
-                .body(DataStream.ofString("{\"__type\": \"com.foo#SomeUnknownError\"}"));
-        var response = responseBuilder.build();
+        var responseBuilder = HttpResponse.create()
+                .setStatusCode(400)
+                .setBody(DataStream.ofString("{\"__type\": \"com.foo#SomeUnknownError\"}"));
+        var response = responseBuilder.toUnmodifiable();
         var result = deserializer.createError(Context.create(), OPERATION, registry, response);
 
         assertThat(result, instanceOf(CallException.class));
@@ -139,17 +139,17 @@ public class HttpBindingErrorDeserializerTest {
         var registry = TypeRegistry.builder()
                 .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
                 .build();
-        var responseBuilder = HttpResponse.builder()
-                .statusCode(400)
-                .headers(
+        var responseBuilder = HttpResponse.create()
+                .setStatusCode(400)
+                .setHeaders(
                         HttpHeaders.of(
                                 Map.of(
                                         "content-length",
                                         List.of("2"),
                                         "x-amzn-errortype",
                                         List.of("com.foo#SomeUnknownError"))))
-                .body(DataStream.ofString("{}"));
-        var response = responseBuilder.build();
+                .setBody(DataStream.ofString("{}"));
+        var response = responseBuilder.toUnmodifiable();
         var result = deserializer.createError(Context.create(), OPERATION, registry, response);
 
         assertThat(result, instanceOf(CallException.class));

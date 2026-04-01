@@ -110,17 +110,17 @@ public class CorsHeadersTest {
     }
 
     private void assertContainsHeader(ModifiableHttpHeaders responseHeaders, String allowedOrigin) {
-        assertTrue(responseHeaders.hasHeader("Access-Control-Allow-Methods"));
-        assertTrue(responseHeaders.hasHeader("Access-Control-Allow-Headers"));
-        assertTrue(responseHeaders.hasHeader("Access-Control-Max-Age"));
-        assertTrue(responseHeaders.hasHeader("Access-Control-Allow-Origin"));
-        assertTrue(responseHeaders.allValues("Access-Control-Allow-Origin").contains(allowedOrigin));
+        assertTrue(responseHeaders.hasHeader("access-control-allow-methods"));
+        assertTrue(responseHeaders.hasHeader("access-control-allow-headers"));
+        assertTrue(responseHeaders.hasHeader("access-control-max-age"));
+        assertTrue(responseHeaders.hasHeader("access-control-allow-origin"));
+        assertTrue(responseHeaders.allValues("access-control-allow-origin").contains(allowedOrigin));
     }
 
     private void assertDoNotContainsHeader(ModifiableHttpHeaders responseHeaders) {
-        assertFalse(responseHeaders.hasHeader("Access-Control-Allow-Methods"));
-        assertFalse(responseHeaders.hasHeader("Access-Control-Allow-Headers"));
-        assertFalse(responseHeaders.hasHeader("Access-Control-Max-Age"));
-        assertFalse(responseHeaders.hasHeader("Access-Control-Allow-Origin"));
+        assertFalse(responseHeaders.hasHeader("access-control-allow-methods"));
+        assertFalse(responseHeaders.hasHeader("access-control-allow-headers"));
+        assertFalse(responseHeaders.hasHeader("access-control-max-age"));
+        assertFalse(responseHeaders.hasHeader("access-control-allow-origin"));
     }
 }

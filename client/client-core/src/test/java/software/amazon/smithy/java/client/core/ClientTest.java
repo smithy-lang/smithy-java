@@ -207,7 +207,7 @@ public class ClientTest {
     @Test
     public void allowsInterceptorRequestOverrides() throws URISyntaxException {
         var queue = new MockQueue();
-        queue.enqueue(HttpResponse.builder().statusCode(200).build());
+        queue.enqueue(HttpResponse.create().setStatusCode(200).toUnmodifiable());
         var id = "abc";
 
         DynamicClient c = DynamicClient.builder()
@@ -239,7 +239,7 @@ public class ClientTest {
     @Test
     public void requestOverridesPerCallTakePrecedence() throws URISyntaxException {
         var queue = new MockQueue();
-        queue.enqueue(HttpResponse.builder().statusCode(200).build());
+        queue.enqueue(HttpResponse.create().setStatusCode(200).toUnmodifiable());
         var id = "abc";
 
         DynamicClient c = DynamicClient.builder()
@@ -281,7 +281,7 @@ public class ClientTest {
     @Test
     public void setsCustomEndpoint() {
         var queue = new MockQueue();
-        queue.enqueue(HttpResponse.builder().statusCode(200).build());
+        queue.enqueue(HttpResponse.create().setStatusCode(200).toUnmodifiable());
 
         DynamicClient c = DynamicClient.builder()
                 .model(MODEL)
