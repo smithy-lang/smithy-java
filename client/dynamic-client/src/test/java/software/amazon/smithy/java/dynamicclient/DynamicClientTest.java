@@ -181,11 +181,11 @@ public class DynamicClientTest {
 
             @Override
             public HttpResponse send(Context context, HttpRequest request) {
-                return HttpResponse.builder()
-                        .httpVersion(HttpVersion.HTTP_1_1)
-                        .statusCode(200)
-                        .body(DataStream.ofString("{\"id\":\"1\"}"))
-                        .build();
+                return HttpResponse.create()
+                        .setHttpVersion(HttpVersion.HTTP_1_1)
+                        .setStatusCode(200)
+                        .setBody(DataStream.ofString("{\"id\":\"1\"}"))
+                        .toUnmodifiable();
             }
         };
     }
@@ -285,11 +285,11 @@ public class DynamicClientTest {
 
             @Override
             public HttpResponse send(Context context, HttpRequest request) {
-                return HttpResponse.builder()
-                        .httpVersion(HttpVersion.HTTP_1_1)
-                        .statusCode(400)
-                        .body(DataStream.ofString(payload))
-                        .build();
+                return HttpResponse.create()
+                        .setHttpVersion(HttpVersion.HTTP_1_1)
+                        .setStatusCode(400)
+                        .setBody(DataStream.ofString(payload))
+                        .toUnmodifiable();
             }
         };
     }

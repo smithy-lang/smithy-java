@@ -80,12 +80,11 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
 
         ByteBuffer body = serializer.finish();
 
-        return HttpRequest.builder()
-                .method("POST")
-                .uri(endpoint)
-                .headers(CONTENT_TYPE_HEADERS)
-                .body(DataStream.ofByteBuffer(body, CONTENT_TYPE))
-                .build();
+        return HttpRequest.create()
+                .setMethod("POST")
+                .setUri(endpoint)
+                .setHeaders(CONTENT_TYPE_HEADERS)
+                .setBody(DataStream.ofByteBuffer(body, CONTENT_TYPE));
     }
 
     @Override

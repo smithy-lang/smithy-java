@@ -27,11 +27,11 @@ public class AmznErrorHeaderExtractorTest {
     public void checksForHeaderPresence() {
         var extractor = new AmznErrorHeaderExtractor();
 
-        var response1 = HttpResponse.builder()
-                .statusCode(400)
-                .headers(HttpHeaders.of(Map.of("x-amzn-errortype", List.of("foo"))))
-                .build();
-        var response2 = HttpResponse.builder().statusCode(400).build();
+        var response1 = HttpResponse.create()
+                .setStatusCode(400)
+                .setHeaders(HttpHeaders.of(Map.of("x-amzn-errortype", List.of("foo"))))
+                .toUnmodifiable();
+        var response2 = HttpResponse.create().setStatusCode(400).toUnmodifiable();
 
         assertThat(extractor.hasHeader(response1), is(true));
         assertThat(extractor.hasHeader(response2), is(false));
@@ -40,7 +40,7 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void resolveIdReturnsNullWhenMissing() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = HttpResponse.builder().statusCode(400).build();
+        var response = HttpResponse.create().setStatusCode(400).toUnmodifiable();
 
         assertThat(extractor.resolveId(response, "com.foo", TypeRegistry.builder().build()), nullValue());
     }
@@ -48,10 +48,10 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void resolvesAbsoluteShapeIds() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = HttpResponse.builder()
-                .statusCode(400)
-                .headers(HttpHeaders.of(Map.of("x-amzn-errortype", List.of("baz#Bam"))))
-                .build();
+        var response = HttpResponse.create()
+                .setStatusCode(400)
+                .setHeaders(HttpHeaders.of(Map.of("x-amzn-errortype", List.of("baz#Bam"))))
+                .toUnmodifiable();
         var registry = TypeRegistry.builder()
                 .putType(ShapeId.from("baz#Bam"), ModeledException.class, ApiExceptionBuilder::new)
                 .build();
@@ -62,14 +62,14 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void resolvesAbsoluteShapeIdsWithColons() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = HttpResponse.builder()
-                .statusCode(400)
-                .headers(
+        var response = HttpResponse.create()
+                .setStatusCode(400)
+                .setHeaders(
                         HttpHeaders.of(
                                 Map.of(
                                         "x-amzn-errortype",
                                         List.of("baz#Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/"))))
-                .build();
+                .toUnmodifiable();
         var registry = TypeRegistry.builder()
                 .putType(ShapeId.from("baz#Bam"), ModeledException.class, ApiExceptionBuilder::new)
                 .build();
@@ -80,14 +80,14 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void resolvesRelativeShapeIds() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = HttpResponse.builder()
-                .statusCode(400)
-                .headers(
+        var response = HttpResponse.create()
+                .setStatusCode(400)
+                .setHeaders(
                         HttpHeaders.of(
                                 Map.of(
                                         "x-amzn-errortype",
                                         List.of("Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/"))))
-                .build();
+                .toUnmodifiable();
         var registry = TypeRegistry.builder()
                 .putType(ShapeId.from("com.foo#Bam"), ModeledException.class, ApiExceptionBuilder::new)
                 .build();
@@ -98,14 +98,14 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void resolvesRelativeShapeIdsWithColons() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = HttpResponse.builder()
-                .statusCode(400)
-                .headers(
+        var response = HttpResponse.create()
+                .setStatusCode(400)
+                .setHeaders(
                         HttpHeaders.of(
                                 Map.of(
                                         "x-amzn-errortype",
                                         List.of("baz#Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/"))))
-                .build();
+                .toUnmodifiable();
         var registry = TypeRegistry.builder()
                 .putType(ShapeId.from("baz#Bam"), ModeledException.class, ApiExceptionBuilder::new)
                 .build();
@@ -116,14 +116,14 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void resolvesToServiceErrorWhenAbsoluteNotFound() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = HttpResponse.builder()
-                .statusCode(400)
-                .headers(
+        var response = HttpResponse.create()
+                .setStatusCode(400)
+                .setHeaders(
                         HttpHeaders.of(
                                 Map.of(
                                         "x-amzn-errortype",
                                         List.of("other#Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/"))))
-                .build();
+                .toUnmodifiable();
         var registry = TypeRegistry.builder()
                 .putType(ShapeId.from("com.foo#Bam"), ModeledException.class, ApiExceptionBuilder::new)
                 .build();
@@ -134,14 +134,14 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void returnsNullWhenNoTypeFound() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = HttpResponse.builder()
-                .statusCode(400)
-                .headers(
+        var response = HttpResponse.create()
+                .setStatusCode(400)
+                .setHeaders(
                         HttpHeaders.of(
                                 Map.of(
                                         "x-amzn-errortype",
                                         List.of("other#Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/"))))
-                .build();
+                .toUnmodifiable();
         var registry = TypeRegistry.empty();
 
         assertThat(extractor.resolveId(response, "com.foo", registry), nullValue());

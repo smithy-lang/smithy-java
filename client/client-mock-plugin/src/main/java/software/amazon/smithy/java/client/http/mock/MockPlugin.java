@@ -313,11 +313,11 @@ public final class MockPlugin implements ClientPlugin {
             protocol.serializeOutput(job, output.output()).join();
         }
 
-        return HttpResponse.builder()
-                .statusCode(response.getStatusCode())
-                .headers(response.headers())
-                .body(response.getSerializedValue())
-                .build();
+        return HttpResponse.create()
+                .setStatusCode(response.getStatusCode())
+                .setHeaders(response.headers())
+                .setBody(response.getSerializedValue())
+                .toUnmodifiable();
     }
 
     private static ServerProtocol detectServerProtocol(ShapeId id) {

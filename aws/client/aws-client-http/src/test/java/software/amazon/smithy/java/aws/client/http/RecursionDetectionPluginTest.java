@@ -48,7 +48,10 @@ public class RecursionDetectionPluginTest {
 
     private HttpHeaders getSentHeaders(ClientPlugin recursionDetectionPlugin, ClientInterceptor interceptor) {
         var mockQueue = new MockQueue();
-        mockQueue.enqueue(HttpResponse.builder().statusCode(200).body(DataStream.ofString("{\"id\":\"1\"}")).build());
+        mockQueue.enqueue(HttpResponse.create()
+                .setStatusCode(200)
+                .setBody(DataStream.ofString("{\"id\":\"1\"}"))
+                .toUnmodifiable());
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var builder = DynamicClient.builder()

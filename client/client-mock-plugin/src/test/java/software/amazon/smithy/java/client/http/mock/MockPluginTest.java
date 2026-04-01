@@ -145,7 +145,7 @@ public class MockPluginTest {
         AtomicReference<Boolean> ref = new AtomicReference<>();
 
         var mockQueue = new MockQueue()
-                .enqueue(HttpResponse.builder().statusCode(404).withAddedHeader("a", "b").build());
+                .enqueue(HttpResponse.create().setStatusCode(404).addHeader("a", "b").toUnmodifiable());
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()

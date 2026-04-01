@@ -75,25 +75,25 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
             SmithyUri endpoint
     ) {
         var target = "/service/" + service.getName() + "/operation/" + operation.schema().id().getName();
-        var builder = HttpRequest.builder().method("POST").uri(endpoint.withConcatPath(target));
+        var builder = HttpRequest.create().setMethod("POST").setUri(endpoint.withConcatPath(target));
 
-        builder.httpVersion(HttpVersion.HTTP_2);
+        builder.setHttpVersion(HttpVersion.HTTP_2);
         if (operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
             // Top-level Unit types do not get serialized
-            builder.headers(HttpHeaders.of(headersForEmptyBody()))
-                    .body(DataStream.ofEmpty());
+            builder.setHeaders(HttpHeaders.of(headersForEmptyBody()))
+                    .setBody(DataStream.ofEmpty());
         } else if (operation.inputEventBuilderSupplier() != null) {
             // Event streaming
             var encoderFactory = getEventEncoderFactory(operation);
             var body = RpcEventStreamsUtil.bodyForEventStreaming(encoderFactory, input);
-            builder.headers(HttpHeaders.of(headersForEventStreaming()))
-                    .body(body);
+            builder.setHeaders(HttpHeaders.of(headersForEventStreaming()))
+                    .setBody(body);
         } else {
             // Regular request
-            builder.headers(HttpHeaders.of(headers()))
-                    .body(getBody(input));
+            builder.setHeaders(HttpHeaders.of(headers()))
+                    .setBody(getBody(input));
         }
-        return builder.build();
+        return builder.toUnmodifiable();
     }
 
     @Override

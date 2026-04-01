@@ -56,7 +56,7 @@ public final class RequestCompressionPlugin implements AutoClientPlugin {
                         if (algorithmId.equals(algorithm.algorithmId())) {
                             var compressed = algorithm.compress(req.body());
                             return hook.asRequestType(
-                                    req.toModifiableCopy()
+                                    req.toModifiable()
                                             .setBody(compressed)
                                             .addHeader(CONTENT_ENCODING_HEADER, algorithmId));
                         }

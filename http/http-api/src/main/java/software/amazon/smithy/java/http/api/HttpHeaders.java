@@ -45,6 +45,16 @@ public interface HttpHeaders {
     }
 
     /**
+     * Create mutable HttpHeaders.
+     *
+     * @param headers Headers to set.
+     * @return the created headers.
+     */
+    static ModifiableHttpHeaders ofModifiable(Map<String, List<String>> headers) {
+        return of(headers).toModifiable();
+    }
+
+    /**
      * Check if the given header is present.
      *
      * @param name Header to check.

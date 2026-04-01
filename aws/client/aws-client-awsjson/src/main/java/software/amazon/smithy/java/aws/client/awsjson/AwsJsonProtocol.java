@@ -78,22 +78,22 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
             SmithyUri endpoint
     ) {
         var target = service.getName() + "." + operation.schema().id().getName();
-        var builder = HttpRequest.builder();
-        builder.method("POST");
-        builder.uri(endpoint);
+        var builder = HttpRequest.create();
+        builder.setMethod("POST");
+        builder.setUri(endpoint);
         if (operation.inputEventBuilderSupplier() != null) {
             // Event streaming
             var encoderFactory = getEventEncoderFactory(operation);
             var body = RpcEventStreamsUtil.bodyForEventStreaming(encoderFactory, input);
-            builder.withAddedHeader("x-amz-target", target)
-                    .withAddedHeader("content-type", "application/vnd.amazon.eventstream")
-                    .withAddedHeader("accept", contentType())
-                    .body(body);
+            builder.addHeader("x-amz-target", target)
+                    .addHeader("content-type", "application/vnd.amazon.eventstream")
+                    .addHeader("accept", contentType())
+                    .setBody(body);
         } else {
-            builder.withAddedHeader("x-amz-target", target)
-                    .withAddedHeader("content-type", contentType());
+            builder.addHeader("x-amz-target", target)
+                    .addHeader("content-type", contentType());
         }
-        return builder.body(DataStream.ofByteBuffer(codec.serialize(input), contentType())).build();
+        return builder.setBody(DataStream.ofByteBuffer(codec.serialize(input), contentType()));
     }
 
     @Override

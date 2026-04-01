@@ -107,10 +107,10 @@ class OperationMetricsPluginTest {
     public void recordsTheExpectedMetrics() throws URISyntaxException {
         // Arrange
         var queue = new MockQueue();
-        queue.enqueue(HttpResponse.builder()
-                .body(DataStream.ofString("{\"id\":\"10\"}"))
-                .statusCode(200)
-                .build());
+        queue.enqueue(HttpResponse.create()
+                .setBody(DataStream.ofString("{\"id\":\"10\"}"))
+                .setStatusCode(200)
+                .toUnmodifiable());
         var client = createClient(queue);
 
         // Act
@@ -134,14 +134,14 @@ class OperationMetricsPluginTest {
     public void recordsRetryAttempts() throws URISyntaxException {
         // Arrange
         var queue = new MockQueue();
-        queue.enqueue(HttpResponse.builder()
-                .body(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
-                .statusCode(429)
-                .build());
-        queue.enqueue(HttpResponse.builder()
-                .body(DataStream.ofString("{\"id\":\"10\"}"))
-                .statusCode(200)
-                .build());
+        queue.enqueue(HttpResponse.create()
+                .setBody(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
+                .setStatusCode(429)
+                .toUnmodifiable());
+        queue.enqueue(HttpResponse.create()
+                .setBody(DataStream.ofString("{\"id\":\"10\"}"))
+                .setStatusCode(200)
+                .toUnmodifiable());
         var client = createClient(queue);
 
         // Act

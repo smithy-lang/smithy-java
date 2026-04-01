@@ -19,11 +19,11 @@ import software.amazon.smithy.model.traits.HttpApiKeyAuthTrait;
 public class HttpApiKeyAuthSignerTest {
     private static final String API_KEY = "my-api-key";
     private static final ApiKeyIdentity TEST_IDENTITY = ApiKeyIdentity.create(API_KEY);
-    private static final HttpRequest TEST_REQUEST = HttpRequest.builder()
-            .httpVersion(HttpVersion.HTTP_1_1)
-            .method("PUT")
-            .uri(SmithyUri.of("https://www.example.com"))
-            .build();
+    private static final HttpRequest TEST_REQUEST = HttpRequest.create()
+            .setHttpVersion(HttpVersion.HTTP_1_1)
+            .setMethod("PUT")
+            .setUri(SmithyUri.of("https://www.example.com"))
+            .toUnmodifiable();
 
     @Test
     void testApiKeyAuthSignerAddsHeaderNoScheme() {

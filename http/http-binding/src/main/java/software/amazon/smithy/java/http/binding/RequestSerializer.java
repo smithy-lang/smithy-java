@@ -157,21 +157,21 @@ public final class RequestSerializer {
             resolvedUri = resolvedUri.withQuery(serializer.getQueryString());
         }
 
-        HttpRequest.Builder builder = HttpRequest.builder()
-                .method(httpTrait.getMethod())
-                .uri(resolvedUri);
+        var builder = HttpRequest.create()
+                .setMethod(httpTrait.getMethod())
+                .setUri(resolvedUri);
 
         var eventStream = serializer.getEventStream();
         if (eventStream != null && operation.inputEventBuilderSupplier() != null) {
             ProtocolEventStreamWriter<SerializableStruct, SerializableStruct, Frame<?>> writer =
                     ProtocolEventStreamWriter.of(eventStream);
             writer.setEventEncoderFactory((EventEncoderFactory) eventStreamEncodingFactory);
-            builder.body(writer.toDataStream());
+            builder.setBody(writer.toDataStream());
             serializer.setContentType(eventStreamEncodingFactory.contentType());
         } else if (serializer.hasBody()) {
-            builder.body(serializer.getBody());
+            builder.setBody(serializer.getBody());
         }
 
-        return builder.headers(serializer.getHeaders()).build();
+        return builder.setHeaders(serializer.getHeaders()).toUnmodifiable();
     }
 }

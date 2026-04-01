@@ -147,13 +147,13 @@ public class SigV4TestRunner {
                 }
             }
 
-            return HttpRequest.builder()
-                    .method(method)
-                    .httpVersion(HttpVersion.HTTP_1_1)
-                    .uri(URI.create("http://" + Objects.requireNonNull(hostValue) + path))
-                    .headers(HttpHeaders.of(headers))
-                    .body(body != null ? DataStream.ofBytes(body.toString().getBytes()) : null)
-                    .build();
+            return HttpRequest.create()
+                    .setMethod(method)
+                    .setHttpVersion(HttpVersion.HTTP_1_1)
+                    .setUri(URI.create("http://" + Objects.requireNonNull(hostValue) + path))
+                    .setHeaders(HttpHeaders.of(headers))
+                    .setBody(body != null ? DataStream.ofBytes(body.toString().getBytes()) : null)
+                    .toUnmodifiable();
         }
 
         Result createResult(

@@ -108,17 +108,17 @@ public final class HttpMcpProxy extends McpServerProxy {
 
             String protocolVersionHeader = getProtocolVersion().identifier();
 
-            HttpRequest.Builder requestBuilder = HttpRequest.builder()
-                    .uri(endpoint)
-                    .method("POST")
-                    .withAddedHeader("Content-Type", "application/json")
-                    .withAddedHeader("Accept", "application/json, text/event-stream")
-                    .withAddedHeader("MCP-Protocol-Version", protocolVersionHeader);
+            var requestBuilder = HttpRequest.create()
+                    .setUri(endpoint)
+                    .setMethod("POST")
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Accept", "application/json, text/event-stream")
+                    .addHeader("MCP-Protocol-Version", protocolVersionHeader);
 
             // Include session ID if we have one
             String currentSessionId = sessionId;
             if (currentSessionId != null) {
-                requestBuilder.withAddedHeader("Mcp-Session-Id", currentSessionId);
+                requestBuilder.addHeader("Mcp-Session-Id", currentSessionId);
                 LOG.debug("Including session ID in request: method={}, sessionId={}",
                         request.getMethod(),
                         currentSessionId);
@@ -127,8 +127,8 @@ public final class HttpMcpProxy extends McpServerProxy {
             }
 
             HttpRequest httpRequest = requestBuilder
-                    .body(DataStream.ofBytes(body, "application/json"))
-                    .build();
+                    .setBody(DataStream.ofBytes(body, "application/json"))
+                    .toUnmodifiable();
 
             Context context = Context.create();
             context.put(HttpContext.HTTP_REQUEST_TIMEOUT, timeout);

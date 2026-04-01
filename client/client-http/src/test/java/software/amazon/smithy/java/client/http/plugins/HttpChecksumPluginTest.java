@@ -20,11 +20,11 @@ public class HttpChecksumPluginTest {
     @Test
     public void interceptorAddsContentMd5HeaderForKnownBody() throws Exception {
         var interceptor = new HttpChecksumPlugin.HttpChecksumInterceptor();
-        var req = HttpRequest.builder()
-                .uri(new URI("/"))
-                .method("POST")
-                .body(DataStream.ofBytes("test body".getBytes(StandardCharsets.UTF_8)))
-                .build();
+        var req = HttpRequest.create()
+                .setUri(new URI("/"))
+                .setMethod("POST")
+                .setBody(DataStream.ofBytes("test body".getBytes(StandardCharsets.UTF_8)))
+                .toUnmodifiable();
 
         var result = interceptor.addContentMd5Header(req);
 
@@ -36,12 +36,12 @@ public class HttpChecksumPluginTest {
     @Test
     public void interceptorReplacesExistingContentMd5Header() throws Exception {
         var interceptor = new HttpChecksumPlugin.HttpChecksumInterceptor();
-        var req = HttpRequest.builder()
-                .uri(new URI("/"))
-                .method("POST")
-                .body(DataStream.ofBytes("test body".getBytes(StandardCharsets.UTF_8)))
-                .withAddedHeader("Content-MD5", "wrong-hash")
-                .build();
+        var req = HttpRequest.create()
+                .setUri(new URI("/"))
+                .setMethod("POST")
+                .setBody(DataStream.ofBytes("test body".getBytes(StandardCharsets.UTF_8)))
+                .addHeader("Content-MD5", "wrong-hash")
+                .toUnmodifiable();
 
         var result = interceptor.addContentMd5Header(req);
 

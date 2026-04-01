@@ -128,12 +128,12 @@ public class SigV4SignerTrials {
             queryParameters.forEach(queryBuilder::add);
             uriString += "?" + queryBuilder;
         }
-        return HttpRequest.builder()
-                .method("POST")
-                .httpVersion(HttpVersion.HTTP_1_1)
-                .uri(SmithyUri.of(uriString))
-                .headers(httpHeaders)
-                .body(body != null ? DataStream.ofBytes(body.getBytes(StandardCharsets.UTF_8)) : null)
-                .build();
+        return HttpRequest.create()
+                .setMethod("POST")
+                .setHttpVersion(HttpVersion.HTTP_1_1)
+                .setUri(SmithyUri.of(uriString))
+                .setHeaders(httpHeaders)
+                .setBody(body != null ? DataStream.ofBytes(body.getBytes(StandardCharsets.UTF_8)) : null)
+                .toUnmodifiable();
     }
 }

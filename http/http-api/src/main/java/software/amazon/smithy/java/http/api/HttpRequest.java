@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.http.api;
 
-import java.net.URI;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
 /**
@@ -52,53 +51,7 @@ public interface HttpRequest extends HttpMessage {
      *
      * @return the created builder.
      */
-    static Builder builder() {
-        return new HttpRequestImpl.Builder();
-    }
-
-    /**
-     * HTTP request message builder.
-     */
-    interface Builder extends HttpMessage.Builder<Builder> {
-        /**
-         * Create the request.
-         *
-         * @return the created request.
-         * @throws NullPointerException if method or uri are missing.
-         */
-        HttpRequest build();
-
-        /**
-         * Build a modifiable HTTP request.
-         *
-         * @return the mutable HTTP request.
-         */
-        ModifiableHttpRequest buildModifiable();
-
-        /**
-         * Set the HTTP method.
-         *
-         * @param method Method to set.
-         * @return the builder.
-         */
-        Builder method(String method);
-
-        /**
-         * Set the URI of the message.
-         *
-         * @param uri SmithyUri to set.
-         * @return the builder.
-         */
-        Builder uri(SmithyUri uri);
-
-        /**
-         * Set the URI of the message from a {@link URI}.
-         *
-         * @param uri URI to set.
-         * @return the builder.
-         */
-        default Builder uri(URI uri) {
-            return uri(SmithyUri.of(uri));
-        }
+    static ModifiableHttpRequest create() {
+        return new ModifiableHttpRequestImpl();
     }
 }

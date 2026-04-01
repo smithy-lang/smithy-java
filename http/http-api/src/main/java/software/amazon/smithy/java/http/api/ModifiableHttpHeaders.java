@@ -131,7 +131,7 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
      *
      * @param headers Map of case-insensitive header names to their values.
      */
-    default void setHeaders(Map<String, List<String>> headers) {
+    default void placeHeaders(Map<String, List<String>> headers) {
         for (var entry : headers.entrySet()) {
             setHeader(entry.getKey(), entry.getValue());
         }
@@ -143,10 +143,8 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
      *
      * @param headers HTTP headers to copy from.
      */
-    default void setHeaders(HttpHeaders headers) {
-        for (var e : headers.map().entrySet()) {
-            setHeader(e.getKey(), e.getValue());
-        }
+    default void placeHeaders(HttpHeaders headers) {
+        headers.forEachEntry(this::setHeader);
     }
 
     /**
@@ -171,7 +169,7 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
             return ah.copy();
         } else {
             var copy = new ArrayHttpHeaders(size());
-            copy.setHeaders(this);
+            copy.placeHeaders(this);
             return copy;
         }
     }

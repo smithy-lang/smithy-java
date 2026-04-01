@@ -6,6 +6,8 @@
 package software.amazon.smithy.java.http.api;
 
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
@@ -36,6 +38,50 @@ public interface ModifiableHttpMessage<T extends ModifiableHttpMessage<T>> exten
     T setHeaders(ModifiableHttpHeaders headers);
 
     /**
+     * Set the HTTP headers.
+     *
+     * @param headers Headers to set.
+     * @return this message.
+     */
+    default T setHeaders(HttpHeaders headers) {
+        return setHeaders(headers.toModifiable());
+    }
+
+    /**
+     * Set the HTTP headers.
+     *
+     * @param headers Headers to set.
+     * @return this message.
+     */
+    default T setHeaders(Map<String, List<String>> headers) {
+        return setHeaders(HttpHeaders.ofModifiable(headers));
+    }
+
+    /**
+     * Puts the given {@code headers}, similarly to if {@link #setHeader(String, List)} were
+     * to be called for each entry in the given HttpHeaders.
+     *
+     * @param headers HTTP headers to copy from.
+     * @return this message.
+     */
+    default T placeHeaders(HttpHeaders headers) {
+        headers().placeHeaders(headers);
+        return (T) this;
+    }
+
+    /**
+     * Puts the given {@code headers}, similarly to if {@link #setHeader(String, List)} were
+     * to be called for each entry in the given HttpHeaders.
+     *
+     * @param headers HTTP headers to copy from.
+     * @return this message.
+     */
+    default T placeHeaders(Map<String, List<String>> headers) {
+        headers().placeHeaders(headers);
+        return (T) this;
+    }
+
+    /**
      * Set a specific header by name and replace any existing value.
      *
      * @param name Header to set.
@@ -48,6 +94,18 @@ public interface ModifiableHttpMessage<T extends ModifiableHttpMessage<T>> exten
     }
 
     /**
+     * Set a specific header by name and replace any existing values.
+     *
+     * @param name Header to set.
+     * @param values Values to set.
+     * @return modifiable message.
+     */
+    default T setHeader(String name, List<String> values) {
+        headers().setHeader(name, values);
+        return (T) this;
+    }
+
+    /**
      * Add a specific header by name to any existing headers with the same name.
      *
      * @param name Header to add.
@@ -55,6 +113,18 @@ public interface ModifiableHttpMessage<T extends ModifiableHttpMessage<T>> exten
      * @return modifiable message.
      */
     default T addHeader(String name, String value) {
+        headers().addHeader(name, value);
+        return (T) this;
+    }
+
+    /**
+     * Add a specific header by name to any existing headers with the same name.
+     *
+     * @param name Header to add.
+     * @param value Values to add.
+     * @return modifiable message.
+     */
+    default T addHeader(String name, List<String> value) {
         headers().addHeader(name, value);
         return (T) this;
     }
@@ -75,7 +145,7 @@ public interface ModifiableHttpMessage<T extends ModifiableHttpMessage<T>> exten
      * Set the body of the message.
      *
      * @param publisher Body to set.
-     * @return the builder.
+     * @return this message.
      */
     default T setBody(Flow.Publisher<ByteBuffer> publisher) {
         return setBody(DataStream.ofPublisher(publisher, null, -1));

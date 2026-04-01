@@ -178,9 +178,9 @@ final class HttpClientRequestProtocolTestProvider extends
     }
 
     private static final class TestTransport implements ClientTransport<HttpRequest, HttpResponse> {
-        private static final HttpResponse exceptionalResponse = HttpResponse.builder()
-                .statusCode(555)
-                .build();
+        private static final HttpResponse exceptionalResponse = HttpResponse.create()
+                .setStatusCode(555)
+                .toUnmodifiable();
 
         private HttpRequest capturedRequest;
 

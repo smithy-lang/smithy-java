@@ -137,15 +137,15 @@ public class ClientPipelineTest {
 
         var mockQueue = new MockQueue()
                 .enqueue(
-                        HttpResponse.builder()
-                                .statusCode(429)
-                                .body(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
-                                .build())
+                        HttpResponse.create()
+                                .setStatusCode(429)
+                                .setBody(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
+                                .toUnmodifiable())
                 .enqueue(
-                        HttpResponse.builder()
-                                .statusCode(200)
-                                .body(DataStream.ofString("{\"id\":\"1\"}"))
-                                .build());
+                        HttpResponse.create()
+                                .setStatusCode(200)
+                                .setBody(DataStream.ofString("{\"id\":\"1\"}"))
+                                .toUnmodifiable());
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()
@@ -228,10 +228,10 @@ public class ClientPipelineTest {
                 .build();
 
         var mockQueue = new MockQueue()
-                .enqueue(HttpResponse.builder()
-                        .statusCode(200)
-                        .body(DataStream.ofString("{\"id\":\"1\"}"))
-                        .build());
+                .enqueue(HttpResponse.create()
+                        .setStatusCode(200)
+                        .setBody(DataStream.ofString("{\"id\":\"1\"}"))
+                        .toUnmodifiable());
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()

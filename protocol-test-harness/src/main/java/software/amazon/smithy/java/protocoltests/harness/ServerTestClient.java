@@ -55,11 +55,11 @@ final class ServerTestClient {
             var response = httpClient.send(
                     httpRequestBuilder.build(),
                     java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-            return HttpResponse.builder()
-                    .statusCode(response.statusCode())
-                    .body(DataStream.ofBytes(response.body()))
-                    .headers(HttpHeaders.of(response.headers().map()))
-                    .build();
+            return HttpResponse.create()
+                    .setStatusCode(response.statusCode())
+                    .setBody(DataStream.ofBytes(response.body()))
+                    .setHeaders(HttpHeaders.of(response.headers().map()))
+                    .toUnmodifiable();
 
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);

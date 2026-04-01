@@ -199,12 +199,12 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         var contentType = headers.contentType();
         var body = DataStream.ofInputStream(response.body(), contentType, adaptedLength);
 
-        return HttpResponse.builder()
-                .httpVersion(javaToSmithyVersion(response.version()))
-                .statusCode(response.statusCode())
-                .headers(headers)
-                .body(body)
-                .build();
+        return HttpResponse.create()
+                .setHttpVersion(javaToSmithyVersion(response.version()))
+                .setStatusCode(response.statusCode())
+                .setHeaders(headers)
+                .setBody(body)
+                .toUnmodifiable();
     }
 
     private static HttpClient.Version smithyToHttpVersion(HttpVersion version) {

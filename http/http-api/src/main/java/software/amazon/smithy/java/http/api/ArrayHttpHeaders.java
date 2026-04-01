@@ -183,7 +183,7 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
     }
 
     @Override
-    public void setHeaders(HttpHeaders headers) {
+    public void placeHeaders(HttpHeaders headers) {
         if (headers instanceof AbstractArrayHttpHeaders ah) {
             // Single-pass compaction: remove all entries whose names appear in source
             int write = 0;
@@ -208,7 +208,7 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
             System.arraycopy(ah.array, 0, array, size * 2, ah.size * 2);
             size += ah.size;
         } else {
-            ModifiableHttpHeaders.super.setHeaders(headers);
+            ModifiableHttpHeaders.super.placeHeaders(headers);
         }
     }
 

@@ -22,7 +22,7 @@ final class HttpBearerAuthSigner implements Signer<HttpRequest, TokenIdentity> {
 
     @Override
     public SignResult<HttpRequest> sign(HttpRequest request, TokenIdentity identity, Context properties) {
-        var mod = request.toModifiableCopy();
+        var mod = request.toModifiable();
         if (mod.headers().hasHeader(AUTHORIZATION_HEADER)) {
             LOGGER.debug("Replaced existing Authorization header value.");
         }

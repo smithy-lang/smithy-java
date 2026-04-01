@@ -53,10 +53,10 @@ public class HttpClientProtocolTest {
         };
 
         var endpoint = Endpoint.builder().uri("https://example.com/foo%20/bar").build();
-        var request = HttpRequest.builder()
-                .method("GET")
-                .uri(SmithyUri.of(null, null, -1, "/bam%20", null))
-                .build();
+        var request = HttpRequest.create()
+                .setMethod("GET")
+                .setUri(SmithyUri.of(null, null, -1, "/bam%20", null))
+                .toUnmodifiable();
         var merged = hcp.setServiceEndpoint(request, endpoint);
 
         // It concats the endpoints and maintains percent encoding.

@@ -26,7 +26,7 @@ final class HttpBasicAuthSigner implements Signer<HttpRequest, LoginIdentity> {
     public SignResult<HttpRequest> sign(HttpRequest request, LoginIdentity identity, Context properties) {
         var identityString = identity.username() + ":" + identity.password();
         var base64Value = Base64.getEncoder().encodeToString(identityString.getBytes(StandardCharsets.UTF_8));
-        var mod = request.toModifiableCopy();
+        var mod = request.toModifiable();
         if (mod.headers().hasHeader(AUTHORIZATION_HEADER)) {
             LOGGER.debug("Replaced existing Authorization header value.");
         }

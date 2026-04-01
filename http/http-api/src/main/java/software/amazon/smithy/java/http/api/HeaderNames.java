@@ -79,7 +79,9 @@ public final class HeaderNames {
     public static final String WWW_AUTHENTICATE = "www-authenticate";
 
     // === Amazon-specific Headers ===
+    public static final String AMZ_SDK_REQUEST = "amz-sdk-request";
     public static final String X_AMZN_REQUESTID = "x-amzn-requestid";
+    public static final String X_AMZN_TRACE_ID = "x-amzn-trace-id";
     public static final String X_AMZ_REQUEST_ID = "x-amz-request-id";
 
     // Direct-indexed by header name length. GROUPS[len] is the candidate array for that length, or null.
@@ -113,7 +115,7 @@ public final class HeaderNames {
                 LAST_MODIFIED
         };
         GROUPS[14] = new String[] {CONTENT_LENGTH, ACCEPT_CHARSET};
-        GROUPS[15] = new String[] {ACCEPT_ENCODING, ACCEPT_LANGUAGE};
+        GROUPS[15] = new String[] {ACCEPT_ENCODING, ACCEPT_LANGUAGE, AMZ_SDK_REQUEST, X_AMZN_TRACE_ID};
         GROUPS[16] = new String[] {
                 CONTENT_ENCODING,
                 CONTENT_LANGUAGE,
@@ -526,6 +528,16 @@ public final class HeaderNames {
             case 'l': // accept-[l]anguage
                 if (name.regionMatches(true, 0, ACCEPT_LANGUAGE, 0, 15)) {
                     return ACCEPT_LANGUAGE;
+                }
+                break;
+            case 'r': // amz-sdk-[r]equest
+                if (name.regionMatches(true, 0, AMZ_SDK_REQUEST, 0, 15)) {
+                    return AMZ_SDK_REQUEST;
+                }
+                break;
+            case 't': // x-amzn-[t]race-id
+                if (name.regionMatches(true, 0, X_AMZN_TRACE_ID, 0, 15)) {
+                    return X_AMZN_TRACE_ID;
                 }
                 break;
         }

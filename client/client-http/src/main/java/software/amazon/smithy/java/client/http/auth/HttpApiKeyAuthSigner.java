@@ -29,7 +29,7 @@ final class HttpApiKeyAuthSigner implements Signer<HttpRequest, ApiKeyIdentity> 
                 if (schemeValue != null) {
                     value = schemeValue + " " + value;
                 }
-                var mod = request.toModifiableCopy();
+                var mod = request.toModifiable();
                 if (mod.headers().hasHeader(name)) {
                     LOGGER.debug("Replaced header value for {}", name);
                 }
@@ -42,7 +42,7 @@ final class HttpApiKeyAuthSigner implements Signer<HttpRequest, ApiKeyIdentity> 
                 var existingQuery = request.uri().getQuery();
                 addExistingQueryParams(stringBuilder, existingQuery, name);
                 queryBuilder.write(stringBuilder);
-                var mod = request.toModifiableCopy();
+                var mod = request.toModifiable();
                 mod.setUri(request.uri().withQuery(stringBuilder.toString()));
                 yield new SignResult<>(mod);
             }

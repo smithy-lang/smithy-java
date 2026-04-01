@@ -42,35 +42,7 @@ public interface HttpResponse extends HttpMessage {
      *
      * @return the created builder.
      */
-    static Builder builder() {
-        return new HttpResponseImpl.Builder();
-    }
-
-    /**
-     * HTTP response message builder.
-     */
-    interface Builder extends HttpMessage.Builder<HttpResponse.Builder> {
-        /**
-         * Create the response.
-         *
-         * @return the created response.
-         * @throws NullPointerException if status code is missing.
-         */
-        HttpResponse build();
-
-        /**
-         * Build a modifiable HTTP response.
-         *
-         * @return the mutable HTTP response.
-         */
-        ModifiableHttpResponse buildModifiable();
-
-        /**
-         * Set the status code of the response.
-         *
-         * @param statusCode Response status code.
-         * @return the builder.
-         */
-        Builder statusCode(int statusCode);
+    static ModifiableHttpResponse create() {
+        return new ModifiableHttpResponseImpl();
     }
 }

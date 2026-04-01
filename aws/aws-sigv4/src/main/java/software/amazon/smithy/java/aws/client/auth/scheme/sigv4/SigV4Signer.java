@@ -91,7 +91,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
                 identity.sessionToken(),
                 !request.body().hasKnownLength());
         var signedHeaders = signatureAndSignedHeaders.right;
-        var mod = request.toModifiableCopy();
+        var mod = request.toModifiable();
         mod.setHeaders(HttpHeaders.of(signedHeaders).toModifiable());
         return new SignResult<>(mod, signatureAndSignedHeaders.left);
     }
