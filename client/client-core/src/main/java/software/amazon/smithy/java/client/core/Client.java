@@ -46,7 +46,7 @@ public abstract class Client implements Closeable {
         ClientConfig.Builder configBuilder = builder.configBuilder();
         this.config = configBuilder.build();
         this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
-        this.interceptor = ClientInterceptor.chain(config.interceptors());
+        this.interceptor = config.interceptorChain();
         this.identityResolvers = IdentityResolvers.of(config.identityResolvers());
         this.typeRegistry = typeRegistry();
 
@@ -99,7 +99,7 @@ public abstract class Client implements Closeable {
         // Rebuild the pipeline, resolvers, etc if the config changed.
         if (callConfig != config) {
             callPipeline = ClientPipeline.of(callConfig.protocol(), callConfig.transport());
-            callInterceptor = ClientInterceptor.chain(callConfig.interceptors());
+            callInterceptor = callConfig.interceptorChain();
             callIdentityResolvers = IdentityResolvers.of(callConfig.identityResolvers());
         }
 

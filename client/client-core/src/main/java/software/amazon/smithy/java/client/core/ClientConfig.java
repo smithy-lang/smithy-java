@@ -44,6 +44,7 @@ public final class ClientConfig {
     private final ClientProtocol<?, ?> protocol;
     private final EndpointResolver endpointResolver;
     private final List<ClientInterceptor> interceptors;
+    private final ClientInterceptor interceptorChain;
     private final List<AuthScheme<?, ?>> supportedAuthSchemes;
     private final AuthSchemeResolver authSchemeResolver;
     private final List<IdentityResolver<?>> identityResolvers;
@@ -78,6 +79,7 @@ public final class ClientConfig {
         }
 
         this.interceptors = List.copyOf(builder.interceptors);
+        this.interceptorChain = ClientInterceptor.chain(this.interceptors);
 
         // By default, support NoAuthAuthScheme
         List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
@@ -176,6 +178,13 @@ public final class ClientConfig {
      */
     public List<ClientInterceptor> interceptors() {
         return interceptors;
+    }
+
+    /**
+     * @return A pre-built interceptor chain for the configured interceptors.
+     */
+    public ClientInterceptor interceptorChain() {
+        return interceptorChain;
     }
 
     /**
