@@ -102,8 +102,13 @@
 
     <!-- Intentional pointer comparison (==) for interned header names. -->
     <Match>
-        <Class name="~software\.amazon\.smithy\.java\.http\.api\..*HttpHeaders" />
+        <Class name="~software\.amazon\.smithy\.java\.http\.api\.(.*HttpHeaders|HeaderNames)" />
         <Bug pattern="ES_COMPARING_STRINGS_WITH_EQ" />
+    </Match>
+
+    <Match>
+        <Class name="software.amazon.smithy.java.http.api.HeaderNames" />
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ" />
     </Match>
 
     <!-- Intentional pointer comparison (==) for interned header names in transport. -->

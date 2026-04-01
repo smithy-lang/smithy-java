@@ -250,15 +250,19 @@ public final class HeaderNames {
         };
     }
 
+    private static boolean isMatch(String name, String candidate, int length) {
+        return name == candidate || name.regionMatches(true, 0, candidate, 0, length);
+    }
+
     private static String matchBucket3(String name) {
         switch (name.charAt(0) | 0x20) {
             case 'a': // [a]ge
-                if (name.regionMatches(true, 0, AGE, 0, 3)) {
+                if (isMatch(name, AGE, 3)) {
                     return AGE;
                 }
                 break;
             case 'v': // [v]ia
-                if (name.regionMatches(true, 0, VIA, 0, 3)) {
+                if (isMatch(name, VIA, 3)) {
                     return VIA;
                 }
                 break;
@@ -269,32 +273,32 @@ public final class HeaderNames {
     private static String matchBucket4(String name) {
         switch (name.charAt(0) | 0x20) {
             case 'h': // [h]ost
-                if (name.regionMatches(true, 0, HOST, 0, 4)) {
+                if (isMatch(name, HOST, 4)) {
                     return HOST;
                 }
                 break;
             case 'd': // [d]ate
-                if (name.regionMatches(true, 0, DATE, 0, 4)) {
+                if (isMatch(name, DATE, 4)) {
                     return DATE;
                 }
                 break;
             case 'e': // [e]tag
-                if (name.regionMatches(true, 0, ETAG, 0, 4)) {
+                if (isMatch(name, ETAG, 4)) {
                     return ETAG;
                 }
                 break;
             case 'f': // [f]rom
-                if (name.regionMatches(true, 0, FROM, 0, 4)) {
+                if (isMatch(name, FROM, 4)) {
                     return FROM;
                 }
                 break;
             case 'l': // [l]ink
-                if (name.regionMatches(true, 0, LINK, 0, 4)) {
+                if (isMatch(name, LINK, 4)) {
                     return LINK;
                 }
                 break;
             case 'v': // [v]ary
-                if (name.regionMatches(true, 0, VARY, 0, 4)) {
+                if (isMatch(name, VARY, 4)) {
                     return VARY;
                 }
                 break;
@@ -305,17 +309,17 @@ public final class HeaderNames {
     private static String matchBucket5(String name) {
         switch (name.charAt(0) | 0x20) {
             case ':': // [:path]
-                if (name.regionMatches(true, 0, PSEUDO_PATH, 0, 5)) {
+                if (isMatch(name, PSEUDO_PATH, 5)) {
                     return PSEUDO_PATH;
                 }
                 break;
             case 'a': // [a]llow
-                if (name.regionMatches(true, 0, ALLOW, 0, 5)) {
+                if (isMatch(name, ALLOW, 5)) {
                     return ALLOW;
                 }
                 break;
             case 'r': // [r]ange
-                if (name.regionMatches(true, 0, RANGE, 0, 5)) {
+                if (isMatch(name, RANGE, 5)) {
                     return RANGE;
                 }
                 break;
@@ -326,27 +330,27 @@ public final class HeaderNames {
     private static String matchBucket6(String name) {
         switch (name.charAt(0) | 0x20) {
             case 'a': // [a]ccept
-                if (name.regionMatches(true, 0, ACCEPT, 0, 6)) {
+                if (isMatch(name, ACCEPT, 6)) {
                     return ACCEPT;
                 }
                 break;
             case 'c': // [c]ookie
-                if (name.regionMatches(true, 0, COOKIE, 0, 6)) {
+                if (isMatch(name, COOKIE, 6)) {
                     return COOKIE;
                 }
                 break;
             case 'e': // [e]xpect
-                if (name.regionMatches(true, 0, EXPECT, 0, 6)) {
+                if (isMatch(name, EXPECT, 6)) {
                     return EXPECT;
                 }
                 break;
             case 'o': // [o]rigin
-                if (name.regionMatches(true, 0, ORIGIN, 0, 6)) {
+                if (isMatch(name, ORIGIN, 6)) {
                     return ORIGIN;
                 }
                 break;
             case 's': // [s]erver
-                if (name.regionMatches(true, 0, SERVER, 0, 6)) {
+                if (isMatch(name, SERVER, 6)) {
                     return SERVER;
                 }
                 break;
@@ -357,46 +361,46 @@ public final class HeaderNames {
     private static String matchBucket7(String name) {
         switch (name.charAt(2) | 0x20) {
             case 'a': // tr[a]iler
-                if (name.regionMatches(true, 0, TRAILER, 0, 7)) {
+                if (isMatch(name, TRAILER, 7)) {
                     return TRAILER;
                 }
                 break;
             case 'c': // ":s[c]heme"
-                if (name.regionMatches(true, 0, PSEUDO_SCHEME, 0, 7)) {
+                if (isMatch(name, PSEUDO_SCHEME, 7)) {
                     return PSEUDO_SCHEME;
                 }
                 break;
             case 'e': // ":m[e]thod"
-                if (name.regionMatches(true, 0, PSEUDO_METHOD, 0, 7)) {
+                if (isMatch(name, PSEUDO_METHOD, 7)) {
                     return PSEUDO_METHOD;
                 }
                 break;
             case 'f': // "re[f]erer" / "re[f]resh"
                 switch (name.charAt(3) | 0x20) {
                     case 'e': // "ref(e)rer"
-                        if (name.regionMatches(true, 0, REFERER, 0, 7)) {
+                        if (isMatch(name, REFERER, 7)) {
                             return REFERER;
                         }
                         break;
                     case 'r': // "ref[r]esh"
-                        if (name.regionMatches(true, 0, REFRESH, 0, 7)) {
+                        if (isMatch(name, REFRESH, 7)) {
                             return REFRESH;
                         }
                         break;
                 }
                 break;
             case 'g': // "up[g]rade"
-                if (name.regionMatches(true, 0, UPGRADE, 0, 7)) {
+                if (isMatch(name, UPGRADE, 7)) {
                     return UPGRADE;
                 }
                 break;
             case 'p': // "ex[p]ires"
-                if (name.regionMatches(true, 0, EXPIRES, 0, 7)) {
+                if (isMatch(name, EXPIRES, 7)) {
                     return EXPIRES;
                 }
                 break;
             case 't': // ":s[t]atus"
-                if (name.regionMatches(true, 0, PSEUDO_STATUS, 0, 7)) {
+                if (isMatch(name, PSEUDO_STATUS, 7)) {
                     return PSEUDO_STATUS;
                 }
                 break;
@@ -407,17 +411,17 @@ public final class HeaderNames {
     private static String matchBucket8(String name) {
         switch (name.charAt(3) | 0x20) {
             case 'a': // loc[a]tion
-                if (name.regionMatches(true, 0, LOCATION, 0, 8)) {
+                if (isMatch(name, LOCATION, 8)) {
                     return LOCATION;
                 }
                 break;
             case 'm': // if-[m]atch
-                if (name.regionMatches(true, 0, IF_MATCH, 0, 8)) {
+                if (isMatch(name, IF_MATCH, 8)) {
                     return IF_MATCH;
                 }
                 break;
             case 'r': // if-[r]ange
-                if (name.regionMatches(true, 0, IF_RANGE, 0, 8)) {
+                if (isMatch(name, IF_RANGE, 8)) {
                     return IF_RANGE;
                 }
                 break;
@@ -428,32 +432,32 @@ public final class HeaderNames {
     private static String matchBucket10(String name) {
         switch (name.charAt(0) | 0x20) {
             case ':': // [:]authority
-                if (name.regionMatches(true, 0, PSEUDO_AUTHORITY, 0, 10)) {
+                if (isMatch(name, PSEUDO_AUTHORITY, 10)) {
                     return PSEUDO_AUTHORITY;
                 }
                 break;
             case 'c': // [c]onnection
-                if (name.regionMatches(true, 0, CONNECTION, 0, 10)) {
+                if (isMatch(name, CONNECTION, 10)) {
                     return CONNECTION;
                 }
                 break;
             case 'k': // [k]eep-alive
-                if (name.regionMatches(true, 0, KEEP_ALIVE, 0, 10)) {
+                if (isMatch(name, KEEP_ALIVE, 10)) {
                     return KEEP_ALIVE;
                 }
                 break;
             case 's': // [s]et-cookie
-                if (name.regionMatches(true, 0, SET_COOKIE, 0, 10)) {
+                if (isMatch(name, SET_COOKIE, 10)) {
                     return SET_COOKIE;
                 }
                 break;
             case 'u': // [u]ser-agent
-                if (name.regionMatches(true, 0, USER_AGENT, 0, 10)) {
+                if (isMatch(name, USER_AGENT, 10)) {
                     return USER_AGENT;
                 }
                 break;
             case 'x': // [x]-amz-date
-                if (name.regionMatches(true, 0, X_AMZ_DATE, 0, 10)) {
+                if (isMatch(name, X_AMZ_DATE, 10)) {
                     return X_AMZ_DATE;
                 }
                 break;
@@ -470,7 +474,7 @@ public final class HeaderNames {
                 }
                 break;
             case 'r': // [r]etry-after
-                if (name.regionMatches(true, 0, RETRY_AFTER, 0, 11)) {
+                if (isMatch(name, RETRY_AFTER, 11)) {
                     return RETRY_AFTER;
                 }
                 break;
@@ -482,17 +486,17 @@ public final class HeaderNames {
     private static String matchBucket12(String name) {
         switch (name.charAt(0) | 0x20) {
             case 'c': // [c]ontent-type
-                if (name.regionMatches(true, 0, CONTENT_TYPE, 0, 12)) {
+                if (isMatch(name, CONTENT_TYPE, 12)) {
                     return CONTENT_TYPE;
                 }
                 break;
             case 'm': // [m]ax-forwards
-                if (name.regionMatches(true, 0, MAX_FORWARDS, 0, 12)) {
+                if (isMatch(name, MAX_FORWARDS, 12)) {
                     return MAX_FORWARDS;
                 }
                 break;
             case 'x': // [x]-amz-target
-                if (name.regionMatches(true, 0, X_AMZ_TARGET, 0, 12)) {
+                if (isMatch(name, X_AMZ_TARGET, 12)) {
                     return X_AMZ_TARGET;
                 }
                 break;
@@ -503,32 +507,32 @@ public final class HeaderNames {
     private static String matchBucket13(String name) {
         switch (name.charAt(6) | 0x20) {
             case '-': // accept[-]ranges
-                if (name.regionMatches(true, 0, ACCEPT_RANGES, 0, 13)) {
+                if (isMatch(name, ACCEPT_RANGES, 13)) {
                     return ACCEPT_RANGES;
                 }
                 break;
             case 'c': // cache-[c]ontrol
-                if (name.regionMatches(true, 0, CACHE_CONTROL, 0, 13)) {
+                if (isMatch(name, CACHE_CONTROL, 13)) {
                     return CACHE_CONTROL;
                 }
                 break;
             case 'e': // if-non[e]-match
-                if (name.regionMatches(true, 0, IF_NONE_MATCH, 0, 13)) {
+                if (isMatch(name, IF_NONE_MATCH, 13)) {
                     return IF_NONE_MATCH;
                 }
                 break;
             case 'i': // author[i]zation
-                if (name.regionMatches(true, 0, AUTHORIZATION, 0, 13)) {
+                if (isMatch(name, AUTHORIZATION, 13)) {
                     return AUTHORIZATION;
                 }
                 break;
             case 'o': // last-m[o]dified
-                if (name.regionMatches(true, 0, LAST_MODIFIED, 0, 13)) {
+                if (isMatch(name, LAST_MODIFIED, 13)) {
                     return LAST_MODIFIED;
                 }
                 break;
             case 't': // conten[t]-range
-                if (name.regionMatches(true, 0, CONTENT_RANGE, 0, 13)) {
+                if (isMatch(name, CONTENT_RANGE, 13)) {
                     return CONTENT_RANGE;
                 }
                 break;
@@ -539,12 +543,12 @@ public final class HeaderNames {
     private static String matchBucket14(String name) {
         switch (name.charAt(0) | 0x20) {
             case 'c': // [c]ontent-length
-                if (name.regionMatches(true, 0, CONTENT_LENGTH, 0, 14)) {
+                if (isMatch(name, CONTENT_LENGTH, 14)) {
                     return CONTENT_LENGTH;
                 }
                 break;
             case 'a': // [a]ccept-charset
-                if (name.regionMatches(true, 0, ACCEPT_CHARSET, 0, 14)) {
+                if (isMatch(name, ACCEPT_CHARSET, 14)) {
                     return ACCEPT_CHARSET;
                 }
                 break;
@@ -555,27 +559,27 @@ public final class HeaderNames {
     private static String matchBucket15(String name) {
         switch (name.charAt(7) | 0x20) {
             case 'e': // accept-[e]ncoding
-                if (name.regionMatches(true, 0, ACCEPT_ENCODING, 0, 15)) {
+                if (isMatch(name, ACCEPT_ENCODING, 15)) {
                     return ACCEPT_ENCODING;
                 }
                 break;
             case 'l': // accept-[l]anguage
-                if (name.regionMatches(true, 0, ACCEPT_LANGUAGE, 0, 15)) {
+                if (isMatch(name, ACCEPT_LANGUAGE, 15)) {
                     return ACCEPT_LANGUAGE;
                 }
                 break;
             case 'p': // smithy-[p]rotocol
-                if (name.regionMatches(true, 0, SMITHY_PROTOCOL, 0, 15)) {
+                if (isMatch(name, SMITHY_PROTOCOL, 15)) {
                     return SMITHY_PROTOCOL;
                 }
                 break;
             case 'r': // amz-sdk-[r]equest
-                if (name.regionMatches(true, 0, AMZ_SDK_REQUEST, 0, 15)) {
+                if (isMatch(name, AMZ_SDK_REQUEST, 15)) {
                     return AMZ_SDK_REQUEST;
                 }
                 break;
             case 't': // x-amzn-[t]race-id
-                if (name.regionMatches(true, 0, X_AMZN_TRACE_ID, 0, 15)) {
+                if (isMatch(name, X_AMZN_TRACE_ID, 15)) {
                     return X_AMZN_TRACE_ID;
                 }
                 break;
@@ -586,37 +590,37 @@ public final class HeaderNames {
     private static String matchBucket16(String name) {
         switch (name.charAt(11) | 0x20) {
             case 'a': // content-loc[a]tion
-                if (name.regionMatches(true, 0, CONTENT_LOCATION, 0, 16)) {
+                if (isMatch(name, CONTENT_LOCATION, 16)) {
                     return CONTENT_LOCATION;
                 }
                 break;
             case 'c': // proxy-conne[c]tion
-                if (name.regionMatches(true, 0, PROXY_CONNECTION, 0, 16)) {
+                if (isMatch(name, PROXY_CONNECTION, 16)) {
                     return PROXY_CONNECTION;
                 }
                 break;
             case 'e': // x-amzn-requ[e]stid
-                if (name.regionMatches(true, 0, X_AMZN_REQUESTID, 0, 16)) {
+                if (isMatch(name, X_AMZN_REQUESTID, 16)) {
                     return X_AMZN_REQUESTID;
                 }
                 break;
             case 'g': // content-lan[g]uage
-                if (name.regionMatches(true, 0, CONTENT_LANGUAGE, 0, 16)) {
+                if (isMatch(name, CONTENT_LANGUAGE, 16)) {
                     return CONTENT_LANGUAGE;
                 }
                 break;
             case 'i': // www-authent[i]cate
-                if (name.regionMatches(true, 0, WWW_AUTHENTICATE, 0, 16)) {
+                if (isMatch(name, WWW_AUTHENTICATE, 16)) {
                     return WWW_AUTHENTICATE;
                 }
                 break;
             case 'o': // content-enc[o]ding
-                if (name.regionMatches(true, 0, CONTENT_ENCODING, 0, 16)) {
+                if (isMatch(name, CONTENT_ENCODING, 16)) {
                     return CONTENT_ENCODING;
                 }
                 break;
             case 's': // x-amz-reque[s]t-id
-                if (name.regionMatches(true, 0, X_AMZ_REQUEST_ID, 0, 16)) {
+                if (isMatch(name, X_AMZ_REQUEST_ID, 16)) {
                     return X_AMZ_REQUEST_ID;
                 }
                 break;
@@ -627,12 +631,12 @@ public final class HeaderNames {
     private static String matchBucket17(String name) {
         switch (name.charAt(0) | 0x20) {
             case 'i': // [i]f-modified-since
-                if (name.regionMatches(true, 0, IF_MODIFIED_SINCE, 0, 17)) {
+                if (isMatch(name, IF_MODIFIED_SINCE, 17)) {
                     return IF_MODIFIED_SINCE;
                 }
                 break;
             case 't': // [t]ransfer-encoding
-                if (name.regionMatches(true, 0, TRANSFER_ENCODING, 0, 17)) {
+                if (isMatch(name, TRANSFER_ENCODING, 17)) {
                     return TRANSFER_ENCODING;
                 }
                 break;
@@ -641,7 +645,7 @@ public final class HeaderNames {
     }
 
     private static String matchBucket18(String name) {
-        if (name.regionMatches(true, 0, PROXY_AUTHENTICATE, 0, 18)) {
+        if (isMatch(name, PROXY_AUTHENTICATE, 18)) {
             return PROXY_AUTHENTICATE;
         }
         return HeaderUtils.normalizeName(name);
@@ -650,17 +654,17 @@ public final class HeaderNames {
     private static String matchBucket19(String name) {
         switch (name.charAt(0) | 0x20) {
             case 'c': // [c]ontent-disposition
-                if (name.regionMatches(true, 0, CONTENT_DISPOSITION, 0, 19)) {
+                if (isMatch(name, CONTENT_DISPOSITION, 19)) {
                     return CONTENT_DISPOSITION;
                 }
                 break;
             case 'i': // [i]f-unmodified-since
-                if (name.regionMatches(true, 0, IF_UNMODIFIED_SINCE, 0, 19)) {
+                if (isMatch(name, IF_UNMODIFIED_SINCE, 19)) {
                     return IF_UNMODIFIED_SINCE;
                 }
                 break;
             case 'p': // [p]roxy-authorization
-                if (name.regionMatches(true, 0, PROXY_AUTHORIZATION, 0, 19)) {
+                if (isMatch(name, PROXY_AUTHORIZATION, 19)) {
                     return PROXY_AUTHORIZATION;
                 }
                 break;
@@ -669,21 +673,21 @@ public final class HeaderNames {
     }
 
     private static String matchBucket20(String name) {
-        if (name.regionMatches(true, 0, X_AMZ_SECURITY_TOKEN, 0, 20)) {
+        if (isMatch(name, X_AMZ_SECURITY_TOKEN, 20)) {
             return X_AMZ_SECURITY_TOKEN;
         }
         return HeaderUtils.normalizeName(name);
     }
 
     private static String matchBucket25(String name) {
-        if (name.regionMatches(true, 0, STRICT_TRANSPORT_SECURITY, 0, 25)) {
+        if (isMatch(name, STRICT_TRANSPORT_SECURITY, 25)) {
             return STRICT_TRANSPORT_SECURITY;
         }
         return HeaderUtils.normalizeName(name);
     }
 
     private static String matchBucket27(String name) {
-        if (name.regionMatches(true, 0, ACCESS_CONTROL_ALLOW_ORIGIN, 0, 27)) {
+        if (isMatch(name, ACCESS_CONTROL_ALLOW_ORIGIN, 27)) {
             return ACCESS_CONTROL_ALLOW_ORIGIN;
         }
         return HeaderUtils.normalizeName(name);
