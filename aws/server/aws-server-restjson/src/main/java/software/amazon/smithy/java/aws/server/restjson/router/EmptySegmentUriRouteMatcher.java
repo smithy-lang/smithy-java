@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.aws.server.restjson.router;
 
-import software.amazon.smithy.java.io.uri.QueryStringParser;
+import software.amazon.smithy.java.io.uri.UriUtils;
 
 /**
  * Matches a full URI by matching both the path and query components. This uses the EmptySegmentPathMatcher which does
@@ -19,8 +19,8 @@ class EmptySegmentUriRouteMatcher extends UriRouteMatcher {
 
     @Override
     public Match match(String uri) {
-        String path = QueryStringParser.getPath(uri, true);
-        String query = QueryStringParser.getQuery(uri);
+        String path = UriUtils.getPath(uri, true);
+        String query = UriUtils.getQuery(uri);
         return match(path, query);
     }
 }

@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import software.amazon.smithy.java.io.uri.QueryStringParser;
+import software.amazon.smithy.java.io.uri.UriUtils;
 
 /**
  * A tree based URI Matcher map that implements path specificity URI
@@ -150,8 +151,8 @@ public final class UriTreeMatcherMap<T> implements UriMatcherMap<T> {
 
         ParsedUri(String uri, boolean allowEmptyPathSegments) {
             this(
-                    QueryStringParser.getQuery(uri),
-                    getPathSegments(QueryStringParser.getRawPath(uri), allowEmptyPathSegments),
+                    UriUtils.getQuery(uri),
+                    getPathSegments(UriUtils.getRawPath(uri), allowEmptyPathSegments),
                     allowEmptyPathSegments);
         }
 
@@ -159,7 +160,7 @@ public final class UriTreeMatcherMap<T> implements UriMatcherMap<T> {
             this.query = query;
             this.queryValuesSupplier = query == null
                     ? Collections::emptyMap
-                    : new MemoizingSupplier<>(() -> QueryStringParser.toMapOfLists(query));
+                    : new MemoizingSupplier<>(() -> QueryStringParser.parseSorted(query));
             this.segments = segments;
             this.allowEmptyPathSegments = allowEmptyPathSegments;
         }

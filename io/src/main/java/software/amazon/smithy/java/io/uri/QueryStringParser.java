@@ -5,15 +5,18 @@
 
 package software.amazon.smithy.java.io.uri;
 
-import java.util.*;
-import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
 
 /**
  * A parser for query string values as expected by Smithy.
  */
 public final class QueryStringParser {
-
-    private static final Pattern REGEX_STRING_OF_SLASHES = Pattern.compile("/+");
 
     private QueryStringParser() {}
 
@@ -25,26 +28,53 @@ public final class QueryStringParser {
      * @return a map of key to list of values
      */
     public static Map<String, List<String>> parse(String rawQueryString) {
-        if (rawQueryString == null || rawQueryString.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        var returnMap = new HashMap<String, List<String>>();
-        for (String segment : rawQueryString.split("&")) {
-            String[] keyValue = segment.split("=", 2);
-            var values = returnMap.computeIfAbsent(keyValue[0], k -> new ArrayList<>());
-            if (keyValue.length == 1) {
-                values.add("");
-            } else {
-                values.add(URLEncoding.urlDecode(keyValue[1]));
-            }
-        }
-        return returnMap;
+        return rawQueryString == null || rawQueryString.isEmpty()
+                ? Collections.emptyMap()
+                : parseInto(rawQueryString, new HashMap<>());
     }
 
+    /**
+     * Parses a query string into a sorted map of key to list of values.
+     *
+     * @param rawQueryString the raw, encoded query string (or null).
+     * @return a sorted map of decoded keys to lists of decoded values.
+     */
+    public static Map<String, List<String>> parseSorted(String rawQueryString) {
+        return rawQueryString == null || rawQueryString.isEmpty()
+                ? Collections.emptyMap()
+                : parseInto(rawQueryString, new TreeMap<>());
+    }
+
+    private static Map<String, List<String>> parseInto(String source, Map<String, List<String>> sink) {
+        parse(source, (key, value) -> {
+            sink.computeIfAbsent(key, k -> new ArrayList<>()).add(value);
+            return true;
+        });
+        return sink;
+    }
+
+    /**
+     * Visitor that receives parsed query string parameters.
+     */
     public interface Visitor {
+        /**
+         * Called for each parsed query string parameter.
+         *
+         * @param key   the percent-decoded parameter key.
+         * @param value the percent-decoded parameter value, or "" if no value was present.
+         * @return true to continue parsing, false to stop early.
+         */
         boolean onParameter(String key, String value);
     }
 
+    /**
+     * Parses a query string, invoking the visitor for each parameter. Supports both {@code &} and {@code ;}
+     * as delimiters. Keys and values are percent-decoded.
+     *
+     * @param queryString the raw, encoded query string (or null).
+     * @param visitor     visitor to receive each parameter.
+     * @return true if all parameters were visited, false if the visitor stopped early.
+     */
     public static boolean parse(String queryString, Visitor visitor) {
         Objects.requireNonNull(visitor);
 
@@ -67,24 +97,6 @@ public final class QueryStringParser {
         }
 
         return handleParam(queryString, start, queryString.length(), visitor);
-    }
-
-    public static Map<String, List<String>> toMapOfLists(String queryString) {
-        final Map<String, List<String>> map = new TreeMap<>();
-
-        parse(queryString, (key, value) -> {
-            String strValue = null;
-            if (value != null) {
-                strValue = value;
-            }
-
-            List<String> values = map.computeIfAbsent(key, k -> new ArrayList<>());
-            values.add(strValue);
-
-            return true;
-        });
-
-        return map;
     }
 
     private static boolean handleParam(String queryString, int start, int end, Visitor visitor) {
@@ -127,49 +139,5 @@ public final class QueryStringParser {
             }
         }
         return -1;
-    }
-
-    public static String getPath(String uri) {
-        return getPath(uri, false);
-    }
-
-    public static String getRawPath(String uri) {
-        Objects.requireNonNull(uri);
-
-        int i = 0;
-        // Remove leading slashes
-        while (i < uri.length() - 1 && uri.charAt(i) == '/') {
-            i++;
-        }
-        int j = uri.indexOf('?');
-        if (j < 0) {
-            j = uri.length();
-        }
-        // Remove trailing slashes
-        while (j > i && uri.charAt(j - 1) == '/') {
-            j--;
-        }
-        return uri.substring(i, j);
-    }
-
-    public static String getPath(String uri, boolean allowEmptyPathSegments) {
-        uri = getRawPath(uri);
-        if (allowEmptyPathSegments) {
-            return uri;
-        }
-        return REGEX_STRING_OF_SLASHES.matcher(uri).replaceAll("/");
-    }
-
-    public static String getQuery(String uri) {
-        if (uri == null) {
-            throw new IllegalArgumentException();
-        }
-
-        int questionMark = uri.indexOf('?');
-        if (questionMark < 0) {
-            return null;
-        } else {
-            return uri.substring(questionMark + 1);
-        }
     }
 }

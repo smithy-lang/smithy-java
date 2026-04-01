@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.aws.server.restjson.router;
 
 import java.util.Collections;
-import software.amazon.smithy.java.io.uri.QueryStringParser;
+import software.amazon.smithy.java.io.uri.UriUtils;
 import software.amazon.smithy.model.pattern.InvalidPatternException;
 
 public final class UriPattern {
@@ -22,15 +22,15 @@ public final class UriPattern {
 
     public UriPattern(String pattern, boolean allowEmptyPathSegments) {
         this(
-                new PathPattern(QueryStringParser.getPath(pattern)),
-                getQueryPattern(QueryStringParser.getQuery(pattern)),
+                new PathPattern(UriUtils.getPath(pattern)),
+                getQueryPattern(UriUtils.getQuery(pattern)),
                 allowEmptyPathSegments);
     }
 
     UriPattern(String pattern, boolean allowEmptyPathSegments, boolean checkForLabelsAfterGreedyLabels) {
         this(
-                new PathPattern(QueryStringParser.getPath(pattern), checkForLabelsAfterGreedyLabels),
-                getQueryPattern(QueryStringParser.getQuery(pattern)),
+                new PathPattern(UriUtils.getPath(pattern), checkForLabelsAfterGreedyLabels),
+                getQueryPattern(UriUtils.getQuery(pattern)),
                 allowEmptyPathSegments);
     }
 
