@@ -65,12 +65,33 @@ public interface HttpHeaders {
     }
 
     /**
+     * Check if the given header is present.
+     *
+     * @param name Header to check.
+     * @return true if the header is present.
+     */
+    default boolean hasHeader(HeaderName name) {
+        return !allValues(name).isEmpty();
+    }
+
+    /**
      * Get the first header value of a specific header by case-insensitive name.
      *
      * @param name Name of the header to get.
      * @return the matching header value, or null if not found.
      */
     default String firstValue(String name) {
+        var list = allValues(name);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    /**
+     * Get the first header value of a specific header by case-insensitive name.
+     *
+     * @param name Name of the header to get.
+     * @return the matching header value, or null if not found.
+     */
+    default String firstValue(HeaderName name) {
         var list = allValues(name);
         return list.isEmpty() ? null : list.get(0);
     }
@@ -84,12 +105,22 @@ public interface HttpHeaders {
     List<String> allValues(String name);
 
     /**
+     * Get the values of a specific header by name.
+     *
+     * @param name Name of the header to get the values of, case-insensitively.
+     * @return the values of the header, or an empty list.
+     */
+    default List<String> allValues(HeaderName name) {
+        return allValues(name.name());
+    }
+
+    /**
      * Get the content-type header, or null if not found.
      *
      * @return the content-type header or null.
      */
     default String contentType() {
-        return firstValue("content-type");
+        return firstValue(HeaderName.CONTENT_TYPE);
     }
 
     /**
@@ -98,7 +129,7 @@ public interface HttpHeaders {
      * @return the parsed content-length or null.
      */
     default Long contentLength() {
-        var value = firstValue("content-length");
+        var value = firstValue(HeaderName.CONTENT_LENGTH);
         return value == null ? null : Long.parseLong(value);
     }
 

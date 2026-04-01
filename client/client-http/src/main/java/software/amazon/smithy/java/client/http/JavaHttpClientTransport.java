@@ -20,7 +20,7 @@ import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.error.ConnectTimeoutException;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.java.http.api.HeaderNames;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -149,7 +149,7 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         // Any explicitly set headers overwrite existing headers, they do not merge.
         request.headers().forEachEntry(httpRequestBuilder, (b, name, value) -> {
             // Skip restricted headers; Header names in HttpHeaders are always canonicalized, so check by reference.
-            if (name != HeaderNames.CONTENT_LENGTH) {
+            if (name != HeaderName.CONTENT_LENGTH.name()) {
                 b.setHeader(name, value);
             }
         });

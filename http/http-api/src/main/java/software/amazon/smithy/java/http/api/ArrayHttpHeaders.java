@@ -29,15 +29,15 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
      * Add a header with pre-interned name.
      *
      * <p>Fast path for parsers that already have an interned name from
-     * {@link HeaderNames#canonicalize(String)} or HPACK static table.
+     * {@link HeaderName#canonicalize(String)} or HPACK static table.
      *
-     * @param internedName pre-interned header name (must be from HeaderNameRegistry)
+     * @param key   pre-interned header name (must be from HeaderNameRegistry)
      * @param value header value
      */
-    void addHeaderInterned(String internedName, String value) {
+    void addHeaderCanonical(String key, String value) {
         ensureCapacity();
         int idx = size * 2;
-        array[idx] = internedName;
+        array[idx] = key;
         array[idx + 1] = HeaderUtils.normalizeValue(value);
         size++;
     }
@@ -51,14 +51,17 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
      * @param value header value
      */
     void addHeader(byte[] nameBytes, int nameOffset, int nameLength, String value) {
-        String name = HeaderNames.canonicalize(nameBytes, nameOffset, nameLength);
-        addHeaderInterned(name, value);
+        addHeaderCanonical(HeaderName.canonicalize(nameBytes, nameOffset, nameLength), value);
     }
 
     @Override
     public void addHeader(String name, String value) {
-        String key = HeaderNames.canonicalize(name);
-        addHeaderInterned(key, value);
+        addHeaderCanonical(HeaderName.canonicalize(name), value);
+    }
+
+    @Override
+    public void addHeader(HeaderName name, String value) {
+        addHeaderCanonical(name.name(), value);
     }
 
     @Override
@@ -66,16 +69,35 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
         if (values.isEmpty()) {
             return;
         }
+        addHeaderCanonical(HeaderName.canonicalize(name), values);
+    }
+
+    @Override
+    public void addHeader(HeaderName name, List<String> values) {
+        if (values.isEmpty()) {
+            return;
+        }
+        addHeaderCanonical(name.name(), values);
+    }
+
+    private void addHeaderCanonical(String key, List<String> values) {
         ensureCapacity(values.size());
-        String key = HeaderNames.canonicalize(name);
         for (String v : values) {
-            addHeaderInterned(key, v);
+            addHeaderCanonical(key, v);
         }
     }
 
     @Override
     public void setHeader(String name, String value) {
-        String key = HeaderNames.canonicalize(name);
+        setHeaderCanonical(HeaderName.canonicalize(name), value);
+    }
+
+    @Override
+    public void setHeader(HeaderName name, String value) {
+        setHeaderCanonical(name.name(), value);
+    }
+
+    private void setHeaderCanonical(String key, String value) {
         String normalizedValue = HeaderUtils.normalizeValue(value);
 
         int end = size * 2;
@@ -124,21 +146,33 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
 
     @Override
     public void setHeader(String name, List<String> values) {
-        String key = HeaderNames.canonicalize(name);
-        removeByKey(key);
+        setHeaderCanonical(HeaderName.canonicalize(name), values);
+    }
+
+    @Override
+    public void setHeader(HeaderName name, List<String> values) {
+        setHeaderCanonical(name.name(), values);
+    }
+
+    private void setHeaderCanonical(String key, List<String> values) {
+        removeCanonical(key);
         ensureCapacity(values.size());
         for (String v : values) {
-            addHeaderInterned(key, v);
+            addHeaderCanonical(key, v);
         }
     }
 
     @Override
     public void removeHeader(String name) {
-        String key = HeaderNames.canonicalize(name);
-        removeByKey(key);
+        removeCanonical(HeaderName.canonicalize(name));
     }
 
-    private void removeByKey(String key) {
+    @Override
+    public void removeHeader(HeaderName name) {
+        removeCanonical(name.name());
+    }
+
+    private void removeCanonical(String key) {
         // Compact in-place: copy non-matching entries over matching ones
         int write = 0;
         for (int read = 0; read < size; read++) {
@@ -190,7 +224,7 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
             for (int read = 0; read < size; read++) {
                 int idx = read * 2;
                 String n = array[idx];
-                if (!containsName(ah, n)) {
+                if (!containsCanonical(ah, n)) {
                     if (write != read) {
                         array[write * 2] = n;
                         array[write * 2 + 1] = array[idx + 1];
@@ -212,7 +246,7 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
         }
     }
 
-    private static boolean containsName(AbstractArrayHttpHeaders source, String name) {
+    private static boolean containsCanonical(AbstractArrayHttpHeaders source, String name) {
         for (int i = 0; i < source.size * 2; i += 2) {
             if (source.array[i] == name || source.array[i].equals(name)) {
                 return true;

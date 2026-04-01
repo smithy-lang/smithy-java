@@ -21,7 +21,7 @@ import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
-import software.amazon.smithy.java.http.api.HeaderNames;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -86,13 +86,13 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
             // Event streaming
             var encoderFactory = getEventEncoderFactory(operation);
             var body = RpcEventStreamsUtil.bodyForEventStreaming(encoderFactory, input);
-            builder.addHeader(HeaderNames.X_AMZ_TARGET, target)
-                    .addHeader(HeaderNames.CONTENT_TYPE, "application/vnd.amazon.eventstream")
-                    .addHeader(HeaderNames.ACCEPT, contentType())
+            builder.addHeader(HeaderName.X_AMZ_TARGET, target)
+                    .addHeader(HeaderName.CONTENT_TYPE, "application/vnd.amazon.eventstream")
+                    .addHeader(HeaderName.ACCEPT, contentType())
                     .setBody(body);
         } else {
-            builder.addHeader(HeaderNames.X_AMZ_TARGET, target)
-                    .addHeader(HeaderNames.CONTENT_TYPE, contentType());
+            builder.addHeader(HeaderName.X_AMZ_TARGET, target)
+                    .addHeader(HeaderName.CONTENT_TYPE, contentType());
         }
         return builder.setBody(DataStream.ofByteBuffer(codec.serialize(input), contentType()));
     }

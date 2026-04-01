@@ -7,7 +7,6 @@ package software.amazon.smithy.java.aws.client.awsquery;
 
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.aws.traits.protocols.AwsQueryErrorTrait;
 import software.amazon.smithy.aws.traits.protocols.AwsQueryTrait;
@@ -27,7 +26,7 @@ import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -39,8 +38,6 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public final class AwsQueryClientProtocol extends HttpClientProtocol {
 
     private static final String CONTENT_TYPE = "application/x-www-form-urlencoded";
-    private static final List<String> CONTENT_TYPE_LIST = List.of(CONTENT_TYPE);
-    public static final HttpHeaders CONTENT_TYPE_HEADERS = HttpHeaders.of(Map.of("Content-Type", CONTENT_TYPE_LIST));
 
     private final ShapeId service;
     private final String version;
@@ -83,7 +80,7 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
         return HttpRequest.create()
                 .setMethod("POST")
                 .setUri(endpoint)
-                .setHeaders(CONTENT_TYPE_HEADERS)
+                .setHeader(HeaderName.CONTENT_TYPE, CONTENT_TYPE)
                 .setBody(DataStream.ofByteBuffer(body, CONTENT_TYPE));
     }
 

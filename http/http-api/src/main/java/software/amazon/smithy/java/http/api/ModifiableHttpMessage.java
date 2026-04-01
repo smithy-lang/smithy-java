@@ -94,6 +94,18 @@ public interface ModifiableHttpMessage<T extends ModifiableHttpMessage<T>> exten
     }
 
     /**
+     * Set a specific header by name and replace any existing value.
+     *
+     * @param name Header to set.
+     * @param value Value to set.
+     * @return modifiable message.
+     */
+    default T setHeader(HeaderName name, String value) {
+        headers().setHeader(name, value);
+        return (T) this;
+    }
+
+    /**
      * Set a specific header by name and replace any existing values.
      *
      * @param name Header to set.
@@ -101,6 +113,18 @@ public interface ModifiableHttpMessage<T extends ModifiableHttpMessage<T>> exten
      * @return modifiable message.
      */
     default T setHeader(String name, List<String> values) {
+        headers().setHeader(name, values);
+        return (T) this;
+    }
+
+    /**
+     * Set a specific header by name and replace any existing values.
+     *
+     * @param name Header to set.
+     * @param values Values to set.
+     * @return modifiable message.
+     */
+    default T setHeader(HeaderName name, List<String> values) {
         headers().setHeader(name, values);
         return (T) this;
     }
@@ -121,11 +145,59 @@ public interface ModifiableHttpMessage<T extends ModifiableHttpMessage<T>> exten
      * Add a specific header by name to any existing headers with the same name.
      *
      * @param name Header to add.
+     * @param value Value to add.
+     * @return modifiable message.
+     */
+    default T addHeader(HeaderName name, String value) {
+        headers().addHeader(name, value);
+        return (T) this;
+    }
+
+    /**
+     * Add a specific header by name to any existing headers with the same name.
+     *
+     * @param name Header to add.
      * @param value Values to add.
      * @return modifiable message.
      */
     default T addHeader(String name, List<String> value) {
         headers().addHeader(name, value);
+        return (T) this;
+    }
+
+    /**
+     * Add a specific header by name to any existing headers with the same name.
+     *
+     * @param name Header to add.
+     * @param value Values to add.
+     * @return modifiable message.
+     */
+    default T addHeader(HeaderName name, List<String> value) {
+        headers().addHeader(name, value);
+        return (T) this;
+    }
+
+    /**
+     * Remove a header.
+     *
+     * @param name Header to remove.
+     * @return modifiable message.
+     */
+    @SuppressWarnings("unchecked")
+    default T removeHeader(HeaderName name) {
+        headers().removeHeader(name);
+        return (T) this;
+    }
+
+    /**
+     * Remove a header.
+     *
+     * @param name Header to remove.
+     * @return modifiable message.
+     */
+    @SuppressWarnings("unchecked")
+    default T removeHeader(String name) {
+        headers().removeHeader(name);
         return (T) this;
     }
 

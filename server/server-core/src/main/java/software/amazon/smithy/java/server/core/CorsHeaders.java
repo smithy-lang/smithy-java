@@ -9,9 +9,13 @@ import static software.amazon.smithy.java.core.schema.TraitKey.CORS_TRAIT;
 
 import java.util.Arrays;
 import java.util.List;
-import software.amazon.smithy.java.http.api.HeaderNames;
+import software.amazon.smithy.java.http.api.HeaderName;
 
 public final class CorsHeaders {
+
+    private static final HeaderName ACCESS_CONTROL_ALLOW_METHODS = HeaderName.of("access-control-allow-methods");
+    private static final HeaderName ACCESS_CONTROL_ALLOW_HEADERS = HeaderName.of("access-control-allow-headers");
+    private static final HeaderName ACCESS_CONTROL_MAX_AGE = HeaderName.of("access-control-max-age");
 
     private CorsHeaders() {}
 
@@ -20,7 +24,7 @@ public final class CorsHeaders {
             return;
         }
 
-        String requestOrigin = job.request().headers().firstValue(HeaderNames.ORIGIN);
+        String requestOrigin = job.request().headers().firstValue(HeaderName.ORIGIN);
         String configuredOrigin = getConfiguredOrigin(job);
 
         if (!isOriginAllowed(configuredOrigin, requestOrigin)) {
@@ -28,11 +32,11 @@ public final class CorsHeaders {
         }
 
         var headers = job.response().headers();
-        headers.addHeader("access-control-allow-methods", "GET, POST, PUT, DELETE, OPTIONS");
-        headers.addHeader("access-control-allow-headers",
+        headers.addHeader(ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, PUT, DELETE, OPTIONS");
+        headers.addHeader(ACCESS_CONTROL_ALLOW_HEADERS,
                 "*,Access-Control-Allow-Headers,Access-Control-Allow-Methods,Access-Control-Allow-Origin,Amz-Sdk-Invocation-Id,Amz-Sdk-Request,Authorization,Content-Length,Content-Type,X-Amz-User-Agent,X-Amzn-Trace-Id");
-        headers.addHeader("access-control-max-age", "600");
-        headers.addHeader(HeaderNames.ACCESS_CONTROL_ALLOW_ORIGIN, List.of(requestOrigin));
+        headers.addHeader(ACCESS_CONTROL_MAX_AGE, "600");
+        headers.addHeader(HeaderName.ACCESS_CONTROL_ALLOW_ORIGIN, List.of(requestOrigin));
     }
 
     private static boolean shouldAddCorsHeaders(HttpJob job) {
@@ -42,7 +46,7 @@ public final class CorsHeaders {
                 !job.operation().getApiOperation().service().schema().hasTrait(CORS_TRAIT)) {
             return false;
         }
-        return job.request().headers().hasHeader(HeaderNames.ORIGIN);
+        return job.request().headers().hasHeader(HeaderName.ORIGIN);
     }
 
     private static String getConfiguredOrigin(HttpJob job) {

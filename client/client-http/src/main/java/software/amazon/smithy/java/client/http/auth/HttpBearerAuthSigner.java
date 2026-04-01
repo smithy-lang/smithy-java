@@ -9,7 +9,7 @@ import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.TokenIdentity;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.http.api.HeaderNames;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.logging.InternalLogger;
 
@@ -23,9 +23,9 @@ final class HttpBearerAuthSigner implements Signer<HttpRequest, TokenIdentity> {
     @Override
     public SignResult<HttpRequest> sign(HttpRequest request, TokenIdentity identity, Context properties) {
         var mod = request.toModifiable();
-        if (mod.headers().hasHeader(HeaderNames.AUTHORIZATION)) {
+        if (mod.headers().hasHeader(HeaderName.AUTHORIZATION)) {
             LOGGER.debug("Replaced existing Authorization header value.");
         }
-        return new SignResult<>(mod.setHeader(HeaderNames.AUTHORIZATION, SCHEME + " " + identity.token()));
+        return new SignResult<>(mod.setHeader(HeaderName.AUTHORIZATION, SCHEME + " " + identity.token()));
     }
 }

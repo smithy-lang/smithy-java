@@ -15,7 +15,7 @@ import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.client.http.compression.CompressionAlgorithm;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.TraitKey;
-import software.amazon.smithy.java.http.api.HeaderNames;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.model.traits.RequestCompressionTrait;
@@ -58,7 +58,7 @@ public final class RequestCompressionPlugin implements AutoClientPlugin {
                             return hook.asRequestType(
                                     req.toModifiable()
                                             .setBody(compressed)
-                                            .addHeader(HeaderNames.CONTENT_ENCODING, algorithmId));
+                                            .addHeader(HeaderName.CONTENT_ENCODING, algorithmId));
                         }
                     }
                 }

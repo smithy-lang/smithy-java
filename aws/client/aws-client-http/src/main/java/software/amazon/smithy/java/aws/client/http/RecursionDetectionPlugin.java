@@ -10,7 +10,7 @@ import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
-import software.amazon.smithy.java.http.api.HeaderNames;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 
 /**
@@ -48,9 +48,9 @@ public final class RecursionDetectionPlugin implements ClientPlugin {
         @Override
         public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
             if (hook.request() instanceof HttpRequest req) {
-                if (!req.headers().hasHeader(HeaderNames.X_AMZN_TRACE_ID)) {
+                if (!req.headers().hasHeader(HeaderName.X_AMZN_TRACE_ID)) {
                     return hook.asRequestType(
-                            req.toModifiable().setHeader(HeaderNames.X_AMZN_TRACE_ID, traceIdHeader));
+                            req.toModifiable().setHeader(HeaderName.X_AMZN_TRACE_ID, traceIdHeader));
                 }
             }
             return hook.request();

@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import software.amazon.smithy.java.http.api.HeaderNames;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
 
 final class NettyHttpHeaders implements ModifiableHttpHeaders {
@@ -138,7 +138,7 @@ final class NettyHttpHeaders implements ModifiableHttpHeaders {
     public void forEachEntry(BiConsumer<String, String> consumer) {
         for (var entry : nettyHeaders) {
             // consumers expect canonicalized names
-            consumer.accept(HeaderNames.canonicalize(entry.getKey()), entry.getValue());
+            consumer.accept(HeaderName.canonicalize(entry.getKey()), entry.getValue());
         }
     }
 

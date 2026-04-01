@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.client.rpcv2;
 
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.java.aws.events.AwsEventDecoderFactory;
 import software.amazon.smithy.java.aws.events.AwsEventEncoderFactory;
@@ -30,8 +28,7 @@ import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
-import software.amazon.smithy.java.http.api.HeaderNames;
-import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -47,8 +44,6 @@ import software.amazon.smithy.protocol.traits.Rpcv2CborTrait;
 public final class RpcV2CborProtocol extends HttpClientProtocol {
     private static final Codec CBOR_CODEC = Rpcv2CborCodec.builder().build();
     private static final String PAYLOAD_MEDIA_TYPE = "application/cbor";
-    private static final List<String> CONTENT_TYPE = List.of(PAYLOAD_MEDIA_TYPE);
-    private static final List<String> SMITHY_PROTOCOL = List.of("rpc-v2-cbor");
 
     private final ShapeId service;
     private final HttpErrorDeserializer errorDeserializer;
@@ -81,17 +76,22 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
         builder.setHttpVersion(HttpVersion.HTTP_2);
         if (operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
             // Top-level Unit types do not get serialized
-            builder.setHeaders(HttpHeaders.of(headersForEmptyBody()))
+            builder.addHeader(HeaderName.SMITHY_PROTOCOL, "rpc-v2-cbor")
+                    .addHeader(HeaderName.ACCEPT, PAYLOAD_MEDIA_TYPE)
                     .setBody(DataStream.ofEmpty());
         } else if (operation.inputEventBuilderSupplier() != null) {
             // Event streaming
             var encoderFactory = getEventEncoderFactory(operation);
             var body = RpcEventStreamsUtil.bodyForEventStreaming(encoderFactory, input);
-            builder.setHeaders(HttpHeaders.of(headersForEventStreaming()))
+            builder.addHeader(HeaderName.SMITHY_PROTOCOL, "rpc-v2-cbor")
+                    .addHeader(HeaderName.CONTENT_TYPE, "application/vnd.amazon.eventstream")
+                    .addHeader(HeaderName.ACCEPT, PAYLOAD_MEDIA_TYPE)
                     .setBody(body);
         } else {
             // Regular request
-            builder.setHeaders(HttpHeaders.of(headers()))
+            builder.addHeader(HeaderName.SMITHY_PROTOCOL, "rpc-v2-cbor")
+                    .addHeader(HeaderName.CONTENT_TYPE, PAYLOAD_MEDIA_TYPE)
+                    .addHeader(HeaderName.ACCEPT, PAYLOAD_MEDIA_TYPE)
                     .setBody(getBody(input));
         }
         return builder.toUnmodifiable();
@@ -136,28 +136,6 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
             input.serialize(serializer);
         }
         return DataStream.ofByteBuffer(sink.toByteBuffer(), PAYLOAD_MEDIA_TYPE);
-    }
-
-    private Map<String, List<String>> headers() {
-        return Map.of(HeaderNames.SMITHY_PROTOCOL,
-                SMITHY_PROTOCOL,
-                HeaderNames.CONTENT_TYPE,
-                CONTENT_TYPE,
-                HeaderNames.ACCEPT,
-                CONTENT_TYPE);
-    }
-
-    private Map<String, List<String>> headersForEmptyBody() {
-        return Map.of(HeaderNames.SMITHY_PROTOCOL, SMITHY_PROTOCOL, HeaderNames.ACCEPT, CONTENT_TYPE);
-    }
-
-    private Map<String, List<String>> headersForEventStreaming() {
-        return Map.of(HeaderNames.SMITHY_PROTOCOL,
-                SMITHY_PROTOCOL,
-                HeaderNames.CONTENT_TYPE,
-                List.of("application/vnd.amazon.eventstream"),
-                HeaderNames.ACCEPT,
-                CONTENT_TYPE);
     }
 
     private EventEncoderFactory<AwsEventFrame> getEventEncoderFactory(ApiOperation<?, ?> operation) {

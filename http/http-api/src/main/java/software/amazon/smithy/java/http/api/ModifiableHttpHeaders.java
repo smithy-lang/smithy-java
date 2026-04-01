@@ -29,6 +29,20 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
     void addHeader(String name, String value);
 
     /**
+     * Add a header by name with the given value.
+     *
+     * <p>Any previously set values for this header are retained. This value is added
+     * to a list of values for this header name. To overwrite an existing value, use
+     * {@link #setHeader(String, String)}.
+     *
+     * @param name Case-insensitive name of the header to set.
+     * @param value Value to set.
+     */
+    default void addHeader(HeaderName name, String value) {
+        addHeader(name.name(), value);
+    }
+
+    /**
      * Add a header by name with the given values.
      *
      * <p>Any previously set values for this header are retained. This value is added
@@ -39,6 +53,20 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
      * @param values Values to set.
      */
     void addHeader(String name, List<String> values);
+
+    /**
+     * Add a header by name with the given values.
+     *
+     * <p>Any previously set values for this header are retained. This value is added
+     * to a list of values for this header name. To overwrite an existing value, use
+     * {@link #setHeader(String, List)}.
+     *
+     * @param name Case-insensitive name of the header to set.
+     * @param values Values to set.
+     */
+    default void addHeader(HeaderName name, List<String> values) {
+        addHeader(name.name(), values);
+    }
 
     /**
      * Adds the given {@code headers}, similarly to if {@link #addHeader(String, List)} were to be called for each
@@ -80,6 +108,21 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
      * Sets a header to the given value, overwriting old values if present.
      *
      * <p>Any previously set values for this header are replaced as if {@link #removeHeader(String)} and
+     * {@link #addHeader(String, String)} were called in sequence. To add a new value to a
+     * list of values, use {@link #addHeader(String, String)}.
+     *
+     * @param name Case-insensitive name of the header to set.
+     * @param value Value to set.
+     */
+    default void setHeader(HeaderName name, String value) {
+        removeHeader(name);
+        addHeader(name, value);
+    }
+
+    /**
+     * Sets a header to the given value, overwriting old values if present.
+     *
+     * <p>Any previously set values for this header are replaced as if {@link #removeHeader(String)} and
      * {@link #addHeader(String, String)} were called in sequence. To add new values to a
      * list of values, use {@link #addHeader(String, List)}.
      *
@@ -92,37 +135,18 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Set a value, but only if it isn't set already.
+     * Sets a header to the given value, overwriting old values if present.
      *
-     * @param name Name of the value to set.
-     * @param values Value to set.
-     * @return the previous values associated with the name, or null if there was no mapping.
-     */
-    default List<String> setHeaderIfAbsent(String name, List<String> values) {
-        var current = allValues(name);
-        if (!current.isEmpty()) {
-            return current;
-        } else {
-            setHeader(name, values);
-            return null;
-        }
-    }
-
-    /**
-     * Set a value, but only if it isn't set already.
+     * <p>Any previously set values for this header are replaced as if {@link #removeHeader(String)} and
+     * {@link #addHeader(String, String)} were called in sequence. To add new values to a
+     * list of values, use {@link #addHeader(String, List)}.
      *
-     * @param name Name of the value to set.
-     * @param value Value to set.
-     * @return the previous values associated with the name, or null if there was no mapping.
+     * @param name Case-insensitive name of the header to set.
+     * @param values Values to set.
      */
-    default List<String> setHeaderIfAbsent(String name, String value) {
-        var current = allValues(name);
-        if (!current.isEmpty()) {
-            return current;
-        } else {
-            setHeader(name, List.of(value));
-            return null;
-        }
+    default void setHeader(HeaderName name, List<String> values) {
+        removeHeader(name);
+        addHeader(name, values);
     }
 
     /**
@@ -153,6 +177,15 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
      * @param name Case-insensitive name of the header to remove.
      */
     void removeHeader(String name);
+
+    /**
+     * Remove a header and its values by name.
+     *
+     * @param name Case-insensitive name of the header to remove.
+     */
+    default void removeHeader(HeaderName name) {
+        removeHeader(name.name());
+    }
 
     /**
      * Removes all headers.

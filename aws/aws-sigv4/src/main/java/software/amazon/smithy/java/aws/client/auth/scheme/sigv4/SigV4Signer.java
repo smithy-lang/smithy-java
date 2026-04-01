@@ -24,7 +24,7 @@ import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.http.api.HeaderNames;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -40,11 +40,11 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(SigV4Signer.class);
     private static final List<String> HEADERS_TO_IGNORE_IN_LOWER_CASE = List.of(
-            HeaderNames.CONNECTION,
-            HeaderNames.CONTENT_LENGTH,
-            HeaderNames.X_AMZN_TRACE_ID,
-            HeaderNames.USER_AGENT,
-            HeaderNames.EXPECT);
+            HeaderName.CONNECTION.name(),
+            HeaderName.CONTENT_LENGTH.name(),
+            HeaderName.X_AMZN_TRACE_ID.name(),
+            HeaderName.USER_AGENT.name(),
+            HeaderName.EXPECT.name());
 
     private static final String ALGORITHM = "AWS4-HMAC-SHA256";
     private static final String TERMINATOR = "aws4_request";
@@ -125,16 +125,16 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
         // AWS4 requires a number of headers to be set before signing including 'Host' and 'X-Amz-Date'
         var hostHeader = uriUsingStandardPort(uri) ? uri.getHost() + ':' + uri.getPort() : uri.getHost();
-        headers.put(HeaderNames.HOST, List.of(hostHeader));
+        headers.put(HeaderName.HOST.name(), List.of(hostHeader));
 
         var sb = signingResources.sb;
         var signingDate = signingTimestamp.atOffset(ZoneOffset.UTC).toLocalDateTime();
         var dateStamp = formatDate(signingDate, sb);
         var requestTime = formatRfc3339(signingDate, dateStamp, sb);
-        headers.put(HeaderNames.X_AMZ_DATE, List.of(requestTime));
+        headers.put(HeaderName.X_AMZ_DATE.name(), List.of(requestTime));
 
         if (sessionToken != null) {
-            headers.put(HeaderNames.X_AMZ_SECURITY_TOKEN, List.of(sessionToken));
+            headers.put(HeaderName.X_AMZ_SECURITY_TOKEN.name(), List.of(sessionToken));
         }
 
         // Determine sorted list of headers to sign

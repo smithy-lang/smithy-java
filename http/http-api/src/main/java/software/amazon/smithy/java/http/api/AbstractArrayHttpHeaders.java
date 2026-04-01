@@ -26,9 +26,6 @@ import java.util.function.BiConsumer;
  * array[3] = value2
  * ...
  * </pre>
- *
- * <p>Header names are interned via {@link HeaderNames}, enabling O(1) pointer
- * comparison ({@code ==}) for known headers. Unknown headers fall back to {@code equals()}.
  */
 abstract class AbstractArrayHttpHeaders implements HttpHeaders {
 
@@ -42,7 +39,15 @@ abstract class AbstractArrayHttpHeaders implements HttpHeaders {
 
     @Override
     public String firstValue(String name) {
-        String key = HeaderNames.canonicalize(name);
+        return firstValueCanonical(HeaderName.canonicalize(name));
+    }
+
+    @Override
+    public String firstValue(HeaderName name) {
+        return firstValueCanonical(name.name());
+    }
+
+    private String firstValueCanonical(String key) {
         for (int i = 0; i < size * 2; i += 2) {
             String headerName = array[i];
             if (headerName == key || headerName.equals(key)) {
@@ -54,7 +59,32 @@ abstract class AbstractArrayHttpHeaders implements HttpHeaders {
 
     @Override
     public List<String> allValues(String name) {
-        return canonicalAllValues(HeaderNames.canonicalize(name));
+        return canonicalAllValues(HeaderName.canonicalize(name));
+    }
+
+    @Override
+    public List<String> allValues(HeaderName name) {
+        return canonicalAllValues(name.name());
+    }
+
+    @Override
+    public boolean hasHeader(String name) {
+        return hasHeaderCanonical(HeaderName.canonicalize(name));
+    }
+
+    @Override
+    public boolean hasHeader(HeaderName name) {
+        return hasHeaderCanonical(name.name());
+    }
+
+    private boolean hasHeaderCanonical(String key) {
+        for (int i = 0; i < size * 2; i += 2) {
+            String headerName = array[i];
+            if (headerName == key || headerName.equals(key)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     protected final List<String> canonicalAllValues(String canonicalName) {
@@ -154,18 +184,6 @@ abstract class AbstractArrayHttpHeaders implements HttpHeaders {
             pos += 2;
             return value;
         }
-    }
-
-    @Override
-    public boolean hasHeader(String name) {
-        String key = HeaderNames.canonicalize(name);
-        for (int i = 0; i < size * 2; i += 2) {
-            String headerName = array[i];
-            if (headerName == key || headerName.equals(key)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override
