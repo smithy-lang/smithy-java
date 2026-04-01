@@ -5,12 +5,12 @@
 
 package software.amazon.smithy.java.aws.client.http;
 
-import java.util.List;
 import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 
 /**
@@ -38,9 +38,8 @@ public final class AmzSdkRequestPlugin implements ClientPlugin {
                         value.append("; max=").append(max);
                     }
                     return hook.asRequestType(
-                            req.toBuilder()
-                                    .withReplacedHeader("amz-sdk-request", List.of(value.toString()))
-                                    .build());
+                            req.toModifiable()
+                                    .setHeader(HeaderName.AMZ_SDK_REQUEST, value.toString()));
                 }
             }
             return hook.request();

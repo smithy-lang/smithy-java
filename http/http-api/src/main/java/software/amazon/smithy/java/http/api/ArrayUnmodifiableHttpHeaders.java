@@ -62,7 +62,7 @@ final class ArrayUnmodifiableHttpHeaders extends AbstractArrayHttpHeaders {
         String[] arr = new String[totalPairs * 2];
         int idx = 0;
         for (Map.Entry<String, List<String>> e : map.entrySet()) {
-            String name = HeaderNames.canonicalize(e.getKey());
+            String name = HeaderName.canonicalize(e.getKey());
             for (String value : e.getValue()) {
                 arr[idx++] = name;
                 arr[idx++] = value;
@@ -85,9 +85,9 @@ final class ArrayUnmodifiableHttpHeaders extends AbstractArrayHttpHeaders {
         // Use ArrayHttpHeaders to handle merging of same-named headers
         ArrayHttpHeaders mutable = new ArrayHttpHeaders(input.size() * 2);
         for (Map.Entry<String, List<String>> e : input.entrySet()) {
-            String name = HeaderNames.canonicalize(e.getKey());
+            String name = HeaderName.canonicalize(e.getKey());
             for (String value : e.getValue()) {
-                mutable.addHeaderInterned(name, value);
+                mutable.addHeaderCanonical(name, value);
             }
         }
         return of(mutable);
@@ -95,9 +95,17 @@ final class ArrayUnmodifiableHttpHeaders extends AbstractArrayHttpHeaders {
 
     @Override
     public List<String> allValues(String name) {
-        var canonical = HeaderNames.canonicalize(name);
+        return allValuesCanonical(HeaderName.canonicalize(name));
+    }
+
+    @Override
+    public List<String> allValues(HeaderName name) {
+        return allValuesCanonical(name.name());
+    }
+
+    private List<String> allValuesCanonical(String key) {
         Map<String, List<String>> m = mapView;
-        return m != null ? m.getOrDefault(canonical, Collections.emptyList()) : canonicalAllValues(canonical);
+        return m != null ? m.getOrDefault(key, Collections.emptyList()) : canonicalAllValues(key);
     }
 
     @Override

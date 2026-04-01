@@ -65,13 +65,13 @@ public class HttpServerResponseProtocolTestProvider extends
                 headers.put("content-length", List.of("0"));
                 headers.put("content-type", List.of("application/json"));
 
-                var request = HttpRequest.builder()
-                        .httpVersion(HttpVersion.HTTP_1_1)
-                        .body(DataStream.ofBytes(new byte[0]))
-                        .uri(testData.endpoint())
-                        .headers(HttpHeaders.of(headers))
-                        .method("POST")
-                        .build();
+                var request = HttpRequest.create()
+                        .setHttpVersion(HttpVersion.HTTP_1_1)
+                        .setBody(DataStream.ofBytes(new byte[0]))
+                        .setUri(testData.endpoint())
+                        .setHeaders(HttpHeaders.of(headers))
+                        .setMethod("POST")
+                        .toUnmodifiable();
                 invocationContexts.add(
                         new ServerResponseInvocationContext(
                                 testCase,

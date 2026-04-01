@@ -9,7 +9,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 
-import java.util.List;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.client.core.ClientPlugin;
@@ -49,7 +48,10 @@ public class RecursionDetectionPluginTest {
 
     private HttpHeaders getSentHeaders(ClientPlugin recursionDetectionPlugin, ClientInterceptor interceptor) {
         var mockQueue = new MockQueue();
-        mockQueue.enqueue(HttpResponse.builder().statusCode(200).body(DataStream.ofString("{\"id\":\"1\"}")).build());
+        mockQueue.enqueue(HttpResponse.create()
+                .setStatusCode(200)
+                .setBody(DataStream.ofString("{\"id\":\"1\"}"))
+                .toUnmodifiable());
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var builder = DynamicClient.builder()
@@ -80,7 +82,7 @@ public class RecursionDetectionPluginTest {
             public <RequestT> RequestT modifyBeforeSigning(RequestHook<?, ?, RequestT> hook) {
                 if (hook.request() instanceof HttpRequest req) {
                     return hook.asRequestType(
-                            req.toBuilder().withReplacedHeader("x-amzn-trace-id", List.of("hi")).build());
+                            req.toModifiableCopy().setHeader("x-amzn-trace-id", "hi"));
                 }
                 return hook.request();
             }

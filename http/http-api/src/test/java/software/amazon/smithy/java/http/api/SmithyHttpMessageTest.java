@@ -16,17 +16,16 @@ import org.junit.jupiter.api.Test;
 public class SmithyHttpMessageTest {
     @Test
     public void canAddHeadersToImmutableHeaders() throws Exception {
-        var r = HttpRequest.builder()
-                .method("GET")
-                .uri(new URI("https://example.com"))
-                .headers(HttpHeaders.of(Map.of("foo", List.of("bar"))))
-                .build();
+        var r = HttpRequest.create()
+                .setMethod("GET")
+                .setUri(new URI("https://example.com"))
+                .setHeaders(HttpHeaders.of(Map.of("foo", List.of("bar"))))
+                .toUnmodifiable();
 
-        var builder = r.toBuilder();
-        builder.withAddedHeader("foo", "bar2");
-        builder.withAddedHeaders(HttpHeaders.of(Map.of("foo", List.of("bar3"))));
-        var updated = builder.build();
+        var mod = r.toModifiableCopy();
+        mod.headers().addHeader("foo", "bar2");
+        mod.headers().addHeaders(HttpHeaders.of(Map.of("foo", List.of("bar3"))));
 
-        assertThat(updated.headers().allValues("foo"), contains("bar", "bar2", "bar3"));
+        assertThat(mod.headers().allValues("foo"), contains("bar", "bar2", "bar3"));
     }
 }

@@ -66,13 +66,13 @@ public class HttpServerRequestProtocolTestProvider extends
                 } else {
                     mapper = String::getBytes;
                 }
-                var request = HttpRequest.builder()
-                        .uri(createUri)
-                        .body(DataStream.ofBytes(testCase.getBody().map(mapper).orElse(new byte[0])))
-                        .httpVersion(HttpVersion.HTTP_1_1)
-                        .method(testCase.getMethod())
-                        .headers(headers)
-                        .build();
+                var request = HttpRequest.create()
+                        .setUri(createUri)
+                        .setBody(DataStream.ofBytes(testCase.getBody().map(mapper).orElse(new byte[0])))
+                        .setHttpVersion(HttpVersion.HTTP_1_1)
+                        .setMethod(testCase.getMethod())
+                        .setHeaders(headers)
+                        .toUnmodifiable();
                 invocationContexts.add(
                         new ServerRequestInvocationContext(
                                 testCase,

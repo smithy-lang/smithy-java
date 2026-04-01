@@ -5,10 +5,6 @@
 
 package software.amazon.smithy.java.http.api;
 
-import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Flow;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
@@ -83,117 +79,6 @@ public interface HttpMessage extends AutoCloseable {
         var body = body();
         if (body != null) {
             body.close();
-        }
-    }
-
-    /**
-     * Builder for HTTP messages.
-     *
-     * @param <B> Builder type.
-     */
-    @SuppressWarnings("rawtypes")
-    interface Builder<B extends Builder> {
-        /**
-         * Set the HTTP version.
-         *
-         * @param httpVersion HTTP version of the message.
-         * @return the builder.
-         */
-        B httpVersion(HttpVersion httpVersion);
-
-        /**
-         * Set the body of the message.
-         *
-         * @param publisher Body to set.
-         * @return the builder.
-         */
-        default B body(Flow.Publisher<ByteBuffer> publisher) {
-            return body(DataStream.ofPublisher(publisher, null, -1));
-        }
-
-        /**
-         * Set the body of the message.
-         *
-         * @param body Body to set.
-         * @return the builder.
-         */
-        B body(DataStream body);
-
-        /**
-         * Set the headers of the message, replacing any previously set headers.
-         *
-         * @param headers Headers to set.
-         * @return the builder.
-         */
-        B headers(HttpHeaders headers);
-
-        /**
-         * Add and merge in the given headers to the message.
-         *
-         * @param name  Header name to append.
-         * @param value Header value to append.
-         * @return the builder.
-         */
-        B withAddedHeader(String name, String value);
-
-        /**
-         * Add and merge in the given headers to the message.
-         *
-         * @param headers Headers to add and merge in.
-         * @return the builder.
-         */
-        B withAddedHeaders(Map<String, List<String>> headers);
-
-        /**
-         * Add and merge in the given headers to the message.
-         *
-         * @param headers Headers to add and merge in.
-         * @return the builder.
-         */
-        @SuppressWarnings("unchecked")
-        default B withAddedHeaders(HttpHeaders headers) {
-            headers.forEachEntry(this::withAddedHeader);
-            return (B) this;
-        }
-
-        /**
-         * Put the given headers onto the message, replacing any existing headers with the same names.
-         *
-         * @param headers Headers to put.
-         * @return the builder.
-         */
-        B withReplacedHeaders(Map<String, List<String>> headers);
-
-        /**
-         * Put the given headers onto the message, replacing any existing headers with the same names.
-         *
-         * @param headers Headers to put.
-         * @return the builder.
-         */
-        @SuppressWarnings("unchecked")
-        default B withReplacedHeaders(HttpHeaders headers) {
-            headers.forEachEntry(this::withReplacedHeader);
-            return (B) this;
-        }
-
-        /**
-         * Replaces a header.
-         *
-         * @param name  Header name to replace.
-         * @param value Header value to replace.
-         * @return the builder.
-         */
-        B withReplacedHeader(String name, String value);
-
-        /**
-         * Replaces a header.
-         *
-         * @param name  Header name to replace.
-         * @param values Header values to replace.
-         * @return the builder.
-         */
-        default B withReplacedHeader(String name, List<String> values) {
-            return withReplacedHeaders(Map.of(name, values));
         }
     }
 }

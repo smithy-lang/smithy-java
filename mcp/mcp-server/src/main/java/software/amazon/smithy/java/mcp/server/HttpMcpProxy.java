@@ -15,6 +15,7 @@ import software.amazon.smithy.java.client.http.HttpContext;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.ByteBufferUtils;
@@ -33,6 +34,9 @@ public final class HttpMcpProxy extends McpServerProxy {
     private static final JsonCodec JSON_CODEC = JsonCodec.builder()
             .settings(JsonSettings.builder().serializeTypeInDocuments(false).useJsonName(true).build())
             .build();
+
+    private static final HeaderName MCP_PROTOCOL_VERSION = HeaderName.of("mcp-protocol-version");
+    private static final HeaderName MCP_SESSION_ID = HeaderName.of("mcp-session-id");
 
     private final ClientTransport<HttpRequest, HttpResponse> transport;
     private final URI endpoint;
@@ -108,17 +112,17 @@ public final class HttpMcpProxy extends McpServerProxy {
 
             String protocolVersionHeader = getProtocolVersion().identifier();
 
-            HttpRequest.Builder requestBuilder = HttpRequest.builder()
-                    .uri(endpoint)
-                    .method("POST")
-                    .withAddedHeader("Content-Type", "application/json")
-                    .withAddedHeader("Accept", "application/json, text/event-stream")
-                    .withAddedHeader("MCP-Protocol-Version", protocolVersionHeader);
+            var requestBuilder = HttpRequest.create()
+                    .setUri(endpoint)
+                    .setMethod("POST")
+                    .addHeader(HeaderName.CONTENT_TYPE, "application/json")
+                    .addHeader(HeaderName.ACCEPT, "application/json, text/event-stream")
+                    .addHeader(MCP_PROTOCOL_VERSION, protocolVersionHeader);
 
             // Include session ID if we have one
             String currentSessionId = sessionId;
             if (currentSessionId != null) {
-                requestBuilder.withAddedHeader("Mcp-Session-Id", currentSessionId);
+                requestBuilder.addHeader(MCP_SESSION_ID, currentSessionId);
                 LOG.debug("Including session ID in request: method={}, sessionId={}",
                         request.getMethod(),
                         currentSessionId);
@@ -127,8 +131,8 @@ public final class HttpMcpProxy extends McpServerProxy {
             }
 
             HttpRequest httpRequest = requestBuilder
-                    .body(DataStream.ofBytes(body, "application/json"))
-                    .build();
+                    .setBody(DataStream.ofBytes(body, "application/json"))
+                    .toUnmodifiable();
 
             Context context = Context.create();
             context.put(HttpContext.HTTP_REQUEST_TIMEOUT, timeout);

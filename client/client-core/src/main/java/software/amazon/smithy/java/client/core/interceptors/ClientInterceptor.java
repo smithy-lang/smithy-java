@@ -45,7 +45,11 @@ public interface ClientInterceptor {
      * @return the combined interceptors.
      */
     static ClientInterceptor chain(List<ClientInterceptor> interceptors) {
-        return interceptors.isEmpty() ? NOOP : new ClientInterceptorChain(interceptors);
+        return switch (interceptors.size()) {
+            case 0 -> NOOP;
+            case 1 -> interceptors.get(0);
+            default -> new ClientInterceptorChain(interceptors);
+        };
     }
 
     /**

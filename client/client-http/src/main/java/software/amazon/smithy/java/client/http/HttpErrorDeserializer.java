@@ -104,12 +104,9 @@ public final class HttpErrorDeserializer {
                 Document parsedDocument,
                 ShapeBuilder<ModeledException> builder
         ) {
-            return createError(
-                    context,
-                    codec,
-                    // Make a new response that uses the previously read response payload.
-                    response.toBuilder().body(DataStream.ofByteBuffer(responsePayload)).build(),
-                    builder);
+            var modResponse = response.toModifiableCopy();
+            modResponse.setBody(DataStream.ofByteBuffer(responsePayload));
+            return createError(context, codec, modResponse, builder);
         }
     }
 

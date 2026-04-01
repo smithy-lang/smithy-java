@@ -65,7 +65,7 @@ public class GenericClientTest {
             @Override
             public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
                 if (hook.request() instanceof HttpRequest req) {
-                    return hook.asRequestType(req.toBuilder().withAddedHeader("X-Foo", "Bar").build());
+                    return hook.asRequestType(req.toModifiableCopy().addHeader("X-Foo", "Bar"));
                 }
                 return hook.request();
             }

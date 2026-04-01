@@ -25,11 +25,11 @@ public class HttpBasicAuthSignerTest {
         var username = "username";
         var password = "password";
         var testIdentity = LoginIdentity.create(username, password);
-        var request = HttpRequest.builder()
-                .httpVersion(HttpVersion.HTTP_1_1)
-                .method("PUT")
-                .uri(URI.create("https://www.example.com"))
-                .build();
+        var request = HttpRequest.create()
+                .setHttpVersion(HttpVersion.HTTP_1_1)
+                .setMethod("PUT")
+                .setUri(URI.create("https://www.example.com"))
+                .toUnmodifiable();
 
         var expectedHeader = "Basic " + Base64.getEncoder()
                 .encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
@@ -43,12 +43,12 @@ public class HttpBasicAuthSignerTest {
         var username = "username";
         var password = "password";
         var testIdentity = LoginIdentity.create(username, password);
-        var request = HttpRequest.builder()
-                .httpVersion(HttpVersion.HTTP_1_1)
-                .method("PUT")
-                .headers(HttpHeaders.of(Map.of("Authorization", List.of("FOO", "BAR"))))
-                .uri(URI.create("https://www.example.com"))
-                .build();
+        var request = HttpRequest.create()
+                .setHttpVersion(HttpVersion.HTTP_1_1)
+                .setMethod("PUT")
+                .setHeaders(HttpHeaders.of(Map.of("Authorization", List.of("FOO", "BAR"))))
+                .setUri(URI.create("https://www.example.com"))
+                .toUnmodifiable();
 
         var expectedHeader = "Basic " + Base64.getEncoder()
                 .encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));

@@ -10,7 +10,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
-import software.amazon.smithy.java.http.api.HeaderNames;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -46,7 +46,7 @@ final class ServerTestClient {
 
         request.headers().forEachEntry(httpRequestBuilder, (b, name, value) -> {
             // Header names in HttpHeaders from Smithy are always canonicalized, so check by reference
-            if (!name.equals(HeaderNames.CONTENT_LENGTH)) {
+            if (!name.equals(HeaderName.CONTENT_LENGTH.name())) {
                 b.header(name, value);
             }
         });
@@ -55,11 +55,11 @@ final class ServerTestClient {
             var response = httpClient.send(
                     httpRequestBuilder.build(),
                     java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-            return HttpResponse.builder()
-                    .statusCode(response.statusCode())
-                    .body(DataStream.ofBytes(response.body()))
-                    .headers(HttpHeaders.of(response.headers().map()))
-                    .build();
+            return HttpResponse.create()
+                    .setStatusCode(response.statusCode())
+                    .setBody(DataStream.ofBytes(response.body()))
+                    .setHeaders(HttpHeaders.of(response.headers().map()))
+                    .toUnmodifiable();
 
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);

@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.client.rpcv2;
 
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.java.aws.events.AwsEventDecoderFactory;
 import software.amazon.smithy.java.aws.events.AwsEventEncoderFactory;
@@ -30,7 +28,7 @@ import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
-import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -46,8 +44,6 @@ import software.amazon.smithy.protocol.traits.Rpcv2CborTrait;
 public final class RpcV2CborProtocol extends HttpClientProtocol {
     private static final Codec CBOR_CODEC = Rpcv2CborCodec.builder().build();
     private static final String PAYLOAD_MEDIA_TYPE = "application/cbor";
-    private static final List<String> CONTENT_TYPE = List.of(PAYLOAD_MEDIA_TYPE);
-    private static final List<String> SMITHY_PROTOCOL = List.of("rpc-v2-cbor");
 
     private final ShapeId service;
     private final HttpErrorDeserializer errorDeserializer;
@@ -75,25 +71,30 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
             SmithyUri endpoint
     ) {
         var target = "/service/" + service.getName() + "/operation/" + operation.schema().id().getName();
-        var builder = HttpRequest.builder().method("POST").uri(endpoint.withConcatPath(target));
+        var builder = HttpRequest.create().setMethod("POST").setUri(endpoint.withConcatPath(target));
 
-        builder.httpVersion(HttpVersion.HTTP_2);
+        builder.setHttpVersion(HttpVersion.HTTP_2);
         if (operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
             // Top-level Unit types do not get serialized
-            builder.headers(HttpHeaders.of(headersForEmptyBody()))
-                    .body(DataStream.ofEmpty());
+            builder.addHeader(HeaderName.SMITHY_PROTOCOL, "rpc-v2-cbor")
+                    .addHeader(HeaderName.ACCEPT, PAYLOAD_MEDIA_TYPE)
+                    .setBody(DataStream.ofEmpty());
         } else if (operation.inputEventBuilderSupplier() != null) {
             // Event streaming
             var encoderFactory = getEventEncoderFactory(operation);
             var body = RpcEventStreamsUtil.bodyForEventStreaming(encoderFactory, input);
-            builder.headers(HttpHeaders.of(headersForEventStreaming()))
-                    .body(body);
+            builder.addHeader(HeaderName.SMITHY_PROTOCOL, "rpc-v2-cbor")
+                    .addHeader(HeaderName.CONTENT_TYPE, "application/vnd.amazon.eventstream")
+                    .addHeader(HeaderName.ACCEPT, PAYLOAD_MEDIA_TYPE)
+                    .setBody(body);
         } else {
             // Regular request
-            builder.headers(HttpHeaders.of(headers()))
-                    .body(getBody(input));
+            builder.addHeader(HeaderName.SMITHY_PROTOCOL, "rpc-v2-cbor")
+                    .addHeader(HeaderName.CONTENT_TYPE, PAYLOAD_MEDIA_TYPE)
+                    .addHeader(HeaderName.ACCEPT, PAYLOAD_MEDIA_TYPE)
+                    .setBody(getBody(input));
         }
-        return builder.build();
+        return builder.toUnmodifiable();
     }
 
     @Override
@@ -135,23 +136,6 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
             input.serialize(serializer);
         }
         return DataStream.ofByteBuffer(sink.toByteBuffer(), PAYLOAD_MEDIA_TYPE);
-    }
-
-    private Map<String, List<String>> headers() {
-        return Map.of("smithy-protocol", SMITHY_PROTOCOL, "Content-Type", CONTENT_TYPE, "Accept", CONTENT_TYPE);
-    }
-
-    private Map<String, List<String>> headersForEmptyBody() {
-        return Map.of("smithy-protocol", SMITHY_PROTOCOL, "Accept", CONTENT_TYPE);
-    }
-
-    private Map<String, List<String>> headersForEventStreaming() {
-        return Map.of("smithy-protocol",
-                SMITHY_PROTOCOL,
-                "Content-Type",
-                List.of("application/vnd.amazon.eventstream"),
-                "Accept",
-                CONTENT_TYPE);
     }
 
     private EventEncoderFactory<AwsEventFrame> getEventEncoderFactory(ApiOperation<?, ?> operation) {

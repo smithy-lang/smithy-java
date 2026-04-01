@@ -143,9 +143,9 @@ final class HttpClientResponseProtocolTestProvider extends
 
         @Override
         public HttpResponse send(Context context, HttpRequest request) {
-            var builder = HttpResponse.builder()
-                    .httpVersion(HttpVersion.HTTP_1_1)
-                    .statusCode(testCase.getCode());
+            var builder = HttpResponse.create()
+                    .setHttpVersion(HttpVersion.HTTP_1_1)
+                    .setStatusCode(testCase.getCode());
 
             // Add headers
             Map<String, List<String>> headerMap = new HashMap<>();
@@ -153,23 +153,23 @@ final class HttpClientResponseProtocolTestProvider extends
                 headerMap.put(headerEntry.getKey(), List.of(headerEntry.getValue()));
             }
             testCase.getBodyMediaType().ifPresent(mediaType -> headerMap.put("content-type", List.of(mediaType)));
-            builder.headers(HttpHeaders.of(headerMap));
+            builder.setHeaders(HttpHeaders.of(headerMap));
 
             // Add request body if present;
             testCase.getBody().ifPresent(body -> {
                 if (testCase.getBodyMediaType().isPresent()) {
                     var type = testCase.getBodyMediaType().get();
                     if (ProtocolTestProvider.isBinaryMediaType(type)) {
-                        builder.body(DataStream.ofBytes(Base64.getDecoder().decode(body), type));
+                        builder.setBody(DataStream.ofBytes(Base64.getDecoder().decode(body), type));
                     } else {
-                        builder.body(DataStream.ofString(body, type));
+                        builder.setBody(DataStream.ofString(body, type));
                     }
                 } else {
-                    builder.body(DataStream.ofString(body));
+                    builder.setBody(DataStream.ofString(body));
                 }
             });
 
-            return builder.build();
+            return builder.toUnmodifiable();
         }
 
         @Override

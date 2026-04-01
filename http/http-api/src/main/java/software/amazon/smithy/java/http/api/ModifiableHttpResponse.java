@@ -8,13 +8,14 @@ package software.amazon.smithy.java.http.api;
 /**
  * A modifiable HTTP response.
  */
-public interface ModifiableHttpResponse extends ModifiableHttpMessage, HttpResponse {
+public interface ModifiableHttpResponse extends ModifiableHttpMessage<ModifiableHttpResponse>, HttpResponse {
     /**
      * Set the status code.
      *
      * @param statusCode Status code to set.
+     * @return this response.
      */
-    void setStatusCode(int statusCode);
+    ModifiableHttpResponse setStatusCode(int statusCode);
 
     @Override
     default ModifiableHttpResponse toModifiable() {
