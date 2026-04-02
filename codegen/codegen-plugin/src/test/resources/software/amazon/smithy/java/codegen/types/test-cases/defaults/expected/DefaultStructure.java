@@ -266,7 +266,33 @@ public final class DefaultStructure implements SerializableStruct {
 
     @Override
     public int hashCode() {
-        return Objects.hash(booleanMember, bigDecimal, bigDecimalWithDoubleDefault, bigDecimalWithLongDefault, bigInteger, bigIntegerWithLongDefault, byteMember, doubleMember, floatMember, integer, longMember, shortMember, string, blob, streamingBlob, boolDoc, stringDoc, numberDoc, floatingPointnumberDoc, listDoc, mapDoc, list, map, timestamp, enumMember, intEnum);
+        int result = Boolean.hashCode(booleanMember);
+        result = 31 * result + Objects.hashCode(bigDecimal);
+        result = 31 * result + Objects.hashCode(bigDecimalWithDoubleDefault);
+        result = 31 * result + Objects.hashCode(bigDecimalWithLongDefault);
+        result = 31 * result + Objects.hashCode(bigInteger);
+        result = 31 * result + Objects.hashCode(bigIntegerWithLongDefault);
+        result = 31 * result + Byte.hashCode(byteMember);
+        result = 31 * result + Double.hashCode(doubleMember);
+        result = 31 * result + Float.hashCode(floatMember);
+        result = 31 * result + Integer.hashCode(integer);
+        result = 31 * result + Long.hashCode(longMember);
+        result = 31 * result + Short.hashCode(shortMember);
+        result = 31 * result + Objects.hashCode(string);
+        result = 31 * result + Objects.hashCode(blob);
+        result = 31 * result + Objects.hashCode(streamingBlob);
+        result = 31 * result + Objects.hashCode(boolDoc);
+        result = 31 * result + Objects.hashCode(stringDoc);
+        result = 31 * result + Objects.hashCode(numberDoc);
+        result = 31 * result + Objects.hashCode(floatingPointnumberDoc);
+        result = 31 * result + Objects.hashCode(listDoc);
+        result = 31 * result + Objects.hashCode(mapDoc);
+        result = 31 * result + Objects.hashCode(list);
+        result = 31 * result + Objects.hashCode(map);
+        result = 31 * result + Objects.hashCode(timestamp);
+        result = 31 * result + Objects.hashCode(enumMember);
+        result = 31 * result + Objects.hashCode(intEnum);
+        return result;
     }
 
     @Override

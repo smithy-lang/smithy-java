@@ -145,7 +145,9 @@ public final class StructureGenerator<
             writer.putContext(
                     "equals",
                     new EqualsGenerator(writer, shape, directive.symbolProvider(), directive.model()));
-            writer.putContext("hashCode", new HashCodeGenerator(writer, shape, directive.symbolProvider()));
+            writer.putContext(
+                    "hashCode",
+                    new HashCodeGenerator(writer, shape, directive.symbolProvider(), directive.model()));
             writer.putContext("toString", new ToStringGenerator(writer));
             writer.putContext(
                     "serializer",
@@ -420,8 +422,8 @@ public final class StructureGenerator<
         }
     }
 
-    private record HashCodeGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements
-            Runnable {
+    private record HashCodeGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model)
+            implements Runnable {
 
         @Override
         public void run() {
@@ -441,32 +443,36 @@ public final class StructureGenerator<
         }
 
         private void generate(JavaWriter writer) {
-            List<String> arrayMemberNames = shape.members()
-                    .stream()
-                    .filter(member -> CodegenUtils.isJavaArray(symbolProvider.toSymbol(member)))
-                    .map(symbolProvider::toMemberName)
-                    .toList();
-            List<String> objectMemberNames = shape.members()
-                    .stream()
-                    .map(symbolProvider::toMemberName)
-                    .filter(name -> !arrayMemberNames.contains(name))
-                    .toList();
-            writer.pushState();
-            writer.putContext("arr", arrayMemberNames);
-            writer.putContext("obj", objectMemberNames);
-            writer.putContext("objects", Objects.class);
-            if (arrayMemberNames.isEmpty()) {
-                writer.write("return ${objects:T}.hash(${#obj}${value:L}${^key.last}, ${/key.last}${/obj});");
-            } else {
-                writer.putContext("arrays", Arrays.class);
-                writer.write(
-                        """
-                                int result = ${objects:T}.hash(${#obj}${value:L}${^key.last}, ${/key.last}${/obj});
-                                result = 31 * result${#arr} + ${arrays:T}.hashCode(${value:L})${/arr};
-                                return result;
-                                """);
+            var members = shape.members();
+            if (members.isEmpty()) {
+                writer.write("return 0;");
+                return;
             }
-            writer.popState();
+
+            var iter = members.iterator();
+            var first = iter.next();
+            writer.write("int result = $C;", writer.consumer(w -> writeMemberHash(w, first)));
+            while (iter.hasNext()) {
+                var member = iter.next();
+                writer.write("result = 31 * result + $C;", writer.consumer(w -> writeMemberHash(w, member)));
+            }
+            writer.write("return result;");
+        }
+
+        private void writeMemberHash(JavaWriter writer, MemberShape member) {
+            var memberSymbol = symbolProvider.toSymbol(member);
+            var memberName = symbolProvider.toMemberName(member);
+            if (CodegenUtils.isJavaArray(memberSymbol)) {
+                writer.writeInline("$T.hashCode($L)", Arrays.class, memberName);
+            } else if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE)
+                    && !CodegenUtils.isNullableMember(model, member)) {
+                writer.writeInline(
+                        "$T.hashCode($L)",
+                        memberSymbol.expectProperty(SymbolProperties.BOXED_TYPE),
+                        memberName);
+            } else {
+                writer.writeInline("$T.hashCode($L)", Objects.class, memberName);
+            }
         }
     }
 

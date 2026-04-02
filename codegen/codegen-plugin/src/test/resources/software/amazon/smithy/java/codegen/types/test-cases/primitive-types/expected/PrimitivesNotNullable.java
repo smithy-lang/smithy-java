@@ -1,6 +1,5 @@
 package software.amazon.smithy.java.example.standalone.model;
 
-import java.util.Objects;
 import software.amazon.smithy.java.core.schema.PresenceTracker;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
@@ -100,7 +99,14 @@ public final class PrimitivesNotNullable implements SerializableStruct {
 
     @Override
     public int hashCode() {
-        return Objects.hash(byteMember, shortMember, intMember, longMember, floatMember, doubleMember, booleanMember);
+        int result = Byte.hashCode(byteMember);
+        result = 31 * result + Short.hashCode(shortMember);
+        result = 31 * result + Integer.hashCode(intMember);
+        result = 31 * result + Long.hashCode(longMember);
+        result = 31 * result + Float.hashCode(floatMember);
+        result = 31 * result + Double.hashCode(doubleMember);
+        result = 31 * result + Boolean.hashCode(booleanMember);
+        return result;
     }
 
     @Override

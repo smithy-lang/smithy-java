@@ -47,7 +47,8 @@ public final class Schema implements SerializableStruct {
 
     @Override
     public int hashCode() {
-        return Objects.hash(oneMember);
+        int result = Objects.hashCode(oneMember);
+        return result;
     }
 
     @Override

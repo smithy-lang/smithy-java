@@ -1,6 +1,5 @@
 package software.amazon.smithy.java.example.standalone.model;
 
-import java.util.Objects;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
@@ -35,7 +34,7 @@ public final class Map implements SerializableStruct {
 
     @Override
     public int hashCode() {
-        return Objects.hash();
+        return 0;
     }
 
     @Override
