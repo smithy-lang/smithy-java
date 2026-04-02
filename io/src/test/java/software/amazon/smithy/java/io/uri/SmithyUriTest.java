@@ -90,6 +90,26 @@ public class SmithyUriTest {
         }
 
         @Test
+        void preservesUserInfo() {
+            var uri = SmithyUri.of("https://user:pass@example.com/path");
+            assertThat(uri.getUserInfo(), equalTo("user:pass"));
+            assertThat(uri.getHost(), equalTo("example.com"));
+        }
+
+        @Test
+        void preservesUserInfoWithoutPassword() {
+            var uri = SmithyUri.of("https://user@example.com/path");
+            assertThat(uri.getUserInfo(), equalTo("user"));
+            assertThat(uri.getHost(), equalTo("example.com"));
+        }
+
+        @Test
+        void nullUserInfoWhenAbsent() {
+            var uri = SmithyUri.of("https://example.com/path");
+            assertThat(uri.getUserInfo(), nullValue());
+        }
+
+        @Test
         void rejectsNull() {
             assertThrows(NullPointerException.class, () -> SmithyUri.of((URI) null));
         }
@@ -299,6 +319,42 @@ public class SmithyUriTest {
         void witherValidatesQuery() {
             assertThrows(IllegalArgumentException.class, () -> base.withQuery("bad query"));
         }
+
+        @Test
+        void withUserInfo() {
+            var uri = base.withUserInfo("user:pass");
+            assertThat(uri.getUserInfo(), equalTo("user:pass"));
+            assertThat(uri.getHost(), equalTo("example.com"));
+            assertThat(uri.getPort(), equalTo(8080));
+        }
+
+        @Test
+        void withUserInfoReturnsSameWhenEqual() {
+            var uri = SmithyUri.of("https://user@example.com/path");
+            assertThat(uri.withUserInfo("user"), is(uri));
+        }
+
+        @Test
+        void withNullUserInfo() {
+            var uri = SmithyUri.of("https://user@example.com/path").withUserInfo(null);
+            assertThat(uri.getUserInfo(), nullValue());
+            assertThat(uri.toString(), equalTo("https://example.com/path"));
+        }
+
+        @Test
+        void withPathNullReturnsSameWhenAlreadyEmpty() {
+            var uri = SmithyUri.of("https", "host", -1, null, null);
+            assertThat(uri.withPath(null), is(uri));
+        }
+
+        @Test
+        void userInfoPreservedThroughNonAuthorityWithers() {
+            var uri = SmithyUri.of("https://user:pass@example.com/path?q=1");
+            assertThat(uri.withScheme("http").getUserInfo(), equalTo("user:pass"));
+            assertThat(uri.withPath("/other").getUserInfo(), equalTo("user:pass"));
+            assertThat(uri.withQuery("x=2").getUserInfo(), equalTo("user:pass"));
+            assertThat(uri.withConcatPath("/more").getUserInfo(), equalTo("user:pass"));
+        }
     }
 
     @Nested
@@ -489,6 +545,31 @@ public class SmithyUriTest {
             var b = SmithyUri.of("https://example.com/other");
             assertThat(a, not(equalTo(b)));
         }
+
+        @Test
+        void notEqualsDifferentUserInfo() {
+            var a = SmithyUri.of("https://user@example.com/path");
+            var b = SmithyUri.of("https://example.com/path");
+            assertThat(a, not(equalTo(b)));
+        }
+
+        @Test
+        void equalsSameReference() {
+            var uri = SmithyUri.of("https://example.com/path");
+            assertThat(uri.equals(uri), is(true));
+        }
+
+        @Test
+        void userInfoRoundTripsViaToString() {
+            var uri = SmithyUri.of("https://user:pass@example.com:8080/path?q=1");
+            assertThat(uri.toString(), equalTo("https://user:pass@example.com:8080/path?q=1"));
+        }
+
+        @Test
+        void authorityPathJoinInsertsSlash() {
+            var uri = SmithyUri.of("https", "example.com", -1, "foo", null);
+            assertThat(uri.toString(), equalTo("https://example.com/foo"));
+        }
     }
 
     @Nested
@@ -537,7 +618,147 @@ public class SmithyUriTest {
         @Test
         void hostWithBracketedIpv6() {
             var uri = SmithyUri.of("https", "[::1]", 8080, "/", null);
-            assertThat(uri.getHost(), equalTo("[::1]"));
+            // Brackets stripped on storage; host stored unbracketed.
+            assertThat(uri.getHost(), equalTo("::1"));
+        }
+
+        @Test
+        void ipv6HostBracketedInToString() {
+            var uri = SmithyUri.of("https", "::1", 443, "/path", null);
+            assertThat(uri.toString(), equalTo("https://[::1]:443/path"));
+        }
+
+        @Test
+        void ipv6HostBracketedWithoutPort() {
+            var uri = SmithyUri.of("https", "2001:db8::1", -1, "/path", null);
+            assertThat(uri.toString(), equalTo("https://[2001:db8::1]/path"));
+        }
+
+        @Test
+        void alreadyBracketedIpv6NotDoubleBracketed() {
+            var uri = SmithyUri.of("https", "[::1]", -1, "/path", null);
+            assertThat(uri.toString(), equalTo("https://[::1]/path"));
+        }
+
+        @Test
+        void hostNormalizedToLowercase() {
+            var uri = SmithyUri.of("https://Example.COM/path");
+            assertThat(uri.getHost(), equalTo("example.com"));
+        }
+
+        @Test
+        void hostCaseInsensitiveEquality() {
+            var a = SmithyUri.of("https://Example.COM/path");
+            var b = SmithyUri.of("https", "example.com", -1, "/path", null);
+            assertThat(a, equalTo(b));
+            assertThat(a.hashCode(), equalTo(b.hashCode()));
+        }
+
+        @Test
+        void bracketedAndUnbracketedIpv6AreEqual() {
+            var a = SmithyUri.of("https", "[::1]", 443, "/", null);
+            var b = SmithyUri.of("https", "::1", 443, "/", null);
+            assertThat(a, equalTo(b));
+            assertThat(a.hashCode(), equalTo(b.hashCode()));
+        }
+
+        @Test
+        void rejectsUppercaseScheme() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of("HTTPS", "host", -1, "/", null));
+        }
+
+        @Test
+        void rejectsUppercaseHost() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of("https", "Example.COM", -1, "/", null));
+        }
+
+        @Test
+        void schemeLowercasedFromUri() {
+            var uri = SmithyUri.of("HTTP://example.com/path");
+            assertThat(uri.getScheme(), equalTo("http"));
+        }
+
+        @Test
+        void rejectsBracketedNonIpv6() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of("https", "[foo]", -1, "/", null));
+        }
+
+        @Test
+        void rejectsZoneIdInHost() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of("https", "fe80::1%25eth0", -1, "/", null));
+        }
+
+        @Test
+        void rejectsBareBracketsInHost() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of("https", "abc]def", -1, "/", null));
+        }
+
+        @Test
+        void rejectsOpaqueUri() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of(URI.create("mailto:user@example.com")));
+        }
+
+        @Test
+        void ipv6RoundTripFromString() {
+            var uri = SmithyUri.of("https://[::1]:8080/path");
+            // Host stored unbracketed.
+            assertThat(uri.getHost(), equalTo("::1"));
+            assertThat(uri.getPort(), equalTo(8080));
+            // toString re-brackets for valid URI form.
+            assertThat(uri.toString(), equalTo("https://[::1]:8080/path"));
+        }
+
+        @Test
+        void withEndpointPreservesUserInfo() {
+            var request = SmithyUri.of(null, null, -1, "/op", "q=1");
+            var endpoint = SmithyUri.of("https://user@example.com/v1");
+            var result = request.withEndpoint(endpoint);
+            assertThat(result.getUserInfo(), equalTo("user"));
+            assertThat(result.toString(), equalTo("https://user@example.com/v1/op?q=1"));
+        }
+
+        @Test
+        void sixArgFactoryWithUserInfo() {
+            var uri = SmithyUri.of("https", "user:pass", "example.com", 443, "/path", "q=1");
+            assertThat(uri.getUserInfo(), equalTo("user:pass"));
+            assertThat(uri.getHost(), equalTo("example.com"));
+            assertThat(uri.toString(), equalTo("https://user:pass@example.com:443/path?q=1"));
+        }
+
+        @Test
+        void userInfoValidationRejectsAtSign() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of("https", "user@oops", "host", -1, "/", null));
+        }
+
+        @Test
+        void userInfoValidationRejectsSpace() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of("https", "user name", "host", -1, "/", null));
+        }
+
+        @Test
+        void userInfoValidationRejectsFragment() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of("https", "user#frag", "host", -1, "/", null));
+        }
+
+        @Test
+        void userInfoValidationRejectsBadPercent() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of("https", "user%GG", "host", -1, "/", null));
+        }
+
+        @Test
+        void witherUserInfoValidationRejectsAtSign() {
+            var uri = SmithyUri.of("https://example.com/path");
+            assertThrows(IllegalArgumentException.class, () -> uri.withUserInfo("bad@value"));
         }
     }
 }

@@ -6,19 +6,110 @@
 package software.amazon.smithy.java.io.uri;
 
 import java.net.URI;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
- * A lightweight, pre-decomposed URI representation that avoids repeated {@link URI} parsing.
+ * A lightweight, pre-decomposed URI representation optimized for endpoint-style URIs.
  *
- * <p>Components are stored in their raw (percent-encoded) form. Validation is performed at construction boundaries
- * (factory methods and withers), while internal construction from already-validated components skips validation.
+ * <p>This type stores scheme, userInfo, host, port, path, and query. It does not support fragments,
+ * opaque URIs, or IPv6 zone identifiers.
  *
- * <p>Derived values ({@link #toString()}, {@link #hashCode()}, {@link #toURI()}) are computed lazily and cached.
+ * <p>Scheme and host must be lowercase. IPv6 host literals are stored without brackets; brackets are
+ * added in {@link #toString()} and {@link #toURI()} output. When constructed from a {@link URI},
+ * scheme and host are normalized to lowercase automatically. When constructed from components,
+ * uppercase scheme or host is rejected.
+ *
+ * <p>Host validation is intentionally lightweight. It rejects obviously invalid characters but does not
+ * enforce IPv4/IPv6 syntax, reg-name grammar, or other RFC 3986 host production rules.
+ *
+ * <p>Derived values ({@link #toString()}, {@link #hashCode()}, {@link #toURI()}) are computed lazily
+ * and always derived from the normalized internal fields.
  */
 public final class SmithyUri {
 
+    // Lookup tables for fast character validation (ASCII range only).
+    private static final boolean[] SCHEME_CONT = new boolean[128];
+    private static final boolean[] INVALID_HOST = new boolean[128];
+    private static final boolean[] VALID_PATH;
+    private static final boolean[] VALID_QUERY;
+    private static final boolean[] VALID_USERINFO;
+    private static final boolean[] IS_HEX = new boolean[128];
+
+    static {
+        // Scheme continuation: lowercase alpha, digits, +, -, .
+        SCHEME_CONT['+'] = true;
+        SCHEME_CONT['-'] = true;
+        SCHEME_CONT['.'] = true;
+
+        INVALID_HOST['/'] = true;
+        INVALID_HOST['?'] = true;
+        INVALID_HOST['#'] = true;
+        INVALID_HOST['%'] = true;
+        INVALID_HOST['['] = true;
+        INVALID_HOST[']'] = true;
+        INVALID_HOST[' '] = true;
+        INVALID_HOST['\t'] = true;
+        INVALID_HOST['\n'] = true;
+        INVALID_HOST['\r'] = true;
+
+        // RFC 3986 shared base: unreserved / pct-encoded / sub-delims
+        // unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
+        // sub-delims = "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
+        VALID_USERINFO = new boolean[128];
+        VALID_PATH = new boolean[128];
+        VALID_QUERY = new boolean[128];
+        for (char c = 'a'; c <= 'z'; c++) {
+            SCHEME_CONT[c] = true;
+            VALID_USERINFO[c] = true;
+            VALID_PATH[c] = true;
+            VALID_QUERY[c] = true;
+        }
+        for (char c = 'A'; c <= 'Z'; c++) {
+            VALID_USERINFO[c] = true;
+            VALID_PATH[c] = true;
+            VALID_QUERY[c] = true;
+        }
+        for (char c = '0'; c <= '9'; c++) {
+            VALID_USERINFO[c] = true;
+            VALID_PATH[c] = true;
+            VALID_QUERY[c] = true;
+            SCHEME_CONT[c] = true;
+        }
+        for (char c : "-._~!$&'()*+,;=%".toCharArray()) {
+            VALID_USERINFO[c] = true;
+            VALID_PATH[c] = true;
+            VALID_QUERY[c] = true;
+        }
+
+        // userinfo adds ":"
+        VALID_USERINFO[':'] = true;
+
+        // path adds ":" / "@" / "/"
+        VALID_PATH[':'] = true;
+        VALID_PATH['@'] = true;
+        VALID_PATH['/'] = true;
+
+        // query adds everything path has plus "?"
+        VALID_QUERY[':'] = true;
+        VALID_QUERY['@'] = true;
+        VALID_QUERY['/'] = true;
+        VALID_QUERY['?'] = true;
+
+        // Hex setup
+        for (char c = '0'; c <= '9'; c++) {
+            IS_HEX[c] = true;
+        }
+        for (char c = 'a'; c <= 'f'; c++) {
+            IS_HEX[c] = true;
+        }
+        for (char c = 'A'; c <= 'F'; c++) {
+            IS_HEX[c] = true;
+        }
+    }
+
     private final String scheme;
+    private final String userInfo;
     private final String host;
     private final int port;
     private final String path;
@@ -29,10 +120,12 @@ public final class SmithyUri {
     private URI cachedUri;
     private String cachedNormalizedPath;
     private int cachedHashcode;
+    private boolean hashComputed;
 
-    // Assumes all inputs are already validated/encoded.
-    SmithyUri(String scheme, String host, int port, String path, String query) {
+    // Assumes all inputs are already validated/normalized.
+    SmithyUri(String scheme, String userInfo, String host, int port, String path, String query) {
         this.scheme = scheme;
+        this.userInfo = userInfo;
         this.host = host;
         this.port = port;
         this.path = path == null ? "" : path;
@@ -40,9 +133,22 @@ public final class SmithyUri {
     }
 
     /**
+     * Strip IPv6 brackets if the host is a bracketed IPv6 literal (contains ':' inside brackets).
+     */
+    private static String stripBrackets(String host) {
+        if (host != null && host.startsWith("[") && host.endsWith("]")) {
+            String inner = host.substring(1, host.length() - 1);
+            if (inner.indexOf(':') >= 0) {
+                return inner;
+            }
+        }
+        return host;
+    }
+
+    /**
      * Parse a URI string into a {@code SmithyUri}.
      *
-     * <p>Delegates to {@link URI} for full RFC 2396 validation. The parsed result is cached.
+     * <p>Delegates to {@link URI} for parsing.
      *
      * @param uri URI string to parse.
      * @return the parsed SmithyUri.
@@ -53,41 +159,76 @@ public final class SmithyUri {
     }
 
     /**
-     * Create a {@code SmithyUri} from a {@link URI}, caching the original.
+     * Create a {@code SmithyUri} from a {@link URI}.
+     *
+     * <p>Scheme and host are normalized to lowercase. IPv6 brackets are stripped from the host.
      *
      * @param uri URI to convert.
      * @return the SmithyUri.
      */
     public static SmithyUri of(URI uri) {
         Objects.requireNonNull(uri, "uri");
-        var s = new SmithyUri(
-                uri.getScheme(),
-                uri.getHost(),
+        if (uri.isOpaque()) {
+            throw new IllegalArgumentException("Opaque URIs are not supported: " + uri);
+        }
+        if (uri.getRawFragment() != null) {
+            throw new IllegalArgumentException("Fragments are not supported: " + uri);
+        }
+        if (uri.getRawAuthority() != null && uri.getHost() == null) {
+            throw new IllegalArgumentException("Registry-based authorities are not supported: " + uri);
+        }
+
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        return new SmithyUri(
+                scheme != null ? scheme.toLowerCase(Locale.ROOT) : null,
+                uri.getRawUserInfo(),
+                host != null ? stripBrackets(host).toLowerCase(Locale.ROOT) : null,
                 uri.getPort(),
                 uri.getRawPath(),
                 uri.getRawQuery());
-        s.cachedUri = uri;
-        s.cachedString = uri.toASCIIString();
-        return s;
     }
 
     /**
-     * Create a {@code SmithyUri} from individual components.
+     * Create a {@code SmithyUri} from individual components (without userInfo).
      *
-     * <p>Components are validated for correctness. Path and query are expected to be in raw (percent-encoded) form.
+     * <p>Scheme and host must be lowercase. IPv6 brackets on host are stripped.
      *
-     * @param scheme URI scheme (e.g. "https"). May be null.
-     * @param host   Host component. May be null.
+     * @param scheme URI scheme (e.g. "https"). May be null. Must be lowercase.
+     * @param host   Host component. May be null. Must be lowercase; IPv6 brackets are stripped.
      * @param port   Port number, or -1 for no port.
      * @param path   Raw percent-encoded path. Null defaults to empty string.
      * @param query  Raw percent-encoded query string. May be null.
      * @return the SmithyUri.
-     * @throws IllegalArgumentException if any component is invalid.
+     * @throws IllegalArgumentException if any component fails validation.
      */
     public static SmithyUri of(String scheme, String host, int port, String path, String query) {
+        return of(scheme, null, host, port, path, query);
+    }
+
+    /**
+     * Create a {@code SmithyUri} from individual components including userInfo.
+     *
+     * <p>Scheme and host must be lowercase. IPv6 brackets on host are stripped.
+     *
+     * @param scheme   URI scheme (e.g. "https"). May be null. Must be lowercase.
+     * @param userInfo Raw percent-encoded userInfo (e.g. "user:pass"). May be null.
+     * @param host     Host component. May be null. Must be lowercase; IPv6 brackets are stripped.
+     * @param port     Port number, or -1 for no port.
+     * @param path     Raw percent-encoded path. Null defaults to empty string.
+     * @param query    Raw percent-encoded query string. May be null.
+     * @return the SmithyUri.
+     * @throws IllegalArgumentException if any component fails validation.
+     */
+    public static SmithyUri of(String scheme, String userInfo, String host, int port, String path, String query) {
         if (scheme != null) {
             validateScheme(scheme);
         }
+        if (userInfo != null) {
+            validateUserInfo(userInfo);
+        }
+        // Strip IPv6 brackets before validation — brackets are not valid in the stored form.
+        host = stripBrackets(host);
         if (host != null) {
             validateHost(host);
         }
@@ -98,18 +239,25 @@ public final class SmithyUri {
         if (query != null) {
             validateQuery(query);
         }
-        return new SmithyUri(scheme, host, port, path, query);
+        return new SmithyUri(scheme, userInfo, host, port, path, query);
     }
 
     /**
-     * @return the URI scheme (e.g. "https"), or null.
+     * @return the URI scheme (e.g. "https"), or null. Always lowercase.
      */
     public String getScheme() {
         return scheme;
     }
 
     /**
-     * @return the host component, or null.
+     * @return the raw percent-encoded userInfo component (e.g. "user:pass"), or null.
+     */
+    public String getUserInfo() {
+        return userInfo;
+    }
+
+    /**
+     * @return the host component (lowercase, unbracketed for IPv6), or null.
      */
     public String getHost() {
         return host;
@@ -139,7 +287,7 @@ public final class SmithyUri {
     /**
      * Return a new {@code SmithyUri} with the scheme replaced.
      *
-     * @param scheme new scheme.
+     * @param scheme new scheme. Must be lowercase.
      * @return new SmithyUri.
      */
     public SmithyUri withScheme(String scheme) {
@@ -149,23 +297,40 @@ public final class SmithyUri {
         if (scheme != null) {
             validateScheme(scheme);
         }
-        return new SmithyUri(scheme, host, port, path, query);
+        return new SmithyUri(scheme, userInfo, host, port, path, query);
+    }
+
+    /**
+     * Return a new {@code SmithyUri} with the userInfo replaced.
+     *
+     * @param userInfo new raw percent-encoded userInfo, or null.
+     * @return new SmithyUri.
+     */
+    public SmithyUri withUserInfo(String userInfo) {
+        if (Objects.equals(this.userInfo, userInfo)) {
+            return this;
+        }
+        if (userInfo != null) {
+            validateUserInfo(userInfo);
+        }
+        return new SmithyUri(scheme, userInfo, host, port, path, query);
     }
 
     /**
      * Return a new {@code SmithyUri} with the host replaced.
      *
-     * @param host new host.
+     * @param host new host. Must be lowercase; IPv6 brackets are stripped.
      * @return new SmithyUri.
      */
     public SmithyUri withHost(String host) {
+        host = stripBrackets(host);
         if (Objects.equals(this.host, host)) {
             return this;
         }
         if (host != null) {
             validateHost(host);
         }
-        return new SmithyUri(scheme, host, port, path, query);
+        return new SmithyUri(scheme, userInfo, host, port, path, query);
     }
 
     /**
@@ -179,7 +344,7 @@ public final class SmithyUri {
             return this;
         }
         validatePort(port);
-        return new SmithyUri(scheme, host, port, path, query);
+        return new SmithyUri(scheme, userInfo, host, port, path, query);
     }
 
     /**
@@ -189,13 +354,14 @@ public final class SmithyUri {
      * @return new SmithyUri.
      */
     public SmithyUri withPath(String path) {
-        if (Objects.equals(this.path, path)) {
+        String normalized = path == null ? "" : path;
+        if (this.path.equals(normalized)) {
             return this;
         }
         if (path != null) {
             validatePath(path);
         }
-        return new SmithyUri(scheme, host, port, path, query);
+        return new SmithyUri(scheme, userInfo, host, port, path, query);
     }
 
     /**
@@ -211,7 +377,7 @@ public final class SmithyUri {
         if (query != null) {
             validateQuery(query);
         }
-        return new SmithyUri(scheme, host, port, path, query);
+        return new SmithyUri(scheme, userInfo, host, port, path, query);
     }
 
     /**
@@ -224,14 +390,14 @@ public final class SmithyUri {
         if (suffix == null || suffix.isEmpty()) {
             return this;
         }
-        return new SmithyUri(scheme, host, port, concatPaths(path, suffix), query);
+        return new SmithyUri(scheme, userInfo, host, port, concatPaths(path, suffix), query);
     }
 
     /**
      * Return a new {@code SmithyUri} that applies the given endpoint as the base.
      *
-     * <p>Takes scheme, host, and port from the endpoint. Concatenates the endpoint's path with this URI's path.
-     * Keeps this URI's query string.
+     * <p>Takes scheme, userInfo, host, and port from the endpoint. Concatenates the endpoint's path
+     * with this URI's path. Keeps this URI's query string.
      *
      * @param endpoint the base endpoint URI.
      * @return new SmithyUri.
@@ -240,6 +406,7 @@ public final class SmithyUri {
         Objects.requireNonNull(endpoint, "endpoint");
         return new SmithyUri(
                 endpoint.scheme,
+                endpoint.userInfo,
                 endpoint.host,
                 endpoint.port,
                 concatPaths(endpoint.path, this.path),
@@ -270,21 +437,24 @@ public final class SmithyUri {
 
     @Override
     public int hashCode() {
-        var cached = cachedHashcode;
-        if (cached == 0) {
-            cached = Objects.hash(scheme, host, port, path, query);
-            cachedHashcode = cached;
+        if (!hashComputed) {
+            cachedHashcode = Objects.hash(scheme, userInfo, host, port, path, query);
+            hashComputed = true;
         }
-        return cached;
+        return cachedHashcode;
     }
 
     @Override
     public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
         if (!(o instanceof SmithyUri smithyUri)) {
             return false;
         }
         return port == smithyUri.port
                 && Objects.equals(scheme, smithyUri.scheme)
+                && Objects.equals(userInfo, smithyUri.userInfo)
                 && Objects.equals(host, smithyUri.host)
                 && path.equals(smithyUri.path)
                 && Objects.equals(query, smithyUri.query);
@@ -296,13 +466,23 @@ public final class SmithyUri {
             sb.append(scheme).append(':');
         }
         if (host != null) {
-            sb.append('/').append('/').append(host);
+            sb.append('/').append('/');
+            if (userInfo != null) {
+                sb.append(userInfo).append('@');
+            }
+            if (host.indexOf(':') >= 0) {
+                sb.append('[').append(host).append(']');
+            } else {
+                sb.append(host);
+            }
             if (port >= 0) {
                 sb.append(':').append(port);
             }
         }
-        // Only append path if it's meaningful
         if (!path.isEmpty()) {
+            if (host != null && path.charAt(0) != '/') {
+                sb.append('/');
+            }
             sb.append(path);
         }
         if (query != null) {
@@ -434,7 +614,7 @@ public final class SmithyUri {
      */
     private static int findPoppablePathSegment(StringBuilder sb, boolean absolute) {
         if (absolute) {
-            if (sb.length() == 1) { // "/"
+            if (sb.length() == 1) {
                 return -1;
             }
         } else if (sb.isEmpty()) {
@@ -471,16 +651,20 @@ public final class SmithyUri {
         }
 
         char first = scheme.charAt(0);
-        if (!isAlpha(first)) {
-            throw new IllegalArgumentException("Scheme must start with a letter: " + scheme);
+        if (first < 'a' || first > 'z') {
+            throw new IllegalArgumentException("Scheme must start with a lowercase letter: " + scheme);
         }
 
         for (int i = 1; i < scheme.length(); i++) {
             char c = scheme.charAt(i);
-            if (!isAlpha(c) && !isDigit(c) && c != '+' && c != '-' && c != '.') {
+            if (c >= 128 || !SCHEME_CONT[c]) {
                 throw new IllegalArgumentException("Invalid character in scheme: '" + c + "' in " + scheme);
             }
         }
+    }
+
+    private static void validateUserInfo(String userInfo) {
+        validateComponent(userInfo, VALID_USERINFO, "userInfo");
     }
 
     private static void validateHost(String host) {
@@ -490,7 +674,10 @@ public final class SmithyUri {
 
         for (int i = 0; i < host.length(); i++) {
             char c = host.charAt(i);
-            if (c == '/' || c == '?' || c == '#' || c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            if (c >= 'A' && c <= 'Z') {
+                throw new IllegalArgumentException("Host must be lowercase: " + host);
+            }
+            if (c < 128 && INVALID_HOST[c]) {
                 throw new IllegalArgumentException("Invalid character in host: '" + c + "' in " + host);
             }
         }
@@ -503,23 +690,21 @@ public final class SmithyUri {
     }
 
     private static void validatePath(String path) {
-        for (int i = 0; i < path.length(); i++) {
-            char c = path.charAt(i);
-            switch (c) {
-                case '#', ' ', '\t', '\n', '\r' -> throw new IllegalArgumentException(
-                        "Invalid character in path: '" + c + "'");
-                case '%' -> validatePercentEncoding(path, i, "path");
-            }
-        }
+        validateComponent(path, VALID_PATH, "path");
     }
 
     private static void validateQuery(String query) {
-        for (int i = 0; i < query.length(); i++) {
-            char c = query.charAt(i);
-            switch (c) {
-                case '#', ' ', '\t', '\n', '\r' -> throw new IllegalArgumentException(
-                        "Invalid character in query: '" + c + "'");
-                case '%' -> validatePercentEncoding(query, i, "query");
+        validateComponent(query, VALID_QUERY, "query");
+    }
+
+    private static void validateComponent(String value, boolean[] allowed, String component) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c >= 128 || !allowed[c]) {
+                throw new IllegalArgumentException("Invalid character in " + component + ": '" + c + "'");
+            }
+            if (c == '%') {
+                validatePercentEncoding(value, i, component);
             }
         }
     }
@@ -533,15 +718,7 @@ public final class SmithyUri {
         }
     }
 
-    private static boolean isAlpha(char c) {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-    }
-
-    private static boolean isDigit(char c) {
-        return c >= '0' && c <= '9';
-    }
-
     private static boolean isHex(char c) {
-        return isDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+        return c < 128 && IS_HEX[c];
     }
 }
