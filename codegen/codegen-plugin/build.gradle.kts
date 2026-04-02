@@ -1,6 +1,7 @@
 plugins {
     id("smithy-java.codegen-plugin-conventions")
     id("smithy-java.publishing-conventions")
+    alias(libs.plugins.jmh)
 }
 
 description = "Smithy Java code generation plugin"
@@ -44,6 +45,13 @@ dependencies {
     itImplementation(project(":aws:client:aws-client-http"))
     itImplementation(project(":aws:client:aws-client-rulesengine"))
     itImplementation(libs.smithy.aws.endpoints)
+
+    // JMH benchmark deps (generated code and its runtime deps)
+    jmhImplementation(sourceSets["it"].output)
+    jmhImplementation(project(":client:client-core"))
+    jmhImplementation(project(":server:server-core"))
+    jmhImplementation(project(":server:server-api"))
+    jmhImplementation(project(":aws:client:aws-client-restjson"))
 }
 
 // Core codegen test runner
@@ -61,6 +69,18 @@ sourceSets {
         compileClasspath += sourceSets["test"].output
     }
 }
+
+// Wire JMH source set to see generated integration test classes
+sourceSets.named("jmh") {
+    compileClasspath += sourceSets["it"].output + sourceSets["it"].compileClasspath
+    runtimeClasspath += sourceSets["it"].output + sourceSets["it"].runtimeClasspath
+}
+
+tasks.named("compileJmhJava") {
+    dependsOn("compileItJava")
+}
+
+jmh {}
 
 // Ensure generate tasks that use it source set resources depend on base generateSources
 listOf("generateSourcesClient", "generateSourcesServer", "generateSourcesTypes").forEach { taskName ->
