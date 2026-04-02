@@ -243,8 +243,8 @@ public final class DefaultStructure implements SerializableStruct {
                && Objects.equals(this.bigInteger, that.bigInteger)
                && Objects.equals(this.bigIntegerWithLongDefault, that.bigIntegerWithLongDefault)
                && this.byteMember == that.byteMember
-               && this.doubleMember == that.doubleMember
-               && this.floatMember == that.floatMember
+               && Double.compare(this.doubleMember, that.doubleMember) == 0
+               && Float.compare(this.floatMember, that.floatMember) == 0
                && this.integer == that.integer
                && this.longMember == that.longMember
                && this.shortMember == that.shortMember

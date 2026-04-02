@@ -93,8 +93,8 @@ public final class PrimitivesNotNullable implements SerializableStruct {
                && this.shortMember == that.shortMember
                && this.intMember == that.intMember
                && this.longMember == that.longMember
-               && this.floatMember == that.floatMember
-               && this.doubleMember == that.doubleMember
+               && Float.compare(this.floatMember, that.floatMember) == 0
+               && Double.compare(this.doubleMember, that.doubleMember) == 0
                && this.booleanMember == that.booleanMember;
     }
 

@@ -8,6 +8,8 @@ configure<SourceSetContainer> {
     }
 }
 
+configurations["itCompileOnly"].extendsFrom(configurations["testCompileOnly"])
+
 // Add the integ test task
 tasks.register<Test>("integ") {
     useJUnitPlatform()
