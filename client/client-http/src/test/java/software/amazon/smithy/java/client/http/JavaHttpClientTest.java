@@ -93,7 +93,7 @@ public class JavaHttpClientTest {
         var builder = ClientConfig.builder();
         builder.protocol(new AwsJson1Protocol(ShapeId.from("foo#Bar")));
         builder.transport(new JavaHttpClientTransport());
-        builder.endpointResolver(EndpointResolver.staticEndpoint(new URI("localhost:8080")));
+        builder.endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost:8080")));
         var serviceSchema = Schema.createService(ShapeId.from("foo#Bar"));
         builder.service(() -> serviceSchema);
         var config = builder.build();

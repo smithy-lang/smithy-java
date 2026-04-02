@@ -283,7 +283,7 @@ class SmithyCallTest {
                 "smithy.example#Sprockets",
                 "UnknownOperation",
                 "--model-path", modelDir.toString(),
-                "--url", "XXXXXXXXXXXXXXXX:" + PORT,
+                "--url", "http://localhost:" + PORT,
                 "--input-json", "{}"
         };
 
