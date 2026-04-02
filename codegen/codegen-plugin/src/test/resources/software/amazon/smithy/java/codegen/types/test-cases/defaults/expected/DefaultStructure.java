@@ -1,4 +1,3 @@
-
 package software.amazon.smithy.java.example.defaults.model;
 
 import java.math.BigDecimal;
@@ -733,4 +732,3 @@ public final class DefaultStructure implements SerializableStruct {
         }
     }
 }
-

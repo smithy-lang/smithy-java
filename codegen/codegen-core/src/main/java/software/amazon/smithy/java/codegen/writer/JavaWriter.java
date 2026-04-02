@@ -82,15 +82,15 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
 
         putNameContext();
         setExpressionStart(PLACEHOLDER_FORMAT_CHAR);
+        String header = settings.header();
+        String headerPrefix = (header != null && !header.isEmpty()) ? header + "\n" : "";
         return format(
                 """
-                        £L
-                        package £L;
+                        £Lpackage £L;
 
                         £L
-                        £L
-                        """,
-                settings.header(),
+                        £L""",
+                headerPrefix,
                 packageNamespace,
                 getImportContainer(),
                 super.toString());

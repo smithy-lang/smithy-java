@@ -1,4 +1,3 @@
-
 package software.amazon.smithy.java.example.standalone.model;
 
 import java.math.BigDecimal;
@@ -677,4 +676,3 @@ public sealed interface UnionType extends SerializableStruct {
         }
     }
 }
-

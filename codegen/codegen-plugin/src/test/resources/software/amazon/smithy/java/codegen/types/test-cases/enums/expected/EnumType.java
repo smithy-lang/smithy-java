@@ -1,4 +1,3 @@
-
 package software.amazon.smithy.java.example.standalone.model;
 
 import java.util.List;
@@ -156,4 +155,3 @@ public sealed interface EnumType extends SmithyEnum, SerializableShape {
         }
     }
 }
-

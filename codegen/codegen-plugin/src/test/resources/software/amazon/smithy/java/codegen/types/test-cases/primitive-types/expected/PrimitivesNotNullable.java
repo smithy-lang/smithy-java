@@ -1,4 +1,3 @@
-
 package software.amazon.smithy.java.example.standalone.model;
 
 import java.util.Objects;
@@ -333,4 +332,3 @@ public final class PrimitivesNotNullable implements SerializableStruct {
         }
     }
 }
-

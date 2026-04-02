@@ -1,4 +1,3 @@
-
 package software.amazon.smithy.java.example.standalone.model;
 
 import java.util.Objects;
@@ -223,4 +222,3 @@ public sealed interface MixedUnion extends SerializableStruct {
         }
     }
 }
-

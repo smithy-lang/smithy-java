@@ -1,4 +1,3 @@
-
 package software.amazon.smithy.java.example.standalone.model;
 
 import java.util.Collections;
@@ -258,4 +257,3 @@ public final class JSpecifyStruct implements SerializableStruct {
         }
     }
 }
-
