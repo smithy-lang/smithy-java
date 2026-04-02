@@ -12,7 +12,6 @@ import software.amazon.smithy.java.rulesengine.RulesFunction;
 import software.amazon.smithy.rulesengine.aws.language.functions.AwsArn;
 import software.amazon.smithy.rulesengine.aws.language.functions.AwsPartition;
 import software.amazon.smithy.rulesengine.aws.language.functions.IsVirtualHostableS3Bucket;
-import software.amazon.smithy.rulesengine.aws.language.functions.ParseArn;
 import software.amazon.smithy.rulesengine.aws.language.functions.partition.Partition;
 
 /**
@@ -84,24 +83,73 @@ enum AwsRulesFunction implements RulesFunction {
     },
 
     AWS_PARSE_ARN("aws.parseArn", 1) {
+        // Single volatile reference for thread-safe hot-key caching without ThreadLocal overhead.
+        private volatile ArnMap cache;
+
         @Override
         public Object apply1(Object arg1) {
             String value = (String) arg1;
+
+            var c = cache;
+            if (c != null && value.equals(c.key)) {
+                return c;
+            }
+
             var awsArn = AwsArn.parse(value).orElse(null);
             if (awsArn == null) {
                 return null;
             }
-            return Map.of(
-                    ParseArn.PARTITION.toString(),
-                    awsArn.getPartition(),
-                    ParseArn.SERVICE.toString(),
-                    awsArn.getService(),
-                    ParseArn.REGION.toString(),
-                    awsArn.getRegion(),
-                    ParseArn.ACCOUNT_ID.toString(),
-                    awsArn.getAccountId(),
-                    "resourceId", // TODO: make this one public too in Smithy
-                    awsArn.getResource());
+
+            var result = new ArnMap(value, awsArn);
+            cache = result;
+            return result;
+        }
+
+        // Lazy property access map. Same pattern as PartitionMap above.
+        private static final class ArnMap extends AbstractMap<String, Object> {
+            final String key;
+            private final AwsArn arn;
+            private volatile Set<Entry<String, Object>> entrySet;
+
+            private ArnMap(String key, AwsArn arn) {
+                this.key = key;
+                this.arn = arn;
+            }
+
+            @Override
+            public int size() {
+                return 5;
+            }
+
+            @Override
+            public Set<Entry<String, Object>> entrySet() {
+                var result = entrySet;
+                if (result == null) {
+                    result = Set.of(
+                            Map.entry("partition", arn.getPartition()),
+                            Map.entry("service", arn.getService()),
+                            Map.entry("region", arn.getRegion()),
+                            Map.entry("accountId", arn.getAccountId()),
+                            Map.entry("resourceId", arn.getResource()));
+                    entrySet = result;
+                }
+                return result;
+            }
+
+            @Override
+            public Object get(Object key) {
+                if (key instanceof String s) {
+                    return switch (s) {
+                        case "partition" -> arn.getPartition();
+                        case "service" -> arn.getService();
+                        case "region" -> arn.getRegion();
+                        case "accountId" -> arn.getAccountId();
+                        case "resourceId" -> arn.getResource();
+                        default -> null;
+                    };
+                }
+                return null;
+            }
         }
     },
 
