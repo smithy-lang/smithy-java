@@ -104,16 +104,15 @@ abstract class RegisterFiller {
      * @param sink the register array to fill
      * @param context the context for builtin providers
      * @param parameters the input parameters
-     * @return the filled register array
      * @throws RulesEvaluationError if a required parameter is missing
      */
-    abstract Object[] fillRegisters(Object[] sink, Context context, Map<String, Object> parameters);
+    abstract void fillRegisters(Object[] sink, Context context, Map<String, Object> parameters);
 
     /**
      * Fill registers using a pre-populated sink and filled bitmask from RegisterSink.
      * Skips the parameter iteration step since registers are already written.
      */
-    abstract Object[] fillRegisters(Object[] sink, Context context, long prefilled);
+    abstract void fillRegisters(Object[] sink, Context context, long prefilled);
 
     /**
      * Factory method to create the appropriate RegisterFiller implementation.
@@ -183,14 +182,9 @@ abstract class RegisterFiller {
         }
 
         @Override
-        Object[] fillRegisters(Object[] sink, Context context, Map<String, Object> parameters) {
-            // Copy template to set up defaults and clear old state
+        void fillRegisters(Object[] sink, Context context, Map<String, Object> parameters) {
             System.arraycopy(registerTemplate, 0, sink, 0, registerTemplate.length);
-
-            // Start with defaults already marked as filled
             long filled = defaultMask;
-
-            // Fill parameters
             for (var e : parameters.entrySet()) {
                 Integer i = inputRegisterMap.get(e.getKey());
                 if (i != null) {
@@ -198,15 +192,15 @@ abstract class RegisterFiller {
                     filled |= 1L << i;
                 }
             }
-            return fillBuiltinsAndValidate(sink, context, filled);
+            fillBuiltinsAndValidate(sink, context, filled);
         }
 
         @Override
-        Object[] fillRegisters(Object[] sink, Context context, long prefilled) {
-            return fillBuiltinsAndValidate(sink, context, defaultMask | prefilled);
+        void fillRegisters(Object[] sink, Context context, long prefilled) {
+            fillBuiltinsAndValidate(sink, context, defaultMask | prefilled);
         }
 
-        private Object[] fillBuiltinsAndValidate(Object[] sink, Context context, long filled) {
+        private void fillBuiltinsAndValidate(Object[] sink, Context context, long filled) {
 
             // Apply key-based builtins
             for (int j = 0; j < keyBuiltinIndices.length; j++) {
@@ -244,8 +238,6 @@ abstract class RegisterFiller {
                 int i = Long.numberOfTrailingZeros(missingRequired);
                 throw new RulesEvaluationError("Missing required parameter: " + registerDefinitions[i].name());
             }
-
-            return sink;
         }
     }
 
@@ -272,7 +264,7 @@ abstract class RegisterFiller {
         }
 
         @Override
-        Object[] fillRegisters(Object[] sink, Context context, Map<String, Object> parameters) {
+        void fillRegisters(Object[] sink, Context context, Map<String, Object> parameters) {
             // Copy template to set up defaults and clear old state
             System.arraycopy(registerTemplate, 0, sink, 0, registerTemplate.length);
 
@@ -287,11 +279,11 @@ abstract class RegisterFiller {
                     filled[i] = true;
                 }
             }
-            return fillBuiltinsAndValidate(sink, context, filled);
+            fillBuiltinsAndValidate(sink, context, filled);
         }
 
         @Override
-        Object[] fillRegisters(Object[] sink, Context context, long prefilled) {
+        void fillRegisters(Object[] sink, Context context, long prefilled) {
             // Convert bitmask to boolean array and merge with defaults
             boolean[] filled = Arrays.copyOf(hasDefault, hasDefault.length);
             for (int i = 0; i < filled.length; i++) {
@@ -299,10 +291,10 @@ abstract class RegisterFiller {
                     filled[i] = true;
                 }
             }
-            return fillBuiltinsAndValidate(sink, context, filled);
+            fillBuiltinsAndValidate(sink, context, filled);
         }
 
-        private Object[] fillBuiltinsAndValidate(Object[] sink, Context context, boolean[] filled) {
+        private void fillBuiltinsAndValidate(Object[] sink, Context context, boolean[] filled) {
 
             // Fill key-based builtins using dense arrays
             for (int j = 0; j < keyBuiltinIndices.length; j++) {
@@ -341,8 +333,6 @@ abstract class RegisterFiller {
                     throw new RulesEvaluationError("Missing required parameter: " + name);
                 }
             }
-
-            return sink;
         }
     }
 }

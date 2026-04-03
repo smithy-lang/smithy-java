@@ -292,6 +292,7 @@ public class S3EndpointBenchmark {
                 e.printStackTrace();
             }
         }
+
         private static EndpointResolverParams buildParams(
                 DynamicClient client,
                 ApiOperation<?, ?> operation,
