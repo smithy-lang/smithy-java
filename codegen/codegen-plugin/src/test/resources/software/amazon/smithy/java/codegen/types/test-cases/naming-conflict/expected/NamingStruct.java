@@ -115,10 +115,10 @@ public final class NamingStruct implements SerializableStruct {
         }
         NamingStruct that = (NamingStruct) other;
         return Objects.equals(this.other, that.other)
+               && Objects.equals(this.union, that.union)
                && Objects.equals(this.builderMember, that.builderMember)
                && Objects.equals(this.type, that.type)
                && Objects.equals(this.objectMember, that.objectMember)
-               && Objects.equals(this.union, that.union)
                && Objects.equals(this.map, that.map)
                && Objects.equals(this.list, that.list)
                && Objects.equals(this.listOfList, that.listOfList)

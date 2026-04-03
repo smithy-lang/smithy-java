@@ -237,31 +237,31 @@ public final class DefaultStructure implements SerializableStruct {
         }
         DefaultStructure that = (DefaultStructure) other;
         return this.booleanMember == that.booleanMember
+               && this.byteMember == that.byteMember
+               && this.shortMember == that.shortMember
+               && this.integer == that.integer
+               && this.longMember == that.longMember
+               && Float.compare(this.floatMember, that.floatMember) == 0
+               && Double.compare(this.doubleMember, that.doubleMember) == 0
+               && Objects.equals(this.intEnum, that.intEnum)
+               && Objects.equals(this.string, that.string)
+               && Objects.equals(this.enumMember, that.enumMember)
+               && Objects.equals(this.timestamp, that.timestamp)
+               && Objects.equals(this.bigInteger, that.bigInteger)
+               && Objects.equals(this.bigIntegerWithLongDefault, that.bigIntegerWithLongDefault)
                && Objects.equals(this.bigDecimal, that.bigDecimal)
                && Objects.equals(this.bigDecimalWithDoubleDefault, that.bigDecimalWithDoubleDefault)
                && Objects.equals(this.bigDecimalWithLongDefault, that.bigDecimalWithLongDefault)
-               && Objects.equals(this.bigInteger, that.bigInteger)
-               && Objects.equals(this.bigIntegerWithLongDefault, that.bigIntegerWithLongDefault)
-               && this.byteMember == that.byteMember
-               && Double.compare(this.doubleMember, that.doubleMember) == 0
-               && Float.compare(this.floatMember, that.floatMember) == 0
-               && this.integer == that.integer
-               && this.longMember == that.longMember
-               && this.shortMember == that.shortMember
-               && Objects.equals(this.string, that.string)
                && Objects.equals(this.blob, that.blob)
                && Objects.equals(this.streamingBlob, that.streamingBlob)
+               && Objects.equals(this.list, that.list)
+               && Objects.equals(this.map, that.map)
                && Objects.equals(this.boolDoc, that.boolDoc)
                && Objects.equals(this.stringDoc, that.stringDoc)
                && Objects.equals(this.numberDoc, that.numberDoc)
                && Objects.equals(this.floatingPointnumberDoc, that.floatingPointnumberDoc)
                && Objects.equals(this.listDoc, that.listDoc)
-               && Objects.equals(this.mapDoc, that.mapDoc)
-               && Objects.equals(this.list, that.list)
-               && Objects.equals(this.map, that.map)
-               && Objects.equals(this.timestamp, that.timestamp)
-               && Objects.equals(this.enumMember, that.enumMember)
-               && Objects.equals(this.intEnum, that.intEnum);
+               && Objects.equals(this.mapDoc, that.mapDoc);
     }
 
     @Override

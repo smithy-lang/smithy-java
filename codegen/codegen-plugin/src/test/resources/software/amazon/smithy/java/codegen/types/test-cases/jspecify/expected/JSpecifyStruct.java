@@ -80,9 +80,9 @@ public final class JSpecifyStruct implements SerializableStruct {
             return false;
         }
         JSpecifyStruct that = (JSpecifyStruct) other;
-        return Objects.equals(this.requiredString, that.requiredString)
+        return this.requiredPrimitive == that.requiredPrimitive
+               && Objects.equals(this.requiredString, that.requiredString)
                && Objects.equals(this.optionalString, that.optionalString)
-               && this.requiredPrimitive == that.requiredPrimitive
                && Objects.equals(this.sparseList, that.sparseList);
     }
 

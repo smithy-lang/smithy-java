@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -401,7 +402,8 @@ public final class StructureGenerator<
         }
 
         private void writePropertyEqualityChecks(JavaWriter writer) {
-            var iter = shape.members().iterator();
+            var iter =
+                    shape.members().stream().sorted(new CheapEqualsFirstComparator(symbolProvider, model)).iterator();
             while (iter.hasNext()) {
                 var member = iter.next();
                 var memberSymbol = symbolProvider.toSymbol(member);
@@ -426,6 +428,53 @@ public final class StructureGenerator<
                     writer.writeInlineWithNoFormatting(writer.getNewline() + "&& ");
                 }
                 writer.popState();
+            }
+        }
+
+        private record CheapEqualsFirstComparator(SymbolProvider symbolProvider, Model model)
+                implements Comparator<MemberShape> {
+
+            // Equality cost ranking by shape type (lower = cheaper).
+            // Primitives using == are cheapest, followed by types using static compare methods,
+            // then Object.equals/Arrays.equals comparisons.
+            private static final List<ShapeType> COST_RANKING = List.of(
+                    ShapeType.BOOLEAN,
+                    ShapeType.BYTE,
+                    ShapeType.SHORT,
+                    ShapeType.INTEGER,
+                    ShapeType.INT_ENUM,
+                    ShapeType.LONG,
+                    ShapeType.FLOAT,
+                    ShapeType.DOUBLE,
+                    ShapeType.STRING,
+                    ShapeType.ENUM,
+                    ShapeType.TIMESTAMP,
+                    ShapeType.BIG_INTEGER,
+                    ShapeType.BIG_DECIMAL,
+                    ShapeType.BLOB,
+                    ShapeType.UNION,
+                    ShapeType.STRUCTURE,
+                    ShapeType.LIST,
+                    ShapeType.MAP,
+                    ShapeType.DOCUMENT);
+
+            @Override
+            public int compare(MemberShape o1, MemberShape o2) {
+                return Integer.compare(costOf(o1), costOf(o2));
+            }
+
+            private int costOf(MemberShape member) {
+                var symbol = symbolProvider.toSymbol(member);
+                boolean isPrimitive = symbol.getProperty(SymbolProperties.IS_PRIMITIVE).orElse(false)
+                        && !CodegenUtils.isNullableMember(model, member);
+                var targetType = model.expectShape(member.getTarget()).getType();
+                int typeRank = COST_RANKING.indexOf(targetType);
+                if (typeRank < 0) {
+                    typeRank = COST_RANKING.size();
+                }
+                // Boxed members use Objects.equals, which is more expensive than any primitive op.
+                // Shift them after all primitive types in the ranking.
+                return isPrimitive ? typeRank : COST_RANKING.size() + typeRank;
             }
         }
     }

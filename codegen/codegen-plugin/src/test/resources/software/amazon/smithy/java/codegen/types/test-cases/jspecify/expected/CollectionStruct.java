@@ -172,12 +172,12 @@ public final class CollectionStruct implements SerializableStruct {
         CollectionStruct that = (CollectionStruct) other;
         return Objects.equals(this.nonSparseList, that.nonSparseList)
                && Objects.equals(this.sparseList, that.sparseList)
-               && Objects.equals(this.nonSparseMap, that.nonSparseMap)
-               && Objects.equals(this.sparseMap, that.sparseMap)
                && Objects.equals(this.nonSparseListOfSparseMap, that.nonSparseListOfSparseMap)
                && Objects.equals(this.sparseListOfSparseMap, that.sparseListOfSparseMap)
-               && Objects.equals(this.sparseMapOfNonSparseList, that.sparseMapOfNonSparseList)
-               && Objects.equals(this.nonSparseListOfNonSparseMap, that.nonSparseListOfNonSparseMap);
+               && Objects.equals(this.nonSparseListOfNonSparseMap, that.nonSparseListOfNonSparseMap)
+               && Objects.equals(this.nonSparseMap, that.nonSparseMap)
+               && Objects.equals(this.sparseMap, that.sparseMap)
+               && Objects.equals(this.sparseMapOfNonSparseList, that.sparseMapOfNonSparseList);
     }
 
     @Override

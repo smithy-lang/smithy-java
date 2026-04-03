@@ -88,13 +88,13 @@ public final class PrimitivesNotNullable implements SerializableStruct {
             return false;
         }
         PrimitivesNotNullable that = (PrimitivesNotNullable) other;
-        return this.byteMember == that.byteMember
+        return this.booleanMember == that.booleanMember
+               && this.byteMember == that.byteMember
                && this.shortMember == that.shortMember
                && this.intMember == that.intMember
                && this.longMember == that.longMember
                && Float.compare(this.floatMember, that.floatMember) == 0
-               && Double.compare(this.doubleMember, that.doubleMember) == 0
-               && this.booleanMember == that.booleanMember;
+               && Double.compare(this.doubleMember, that.doubleMember) == 0;
     }
 
     @Override

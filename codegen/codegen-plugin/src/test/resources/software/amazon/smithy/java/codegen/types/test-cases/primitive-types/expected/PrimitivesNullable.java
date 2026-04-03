@@ -88,13 +88,13 @@ public final class PrimitivesNullable implements SerializableStruct {
             return false;
         }
         PrimitivesNullable that = (PrimitivesNullable) other;
-        return Objects.equals(this.byteMember, that.byteMember)
+        return Objects.equals(this.booleanMember, that.booleanMember)
+               && Objects.equals(this.byteMember, that.byteMember)
                && Objects.equals(this.shortMember, that.shortMember)
                && Objects.equals(this.intMember, that.intMember)
                && Objects.equals(this.longMember, that.longMember)
                && Objects.equals(this.floatMember, that.floatMember)
-               && Objects.equals(this.doubleMember, that.doubleMember)
-               && Objects.equals(this.booleanMember, that.booleanMember);
+               && Objects.equals(this.doubleMember, that.doubleMember);
     }
 
     @Override
