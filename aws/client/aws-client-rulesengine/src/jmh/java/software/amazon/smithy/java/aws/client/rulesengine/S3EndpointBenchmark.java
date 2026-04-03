@@ -277,8 +277,21 @@ public class S3EndpointBenchmark {
                             false,
                             "Bucket",
                             "arn:aws:s3-outposts:us-west-2:123456789012:outpost/op-01234567890123456/accesspoint/reports"));
+
+            // Dump disassembly to tmp file for analysis
+            dumpDisassembly(treeMode);
         }
 
+        private void dumpDisassembly(String label) {
+            try {
+                var bytecode = ((BytecodeEndpointResolver) resolver).getBytecode();
+                var path = SharedResolver.CACHE_DIR.resolve("s3-bytecode-" + label + ".txt");
+                Files.writeString(path, bytecode.toString());
+                System.out.println("[disasm] Wrote " + path);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
         private static EndpointResolverParams buildParams(
                 DynamicClient client,
                 ApiOperation<?, ?> operation,

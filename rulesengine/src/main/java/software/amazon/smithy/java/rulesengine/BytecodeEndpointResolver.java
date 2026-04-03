@@ -45,6 +45,10 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
         });
     }
 
+    public Bytecode getBytecode() {
+        return bytecode;
+    }
+
     @Override
     public Endpoint resolveEndpoint(EndpointResolverParams params) {
         var evaluator = threadLocalEvaluator.get();
