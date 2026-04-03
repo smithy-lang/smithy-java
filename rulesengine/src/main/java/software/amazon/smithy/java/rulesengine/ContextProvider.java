@@ -31,11 +31,77 @@ sealed interface ContextProvider {
 
     void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params);
 
+    final class RegisterSink {
+        private final Object[] values;
+        final Map<String, Integer> registerMap;
+        long filled;
+        private final int registerCount;
+
+        RegisterSink(int registerCount, Map<String, Integer> registerMap) {
+            this.values = new Object[registerCount];
+            this.registerMap = registerMap;
+            this.registerCount = registerCount;
+        }
+
+        void put(String name, Object value) {
+            Integer i = registerMap.get(name);
+            if (i != null) {
+                values[i] = value;
+                if (i < 64) {
+                    filled |= 1L << i;
+                }
+            }
+        }
+
+        void putAll(Map<String, Object> map) {
+            for (var e : map.entrySet()) {
+                put(e.getKey(), e.getValue());
+            }
+        }
+
+        /** Copy staged values into the target register array, then reset. */
+        void drainTo(Object[] registers) {
+            // Fast path: use bitmask for registers 0-63
+            long mask = filled;
+            while (mask != 0) {
+                int i = Long.numberOfTrailingZeros(mask);
+                registers[i] = values[i];
+                values[i] = null;
+                mask &= mask - 1;
+            }
+            filled = 0;
+            // Slow path: scan registers 64+ for non-null values
+            for (int i = 64; i < registerCount; i++) {
+                if (values[i] != null) {
+                    registers[i] = values[i];
+                    values[i] = null;
+                }
+            }
+        }
+    }
+
+    default void addContext(ApiOperation<?, ?> operation, SerializableStruct input, RegisterSink sink) {
+        // Default: fall back to Map-based path for providers that haven't been updated.
+        // This allocates a temporary map, but only for DecisionTree-style providers.
+        var tmp = new HashMap<String, Object>();
+        addContext(operation, input, tmp);
+        sink.putAll(tmp);
+    }
+
     final class OrchestratingProvider implements ContextProvider {
         private final ConcurrentMap<ShapeId, ContextProvider> providers = new ConcurrentHashMap<>();
 
         @Override
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params) {
+            getProvider(operation).addContext(operation, input, params);
+        }
+
+        @Override
+        public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, RegisterSink sink) {
+            getProvider(operation).addContext(operation, input, sink);
+        }
+
+        private ContextProvider getProvider(ApiOperation<?, ?> operation) {
             var provider = providers.get(operation.schema().id());
             if (provider == null) {
                 provider = createProvider(operation);
@@ -44,7 +110,7 @@ sealed interface ContextProvider {
                     provider = fresh;
                 }
             }
-            provider.addContext(operation, input, params);
+            return provider;
         }
 
         private ContextProvider createProvider(ApiOperation<?, ?> operation) {
@@ -63,6 +129,11 @@ sealed interface ContextProvider {
         @Override
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params) {
             params.putAll(this.params);
+        }
+
+        @Override
+        public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, RegisterSink sink) {
+            sink.putAll(this.params);
         }
 
         static void compute(List<ContextProvider> providers, Schema operation) {
@@ -90,6 +161,14 @@ sealed interface ContextProvider {
             }
         }
 
+        @Override
+        public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, RegisterSink sink) {
+            var value = input.getMemberValue(member);
+            if (value != null) {
+                sink.put(name, value);
+            }
+        }
+
         static void compute(List<ContextProvider> providers, Schema inputSchema) {
             for (var member : inputSchema.members()) {
                 var ctxTrait = member.getTrait(RulesEngineTraits.CONTEXT_PARAM_TRAIT);
@@ -104,16 +183,26 @@ sealed interface ContextProvider {
     record ContextPathProvider(String name, JmespathExpression jp) implements ContextProvider {
         @Override
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params) {
-            Object result;
-            if (input instanceof Document doc) {
-                var docResult = JmesPathQueries.query(jp, doc);
-                result = docResult != null ? docResult.asObject() : null;
-            } else {
-                result = JmesPathQueries.query(jp, input);
-            }
+            var result = evaluateJmesPath(input);
             if (result != null) {
                 params.put(name, result);
             }
+        }
+
+        @Override
+        public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, RegisterSink sink) {
+            var result = evaluateJmesPath(input);
+            if (result != null) {
+                sink.put(name, result);
+            }
+        }
+
+        private Object evaluateJmesPath(SerializableStruct input) {
+            if (input instanceof Document doc) {
+                var docResult = JmesPathQueries.query(jp, doc);
+                return docResult != null ? docResult.asObject() : null;
+            }
+            return JmesPathQueries.query(jp, input);
         }
 
         static void compute(List<ContextProvider> providers, Schema operation) {
@@ -143,6 +232,13 @@ sealed interface ContextProvider {
                 provider.addContext(operation, input, params);
             }
         }
+
+        @Override
+        public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, RegisterSink sink) {
+            for (ContextProvider provider : providers) {
+                provider.addContext(operation, input, sink);
+            }
+        }
     }
 
     static void createEndpointParams(
@@ -156,6 +252,20 @@ sealed interface ContextProvider {
         var additionalParams = context.get(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS);
         if (additionalParams != null) {
             target.putAll(additionalParams);
+        }
+    }
+
+    static void createEndpointParams(
+            RegisterSink sink,
+            ContextProvider operationContextParams,
+            Context context,
+            ApiOperation<?, ?> operation,
+            SerializableStruct input
+    ) {
+        operationContextParams.addContext(operation, input, sink);
+        var additionalParams = context.get(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS);
+        if (additionalParams != null) {
+            sink.putAll(additionalParams);
         }
     }
 }

@@ -25,14 +25,14 @@ import software.amazon.smithy.rulesengine.logic.ConditionEvaluator;
  */
 final class BytecodeEvaluator implements ConditionEvaluator {
 
-    final Map<String, Object> paramsCache = new HashMap<>();
+    final ContextProvider.RegisterSink registerSink;
 
     private final Bytecode bytecode;
     private final Object[] registers;
     private final RulesExtension[] extensions;
     private Object[] tempArray = new Object[8];
     private int tempArraySize = 8;
-    private Object[] stack = new Object[16];
+    private Object[] stack = new Object[64]; // 64 is more than enough for virtual any ruleset
     private int stackPosition = 0;
     private int pc;
     private final StringBuilder stringBuilder = new StringBuilder(64);
@@ -45,6 +45,7 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         this.extensions = extensions;
         this.registers = new Object[bytecode.getRegisterDefinitions().length];
         this.registerFiller = registerFiller;
+        this.registerSink = new ContextProvider.RegisterSink(registers.length, bytecode.getInputRegisterMap());
     }
 
     /**
@@ -58,6 +59,18 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         this.context = context;
         this.stackPosition = 0;
         registerFiller.fillRegisters(registers, context, parameters);
+    }
+
+    void resetFromSink(Context context) {
+        this.context = context;
+        this.stackPosition = 0;
+        // Copy template to set defaults and clear old state
+        System.arraycopy(registerFiller.registerTemplate, 0, registers, 0, registers.length);
+        // Overlay sink values and capture filled mask
+        long prefilled = registerSink.filled;
+        registerSink.drainTo(registers);
+        // Fill builtins and validate
+        registerFiller.fillRegisters(registers, context, prefilled);
     }
 
     @Override
@@ -78,9 +91,6 @@ final class BytecodeEvaluator implements ConditionEvaluator {
     }
 
     private void push(Object value) {
-        if (stackPosition == stack.length) {
-            resizeStack();
-        }
         stack[stackPosition++] = value;
     }
 

@@ -110,6 +110,12 @@ abstract class RegisterFiller {
     abstract Object[] fillRegisters(Object[] sink, Context context, Map<String, Object> parameters);
 
     /**
+     * Fill registers using a pre-populated sink and filled bitmask from RegisterSink.
+     * Skips the parameter iteration step since registers are already written.
+     */
+    abstract Object[] fillRegisters(Object[] sink, Context context, long prefilled);
+
+    /**
      * Factory method to create the appropriate RegisterFiller implementation.
      *
      * @param bytecode the bytecode containing register definitions and indices
@@ -192,6 +198,15 @@ abstract class RegisterFiller {
                     filled |= 1L << i;
                 }
             }
+            return fillBuiltinsAndValidate(sink, context, filled);
+        }
+
+        @Override
+        Object[] fillRegisters(Object[] sink, Context context, long prefilled) {
+            return fillBuiltinsAndValidate(sink, context, defaultMask | prefilled);
+        }
+
+        private Object[] fillBuiltinsAndValidate(Object[] sink, Context context, long filled) {
 
             // Apply key-based builtins
             for (int j = 0; j < keyBuiltinIndices.length; j++) {
@@ -272,6 +287,22 @@ abstract class RegisterFiller {
                     filled[i] = true;
                 }
             }
+            return fillBuiltinsAndValidate(sink, context, filled);
+        }
+
+        @Override
+        Object[] fillRegisters(Object[] sink, Context context, long prefilled) {
+            // Convert bitmask to boolean array and merge with defaults
+            boolean[] filled = Arrays.copyOf(hasDefault, hasDefault.length);
+            for (int i = 0; i < filled.length; i++) {
+                if ((prefilled & (1L << i)) != 0) {
+                    filled[i] = true;
+                }
+            }
+            return fillBuiltinsAndValidate(sink, context, filled);
+        }
+
+        private Object[] fillBuiltinsAndValidate(Object[] sink, Context context, boolean[] filled) {
 
             // Fill key-based builtins using dense arrays
             for (int j = 0; j < keyBuiltinIndices.length; j++) {

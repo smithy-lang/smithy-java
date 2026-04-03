@@ -51,17 +51,14 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
         var operation = params.operation();
         var ctx = params.context();
 
-        // Get reusable params array and clear it
-        var inputParams = evaluator.paramsCache;
-        inputParams.clear();
+        // Write endpoint params into the register sink
+        var sink = evaluator.registerSink;
+        ContextProvider.createEndpointParams(sink, ctxProvider, ctx, operation, params.inputValue());
 
-        // Prep the input parameters by grabbing them from the input and from other traits.
-        ContextProvider.createEndpointParams(inputParams, ctxProvider, ctx, operation, params.inputValue());
+        // Reset the evaluator and prepare new registers from the sink.
+        evaluator.resetFromSink(ctx);
 
-        // Reset the evaluator and prepare new registers.
-        evaluator.reset(ctx, inputParams);
-
-        LOGGER.debug("Resolving endpoint of {} using VM with params: {}", operation, inputParams);
+        LOGGER.debug("Resolving endpoint of {} using VM", operation);
 
         var resultIndex = bdd.evaluate(evaluator);
         if (resultIndex < 0) {
