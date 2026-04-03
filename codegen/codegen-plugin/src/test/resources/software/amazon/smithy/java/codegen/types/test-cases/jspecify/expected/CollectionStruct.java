@@ -182,15 +182,15 @@ public final class CollectionStruct implements SerializableStruct {
 
     @Override
     public int hashCode() {
-        int result = Objects.hashCode(nonSparseList);
-        result = 31 * result + Objects.hashCode(sparseList);
-        result = 31 * result + Objects.hashCode(nonSparseMap);
-        result = 31 * result + Objects.hashCode(sparseMap);
-        result = 31 * result + Objects.hashCode(nonSparseListOfSparseMap);
-        result = 31 * result + Objects.hashCode(sparseListOfSparseMap);
-        result = 31 * result + Objects.hashCode(sparseMapOfNonSparseList);
-        result = 31 * result + Objects.hashCode(nonSparseListOfNonSparseMap);
-        return result;
+        int $hc = Objects.hashCode(nonSparseList);
+        $hc = 31 * $hc + Objects.hashCode(sparseList);
+        $hc = 31 * $hc + Objects.hashCode(nonSparseMap);
+        $hc = 31 * $hc + Objects.hashCode(sparseMap);
+        $hc = 31 * $hc + Objects.hashCode(nonSparseListOfSparseMap);
+        $hc = 31 * $hc + Objects.hashCode(sparseListOfSparseMap);
+        $hc = 31 * $hc + Objects.hashCode(sparseMapOfNonSparseList);
+        $hc = 31 * $hc + Objects.hashCode(nonSparseListOfNonSparseMap);
+        return $hc;
     }
 
     @Override

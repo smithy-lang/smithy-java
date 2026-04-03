@@ -266,33 +266,33 @@ public final class DefaultStructure implements SerializableStruct {
 
     @Override
     public int hashCode() {
-        int result = Boolean.hashCode(booleanMember);
-        result = 31 * result + Objects.hashCode(bigDecimal);
-        result = 31 * result + Objects.hashCode(bigDecimalWithDoubleDefault);
-        result = 31 * result + Objects.hashCode(bigDecimalWithLongDefault);
-        result = 31 * result + Objects.hashCode(bigInteger);
-        result = 31 * result + Objects.hashCode(bigIntegerWithLongDefault);
-        result = 31 * result + Byte.hashCode(byteMember);
-        result = 31 * result + Double.hashCode(doubleMember);
-        result = 31 * result + Float.hashCode(floatMember);
-        result = 31 * result + Integer.hashCode(integer);
-        result = 31 * result + Long.hashCode(longMember);
-        result = 31 * result + Short.hashCode(shortMember);
-        result = 31 * result + Objects.hashCode(string);
-        result = 31 * result + Objects.hashCode(blob);
-        result = 31 * result + Objects.hashCode(streamingBlob);
-        result = 31 * result + Objects.hashCode(boolDoc);
-        result = 31 * result + Objects.hashCode(stringDoc);
-        result = 31 * result + Objects.hashCode(numberDoc);
-        result = 31 * result + Objects.hashCode(floatingPointnumberDoc);
-        result = 31 * result + Objects.hashCode(listDoc);
-        result = 31 * result + Objects.hashCode(mapDoc);
-        result = 31 * result + Objects.hashCode(list);
-        result = 31 * result + Objects.hashCode(map);
-        result = 31 * result + Objects.hashCode(timestamp);
-        result = 31 * result + Objects.hashCode(enumMember);
-        result = 31 * result + Objects.hashCode(intEnum);
-        return result;
+        int $hc = Boolean.hashCode(booleanMember);
+        $hc = 31 * $hc + Objects.hashCode(bigDecimal);
+        $hc = 31 * $hc + Objects.hashCode(bigDecimalWithDoubleDefault);
+        $hc = 31 * $hc + Objects.hashCode(bigDecimalWithLongDefault);
+        $hc = 31 * $hc + Objects.hashCode(bigInteger);
+        $hc = 31 * $hc + Objects.hashCode(bigIntegerWithLongDefault);
+        $hc = 31 * $hc + Byte.hashCode(byteMember);
+        $hc = 31 * $hc + Double.hashCode(doubleMember);
+        $hc = 31 * $hc + Float.hashCode(floatMember);
+        $hc = 31 * $hc + Integer.hashCode(integer);
+        $hc = 31 * $hc + Long.hashCode(longMember);
+        $hc = 31 * $hc + Short.hashCode(shortMember);
+        $hc = 31 * $hc + Objects.hashCode(string);
+        $hc = 31 * $hc + Objects.hashCode(blob);
+        $hc = 31 * $hc + Objects.hashCode(streamingBlob);
+        $hc = 31 * $hc + Objects.hashCode(boolDoc);
+        $hc = 31 * $hc + Objects.hashCode(stringDoc);
+        $hc = 31 * $hc + Objects.hashCode(numberDoc);
+        $hc = 31 * $hc + Objects.hashCode(floatingPointnumberDoc);
+        $hc = 31 * $hc + Objects.hashCode(listDoc);
+        $hc = 31 * $hc + Objects.hashCode(mapDoc);
+        $hc = 31 * $hc + Objects.hashCode(list);
+        $hc = 31 * $hc + Objects.hashCode(map);
+        $hc = 31 * $hc + Objects.hashCode(timestamp);
+        $hc = 31 * $hc + Objects.hashCode(enumMember);
+        $hc = 31 * $hc + Objects.hashCode(intEnum);
+        return $hc;
     }
 
     @Override

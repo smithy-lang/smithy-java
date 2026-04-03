@@ -99,14 +99,14 @@ public final class PrimitivesNullable implements SerializableStruct {
 
     @Override
     public int hashCode() {
-        int result = Objects.hashCode(byteMember);
-        result = 31 * result + Objects.hashCode(shortMember);
-        result = 31 * result + Objects.hashCode(intMember);
-        result = 31 * result + Objects.hashCode(longMember);
-        result = 31 * result + Objects.hashCode(floatMember);
-        result = 31 * result + Objects.hashCode(doubleMember);
-        result = 31 * result + Objects.hashCode(booleanMember);
-        return result;
+        int $hc = Objects.hashCode(byteMember);
+        $hc = 31 * $hc + Objects.hashCode(shortMember);
+        $hc = 31 * $hc + Objects.hashCode(intMember);
+        $hc = 31 * $hc + Objects.hashCode(longMember);
+        $hc = 31 * $hc + Objects.hashCode(floatMember);
+        $hc = 31 * $hc + Objects.hashCode(doubleMember);
+        $hc = 31 * $hc + Objects.hashCode(booleanMember);
+        return $hc;
     }
 
     @Override

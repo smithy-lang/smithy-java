@@ -127,16 +127,16 @@ public final class NamingStruct implements SerializableStruct {
 
     @Override
     public int hashCode() {
-        int result = Objects.hashCode(other);
-        result = 31 * result + Objects.hashCode(builderMember);
-        result = 31 * result + Objects.hashCode(type);
-        result = 31 * result + Objects.hashCode(objectMember);
-        result = 31 * result + Objects.hashCode(union);
-        result = 31 * result + Objects.hashCode(map);
-        result = 31 * result + Objects.hashCode(list);
-        result = 31 * result + Objects.hashCode(listOfList);
-        result = 31 * result + Objects.hashCode(mapOfMap);
-        return result;
+        int $hc = Objects.hashCode(other);
+        $hc = 31 * $hc + Objects.hashCode(builderMember);
+        $hc = 31 * $hc + Objects.hashCode(type);
+        $hc = 31 * $hc + Objects.hashCode(objectMember);
+        $hc = 31 * $hc + Objects.hashCode(union);
+        $hc = 31 * $hc + Objects.hashCode(map);
+        $hc = 31 * $hc + Objects.hashCode(list);
+        $hc = 31 * $hc + Objects.hashCode(listOfList);
+        $hc = 31 * $hc + Objects.hashCode(mapOfMap);
+        return $hc;
     }
 
     @Override

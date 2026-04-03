@@ -112,16 +112,16 @@ public final class ObjectShape implements SerializableStruct {
 
     @Override
     public int hashCode() {
-        int result = Objects.hashCode(classMember);
-        result = 31 * result + Objects.hashCode(getClassMember);
-        result = 31 * result + Objects.hashCode(hashCodeMember);
-        result = 31 * result + Objects.hashCode(cloneMember);
-        result = 31 * result + Objects.hashCode(toStringMember);
-        result = 31 * result + Objects.hashCode(notifyMember);
-        result = 31 * result + Objects.hashCode(notifyAllMember);
-        result = 31 * result + Objects.hashCode(waitMember);
-        result = 31 * result + Objects.hashCode(finalizeMember);
-        return result;
+        int $hc = Objects.hashCode(classMember);
+        $hc = 31 * $hc + Objects.hashCode(getClassMember);
+        $hc = 31 * $hc + Objects.hashCode(hashCodeMember);
+        $hc = 31 * $hc + Objects.hashCode(cloneMember);
+        $hc = 31 * $hc + Objects.hashCode(toStringMember);
+        $hc = 31 * $hc + Objects.hashCode(notifyMember);
+        $hc = 31 * $hc + Objects.hashCode(notifyAllMember);
+        $hc = 31 * $hc + Objects.hashCode(waitMember);
+        $hc = 31 * $hc + Objects.hashCode(finalizeMember);
+        return $hc;
     }
 
     @Override

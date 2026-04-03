@@ -459,12 +459,12 @@ public final class StructureGenerator<
 
             var iter = members.iterator();
             var first = iter.next();
-            writer.write("int result = $C;", writer.consumer(w -> writeMemberHash(w, first)));
+            writer.write("int $$hc = $C;", writer.consumer(w -> writeMemberHash(w, first)));
             while (iter.hasNext()) {
                 var member = iter.next();
-                writer.write("result = 31 * result + $C;", writer.consumer(w -> writeMemberHash(w, member)));
+                writer.write("$$hc = 31 * $$hc + $C;", writer.consumer(w -> writeMemberHash(w, member)));
             }
-            writer.write("return result;");
+            writer.write("return $$hc;");
         }
 
         private void writeMemberHash(JavaWriter writer, MemberShape member) {

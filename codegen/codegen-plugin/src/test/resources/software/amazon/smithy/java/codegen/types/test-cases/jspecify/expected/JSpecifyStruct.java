@@ -88,11 +88,11 @@ public final class JSpecifyStruct implements SerializableStruct {
 
     @Override
     public int hashCode() {
-        int result = Objects.hashCode(requiredString);
-        result = 31 * result + Objects.hashCode(optionalString);
-        result = 31 * result + Boolean.hashCode(requiredPrimitive);
-        result = 31 * result + Objects.hashCode(sparseList);
-        return result;
+        int $hc = Objects.hashCode(requiredString);
+        $hc = 31 * $hc + Objects.hashCode(optionalString);
+        $hc = 31 * $hc + Boolean.hashCode(requiredPrimitive);
+        $hc = 31 * $hc + Objects.hashCode(sparseList);
+        return $hc;
     }
 
     @Override
