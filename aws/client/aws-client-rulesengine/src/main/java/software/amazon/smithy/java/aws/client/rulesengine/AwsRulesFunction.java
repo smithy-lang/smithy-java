@@ -5,9 +5,7 @@
 
 package software.amazon.smithy.java.aws.client.rulesengine;
 
-import java.util.AbstractMap;
-import java.util.Map;
-import java.util.Set;
+import software.amazon.smithy.java.rulesengine.PropertyGetter;
 import software.amazon.smithy.java.rulesengine.RulesFunction;
 import software.amazon.smithy.rulesengine.aws.language.functions.AwsArn;
 import software.amazon.smithy.rulesengine.aws.language.functions.AwsPartition;
@@ -35,56 +33,25 @@ enum AwsRulesFunction implements RulesFunction {
         // Most of the entries aren't needed for evaluating rules, so map entries are created lazily (something that
         // isn't needed when evaluating rules), and accessing map values is done using a switch (something that is
         // essentially compiled into a map lookup via a lookupswitch).
-        private static final class PartitionMap extends AbstractMap<String, Object> {
-            private final Partition partition;
-            private Set<Entry<String, Object>> entrySet;
-
-            private PartitionMap(Partition partition) {
-                this.partition = partition;
-            }
-
+        private record PartitionMap(Partition partition) implements PropertyGetter {
             @Override
-            public int size() {
-                return 6;
-            }
-
-            @Override
-            public Set<Entry<String, Object>> entrySet() {
-                var result = entrySet;
-                if (result == null) {
-                    result = Set.of(
-                            Map.entry("name", partition.getId()),
-                            Map.entry("dnsSuffix", partition.getOutputs().getDnsSuffix()),
-                            Map.entry("dualStackDnsSuffix", partition.getOutputs().getDualStackDnsSuffix()),
-                            Map.entry("supportsFIPS", partition.getOutputs().supportsFips()),
-                            Map.entry("supportsDualStack", partition.getOutputs().supportsDualStack()),
-                            Map.entry("implicitGlobalRegion", partition.getOutputs().getImplicitGlobalRegion()));
-                    entrySet = result;
-                }
-                return result;
-            }
-
-            @Override
-            public Object get(Object key) {
-                if (key instanceof String s) {
-                    return switch (s) {
-                        case "name" -> partition.getId();
-                        case "dnsSuffix" -> partition.getOutputs().getDnsSuffix();
-                        case "dualStackDnsSuffix" -> partition.getOutputs().getDualStackDnsSuffix();
-                        case "supportsFIPS" -> partition.getOutputs().supportsFips();
-                        case "supportsDualStack" -> partition.getOutputs().supportsDualStack();
-                        case "implicitGlobalRegion" -> partition.getOutputs().getImplicitGlobalRegion();
-                        default -> null;
-                    };
-                }
-                return null;
+            public Object getProperty(String name) {
+                return switch (name) {
+                    case "name" -> partition.getId();
+                    case "dnsSuffix" -> partition.getOutputs().getDnsSuffix();
+                    case "dualStackDnsSuffix" -> partition.getOutputs().getDualStackDnsSuffix();
+                    case "supportsFIPS" -> partition.getOutputs().supportsFips();
+                    case "supportsDualStack" -> partition.getOutputs().supportsDualStack();
+                    case "implicitGlobalRegion" -> partition.getOutputs().getImplicitGlobalRegion();
+                    default -> null;
+                };
             }
         }
     },
 
     AWS_PARSE_ARN("aws.parseArn", 1) {
         // Single volatile reference for thread-safe hot-key caching without ThreadLocal overhead.
-        private volatile ArnMap cache;
+        private transient volatile ArnMap cache;
 
         @Override
         public Object apply1(Object arg1) {
@@ -105,50 +72,18 @@ enum AwsRulesFunction implements RulesFunction {
             return result;
         }
 
-        // Lazy property access map. Same pattern as PartitionMap above.
-        private static final class ArnMap extends AbstractMap<String, Object> {
-            final String key;
-            private final AwsArn arn;
-            private volatile Set<Entry<String, Object>> entrySet;
-
-            private ArnMap(String key, AwsArn arn) {
-                this.key = key;
-                this.arn = arn;
-            }
-
+        // Lazy property access. Same pattern as PartitionMap above.
+        private record ArnMap(String key, AwsArn arn) implements PropertyGetter {
             @Override
-            public int size() {
-                return 5;
-            }
-
-            @Override
-            public Set<Entry<String, Object>> entrySet() {
-                var result = entrySet;
-                if (result == null) {
-                    result = Set.of(
-                            Map.entry("partition", arn.getPartition()),
-                            Map.entry("service", arn.getService()),
-                            Map.entry("region", arn.getRegion()),
-                            Map.entry("accountId", arn.getAccountId()),
-                            Map.entry("resourceId", arn.getResource()));
-                    entrySet = result;
-                }
-                return result;
-            }
-
-            @Override
-            public Object get(Object key) {
-                if (key instanceof String s) {
-                    return switch (s) {
-                        case "partition" -> arn.getPartition();
-                        case "service" -> arn.getService();
-                        case "region" -> arn.getRegion();
-                        case "accountId" -> arn.getAccountId();
-                        case "resourceId" -> arn.getResource();
-                        default -> null;
-                    };
-                }
-                return null;
+            public Object getProperty(String name) {
+                return switch (name) {
+                    case "partition" -> arn.getPartition();
+                    case "service" -> arn.getService();
+                    case "region" -> arn.getRegion();
+                    case "accountId" -> arn.getAccountId();
+                    case "resourceId" -> arn.getResource();
+                    default -> null;
+                };
             }
         }
     },

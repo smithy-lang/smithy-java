@@ -86,9 +86,10 @@ public final class EndpointUtils {
         return ((instructions[offset] & 0xFF) << 8) | (instructions[offset + 1] & 0xFF);
     }
 
-    // Get a property from a map or URI, or return null.
+    // Get a property from a PropertyGetter, map, or URI. Returns null if not found.
     static Object getProperty(Object target, String propertyName) {
         return switch (target) {
+            case PropertyGetter pg -> pg.getProperty(propertyName);
             case Map<?, ?> m -> m.get(propertyName);
             case SmithyUri u -> switch (propertyName) {
                 case "scheme" -> u.getScheme();
