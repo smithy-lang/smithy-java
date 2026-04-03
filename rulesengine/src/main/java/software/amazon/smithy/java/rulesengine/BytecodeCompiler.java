@@ -484,7 +484,10 @@ final class BytecodeCompiler {
                 var template = s.value();
                 var parts = template.getParts();
 
-                if (parts.size() == 1 && parts.get(0) instanceof Template.Literal) {
+                if (parts.isEmpty()) {
+                    // Empty string
+                    addLoadConst("");
+                } else if (parts.size() == 1 && parts.get(0) instanceof Template.Literal) {
                     // Simple string with no interpolation
                     addLoadConst(parts.get(0).toString());
                 } else if (parts.size() == 1 && parts.get(0) instanceof Template.Dynamic dynamic) {
