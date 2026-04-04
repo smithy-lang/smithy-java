@@ -9,6 +9,9 @@ pluginManagement {
 
 rootProject.name = "smithy-java"
 
+// BOM (Bill of Materials)
+include(":bom")
+
 // AI
 include(":smithy-ai-traits")
 
@@ -57,7 +60,6 @@ include(":server:server-proxy")
 // Codegen
 include(":codegen:codegen-core")
 include(":codegen:codegen-plugin")
-include(":codegen:test-utils")
 
 // Utilities
 include(":jmespath")

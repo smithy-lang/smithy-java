@@ -1,12 +1,10 @@
 plugins {
-    id("smithy-java.module-conventions")
+    id("smithy-java.java-conventions")
+    id("smithy-java.integ-test-conventions")
     id("software.amazon.smithy.gradle.smithy-base")
 }
 
 description = "This module provides a test harness and tools for fuzzing Smithy codecs using Jazzer."
-
-extra["displayName"] = "Smithy :: Java :: Fuzz Test Harness"
-extra["moduleName"] = "software.amazon.smithy.java.fuzz"
 
 dependencies {
     smithyBuild(project(":codegen:codegen-plugin"))
@@ -43,10 +41,6 @@ afterEvaluate {
 
 tasks.named("compileJava") {
     dependsOn("smithyBuild")
-}
-
-tasks.sourcesJar {
-    mustRunAfter("compileJava")
 }
 
 tasks.processResources {

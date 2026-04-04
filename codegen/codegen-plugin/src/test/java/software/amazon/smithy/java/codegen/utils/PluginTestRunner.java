@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.codegen.test;
+package software.amazon.smithy.java.codegen.utils;
 
 import java.io.File;
 import java.io.IOException;

@@ -1,13 +1,11 @@
 
 
 plugins {
-    id("smithy-java.module-conventions")
+    id("smithy-java.java-conventions")
+    id("smithy-java.integ-test-conventions")
 }
 
 description = "This module provides a test harness and tools for executing protocol tests."
-
-extra["displayName"] = "Smithy :: Java :: Protocol Tests"
-extra["moduleName"] = "software.amazon.smithy.java.protocoltests"
 
 dependencies {
     implementation(project(":logging"))

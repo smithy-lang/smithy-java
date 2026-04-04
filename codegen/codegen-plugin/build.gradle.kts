@@ -24,7 +24,6 @@ dependencies {
     testImplementation(project(":aws:client:aws-client-restjson"))
     testImplementation(libs.smithy.aws.traits)
     testImplementation(libs.smithy.rules)
-    testImplementation(project(":codegen:test-utils"))
     testImplementation(libs.jspecify)
 
     // Integration test deps

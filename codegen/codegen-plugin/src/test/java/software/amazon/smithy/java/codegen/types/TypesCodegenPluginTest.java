@@ -6,12 +6,12 @@
 package software.amazon.smithy.java.codegen.types;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static software.amazon.smithy.java.codegen.test.PluginTestRunner.addTestCasesFromUrl;
+import static software.amazon.smithy.java.codegen.utils.PluginTestRunner.addTestCasesFromUrl;
 
 import java.util.Collection;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import software.amazon.smithy.java.codegen.test.PluginTestRunner.TestCase;
+import software.amazon.smithy.java.codegen.utils.PluginTestRunner.TestCase;
 
 public class TypesCodegenPluginTest {
 
