@@ -17,6 +17,7 @@ final class StringTraitInitializer implements TraitInitializer<StringTrait> {
 
     @Override
     public void accept(JavaWriter writer, StringTrait stringTrait) {
-        writer.writeInline("new $T($S)", stringTrait.getClass(), stringTrait.getValue());
+        var stringValue = stringTrait.getValue().replace("£", "££");
+        writer.writeInline("new $T($S)", stringTrait.getClass(), stringValue);
     }
 }
