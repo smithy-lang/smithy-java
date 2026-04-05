@@ -16,3 +16,7 @@ dependencies {
     testImplementation(project(":client:dynamic-client"))
     testImplementation(project(":aws:client:aws-client-rulesengine"))
 }
+
+configureIntegTests {
+    awsModelTests = true
+}

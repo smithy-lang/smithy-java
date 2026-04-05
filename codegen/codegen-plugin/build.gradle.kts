@@ -92,13 +92,6 @@ tasks.test {
     failOnNoDiscoveredTests = false
 }
 
-// If API_MODELS_AWS_DIR is set, add it as a task input so Gradle doesn't cache results.
-System.getenv("API_MODELS_AWS_DIR")?.let { modelsDir ->
-    val dir = file(modelsDir)
-    if (dir.isDirectory) {
-        tasks.named<Test>("integ") {
-            inputs.dir(dir).withPathSensitivity(PathSensitivity.RELATIVE)
-            maxHeapSize = "4g"
-        }
-    }
+configureIntegTests {
+    awsModelTests = true
 }

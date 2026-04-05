@@ -22,6 +22,7 @@ jazzer = "0.30.0"
 json-schema-validator = "3.0.0"
 opentelemetry = "1.60.1"
 jspecify = "1.0.0"
+aws-api-models = "1.0.204"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -73,6 +74,7 @@ jazzer-junit = { module = "com.code-intelligence:jazzer-junit", version.ref = "j
 jazzer-api = { module = "com.code-intelligence:jazzer-api", version.ref = "jazzer" }
 json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "json-schema-validator"}
 jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
+aws-api-models-bom = { module = "software.amazon.api.models:all", version.ref = "aws-api-models" }
 
 # plugin artifacts for buildsrc plugins
 test-logger-plugin = { module = "com.adarshr:gradle-test-logger-plugin", version.ref = "test-logger-plugin" }

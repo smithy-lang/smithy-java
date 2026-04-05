@@ -9,19 +9,19 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.net.URL;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.jupiter.api.Named;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.rulesengine.Bytecode;
 import software.amazon.smithy.java.rulesengine.RulesEngineBuilder;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
+import software.amazon.smithy.model.loader.ModelDiscovery;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.rulesengine.language.EndpointRuleSet;
 import software.amazon.smithy.rulesengine.language.evaluation.TestEvaluator;
@@ -38,40 +38,36 @@ import software.amazon.smithy.rulesengine.traits.EndpointTestsTrait;
  * evaluated against its endpoint test cases, round-tripped through serialization,
  * and disassembled without errors.
  *
- * <p>Set the {@code API_MODELS_AWS_DIR} environment variable to the root of a local
- * checkout of api-models-aws to enable this test.
+ * <p>AWS service models are discovered on the classpath via
+ * {@link ModelDiscovery#findModels()}.
  */
+@EnabledIfSystemProperty(named = "awsModelsTests", matches = "true")
 class AwsEndpointRulesetTest {
 
-    private static Path getModelsDir() {
-        var dir = System.getenv("API_MODELS_AWS_DIR");
-        return dir != null ? Paths.get(dir, "models") : null;
+    static Stream<Named<URL>> awsModels() {
+        return ModelDiscovery.findModels()
+                .stream()
+                .filter(url -> url.toString().endsWith(".json"))
+                .map(url -> Named.of(artifactName(url), url))
+                .sorted(Comparator.comparing(Named::getName));
     }
 
-    static boolean modelsAvailable() {
-        var dir = getModelsDir();
-        return dir != null && Files.isDirectory(dir);
+    private static String artifactName(URL modelUrl) {
+        String urlStr = modelUrl.toString();
+        int bangIdx = urlStr.indexOf("!/");
+        String jarPath = urlStr.substring(0, bangIdx);
+        String jarName = jarPath.substring(jarPath.lastIndexOf('/') + 1);
+        return jarName.replaceFirst("-\\d[\\d.]*\\.jar$", "");
     }
 
-    static Stream<Path> awsModels() throws IOException {
-        var modelsDir = getModelsDir();
-        try (var paths = Files.find(modelsDir,
-                4,
-                (p, a) -> p.toString().endsWith(".json")
-                        && p.getParent().getParent().getFileName().toString().equals("service"))) {
-            return paths.sorted().toList().stream();
-        }
-    }
-
-    @EnabledIf("modelsAvailable")
     @ParameterizedTest(name = "{0}")
     @MethodSource("awsModels")
-    void compileEvaluateAndRoundTrip(Path modelPath) {
+    void compileEvaluateAndRoundTrip(URL modelUrl) {
         // Load the model
         Model model = Model.assembler()
-                .addImport(modelPath)
+                .addImport(modelUrl)
                 .putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
-                .discoverModels()
+                .disableValidation()
                 .assemble()
                 .unwrap();
 

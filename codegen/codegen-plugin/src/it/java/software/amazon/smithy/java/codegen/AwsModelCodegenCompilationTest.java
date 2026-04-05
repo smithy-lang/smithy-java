@@ -13,11 +13,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -33,7 +34,7 @@ import javax.tools.SimpleJavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
 import org.junit.jupiter.api.Named;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -42,6 +43,7 @@ import software.amazon.smithy.build.MockManifest;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
+import software.amazon.smithy.model.loader.ModelDiscovery;
 import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ServiceShape;
@@ -49,44 +51,44 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 /**
  * Tests that Java code generation produces compilable code for all AWS service models.
  *
- * <p>Set the {@code API_MODELS_AWS_DIR} environment variable to the root of a local
- * checkout of {@code aws/api-models-aws} to enable this test.
+ * <p>AWS service models are discovered on the classpath via
+ * {@link ModelDiscovery#findModels()}.
  */
-@EnabledIfEnvironmentVariable(named = "API_MODELS_AWS_DIR", matches = ".*")
+@EnabledIfSystemProperty(named = "awsModelsTests", matches = "true")
 class AwsModelCodegenCompilationTest {
 
     private static final Set<String> IGNORED_SDK_IDS = Set.of(
             "timestream-write",
             "timestream-query",
-            "clouddirectory"
+            "clouddirectory");
 
-    );
-
-    private static Path getModelsDir() {
-        var dir = System.getenv("API_MODELS_AWS_DIR");
-        return Paths.get(dir, "models");
+    static Stream<Named<URL>> awsModels() {
+        return ModelDiscovery.findModels()
+                .stream()
+                .filter(url -> url.toString().endsWith(".json"))
+                .map(url -> Named.of(artifactName(url), url))
+                .sorted(Comparator.comparing(Named::getName));
     }
 
-    static Stream<Named<Path>> awsModels() throws IOException {
-        var modelsDir = getModelsDir();
-        return Files.find(modelsDir,
-                4,
-                (p, a) -> p.toString().endsWith(".json")
-                        && p.getParent().getParent().getFileName().toString().equals("service"))
-                .map(p -> Named.of(sdkId(modelsDir, p), p));
+    private static String artifactName(URL modelUrl) {
+        String urlStr = modelUrl.toString();
+        int bangIdx = urlStr.indexOf("!/");
+        String jarPath = urlStr.substring(0, bangIdx);
+        String jarName = jarPath.substring(jarPath.lastIndexOf('/') + 1);
+        return jarName.replaceFirst("-\\d[\\d.]*\\.jar$", "");
     }
 
     @ParameterizedTest(name = "client: {0}")
     @MethodSource("awsModels")
     @Execution(ExecutionMode.CONCURRENT)
-    void compileGeneratedCode(Path modelPath) {
-        generateAndCompile(modelPath, "client", "server");
+    void compileGeneratedCode(URL modelUrl) {
+        generateAndCompile(modelUrl, "client", "server");
     }
 
-    private void generateAndCompile(Path modelPath, String... modes) {
+    private void generateAndCompile(URL modelUrl, String... modes) {
         // 1. Load model
         Model model = Model.assembler()
-                .addImport(modelPath)
+                .addImport(modelUrl)
                 .putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
                 .disableValidation()
                 .assemble()
@@ -149,7 +151,7 @@ class AwsModelCodegenCompilationTest {
                 }
             }
         } catch (Throwable t) {
-            if (IGNORED_SDK_IDS.contains(sdkId(getModelsDir(), modelPath))) {
+            if (IGNORED_SDK_IDS.contains(artifactName(modelUrl))) {
                 abort("Known failure for " + service.getId() + ": " + t.getMessage());
             }
             sneakyThrow(t);
@@ -175,10 +177,6 @@ class AwsModelCodegenCompilationTest {
         } catch (IOException e) {
             return Path.of("<dump failed: " + e.getMessage() + ">");
         }
-    }
-
-    private static String sdkId(Path modelsDir, Path modelPath) {
-        return modelsDir.relativize(modelPath).getName(0).toString();
     }
 
     private static String sanitize(String name) {
