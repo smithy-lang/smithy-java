@@ -1,5 +1,6 @@
 //This ensures composite builds also have the repositories configured.
 pluginManagement {
+    includeBuild("gradle-plugin")
     repositories {
         mavenLocal()
         mavenCentral()

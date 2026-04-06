@@ -1,7 +1,7 @@
 plugins {
     application
     id("smithy-java.module-conventions")
-    id("software.amazon.smithy.gradle.smithy-base")
+    id("software.amazon.smithy.java.codegen")
 }
 
 description = "This module implements the model-bundle utility"
@@ -9,8 +9,10 @@ description = "This module implements the model-bundle utility"
 extra["displayName"] = "Smithy :: Java :: Model Bundle"
 extra["moduleName"] = "software.amazon.smithy.java.modelbundle.api"
 
+smithyJava {
+}
+
 dependencies {
-    smithyBuild(project(":codegen:codegen-plugin"))
 
     implementation(project(":core"))
     implementation(project(":logging"))
@@ -20,31 +22,4 @@ dependencies {
     api(project(":dynamic-schemas"))
     api(project(":server:server-api"))
     api(project(":server:server-proxy"))
-}
-
-afterEvaluate {
-    val typesPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
-    sourceSets {
-        main {
-            java {
-                srcDir("$typesPath/java")
-            }
-            resources {
-                srcDir("$typesPath/resources")
-            }
-        }
-    }
-}
-
-tasks.named("compileJava") {
-    dependsOn("smithyBuild")
-}
-
-// Needed because sources-jar needs to run after smithy-build is done
-tasks.sourcesJar {
-    mustRunAfter(tasks.compileJava)
-}
-
-tasks.processResources {
-    dependsOn(tasks.compileJava)
 }
