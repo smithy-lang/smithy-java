@@ -328,6 +328,19 @@ final class BytecodeCompiler {
                             throw new RulesEvaluationError("ite requires exactly 3 arguments, got " + args.size());
                         }
 
+                        // Optimize: ite(boolRegister, constA, constB) -> SELECT_BOOL_REG
+                        if (args.get(0) instanceof Reference ref
+                                && args.get(1) instanceof Literal litTrue
+                                && args.get(2) instanceof Literal litFalse) {
+                            var trueVal = litTrue.toNode().toNode();
+                            var falseVal = litFalse.toNode().toNode();
+                            writer.writeByte(Opcodes.SELECT_BOOL_REG);
+                            writer.writeByte(registerAllocator.getRegister(ref.getName().toString()));
+                            writer.writeShort(writer.getConstantIndex(EndpointUtils.convertNode(trueVal, true)));
+                            writer.writeShort(writer.getConstantIndex(EndpointUtils.convertNode(falseVal, true)));
+                            return null;
+                        }
+
                         // Compile condition
                         compileExpression(args.get(0));
 

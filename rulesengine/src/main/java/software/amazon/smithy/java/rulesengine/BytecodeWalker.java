@@ -96,7 +96,7 @@ final class BytecodeWalker {
             case Opcodes.GET_PROPERTY_REG, Opcodes.GET_INDEX_REG, Opcodes.RESOLVE_TEMPLATE,
                     Opcodes.GET_NEGATIVE_INDEX_REG ->
                 2;
-            case Opcodes.SUBSTRING, Opcodes.SPLIT_GET -> 3;
+            case Opcodes.SUBSTRING, Opcodes.SPLIT_GET, Opcodes.SELECT_BOOL_REG -> 3;
             case Opcodes.SUBSTRING_EQ -> 5;
             default -> -1;
         };
@@ -206,6 +206,16 @@ final class BytecodeWalker {
                     return code.get(pc + 4) & 0xFF; // index (will be cast to signed byte by caller)
                 }
                 break;
+
+            case Opcodes.SELECT_BOOL_REG:
+                if (index == 0) {
+                    return code.get(pc + 1) & 0xFF; // register
+                } else if (index == 1) {
+                    return ((code.get(pc + 2) & 0xFF) << 8) | (code.get(pc + 3) & 0xFF); // true const
+                } else if (index == 2) {
+                    return ((code.get(pc + 4) & 0xFF) << 8) | (code.get(pc + 5) & 0xFF); // false const
+                }
+                break;
         }
 
         throw new IllegalArgumentException("Invalid operand index " + index + " for opcode " + opcode);
@@ -242,6 +252,7 @@ final class BytecodeWalker {
                 3;
             case Opcodes.RESOLVE_TEMPLATE, Opcodes.GET_PROPERTY_REG, Opcodes.SUBSTRING -> 4;
             case Opcodes.SPLIT_GET -> 5;
+            case Opcodes.SELECT_BOOL_REG -> 6;
             case Opcodes.SUBSTRING_EQ -> 7;
             default -> -1;
         };

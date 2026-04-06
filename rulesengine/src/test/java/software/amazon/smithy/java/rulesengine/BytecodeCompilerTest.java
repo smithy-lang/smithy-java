@@ -647,8 +647,7 @@ class BytecodeCompilerTest {
 
         Bytecode bytecode = compiler.compile();
 
-        assertOpcodePresent(bytecode, Opcodes.JMP_IF_FALSE);
-        assertOpcodePresent(bytecode, Opcodes.JUMP);
+        assertOpcodePresent(bytecode, Opcodes.SELECT_BOOL_REG);
     }
 
     @Test

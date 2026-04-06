@@ -487,4 +487,14 @@ public final class Opcodes {
      * <p>Index is signed: positive = from start, negative = from end (-1 = last)
      */
     public static final byte SPLIT_GET = 49;
+
+    /**
+     * Select one of two constant values based on a boolean register.
+     * Fuses ite(register, constA, constB) into a single opcode.
+     *
+     * <p>Stack: [...] => [..., value]
+     *
+     * <p><code>SELECT_BOOL_REG [register:byte] [true-const:short] [false-const:short]</code>
+     */
+    public static final byte SELECT_BOOL_REG = 50;
 }

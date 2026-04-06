@@ -459,6 +459,16 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     var sgDelimiter = (String) constantPool[sgDelimIdx];
                     push(EndpointUtils.splitGet(sgValue, sgDelimiter, sgIndex));
                 }
+                case Opcodes.SELECT_BOOL_REG -> {
+                    var selVal = registers[instructions[pc++] & 0xFF];
+                    int selTrue = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                    pc += 2;
+                    int selFalse = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                    pc += 2;
+                    push(selVal != null && selVal != Boolean.FALSE
+                            ? constantPool[selTrue]
+                            : constantPool[selFalse]);
+                }
                 default -> throw new RulesEvaluationError("Unknown rules engine instruction: " + opcode, pc);
             }
         }
