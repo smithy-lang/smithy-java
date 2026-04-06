@@ -46,11 +46,20 @@ sealed interface ContextProvider {
         void put(String name, Object value) {
             Integer i = registerMap.get(name);
             if (i != null) {
-                values[i] = value;
-                if (i < 64) {
-                    filled |= 1L << i;
-                }
+                putIndex(i, value);
             }
+        }
+
+        void putIndex(int i, Object value) {
+            values[i] = value;
+            if (i < 64) {
+                filled |= 1L << i;
+            }
+        }
+
+        int resolveIndex(String name) {
+            Integer i = registerMap.get(name);
+            return i != null ? i : -1;
         }
 
         void putAll(Map<String, Object> map) {
@@ -125,7 +134,16 @@ sealed interface ContextProvider {
     }
 
     // Find the smithy.rules#staticContextParams on the operation.
-    record StaticParamsProvider(Map<String, Object> params) implements ContextProvider {
+    static final class StaticParamsProvider implements ContextProvider {
+        private final Map<String, Object> params;
+        // Pre-resolved: parallel arrays of index->value for direct sink writes
+        private int[] resolvedIndices;
+        private Object[] resolvedValues;
+
+        StaticParamsProvider(Map<String, Object> params) {
+            this.params = params;
+        }
+
         @Override
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params) {
             params.putAll(this.params);
@@ -133,7 +151,29 @@ sealed interface ContextProvider {
 
         @Override
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, RegisterSink sink) {
-            sink.putAll(this.params);
+            if (resolvedIndices == null) {
+                resolveIndices(sink);
+            }
+            for (int i = 0; i < resolvedIndices.length; i++) {
+                sink.putIndex(resolvedIndices[i], resolvedValues[i]);
+            }
+        }
+
+        private void resolveIndices(RegisterSink sink) {
+            int count = 0;
+            int[] indices = new int[params.size()];
+            Object[] values = new Object[params.size()];
+            for (var entry : params.entrySet()) {
+                int idx = sink.resolveIndex(entry.getKey());
+                if (idx >= 0) {
+                    indices[count] = idx;
+                    values[count] = entry.getValue();
+                    count++;
+                }
+            }
+            // Trim to actual size
+            resolvedIndices = count == indices.length ? indices : java.util.Arrays.copyOf(indices, count);
+            resolvedValues = count == values.length ? values : java.util.Arrays.copyOf(values, count);
         }
 
         static void compute(List<ContextProvider> providers, Schema operation) {
@@ -152,7 +192,16 @@ sealed interface ContextProvider {
     }
 
     // Find smithy.rules#contextParam trait on operation input members.
-    record ContextParamProvider(Schema member, String name) implements ContextProvider {
+    final class ContextParamProvider implements ContextProvider {
+        private final Schema member;
+        private final String name;
+        private int cachedIndex = -2; // -2 = not resolved yet
+
+        ContextParamProvider(Schema member, String name) {
+            this.member = member;
+            this.name = name;
+        }
+
         @Override
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params) {
             var value = input.getMemberValue(member);
@@ -165,7 +214,14 @@ sealed interface ContextProvider {
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, RegisterSink sink) {
             var value = input.getMemberValue(member);
             if (value != null) {
-                sink.put(name, value);
+                int idx = cachedIndex;
+                if (idx == -2) {
+                    idx = sink.resolveIndex(name);
+                    cachedIndex = idx;
+                }
+                if (idx >= 0) {
+                    sink.putIndex(idx, value);
+                }
             }
         }
 
