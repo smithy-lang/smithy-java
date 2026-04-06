@@ -113,12 +113,14 @@ final class BytecodeCompiler {
 
     private void compileCondition(Condition condition) {
         compileExpression(condition.getFunction());
-        condition.getResult().ifPresent(result -> {
-            byte register = registerAllocator.getOrAllocateRegister(result.toString());
-            writer.writeByte(Opcodes.SET_REGISTER);
+        var result = condition.getResult();
+        if (result.isPresent()) {
+            byte register = registerAllocator.getOrAllocateRegister(result.get().toString());
+            writer.writeByte(Opcodes.SET_REG_RETURN);
             writer.writeByte(register);
-        });
-        writer.writeByte(Opcodes.RETURN_VALUE);
+        } else {
+            writer.writeByte(Opcodes.RETURN_VALUE);
+        }
     }
 
     private void compileEndpointRule(EndpointRule rule) {
@@ -287,6 +289,21 @@ final class BytecodeCompiler {
                             return null;
                         }
                     }
+                }
+                // Optimize: stringEquals(ref, "literal") -> STRING_EQUALS_REG_CONST
+                if (left instanceof Reference ref && right instanceof StringLiteral sl
+                        && sl.value().getParts().size() == 1) {
+                    writer.writeByte(Opcodes.STRING_EQUALS_REG_CONST);
+                    writer.writeByte(registerAllocator.getRegister(ref.getName().toString()));
+                    writer.writeShort(writer.getConstantIndex(sl.value().getParts().get(0).toString()));
+                    return null;
+                }
+                if (right instanceof Reference ref && left instanceof StringLiteral sl
+                        && sl.value().getParts().size() == 1) {
+                    writer.writeByte(Opcodes.STRING_EQUALS_REG_CONST);
+                    writer.writeByte(registerAllocator.getRegister(ref.getName().toString()));
+                    writer.writeShort(writer.getConstantIndex(sl.value().getParts().get(0).toString()));
+                    return null;
                 }
                 compileExpression(left);
                 compileExpression(right);

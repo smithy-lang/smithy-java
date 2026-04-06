@@ -487,4 +487,25 @@ public final class Opcodes {
      * <p>Index is signed: positive = from start, negative = from end (-1 = last)
      */
     public static final byte SPLIT_GET = 49;
+
+    /**
+     * Compare a register's string value against a constant string.
+     * Pushes true if the register value equals the constant, false otherwise.
+     * Handles null register values (returns false).
+     *
+     * <p>Stack: [...] => [..., boolean]
+     *
+     * <p><code>STRING_EQUALS_REG_CONST [register:byte] [const-index:short]</code>
+     */
+    public static final byte STRING_EQUALS_REG_CONST = 48;
+
+    /**
+     * Store the value at the top of the stack into a register and return it.
+     * Combines SET_REGISTER + RETURN_VALUE into a single instruction.
+     *
+     * <p>Stack: [..., value] => (returns value)
+     *
+     * <p><code>SET_REG_RETURN [register:byte]</code>
+     */
+    public static final byte SET_REG_RETURN = 50;
 }

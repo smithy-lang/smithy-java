@@ -127,7 +127,7 @@ class BytecodeCompilerTest {
         }
         assertTrue(foundHasInput);
 
-        assertOpcodePresent(bytecode, Opcodes.SET_REGISTER);
+        assertOpcodePresent(bytecode, Opcodes.SET_REG_RETURN);
     }
 
     @Test

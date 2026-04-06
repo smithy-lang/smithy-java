@@ -45,9 +45,11 @@ sourceSets {
 }
 
 jmh {
-    warmupIterations = 2
-    iterations = 3
-    fork = 1
+    warmupIterations = providers.gradleProperty("jmh.wi").map { it.toInt() }.orElse(2).get()
+    iterations = providers.gradleProperty("jmh.i").map { it.toInt() }.orElse(3).get()
+    fork = providers.gradleProperty("jmh.f").map { it.toInt() }.orElse(1).get()
+    benchmarkMode = providers.gradleProperty("jmh.bm").map { listOf(it) }.orElse(listOf("avgt")).get()
+    timeOnIteration = providers.gradleProperty("jmh.t").orElse("10s").get()
     // Allow filtering for specific benchmarks, e.g. -Pjmh.includes=S3EndpointBenchmark
     includes.addAll(
         providers

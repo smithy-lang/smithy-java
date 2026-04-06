@@ -19,6 +19,7 @@ import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Split;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Substring;
 import software.amazon.smithy.rulesengine.logic.ConditionEvaluator;
+import software.amazon.smithy.rulesengine.logic.bdd.Bdd;
 
 /**
  * Evaluates bytecode for a single specific condition or result per evaluation.
@@ -35,7 +36,7 @@ final class BytecodeEvaluator implements ConditionEvaluator {
     private Object[] stack = new Object[64]; // 64 is more than enough for virtual any ruleset
     private int stackPosition = 0;
     private int pc;
-    private final StringBuilder stringBuilder = new StringBuilder(64);
+    private char[] charBuffer = new char[128];
     private final UriFactory uriFactory = new UriFactory();
     private final RegisterFiller registerFiller;
     private Context context;
@@ -81,6 +82,47 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         return result != null && result != Boolean.FALSE;
     }
 
+    /**
+     * Evaluates the BDD with inline condition optimization.
+     * Trivial conditions (register checks, string equality) are evaluated directly
+     * without entering the full bytecode dispatch loop.
+     */
+    Endpoint evaluateBdd() {
+        int ref = bytecode.getBddRootRef();
+        int[] nodes = bytecode.getBddNodes();
+        byte[] condTypes = bytecode.conditionTypes;
+        int[] condOps = bytecode.conditionOperands;
+        Object[] regs = this.registers;
+        Object[] cpool = bytecode.getConstantPool();
+
+        while (Bdd.isNodeReference(ref)) {
+            int idx = ref > 0 ? ref - 1 : -ref - 1;
+            int base = idx * 3;
+            int condIdx = nodes[base];
+
+            boolean result = switch (condTypes[condIdx]) {
+                case Bytecode.COND_ISSET -> regs[condOps[condIdx]] != null;
+                case Bytecode.COND_IS_TRUE -> regs[condOps[condIdx]] == Boolean.TRUE;
+                case Bytecode.COND_IS_FALSE -> regs[condOps[condIdx]] == Boolean.FALSE;
+                case Bytecode.COND_NOT_SET -> regs[condOps[condIdx]] == null;
+                case Bytecode.COND_STRING_EQ_REG_CONST -> {
+                    int packed = condOps[condIdx];
+                    String s = (String) regs[packed & 0xFF];
+                    String expected = (String) cpool[packed >>> 8];
+                    yield s != null && s.equals(expected);
+                }
+                default -> test(condIdx);
+            };
+
+            ref = (result ^ (ref < 0)) ? nodes[base + 1] : nodes[base + 2];
+        }
+
+        if (Bdd.isTerminal(ref)) {
+            return null;
+        }
+        return resolveResult(ref - Bdd.RESULT_OFFSET);
+    }
+
     public Endpoint resolveResult(int resultIndex) {
         if (resultIndex <= -1) {
             return null;
@@ -110,6 +152,14 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         tempArray = new Object[newSize];
         tempArraySize = newSize;
         return tempArray;
+    }
+
+    private char[] getCharBuffer(int requiredSize) {
+        if (charBuffer.length >= requiredSize) {
+            return charBuffer;
+        }
+        charBuffer = new char[Math.max(requiredSize, charBuffer.length * 2)];
+        return charBuffer;
     }
 
     private Object run(int start) {
@@ -241,14 +291,21 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                 }
                 case Opcodes.RESOLVE_TEMPLATE -> {
                     int argCount = instructions[pc++] & 0xFF;
-                    stringBuilder.setLength(0);
-                    // Calculate where the first argument is on the stack
                     int firstArgPosition = stackPosition - argCount;
+                    // Pre-calculate total length
+                    int totalLen = 0;
                     for (int i = 0; i < argCount; i++) {
-                        stringBuilder.append(stack[firstArgPosition + i]);
+                        totalLen += ((String) stack[firstArgPosition + i]).length();
                     }
-                    // Result goes where first arg was
-                    stack[firstArgPosition] = stringBuilder.toString();
+                    // Build directly into char array (avoids StringBuilder resize/copy)
+                    char[] buf = getCharBuffer(totalLen);
+                    int pos = 0;
+                    for (int i = 0; i < argCount; i++) {
+                        String s = (String) stack[firstArgPosition + i];
+                        s.getChars(0, s.length(), buf, pos);
+                        pos += s.length();
+                    }
+                    stack[firstArgPosition] = new String(buf, 0, totalLen);
                     stackPosition = firstArgPosition + 1;
                 }
                 case Opcodes.FN0 -> {
@@ -458,6 +515,20 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     var sgValue = (String) registers[sgRegIndex];
                     var sgDelimiter = (String) constantPool[sgDelimIdx];
                     push(EndpointUtils.splitGet(sgValue, sgDelimiter, sgIndex));
+                }
+                case Opcodes.STRING_EQUALS_REG_CONST -> {
+                    int srcRegIndex = instructions[pc++] & 0xFF;
+                    int srcConstIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                    pc += 2;
+                    var srcValue = (String) registers[srcRegIndex];
+                    var srcExpected = (String) constantPool[srcConstIdx];
+                    push(srcValue != null && srcValue.equals(srcExpected) ? Boolean.TRUE : Boolean.FALSE);
+                }
+                case Opcodes.SET_REG_RETURN -> {
+                    int srIndex = instructions[pc++] & 0xFF;
+                    Object srValue = stack[--stackPosition];
+                    registers[srIndex] = srValue;
+                    return srValue;
                 }
                 default -> throw new RulesEvaluationError("Unknown rules engine instruction: " + opcode, pc);
             }
