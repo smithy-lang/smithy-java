@@ -1670,6 +1670,253 @@ public class McpServerTest {
         assertEquals(1, callCounter.get(), "Cache should not be invalidated by other notifications");
     }
 
+    // --- Metrics Observer Tests ---
+
+    @Test
+    void testMetricsObserverOnInitialize() {
+        var observer = new TestMetricsObserver();
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .metricsObserver(observer)
+                .build();
+
+        server.start();
+
+        write("initialize",
+                Document.of(Map.of(
+                        "protocolVersion",
+                        Document.of("2025-03-26"),
+                        "clientInfo",
+                        Document.of(Map.of(
+                                "name",
+                                Document.of("test-client"),
+                                "title",
+                                Document.of("Test Client"))),
+                        "capabilities",
+                        Document.of(Map.of(
+                                "roots",
+                                Document.of(Map.of("listChanged", Document.of(true))),
+                                "sampling",
+                                Document.of(Map.of()))))));
+        read();
+
+        assertEquals(1, observer.initializeCount);
+        assertEquals("2025-03-26", observer.lastProtocolVersion);
+        assertEquals("test-client", observer.lastClientName);
+        assertEquals("Test Client", observer.lastClientTitle);
+        assertTrue(observer.lastRootsListChanged);
+        assertTrue(observer.lastSampling);
+    }
+
+    @Test
+    void testMetricsObserverOnToolsList() {
+        var observer = new TestMetricsObserver();
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .metricsObserver(observer)
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(null);
+        write("tools/list", Document.of(Map.of()));
+        read();
+
+        assertEquals(1, observer.toolsListCount);
+        assertEquals(6, observer.lastToolCount);
+
+        write("tools/list", Document.of(Map.of()));
+        read();
+
+        assertEquals(2, observer.toolsListCount);
+    }
+
+    @Test
+    void testMetricsObserverOnToolCallForNonExistentTool() {
+        var observer = new TestMetricsObserver();
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .metricsObserver(observer)
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(null);
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NonExistentTool"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        var response = read();
+
+        assertNotNull(response.getError());
+        assertEquals(1, observer.toolCallCount);
+        assertEquals("NonExistentTool", observer.lastToolCallName);
+        // onToolCallComplete should also fire for "tool not found" with success=false
+        assertEquals(1, observer.toolCallCompleteCount);
+        assertFalse(observer.lastCompleteSuccess);
+        assertFalse(observer.lastCompleteIsProxy);
+        assertNull(observer.lastCompleteServerId);
+        assertNotNull(observer.lastCompleteLatency);
+        assertEquals(1, observer.toolCallErrorCount);
+        assertEquals("NonExistentTool", observer.lastErrorToolName);
+        assertTrue(observer.lastErrorMessage.contains("No such tool"));
+    }
+
+    @Test
+    void testMetricsObserverOnToolCallLocal() {
+        var observer = new TestMetricsObserver();
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .metricsObserver(observer)
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(null);
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        read();
+
+        // onToolCall fires at the start of every tool call
+        assertEquals(1, observer.toolCallCount);
+        assertEquals("NoIOOperation", observer.lastToolCallName);
+        // onToolCallComplete fires after execution (ProxyService proxies to localhost which
+        // is not running, so this is a local execution that results in an error response)
+        assertEquals(1, observer.toolCallCompleteCount);
+        assertEquals("NoIOOperation", observer.lastCompleteToolName);
+        assertEquals("test-mcp", observer.lastCompleteServerId);
+        assertFalse(observer.lastCompleteSuccess);
+        assertFalse(observer.lastCompleteIsProxy);
+        assertNotNull(observer.lastCompleteLatency);
+    }
+
+    private static class TestMetricsObserver implements McpMetricsObserver {
+        int initializeCount;
+        String lastProtocolVersion;
+        boolean lastRootsListChanged;
+        boolean lastSampling;
+        boolean lastElicitation;
+        String lastClientName;
+        String lastClientTitle;
+
+        int toolCallCount;
+        String lastToolCallName;
+
+        int toolCallCompleteCount;
+        String lastCompleteToolName;
+        String lastCompleteServerId;
+        Duration lastCompleteLatency;
+        boolean lastCompleteSuccess;
+        boolean lastCompleteIsProxy;
+
+        int toolCallErrorCount;
+        String lastErrorToolName;
+        String lastErrorServerId;
+        String lastErrorMessage;
+
+        int toolsListCount;
+        int lastToolCount;
+
+        @Override
+        public void onInitialize(
+                String method,
+                String extractedProtocolVersion,
+                boolean rootsListChanged,
+                boolean sampling,
+                boolean elicitation,
+                String clientName,
+                String clientTitle
+        ) {
+            initializeCount++;
+            lastProtocolVersion = extractedProtocolVersion;
+            lastRootsListChanged = rootsListChanged;
+            lastSampling = sampling;
+            lastElicitation = elicitation;
+            lastClientName = clientName;
+            lastClientTitle = clientTitle;
+        }
+
+        @Override
+        public void onToolCall(String method, String toolName) {
+            toolCallCount++;
+            lastToolCallName = toolName;
+        }
+
+        @Override
+        public void onToolCallComplete(
+                String method,
+                String toolName,
+                String serverId,
+                Duration latency,
+                boolean success,
+                boolean isProxy
+        ) {
+            toolCallCompleteCount++;
+            lastCompleteToolName = toolName;
+            lastCompleteServerId = serverId;
+            lastCompleteLatency = latency;
+            lastCompleteSuccess = success;
+            lastCompleteIsProxy = isProxy;
+        }
+
+        @Override
+        public void onToolCallError(
+                String method,
+                String toolName,
+                String serverId,
+                String errorMessage
+        ) {
+            toolCallErrorCount++;
+            lastErrorToolName = toolName;
+            lastErrorServerId = serverId;
+            lastErrorMessage = errorMessage;
+        }
+
+        @Override
+        public void onToolsList(String method, int toolCount) {
+            toolsListCount++;
+            lastToolCount = toolCount;
+        }
+    }
+
     private static class CacheTestProxy extends McpServerProxy {
         private final AtomicInteger callCounter;
         private final List<String> sentNotifications = new ArrayList<>();

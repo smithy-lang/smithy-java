@@ -14,6 +14,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -156,37 +157,39 @@ public final class McpService {
 
     private JsonRpcResponse handleInitialize(JsonRpcRequest req) {
         if (metricsObserver != null) {
-            var params = req.getParams();
-            var clientInfo = params.getMember("clientInfo");
-            var capabilities = params.getMember("capabilities");
+            safeObserve(() -> {
+                var params = req.getParams();
+                var clientInfo = params.getMember("clientInfo");
+                var capabilities = params.getMember("capabilities");
 
-            String extractedProtocolVersion = params.getMember("protocolVersion") != null
-                    ? params.getMember("protocolVersion").asString()
-                    : null;
+                String extractedProtocolVersion = params.getMember("protocolVersion") != null
+                        ? params.getMember("protocolVersion").asString()
+                        : null;
 
-            String clientName = clientInfo != null && clientInfo.getMember("name") != null
-                    ? clientInfo.getMember("name").asString()
-                    : null;
+                String clientName = clientInfo != null && clientInfo.getMember("name") != null
+                        ? clientInfo.getMember("name").asString()
+                        : null;
 
-            String clientTitle = clientInfo != null && clientInfo.getMember("title") != null
-                    ? clientInfo.getMember("title").asString()
-                    : null;
+                String clientTitle = clientInfo != null && clientInfo.getMember("title") != null
+                        ? clientInfo.getMember("title").asString()
+                        : null;
 
-            boolean rootsListChanged = capabilities != null
-                    && capabilities.getMember("roots") != null
-                    && capabilities.getMember("roots").getMember("listChanged") != null
-                    && capabilities.getMember("roots").getMember("listChanged").asBoolean();
+                boolean rootsListChanged = capabilities != null
+                        && capabilities.getMember("roots") != null
+                        && capabilities.getMember("roots").getMember("listChanged") != null
+                        && capabilities.getMember("roots").getMember("listChanged").asBoolean();
 
-            boolean sampling = capabilities != null && capabilities.getMember("sampling") != null;
-            boolean elicitation = capabilities != null && capabilities.getMember("elicitation") != null;
+                boolean sampling = capabilities != null && capabilities.getMember("sampling") != null;
+                boolean elicitation = capabilities != null && capabilities.getMember("elicitation") != null;
 
-            metricsObserver.onInitialize("initialize",
-                    extractedProtocolVersion,
-                    rootsListChanged,
-                    sampling,
-                    elicitation,
-                    clientName,
-                    clientTitle);
+                metricsObserver.onInitialize("initialize",
+                        extractedProtocolVersion,
+                        rootsListChanged,
+                        sampling,
+                        elicitation,
+                        clientName,
+                        clientTitle);
+            });
         }
 
         this.initializeRequest.compareAndSet(null, req);
@@ -251,10 +254,17 @@ public final class McpService {
     }
 
     private JsonRpcResponse handleToolsList(JsonRpcRequest req, ProtocolVersion protocolVersion) {
+        var filteredTools = tools.values()
+                .stream()
+                .filter(t -> toolFilter.allowTool(t.serverId(), t.toolInfo().getName()))
+                .toList();
+
+        if (metricsObserver != null) {
+            safeObserve(() -> metricsObserver.onToolsList("tools/list", filteredTools.size()));
+        }
+
         var result = ListToolsResult.builder()
-                .tools(tools.values()
-                        .stream()
-                        .filter(t -> toolFilter.allowTool(t.serverId(), t.toolInfo().getName()))
+                .tools(filteredTools.stream()
                         .map(tool -> extractToolInfo(tool, protocolVersion))
                         .toList())
                 .build();
@@ -266,18 +276,36 @@ public final class McpService {
             Consumer<JsonRpcResponse> asyncResponseCallback,
             ProtocolVersion protocolVersion
     ) {
+        String toolName = req.getParams().getMember("name") != null
+                ? req.getParams().getMember("name").asString()
+                : null;
+
         if (metricsObserver != null) {
-            String toolName = req.getParams().getMember("name") != null
-                    ? req.getParams().getMember("name").asString()
-                    : null;
-            metricsObserver.onToolCall("tools/call", toolName);
+            safeObserve(() -> metricsObserver.onToolCall("tools/call", toolName));
         }
 
-        var operationName = req.getParams().getMember("name").asString();
-        var tool = tools.get(operationName);
+        long startNanos = System.nanoTime();
+        var tool = tools.get(toolName);
 
         if (tool == null) {
-            return createErrorResponse(req, "No such tool: " + operationName);
+            Duration latency = Duration.ofNanos(System.nanoTime() - startNanos);
+            if (metricsObserver != null) {
+                safeObserve(() -> {
+                    metricsObserver.onToolCallComplete(
+                            "tools/call",
+                            toolName,
+                            null,
+                            latency,
+                            false,
+                            false);
+                    metricsObserver.onToolCallError(
+                            "tools/call",
+                            toolName,
+                            null,
+                            "No such tool: " + toolName);
+                });
+            }
+            return createErrorResponse(req, "No such tool: " + toolName);
         }
 
         // Check if this tool should be dispatched to a proxy
@@ -291,8 +319,46 @@ public final class McpService {
                     .build();
 
             // Get response asynchronously and invoke callback
-            tool.proxy().rpc(proxyRequest).thenAccept(asyncResponseCallback).exceptionally(ex -> {
+            tool.proxy().rpc(proxyRequest).thenAccept(response -> {
+                Duration latency = Duration.ofNanos(System.nanoTime() - startNanos);
+                boolean success = response.getError() == null;
+                if (metricsObserver != null) {
+                    safeObserve(() -> {
+                        metricsObserver.onToolCallComplete("tools/call",
+                                toolName,
+                                tool.serverId(),
+                                latency,
+                                success,
+                                true);
+                        if (!success) {
+                            String errMsg = response.getError().getMessage() != null
+                                    ? response.getError().getMessage()
+                                    : "Unknown error";
+                            metricsObserver.onToolCallError("tools/call",
+                                    toolName,
+                                    tool.serverId(),
+                                    errMsg);
+                        }
+                    });
+                }
+                asyncResponseCallback.accept(response);
+            }).exceptionally(ex -> {
+                Duration latency = Duration.ofNanos(System.nanoTime() - startNanos);
                 LOG.error("Error from proxy RPC", ex);
+                if (metricsObserver != null) {
+                    safeObserve(() -> {
+                        metricsObserver.onToolCallComplete("tools/call",
+                                toolName,
+                                tool.serverId(),
+                                latency,
+                                false,
+                                true);
+                        metricsObserver.onToolCallError("tools/call",
+                                toolName,
+                                tool.serverId(),
+                                safeErrorMessage(ex));
+                    });
+                }
                 asyncResponseCallback
                         .accept(createErrorResponse(req, new RuntimeException("Proxy error: " + ex.getMessage(), ex)));
                 return null;
@@ -302,14 +368,54 @@ public final class McpService {
             return null;
         } else {
             // Handle locally
-            var operation = tool.operation();
-            var argumentsDoc = req.getParams().getMember("arguments");
-            var adaptedDoc = adaptDocument(argumentsDoc, operation.getApiOperation().inputSchema());
-            var input = adaptedDoc.asShape(operation.getApiOperation().inputBuilder());
-            var output = operation.function().apply(input, null);
-            var result = formatStructuredContent(tool, (SerializableShape) output, protocolVersion);
-            return createSuccessResponse(req.getId(), result);
+            try {
+                var operation = tool.operation();
+                var argumentsDoc = req.getParams().getMember("arguments");
+                var adaptedDoc = adaptDocument(argumentsDoc, operation.getApiOperation().inputSchema());
+                var input = adaptedDoc.asShape(operation.getApiOperation().inputBuilder());
+                var output = operation.function().apply(input, null);
+                var result = formatStructuredContent(tool, (SerializableShape) output, protocolVersion);
+                Duration latency = Duration.ofNanos(System.nanoTime() - startNanos);
+                if (metricsObserver != null) {
+                    safeObserve(() -> metricsObserver.onToolCallComplete("tools/call",
+                            toolName,
+                            tool.serverId(),
+                            latency,
+                            true,
+                            false));
+                }
+                return createSuccessResponse(req.getId(), result);
+            } catch (Exception e) {
+                Duration latency = Duration.ofNanos(System.nanoTime() - startNanos);
+                if (metricsObserver != null) {
+                    safeObserve(() -> {
+                        metricsObserver.onToolCallComplete("tools/call",
+                                toolName,
+                                tool.serverId(),
+                                latency,
+                                false,
+                                false);
+                        metricsObserver.onToolCallError("tools/call",
+                                toolName,
+                                tool.serverId(),
+                                safeErrorMessage(e));
+                    });
+                }
+                throw e;
+            }
         }
+    }
+
+    private void safeObserve(Runnable observation) {
+        try {
+            observation.run();
+        } catch (Exception e) {
+            LOG.warn("Metrics observer error", e);
+        }
+    }
+
+    private static String safeErrorMessage(Throwable t) {
+        return t.getMessage() != null ? t.getMessage() : t.getClass().getName();
     }
 
     /**
