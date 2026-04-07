@@ -85,8 +85,7 @@ final class BytecodeDisassembler {
             Map.entry(Opcodes.JUMP, new InstructionDef("JUMP", Show.JUMP_OFFSET)),
             Map.entry(Opcodes.SUBSTRING_EQ, new InstructionDef("SUBSTRING_EQ", Show.SUBSTRING_EQ)),
             Map.entry(Opcodes.SPLIT_GET, new InstructionDef("SPLIT_GET", Show.SPLIT_GET)),
-            Map.entry(Opcodes.SELECT_BOOL_REG, new InstructionDef("SELECT_BOOL_REG", Show.SELECT_BOOL))),
-            Map.entry(Opcodes.SPLIT_GET, new InstructionDef("SPLIT_GET", Show.SPLIT_GET)),
+            Map.entry(Opcodes.SELECT_BOOL_REG, new InstructionDef("SELECT_BOOL_REG", Show.SELECT_BOOL)),
             Map.entry(Opcodes.STRING_EQUALS_REG_CONST, new InstructionDef("STRING_EQUALS_REG_CONST", Show.REG_CONST)),
             Map.entry(Opcodes.SET_REG_RETURN, new InstructionDef("SET_REG_RETURN", Show.REGISTER)),
             Map.entry(Opcodes.BUILD_URI, new InstructionDef("BUILD_URI", Show.CONST)),
@@ -107,7 +106,6 @@ final class BytecodeDisassembler {
         SUBSTRING_EQ,
         SPLIT_GET,
         SELECT_BOOL,
-        SPLIT_GET,
         REG_CONST
     }
 
