@@ -236,7 +236,14 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     stack[idx] = List.of(stack[idx], stack[idx + 1]);
                     stackPosition = idx + 1;
                 }
-                case Opcodes.LISTN -> execListN(instructions);
+                case Opcodes.LISTN -> {
+                    var size = instructions[pc++] & 0xFF;
+                    var values = new Object[size];
+                    for (var i = size - 1; i >= 0; i--) {
+                        values[i] = stack[--stackPosition];
+                    }
+                    push(Arrays.asList(values));
+                }
                 // Map operations
                 case Opcodes.MAP0 -> push(Map.of());
                 case Opcodes.MAP1 -> {
@@ -255,9 +262,31 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                             stack[idx + 2]); // value
                     stackPosition = idx + 1;
                 }
-                case Opcodes.MAP3 -> execMap3();
-                case Opcodes.MAP4 -> execMap4();
-                case Opcodes.MAPN -> execMapN(instructions);
+                case Opcodes.MAP3 -> {
+                    int idx = stackPosition - 6;
+                    stack[idx] = Map.of(
+                            (String) stack[idx + 2], stack[idx + 1],
+                            (String) stack[idx + 4], stack[idx + 3],
+                            (String) stack[idx + 5], stack[idx]);
+                    stackPosition = idx + 1;
+                }
+                case Opcodes.MAP4 -> {
+                    int idx = stackPosition - 8;
+                    stack[idx] = Map.of(
+                            (String) stack[idx + 1], stack[idx],
+                            (String) stack[idx + 3], stack[idx + 2],
+                            (String) stack[idx + 5], stack[idx + 4],
+                            (String) stack[idx + 7], stack[idx + 6]);
+                    stackPosition = idx + 1;
+                }
+                case Opcodes.MAPN -> {
+                    var size = instructions[pc++] & 0xFF;
+                    Map<String, Object> map = new HashMap<>(size + 1, 1.0f);
+                    for (var i = 0; i < size; i++) {
+                        map.put((String) stack[--stackPosition], stack[--stackPosition]);
+                    }
+                    push(map);
+                }
                 case Opcodes.RESOLVE_TEMPLATE -> {
                     int argCount = instructions[pc++] & 0xFF;
                     int firstArgPosition = stackPosition - argCount;
@@ -291,8 +320,20 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     stack[idx] = fn.apply2(stack[idx], stack[idx + 1]);
                     stackPosition = idx + 1;
                 }
-                case Opcodes.FN3 -> execFn3(functions, instructions);
-                case Opcodes.FN -> execFnN(functions, instructions);
+                case Opcodes.FN3 -> {
+                    var fn = functions[instructions[pc++] & 0xFF];
+                    int idx = stackPosition - 3;
+                    stack[idx] = fn.apply(stack[idx], stack[idx + 1], stack[idx + 2]);
+                    stackPosition = idx + 1;
+                }
+                case Opcodes.FN -> {
+                    var fn = functions[instructions[pc++] & 0xFF];
+                    var temp = getTempArray(fn.getArgumentCount());
+                    for (int i = fn.getArgumentCount() - 1; i >= 0; i--) {
+                        temp[i] = stack[--stackPosition];
+                    }
+                    push(fn.apply(temp));
+                }
                 case Opcodes.GET_PROPERTY -> {
                     int propertyIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     var propertyName = (String) constantPool[propertyIdx];
@@ -360,9 +401,25 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     var reverse = (instructions[pc++] & 0xFF) != 0;
                     stack[idx] = Substring.getSubstring(string, startPos, endPos, reverse);
                 }
-                case Opcodes.IS_VALID_HOST_LABEL -> execIsValidHostLabel();
-                case Opcodes.PARSE_URL -> execParseUrl();
-                case Opcodes.URI_ENCODE -> execUriEncode();
+                case Opcodes.IS_VALID_HOST_LABEL -> {
+                    int idx = stackPosition - 2;
+                    var hostLabel = (String) stack[idx];
+                    var allowDots = (Boolean) stack[idx + 1];
+                    stack[idx] = IsValidHostLabel.isValidHostLabel(hostLabel, Boolean.TRUE.equals(allowDots))
+                            ? Boolean.TRUE
+                            : Boolean.FALSE;
+                    stackPosition = idx + 1;
+                }
+                case Opcodes.PARSE_URL -> {
+                    int idx = stackPosition - 1;
+                    var urlString = (String) stack[idx];
+                    stack[idx] = urlString == null ? null : uriFactory.createUri(urlString);
+                }
+                case Opcodes.URI_ENCODE -> {
+                    int idx = stackPosition - 1;
+                    var string = (String) stack[idx];
+                    stack[idx] = URLEncoding.encodeUnreserved(string, false);
+                }
                 case Opcodes.RETURN_ERROR -> throw new RulesEvaluationError((String) stack[--stackPosition], pc);
                 case Opcodes.RETURN_ENDPOINT -> {
                     var packed = instructions[pc++];
@@ -398,9 +455,24 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                         stackPosition--; // Pop the null value
                     }
                 }
-                case Opcodes.SPLIT -> execSplit();
-                case Opcodes.GET_NEGATIVE_INDEX -> execGetNegativeIndex(instructions);
-                case Opcodes.GET_NEGATIVE_INDEX_REG -> execGetNegativeIndexReg(instructions);
+                case Opcodes.SPLIT -> {
+                    int idx = stackPosition - 3;
+                    var string = (String) stack[idx];
+                    var delimiter = (String) stack[idx + 1];
+                    var limit = ((Number) stack[idx + 2]).intValue();
+                    stack[idx] = Split.split(string, delimiter, limit);
+                    stackPosition = idx + 1;
+                }
+                case Opcodes.GET_NEGATIVE_INDEX -> {
+                    int index = instructions[pc++] & 0xFF;
+                    int idx = stackPosition - 1;
+                    stack[idx] = EndpointUtils.getNegativeIndex(stack[idx], index);
+                }
+                case Opcodes.GET_NEGATIVE_INDEX_REG -> {
+                    int regIndex = instructions[pc++] & 0xFF;
+                    int index = instructions[pc++] & 0xFF;
+                    push(EndpointUtils.getNegativeIndex(registers[regIndex], index));
+                }
                 case Opcodes.JMP_IF_FALSE -> {
                     Object condition = stack[--stackPosition];
                     // Read as unsigned 16-bit value (0-65535)
@@ -416,8 +488,29 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     pc += 2;
                     pc += offset;
                 }
-                case Opcodes.SUBSTRING_EQ -> execSubstringEq(instructions, constantPool);
-                case Opcodes.SPLIT_GET -> execSplitGet(instructions, constantPool);
+                case Opcodes.SUBSTRING_EQ -> {
+                    int seqRegIndex = instructions[pc++] & 0xFF;
+                    int seqStart = instructions[pc++] & 0xFF;
+                    int seqEnd = instructions[pc++] & 0xFF;
+                    int seqFlags = instructions[pc++] & 0xFF;
+                    int seqConstIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                    pc += 2;
+                    boolean seqReverse = (seqFlags & 0x01) != 0;
+                    var seqValue = (String) registers[seqRegIndex];
+                    var seqExpected = (String) constantPool[seqConstIdx];
+                    push(EndpointUtils.substringEquals(seqValue, seqStart, seqEnd, seqReverse, seqExpected)
+                            ? Boolean.TRUE
+                            : Boolean.FALSE);
+                }
+                case Opcodes.SPLIT_GET -> {
+                    int sgRegIndex = instructions[pc++] & 0xFF;
+                    int sgDelimIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                    pc += 2;
+                    int sgIndex = instructions[pc++]; // signed byte
+                    var sgValue = (String) registers[sgRegIndex];
+                    var sgDelimiter = (String) constantPool[sgDelimIdx];
+                    push(EndpointUtils.splitGet(sgValue, sgDelimiter, sgIndex));
+                }
                 case Opcodes.STRING_EQUALS_REG_CONST -> {
                     int srcRegIndex = instructions[pc++] & 0xFF;
                     int srcConstIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
@@ -458,127 +551,4 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         throw new IllegalArgumentException("Expected to return a value during evaluation");
     }
 
-    // --- Cold path methods extracted from runLoop for JIT optimization ---
-
-    private void execListN(byte[] instructions) {
-        var size = instructions[pc++] & 0xFF;
-        var values = new Object[size];
-        for (var i = size - 1; i >= 0; i--) {
-            values[i] = stack[--stackPosition];
-        }
-        push(Arrays.asList(values));
-    }
-
-    private void execMap3() {
-        int idx = stackPosition - 6;
-        stack[idx] = Map.of(
-                (String) stack[idx + 2], stack[idx + 1],
-                (String) stack[idx + 4], stack[idx + 3],
-                (String) stack[idx + 5], stack[idx]);
-        stackPosition = idx + 1;
-    }
-
-    private void execMap4() {
-        int idx = stackPosition - 8;
-        stack[idx] = Map.of(
-                (String) stack[idx + 1], stack[idx],
-                (String) stack[idx + 3], stack[idx + 2],
-                (String) stack[idx + 5], stack[idx + 4],
-                (String) stack[idx + 7], stack[idx + 6]);
-        stackPosition = idx + 1;
-    }
-
-    @SuppressWarnings("unchecked")
-    private void execMapN(byte[] instructions) {
-        var size = instructions[pc++] & 0xFF;
-        Map<String, Object> map = new HashMap<>(size + 1, 1.0f);
-        for (var i = 0; i < size; i++) {
-            map.put((String) stack[--stackPosition], stack[--stackPosition]);
-        }
-        push(map);
-    }
-
-    private void execFn3(RulesFunction[] functions, byte[] instructions) {
-        var fn = functions[instructions[pc++] & 0xFF];
-        int idx = stackPosition - 3;
-        stack[idx] = fn.apply(stack[idx], stack[idx + 1], stack[idx + 2]);
-        stackPosition = idx + 1;
-    }
-
-    private void execFnN(RulesFunction[] functions, byte[] instructions) {
-        var fn = functions[instructions[pc++] & 0xFF];
-        var temp = getTempArray(fn.getArgumentCount());
-        for (int i = fn.getArgumentCount() - 1; i >= 0; i--) {
-            temp[i] = stack[--stackPosition];
-        }
-        push(fn.apply(temp));
-    }
-
-    private void execIsValidHostLabel() {
-        int idx = stackPosition - 2;
-        var hostLabel = (String) stack[idx];
-        var allowDots = (Boolean) stack[idx + 1];
-        stack[idx] = IsValidHostLabel.isValidHostLabel(hostLabel, Boolean.TRUE.equals(allowDots))
-                ? Boolean.TRUE
-                : Boolean.FALSE;
-        stackPosition = idx + 1;
-    }
-
-    private void execParseUrl() {
-        int idx = stackPosition - 1;
-        var urlString = (String) stack[idx];
-        stack[idx] = urlString == null ? null : uriFactory.createUri(urlString);
-    }
-
-    private void execUriEncode() {
-        int idx = stackPosition - 1;
-        var string = (String) stack[idx];
-        stack[idx] = URLEncoding.encodeUnreserved(string, false);
-    }
-
-    private void execSplit() {
-        int idx = stackPosition - 3;
-        var string = (String) stack[idx];
-        var delimiter = (String) stack[idx + 1];
-        var limit = ((Number) stack[idx + 2]).intValue();
-        stack[idx] = Split.split(string, delimiter, limit);
-        stackPosition = idx + 1;
-    }
-
-    private void execGetNegativeIndex(byte[] instructions) {
-        int index = instructions[pc++] & 0xFF;
-        int idx = stackPosition - 1;
-        stack[idx] = EndpointUtils.getNegativeIndex(stack[idx], index);
-    }
-
-    private void execGetNegativeIndexReg(byte[] instructions) {
-        int regIndex = instructions[pc++] & 0xFF;
-        int index = instructions[pc++] & 0xFF;
-        push(EndpointUtils.getNegativeIndex(registers[regIndex], index));
-    }
-
-    private void execSubstringEq(byte[] instructions, Object[] constantPool) {
-        int regIndex = instructions[pc++] & 0xFF;
-        int start = instructions[pc++] & 0xFF;
-        int end = instructions[pc++] & 0xFF;
-        int flags = instructions[pc++] & 0xFF;
-        int constIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
-        pc += 2;
-        boolean reverse = (flags & 0x01) != 0;
-        var value = (String) registers[regIndex];
-        var expected = (String) constantPool[constIdx];
-        push(EndpointUtils.substringEquals(value, start, end, reverse, expected)
-                ? Boolean.TRUE
-                : Boolean.FALSE);
-    }
-
-    private void execSplitGet(byte[] instructions, Object[] constantPool) {
-        int regIndex = instructions[pc++] & 0xFF;
-        int delimIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
-        pc += 2;
-        int index = instructions[pc++]; // signed byte
-        var value = (String) registers[regIndex];
-        var delimiter = (String) constantPool[delimIdx];
-        push(EndpointUtils.splitGet(value, delimiter, index));
-    }
 }
