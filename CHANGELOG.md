@@ -1,4 +1,32 @@
 # Change Log
+
+## 1.1.0 (4/8/2026)
+> [!IMPORTANT]
+> All client modules are considered stable.  Some modules, including
+> server, CLI, and MCP, are still in developer-preview and may contain
+> bugs.  No guarantee is made about their API stability. Unstable
+> modules are marked with a warning in their `README.md` and with the
+> `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Features
+- Made input/output structs implement `Closeable` when they have streaming members. ([#1138](https://github.com/smithy-lang/smithy-java/pull/1138))
+- Added new opcodes to endpoints VM ([#1141](https://github.com/smithy-lang/smithy-java/pull/1141))
+
+### Bug Fixes
+- Fixed content-type serialization for lists. ([#1144](https://github.com/smithy-lang/smithy-java/pull/1144))
+- Fixed placeholder character escaping in trait values. ([#1139](https://github.com/smithy-lang/smithy-java/pull/1139))
+- Fixed hashcode variable name clash. ([#1133](https://github.com/smithy-lang/smithy-java/pull/1133))
+
+### Improvements
+- Optimized ARN handling with a lazy map. ([#1132](https://github.com/smithy-lang/smithy-java/pull/1132))
+- Optimized endpoint resolution with benchmarks. ([#1135](https://github.com/smithy-lang/smithy-java/pull/1135))
+- Optimized equals for faster short-circuiting. ([#1136](https://github.com/smithy-lang/smithy-java/pull/1136))
+- Optimized the handling of URLs for the rules engine ([#1143](https://github.com/smithy-lang/smithy-java/pull/1143))
+
+### Other
+- Consumed AWS API models from Maven instead of checking out from git. ([#1140](https://github.com/smithy-lang/smithy-java/pull/1140))
+- Published a BOM (Bill of Materials) for dependency management. ([#1137](https://github.com/smithy-lang/smithy-java/pull/1137))
+
 ## 1.0.0 (04/2/2026)
 > [!IMPORTANT]
 > This is the first GA release of Smithy Java. All client modules are now considered stable.
