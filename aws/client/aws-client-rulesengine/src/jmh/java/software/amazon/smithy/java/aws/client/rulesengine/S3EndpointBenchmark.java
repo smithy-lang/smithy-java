@@ -339,4 +339,49 @@ public class S3EndpointBenchmark {
     public Object s3OutpostsVanilla(ParamState params) {
         return params.resolver.resolveEndpoint(params.s3OutpostsVanillaParams);
     }
+
+    /**
+     * Cycles through different bucket names on each invocation to defeat the URI cache hot-slot.
+     * This measures the cost of URI construction on cache miss.
+     */
+    @State(Scope.Thread)
+    public static class VaryingBucketState {
+        private static final int BUCKET_COUNT = 64;
+        private EndpointResolverParams[] paramVariants;
+        private int index;
+
+        @Setup
+        public void setup(ParamState params) {
+            boolean canned = "canned".equals(params.paramMode);
+            var client = SharedResolver.CLIENT;
+            var getObject = SharedResolver.GET_OBJECT;
+            paramVariants = new EndpointResolverParams[BUCKET_COUNT];
+            for (int i = 0; i < BUCKET_COUNT; i++) {
+                String bucket = "bucket-" + i;
+                paramVariants[i] = ParamState.buildParams(client,
+                        getObject,
+                        canned,
+                        Map.of("Bucket", Document.of(bucket), "Key", Document.of("key")),
+                        "us-west-2",
+                        Map.of("Accelerate",
+                                false,
+                                "Bucket",
+                                bucket,
+                                "ForcePathStyle",
+                                false,
+                                "Region",
+                                "us-west-2",
+                                "UseDualStack",
+                                false,
+                                "UseFIPS",
+                                false));
+            }
+        }
+    }
+
+    @Benchmark
+    public Object vanillaVirtualAddressingVaryingBucket(ParamState params, VaryingBucketState varying) {
+        var p = varying.paramVariants[varying.index++ & (VaryingBucketState.BUCKET_COUNT - 1)];
+        return params.resolver.resolveEndpoint(p);
+    }
 }
