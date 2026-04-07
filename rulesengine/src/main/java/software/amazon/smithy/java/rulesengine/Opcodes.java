@@ -178,7 +178,7 @@ public final class Opcodes {
      *
      * <p>Stack: [..., arg1, arg2, ..., argN] => [..., string]
      *
-     * <p><code>RESOLVE_TEMPLATE [arg-count:byte] [template-index:short]</code>
+     * <p><code>RESOLVE_TEMPLATE [arg-count:byte]</code>
      */
     public static final byte RESOLVE_TEMPLATE = 18;
 
@@ -497,4 +497,46 @@ public final class Opcodes {
      * <p><code>SELECT_BOOL_REG [register:byte] [true-const:short] [false-const:short]</code>
      */
     public static final byte SELECT_BOOL_REG = 50;
+
+    /**
+     * Compare a register's string value against a constant string.
+     * Pushes true if the register value equals the constant, false otherwise.
+     * Handles null register values (returns false).
+     *
+     * <p>Stack: [...] => [..., boolean]
+     *
+     * <p><code>STRING_EQUALS_REG_CONST [register:byte] [const-index:short]</code>
+     */
+    public static final byte STRING_EQUALS_REG_CONST = 51;
+
+    /**
+     * Store the value at the top of the stack into a register and return it.
+     * Combines SET_REGISTER + RETURN_VALUE into a single instruction.
+     *
+     * <p>Stack: [..., value] => (returns value)
+     *
+     * <p><code>SET_REG_RETURN [register:byte]</code>
+     */
+    public static final byte SET_REG_RETURN = 52;
+
+    /**
+     * Pop host and path strings from the stack, build a SmithyUri using a scheme from the constant pool.
+     * Pushes the resulting SmithyUri onto the stack. The scheme is always a compile-time constant.
+     *
+     * <p>Stack: [..., host, path] => [..., SmithyUri]
+     *
+     * <p><code>BUILD_URI [scheme-const:short]</code>
+     */
+    public static final byte BUILD_URI = 53;
+
+    /**
+     * Pop N key-value pairs from the stack and push a PropertyGetter backed by parallel arrays.
+     * Same stack layout as MAPN, but produces a lightweight PropertyGetter instead of a Map.
+     * More efficient for small fixed-key maps (e.g., auth scheme properties).
+     *
+     * <p>Stack: [..., value1, key1, ..., valueN, keyN] => [..., PropertyGetter]
+     *
+     * <p><code>STRUCTN [size:byte]</code>
+     */
+    public static final byte STRUCTN = 54;
 }

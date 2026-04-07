@@ -85,7 +85,12 @@ final class BytecodeDisassembler {
             Map.entry(Opcodes.JUMP, new InstructionDef("JUMP", Show.JUMP_OFFSET)),
             Map.entry(Opcodes.SUBSTRING_EQ, new InstructionDef("SUBSTRING_EQ", Show.SUBSTRING_EQ)),
             Map.entry(Opcodes.SPLIT_GET, new InstructionDef("SPLIT_GET", Show.SPLIT_GET)),
-            Map.entry(Opcodes.SELECT_BOOL_REG, new InstructionDef("SELECT_BOOL_REG", Show.SELECT_BOOL)));
+            Map.entry(Opcodes.SELECT_BOOL_REG, new InstructionDef("SELECT_BOOL_REG", Show.SELECT_BOOL))),
+            Map.entry(Opcodes.SPLIT_GET, new InstructionDef("SPLIT_GET", Show.SPLIT_GET)),
+            Map.entry(Opcodes.STRING_EQUALS_REG_CONST, new InstructionDef("STRING_EQUALS_REG_CONST", Show.REG_CONST)),
+            Map.entry(Opcodes.SET_REG_RETURN, new InstructionDef("SET_REG_RETURN", Show.REGISTER)),
+            Map.entry(Opcodes.BUILD_URI, new InstructionDef("BUILD_URI", Show.CONST)),
+            Map.entry(Opcodes.STRUCTN, new InstructionDef("STRUCTN", Show.NUMBER)));
 
     private enum Show {
         CONST,
@@ -101,7 +106,9 @@ final class BytecodeDisassembler {
         ARG_COUNT,
         SUBSTRING_EQ,
         SPLIT_GET,
-        SELECT_BOOL
+        SELECT_BOOL,
+        SPLIT_GET,
+        REG_CONST
     }
 
     private record InstructionDef(String name, Show show) {
@@ -263,8 +270,7 @@ final class BytecodeDisassembler {
                         opcode == Opcodes.JNN_OR_POP
                         || (opcode == Opcodes.GET_PROPERTY_REG && i == 1)
                         || (opcode == Opcodes.SELECT_BOOL_REG && i >= 1)
-                        ||
-                        (opcode == Opcodes.RESOLVE_TEMPLATE && i == 1)) {
+                        || (opcode == Opcodes.STRING_EQUALS_REG_CONST && i == 1)) {
                     s.append(String.format("%5d", value));
                 } else {
                     s.append(String.format("%3d", value));
@@ -397,6 +403,17 @@ final class BytecodeDisassembler {
                 s.append(" : ");
                 if (falseIdx >= 0 && falseIdx < bytecode.getConstantPoolCount()) {
                     s.append(formatConstant(bytecode.getConstant(falseIdx)));
+                }
+            }
+            case REG_CONST -> {
+                int regIndex = walker.getOperand(0);
+                int constIdx = walker.getOperand(1);
+                if (regIndex >= 0 && regIndex < bytecode.getRegisterDefinitions().length) {
+                    s.append(bytecode.getRegisterDefinitions()[regIndex].name());
+                }
+                s.append(" == ");
+                if (constIdx >= 0 && constIdx < bytecode.getConstantPoolCount()) {
+                    s.append(formatConstant(bytecode.getConstant(constIdx)));
                 }
             }
         }

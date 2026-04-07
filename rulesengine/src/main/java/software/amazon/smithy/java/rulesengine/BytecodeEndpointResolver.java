@@ -13,7 +13,6 @@ import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.endpoints.EndpointResolverParams;
 import software.amazon.smithy.java.logging.InternalLogger;
-import software.amazon.smithy.rulesengine.logic.bdd.Bdd;
 
 /**
  * Endpoint resolver that uses a compiled endpoint rules program from a BDD.
@@ -23,7 +22,6 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(BytecodeEndpointResolver.class);
 
     private final Bytecode bytecode;
-    private final Bdd bdd;
     private final RulesExtension[] extensions;
     private final RegisterFiller registerFiller;
     private final ContextProvider ctxProvider = new ContextProvider.OrchestratingProvider();
@@ -36,7 +34,6 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
     ) {
         this.bytecode = bytecode;
         this.extensions = extensions.toArray(new RulesExtension[0]);
-        this.bdd = bytecode.getBdd();
 
         // Create and reuse this register filler across thread local evaluators.
         this.registerFiller = RegisterFiller.of(bytecode, builtinProviders);
@@ -64,10 +61,6 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
 
         LOGGER.debug("Resolving endpoint of {} using VM", operation);
 
-        var resultIndex = bdd.evaluate(evaluator);
-        if (resultIndex < 0) {
-            return null;
-        }
-        return evaluator.resolveResult(resultIndex);
+        return evaluator.evaluateBdd();
     }
 }

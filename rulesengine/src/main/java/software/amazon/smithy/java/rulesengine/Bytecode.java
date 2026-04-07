@@ -178,6 +178,17 @@ public final class Bytecode {
     private final int[] hardRequiredIndices;
     private final Map<String, Integer> inputRegisterMap;
 
+    // Inline condition types for fast BDD evaluation.
+    static final byte COND_ISSET = 1;
+    static final byte COND_IS_TRUE = 2;
+    static final byte COND_IS_FALSE = 3;
+    static final byte COND_NOT_SET = 4;
+    static final byte COND_STRING_EQ_REG_CONST = 5;
+
+    // Condition classification arrays for inline BDD evaluation
+    final byte[] conditionTypes;
+    final int[] conditionOperands;
+
     private Bdd bdd;
 
     Bytecode(
@@ -230,6 +241,67 @@ public final class Bytecode {
         this.hardRequiredIndices = findRequiredIndicesWithoutDefaultsOrBuiltins(registerDefinitions);
         this.inputRegisterMap = createInputRegisterMap(registerDefinitions);
         this.version = version;
+
+        // Classify conditions for inline BDD evaluation
+        this.conditionTypes = new byte[conditionOffsets.length];
+        this.conditionOperands = new int[conditionOffsets.length];
+        classifyConditions();
+    }
+
+    private void classifyConditions() {
+        int len = bytecode.length;
+        for (int i = 0; i < conditionOffsets.length; i++) {
+            int offset = conditionOffsets[i];
+
+            // 2-byte opcode patterns: <opcode> <register> <return>  (need offset+2 in bounds)
+            if (offset + 2 < len) {
+                int firstOpcode = bytecode[offset] & 0xFF;
+                int reg = bytecode[offset + 1] & 0xFF;
+                int next = bytecode[offset + 2] & 0xFF;
+                // Only inline conditions that end with RETURN_VALUE (no binding).
+                // Conditions with SET_REG_RETURN have a side effect (register write) that
+                // the inline path cannot replicate — they must go through full bytecode eval.
+                boolean isReturn = next == (Opcodes.RETURN_VALUE & 0xFF);
+
+                if (isReturn) {
+                    switch (firstOpcode) {
+                        case Opcodes.TEST_REGISTER_ISSET & 0xFF -> {
+                            conditionTypes[i] = COND_ISSET;
+                            conditionOperands[i] = reg;
+                            continue;
+                        }
+                        case Opcodes.TEST_REGISTER_IS_TRUE & 0xFF -> {
+                            conditionTypes[i] = COND_IS_TRUE;
+                            conditionOperands[i] = reg;
+                            continue;
+                        }
+                        case Opcodes.TEST_REGISTER_IS_FALSE & 0xFF -> {
+                            conditionTypes[i] = COND_IS_FALSE;
+                            conditionOperands[i] = reg;
+                            continue;
+                        }
+                        case Opcodes.TEST_REGISTER_NOT_SET & 0xFF -> {
+                            conditionTypes[i] = COND_NOT_SET;
+                            conditionOperands[i] = reg;
+                            continue;
+                        }
+                        default -> {
+                        }
+                    }
+                }
+            }
+
+            // 4-byte opcode pattern: STRING_EQUALS_REG_CONST [reg:1] [const:2] <return>
+            if (offset + 4 < len && (bytecode[offset] & 0xFF) == (Opcodes.STRING_EQUALS_REG_CONST & 0xFF)) {
+                int reg = bytecode[offset + 1] & 0xFF;
+                int constIdx = ((bytecode[offset + 2] & 0xFF) << 8) | (bytecode[offset + 3] & 0xFF);
+                int next = bytecode[offset + 4] & 0xFF;
+                if (next == (Opcodes.RETURN_VALUE & 0xFF)) {
+                    conditionTypes[i] = COND_STRING_EQ_REG_CONST;
+                    conditionOperands[i] = (constIdx << 8) | reg;
+                }
+            }
+        }
     }
 
     /**

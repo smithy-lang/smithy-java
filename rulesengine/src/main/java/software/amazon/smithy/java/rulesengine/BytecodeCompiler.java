@@ -113,12 +113,14 @@ final class BytecodeCompiler {
 
     private void compileCondition(Condition condition) {
         compileExpression(condition.getFunction());
-        condition.getResult().ifPresent(result -> {
-            byte register = registerAllocator.getOrAllocateRegister(result.toString());
-            writer.writeByte(Opcodes.SET_REGISTER);
+        var result = condition.getResult();
+        if (result.isPresent()) {
+            byte register = registerAllocator.getOrAllocateRegister(result.get().toString());
+            writer.writeByte(Opcodes.SET_REG_RETURN);
             writer.writeByte(register);
-        });
-        writer.writeByte(Opcodes.RETURN_VALUE);
+        } else {
+            writer.writeByte(Opcodes.RETURN_VALUE);
+        }
     }
 
     private void compileEndpointRule(EndpointRule rule) {
@@ -150,7 +152,7 @@ final class BytecodeCompiler {
             compileMapCreation(e.getProperties().size());
         }
 
-        compileExpression(e.getUrl());
+        compileEndpointUrl(e.getUrl());
 
         // Add the return endpoint instruction
         writer.writeByte(Opcodes.RETURN_ENDPOINT);
@@ -162,6 +164,95 @@ final class BytecodeCompiler {
             packed |= 2;
         }
         writer.writeByte(packed);
+    }
+
+    /**
+     * Compile the URL expression for an endpoint, attempting to decompose it into scheme/host/path
+     * so that BUILD_URI can construct a SmithyUri directly without string-to-URI parsing.
+     *
+     * <p>Falls back to compileExpression (producing a String) if the URL can't be decomposed.
+     */
+    private void compileEndpointUrl(Expression urlExpression) {
+        // Only optimize StringLiteral templates with multiple parts where the first part
+        // is a literal starting with a scheme (e.g., "https://...")
+        if (urlExpression instanceof StringLiteral sl) {
+            var template = sl.value();
+            var parts = template.getParts();
+            if (parts.size() > 1 && parts.getFirst() instanceof Template.Literal firstLit) {
+                String firstStr = firstLit.toString();
+                int schemeEnd = firstStr.indexOf("://");
+                if (schemeEnd > 0) {
+                    String scheme = firstStr.substring(0, schemeEnd);
+                    String afterScheme = firstStr.substring(schemeEnd + 3);
+
+                    // Find where path starts: look for a part that is "/" or starts with "/"
+                    // The host is everything between "://" and the first "/" separator
+                    // In most S3 templates, there's no explicit "/" — the path is empty
+                    // In some, there's a "/" part followed by bucket + url.path
+                    int pathPartIndex = -1;
+                    for (int i = 0; i < parts.size(); i++) {
+                        if (parts.get(i) instanceof Template.Literal lit && lit.toString().startsWith("/")
+                                && i > 0) {
+                            pathPartIndex = i;
+                            break;
+                        }
+                    }
+
+                    // Compile host parts: afterScheme + parts[1..pathPartIndex)
+                    int hostPartCount = 0;
+                    if (!afterScheme.isEmpty()) {
+                        addLoadConst(afterScheme);
+                        hostPartCount++;
+                    }
+                    int hostEnd = pathPartIndex > 0 ? pathPartIndex : parts.size();
+                    for (int i = 1; i < hostEnd; i++) {
+                        var part = parts.get(i);
+                        if (part instanceof Template.Dynamic d) {
+                            compileExpression(d.toExpression());
+                        } else {
+                            addLoadConst(part.toString());
+                        }
+                        hostPartCount++;
+                    }
+                    // Resolve host template to a single string
+                    if (hostPartCount == 1) {
+                        // Already a single value on stack
+                    } else if (hostPartCount > 1) {
+                        writer.writeByte(Opcodes.RESOLVE_TEMPLATE);
+                        writer.writeByte(hostPartCount);
+                    } else {
+                        addLoadConst("");
+                    }
+
+                    // Compile path parts
+                    if (pathPartIndex > 0) {
+                        int pathPartCount = 0;
+                        for (int i = pathPartIndex; i < parts.size(); i++) {
+                            var part = parts.get(i);
+                            if (part instanceof Template.Dynamic d) {
+                                compileExpression(d.toExpression());
+                            } else {
+                                addLoadConst(part.toString());
+                            }
+                            pathPartCount++;
+                        }
+                        if (pathPartCount > 1) {
+                            writer.writeByte(Opcodes.RESOLVE_TEMPLATE);
+                            writer.writeByte(pathPartCount);
+                        }
+                    } else {
+                        addLoadConst("");
+                    }
+
+                    // BUILD_URI pops host and path, pushes SmithyUri
+                    writer.writeByte(Opcodes.BUILD_URI);
+                    writer.writeShort(writer.getConstantIndex(scheme));
+                    return;
+                }
+            }
+        }
+        // Fallback: compile as regular string expression
+        compileExpression(urlExpression);
     }
 
     private void compileErrorRule(ErrorRule rule) {
@@ -287,6 +378,20 @@ final class BytecodeCompiler {
                             return null;
                         }
                     }
+                }
+                if (left instanceof Reference ref && right instanceof StringLiteral sl
+                        && sl.value().getParts().size() == 1) {
+                    writer.writeByte(Opcodes.STRING_EQUALS_REG_CONST);
+                    writer.writeByte(registerAllocator.getRegister(ref.getName().toString()));
+                    writer.writeShort(writer.getConstantIndex(sl.value().getParts().get(0).toString()));
+                    return null;
+                }
+                if (right instanceof Reference ref && left instanceof StringLiteral sl
+                        && sl.value().getParts().size() == 1) {
+                    writer.writeByte(Opcodes.STRING_EQUALS_REG_CONST);
+                    writer.writeByte(registerAllocator.getRegister(ref.getName().toString()));
+                    writer.writeShort(writer.getConstantIndex(sl.value().getParts().get(0).toString()));
+                    return null;
                 }
                 compileExpression(left);
                 compileExpression(right);
@@ -532,7 +637,14 @@ final class BytecodeCompiler {
                     compileLiteral(e.getValue()); // value then key to make popping ordered
                     addLoadConst(e.getKey().toString());
                 }
-                compileMapCreation(r.members().size());
+                int size = r.members().size();
+                if (size <= 8) {
+                    // Small records: PropertyGetter with linear scan beats Map hashing
+                    writer.writeByte(Opcodes.STRUCTN);
+                    writer.writeByte(size);
+                } else {
+                    compileMapCreation(size);
+                }
             }
             case BooleanLiteral b -> addLoadConst(b.value().getValue());
             case IntegerLiteral i -> addLoadConst(i.toNode().expectNumberNode().getValue());

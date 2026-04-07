@@ -127,7 +127,7 @@ class BytecodeCompilerTest {
         }
         assertTrue(foundHasInput);
 
-        assertOpcodePresent(bytecode, Opcodes.SET_REGISTER);
+        assertOpcodePresent(bytecode, Opcodes.SET_REG_RETURN);
     }
 
     @Test
@@ -346,7 +346,7 @@ class BytecodeCompilerTest {
 
         Bytecode bytecode = compiler.compile();
 
-        assertOpcodePresent(bytecode, Opcodes.MAP2);
+        assertOpcodePresent(bytecode, Opcodes.STRUCTN);
     }
 
     @Test
@@ -619,7 +619,7 @@ class BytecodeCompilerTest {
 
         Bytecode bytecode = compiler.compile();
 
-        assertOpcodePresent(bytecode, Opcodes.MAPN);
+        assertOpcodePresent(bytecode, Opcodes.STRUCTN);
     }
 
     @Test

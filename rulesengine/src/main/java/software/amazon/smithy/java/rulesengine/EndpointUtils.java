@@ -122,6 +122,32 @@ public final class EndpointUtils {
         return null;
     }
 
+    // TODO: Remove when Substring.getSubstring in smithy is updated to only check the substring range for ASCII.
+    // Fast substring that only validates ASCII within the actual substring range, not the entire string.
+    static String getSubstring(String value, int startIndex, int stopIndex, boolean reverse) {
+        if (value == null) {
+            return null;
+        }
+        int len = value.length();
+        if (startIndex >= stopIndex || len < stopIndex) {
+            return null;
+        }
+        int actualStart, actualEnd;
+        if (reverse) {
+            actualStart = len - stopIndex;
+            actualEnd = len - startIndex;
+        } else {
+            actualStart = startIndex;
+            actualEnd = stopIndex;
+        }
+        for (int i = actualStart; i < actualEnd; i++) {
+            if (value.charAt(i) > 127) {
+                return null;
+            }
+        }
+        return value.substring(actualStart, actualEnd);
+    }
+
     // Check if substring equals expected, returning false for null/short strings
     static boolean substringEquals(String value, int start, int end, boolean reverse, String expected) {
         if (value == null || expected == null) {

@@ -88,13 +88,15 @@ final class BytecodeWalker {
                     Opcodes.RETURN_ERROR, Opcodes.RETURN_VALUE, Opcodes.SPLIT ->
                 0;
             case Opcodes.LOAD_CONST, Opcodes.SET_REGISTER, Opcodes.LOAD_REGISTER, Opcodes.TEST_REGISTER_ISSET,
-                    Opcodes.TEST_REGISTER_NOT_SET, Opcodes.LISTN, Opcodes.MAPN, Opcodes.FN0, Opcodes.FN1, Opcodes.FN2,
-                    Opcodes.FN3, Opcodes.FN, Opcodes.GET_INDEX, Opcodes.TEST_REGISTER_IS_TRUE,
-                    Opcodes.TEST_REGISTER_IS_FALSE, Opcodes.RETURN_ENDPOINT, Opcodes.LOAD_CONST_W, Opcodes.GET_PROPERTY,
-                    Opcodes.JNN_OR_POP, Opcodes.GET_NEGATIVE_INDEX, Opcodes.JMP_IF_FALSE, Opcodes.JUMP ->
+                    Opcodes.TEST_REGISTER_NOT_SET, Opcodes.LISTN, Opcodes.MAPN, Opcodes.STRUCTN, Opcodes.FN0,
+                    Opcodes.FN1, Opcodes.FN2, Opcodes.FN3, Opcodes.FN, Opcodes.GET_INDEX,
+                    Opcodes.TEST_REGISTER_IS_TRUE, Opcodes.TEST_REGISTER_IS_FALSE, Opcodes.RETURN_ENDPOINT,
+                    Opcodes.LOAD_CONST_W, Opcodes.GET_PROPERTY, Opcodes.JNN_OR_POP, Opcodes.GET_NEGATIVE_INDEX,
+                    Opcodes.JMP_IF_FALSE, Opcodes.JUMP, Opcodes.SET_REG_RETURN, Opcodes.BUILD_URI,
+                    Opcodes.RESOLVE_TEMPLATE ->
                 1;
-            case Opcodes.GET_PROPERTY_REG, Opcodes.GET_INDEX_REG, Opcodes.RESOLVE_TEMPLATE,
-                    Opcodes.GET_NEGATIVE_INDEX_REG ->
+            case Opcodes.GET_PROPERTY_REG, Opcodes.GET_INDEX_REG, Opcodes.GET_NEGATIVE_INDEX_REG,
+                    Opcodes.STRING_EQUALS_REG_CONST ->
                 2;
             case Opcodes.SUBSTRING, Opcodes.SPLIT_GET, Opcodes.SELECT_BOOL_REG -> 3;
             case Opcodes.SUBSTRING_EQ -> 5;
@@ -114,6 +116,7 @@ final class BytecodeWalker {
             case Opcodes.TEST_REGISTER_NOT_SET:
             case Opcodes.LISTN:
             case Opcodes.MAPN:
+            case Opcodes.STRUCTN:
             case Opcodes.FN0:
             case Opcodes.FN1:
             case Opcodes.FN2:
@@ -123,6 +126,7 @@ final class BytecodeWalker {
             case Opcodes.TEST_REGISTER_IS_TRUE:
             case Opcodes.TEST_REGISTER_IS_FALSE:
             case Opcodes.RETURN_ENDPOINT:
+            case Opcodes.SET_REG_RETURN:
                 if (index == 0) {
                     return code.get(pc + 1) & 0xFF;
                 }
@@ -132,6 +136,7 @@ final class BytecodeWalker {
             case Opcodes.LOAD_CONST_W:
             case Opcodes.GET_PROPERTY:
             case Opcodes.JNN_OR_POP:
+            case Opcodes.BUILD_URI:
                 if (index == 0) {
                     return ((code.get(pc + 1) & 0xFF) << 8) | (code.get(pc + 2) & 0xFF);
                 }
@@ -139,10 +144,11 @@ final class BytecodeWalker {
 
             // Mixed operand instructions
             case Opcodes.GET_PROPERTY_REG:
+            case Opcodes.STRING_EQUALS_REG_CONST:
                 if (index == 0) {
                     return code.get(pc + 1) & 0xFF; // register
                 } else if (index == 1) {
-                    return ((code.get(pc + 2) & 0xFF) << 8) | (code.get(pc + 3) & 0xFF); // property index
+                    return ((code.get(pc + 2) & 0xFF) << 8) | (code.get(pc + 3) & 0xFF); // const/property index
                 }
                 break;
 
@@ -157,8 +163,6 @@ final class BytecodeWalker {
             case Opcodes.RESOLVE_TEMPLATE:
                 if (index == 0) {
                     return code.get(pc + 1) & 0xFF; // arg count
-                } else if (index == 1) {
-                    return ((code.get(pc + 2) & 0xFF) << 8) | (code.get(pc + 3) & 0xFF); // template index
                 }
                 break;
 
@@ -232,7 +236,9 @@ final class BytecodeWalker {
 
     public boolean isReturnOpcode() {
         byte op = currentOpcode();
-        return op == Opcodes.RETURN_VALUE || op == Opcodes.RETURN_ENDPOINT || op == Opcodes.RETURN_ERROR;
+        return op == Opcodes.RETURN_VALUE || op == Opcodes.RETURN_ENDPOINT
+                || op == Opcodes.RETURN_ERROR
+                || op == Opcodes.SET_REG_RETURN;
     }
 
     public static int getInstructionLength(byte opcode) {
@@ -243,14 +249,16 @@ final class BytecodeWalker {
                     Opcodes.RETURN_ERROR, Opcodes.RETURN_VALUE, Opcodes.SPLIT ->
                 1;
             case Opcodes.LOAD_CONST, Opcodes.SET_REGISTER, Opcodes.LOAD_REGISTER, Opcodes.TEST_REGISTER_ISSET,
-                    Opcodes.TEST_REGISTER_NOT_SET, Opcodes.LISTN, Opcodes.MAPN, Opcodes.FN0, Opcodes.FN1, Opcodes.FN2,
-                    Opcodes.FN3, Opcodes.FN, Opcodes.GET_INDEX, Opcodes.TEST_REGISTER_IS_TRUE,
-                    Opcodes.TEST_REGISTER_IS_FALSE, Opcodes.RETURN_ENDPOINT, Opcodes.GET_NEGATIVE_INDEX ->
+                    Opcodes.TEST_REGISTER_NOT_SET, Opcodes.LISTN, Opcodes.MAPN, Opcodes.STRUCTN, Opcodes.FN0,
+                    Opcodes.FN1, Opcodes.FN2, Opcodes.FN3, Opcodes.FN, Opcodes.GET_INDEX,
+                    Opcodes.TEST_REGISTER_IS_TRUE, Opcodes.TEST_REGISTER_IS_FALSE, Opcodes.RETURN_ENDPOINT,
+                    Opcodes.GET_NEGATIVE_INDEX, Opcodes.SET_REG_RETURN, Opcodes.RESOLVE_TEMPLATE ->
                 2;
             case Opcodes.LOAD_CONST_W, Opcodes.GET_PROPERTY, Opcodes.JNN_OR_POP, Opcodes.GET_INDEX_REG,
-                    Opcodes.GET_NEGATIVE_INDEX_REG, Opcodes.JMP_IF_FALSE, Opcodes.JUMP ->
+                    Opcodes.GET_NEGATIVE_INDEX_REG, Opcodes.JMP_IF_FALSE, Opcodes.JUMP, Opcodes.BUILD_URI ->
                 3;
-            case Opcodes.RESOLVE_TEMPLATE, Opcodes.GET_PROPERTY_REG, Opcodes.SUBSTRING -> 4;
+            case Opcodes.GET_PROPERTY_REG, Opcodes.SUBSTRING, Opcodes.STRING_EQUALS_REG_CONST ->
+                4;
             case Opcodes.SPLIT_GET -> 5;
             case Opcodes.SELECT_BOOL_REG -> 6;
             case Opcodes.SUBSTRING_EQ -> 7;
