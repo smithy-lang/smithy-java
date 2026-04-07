@@ -94,6 +94,7 @@ final class PayloadSerializer implements ShapeSerializer {
 
     @Override
     public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+        serializer.writePayloadContentType();
         structSerializer.writeList(schema, listState, size, consumer);
     }
 
