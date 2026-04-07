@@ -18,11 +18,9 @@ import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.io.uri.URLEncoding;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.IsValidHostLabel;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Split;
-import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Substring;
 import software.amazon.smithy.rulesengine.logic.ConditionEvaluator;
 import software.amazon.smithy.rulesengine.logic.bdd.Bdd;
 
-import static software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Substring.getSubstring;
 
 /**
  * Evaluates bytecode for a single specific condition or result per evaluation.
@@ -409,7 +407,7 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     var startPos = instructions[pc++] & 0xFF;
                     var endPos = instructions[pc++] & 0xFF;
                     var reverse = (instructions[pc++] & 0xFF) != 0;
-                    stack[idx] = Substring.getSubstring(string, startPos, endPos, reverse);
+                    stack[idx] = EndpointUtils.getSubstring(string, startPos, endPos, reverse);
                 }
                 case Opcodes.IS_VALID_HOST_LABEL -> {
                     int idx = stackPosition - 2;
