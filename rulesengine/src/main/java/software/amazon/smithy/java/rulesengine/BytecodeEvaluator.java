@@ -285,13 +285,12 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                 }
                 case Opcodes.STRUCTN -> {
                     var size = instructions[pc++] & 0xFF;
-                    var keys = new String[size];
-                    var values = new Object[size];
-                    for (var i = 0; i < size; i++) {
-                        keys[i] = (String) stack[--stackPosition];
-                        values[i] = stack[--stackPosition];
-                    }
-                    push(new ArrayPropertyGetter(keys, values));
+                    int totalSlots = size * 2;
+                    int base = stackPosition - totalSlots;
+                    var data = new Object[totalSlots];
+                    System.arraycopy(stack, base, data, 0, totalSlots);
+                    stack[base] = new ArrayPropertyGetter(data);
+                    stackPosition = base + 1;
                 }
                 case Opcodes.RESOLVE_TEMPLATE -> {
                     int argCount = instructions[pc++] & 0xFF;

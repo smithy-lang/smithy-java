@@ -180,6 +180,12 @@ final class BytecodeCompiler {
             var parts = template.getParts();
             if (parts.size() > 1 && parts.getFirst() instanceof Template.Literal firstLit) {
                 String firstStr = firstLit.toString();
+                // Bail out if any literal part contains characters that indicate
+                // query strings or userInfo — these need full URI.create() parsing.
+                if (containsUriSpecialChars(parts)) {
+                    compileExpression(urlExpression);
+                    return;
+                }
                 int schemeEnd = firstStr.indexOf("://");
                 if (schemeEnd > 0) {
                     String scheme = firstStr.substring(0, schemeEnd);
@@ -253,6 +259,18 @@ final class BytecodeCompiler {
         }
         // Fallback: compile as regular string expression
         compileExpression(urlExpression);
+    }
+
+    private static boolean containsUriSpecialChars(List<Template.Part> parts) {
+        for (var part : parts) {
+            if (part instanceof Template.Literal lit) {
+                String s = lit.toString();
+                if (s.indexOf('?') >= 0 || s.indexOf('@') >= 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private void compileErrorRule(ErrorRule rule) {
