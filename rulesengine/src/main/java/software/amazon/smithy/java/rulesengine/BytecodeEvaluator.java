@@ -287,6 +287,16 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     }
                     push(map);
                 }
+                case Opcodes.STRUCTN -> {
+                    var size = instructions[pc++] & 0xFF;
+                    var keys = new String[size];
+                    var values = new Object[size];
+                    for (var i = 0; i < size; i++) {
+                        keys[i] = (String) stack[--stackPosition];
+                        values[i] = stack[--stackPosition];
+                    }
+                    push(new ArrayPropertyGetter(keys, values));
+                }
                 case Opcodes.RESOLVE_TEMPLATE -> {
                     int argCount = instructions[pc++] & 0xFF;
                     int firstArgPosition = stackPosition - argCount;

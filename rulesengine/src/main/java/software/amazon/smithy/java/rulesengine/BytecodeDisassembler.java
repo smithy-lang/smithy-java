@@ -87,7 +87,8 @@ final class BytecodeDisassembler {
             Map.entry(Opcodes.SPLIT_GET, new InstructionDef("SPLIT_GET", Show.SPLIT_GET)),
             Map.entry(Opcodes.STRING_EQUALS_REG_CONST, new InstructionDef("STRING_EQUALS_REG_CONST", Show.REG_CONST)),
             Map.entry(Opcodes.SET_REG_RETURN, new InstructionDef("SET_REG_RETURN", Show.REGISTER)),
-            Map.entry(Opcodes.BUILD_URI, new InstructionDef("BUILD_URI", Show.CONST)));
+            Map.entry(Opcodes.BUILD_URI, new InstructionDef("BUILD_URI", Show.CONST)),
+            Map.entry(Opcodes.STRUCTN, new InstructionDef("STRUCTN", Show.NUMBER)));
 
     private enum Show {
         CONST,

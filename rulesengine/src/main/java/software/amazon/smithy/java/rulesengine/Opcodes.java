@@ -518,4 +518,15 @@ public final class Opcodes {
      * <p><code>BUILD_URI [scheme-const:short]</code>
      */
     public static final byte BUILD_URI = 51;
+
+    /**
+     * Pop N key-value pairs from the stack and push a PropertyGetter backed by parallel arrays.
+     * Same stack layout as MAPN, but produces a lightweight PropertyGetter instead of a Map.
+     * More efficient for small fixed-key maps (e.g., auth scheme properties).
+     *
+     * <p>Stack: [..., value1, key1, ..., valueN, keyN] => [..., PropertyGetter]
+     *
+     * <p><code>STRUCTN [size:byte]</code>
+     */
+    public static final byte STRUCTN = 52;
 }

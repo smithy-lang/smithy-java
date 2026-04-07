@@ -156,7 +156,7 @@ public class S3EndpointBenchmark {
 
     @State(Scope.Benchmark)
     public static class ParamState {
-        @Param({"binding", "canned"})
+        @Param({"canned"})
         private String paramMode;
 
         @Param({"none", "rewritten"})

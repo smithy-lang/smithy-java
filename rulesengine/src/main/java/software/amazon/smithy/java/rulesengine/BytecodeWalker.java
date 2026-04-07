@@ -88,7 +88,8 @@ final class BytecodeWalker {
                     Opcodes.RETURN_ERROR, Opcodes.RETURN_VALUE, Opcodes.SPLIT ->
                 0;
             case Opcodes.LOAD_CONST, Opcodes.SET_REGISTER, Opcodes.LOAD_REGISTER, Opcodes.TEST_REGISTER_ISSET,
-                    Opcodes.TEST_REGISTER_NOT_SET, Opcodes.LISTN, Opcodes.MAPN, Opcodes.FN0, Opcodes.FN1, Opcodes.FN2,
+                    Opcodes.TEST_REGISTER_NOT_SET, Opcodes.LISTN, Opcodes.MAPN, Opcodes.STRUCTN, Opcodes.FN0,
+                    Opcodes.FN1, Opcodes.FN2,
                     Opcodes.FN3, Opcodes.FN, Opcodes.GET_INDEX, Opcodes.TEST_REGISTER_IS_TRUE,
                     Opcodes.TEST_REGISTER_IS_FALSE, Opcodes.RETURN_ENDPOINT, Opcodes.LOAD_CONST_W, Opcodes.GET_PROPERTY,
                     Opcodes.JNN_OR_POP, Opcodes.GET_NEGATIVE_INDEX, Opcodes.JMP_IF_FALSE, Opcodes.JUMP,
@@ -115,6 +116,7 @@ final class BytecodeWalker {
             case Opcodes.TEST_REGISTER_NOT_SET:
             case Opcodes.LISTN:
             case Opcodes.MAPN:
+            case Opcodes.STRUCTN:
             case Opcodes.FN0:
             case Opcodes.FN1:
             case Opcodes.FN2:
@@ -239,10 +241,10 @@ final class BytecodeWalker {
                     Opcodes.RETURN_ERROR, Opcodes.RETURN_VALUE, Opcodes.SPLIT ->
                 1;
             case Opcodes.LOAD_CONST, Opcodes.SET_REGISTER, Opcodes.LOAD_REGISTER, Opcodes.TEST_REGISTER_ISSET,
-                    Opcodes.TEST_REGISTER_NOT_SET, Opcodes.LISTN, Opcodes.MAPN, Opcodes.FN0, Opcodes.FN1, Opcodes.FN2,
-                    Opcodes.FN3, Opcodes.FN, Opcodes.GET_INDEX, Opcodes.TEST_REGISTER_IS_TRUE,
-                    Opcodes.TEST_REGISTER_IS_FALSE, Opcodes.RETURN_ENDPOINT, Opcodes.GET_NEGATIVE_INDEX,
-                    Opcodes.SET_REG_RETURN ->
+                    Opcodes.TEST_REGISTER_NOT_SET, Opcodes.LISTN, Opcodes.MAPN, Opcodes.STRUCTN, Opcodes.FN0,
+                    Opcodes.FN1, Opcodes.FN2, Opcodes.FN3, Opcodes.FN, Opcodes.GET_INDEX,
+                    Opcodes.TEST_REGISTER_IS_TRUE, Opcodes.TEST_REGISTER_IS_FALSE, Opcodes.RETURN_ENDPOINT,
+                    Opcodes.GET_NEGATIVE_INDEX, Opcodes.SET_REG_RETURN ->
                 2;
             case Opcodes.LOAD_CONST_W, Opcodes.GET_PROPERTY, Opcodes.JNN_OR_POP, Opcodes.GET_INDEX_REG,
                     Opcodes.GET_NEGATIVE_INDEX_REG, Opcodes.JMP_IF_FALSE, Opcodes.JUMP, Opcodes.BUILD_URI ->

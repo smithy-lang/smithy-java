@@ -625,7 +625,14 @@ final class BytecodeCompiler {
                     compileLiteral(e.getValue()); // value then key to make popping ordered
                     addLoadConst(e.getKey().toString());
                 }
-                compileMapCreation(r.members().size());
+                int size = r.members().size();
+                if (size <= 8) {
+                    // Small records: PropertyGetter with linear scan beats Map hashing
+                    writer.writeByte(Opcodes.STRUCTN);
+                    writer.writeByte(size);
+                } else {
+                    compileMapCreation(size);
+                }
             }
             case BooleanLiteral b -> addLoadConst(b.value().getValue());
             case IntegerLiteral i -> addLoadConst(i.toNode().expectNumberNode().getValue());

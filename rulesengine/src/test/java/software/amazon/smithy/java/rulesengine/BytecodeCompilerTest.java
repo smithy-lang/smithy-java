@@ -346,7 +346,7 @@ class BytecodeCompilerTest {
 
         Bytecode bytecode = compiler.compile();
 
-        assertOpcodePresent(bytecode, Opcodes.MAP2);
+        assertOpcodePresent(bytecode, Opcodes.STRUCTN);
     }
 
     @Test
@@ -619,7 +619,7 @@ class BytecodeCompilerTest {
 
         Bytecode bytecode = compiler.compile();
 
-        assertOpcodePresent(bytecode, Opcodes.MAPN);
+        assertOpcodePresent(bytecode, Opcodes.STRUCTN);
     }
 
     @Test
