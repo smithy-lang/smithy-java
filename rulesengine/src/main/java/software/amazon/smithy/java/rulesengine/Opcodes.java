@@ -508,4 +508,14 @@ public final class Opcodes {
      * <p><code>SET_REG_RETURN [register:byte]</code>
      */
     public static final byte SET_REG_RETURN = 50;
+
+    /**
+     * Pop host and path strings from the stack, build a SmithyUri using a scheme from the constant pool.
+     * Pushes the resulting SmithyUri onto the stack. The scheme is always a compile-time constant.
+     *
+     * <p>Stack: [..., host, path] => [..., SmithyUri]
+     *
+     * <p><code>BUILD_URI [scheme-const:short]</code>
+     */
+    public static final byte BUILD_URI = 51;
 }

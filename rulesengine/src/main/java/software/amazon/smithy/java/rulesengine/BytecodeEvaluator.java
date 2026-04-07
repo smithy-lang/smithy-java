@@ -14,6 +14,7 @@ import java.util.Objects;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointContext;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.io.uri.URLEncoding;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.IsValidHostLabel;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Split;
@@ -42,6 +43,10 @@ final class BytecodeEvaluator implements ConditionEvaluator {
     private final UriFactory uriFactory = new UriFactory();
     private final RegisterFiller registerFiller;
     private Context context;
+    // Hot-slot cache for BUILD_URI
+    private String cachedUriHost;
+    private String cachedUriPath;
+    private SmithyUri cachedUri;
 
     BytecodeEvaluator(Bytecode bytecode, RulesExtension[] extensions, RegisterFiller registerFiller) {
         this.bytecode = bytecode;
@@ -363,10 +368,14 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     var packed = instructions[pc++];
                     boolean hasHeaders = (packed & 1) != 0;
                     boolean hasProperties = (packed & 2) != 0;
-                    var urlString = (String) stack[--stackPosition];
+                    var urlValue = stack[--stackPosition];
                     var properties = (Map<String, Object>) (hasProperties ? stack[--stackPosition] : Map.of());
                     var headers = (Map<String, List<String>>) (hasHeaders ? stack[--stackPosition] : Map.of());
-                    var builder = Endpoint.builder().uri(uriFactory.createUri(urlString));
+                    // URL may be a SmithyUri (from BUILD_URI) or String (legacy/fallback)
+                    SmithyUri uri = urlValue instanceof SmithyUri su
+                            ? su
+                            : uriFactory.createUri((String) urlValue);
+                    var builder = Endpoint.builder().uri(uri);
                     if (!headers.isEmpty()) {
                         builder.putProperty(EndpointContext.HEADERS, headers);
                     }
@@ -422,6 +431,25 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     Object srValue = stack[--stackPosition];
                     registers[srIndex] = srValue;
                     return srValue;
+                }
+                case Opcodes.BUILD_URI -> {
+                    int schemeIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                    pc += 2;
+                    int idx = stackPosition - 2;
+                    var host = (String) stack[idx];
+                    var path = (String) stack[idx + 1];
+                    // Hot-slot cache: scheme is always a constant, so only check host+path
+                    if (host.equals(cachedUriHost) && path.equals(cachedUriPath)) {
+                        stack[idx] = cachedUri;
+                    } else {
+                        var scheme = (String) constantPool[schemeIdx];
+                        var uri = SmithyUri.of(scheme, host, -1, path, null);
+                        cachedUriHost = host;
+                        cachedUriPath = path;
+                        cachedUri = uri;
+                        stack[idx] = uri;
+                    }
+                    stackPosition = idx + 1;
                 }
                 default -> throw new RulesEvaluationError("Unknown rules engine instruction: " + opcode, pc);
             }

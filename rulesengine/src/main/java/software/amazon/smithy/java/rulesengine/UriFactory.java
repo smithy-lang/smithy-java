@@ -138,7 +138,7 @@ final class UriFactory extends LinkedHashMap<String, SmithyUri> {
             }
         }
 
-        return SmithyUri.of(scheme, host, port, path, null, SmithyUri.VALIDATE_HOST);
+        return SmithyUri.of(scheme, host, port, path, null);
     }
 
     private static boolean isNumeric(String s, int from) {
