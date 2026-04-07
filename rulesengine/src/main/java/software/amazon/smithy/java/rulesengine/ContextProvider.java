@@ -68,6 +68,7 @@ sealed interface ContextProvider {
             }
         }
 
+
         /** Copy staged values into the target register array, then reset. */
         void drainTo(Object[] registers) {
             // Fast path: use bitmask for registers 0-63

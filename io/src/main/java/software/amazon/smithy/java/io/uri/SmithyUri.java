@@ -202,8 +202,46 @@ public final class SmithyUri {
      * @return the SmithyUri.
      * @throws IllegalArgumentException if any component fails validation.
      */
+    /** Validation flag: validate the scheme component. */
+    public static final int VALIDATE_SCHEME = 1;
+    /** Validation flag: validate the host component. */
+    public static final int VALIDATE_HOST = 2;
+    /** Validation flag: validate the path component. */
+    public static final int VALIDATE_PATH = 4;
+    /** Validation flag: validate the query component. */
+    public static final int VALIDATE_QUERY = 8;
+    /** Validation flag: validate all components. */
+    public static final int VALIDATE_ALL = VALIDATE_SCHEME | VALIDATE_HOST | VALIDATE_PATH | VALIDATE_QUERY;
+
     public static SmithyUri of(String scheme, String host, int port, String path, String query) {
-        return of(scheme, null, host, port, path, query);
+        return of(scheme, null, host, port, path, query, VALIDATE_ALL);
+    }
+
+    /**
+     * Create a {@code SmithyUri} from individual components with selective validation.
+     *
+     * <p>Use {@code validationFlags} to control which components are validated. This is useful when
+     * the caller knows certain components are already valid (e.g., scheme from a constant, path from
+     * URI encoding).
+     *
+     * @param scheme          URI scheme (e.g. "https"). May be null.
+     * @param host            Host component. May be null. IPv6 brackets are stripped.
+     * @param port            Port number, or -1 for no port.
+     * @param path            Raw percent-encoded path. Null defaults to empty string.
+     * @param query           Raw percent-encoded query string. May be null.
+     * @param validationFlags Bitmask of {@code VALIDATE_*} constants controlling which components to validate.
+     * @return the SmithyUri.
+     * @throws IllegalArgumentException if any validated component fails validation.
+     */
+    public static SmithyUri of(
+            String scheme,
+            String host,
+            int port,
+            String path,
+            String query,
+            int validationFlags
+    ) {
+        return of(scheme, null, host, port, path, query, validationFlags);
     }
 
     /**
@@ -221,23 +259,58 @@ public final class SmithyUri {
      * @throws IllegalArgumentException if any component fails validation.
      */
     public static SmithyUri of(String scheme, String userInfo, String host, int port, String path, String query) {
-        if (scheme != null) {
-            validateScheme(scheme);
-        }
-        if (userInfo != null) {
-            validateUserInfo(userInfo);
-        }
-        // Strip IPv6 brackets before validation — brackets are not valid in the stored form.
-        host = stripBrackets(host);
-        if (host != null) {
-            validateHost(host);
-        }
-        validatePort(port);
-        if (path != null) {
-            validatePath(path);
-        }
-        if (query != null) {
-            validateQuery(query);
+        return of(scheme, userInfo, host, port, path, query, VALIDATE_ALL);
+    }
+
+    /**
+     * Create a {@code SmithyUri} from individual components with selective validation.
+     */
+    public static SmithyUri of(
+            String scheme,
+            String userInfo,
+            String host,
+            int port,
+            String path,
+            String query,
+            int validationFlags
+    ) {
+        if (validationFlags == VALIDATE_ALL) {
+            // Fast path: avoid per-flag bitwise checks
+            if (scheme != null) {
+                validateScheme(scheme);
+            }
+            if (userInfo != null) {
+                validateUserInfo(userInfo);
+            }
+            host = stripBrackets(host);
+            if (host != null) {
+                validateHost(host);
+            }
+            validatePort(port);
+            if (path != null) {
+                validatePath(path);
+            }
+            if (query != null) {
+                validateQuery(query);
+            }
+        } else {
+            if (scheme != null && (validationFlags & VALIDATE_SCHEME) != 0) {
+                validateScheme(scheme);
+            }
+            if (userInfo != null) {
+                validateUserInfo(userInfo);
+            }
+            host = stripBrackets(host);
+            if (host != null && (validationFlags & VALIDATE_HOST) != 0) {
+                validateHost(host);
+            }
+            validatePort(port);
+            if (path != null && (validationFlags & VALIDATE_PATH) != 0) {
+                validatePath(path);
+            }
+            if (query != null && (validationFlags & VALIDATE_QUERY) != 0) {
+                validateQuery(query);
+            }
         }
         return new SmithyUri(scheme, userInfo, host, port, path, query);
     }
