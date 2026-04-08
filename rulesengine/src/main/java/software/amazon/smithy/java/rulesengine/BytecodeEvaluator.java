@@ -136,10 +136,6 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         }
     }
 
-    private void push(Object value) {
-        stack[stackPosition++] = value;
-    }
-
     private Object[] getTempArray(int requiredSize) {
         return tempArraySize >= requiredSize ? tempArray : resizeTempArray(requiredSize);
     }
@@ -178,81 +174,88 @@ final class BytecodeEvaluator implements ConditionEvaluator {
 
     @SuppressWarnings("unchecked")
     private Object runLoop(byte[] instructions, RulesFunction[] functions, Object[] constantPool) {
+        // Localize hot interpreter state to avoid field access on every instruction.
+        // Written back in finally for error reporting.
+        int pc = this.pc;
+        int sp = this.stackPosition;
+        Object[] stack = this.stack;
+        Object[] regs = this.registers;
 
+        try {
         while (pc < instructions.length) {
             int opcode = instructions[pc++] & 0xFF;
             switch (opcode) {
-                case Opcodes.LOAD_CONST -> push(constantPool[instructions[pc++] & 0xFF]);
+                case Opcodes.LOAD_CONST -> stack[sp++] = constantPool[instructions[pc++] & 0xFF];
                 case Opcodes.LOAD_CONST_W -> {
                     int constIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
-                    push(constantPool[constIdx]);
+                    stack[sp++] = constantPool[constIdx];
                     pc += 2;
                 }
                 case Opcodes.SET_REGISTER -> {
                     int index = instructions[pc++] & 0xFF;
-                    registers[index] = stack[stackPosition - 1];
+                    regs[index] = stack[sp - 1];
                 }
                 case Opcodes.LOAD_REGISTER -> {
                     int index = instructions[pc++] & 0xFF;
-                    push(registers[index]);
+                    stack[sp++] = regs[index];
                 }
                 case Opcodes.NOT -> {
                     // In-place operation
-                    int idx = stackPosition - 1;
+                    int idx = sp - 1;
                     stack[idx] = stack[idx] == Boolean.FALSE ? Boolean.TRUE : Boolean.FALSE;
                 }
                 case Opcodes.ISSET -> {
                     // In-place operation
-                    int idx = stackPosition - 1;
+                    int idx = sp - 1;
                     stack[idx] = stack[idx] != null ? Boolean.TRUE : Boolean.FALSE;
                 }
                 case Opcodes.TEST_REGISTER_ISSET -> {
-                    push(registers[instructions[pc++] & 0xFF] != null ? Boolean.TRUE : Boolean.FALSE);
+                    stack[sp++] = regs[instructions[pc++] & 0xFF] != null ? Boolean.TRUE : Boolean.FALSE;
                 }
                 case Opcodes.TEST_REGISTER_NOT_SET -> {
-                    push(registers[instructions[pc++] & 0xFF] == null ? Boolean.TRUE : Boolean.FALSE);
+                    stack[sp++] = regs[instructions[pc++] & 0xFF] == null ? Boolean.TRUE : Boolean.FALSE;
                 }
                 // List operations
-                case Opcodes.LIST0 -> push(Collections.emptyList());
+                case Opcodes.LIST0 -> stack[sp++] = Collections.emptyList();
                 case Opcodes.LIST1 -> {
                     // Pops 1, pushes 1: reuse position
-                    int idx = stackPosition - 1;
+                    int idx = sp - 1;
                     stack[idx] = List.of(stack[idx]);
                 }
                 case Opcodes.LIST2 -> {
                     // Pops 2, pushes 1
-                    int idx = stackPosition - 2;
+                    int idx = sp - 2;
                     stack[idx] = List.of(stack[idx], stack[idx + 1]);
-                    stackPosition = idx + 1;
+                    sp = idx + 1;
                 }
                 case Opcodes.LISTN -> {
                     var size = instructions[pc++] & 0xFF;
                     var values = new Object[size];
                     for (var i = size - 1; i >= 0; i--) {
-                        values[i] = stack[--stackPosition];
+                        values[i] = stack[--sp];
                     }
-                    push(Arrays.asList(values)); // dynamic size
+                    stack[sp++] = Arrays.asList(values); // dynamic size
                 }
                 // Map operations
-                case Opcodes.MAP0 -> push(Map.of());
+                case Opcodes.MAP0 -> stack[sp++] = Map.of();
                 case Opcodes.MAP1 -> {
                     // Pops 2, pushes 1
-                    int idx = stackPosition - 2;
+                    int idx = sp - 2;
                     stack[idx] = Map.of((String) stack[idx + 1], stack[idx]);
-                    stackPosition = idx + 1;
+                    sp = idx + 1;
                 }
                 case Opcodes.MAP2 -> {
                     // Pops 4, pushes 1
-                    int idx = stackPosition - 4;
+                    int idx = sp - 4;
                     stack[idx] = Map.of(
                             (String) stack[idx + 1], // key
                             stack[idx], // value
                             (String) stack[idx + 3], // key
                             stack[idx + 2]); // value
-                    stackPosition = idx + 1;
+                    sp = idx + 1;
                 }
                 case Opcodes.MAP3 -> {
-                    int idx = stackPosition - 6;
+                    int idx = sp - 6;
                     stack[idx] = Map.of(
                             (String) stack[idx + 2], // key
                             stack[idx + 1], // value
@@ -260,10 +263,10 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                             stack[idx + 3], // value
                             (String) stack[idx + 5], // key
                             stack[idx]);
-                    stackPosition = idx + 1;
+                    sp = idx + 1;
                 }
                 case Opcodes.MAP4 -> {
-                    int idx = stackPosition - 8;
+                    int idx = sp - 8;
                     stack[idx] = Map.of(
                             (String) stack[idx + 1], // key
                             stack[idx], // value
@@ -273,28 +276,28 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                             stack[idx + 4], // value
                             (String) stack[idx + 7], // key
                             stack[idx + 6]); // value
-                    stackPosition = idx + 1;
+                    sp = idx + 1;
                 }
                 case Opcodes.MAPN -> {
                     var size = instructions[pc++] & 0xFF;
                     Map<String, Object> map = new HashMap<>(size + 1, 1.0f);
                     for (var i = 0; i < size; i++) {
-                        map.put((String) stack[--stackPosition], stack[--stackPosition]);
+                        map.put((String) stack[--sp], stack[--sp]);
                     }
-                    push(map);
+                    stack[sp++] = map;
                 }
                 case Opcodes.STRUCTN -> {
                     var size = instructions[pc++] & 0xFF;
                     int totalSlots = size * 2;
-                    int base = stackPosition - totalSlots;
+                    int base = sp - totalSlots;
                     var data = new Object[totalSlots];
                     System.arraycopy(stack, base, data, 0, totalSlots);
                     stack[base] = new ArrayPropertyGetter(data);
-                    stackPosition = base + 1;
+                    sp = base + 1;
                 }
                 case Opcodes.RESOLVE_TEMPLATE -> {
                     int argCount = instructions[pc++] & 0xFF;
-                    int firstArgPosition = stackPosition - argCount;
+                    int firstArgPosition = sp - argCount;
                     int totalLen = 0;
                     for (int i = 0; i < argCount; i++) {
                         totalLen += ((String) stack[firstArgPosition + i]).length();
@@ -307,97 +310,97 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                         pos += s.length();
                     }
                     stack[firstArgPosition] = new String(buf, 0, totalLen);
-                    stackPosition = firstArgPosition + 1;
+                    sp = firstArgPosition + 1;
                 }
-                case Opcodes.FN0 -> push(functions[instructions[pc++] & 0xFF].apply0());
+                case Opcodes.FN0 -> stack[sp++] = functions[instructions[pc++] & 0xFF].apply0();
                 case Opcodes.FN1 -> {
                     // Pops 1, pushes 1 - reuse position
                     var fn = functions[instructions[pc++] & 0xFF];
-                    int idx = stackPosition - 1;
+                    int idx = sp - 1;
                     stack[idx] = fn.apply1(stack[idx]);
                 }
                 case Opcodes.FN2 -> {
                     // Pops 2, pushes 1
                     var fn = functions[instructions[pc++] & 0xFF];
-                    int idx = stackPosition - 2;
+                    int idx = sp - 2;
                     stack[idx] = fn.apply2(stack[idx], stack[idx + 1]);
-                    stackPosition = idx + 1;
+                    sp = idx + 1;
                 }
                 case Opcodes.FN3 -> {
                     var fn = functions[instructions[pc++] & 0xFF];
-                    int idx = stackPosition - 3;
+                    int idx = sp - 3;
                     stack[idx] = fn.apply(stack[idx], stack[idx + 1], stack[idx + 2]);
-                    stackPosition = idx + 1;
+                    sp = idx + 1;
                 }
                 case Opcodes.FN -> {
                     var fn = functions[instructions[pc++] & 0xFF];
                     var temp = getTempArray(fn.getArgumentCount());
                     for (int i = fn.getArgumentCount() - 1; i >= 0; i--) {
-                        temp[i] = stack[--stackPosition];
+                        temp[i] = stack[--sp];
                     }
-                    push(fn.apply(temp));
+                    stack[sp++] = fn.apply(temp);
                 }
                 case Opcodes.GET_PROPERTY -> {
                     int propertyIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     var propertyName = (String) constantPool[propertyIdx];
-                    int idx = stackPosition - 1;
+                    int idx = sp - 1;
                     stack[idx] = EndpointUtils.getProperty(stack[idx], propertyName);
                     pc += 2;
                 }
                 case Opcodes.GET_INDEX -> {
                     int index = instructions[pc++] & 0xFF;
-                    int idx = stackPosition - 1;
+                    int idx = sp - 1;
                     stack[idx] = EndpointUtils.getIndex(stack[idx], index);
                 }
                 case Opcodes.GET_PROPERTY_REG -> {
                     int regIndex = instructions[pc++] & 0xFF;
                     int propertyIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     var propertyName = (String) constantPool[propertyIdx];
-                    var target = registers[regIndex];
-                    push(EndpointUtils.getProperty(target, propertyName));
+                    var target = regs[regIndex];
+                    stack[sp++] = EndpointUtils.getProperty(target, propertyName);
                     pc += 2;
                 }
                 case Opcodes.GET_INDEX_REG -> {
                     int regIndex = instructions[pc++] & 0xFF;
                     int index = instructions[pc++] & 0xFF;
-                    var target = registers[regIndex];
-                    push(EndpointUtils.getIndex(target, index));
+                    var target = regs[regIndex];
+                    stack[sp++] = EndpointUtils.getIndex(target, index);
                 }
                 case Opcodes.IS_TRUE -> {
                     // In-place operation
-                    int idx = stackPosition - 1;
+                    int idx = sp - 1;
                     stack[idx] = stack[idx] == Boolean.TRUE ? Boolean.TRUE : Boolean.FALSE;
                 }
                 case Opcodes.TEST_REGISTER_IS_TRUE -> {
-                    push(registers[instructions[pc++] & 0xFF] == Boolean.TRUE ? Boolean.TRUE : Boolean.FALSE);
+                    stack[sp++] = regs[instructions[pc++] & 0xFF] == Boolean.TRUE ? Boolean.TRUE : Boolean.FALSE;
                 }
                 case Opcodes.TEST_REGISTER_IS_FALSE -> {
-                    push(registers[instructions[pc++] & 0xFF] == Boolean.FALSE ? Boolean.TRUE : Boolean.FALSE);
+                    stack[sp++] = regs[instructions[pc++] & 0xFF] == Boolean.FALSE ? Boolean.TRUE : Boolean.FALSE;
                 }
                 case Opcodes.EQUALS -> {
                     // Pops 2, pushes 1
-                    int idx = stackPosition - 2;
+                    int idx = sp - 2;
                     stack[idx] = Objects.equals(stack[idx], stack[idx + 1]) ? Boolean.TRUE : Boolean.FALSE;
-                    stackPosition = idx + 1;
+                    sp = idx + 1;
                 }
                 case Opcodes.STRING_EQUALS -> {
                     // Pops 2, pushes 1
-                    int idx = stackPosition - 2;
+                    int idx = sp - 2;
                     var a = (String) stack[idx];
                     var b = (String) stack[idx + 1];
                     stack[idx] = a != null && a.equals(b) ? Boolean.TRUE : Boolean.FALSE;
-                    stackPosition = idx + 1;
+                    sp = idx + 1;
                 }
                 case Opcodes.BOOLEAN_EQUALS -> {
                     // Pops 2, pushes 1
-                    int idx = stackPosition - 2;
+                    int idx = sp - 2;
                     var a = (Boolean) stack[idx];
                     var b = (Boolean) stack[idx + 1];
                     stack[idx] = a != null && a.equals(b) ? Boolean.TRUE : Boolean.FALSE;
-                    stackPosition = idx + 1;
+                    sp = idx + 1;
                 }
                 case Opcodes.SUBSTRING -> {
-                    int idx = stackPosition - 1;
+                    int idx = sp - 1;
                     var string = (String) stack[idx];
                     var startPos = instructions[pc++] & 0xFF;
                     var endPos = instructions[pc++] & 0xFF;
@@ -405,32 +408,32 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     stack[idx] = EndpointUtils.getSubstring(string, startPos, endPos, reverse);
                 }
                 case Opcodes.IS_VALID_HOST_LABEL -> {
-                    int idx = stackPosition - 2;
+                    int idx = sp - 2;
                     var hostLabel = (String) stack[idx];
                     var allowDots = (Boolean) stack[idx + 1];
                     stack[idx] = IsValidHostLabel.isValidHostLabel(hostLabel, Boolean.TRUE.equals(allowDots))
                             ? Boolean.TRUE
                             : Boolean.FALSE;
-                    stackPosition = idx + 1;
+                    sp = idx + 1;
                 }
                 case Opcodes.PARSE_URL -> {
-                    int idx = stackPosition - 1;
+                    int idx = sp - 1;
                     var urlString = (String) stack[idx];
                     stack[idx] = urlString == null ? null : uriFactory.createUri(urlString);
                 }
                 case Opcodes.URI_ENCODE -> {
-                    int idx = stackPosition - 1;
+                    int idx = sp - 1;
                     var string = (String) stack[idx];
                     stack[idx] = URLEncoding.encodeUnreserved(string, false);
                 }
-                case Opcodes.RETURN_ERROR -> throw new RulesEvaluationError((String) stack[--stackPosition], pc);
+                case Opcodes.RETURN_ERROR -> throw new RulesEvaluationError((String) stack[--sp], pc);
                 case Opcodes.RETURN_ENDPOINT -> {
                     var packed = instructions[pc++];
                     boolean hasHeaders = (packed & 1) != 0;
                     boolean hasProperties = (packed & 2) != 0;
-                    var urlValue = stack[--stackPosition];
-                    var properties = (Map<String, Object>) (hasProperties ? stack[--stackPosition] : Map.of());
-                    var headers = (Map<String, List<String>>) (hasHeaders ? stack[--stackPosition] : Map.of());
+                    var urlValue = stack[--sp];
+                    var properties = (Map<String, Object>) (hasProperties ? stack[--sp] : Map.of());
+                    var headers = (Map<String, List<String>>) (hasHeaders ? stack[--sp] : Map.of());
                     // URL may be a SmithyUri (from BUILD_URI) or String (legacy/fallback)
                     SmithyUri uri = urlValue instanceof SmithyUri su
                             ? su
@@ -445,39 +448,39 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     return builder.build();
                 }
                 case Opcodes.RETURN_VALUE -> {
-                    return stack[--stackPosition];
+                    return stack[--sp];
                 }
                 case Opcodes.JNN_OR_POP -> {
-                    Object value = stack[stackPosition - 1];
+                    Object value = stack[sp - 1];
                     // Read as unsigned 16-bit value (0-65535)
                     int offset = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     pc += 2;
                     if (value != null) {
                         pc += offset; // Jump forward, keeping value on stack
                     } else {
-                        stackPosition--; // Pop the null value
+                        sp--; // Pop the null value
                     }
                 }
                 case Opcodes.SPLIT -> {
-                    int idx = stackPosition - 3;
+                    int idx = sp - 3;
                     var string = (String) stack[idx];
                     var delimiter = (String) stack[idx + 1];
                     var limit = ((Number) stack[idx + 2]).intValue();
                     stack[idx] = Split.split(string, delimiter, limit);
-                    stackPosition = idx + 1;
+                    sp = idx + 1;
                 }
                 case Opcodes.GET_NEGATIVE_INDEX -> {
                     int index = instructions[pc++] & 0xFF;
-                    int idx = stackPosition - 1;
+                    int idx = sp - 1;
                     stack[idx] = EndpointUtils.getNegativeIndex(stack[idx], index);
                 }
                 case Opcodes.GET_NEGATIVE_INDEX_REG -> {
                     int regIndex = instructions[pc++] & 0xFF;
                     int index = instructions[pc++] & 0xFF;
-                    push(EndpointUtils.getNegativeIndex(registers[regIndex], index));
+                    stack[sp++] = EndpointUtils.getNegativeIndex(regs[regIndex], index);
                 }
                 case Opcodes.JMP_IF_FALSE -> {
-                    Object condition = stack[--stackPosition];
+                    Object condition = stack[--sp];
                     // Read as unsigned 16-bit value (0-65535)
                     int offset = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     pc += 2;
@@ -499,49 +502,49 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                     int seqConstIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     pc += 2;
                     boolean seqReverse = (seqFlags & 0x01) != 0;
-                    var seqValue = (String) registers[seqRegIndex];
+                    var seqValue = (String) regs[seqRegIndex];
                     var seqExpected = (String) constantPool[seqConstIdx];
-                    push(EndpointUtils.substringEquals(seqValue, seqStart, seqEnd, seqReverse, seqExpected)
+                    stack[sp++] = EndpointUtils.substringEquals(seqValue, seqStart, seqEnd, seqReverse, seqExpected)
                             ? Boolean.TRUE
-                            : Boolean.FALSE);
+                            : Boolean.FALSE;
                 }
                 case Opcodes.SPLIT_GET -> {
                     int sgRegIndex = instructions[pc++] & 0xFF;
                     int sgDelimIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     pc += 2;
                     int sgIndex = instructions[pc++]; // signed byte
-                    var sgValue = (String) registers[sgRegIndex];
+                    var sgValue = (String) regs[sgRegIndex];
                     var sgDelimiter = (String) constantPool[sgDelimIdx];
-                    push(EndpointUtils.splitGet(sgValue, sgDelimiter, sgIndex));
+                    stack[sp++] = EndpointUtils.splitGet(sgValue, sgDelimiter, sgIndex);
                 }
                 case Opcodes.SELECT_BOOL_REG -> {
-                    var selVal = registers[instructions[pc++] & 0xFF];
+                    var selVal = regs[instructions[pc++] & 0xFF];
                     int selTrue = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     pc += 2;
                     int selFalse = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     pc += 2;
-                    push(selVal != null && selVal != Boolean.FALSE
+                    stack[sp++] = selVal != null && selVal != Boolean.FALSE
                             ? constantPool[selTrue]
-                            : constantPool[selFalse]);
+                            : constantPool[selFalse];
                 }
                 case Opcodes.STRING_EQUALS_REG_CONST -> {
                     int srcRegIndex = instructions[pc++] & 0xFF;
                     int srcConstIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     pc += 2;
-                    var srcValue = (String) registers[srcRegIndex];
+                    var srcValue = (String) regs[srcRegIndex];
                     var srcExpected = (String) constantPool[srcConstIdx];
-                    push(srcValue != null && srcValue.equals(srcExpected) ? Boolean.TRUE : Boolean.FALSE);
+                    stack[sp++] = srcValue != null && srcValue.equals(srcExpected) ? Boolean.TRUE : Boolean.FALSE;
                 }
                 case Opcodes.SET_REG_RETURN -> {
                     int srIndex = instructions[pc++] & 0xFF;
-                    Object srValue = stack[--stackPosition];
-                    registers[srIndex] = srValue;
+                    Object srValue = stack[--sp];
+                    regs[srIndex] = srValue;
                     return srValue;
                 }
                 case Opcodes.BUILD_URI -> {
                     int schemeIdx = ((instructions[pc] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
                     pc += 2;
-                    int idx = stackPosition - 2;
+                    int idx = sp - 2;
                     var host = (String) stack[idx];
                     var path = (String) stack[idx + 1];
                     // Hot-slot cache: scheme is always a constant, so only check host+path
@@ -555,13 +558,17 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                         cachedUri = uri;
                         stack[idx] = uri;
                     }
-                    stackPosition = idx + 1;
+                    sp = idx + 1;
                 }
                 default -> throw new RulesEvaluationError("Unknown rules engine instruction: " + opcode, pc);
             }
         }
 
         throw new IllegalArgumentException("Expected to return a value during evaluation");
+        } finally {
+            this.pc = pc;
+            this.stackPosition = sp;
+        }
     }
 
 }
