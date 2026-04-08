@@ -8,6 +8,7 @@ package software.amazon.smithy.java.json;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -55,6 +56,26 @@ public final class JsonCodec implements Codec {
     @Override
     public ShapeSerializer createSerializer(OutputStream sink) {
         return settings.provider().newSerializer(sink, settings);
+    }
+
+    @Override
+    public <T extends SerializableShape> T deserializeShape(byte[] source, ShapeBuilder<T> builder) {
+        var deserializer = createDeserializer(source);
+        try {
+            return builder.deserialize(deserializer).errorCorrection().build();
+        } finally {
+            deserializer.close();
+        }
+    }
+
+    @Override
+    public <T extends SerializableShape> T deserializeShape(ByteBuffer source, ShapeBuilder<T> builder) {
+        var deserializer = createDeserializer(source);
+        try {
+            return builder.deserialize(deserializer).errorCorrection().build();
+        } finally {
+            deserializer.close();
+        }
     }
 
     @Override
