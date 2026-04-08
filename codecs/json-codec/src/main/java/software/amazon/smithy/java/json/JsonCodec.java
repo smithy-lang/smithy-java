@@ -7,10 +7,12 @@ package software.amazon.smithy.java.json;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
+import software.amazon.smithy.java.io.ByteBufferOutputStream;
 import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
@@ -39,6 +41,15 @@ public final class JsonCodec implements Codec {
 
     public JsonSettings settings() {
         return settings;
+    }
+
+    @Override
+    public ByteBuffer serialize(SerializableShape shape) {
+        var baos = new ByteBufferOutputStream(256);
+        try (var serializer = createSerializer(baos)) {
+            shape.serialize(serializer);
+        }
+        return baos.toByteBuffer();
     }
 
     @Override
