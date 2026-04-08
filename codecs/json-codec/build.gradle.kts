@@ -2,6 +2,7 @@ plugins {
     id("smithy-java.module-conventions")
     id("smithy-java.fuzz-test")
     id("me.champeau.jmh") version "0.7.3"
+    id("software.amazon.smithy.gradle.smithy-base")
     alias(libs.plugins.shadow)
 }
 
@@ -14,6 +15,7 @@ dependencies {
     api(project(":core"))
     compileOnly(libs.jackson.core)
     testRuntimeOnly(libs.jackson.core)
+    smithyBuild(project(":codegen:codegen-plugin"))
 }
 
 tasks {
@@ -56,10 +58,36 @@ afterEvaluate {
     }
 }
 
+afterEvaluate {
+    val typePath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
+    sourceSets.named("jmh") {
+        java {
+            srcDir("$typePath/java")
+        }
+        resources {
+            srcDir("$typePath/resources")
+        }
+    }
+}
+
+tasks.named("compileJmhJava") {
+    dependsOn("smithyBuild")
+}
+
+tasks.named("processJmhResources") {
+    dependsOn("smithyBuild")
+}
+
 jmh {
     warmupIterations = 3
     iterations = 3
     fork = 3
-    // profilers.add("async:output=flamegraph")
+    includes.addAll(
+        providers
+            .gradleProperty("jmh.includes")
+            .map { listOf(it) }
+            .orElse(emptyList()),
+    )
+    // profilers.add("async:output=jfr;dir=${layout.buildDirectory.get()}/jmh-profiler")
     // profilers.add("gc")
 }
