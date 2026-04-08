@@ -13,7 +13,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
-import software.amazon.smithy.java.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -218,13 +217,176 @@ final class JacksonJsonSerializer implements ShapeSerializer {
         }
     }
 
-    private final class JsonStructSerializer extends InterceptingSerializer {
+    private void writeFieldName(Schema schema) throws Exception {
+        generator.writeName(JacksonJsonSerdeProvider.resolveFieldName(fieldNameCache, fieldMapper, schema));
+    }
+
+    private final class JsonStructSerializer implements ShapeSerializer {
         @Override
-        protected ShapeSerializer before(Schema schema) {
+        public void writeBoolean(Schema schema, boolean value) {
             try {
-                generator.writeName(
-                        JacksonJsonSerdeProvider.resolveFieldName(fieldNameCache, fieldMapper, schema));
-                return JacksonJsonSerializer.this;
+                writeFieldName(schema);
+                generator.writeBoolean(value);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+        }
+
+        @Override
+        public void writeByte(Schema schema, byte value) {
+            try {
+                writeFieldName(schema);
+                generator.writeNumber(value);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+        }
+
+        @Override
+        public void writeShort(Schema schema, short value) {
+            try {
+                writeFieldName(schema);
+                generator.writeNumber(value);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+        }
+
+        @Override
+        public void writeInteger(Schema schema, int value) {
+            try {
+                writeFieldName(schema);
+                generator.writeNumber(value);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+        }
+
+        @Override
+        public void writeLong(Schema schema, long value) {
+            try {
+                writeFieldName(schema);
+                generator.writeNumber(value);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+        }
+
+        @Override
+        public void writeFloat(Schema schema, float value) {
+            try {
+                writeFieldName(schema);
+                JacksonJsonSerializer.this.writeFloat(schema, value);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+        }
+
+        @Override
+        public void writeDouble(Schema schema, double value) {
+            try {
+                writeFieldName(schema);
+                JacksonJsonSerializer.this.writeDouble(schema, value);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+        }
+
+        @Override
+        public void writeBigInteger(Schema schema, BigInteger value) {
+            try {
+                writeFieldName(schema);
+                generator.writeNumber(value);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+        }
+
+        @Override
+        public void writeBigDecimal(Schema schema, BigDecimal value) {
+            try {
+                writeFieldName(schema);
+                generator.writeNumber(value);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+        }
+
+        @Override
+        public void writeString(Schema schema, String value) {
+            try {
+                writeFieldName(schema);
+                generator.writeString(value);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+        }
+
+        @Override
+        public void writeBlob(Schema schema, ByteBuffer value) {
+            try {
+                writeFieldName(schema);
+                JacksonJsonSerializer.this.writeBlob(schema, value);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+        }
+
+        @Override
+        public void writeTimestamp(Schema schema, Instant value) {
+            try {
+                writeFieldName(schema);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+            settings.timestampResolver().resolve(schema).writeToSerializer(schema, value, JacksonJsonSerializer.this);
+        }
+
+        @Override
+        public void writeStruct(Schema schema, SerializableStruct struct) {
+            try {
+                writeFieldName(schema);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+            JacksonJsonSerializer.this.writeStruct(schema, struct);
+        }
+
+        @Override
+        public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+            try {
+                writeFieldName(schema);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+            JacksonJsonSerializer.this.writeList(schema, listState, size, consumer);
+        }
+
+        @Override
+        public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
+            try {
+                writeFieldName(schema);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+            JacksonJsonSerializer.this.writeMap(schema, mapState, size, consumer);
+        }
+
+        @Override
+        public void writeDocument(Schema schema, Document value) {
+            try {
+                writeFieldName(schema);
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+            JacksonJsonSerializer.this.writeDocument(schema, value);
+        }
+
+        @Override
+        public void writeNull(Schema schema) {
+            try {
+                writeFieldName(schema);
+                generator.writeNull();
             } catch (Exception e) {
                 throw new SerializationException(e);
             }
