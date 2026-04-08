@@ -7,9 +7,13 @@ package software.amazon.smithy.java.json.jackson;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.json.JsonFieldMapper;
 import software.amazon.smithy.java.json.JsonSerdeProvider;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -17,8 +21,10 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.ObjectReadContext;
 import tools.jackson.core.ObjectWriteContext;
 import tools.jackson.core.PrettyPrinter;
+import tools.jackson.core.SerializableString;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.core.StreamWriteFeature;
+import tools.jackson.core.io.SerializedString;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.core.util.DefaultPrettyPrinter;
 
@@ -28,6 +34,8 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
     private static final JsonFactory FACTORY;
     private static final ObjectWriteContext PRETTY_PRINT_CONTEXT;
     static final SerializedStringCache SERIALIZED_STRINGS = new SerializedStringCache();
+    private static final ConcurrentMap<JsonFieldMapper, ConcurrentMap<Schema, SerializableString>> FIELD_NAME_CACHES =
+            new ConcurrentHashMap<>();
 
     static {
         FACTORY = JsonFactory.builder()
@@ -92,5 +100,24 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
 
     private static ObjectReadContext readCtx(JsonSettings settings) {
         return ObjectReadContext.empty();
+    }
+
+    static ConcurrentMap<Schema, SerializableString> fieldNameCache(JsonFieldMapper mapper) {
+        return FIELD_NAME_CACHES.computeIfAbsent(mapper, k -> new ConcurrentHashMap<>());
+    }
+
+    static SerializableString resolveFieldName(
+            ConcurrentMap<Schema, SerializableString> cache,
+            JsonFieldMapper mapper,
+            Schema member
+    ) {
+        var result = cache.get(member);
+        if (result != null) {
+            return result;
+        }
+        var fieldName = mapper.memberToField(member);
+        var fresh = new SerializedString(fieldName);
+        var existing = cache.putIfAbsent(member, fresh);
+        return existing != null ? existing : fresh;
     }
 }
