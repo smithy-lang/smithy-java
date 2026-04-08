@@ -61,18 +61,22 @@ public sealed interface JsonFieldMapper {
      */
     final class UseJsonNameTrait implements JsonFieldMapper {
 
-        private final Map<Schema, MemberLookup> jsonNameCache = new ConcurrentHashMap<>();
+        private final ConcurrentHashMap<Schema, MemberLookup> jsonNameCache = new ConcurrentHashMap<>();
 
         @Override
         public MemberLookup fieldToMember(Schema container) {
-            return jsonNameCache.computeIfAbsent(container, c -> {
-                Map<String, Schema> map = new HashMap<>(c.members().size());
-                for (Schema m : c.members()) {
-                    var jsonName = m.getTrait(TraitKey.JSON_NAME_TRAIT);
-                    map.put(jsonName != null ? jsonName.getValue() : m.memberName(), m);
-                }
-                return map::get;
-            });
+            var cached = jsonNameCache.get(container);
+            if (cached != null) {
+                return cached;
+            }
+            Map<String, Schema> map = new HashMap<>(container.members().size());
+            for (Schema m : container.members()) {
+                var jsonName = m.getTrait(TraitKey.JSON_NAME_TRAIT);
+                map.put(jsonName != null ? jsonName.getValue() : m.memberName(), m);
+            }
+            MemberLookup lookup = map::get;
+            jsonNameCache.putIfAbsent(container, lookup);
+            return jsonNameCache.get(container);
         }
 
         @Override
