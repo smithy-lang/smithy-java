@@ -106,93 +106,82 @@ final class BytecodeEvaluator implements ConditionEvaluator {
      * <p>On cache hit (same input registers as previous call), restores the register
      * mutations from the cached BDD evaluation and skips directly to result resolution.
      * On cache miss, runs the full BDD traversal and records the outcome for next time.
+     *
+     * <p>The BDD traversal is kept inline (not extracted) to preserve JIT inlining and
+     * register allocation across the entire method.
      */
     Endpoint evaluateBdd() {
         Object[] regs = this.registers;
         int[] inputIndices = this.inputRegisterIndices;
+        Object[] inputSnapshot = this.cachedInputSnapshot;
 
-        // Check single-entry cache using reference equality
-        if (bddCacheValid && inputsMatch(regs, inputIndices, cachedInputSnapshot)) {
+        // Check single-entry cache using reference equality.
+        // On the miss fast-path, the first differing register short-circuits immediately.
+        boolean hit = bddCacheValid;
+        if (hit) {
+            for (int i = 0; i < inputIndices.length; i++) {
+                if (regs[inputIndices[i]] != inputSnapshot[i]) {
+                    hit = false;
+                    break;
+                }
+            }
+        }
+
+        int ref;
+        if (hit) {
             // Cache hit: restore register writes from cached BDD evaluation
             int[] writableIndices = this.bddWritableRegisters;
             Object[] writtenVals = this.cachedWrittenValues;
             for (int i = 0; i < writableIndices.length; i++) {
                 regs[writableIndices[i]] = writtenVals[i];
             }
-            int ref = cachedResultRef;
-            if (Bdd.isTerminal(ref)) {
-                return null;
+            ref = cachedResultRef;
+        } else {
+            // Cache miss: run full BDD traversal inline
+            ref = bytecode.getBddRootRef();
+            int[] nodes = bytecode.getBddNodes();
+            byte[] condTypes = bytecode.conditionTypes;
+            int[] condOps = bytecode.conditionOperands;
+            Object[] cpool = bytecode.getConstantPool();
+
+            while (Bdd.isNodeReference(ref)) {
+                int idx = ref > 0 ? ref - 1 : -ref - 1;
+                int base = idx * 3;
+                int condIdx = nodes[base];
+
+                boolean result = switch (condTypes[condIdx]) {
+                    case Bytecode.COND_ISSET -> regs[condOps[condIdx]] != null;
+                    case Bytecode.COND_IS_TRUE -> regs[condOps[condIdx]] == Boolean.TRUE;
+                    case Bytecode.COND_IS_FALSE -> regs[condOps[condIdx]] == Boolean.FALSE;
+                    case Bytecode.COND_NOT_SET -> regs[condOps[condIdx]] == null;
+                    case Bytecode.COND_STRING_EQ_REG_CONST -> {
+                        int packed = condOps[condIdx];
+                        String s = (String) regs[packed & 0xFF];
+                        String expected = (String) cpool[packed >>> 8];
+                        yield s != null && s.equals(expected);
+                    }
+                    default -> test(condIdx);
+                };
+
+                ref = (result ^ (ref < 0)) ? nodes[base + 1] : nodes[base + 2];
             }
-            return resolveResult(ref - Bdd.RESULT_OFFSET);
+
+            // Record cache entry
+            for (int i = 0; i < inputIndices.length; i++) {
+                inputSnapshot[i] = regs[inputIndices[i]];
+            }
+            int[] writableIndices = this.bddWritableRegisters;
+            for (int i = 0; i < writableIndices.length; i++) {
+                cachedWrittenValues[i] = regs[writableIndices[i]];
+            }
+            cachedResultRef = ref;
+            bddCacheValid = true;
         }
 
-        // Cache miss: run full BDD traversal
-        int ref = runBddTraversal(regs);
-
-        // Record cache entry
-        recordBddCache(regs, inputIndices, ref);
-
-        // Resolve result
         if (Bdd.isTerminal(ref)) {
             return null;
         }
         return resolveResult(ref - Bdd.RESULT_OFFSET);
-    }
-
-    /**
-     * Runs the BDD traversal with inline condition optimization.
-     * Returns the raw terminal reference (may be a terminal, result offset, etc.).
-     */
-    private int runBddTraversal(Object[] regs) {
-        int ref = bytecode.getBddRootRef();
-        int[] nodes = bytecode.getBddNodes();
-        byte[] condTypes = bytecode.conditionTypes;
-        int[] condOps = bytecode.conditionOperands;
-        Object[] cpool = bytecode.getConstantPool();
-
-        while (Bdd.isNodeReference(ref)) {
-            int idx = ref > 0 ? ref - 1 : -ref - 1;
-            int base = idx * 3;
-            int condIdx = nodes[base];
-
-            boolean result = switch (condTypes[condIdx]) {
-                case Bytecode.COND_ISSET -> regs[condOps[condIdx]] != null;
-                case Bytecode.COND_IS_TRUE -> regs[condOps[condIdx]] == Boolean.TRUE;
-                case Bytecode.COND_IS_FALSE -> regs[condOps[condIdx]] == Boolean.FALSE;
-                case Bytecode.COND_NOT_SET -> regs[condOps[condIdx]] == null;
-                case Bytecode.COND_STRING_EQ_REG_CONST -> {
-                    int packed = condOps[condIdx];
-                    String s = (String) regs[packed & 0xFF];
-                    String expected = (String) cpool[packed >>> 8];
-                    yield s != null && s.equals(expected);
-                }
-                default -> test(condIdx);
-            };
-
-            ref = (result ^ (ref < 0)) ? nodes[base + 1] : nodes[base + 2];
-        }
-        return ref;
-    }
-
-    private static boolean inputsMatch(Object[] regs, int[] indices, Object[] snapshot) {
-        for (int i = 0; i < indices.length; i++) {
-            if (regs[indices[i]] != snapshot[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private void recordBddCache(Object[] regs, int[] inputIndices, int ref) {
-        for (int i = 0; i < inputIndices.length; i++) {
-            cachedInputSnapshot[i] = regs[inputIndices[i]];
-        }
-        int[] writableIndices = this.bddWritableRegisters;
-        for (int i = 0; i < writableIndices.length; i++) {
-            cachedWrittenValues[i] = regs[writableIndices[i]];
-        }
-        cachedResultRef = ref;
-        bddCacheValid = true;
     }
 
     public Endpoint resolveResult(int resultIndex) {
