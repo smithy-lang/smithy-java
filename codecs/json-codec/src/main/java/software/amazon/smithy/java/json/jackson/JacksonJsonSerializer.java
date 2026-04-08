@@ -29,6 +29,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     private final JsonSettings settings;
     private SerializeDocumentContents serializeDocumentContents;
     private final ShapeSerializer structSerializer = new JsonStructSerializer();
+    private final MapSerializer mapSerializer = new JsonMapSerializer();
 
     JacksonJsonSerializer(
             JsonGenerator generator,
@@ -238,7 +239,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
         try {
             generator.writeStartObject();
-            consumer.accept(mapState, new JsonMapSerializer());
+            consumer.accept(mapState, mapSerializer);
             generator.writeEndObject();
         } catch (Exception e) {
             throw new SerializationException(e);
