@@ -50,9 +50,8 @@ final class BytecodeEvaluator implements ConditionEvaluator {
     // skip the entire BDD evaluation and condition dispatch.
     private final int[] inputRegisterIndices;
     private final int[] bddWritableRegisters;
-    private final int[] cachedInputSnapshot;
+    private final Object[] cachedInputSnapshot;
     private final Object[] cachedWrittenValues;
-    private int cachedInputHash;
     private int cachedResultRef;
     private boolean bddCacheValid;
 
@@ -64,7 +63,7 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         this.registerSink = new ContextProvider.RegisterSink(registers.length, bytecode.getInputRegisterMap());
         this.inputRegisterIndices = bytecode.getInputRegisterIndices();
         this.bddWritableRegisters = bytecode.getBddWritableRegisters();
-        this.cachedInputSnapshot = new int[inputRegisterIndices.length];
+        this.cachedInputSnapshot = new Object[inputRegisterIndices.length];
         this.cachedWrittenValues = new Object[bddWritableRegisters.length];
     }
 
@@ -112,11 +111,8 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         Object[] regs = this.registers;
         int[] inputIndices = this.inputRegisterIndices;
 
-        // Compute identity-based hash of input registers
-        int hash = computeInputHash(regs, inputIndices);
-
-        // Check single-entry cache
-        if (bddCacheValid && hash == cachedInputHash && inputsMatch(regs, inputIndices, cachedInputSnapshot)) {
+        // Check single-entry cache using reference equality
+        if (bddCacheValid && inputsMatch(regs, inputIndices, cachedInputSnapshot)) {
             // Cache hit: restore register writes from cached BDD evaluation
             int[] writableIndices = this.bddWritableRegisters;
             Object[] writtenVals = this.cachedWrittenValues;
@@ -134,7 +130,7 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         int ref = runBddTraversal(regs);
 
         // Record cache entry
-        recordBddCache(regs, inputIndices, hash, ref);
+        recordBddCache(regs, inputIndices, ref);
 
         // Resolve result
         if (Bdd.isTerminal(ref)) {
@@ -178,36 +174,23 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         return ref;
     }
 
-    private static int computeInputHash(Object[] regs, int[] indices) {
-        int h = 1;
-        for (int idx : indices) {
-            Object v = regs[idx];
-            h = 31 * h + (v == null ? 0 : System.identityHashCode(v));
-        }
-        return h;
-    }
-
-    private static boolean inputsMatch(Object[] regs, int[] indices, int[] snapshot) {
+    private static boolean inputsMatch(Object[] regs, int[] indices, Object[] snapshot) {
         for (int i = 0; i < indices.length; i++) {
-            Object v = regs[indices[i]];
-            int current = v == null ? 0 : System.identityHashCode(v);
-            if (current != snapshot[i]) {
+            if (regs[indices[i]] != snapshot[i]) {
                 return false;
             }
         }
         return true;
     }
 
-    private void recordBddCache(Object[] regs, int[] inputIndices, int hash, int ref) {
+    private void recordBddCache(Object[] regs, int[] inputIndices, int ref) {
         for (int i = 0; i < inputIndices.length; i++) {
-            Object v = regs[inputIndices[i]];
-            cachedInputSnapshot[i] = v == null ? 0 : System.identityHashCode(v);
+            cachedInputSnapshot[i] = regs[inputIndices[i]];
         }
         int[] writableIndices = this.bddWritableRegisters;
         for (int i = 0; i < writableIndices.length; i++) {
             cachedWrittenValues[i] = regs[writableIndices[i]];
         }
-        cachedInputHash = hash;
         cachedResultRef = ref;
         bddCacheValid = true;
     }
