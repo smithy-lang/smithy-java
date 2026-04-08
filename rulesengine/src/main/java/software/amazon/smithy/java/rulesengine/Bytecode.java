@@ -189,6 +189,10 @@ public final class Bytecode {
     final byte[] conditionTypes;
     final int[] conditionOperands;
 
+    // BDD path memoization support
+    private final int[] inputRegisterIndices;
+    private final int[] bddWritableRegisters;
+
     private Bdd bdd;
 
     Bytecode(
@@ -246,6 +250,10 @@ public final class Bytecode {
         this.conditionTypes = new byte[conditionOffsets.length];
         this.conditionOperands = new int[conditionOffsets.length];
         classifyConditions();
+
+        // Precompute arrays for BDD path memoization
+        this.inputRegisterIndices = createInputRegisterIndices(registerDefinitions);
+        this.bddWritableRegisters = findBddWritableRegisters();
     }
 
     private void classifyConditions() {
@@ -546,6 +554,65 @@ public final class Bytecode {
             }
         }
         return indices.stream().mapToInt(Integer::intValue).toArray();
+    }
+
+    private static int[] createInputRegisterIndices(RegisterDefinition[] definitions) {
+        int count = 0;
+        for (RegisterDefinition def : definitions) {
+            if (!def.temp()) {
+                count++;
+            }
+        }
+        int[] indices = new int[count];
+        int j = 0;
+        for (int i = 0; i < definitions.length; i++) {
+            if (!definitions[i].temp()) {
+                indices[j++] = i;
+            }
+        }
+        return indices;
+    }
+
+    private int[] findBddWritableRegisters() {
+        boolean[] written = new boolean[registerDefinitions.length];
+        for (int condOffset : conditionOffsets) {
+            BytecodeWalker walker = new BytecodeWalker(bytecode, condOffset);
+            while (walker.hasNext()) {
+                byte opcode = walker.currentOpcode();
+                if (opcode == Opcodes.SET_REG_RETURN) {
+                    written[walker.getOperand(0)] = true;
+                    break;
+                }
+                if (walker.isReturnOpcode()) {
+                    break;
+                }
+                if (!walker.advance()) {
+                    break;
+                }
+            }
+        }
+        int count = 0;
+        for (boolean b : written) {
+            if (b) {
+                count++;
+            }
+        }
+        int[] result = new int[count];
+        int j = 0;
+        for (int i = 0; i < written.length; i++) {
+            if (written[i]) {
+                result[j++] = i;
+            }
+        }
+        return result;
+    }
+
+    int[] getInputRegisterIndices() {
+        return inputRegisterIndices;
+    }
+
+    int[] getBddWritableRegisters() {
+        return bddWritableRegisters;
     }
 
     @Override
