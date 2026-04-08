@@ -143,6 +143,8 @@ final class BytecodeEvaluator implements ConditionEvaluator {
             byte[] condTypes = bytecode.conditionTypes;
             int[] condOps = bytecode.conditionOperands;
             Object[] cpool = bytecode.getConstantPool();
+            RulesFunction[] functions = bytecode.getFunctions();
+            UriFactory uriFactory = this.uriFactory;
 
             while (Bdd.isNodeReference(ref)) {
                 int idx = ref > 0 ? ref - 1 : -ref - 1;
@@ -159,6 +161,34 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                         String s = (String) regs[packed & 0xFF];
                         String expected = (String) cpool[packed >>> 8];
                         yield s != null && s.equals(expected);
+                    }
+                    case Bytecode.COND_FN1_REG_SET_REG -> {
+                        int packed = condOps[condIdx];
+                        Object r = functions[(packed >>> 8) & 0xFF].apply1(regs[packed & 0xFF]);
+                        regs[(packed >>> 16) & 0xFF] = r;
+                        yield r != null && r != Boolean.FALSE;
+                    }
+                    case Bytecode.COND_FN2_REG_REG_SET_REG -> {
+                        int packed = condOps[condIdx];
+                        Object r = functions[(packed >>> 16) & 0xFF]
+                                .apply2(regs[packed & 0xFF], regs[(packed >>> 8) & 0xFF]);
+                        regs[(packed >>> 24) & 0xFF] = r;
+                        yield r != null && r != Boolean.FALSE;
+                    }
+                    case Bytecode.COND_PARSE_URL_SET_REG -> {
+                        int packed = condOps[condIdx];
+                        String url = (String) regs[packed & 0xFF];
+                        Object r = url == null ? null : uriFactory.createUri(url);
+                        regs[(packed >>> 8) & 0xFF] = r;
+                        yield r != null;
+                    }
+                    case Bytecode.COND_GET_PROP_REG_SET_REG -> {
+                        int packed = condOps[condIdx];
+                        Object r = EndpointUtils.getProperty(
+                                regs[packed & 0xFF],
+                                (String) cpool[(packed >>> 8) & 0xFFFF]);
+                        regs[(packed >>> 24) & 0xFF] = r;
+                        yield r != null && r != Boolean.FALSE;
                     }
                     default -> test(condIdx);
                 };

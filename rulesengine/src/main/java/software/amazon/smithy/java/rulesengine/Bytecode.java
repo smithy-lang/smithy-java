@@ -179,11 +179,17 @@ public final class Bytecode {
     private final Map<String, Integer> inputRegisterMap;
 
     // Inline condition types for fast BDD evaluation.
+    // Types 1-5: pure conditions (no side effects, end with RETURN_VALUE)
     static final byte COND_ISSET = 1;
     static final byte COND_IS_TRUE = 2;
     static final byte COND_IS_FALSE = 3;
     static final byte COND_NOT_SET = 4;
     static final byte COND_STRING_EQ_REG_CONST = 5;
+    // Types 6-9: conditions with side effects (write register, end with SET_REG_RETURN)
+    static final byte COND_FN1_REG_SET_REG = 6;
+    static final byte COND_FN2_REG_REG_SET_REG = 7;
+    static final byte COND_PARSE_URL_SET_REG = 8;
+    static final byte COND_GET_PROP_REG_SET_REG = 9;
 
     // Condition classification arrays for inline BDD evaluation
     final byte[] conditionTypes;
@@ -307,7 +313,65 @@ public final class Bytecode {
                 if (next == (Opcodes.RETURN_VALUE & 0xFF)) {
                     conditionTypes[i] = COND_STRING_EQ_REG_CONST;
                     conditionOperands[i] = (constIdx << 8) | reg;
+                    continue;
                 }
+            }
+
+            // --- SET_REG_RETURN patterns: conditions that call functions and bind results ---
+
+            int setRegReturn = Opcodes.SET_REG_RETURN & 0xFF;
+            int loadReg = Opcodes.LOAD_REGISTER & 0xFF;
+
+            // LOAD_REGISTER [src] FN1 [fn] SET_REG_RETURN [dest] (6 bytes)
+            if (offset + 5 < len
+                    && (bytecode[offset] & 0xFF) == loadReg
+                    && (bytecode[offset + 2] & 0xFF) == (Opcodes.FN1 & 0xFF)
+                    && (bytecode[offset + 4] & 0xFF) == setRegReturn) {
+                int srcReg = bytecode[offset + 1] & 0xFF;
+                int fnIdx = bytecode[offset + 3] & 0xFF;
+                int destReg = bytecode[offset + 5] & 0xFF;
+                conditionTypes[i] = COND_FN1_REG_SET_REG;
+                conditionOperands[i] = (destReg << 16) | (fnIdx << 8) | srcReg;
+                continue;
+            }
+
+            // LOAD_REGISTER [a1] LOAD_REGISTER [a2] FN2 [fn] SET_REG_RETURN [dest] (8 bytes)
+            if (offset + 7 < len
+                    && (bytecode[offset] & 0xFF) == loadReg
+                    && (bytecode[offset + 2] & 0xFF) == loadReg
+                    && (bytecode[offset + 4] & 0xFF) == (Opcodes.FN2 & 0xFF)
+                    && (bytecode[offset + 6] & 0xFF) == setRegReturn) {
+                int arg1Reg = bytecode[offset + 1] & 0xFF;
+                int arg2Reg = bytecode[offset + 3] & 0xFF;
+                int fnIdx = bytecode[offset + 5] & 0xFF;
+                int destReg = bytecode[offset + 7] & 0xFF;
+                conditionTypes[i] = COND_FN2_REG_REG_SET_REG;
+                conditionOperands[i] = (destReg << 24) | (fnIdx << 16) | (arg2Reg << 8) | arg1Reg;
+                continue;
+            }
+
+            // LOAD_REGISTER [src] PARSE_URL SET_REG_RETURN [dest] (5 bytes)
+            if (offset + 4 < len
+                    && (bytecode[offset] & 0xFF) == loadReg
+                    && (bytecode[offset + 2] & 0xFF) == (Opcodes.PARSE_URL & 0xFF)
+                    && (bytecode[offset + 3] & 0xFF) == setRegReturn) {
+                int srcReg = bytecode[offset + 1] & 0xFF;
+                int destReg = bytecode[offset + 4] & 0xFF;
+                conditionTypes[i] = COND_PARSE_URL_SET_REG;
+                conditionOperands[i] = (destReg << 8) | srcReg;
+                continue;
+            }
+
+            // GET_PROPERTY_REG [src] [propIdx:2] SET_REG_RETURN [dest] (6 bytes)
+            if (offset + 5 < len
+                    && (bytecode[offset] & 0xFF) == (Opcodes.GET_PROPERTY_REG & 0xFF)
+                    && (bytecode[offset + 4] & 0xFF) == setRegReturn) {
+                int srcReg = bytecode[offset + 1] & 0xFF;
+                int propIdx = ((bytecode[offset + 2] & 0xFF) << 8) | (bytecode[offset + 3] & 0xFF);
+                int destReg = bytecode[offset + 5] & 0xFF;
+                conditionTypes[i] = COND_GET_PROP_REG_SET_REG;
+                conditionOperands[i] = (destReg << 24) | (propIdx << 8) | srcReg;
+                continue;
             }
         }
     }
