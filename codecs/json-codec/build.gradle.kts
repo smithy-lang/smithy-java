@@ -81,7 +81,7 @@ tasks.named("processJmhResources") {
 jmh {
     warmupIterations = 3
     iterations = 3
-    fork = 3
+    fork = 1
     includes.addAll(
         providers
             .gradleProperty("jmh.includes")

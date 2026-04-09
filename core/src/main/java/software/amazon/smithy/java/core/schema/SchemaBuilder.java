@@ -170,6 +170,7 @@ public final class SchemaBuilder {
                     builderSupplier,
                     this,
                     shapeClass);
+            // DeferredRootSchema: extensions initialized in resolveInternal() when members exist.
         } else {
             builtShape = new RootSchema(
                     type,

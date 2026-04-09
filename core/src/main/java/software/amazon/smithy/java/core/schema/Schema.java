@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -67,6 +68,9 @@ public abstract sealed class Schema implements MemberLookup
     private Schema listMember;
     private Schema mapKeyMember;
     private Schema mapValueMember;
+
+    private static final Object[] EMPTY_EXTENSIONS = new Object[0];
+    private Object[] extensions = EMPTY_EXTENSIONS;
 
     final Supplier<ShapeBuilder<?>> shapeBuilder;
 
@@ -443,6 +447,56 @@ public abstract sealed class Schema implements MemberLookup
      */
     public <T extends Trait> T getDirectTrait(TraitKey<T> trait) {
         return getTrait(trait);
+    }
+
+    /**
+     * Get extension data stored on this schema by a {@link SchemaExtensionInitializer}.
+     *
+     * @param key The extension key.
+     * @param <T> Extension data type.
+     * @return The extension data, or null if not set.
+     */
+    @SuppressWarnings("unchecked")
+    public final <T> T getExtension(SchemaExtensionKey<T> key) {
+        var ext = extensions;
+        return key.id < ext.length ? (T) ext[key.id] : null;
+    }
+
+    /**
+     * Initialize extensions on this schema by running all registered {@link SchemaExtensionInitializer} providers.
+     * This method must be called exactly once per schema during construction.
+     */
+    final void initExtensions() {
+        var providers = ExtensionInitializerHolder.INITIALIZERS;
+        if (!providers.isEmpty()) {
+            if (extensions != EMPTY_EXTENSIONS) {
+                throw new IllegalStateException("Schema extensions already initialized for " + id);
+            }
+            extensions = new Object[SchemaExtensionKey.count()];
+            for (var provider : providers) {
+                var value = provider.provide(this);
+                if (value != null) {
+                    extensions[provider.key().id] = value;
+                }
+            }
+        }
+    }
+
+    /**
+     * Copy extensions from another schema. Used by {@link ResolvedRootSchema} to inherit
+     * extensions from its {@link DeferredRootSchema}.
+     */
+    final void copyExtensionsFrom(Schema source) {
+        this.extensions = source.extensions;
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class ExtensionInitializerHolder {
+        static final List<SchemaExtensionProvider> INITIALIZERS = ServiceLoader
+                .load(SchemaExtensionProvider.class, SchemaExtensionProvider.class.getClassLoader())
+                .stream()
+                .map(ServiceLoader.Provider::get)
+                .toList();
     }
 
     /**
