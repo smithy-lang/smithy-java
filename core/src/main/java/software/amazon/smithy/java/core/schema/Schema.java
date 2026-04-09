@@ -450,7 +450,7 @@ public abstract sealed class Schema implements MemberLookup
     }
 
     /**
-     * Get extension data stored on this schema by a {@link SchemaExtensionInitializer}.
+     * Get extension data stored on this schema by a {@link SchemaExtensionProvider}.
      *
      * @param key The extension key.
      * @param <T> Extension data type.
@@ -463,14 +463,17 @@ public abstract sealed class Schema implements MemberLookup
     }
 
     /**
-     * Initialize extensions on this schema by running all registered {@link SchemaExtensionInitializer} providers.
-     * This method must be called exactly once per schema during construction.
+     * Initialize extensions on this schema by running all registered {@link SchemaExtensionProvider} providers.
+     *
+     * <p>Idempotent: returns immediately if already initialized. This is necessary because
+     * {@link DeferredRootSchema} uses a benign-race lazy init pattern where two threads may
+     * both call this method; both produce the same deterministic result.
      */
     final void initExtensions() {
         var providers = ExtensionInitializerHolder.INITIALIZERS;
         if (!providers.isEmpty()) {
             if (extensions != EMPTY_EXTENSIONS) {
-                throw new IllegalStateException("Schema extensions already initialized for " + id);
+                return;
             }
             extensions = new Object[SchemaExtensionKey.count()];
             for (var provider : providers) {
