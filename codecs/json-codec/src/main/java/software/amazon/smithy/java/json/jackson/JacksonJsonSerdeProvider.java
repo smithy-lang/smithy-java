@@ -20,6 +20,7 @@ import tools.jackson.core.PrettyPrinter;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.core.util.DefaultPrettyPrinter;
+import tools.jackson.core.util.JsonRecyclerPools;
 
 @SmithyInternalApi
 public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
@@ -29,6 +30,7 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
 
     static {
         FACTORY = JsonFactory.builder()
+                .recyclerPool(JsonRecyclerPools.sharedBoundedPool())
                 .enable(StreamWriteFeature.USE_FAST_DOUBLE_WRITER)
                 .enable(StreamReadFeature.USE_FAST_DOUBLE_PARSER)
                 .enable(StreamReadFeature.USE_FAST_BIG_NUMBER_PARSER)
