@@ -9,7 +9,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.concurrent.ConcurrentMap;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -20,17 +19,16 @@ import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonFieldMapper;
+import software.amazon.smithy.java.json.JsonSchemaExtensions;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.model.shapes.ShapeType;
 import tools.jackson.core.JsonGenerator;
-import tools.jackson.core.SerializableString;
 
 final class JacksonJsonSerializer implements ShapeSerializer {
 
     private JsonGenerator generator;
     private final JsonSettings settings;
-    private final JsonFieldMapper fieldMapper;
-    private final ConcurrentMap<Schema, SerializableString> fieldNameCache;
+    private final boolean useJsonName;
     private SerializeDocumentContents serializeDocumentContents;
     private final ShapeSerializer structSerializer = new JsonStructSerializer();
     private final MapSerializer mapSerializer = new JsonMapSerializer();
@@ -41,8 +39,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     ) {
         this.generator = generator;
         this.settings = settings;
-        this.fieldMapper = settings.fieldMapper();
-        this.fieldNameCache = JacksonJsonSerdeProvider.fieldNameCache(this.fieldMapper);
+        this.useJsonName = settings.fieldMapper() instanceof JsonFieldMapper.UseJsonNameTrait;
     }
 
     @Override
@@ -218,7 +215,8 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     }
 
     private void writeFieldName(Schema schema) throws Exception {
-        generator.writeName(JacksonJsonSerdeProvider.resolveFieldName(fieldNameCache, fieldMapper, schema));
+        var ext = schema.getExtension(JsonSchemaExtensions.KEY);
+        generator.writeName(useJsonName ? ext.jsonFieldName() : ext.memberFieldName());
     }
 
     private final class JsonStructSerializer implements ShapeSerializer {

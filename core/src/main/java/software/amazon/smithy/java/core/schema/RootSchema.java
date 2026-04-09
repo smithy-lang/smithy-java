@@ -73,6 +73,7 @@ final class RootSchema extends Schema {
                     memberList,
                     Schema::requiredByValidationBitmask);
         }
+        initExtensions();
     }
 
     RootSchema(
