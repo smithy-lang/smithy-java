@@ -69,11 +69,16 @@ final class DeferredRootSchema extends Schema {
                     requiredMemberCount,
                     memberBuilders,
                     m -> m.requiredByValidationBitmask);
+
+            // Member extensions already initialized in MemberSchemaBuilder.build() above.
             this.resolvedMembers = new ResolvedMembers(SchemaBuilder.createMembers(memberList),
                     memberList,
                     requiredMemberCount,
                     requiredStructureMemberBitfield);
 
+            // Initialize extensions on root schema after volatile write so that
+            // schema.members() doesn't re-enter resolveInternal().
+            initExtensions();
         }
     }
 

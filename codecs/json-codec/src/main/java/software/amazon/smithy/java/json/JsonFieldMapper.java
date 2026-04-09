@@ -5,9 +5,6 @@
 
 package software.amazon.smithy.java.json;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.smithy.java.core.schema.MemberLookup;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -61,22 +58,11 @@ public sealed interface JsonFieldMapper {
      */
     final class UseJsonNameTrait implements JsonFieldMapper {
 
-        private final ConcurrentHashMap<Schema, MemberLookup> jsonNameCache = new ConcurrentHashMap<>();
-
         @Override
         public MemberLookup fieldToMember(Schema container) {
-            var cached = jsonNameCache.get(container);
-            if (cached != null) {
-                return cached;
-            }
-            Map<String, Schema> map = new HashMap<>(container.members().size());
-            for (Schema m : container.members()) {
-                var jsonName = m.getTrait(TraitKey.JSON_NAME_TRAIT);
-                map.put(jsonName != null ? jsonName.getValue() : m.memberName(), m);
-            }
-            MemberLookup lookup = map::get;
-            jsonNameCache.putIfAbsent(container, lookup);
-            return jsonNameCache.get(container);
+            // container may be a member schema (via assertMemberTargetIs) — resolve to target
+            var schema = container.isMember() ? container.memberTarget() : container;
+            return schema.getExtension(JsonSchemaExtensions.KEY).jsonMemberLookup();
         }
 
         @Override

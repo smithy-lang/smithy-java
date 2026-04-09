@@ -34,7 +34,7 @@ final class ResolvedRootSchema extends Schema {
         this.requiredStructureMemberBitfield = resolvedMembers.requiredStructureMemberBitfield();
         this.members = resolvedMembers.members();
         this.intEnumValues = deferredRootSchema.intEnumValues;
-
+        copyExtensionsFrom(deferredRootSchema);
     }
 
     @Override
