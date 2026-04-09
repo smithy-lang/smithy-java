@@ -31,7 +31,6 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
     static {
         FACTORY = JsonFactory.builder()
                 .recyclerPool(JsonRecyclerPools.sharedBoundedPool())
-                .enable(StreamWriteFeature.USE_FAST_DOUBLE_WRITER)
                 .enable(StreamReadFeature.USE_FAST_DOUBLE_PARSER)
                 .enable(StreamReadFeature.USE_FAST_BIG_NUMBER_PARSER)
                 .build();
