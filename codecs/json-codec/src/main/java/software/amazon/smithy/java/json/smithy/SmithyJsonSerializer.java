@@ -50,8 +50,9 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     // for all member writes — avoids per-field VarHandle acquire reads.
     private byte[][] currentFieldNameTable;
 
-    // Inner serializers
+    // Inner serializers — cached (single instance per serializer)
     private final ShapeSerializer structSerializer = new StructSerializer();
+    private final ShapeSerializer listElementSerializer = new ListElementSerializer();
     private final MapSerializer mapSerializer = new SmithyMapSerializer();
     private SerializeDocumentContents serializeDocumentContents;
 
@@ -222,6 +223,9 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         ensureCapacity(2);
         buf[pos++] = '{';
         depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
         needsComma[depth] = false;
 
         // Resolve field name table ONCE per struct (single VarHandle acquire read),
@@ -239,6 +243,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
 
         currentFieldNameTable = savedTable; // restore for nested struct returns
         depth--;
+        ensureCapacity(1);
         buf[pos++] = '}';
     }
 
@@ -247,9 +252,13 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         ensureCapacity(2);
         buf[pos++] = '[';
         depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
         needsComma[depth] = false;
-        consumer.accept(listState, this.new ListElementSerializer());
+        consumer.accept(listState, listElementSerializer);
         depth--;
+        ensureCapacity(1);
         buf[pos++] = ']';
     }
 
@@ -258,9 +267,13 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         ensureCapacity(2);
         buf[pos++] = '{';
         depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
         needsComma[depth] = false;
         consumer.accept(mapState, mapSerializer);
         depth--;
+        ensureCapacity(1);
         buf[pos++] = '}';
     }
 
