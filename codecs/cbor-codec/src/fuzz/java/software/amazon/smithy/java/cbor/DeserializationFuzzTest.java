@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.cbor;
 
+import java.util.List;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.fuzz.CodecDeserializationFuzzTestBase;
 
@@ -16,8 +17,8 @@ class DeserializationFuzzTest {
     static class DefaultTest extends CodecDeserializationFuzzTestBase {
 
         @Override
-        protected Codec codecToFuzz() {
-            return Rpcv2CborCodec.builder().build();
+        protected List<Codec> codecsToFuzz() {
+            return List.of(Rpcv2CborCodec.builder().build());
         }
     }
 
