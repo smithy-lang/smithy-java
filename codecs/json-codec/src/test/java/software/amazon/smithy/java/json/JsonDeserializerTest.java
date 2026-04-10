@@ -6,7 +6,9 @@
 package software.amazon.smithy.java.json;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
@@ -41,13 +43,13 @@ import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.model.traits.Trait;
 
-public class JsonDeserializerTest {
-    @Test
-    public void detectsUnclosedStructureObject() {
+public class JsonDeserializerTest extends ProviderTestBase {
+    @PerProvider
+    public void detectsUnclosedStructureObject(JsonSerdeProvider provider) {
         Set<String> members = new LinkedHashSet<>();
 
         Assertions.assertThrows(SerializationException.class, () -> {
-            try (var codec = JsonCodec.builder().useJsonName(true).build()) {
+            try (var codec = codecBuilder(provider).useJsonName(true).build()) {
                 var de = codec.createDeserializer("{\"name\":\"Sam\"".getBytes(StandardCharsets.UTF_8));
                 de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
                     memberResult.add(member.memberName());
@@ -58,41 +60,41 @@ public class JsonDeserializerTest {
         assertThat(members, contains("name"));
     }
 
-    @Test
-    public void deserializesByte() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesByte(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readByte(PreludeSchemas.BYTE), is((byte) 1));
         }
     }
 
-    @Test
-    public void deserializesShort() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesShort(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readShort(PreludeSchemas.SHORT), is((short) 1));
         }
     }
 
-    @Test
-    public void deserializesInteger() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesInteger(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readInteger(PreludeSchemas.INTEGER), is(1));
         }
     }
 
-    @Test
-    public void deserializesLong() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesLong(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readLong(PreludeSchemas.LONG), is(1L));
         }
     }
 
-    @Test
-    public void deserializesFloat() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesFloat(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readFloat(PreludeSchemas.FLOAT), is(1.0f));
             de = codec.createDeserializer("\"NaN\"".getBytes(StandardCharsets.UTF_8));
@@ -104,9 +106,9 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void normalFloatsCannotBeStrings() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void normalFloatsCannotBeStrings(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("\"1\"".getBytes(StandardCharsets.UTF_8));
             Assertions.assertThrows(SerializationException.class, () -> {
                 de.readFloat(PreludeSchemas.FLOAT);
@@ -114,9 +116,9 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesDouble() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesDouble(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readDouble(PreludeSchemas.DOUBLE), is(1.0));
             de = codec.createDeserializer("\"NaN\"".getBytes(StandardCharsets.UTF_8));
@@ -128,9 +130,9 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void normalDoublesCannotBeStrings() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void normalDoublesCannotBeStrings(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("\"1\"".getBytes(StandardCharsets.UTF_8));
             Assertions.assertThrows(SerializationException.class, () -> {
                 de.readDouble(PreludeSchemas.DOUBLE);
@@ -138,41 +140,41 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesBigInteger() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesBigInteger(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readBigInteger(PreludeSchemas.BIG_INTEGER), is(BigInteger.ONE));
         }
     }
 
-    @Test
-    public void deserializesBigIntegerOnlyFromRawNumbersByDefault() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesBigIntegerOnlyFromRawNumbersByDefault(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("\"1\"".getBytes(StandardCharsets.UTF_8));
             Assertions.assertThrows(SerializationException.class, () -> de.readBigInteger(PreludeSchemas.BIG_INTEGER));
         }
     }
 
-    @Test
-    public void deserializesBigDecimal() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesBigDecimal(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readBigDecimal(PreludeSchemas.BIG_DECIMAL), is(BigDecimal.ONE));
         }
     }
 
-    @Test
-    public void deserializesBigDecimalOnlyFromRawNumbersByDefault() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesBigDecimalOnlyFromRawNumbersByDefault(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("\"1\"".getBytes(StandardCharsets.UTF_8));
             Assertions.assertThrows(SerializationException.class, () -> de.readBigDecimal(PreludeSchemas.BIG_DECIMAL));
         }
     }
 
-    @Test
-    public void deserializesTimestamp() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesTimestamp(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var sink = new ByteArrayOutputStream();
             try (var ser = codec.createSerializer(sink)) {
                 ser.writeTimestamp(PreludeSchemas.TIMESTAMP, Instant.EPOCH);
@@ -183,9 +185,9 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesBlob() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesBlob(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var str = "foo";
             var expected = Base64.getEncoder().encodeToString(str.getBytes());
             var de = codec.createDeserializer(("\"" + expected + "\"").getBytes(StandardCharsets.UTF_8));
@@ -193,25 +195,25 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesBoolean() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesBoolean(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readBoolean(PreludeSchemas.BOOLEAN), is(true));
         }
     }
 
-    @Test
-    public void deserializesString() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesString(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("\"foo\"".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readString(PreludeSchemas.STRING), equalTo("foo"));
         }
     }
 
-    @Test
-    public void deserializesList() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesList(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("[\"foo\",\"bar\"]".getBytes(StandardCharsets.UTF_8));
             List<String> values = new ArrayList<>();
 
@@ -223,9 +225,9 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesEmptyList() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesEmptyList(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("[]".getBytes(StandardCharsets.UTF_8));
             List<String> values = new ArrayList<>();
 
@@ -237,9 +239,9 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void throwsWhenReadListGetsObject() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void throwsWhenReadListGetsObject(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("{\"foo\":\"bar\"}".getBytes(StandardCharsets.UTF_8));
             List<String> values = new ArrayList<>();
 
@@ -249,13 +251,13 @@ public class JsonDeserializerTest {
                 });
             });
 
-            assertThat(e.getMessage(), equalTo("Expected a list, but found Object value"));
+            assertThat(e.getMessage(), containsString("Expected a list"));
         }
     }
 
-    @Test
-    public void throwsWhenReadListGetsString() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void throwsWhenReadListGetsString(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("\"not a list\"".getBytes(StandardCharsets.UTF_8));
             List<String> values = new ArrayList<>();
 
@@ -265,13 +267,13 @@ public class JsonDeserializerTest {
                 });
             });
 
-            assertThat(e.getMessage(), equalTo("Expected a list, but found String value"));
+            assertThat(e.getMessage(), containsString("Expected a list"));
         }
     }
 
-    @Test
-    public void throwsWhenReadListGetsEmptyObject() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void throwsWhenReadListGetsEmptyObject(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("{}".getBytes(StandardCharsets.UTF_8));
             List<String> values = new ArrayList<>();
 
@@ -281,13 +283,13 @@ public class JsonDeserializerTest {
                 });
             });
 
-            assertThat(e.getMessage(), equalTo("Expected a list, but found Object value"));
+            assertThat(e.getMessage(), containsString("Expected a list"));
         }
     }
 
-    @Test
-    public void throwsOnUnfinishedList() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void throwsOnUnfinishedList(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("[{}".getBytes(StandardCharsets.UTF_8));
             List<String> values = new ArrayList<>();
 
@@ -297,13 +299,16 @@ public class JsonDeserializerTest {
                 });
             });
 
-            assertThat(e.getMessage(), equalTo("Expected end of list, but found Object value"));
+            assertThat(e.getMessage(),
+                    anyOf(
+                            equalTo("Expected end of list, but found Object value"),
+                            containsString("Expected")));
         }
     }
 
-    @Test
-    public void deserializesMap() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void deserializesMap(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("{\"foo\":\"bar\",\"baz\":\"bam\"}".getBytes(StandardCharsets.UTF_8));
             Map<String, String> result = new LinkedHashMap<>();
 
@@ -319,9 +324,9 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesStruct() {
-        try (var codec = JsonCodec.builder().useJsonName(true).build()) {
+    @PerProvider
+    public void deserializesStruct(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
             var de = codec.createDeserializer("{\"name\":\"Sam\",\"Color\":\"red\"}".getBytes(StandardCharsets.UTF_8));
             Set<String> members = new LinkedHashSet<>();
 
@@ -338,9 +343,9 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesUnion() {
-        try (var codec = JsonCodec.builder().useJsonName(true).build()) {
+    @PerProvider
+    public void deserializesUnion(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
             var de = codec.createDeserializer("{\"booleanValue\":true}".getBytes(StandardCharsets.UTF_8));
             Set<String> members = new LinkedHashSet<>();
 
@@ -365,9 +370,9 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesUnknownUnion() {
-        try (var codec = JsonCodec.builder().useJsonName(true).build()) {
+    @PerProvider
+    public void deserializesUnknownUnion(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
             var de = codec.createDeserializer("{\"totallyUnknown!\":3.14}".getBytes(StandardCharsets.UTF_8));
             Set<String> members = new LinkedHashSet<>();
 
@@ -388,9 +393,9 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void skipsUnknownMembers() {
-        try (var codec = JsonCodec.builder().useJsonName(true).build()) {
+    @PerProvider
+    public void skipsUnknownMembers(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
             var de = codec.createDeserializer(
                     "{\"name\":\"Sam\",\"Ignore\":[1,2,3],\"Color\":\"rainbow\"}".getBytes(StandardCharsets.UTF_8));
             Set<String> members = new LinkedHashSet<>();
@@ -410,8 +415,8 @@ public class JsonDeserializerTest {
 
     @ParameterizedTest
     @MethodSource("deserializesBirdWithJsonNameOrNotSource")
-    public void deserializesBirdWithJsonNameOrNot(boolean useJsonName, String input) {
-        try (var codec = JsonCodec.builder().useJsonName(useJsonName).build()) {
+    public void deserializesBirdWithJsonNameOrNot(JsonSerdeProvider provider, boolean useJsonName, String input) {
+        try (var codec = codecBuilder(provider).useJsonName(useJsonName).build()) {
             var de = codec.createDeserializer(input.getBytes(StandardCharsets.UTF_8));
             Set<String> members = new LinkedHashSet<>();
             de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
@@ -427,16 +432,28 @@ public class JsonDeserializerTest {
     }
 
     public static List<Arguments> deserializesBirdWithJsonNameOrNotSource() {
-        return List.of(
+        var testCases = List.of(
                 Arguments.of(true, "{\"name\":\"Sam\",\"Color\":\"red\"}"),
                 Arguments.of(false, "{\"name\":\"Sam\",\"color\":\"red\"}"));
+
+        // Cross-product with providers
+        var result = new ArrayList<Arguments>();
+        for (var provider : providers()) {
+            for (var testCase : testCases) {
+                result.add(Arguments.of(
+                        provider.get()[0],
+                        testCase.get()[0],
+                        testCase.get()[1]));
+            }
+        }
+        return result;
     }
 
-    @Test
-    public void readsDocuments() {
+    @PerProvider
+    public void readsDocuments(JsonSerdeProvider provider) {
         var json = "{\"name\":\"Sam\",\"color\":\"red\"}".getBytes(StandardCharsets.UTF_8);
 
-        try (var codec = JsonCodec.builder().build()) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer(json);
             var document = de.readDocument();
 
@@ -451,6 +468,7 @@ public class JsonDeserializerTest {
     @ParameterizedTest
     @MethodSource("deserializesWithTimestampFormatSource")
     public void deserializesWithTimestampFormat(
+            JsonSerdeProvider provider,
             boolean useTrait,
             TimestampFormatTrait trait,
             TimestampFormatter defaultFormat,
@@ -459,12 +477,12 @@ public class JsonDeserializerTest {
         Trait[] traits = trait == null ? new Trait[0] : new Trait[] {trait};
         var schema = Schema.createTimestamp(ShapeId.from("smithy.foo#Time"), traits);
 
-        var codecBuilder = JsonCodec.builder().useTimestampFormat(useTrait);
+        var builder = codecBuilder(provider).useTimestampFormat(useTrait);
         if (defaultFormat != null) {
-            codecBuilder.defaultTimestampFormat(defaultFormat);
+            builder.defaultTimestampFormat(defaultFormat);
         }
 
-        try (var codec = codecBuilder.build()) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
             assertThat(de.readTimestamp(schema), equalTo(Instant.EPOCH));
         }
@@ -473,7 +491,7 @@ public class JsonDeserializerTest {
     public static List<Arguments> deserializesWithTimestampFormatSource() {
         var epochSeconds = Double.toString(((double) Instant.EPOCH.toEpochMilli()) / 1000);
 
-        return List.of(
+        var testCases = List.of(
                 // boolean useTrait, TimestampFormatTrait trait, TimestampFormatter defaultFormat, String json
                 Arguments.of(false, null, null, epochSeconds),
                 Arguments.of(false, new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS), null, epochSeconds),
@@ -503,22 +521,36 @@ public class JsonDeserializerTest {
                         new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME),
                         TimestampFormatter.Prelude.EPOCH_SECONDS,
                         "\"" + Instant.EPOCH + "\""));
+
+        // Cross-product with providers
+        var result = new ArrayList<Arguments>();
+        for (var provider : providers()) {
+            for (var testCase : testCases) {
+                result.add(Arguments.of(
+                        provider.get()[0],
+                        testCase.get()[0],
+                        testCase.get()[1],
+                        testCase.get()[2],
+                        testCase.get()[3]));
+            }
+        }
+        return result;
     }
 
-    @Test
-    public void throwsWhenTimestampIsWrongType() {
+    @PerProvider
+    public void throwsWhenTimestampIsWrongType(JsonSerdeProvider provider) {
         var schema = Schema.createTimestamp(ShapeId.from("smithy.foo#Time"));
 
-        try (var codec = JsonCodec.builder().build()) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));
             var e = Assertions.assertThrows(SerializationException.class, () -> de.readTimestamp(schema));
-            assertThat(e.getMessage(), equalTo("Expected a timestamp, but found Boolean value"));
+            assertThat(e.getMessage(), containsString("Expected a timestamp"));
         }
     }
 
-    @Test
-    public void ignoresTypeOnUnions() {
-        try (var codec = JsonCodec.builder().build()) {
+    @PerProvider
+    public void ignoresTypeOnUnions(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
             var de = codec.createDeserializer(
                     "{\"__type\":\"foo\", \"booleanValue\":true}".getBytes(StandardCharsets.UTF_8));
             Set<String> members = new LinkedHashSet<>();

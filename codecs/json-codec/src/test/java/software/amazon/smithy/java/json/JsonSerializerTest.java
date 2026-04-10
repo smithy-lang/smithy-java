@@ -28,11 +28,11 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
-public class JsonSerializerTest {
+public class JsonSerializerTest extends ProviderTestBase {
 
-    @Test
-    public void writesNull() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void writesNull(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var output = new ByteArrayOutputStream();
         var serializer = codec.createSerializer(output);
         serializer.writeNull(PreludeSchemas.STRING);
@@ -41,28 +41,16 @@ public class JsonSerializerTest {
         assertThat(result, equalTo("null"));
     }
 
-    @Test
-    public void writesDocumentsInline() throws Exception {
+    @PerProvider
+    public void writesDocumentsInline(JsonSerdeProvider provider) throws Exception {
         var document = Document.of(List.of(Document.of("a")));
 
-        try (JsonCodec codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
+        try (JsonCodec codec = codec(provider); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeDocument(PreludeSchemas.DOCUMENT, document);
             }
             var result = output.toString(StandardCharsets.UTF_8);
             assertThat(result, equalTo("[\"a\"]"));
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("serializesJsonValuesProvider")
-    public void serializesJsonValues(Document value, String expected) throws Exception {
-        try (JsonCodec codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
-            try (var serializer = codec.createSerializer(output)) {
-                value.serializeContents(serializer);
-            }
-            var result = output.toString(StandardCharsets.UTF_8);
-            assertThat(result, equalTo(expected));
         }
     }
 
@@ -110,9 +98,50 @@ public class JsonSerializerTest {
                 }), "{\"a\":\"av\",\"b\":\"bv\",\"c\":1,\"d\":[1,2],\"e\":{\"ek\":\"ek1\"}}"));
     }
 
+    // Cross-product: each provider x each json value
+    static List<Arguments> serializesJsonValuesWithProvider() {
+        var values = serializesJsonValuesProvider();
+        var provs = providers();
+        List<Arguments> result = new java.util.ArrayList<>();
+        for (var prov : provs) {
+            for (var val : values) {
+                result.add(Arguments.of(prov.get()[0], val.get()[0], val.get()[1]));
+            }
+        }
+        return result;
+    }
+
     @ParameterizedTest
-    @MethodSource("configurableTimestampFormatProvider")
+    @MethodSource("serializesJsonValuesWithProvider")
+    public void serializesJsonValues(JsonSerdeProvider provider, Document value, String expected) throws Exception {
+        try (JsonCodec codec = codec(provider); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                value.serializeContents(serializer);
+            }
+            var result = output.toString(StandardCharsets.UTF_8);
+            assertThat(result, equalTo(expected));
+        }
+    }
+
+    // Cross-product: each provider x each timestamp config
+    static List<Arguments> configurableTimestampFormatWithProvider() {
+        var configs = List.of(
+                Arguments.of(true, "\"1970-01-01T00:00:00Z\""),
+                Arguments.of(false, "0"));
+        var provs = providers();
+        List<Arguments> result = new java.util.ArrayList<>();
+        for (var prov : provs) {
+            for (var cfg : configs) {
+                result.add(Arguments.of(prov.get()[0], cfg.get()[0], cfg.get()[1]));
+            }
+        }
+        return result;
+    }
+
+    @ParameterizedTest
+    @MethodSource("configurableTimestampFormatWithProvider")
     public void configurableTimestampFormat(
+            JsonSerdeProvider provider,
             boolean useTimestampFormat,
             String json
     ) throws Exception {
@@ -120,7 +149,7 @@ public class JsonSerializerTest {
                 ShapeId.from("smithy.example#foo"),
                 new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME));
         try (
-                var codec = JsonCodec.builder()
+                var codec = codecBuilder(provider)
                         .useTimestampFormat(useTimestampFormat)
                         .build();
                 var output = new ByteArrayOutputStream()) {
@@ -132,17 +161,26 @@ public class JsonSerializerTest {
         }
     }
 
-    public static List<Arguments> configurableTimestampFormatProvider() {
-        return List.of(
-                Arguments.of(true, "\"1970-01-01T00:00:00Z\""),
-                Arguments.of(false, "0"));
+    // Cross-product: each provider x each jsonName config
+    static List<Arguments> configurableJsonNameWithProvider() {
+        var configs = List.of(
+                Arguments.of(true, "{\"name\":\"Toucan\",\"Color\":\"red\"}"),
+                Arguments.of(false, "{\"name\":\"Toucan\",\"color\":\"red\"}"));
+        var provs = providers();
+        List<Arguments> result = new java.util.ArrayList<>();
+        for (var prov : provs) {
+            for (var cfg : configs) {
+                result.add(Arguments.of(prov.get()[0], cfg.get()[0], cfg.get()[1]));
+            }
+        }
+        return result;
     }
 
     @ParameterizedTest
-    @MethodSource("configurableJsonNameProvider")
-    public void configurableJsonName(boolean useJsonName, String json) throws Exception {
+    @MethodSource("configurableJsonNameWithProvider")
+    public void configurableJsonName(JsonSerdeProvider provider, boolean useJsonName, String json) throws Exception {
         try (
-                var codec = JsonCodec.builder().useJsonName(useJsonName).build();
+                var codec = codecBuilder(provider).useJsonName(useJsonName).build();
                 var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeStruct(
@@ -170,15 +208,9 @@ public class JsonSerializerTest {
         }
     }
 
-    public static List<Arguments> configurableJsonNameProvider() {
-        return List.of(
-                Arguments.of(true, "{\"name\":\"Toucan\",\"Color\":\"red\"}"),
-                Arguments.of(false, "{\"name\":\"Toucan\",\"color\":\"red\"}"));
-    }
-
-    @Test
-    public void writesNestedStructures() throws Exception {
-        try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
+    @PerProvider
+    public void writesNestedStructures(JsonSerdeProvider provider) throws Exception {
+        try (var codec = codec(provider); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeStruct(
                         JsonTestData.BIRD,
@@ -204,9 +236,9 @@ public class JsonSerializerTest {
         }
     }
 
-    @Test
-    public void writesStructureUsingSerializableStruct() throws Exception {
-        try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
+    @PerProvider
+    public void writesStructureUsingSerializableStruct(JsonSerdeProvider provider) throws Exception {
+        try (var codec = codec(provider); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeStruct(JsonTestData.NESTED, new NestedStruct());
             }
@@ -215,11 +247,11 @@ public class JsonSerializerTest {
         }
     }
 
-    @Test
-    public void writesDunderTypeAndMoreMembers() throws Exception {
+    @PerProvider
+    public void writesDunderTypeAndMoreMembers(JsonSerdeProvider provider) throws Exception {
         var struct = new NestedStruct();
         var document = Document.of(struct);
-        try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
+        try (var codec = codec(provider); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 document.serialize(serializer);
             }
@@ -228,12 +260,12 @@ public class JsonSerializerTest {
         }
     }
 
-    @Test
-    public void writesNestedDunderType() throws Exception {
+    @PerProvider
+    public void writesNestedDunderType(JsonSerdeProvider provider) throws Exception {
         var struct = new NestedStruct();
         var document = Document.of(struct);
         var map = Document.of(Map.of("a", document));
-        try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
+        try (var codec = codec(provider); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 map.serialize(serializer);
             }
@@ -242,11 +274,11 @@ public class JsonSerializerTest {
         }
     }
 
-    @Test
-    public void writesDunderTypeForEmptyStruct() throws Exception {
+    @PerProvider
+    public void writesDunderTypeForEmptyStruct(JsonSerdeProvider provider) throws Exception {
         var struct = new EmptyStruct();
         var document = Document.of(struct);
-        try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
+        try (var codec = codec(provider); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 document.serialize(serializer);
             }
@@ -257,6 +289,7 @@ public class JsonSerializerTest {
 
     @Test
     public void testPrettyPrinting() throws Exception {
+        // Pretty printing delegates to Jackson regardless of provider, so test once
         try (var codec = JsonCodec.builder().prettyPrint(true).build(); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeStruct(
@@ -280,7 +313,6 @@ public class JsonSerializerTest {
                         });
             }
             var result = output.toString(StandardCharsets.UTF_8);
-            // Expected format with Jackson's default pretty printer
             String expectedFormat = """
                     {
                       "name" : "Toucan",

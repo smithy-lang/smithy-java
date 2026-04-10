@@ -68,13 +68,29 @@ afterEvaluate {
             srcDir("$typePath/resources")
         }
     }
+    sourceSets.named("test") {
+        java {
+            srcDir("$typePath/java")
+        }
+        resources {
+            srcDir("$typePath/resources")
+        }
+    }
 }
 
 tasks.named("compileJmhJava") {
     dependsOn("smithyBuild")
 }
 
+tasks.named("compileTestJava") {
+    dependsOn("smithyBuild")
+}
+
 tasks.named("processJmhResources") {
+    dependsOn("smithyBuild")
+}
+
+tasks.named("processTestResources") {
     dependsOn("smithyBuild")
 }
 
@@ -89,6 +105,6 @@ jmh {
             .map { listOf(it) }
             .orElse(emptyList()),
     )
-    // profilers.add("async:output=jfr;dir=${layout.buildDirectory.get()}/jmh-profiler")
+//    profilers.add("async:output=jfr;dir=${layout.buildDirectory.get()}/jmh-profiler")
     // profilers.add("gc")
 }

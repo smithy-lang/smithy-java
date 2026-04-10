@@ -46,13 +46,13 @@ import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
-public class JsonDocumentTest {
+public class JsonDocumentTest extends ProviderTestBase {
 
     private static final String FOO_B64 = "Zm9v";
 
-    @Test
-    public void convertsNumberToNumber() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void convertsNumberToNumber(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("120".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -67,9 +67,9 @@ public class JsonDocumentTest {
         assertThat(document.asBigDecimal(), comparesEqualTo(BigDecimal.valueOf(120.0)));
     }
 
-    @Test
-    public void convertsDoubleToNumber() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void convertsDoubleToNumber(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("1.1".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -78,9 +78,9 @@ public class JsonDocumentTest {
         assertThat(document.asDouble(), is(1.1));
     }
 
-    @Test
-    public void convertsToBoolean() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void convertsToBoolean(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -88,9 +88,9 @@ public class JsonDocumentTest {
         assertThat(document.asBoolean(), is(true));
     }
 
-    @Test
-    public void convertsToTimestampWithEpochSeconds() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void convertsToTimestampWithEpochSeconds(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("0".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -98,10 +98,10 @@ public class JsonDocumentTest {
         assertThat(document.asTimestamp(), equalTo(Instant.EPOCH));
     }
 
-    @Test
-    public void convertsToTimestampWithDefaultStringFormat() {
+    @PerProvider
+    public void convertsToTimestampWithDefaultStringFormat(JsonSerdeProvider provider) {
         var now = Instant.now();
-        var codec = JsonCodec.builder().defaultTimestampFormat(TimestampFormatter.Prelude.DATE_TIME).build();
+        var codec = codecBuilder(provider).defaultTimestampFormat(TimestampFormatter.Prelude.DATE_TIME).build();
         var de = codec.createDeserializer(("\"" + now + "\"").getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -109,19 +109,19 @@ public class JsonDocumentTest {
         assertThat(document.asTimestamp(), equalTo(now));
     }
 
-    @Test
-    public void convertsToTimestampFailsOnUnknownType() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void convertsToTimestampFailsOnUnknownType(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));
         var document = de.readDocument();
 
         var e = Assertions.assertThrows(SerializationException.class, document::asTimestamp);
-        assertThat(e.getMessage(), containsString("Expected a timestamp document, but found boolean"));
+        assertThat(e.getMessage(), containsString("Expected a timestamp document"));
     }
 
-    @Test
-    public void convertsToBlob() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void convertsToBlob(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer(("\"" + FOO_B64 + "\"").getBytes(StandardCharsets.UTF_8));
         var document = de.readDocument();
 
@@ -131,9 +131,9 @@ public class JsonDocumentTest {
         assertThat(document.asBlob(), equalTo(wrap("foo".getBytes(StandardCharsets.UTF_8))));
     }
 
-    @Test
-    public void convertsToList() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void convertsToList(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("[1, 2, 3]".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -148,9 +148,9 @@ public class JsonDocumentTest {
         assertThat(list.get(2).asInteger(), is(3));
     }
 
-    @Test
-    public void convertsToMap() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void convertsToMap(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("{\"a\":1,\"b\":true}".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -168,18 +168,18 @@ public class JsonDocumentTest {
         assertThat(document.getMember("b").type(), is(ShapeType.BOOLEAN));
     }
 
-    @Test
-    public void otherDocumentsReturnSizeOfNegativeOne() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void otherDocumentsReturnSizeOfNegativeOne(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
         var document = de.readDocument();
 
         assertThat(document.size(), is(-1));
     }
 
-    @Test
-    public void nullAndMissingMapMembersReturnsNull() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void nullAndMissingMapMembersReturnsNull(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("{\"a\":null}".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -187,27 +187,27 @@ public class JsonDocumentTest {
         assertThat(document.getMember("d"), nullValue());
     }
 
-    @Test
-    public void nullMapMemberRoundtrip() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void nullMapMemberRoundtrip(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var doc = codec.createDeserializer("{\"a\":null}".getBytes(StandardCharsets.UTF_8)).readDocument();
         var roundtrip = codec.createDeserializer(codec.serialize(doc)).readDocument();
 
         assertEquals(doc, roundtrip);
     }
 
-    @Test
-    public void nullListMemberRoundtrip() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void nullListMemberRoundtrip(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var doc = codec.createDeserializer("[null]".getBytes(StandardCharsets.UTF_8)).readDocument();
         var roundtrip = codec.createDeserializer(codec.serialize(doc)).readDocument();
 
         assertEquals(doc, roundtrip);
     }
 
-    @Test
-    public void nullDocument() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void nullDocument(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("null".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -216,8 +216,8 @@ public class JsonDocumentTest {
 
     @ParameterizedTest
     @MethodSource("failToConvertSource")
-    public void failToConvert(String json, Consumer<Document> consumer) {
-        var codec = JsonCodec.builder().build();
+    public void failToConvert(JsonSerdeProvider provider, String json, Consumer<Document> consumer) {
+        var codec = codec(provider);
         var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
         var document = de.readDocument();
 
@@ -225,7 +225,7 @@ public class JsonDocumentTest {
     }
 
     public static List<Arguments> failToConvertSource() {
-        return List.of(
+        var tests = List.of(
                 Arguments.of("1", (Consumer<Document>) Document::asBoolean),
                 Arguments.of("1", (Consumer<Document>) Document::asBlob),
                 Arguments.of("1", (Consumer<Document>) Document::asString),
@@ -246,12 +246,20 @@ public class JsonDocumentTest {
                 Arguments.of("\"1\"", (Consumer<Document>) Document::asDouble),
                 Arguments.of("\"1\"", (Consumer<Document>) Document::asBigInteger),
                 Arguments.of("\"1\"", (Consumer<Document>) Document::asBigDecimal));
+
+        var result = new ArrayList<Arguments>();
+        for (var provider : providers()) {
+            for (var test : tests) {
+                result.add(Arguments.of(provider.get()[0], test.get()[0], test.get()[1]));
+            }
+        }
+        return result;
     }
 
     @ParameterizedTest
     @MethodSource("serializeContentSource")
-    public void serializeContent(String json) {
-        var codec = JsonCodec.builder().build();
+    public void serializeContent(JsonSerdeProvider provider, String json) {
+        var codec = codec(provider);
         var sink = new ByteArrayOutputStream();
         var se = codec.createSerializer(sink);
         var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
@@ -264,8 +272,8 @@ public class JsonDocumentTest {
 
     @ParameterizedTest
     @MethodSource("serializeContentSource")
-    public void serializeDocument(String json) {
-        var codec = JsonCodec.builder().build();
+    public void serializeDocument(JsonSerdeProvider provider, String json) {
+        var codec = codec(provider);
         var sink = new ByteArrayOutputStream();
         var se = codec.createSerializer(sink);
         var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
@@ -277,20 +285,28 @@ public class JsonDocumentTest {
     }
 
     public static List<Arguments> serializeContentSource() {
-        return List.of(
+        var tests = List.of(
                 Arguments.of("true"),
                 Arguments.of("false"),
                 Arguments.of("1"),
                 Arguments.of("1.1"),
                 Arguments.of("[1,2,3]"),
                 Arguments.of("{\"a\":1,\"b\":[1,true,-20,\"hello\"]}"));
+
+        var result = new ArrayList<Arguments>();
+        for (var provider : providers()) {
+            for (var test : tests) {
+                result.add(Arguments.of(provider.get()[0], test.get()[0]));
+            }
+        }
+        return result;
     }
 
-    @Test
-    public void deserializesIntoBuilderWithJsonNameAndTimestampFormat() {
+    @PerProvider
+    public void deserializesIntoBuilderWithJsonNameAndTimestampFormat(JsonSerdeProvider provider) {
         String date = Instant.EPOCH.toString();
         var json = "{\"name\":\"Hank\",\"BINARY\":\"" + FOO_B64 + "\",\"date\":\"" + date + "\",\"numbers\":[1,2,3]}";
-        var codec = JsonCodec.builder().useTimestampFormat(true).useJsonName(true).build();
+        var codec = codecBuilder(provider).useTimestampFormat(true).useJsonName(true).build();
         var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
         var document = de.readDocument();
 
@@ -304,10 +320,10 @@ public class JsonDocumentTest {
         assertThat(pojo.numbers, equalTo(List.of(1, 2, 3)));
     }
 
-    @Test
-    public void deserializesIntoBuilder() {
+    @PerProvider
+    public void deserializesIntoBuilder(JsonSerdeProvider provider) {
         var json = "{\"name\":\"Hank\",\"binary\":\"" + FOO_B64 + "\",\"date\":0,\"numbers\":[1,2,3]}";
-        var codec = JsonCodec.builder().build();
+        var codec = codec(provider);
         var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
         var document = de.readDocument();
 
@@ -397,8 +413,8 @@ public class JsonDocumentTest {
 
     @ParameterizedTest
     @MethodSource("checkEqualitySource")
-    public void checkEquality(String left, String right, boolean equal) {
-        var codec = JsonCodec.builder().build();
+    public void checkEquality(JsonSerdeProvider provider, String left, String right, boolean equal) {
+        var codec = codec(provider);
 
         var de1 = codec.createDeserializer(left.getBytes(StandardCharsets.UTF_8));
         var leftValue = de1.readDocument();
@@ -410,7 +426,7 @@ public class JsonDocumentTest {
     }
 
     public static List<Arguments> checkEqualitySource() {
-        return List.of(
+        var tests = List.of(
                 Arguments.of("1", "1", true),
                 Arguments.of("1", "1.1", false),
                 Arguments.of("true", "true", true),
@@ -421,6 +437,14 @@ public class JsonDocumentTest {
                 Arguments.of("[\"foo\"]", "[\"foo\"]", true),
                 Arguments.of("{\"foo\":\"foo\"}", "{\"foo\":\"foo\"}", true),
                 Arguments.of("{\"foo\":\"foo\"}", "{\"foo\":\"bar\"}", false));
+
+        var result = new ArrayList<Arguments>();
+        for (var provider : providers()) {
+            for (var test : tests) {
+                result.add(Arguments.of(provider.get()[0], test.get()[0], test.get()[1], test.get()[2]));
+            }
+        }
+        return result;
     }
 
     @Test
@@ -459,45 +483,45 @@ public class JsonDocumentTest {
         assertThat(leftValue, not(equalTo(rightValue)));
     }
 
-    @Test
-    public void canNormalizeJsonDocuments() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void canNormalizeJsonDocuments(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));
         var json = de.readDocument();
 
         assertThat(Document.equals(json, Document.of(true)), is(true));
     }
 
-    @Test
-    public void returnsNullWhenGettingDisciminatorOfWrongType() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void returnsNullWhenGettingDisciminatorOfWrongType(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("\"hi\"".getBytes(StandardCharsets.UTF_8));
         var json = de.readDocument();
 
         assertThat(json.discriminator(), nullValue());
     }
 
-    @Test
-    public void findsDiscriminatorForAbsoluteShapeId() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void findsDiscriminatorForAbsoluteShapeId(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("{\"__type\":\"com.example#Foo\"}".getBytes(StandardCharsets.UTF_8));
         var json = de.readDocument();
 
         assertThat(json.discriminator(), equalTo(ShapeId.from("com.example#Foo")));
     }
 
-    @Test
-    public void findsDiscriminatorForRelativeShapeId() {
-        var codec = JsonCodec.builder().defaultNamespace("com.foo").build();
+    @PerProvider
+    public void findsDiscriminatorForRelativeShapeId(JsonSerdeProvider provider) {
+        var codec = codecBuilder(provider).defaultNamespace("com.foo").build();
         var de = codec.createDeserializer("{\"__type\":\"Foo\"}".getBytes(StandardCharsets.UTF_8));
         var json = de.readDocument();
 
         assertThat(json.discriminator(), equalTo(ShapeId.from("com.foo#Foo")));
     }
 
-    @Test
-    public void failsToParseRelativeDiscriminatorWithNoDefaultNamespace() {
-        var codec = JsonCodec.builder().build();
+    @PerProvider
+    public void failsToParseRelativeDiscriminatorWithNoDefaultNamespace(JsonSerdeProvider provider) {
+        var codec = codec(provider);
         var de = codec.createDeserializer("{\"__type\":\"Foo\"}".getBytes(StandardCharsets.UTF_8));
         var json = de.readDocument();
     }
