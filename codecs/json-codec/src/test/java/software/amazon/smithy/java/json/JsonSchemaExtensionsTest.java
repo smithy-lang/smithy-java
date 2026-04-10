@@ -22,7 +22,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
-public class JsonSchemaExtensionsTest {
+public class JsonSchemaExtensionsTest extends ProviderTestBase {
 
     private static final Schema STRUCT = Schema.structureBuilder(ShapeId.from("test#Struct"))
             .putMember("name", PreludeSchemas.STRING)
@@ -81,9 +81,9 @@ public class JsonSchemaExtensionsTest {
         assertThat(ext.jsonMemberLookup().member("intValue")).isEqualTo(UNION.member("intValue"));
     }
 
-    @Test
-    public void roundtripWithJsonName() {
-        var codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
+    @PerProvider
+    public void roundtripWithJsonName(JsonSerdeProvider provider) {
+        var codec = codecBuilder(provider).useJsonName(true).useTimestampFormat(true).build();
         var pojo = new TestStruct("hello", 42, Instant.EPOCH);
 
         ByteBuffer serialized = codec.serialize(pojo);
@@ -97,9 +97,9 @@ public class JsonSchemaExtensionsTest {
         assertThat(deserialized.createdAt).isEqualTo(Instant.EPOCH);
     }
 
-    @Test
-    public void roundtripWithoutJsonName() {
-        var codec = JsonCodec.builder().useTimestampFormat(true).build();
+    @PerProvider
+    public void roundtripWithoutJsonName(JsonSerdeProvider provider) {
+        var codec = codecBuilder(provider).useTimestampFormat(true).build();
         var pojo = new TestStruct("hello", 42, Instant.EPOCH);
 
         ByteBuffer serialized = codec.serialize(pojo);

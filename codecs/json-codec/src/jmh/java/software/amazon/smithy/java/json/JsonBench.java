@@ -40,6 +40,8 @@ import software.amazon.smithy.java.json.bench.model.ComplexStruct;
 import software.amazon.smithy.java.json.bench.model.InnerStruct;
 import software.amazon.smithy.java.json.bench.model.NestedStruct;
 import software.amazon.smithy.java.json.bench.model.SimpleStruct;
+import software.amazon.smithy.java.json.jackson.JacksonJsonSerdeProvider;
+import software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider;
 import static tools.jackson.core.JsonToken.PROPERTY_NAME;
 import tools.jackson.core.ObjectReadContext;
 import tools.jackson.core.ObjectWriteContext;
@@ -58,8 +60,16 @@ public class JsonBench {
         COMPLEX,
     }
 
+    public enum Provider {
+        jackson,
+        smithy,
+    }
+
     @Param
     private TestCase testCase;
+
+    @Param
+    private Provider provider;
 
     private JsonCodec codec;
     private SerializableStruct shape;
@@ -69,7 +79,12 @@ public class JsonBench {
 
     @Setup
     public void setup() {
+        JsonSerdeProvider serdeProvider = switch (provider) {
+            case jackson -> new JacksonJsonSerdeProvider();
+            case smithy -> new SmithyJsonSerdeProvider();
+        };
         codec = JsonCodec.builder()
+                .overrideSerdeProvider(serdeProvider)
                 .useJsonName(true)
                 .useTimestampFormat(true)
                 .build();

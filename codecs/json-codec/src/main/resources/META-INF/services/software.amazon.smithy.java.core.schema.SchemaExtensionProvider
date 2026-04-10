@@ -1,1 +1,2 @@
 software.amazon.smithy.java.json.JsonSchemaExtensions
+software.amazon.smithy.java.json.smithy.SmithyJsonSchemaExtensions

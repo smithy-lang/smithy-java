@@ -1,0 +1,432 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.json.smithy;
+
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
+/**
+ * Low-level utilities for writing JSON primitives directly to byte arrays.
+ *
+ * <p>All methods write UTF-8 encoded JSON bytes and return the new write position.
+ */
+final class JsonWriteUtils {
+
+    private JsonWriteUtils() {}
+
+    // Pre-computed byte arrays for JSON literals
+    static final byte[] TRUE_BYTES = {'t', 'r', 'u', 'e'};
+    static final byte[] FALSE_BYTES = {'f', 'a', 'l', 's', 'e'};
+    static final byte[] NULL_BYTES = {'n', 'u', 'l', 'l'};
+    static final byte[] NAN_BYTES = {'"', 'N', 'a', 'N', '"'};
+    static final byte[] INF_BYTES = {'"', 'I', 'n', 'f', 'i', 'n', 'i', 't', 'y', '"'};
+    static final byte[] NEG_INF_BYTES = {'"', '-', 'I', 'n', 'f', 'i', 'n', 'i', 't', 'y', '"'};
+
+    // Pre-computed digit pairs: DIGIT_PAIRS[i*2] and DIGIT_PAIRS[i*2+1] give the two ASCII
+    // digits for the number i (00-99).
+    private static final byte[] DIGIT_PAIRS = new byte[200];
+
+    static {
+        for (int i = 0; i < 100; i++) {
+            DIGIT_PAIRS[i * 2] = (byte) ('0' + i / 10);
+            DIGIT_PAIRS[i * 2 + 1] = (byte) ('0' + i % 10);
+        }
+    }
+
+    // Hex digits for unicode escapes
+    private static final byte[] HEX = {
+            '0',
+            '1',
+            '2',
+            '3',
+            '4',
+            '5',
+            '6',
+            '7',
+            '8',
+            '9',
+            'a',
+            'b',
+            'c',
+            'd',
+            'e',
+            'f'
+    };
+
+    // Pre-computed escape sequences for control characters and special chars.
+    // null means "not a simple 2-char escape" (use \\uXXXX instead).
+    private static final byte[] ESCAPE_TABLE = new byte[128];
+    private static final boolean[] NEEDS_ESCAPE = new boolean[128];
+
+    static {
+        // All control characters need escaping
+        for (int i = 0; i < 0x20; i++) {
+            NEEDS_ESCAPE[i] = true;
+        }
+        NEEDS_ESCAPE['"'] = true;
+        NEEDS_ESCAPE['\\'] = true;
+
+        // Two-character escape sequences
+        ESCAPE_TABLE['"'] = '"';
+        ESCAPE_TABLE['\\'] = '\\';
+        ESCAPE_TABLE['\b'] = 'b';
+        ESCAPE_TABLE['\f'] = 'f';
+        ESCAPE_TABLE['\n'] = 'n';
+        ESCAPE_TABLE['\r'] = 'r';
+        ESCAPE_TABLE['\t'] = 't';
+    }
+
+    private static final Base64.Encoder BASE64_ENCODER = Base64.getEncoder();
+
+    // VarHandle for 8-byte-at-a-time SWAR operations
+    private static final VarHandle LONG_HANDLE =
+            MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
+
+    /**
+     * Writes an integer value as JSON number bytes. Returns new position.
+     *
+     * <p>Handles Integer.MIN_VALUE correctly.
+     */
+    static int writeInt(byte[] buf, int pos, int value) {
+        if (value == 0) {
+            buf[pos] = '0';
+            return pos + 1;
+        }
+
+        if (value < 0) {
+            buf[pos++] = '-';
+            if (value == Integer.MIN_VALUE) {
+                // -2147483648 — can't negate, write directly
+                return writePositiveLong(buf, pos, 2147483648L);
+            }
+            value = -value;
+        }
+
+        return writePositiveInt(buf, pos, value);
+    }
+
+    private static int writePositiveInt(byte[] buf, int pos, int value) {
+        // Determine digit count to write left-to-right
+        int digits = digitCount(value);
+        int end = pos + digits;
+        int p = end;
+
+        // Process two digits at a time from least significant
+        while (value >= 100) {
+            int q = value / 100;
+            int r = (value - q * 100) * 2;
+            value = q;
+            buf[--p] = DIGIT_PAIRS[r + 1];
+            buf[--p] = DIGIT_PAIRS[r];
+        }
+
+        // Handle remaining 1-2 digits
+        if (value >= 10) {
+            int r = value * 2;
+            buf[--p] = DIGIT_PAIRS[r + 1];
+            buf[--p] = DIGIT_PAIRS[r];
+        } else {
+            buf[--p] = (byte) ('0' + value);
+        }
+
+        return end;
+    }
+
+    /**
+     * Writes a long value as JSON number bytes. Returns new position.
+     */
+    static int writeLong(byte[] buf, int pos, long value) {
+        if (value == 0) {
+            buf[pos] = '0';
+            return pos + 1;
+        }
+
+        if (value < 0) {
+            buf[pos++] = '-';
+            if (value == Long.MIN_VALUE) {
+                // -9223372036854775808 — can't negate
+                byte[] minBytes = "9223372036854775808".getBytes(StandardCharsets.US_ASCII);
+                System.arraycopy(minBytes, 0, buf, pos, minBytes.length);
+                return pos + minBytes.length;
+            }
+            value = -value;
+        }
+
+        return writePositiveLong(buf, pos, value);
+    }
+
+    private static int writePositiveLong(byte[] buf, int pos, long value) {
+        // For values that fit in int, use the int path
+        if (value <= Integer.MAX_VALUE) {
+            return writePositiveInt(buf, pos, (int) value);
+        }
+
+        int digits = digitCountLong(value);
+        int end = pos + digits;
+        int p = end;
+
+        // Process two digits at a time
+        while (value >= 100) {
+            long q = value / 100;
+            int r = (int) (value - q * 100) * 2;
+            value = q;
+            buf[--p] = DIGIT_PAIRS[r + 1];
+            buf[--p] = DIGIT_PAIRS[r];
+        }
+
+        if (value >= 10) {
+            int r = (int) value * 2;
+            buf[--p] = DIGIT_PAIRS[r + 1];
+            buf[--p] = DIGIT_PAIRS[r];
+        } else {
+            buf[--p] = (byte) ('0' + value);
+        }
+
+        return end;
+    }
+
+    private static int digitCount(int value) {
+        // Fast digit count for positive integers
+        if (value < 10)
+            return 1;
+        if (value < 100)
+            return 2;
+        if (value < 1000)
+            return 3;
+        if (value < 10000)
+            return 4;
+        if (value < 100000)
+            return 5;
+        if (value < 1000000)
+            return 6;
+        if (value < 10000000)
+            return 7;
+        if (value < 100000000)
+            return 8;
+        if (value < 1000000000)
+            return 9;
+        return 10;
+    }
+
+    private static int digitCountLong(long value) {
+        if (value < 10000000000L) {
+            return digitCount((int) Math.min(value, Integer.MAX_VALUE));
+        }
+        if (value < 100000000000L)
+            return 11;
+        if (value < 1000000000000L)
+            return 12;
+        if (value < 10000000000000L)
+            return 13;
+        if (value < 100000000000000L)
+            return 14;
+        if (value < 1000000000000000L)
+            return 15;
+        if (value < 10000000000000000L)
+            return 16;
+        if (value < 100000000000000000L)
+            return 17;
+        if (value < 1000000000000000000L)
+            return 18;
+        return 19;
+    }
+
+    /**
+     * Writes a JSON quoted string with SWAR-accelerated safe-ASCII detection.
+     *
+     * <p>Strategy for LATIN1 strings (common case): copy bytes using the fast
+     * {@code String.getBytes(int,int,byte[],int)} (single arraycopy), then SWAR-scan
+     * the copied bytes. For non-LATIN1 strings, fall through to the slow path immediately.
+     */
+    @SuppressWarnings("deprecation")
+    static int writeQuotedString(byte[] buf, int pos, String value) {
+        int len = value.length();
+        buf[pos++] = '"';
+
+        if (len == 0) {
+            buf[pos++] = '"';
+            return pos;
+        }
+
+        // Check if we can use the fast LATIN1 path.
+        // String.getBytes(int,int,byte[],int) only works correctly for LATIN1 chars (< 256).
+        // For strings with chars >= 256, we must use the slow path for proper UTF-8 encoding.
+        // Quick check: scan chars for anything >= 0x80 that needs multi-byte UTF-8.
+        // Also check for escaping needs in the same scan.
+        for (int i = 0; i < len; i++) {
+            char c = value.charAt(i);
+            if (c >= 0x80 || c < 0x20 || c == '"' || c == '\\') {
+                if (c >= 0x80) {
+                    // Non-ASCII: must use full slow path from the beginning for UTF-8
+                    pos = writeStringSlowPath(buf, pos, value, 0, len);
+                    buf[pos++] = '"';
+                    return pos;
+                }
+                // ASCII but needs escaping: copy safe prefix, then slow path from here
+                if (i > 0) {
+                    value.getBytes(0, i, buf, pos);
+                    pos += i;
+                }
+                pos = writeStringSlowPath(buf, pos, value, i, len);
+                buf[pos++] = '"';
+                return pos;
+            }
+        }
+
+        // All safe ASCII — bulk copy
+        value.getBytes(0, len, buf, pos);
+        pos += len;
+        buf[pos++] = '"';
+        return pos;
+    }
+
+    private static int writeStringSlowPath(byte[] buf, int pos, String value, int startIdx, int len) {
+        for (int i = startIdx; i < len; i++) {
+            char c = value.charAt(i);
+
+            if (c < 0x80) {
+                // ASCII range
+                if (c >= 0x20 && !NEEDS_ESCAPE[c]) {
+                    buf[pos++] = (byte) c;
+                } else if (ESCAPE_TABLE[c] != 0) {
+                    // Two-character escape: \n, \t, \\, \", etc.
+                    buf[pos++] = '\\';
+                    buf[pos++] = ESCAPE_TABLE[c];
+                } else {
+                    // Unicode escape for control characters
+                    pos = writeUnicodeEscape(buf, pos, c);
+                }
+            } else if (c < 0x800) {
+                // 2-byte UTF-8
+                buf[pos++] = (byte) (0xC0 | (c >> 6));
+                buf[pos++] = (byte) (0x80 | (c & 0x3F));
+            } else if (!Character.isSurrogate(c)) {
+                // 3-byte UTF-8 (BMP, non-surrogate)
+                buf[pos++] = (byte) (0xE0 | (c >> 12));
+                buf[pos++] = (byte) (0x80 | ((c >> 6) & 0x3F));
+                buf[pos++] = (byte) (0x80 | (c & 0x3F));
+            } else {
+                // Surrogate pair → 4-byte UTF-8
+                if (Character.isHighSurrogate(c) && i + 1 < len) {
+                    char low = value.charAt(++i);
+                    if (Character.isLowSurrogate(low)) {
+                        int cp = Character.toCodePoint(c, low);
+                        buf[pos++] = (byte) (0xF0 | (cp >> 18));
+                        buf[pos++] = (byte) (0x80 | ((cp >> 12) & 0x3F));
+                        buf[pos++] = (byte) (0x80 | ((cp >> 6) & 0x3F));
+                        buf[pos++] = (byte) (0x80 | (cp & 0x3F));
+                    } else {
+                        // Lone high surrogate followed by non-low — escape both
+                        pos = writeUnicodeEscape(buf, pos, c);
+                        i--; // re-process the non-low char
+                    }
+                } else {
+                    // Lone surrogate — escape as unicode
+                    pos = writeUnicodeEscape(buf, pos, c);
+                }
+            }
+        }
+        return pos;
+    }
+
+    private static int writeUnicodeEscape(byte[] buf, int pos, int c) {
+        buf[pos++] = '\\';
+        buf[pos++] = 'u';
+        buf[pos++] = HEX[(c >> 12) & 0xF];
+        buf[pos++] = HEX[(c >> 8) & 0xF];
+        buf[pos++] = HEX[(c >> 4) & 0xF];
+        buf[pos++] = HEX[c & 0xF];
+        return pos;
+    }
+
+    /**
+     * Writes a double value as JSON. Handles integer-valued doubles optimization.
+     * Returns new position.
+     */
+    static int writeDouble(byte[] buf, int pos, double value) {
+        // Avoid writing 1.0 when 1 suffices — match Jackson behavior
+        long longValue = (long) value;
+        if (value == (double) longValue) {
+            return writeLong(buf, pos, longValue);
+        }
+        return writeAsciiString(buf, pos, Double.toString(value));
+    }
+
+    /**
+     * Writes a float value as JSON. Handles integer-valued floats optimization.
+     * Returns new position.
+     */
+    static int writeFloat(byte[] buf, int pos, float value) {
+        int intValue = (int) value;
+        if (value == (float) intValue) {
+            return writeInt(buf, pos, intValue);
+        }
+        return writeAsciiString(buf, pos, Float.toString(value));
+    }
+
+    /**
+     * Writes an ASCII string directly to the buffer without quoting.
+     * Used for number-to-string conversions (Double.toString, BigDecimal.toString, etc).
+     */
+    @SuppressWarnings("deprecation")
+    static int writeAsciiString(byte[] buf, int pos, String s) {
+        int len = s.length();
+        s.getBytes(0, len, buf, pos);
+        return pos + len;
+    }
+
+    /**
+     * Base64-encodes the given data and writes it as a JSON quoted string.
+     * Returns the new write position.
+     */
+    static int writeBase64String(byte[] buf, int pos, byte[] data, int off, int len) {
+        buf[pos++] = '"';
+        // Use JDK Base64 encoder — produces standard base64 with +/ alphabet, no line breaks.
+        // This matches Jackson's MIME_NO_LINEFEEDS variant for JSON.
+        byte[] encoded = BASE64_ENCODER.encode(
+                off == 0 && len == data.length ? data : java.util.Arrays.copyOfRange(data, off, off + len));
+        System.arraycopy(encoded, 0, buf, pos, encoded.length);
+        pos += encoded.length;
+        buf[pos++] = '"';
+        return pos;
+    }
+
+    /**
+     * Returns the maximum number of bytes needed to write a JSON-quoted string.
+     * Used for buffer capacity estimation.
+     */
+    static int maxQuotedStringBytes(String value) {
+        // Worst case: every char is a control char needing unicode escape (6 bytes) + 2 quotes
+        return value.length() * 6 + 2;
+    }
+
+    /**
+     * Returns the maximum number of bytes needed for a base64-encoded string.
+     */
+    static int maxBase64Bytes(int dataLen) {
+        // Base64: 4 bytes per 3 input bytes, rounded up, plus 2 quotes
+        return ((dataLen + 2) / 3) * 4 + 2;
+    }
+
+    /**
+     * Pre-computes the UTF-8 byte representation of a JSON field name prefix.
+     * The result includes the opening quote, the field name, the closing quote, and the colon.
+     * Example: for field name "foo", returns bytes for {@code "foo":}
+     */
+    static byte[] precomputeFieldNameBytes(String fieldName) {
+        byte[] nameUtf8 = fieldName.getBytes(StandardCharsets.UTF_8);
+        // "fieldName":
+        byte[] result = new byte[nameUtf8.length + 3]; // quote + name + quote + colon
+        result[0] = '"';
+        System.arraycopy(nameUtf8, 0, result, 1, nameUtf8.length);
+        result[nameUtf8.length + 1] = '"';
+        result[nameUtf8.length + 2] = ':';
+        return result;
+    }
+}
