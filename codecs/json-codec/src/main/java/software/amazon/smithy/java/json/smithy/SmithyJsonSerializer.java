@@ -65,6 +65,17 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         this.depth = 0;
     }
 
+    /**
+     * Returns the serializer's internal buffer and position directly,
+     * avoiding the ByteBufferOutputStream copy. After calling this, the
+     * serializer transfers buffer ownership to the caller (no pool return).
+     */
+    ByteBuffer toByteBuffer() {
+        var result = ByteBuffer.wrap(buf, 0, pos);
+        buf = null; // transfer ownership — don't pool this buffer
+        return result;
+    }
+
     private void ensureCapacity(int needed) {
         if (pos + needed > buf.length) {
             grow(needed);
