@@ -344,6 +344,35 @@ final class JsonWriteUtils {
     }
 
     /**
+     * Writes an epoch-seconds timestamp directly from an Instant using integer arithmetic.
+     * Avoids the Instant → double → Double.toString → bytes round-trip that accounts for
+     * ~21% of simple-serialize time. Writes "seconds" for whole seconds or "seconds.millis"
+     * for fractional, stripping trailing zeros.
+     */
+    static int writeEpochSeconds(byte[] buf, int pos, long epochSecond, int nano) {
+        if (nano == 0) {
+            return writeLong(buf, pos, epochSecond);
+        }
+        // Write seconds part
+        pos = writeLong(buf, pos, epochSecond);
+        buf[pos++] = '.';
+        // Convert nano to millis (epoch-seconds uses up to 3 decimal places)
+        int millis = nano / 1_000_000;
+        // Strip trailing zeros
+        if (millis % 100 == 0) {
+            buf[pos++] = (byte) ('0' + millis / 100);
+        } else if (millis % 10 == 0) {
+            buf[pos++] = (byte) ('0' + millis / 100);
+            buf[pos++] = (byte) ('0' + (millis / 10) % 10);
+        } else {
+            buf[pos++] = (byte) ('0' + millis / 100);
+            buf[pos++] = (byte) ('0' + (millis / 10) % 10);
+            buf[pos++] = (byte) ('0' + millis % 10);
+        }
+        return pos;
+    }
+
+    /**
      * Writes a float value as JSON. Handles integer-valued floats optimization.
      * Returns new position.
      */
