@@ -180,19 +180,16 @@ final class JsonReadUtils {
 
     /**
      * Parses a JSON string starting at the current position (which should be at the opening quote).
-     * Returns the parsed String and advances past the closing quote.
+     * Stores result in deser.parsedString and deser.parsedEndPos (avoids Object[] allocation).
      * Strict: rejects unescaped control characters, validates UTF-8, validates escape sequences.
-     *
-     * @return array of [string, newPos as encoded int]
      */
-    static Object[] parseString(byte[] buf, int pos, int end) {
+    static void parseString(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
         if (pos >= end || buf[pos] != '"') {
             throw new SerializationException("Expected '\"', found: " + describePos(buf, pos, end));
         }
         pos++; // skip opening quote
 
         // Fast path: SWAR scan 8 bytes at a time for closing quote, backslash, or control chars.
-        // A byte needs special handling if: b == '"' (0x22), b == '\\' (0x5C), or b < 0x20.
         int start = pos;
 
         while (pos + 8 <= end) {
@@ -208,12 +205,14 @@ final class JsonReadUtils {
             byte b = buf[pos];
             if (b == '"') {
                 // No escapes found — fast path
-                String result = new String(buf, start, pos - start, StandardCharsets.UTF_8);
-                return new Object[] {result, pos + 1};
+                deser.parsedString = new String(buf, start, pos - start, StandardCharsets.UTF_8);
+                deser.parsedEndPos = pos + 1;
+                return;
             }
             if (b == '\\') {
                 // Has escapes — slow path
-                return parseStringWithEscapes(buf, start, pos, end);
+                parseStringWithEscapes(buf, start, pos, end, deser);
+                return;
             }
             if ((b & 0xFF) < 0x20) {
                 throw new SerializationException(
@@ -245,7 +244,13 @@ final class JsonReadUtils {
         return (controlCheck | hasQuote | hasBackslash) != 0;
     }
 
-    private static Object[] parseStringWithEscapes(byte[] buf, int start, int escapePos, int end) {
+    private static void parseStringWithEscapes(
+            byte[] buf,
+            int start,
+            int escapePos,
+            int end,
+            SmithyJsonDeserializer deser
+    ) {
         // Build a StringBuilder from what we've read so far + escaped content
         StringBuilder sb = new StringBuilder(escapePos - start + 16);
         // Append everything before the first escape as UTF-8
@@ -255,7 +260,9 @@ final class JsonReadUtils {
         while (pos < end) {
             byte b = buf[pos];
             if (b == '"') {
-                return new Object[] {sb.toString(), pos + 1};
+                deser.parsedString = sb.toString();
+                deser.parsedEndPos = pos + 1;
+                return;
             }
 
             if ((b & 0xFF) < 0x20) {

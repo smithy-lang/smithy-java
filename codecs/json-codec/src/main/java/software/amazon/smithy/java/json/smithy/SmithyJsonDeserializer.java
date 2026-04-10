@@ -52,6 +52,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     long parsedLong;
     int parsedEndPos;
     double parsedDouble;
+    String parsedString;
 
     SmithyJsonDeserializer(byte[] buf, int pos, int end, JsonSettings settings) {
         this.buf = buf;
@@ -205,9 +206,9 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     }
 
     private String readStringValue() {
-        Object[] result = JsonReadUtils.parseString(buf, pos, end);
-        pos = (int) result[1];
-        return (String) result[0];
+        JsonReadUtils.parseString(buf, pos, end, this);
+        pos = parsedEndPos;
+        return parsedString;
     }
 
     @Override
