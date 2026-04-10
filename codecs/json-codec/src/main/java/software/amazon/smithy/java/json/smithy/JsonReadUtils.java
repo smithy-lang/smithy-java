@@ -43,9 +43,10 @@ final class JsonReadUtils {
 
     /**
      * Parses a JSON integer value starting at pos. Strict RFC 8259: no leading zeros, no + prefix.
-     * Returns an array of [value, newPos]. Throws on overflow or invalid format.
+     * Stores result in deser.parsedLong and deser.parsedEndPos (avoids array allocation).
+     * Accumulates as negative to correctly handle Long.MIN_VALUE.
      */
-    static long[] parseLong(byte[] buf, int pos, int end) {
+    static void parseLong(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
         if (pos >= end) {
             throw new SerializationException("Unexpected end of input while parsing number");
         }
@@ -69,7 +70,9 @@ final class JsonReadUtils {
             throw new SerializationException("Leading zeros not allowed in JSON numbers");
         }
 
-        long value = first - '0';
+        // Accumulate as negative to handle Long.MIN_VALUE correctly
+        // (Long.MIN_VALUE has no positive counterpart)
+        long value = -(first - '0');
         pos++;
 
         while (pos < end) {
@@ -78,22 +81,28 @@ final class JsonReadUtils {
                 break;
             }
             long prev = value;
-            value = value * 10 + (b - '0');
-            if (value < prev) {
+            value = value * 10 - (b - '0');
+            if (value > prev) {
+                // Overflowed past Long.MIN_VALUE
                 throw new SerializationException("Number overflow");
             }
             pos++;
         }
 
-        return new long[] {negative ? -value : value, pos};
+        deser.parsedLong = negative ? value : -value;
+        deser.parsedEndPos = pos;
+
+        // Check for positive overflow (e.g., 9223372036854775808 without minus)
+        if (!negative && deser.parsedLong < 0) {
+            throw new SerializationException("Number overflow");
+        }
     }
 
     /**
-     * Parses a JSON number (integer or floating point) and returns it as a double.
-     * Strict RFC 8259: validates the full number grammar.
-     * Returns [Double.longBitsToDouble(value), newPos].
+     * Parses a JSON number (integer or floating point) with strict RFC 8259 validation.
+     * Stores result in deser.parsedDouble and deser.parsedEndPos.
      */
-    static double[] parseDouble(byte[] buf, int pos, int end) {
+    static void parseDouble(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
         int start = pos;
 
         // Optional minus sign
@@ -149,8 +158,8 @@ final class JsonReadUtils {
 
         // Use JDK's Double.parseDouble for the actual conversion (Eisel-Lemire on JDK 21)
         String numStr = new String(buf, start, pos - start, StandardCharsets.US_ASCII);
-        double value = Double.parseDouble(numStr);
-        return new double[] {value, Double.longBitsToDouble(pos)};
+        deser.parsedDouble = Double.parseDouble(numStr);
+        deser.parsedEndPos = pos;
     }
 
     /**

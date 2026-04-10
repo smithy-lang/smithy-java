@@ -74,10 +74,12 @@ final class SmithyMemberLookup implements MemberLookup {
     Schema lookupWithHash(byte[] buf, int start, int end, long hash, int expectedNext) {
         int nameLen = end - start;
 
-        // Speculative fast path: hash + length match is sufficient.
+        // Speculative fast path: hash + length + byte equality.
+        // Arrays.equals is intrinsified by the JVM and very fast for short arrays.
         if (expectedNext >= 0 && expectedNext < orderedHashes.length
                 && orderedHashes[expectedNext] == hash
-                && orderedNameBytes[expectedNext].length == nameLen) {
+                && orderedNameBytes[expectedNext].length == nameLen
+                && Arrays.equals(buf, start, end, orderedNameBytes[expectedNext], 0, nameLen)) {
             return orderedSchemas[expectedNext];
         }
 
