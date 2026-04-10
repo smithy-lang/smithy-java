@@ -29,6 +29,12 @@ public interface SchemaExtensionProvider<T> {
     /**
      * Compute the extension value for the given schema.
      *
+     * <p>Extension values are cached: once computed for a given schema and key, the result is stored
+     * and this method is not called again. Implementations must be idempotent — returning the same
+     * (or equivalent) result for the same schema on every invocation. Under concurrent access,
+     * multiple threads may invoke this method simultaneously for the same schema and key (benign race);
+     * all invocations must produce equivalent results.
+     *
      * @param schema The schema to compute extension data for.
      * @return the extension value, or {@code null} if this provider has no data for this schema.
      */

@@ -23,9 +23,6 @@ final class DeferredRootSchema extends Schema {
     private final SchemaBuilder schemaBuilder;
     final Set<String> stringEnumValues;
     final Set<Integer> intEnumValues;
-    // Written before the volatile resolvedMembers for re-entrant access from
-    // initExtensions() -> provide(this) -> schema.members() on the same thread.
-    private List<Schema> resolvingMembers;
     private volatile ResolvedMembers resolvedMembers;
 
     DeferredRootSchema(
@@ -62,17 +59,10 @@ final class DeferredRootSchema extends Schema {
 
     private void resolveInternal() {
         if (resolvedMembers == null) {
-            if (resolvingMembers != null) {
-                // Re-entrant call from initExtensions() on the same thread.
-                return;
-            }
             List<Schema> memberList = new ArrayList<>(memberBuilders.size());
             for (var builder : memberBuilders) {
                 memberList.add(builder.build());
             }
-            // Store for re-entrant access: initExtensions() -> provide(this) ->
-            // schema.members() re-enters resolveInternal() on the same thread.
-            this.resolvingMembers = memberList;
 
             int requiredMemberCount = SchemaBuilder.computeRequiredMemberCount(this.type(), memberBuilders);
             long requiredStructureMemberBitfield = SchemaBuilder.computeRequiredBitField(
@@ -81,12 +71,6 @@ final class DeferredRootSchema extends Schema {
                     memberBuilders,
                     m -> m.requiredByValidationBitmask);
 
-            // Initialize extensions BEFORE the volatile write. The subsequent
-            // volatile write to resolvedMembers acts as a release fence, ensuring
-            // the extensions array is visible to any thread that reads resolvedMembers.
-            initExtensions();
-
-            // Volatile write is LAST: publishes both ResolvedMembers and extensions.
             this.resolvedMembers = new ResolvedMembers(SchemaBuilder.createMembers(memberList),
                     memberList,
                     requiredMemberCount,
@@ -102,25 +86,13 @@ final class DeferredRootSchema extends Schema {
     @Override
     public List<Schema> members() {
         resolveInternal();
-        var rm = resolvedMembers;
-        // During re-entrant init on the same thread, resolvedMembers is still null.
-        return rm != null ? rm.memberList : resolvingMembers;
+        return resolvedMembers.memberList;
     }
 
     @Override
     public Schema member(String memberName) {
         resolveInternal();
-        var rm = resolvedMembers;
-        if (rm != null) {
-            return rm.members.get(memberName);
-        }
-        // Re-entrant path (same thread only): linear scan.
-        for (var m : resolvingMembers) {
-            if (m.memberName().equals(memberName)) {
-                return m;
-            }
-        }
-        return null;
+        return resolvedMembers.members.get(memberName);
     }
 
     @Override
