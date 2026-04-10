@@ -117,4 +117,12 @@
         <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ" />
     </Match>
 
+    <!-- Vendored Schubfach algorithm (from Jackson/OpenJDK) — not our code to fix. -->
+    <Match>
+        <Class name="software.amazon.smithy.java.json.smithy.Schubfach$DoubleToDecimal" />
+    </Match>
+    <Match>
+        <Class name="software.amazon.smithy.java.json.smithy.Schubfach$FloatToDecimal" />
+    </Match>
+
 </FindBugsFilter>
