@@ -5,7 +5,10 @@
 
 package software.amazon.smithy.java.core.schema;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -70,7 +73,11 @@ public abstract sealed class Schema implements MemberLookup
     private Schema mapValueMember;
 
     private static final Object[] EMPTY_EXTENSIONS = new Object[0];
-    private Object[] extensions = EMPTY_EXTENSIONS;
+    private static final Object NOT_COMPUTED = new Object();
+    private static final Object NULL_SENTINEL = new Object();
+    private static final VarHandle AA = MethodHandles.arrayElementVarHandle(Object[].class);
+    // Allocated eagerly (cheap sentinel-filled array), elements computed lazily per-key in getExtension().
+    private final Object[] extensions;
 
     final Supplier<ShapeBuilder<?>> shapeBuilder;
 
@@ -123,6 +130,7 @@ public abstract sealed class Schema implements MemberLookup
 
         // Only use the slow version of required member validation if there are > 64 required members.
 
+        this.extensions = createExtensionArray();
         this.hash = computeHash(this);
     }
 
@@ -159,6 +167,7 @@ public abstract sealed class Schema implements MemberLookup
         this.uniqueItemsConstraint = type == ShapeType.LIST && hasTrait(TraitKey.UNIQUE_ITEMS_TRAIT);
         this.hasRangeConstraint = builder.validationState.hasRangeConstraint();
 
+        this.extensions = createExtensionArray();
         this.hash = computeHash(this);
     }
 
@@ -450,7 +459,12 @@ public abstract sealed class Schema implements MemberLookup
     }
 
     /**
-     * Get extension data stored on this schema by a {@link SchemaExtensionProvider}.
+     * Get extension data for the given key, computing it lazily on first access.
+     *
+     * <p>Uses a benign-race pattern: concurrent threads may compute the same key
+     * simultaneously, producing identical deterministic results. Array element access
+     * uses acquire/release semantics via {@link VarHandle} to ensure computed values
+     * are safely published — providers have no special thread-safety requirements.
      *
      * @param key The extension key.
      * @param <T> Extension data type.
@@ -459,47 +473,58 @@ public abstract sealed class Schema implements MemberLookup
     @SuppressWarnings("unchecked")
     public final <T> T getExtension(SchemaExtensionKey<T> key) {
         var ext = extensions;
-        return key.id < ext.length ? (T) ext[key.id] : null;
-    }
-
-    /**
-     * Initialize extensions on this schema by running all registered {@link SchemaExtensionProvider} providers.
-     *
-     * <p>Idempotent: returns immediately if already initialized. This is necessary because
-     * {@link DeferredRootSchema} uses a benign-race lazy init pattern where two threads may
-     * both call this method; both produce the same deterministic result.
-     */
-    final void initExtensions() {
-        var providers = ExtensionInitializerHolder.INITIALIZERS;
-        if (!providers.isEmpty()) {
-            if (extensions != EMPTY_EXTENSIONS) {
-                return;
-            }
-            extensions = new Object[SchemaExtensionKey.count()];
-            for (var provider : providers) {
-                var value = provider.provide(this);
-                if (value != null) {
-                    extensions[provider.key().id] = value;
-                }
-            }
+        if (key.id >= ext.length) {
+            return null;
         }
+        var value = AA.getAcquire(ext, key.id);
+        if (value == NOT_COMPUTED) {
+            value = computeExtension(key, ext);
+        }
+        return value == NULL_SENTINEL ? null : (T) value;
     }
 
-    /**
-     * Copy extensions from another schema. Used by {@link ResolvedRootSchema} to inherit
-     * extensions from its {@link DeferredRootSchema}.
-     */
-    final void copyExtensionsFrom(Schema source) {
-        this.extensions = source.extensions;
+    @SuppressWarnings("rawtypes")
+    private Object computeExtension(SchemaExtensionKey<?> key, Object[] ext) {
+        SchemaExtensionProvider provider = ExtensionInitializerHolder.PROVIDER_BY_KEY[key.id];
+        Object result;
+        if (provider == null) {
+            result = NULL_SENTINEL;
+        } else {
+            var value = provider.provide(this);
+            result = value != null ? value : NULL_SENTINEL;
+        }
+        AA.setRelease(ext, key.id, result);
+        return result;
+    }
+
+    static Object[] createExtensionArray() {
+        int count = ExtensionInitializerHolder.PROVIDER_BY_KEY.length;
+        if (count == 0) {
+            return EMPTY_EXTENSIONS;
+        }
+        var ext = new Object[count];
+        Arrays.fill(ext, NOT_COMPUTED);
+        return ext;
     }
 
     @SuppressWarnings("rawtypes")
     private static final class ExtensionInitializerHolder {
-        static final List<SchemaExtensionProvider> INITIALIZERS = ServiceLoader
-                .load(SchemaExtensionProvider.class, SchemaExtensionProvider.class.getClassLoader())
-                .stream()
-                .map(ServiceLoader.Provider::get)
-                .toList();
+        static final SchemaExtensionProvider[] PROVIDER_BY_KEY;
+        static {
+            var providers = ServiceLoader
+                    .load(SchemaExtensionProvider.class, SchemaExtensionProvider.class.getClassLoader())
+                    .stream()
+                    .map(ServiceLoader.Provider::get)
+                    .toList();
+            if (providers.isEmpty()) {
+                PROVIDER_BY_KEY = new SchemaExtensionProvider[0];
+            } else {
+                PROVIDER_BY_KEY = new SchemaExtensionProvider[SchemaExtensionKey.count()];
+                for (var provider : providers) {
+                    PROVIDER_BY_KEY[provider.key().id] = provider;
+                }
+            }
+        }
     }
 
     /**
