@@ -74,9 +74,7 @@ final class MemberSchemaBuilder {
     }
 
     Schema build() {
-        var schema = targetBuilder != null ? new DeferredMemberSchema(this) : new MemberSchema(this);
-        schema.initExtensions();
-        return schema;
+        return targetBuilder != null ? new DeferredMemberSchema(this) : new MemberSchema(this);
     }
 
     // Setting the member index has to be deferred until a shape is built because members need to be sorted based
