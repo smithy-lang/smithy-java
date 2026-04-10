@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.core.schema;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
@@ -75,7 +73,6 @@ public abstract sealed class Schema implements MemberLookup
     private static final Object[] EMPTY_EXTENSIONS = new Object[0];
     private static final Object NOT_COMPUTED = new Object();
     private static final Object NULL_SENTINEL = new Object();
-    private static final VarHandle AA = MethodHandles.arrayElementVarHandle(Object[].class);
     // Allocated eagerly (cheap sentinel-filled array), elements computed lazily per-key in getExtension().
     private final Object[] extensions;
 
@@ -463,8 +460,8 @@ public abstract sealed class Schema implements MemberLookup
      *
      * <p>Uses a benign-race pattern: concurrent threads may compute the same key
      * simultaneously, producing identical deterministic results. Array element access
-     * uses acquire/release semantics via {@link VarHandle} to ensure computed values
-     * are safely published — providers have no special thread-safety requirements.
+     * uses plain array access (benign-race pattern) — providers must ensure their
+     * return values are safely publishable (see {@link SchemaExtensionProvider}).
      *
      * @param key The extension key.
      * @param <T> Extension data type.
@@ -476,7 +473,10 @@ public abstract sealed class Schema implements MemberLookup
         if (key.id >= ext.length) {
             return null;
         }
-        var value = AA.getAcquire(ext, key.id);
+        // Plain array read (benign race). Safe because extension objects are immutable
+        // (records with final fields), and Java's final field semantics (JLS 17.5)
+        // guarantee visibility once the reference is seen. Worst case: redundant computation.
+        var value = ext[key.id];
         if (value == NOT_COMPUTED) {
             value = computeExtension(key, ext);
         }
@@ -493,7 +493,9 @@ public abstract sealed class Schema implements MemberLookup
             var value = provider.provide(this);
             result = value != null ? value : NULL_SENTINEL;
         }
-        AA.setRelease(ext, key.id, result);
+        // Plain array write (benign race). The stored object is immutable, so any thread
+        // that later reads this element and sees the object will see all its final fields.
+        ext[key.id] = result;
         return result;
     }
 
