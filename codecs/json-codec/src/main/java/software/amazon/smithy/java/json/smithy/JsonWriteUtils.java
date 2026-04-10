@@ -340,7 +340,7 @@ final class JsonWriteUtils {
         if (value == (double) longValue) {
             return writeLong(buf, pos, longValue);
         }
-        return writeAsciiString(buf, pos, Double.toString(value));
+        return Schubfach.writeDouble(buf, pos, value);
     }
 
     /**
@@ -381,7 +381,7 @@ final class JsonWriteUtils {
         if (value == (float) intValue) {
             return writeInt(buf, pos, intValue);
         }
-        return writeAsciiString(buf, pos, Float.toString(value));
+        return Schubfach.writeFloat(buf, pos, value);
     }
 
     /**
