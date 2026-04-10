@@ -7,6 +7,7 @@ package software.amazon.smithy.java.json.smithy;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.json.JsonSerdeProvider;
@@ -40,6 +41,19 @@ public final class SmithyJsonSerdeProvider implements JsonSerdeProvider {
     @Override
     public String getName() {
         return "smithy";
+    }
+
+    @Override
+    public ByteBuffer serialize(SerializableShape shape, JsonSettings settings) {
+        if (settings.prettyPrint()) {
+            return getJacksonFallback().serialize(shape, settings);
+        }
+        // Direct path: serialize to the internal buffer, extract with a single small copy.
+        // Avoids: ByteBufferOutputStream allocation + zero-fill + flush arraycopy.
+        // The pooled buffer is returned immediately after copying the used portion.
+        var serializer = new SmithyJsonSerializer(settings);
+        shape.serialize(serializer);
+        return serializer.toByteBuffer();
     }
 
     @Override
