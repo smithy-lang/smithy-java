@@ -26,6 +26,7 @@ import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.document.DocumentEqualsFlags;
 import software.amazon.smithy.java.json.jackson.JacksonJsonSerdeProvider;
+import software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider;
 
 public class ParsingTest {
     @ParameterizedTest
@@ -64,10 +65,12 @@ public class ParsingTest {
 
     static List<Arguments> parserTestCases() throws IOException, URISyntaxException {
         var jacksonProvider = new JacksonJsonSerdeProvider();
+        var smithyProvider = new SmithyJsonSerdeProvider();
 
         List<Arguments> arguments = new ArrayList<>();
         for (var path : loadJsonFiles()) {
             arguments.add(Arguments.arguments(jacksonProvider, path));
+            arguments.add(Arguments.arguments(smithyProvider, path));
         }
 
         return arguments;
