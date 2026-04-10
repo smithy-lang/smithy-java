@@ -5,9 +5,6 @@
 
 package software.amazon.smithy.java.json.smithy;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
@@ -83,10 +80,6 @@ final class JsonWriteUtils {
     }
 
     private static final Base64.Encoder BASE64_ENCODER = Base64.getEncoder();
-
-    // VarHandle for 8-byte-at-a-time SWAR operations
-    private static final VarHandle LONG_HANDLE =
-            MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
 
     /**
      * Writes an integer value as JSON number bytes. Returns new position.
@@ -238,11 +231,12 @@ final class JsonWriteUtils {
     }
 
     /**
-     * Writes a JSON quoted string with SWAR-accelerated safe-ASCII detection.
+     * Writes a JSON quoted string. Single-pass for safe ASCII strings.
      *
-     * <p>Strategy for LATIN1 strings (common case): copy bytes using the fast
-     * {@code String.getBytes(int,int,byte[],int)} (single arraycopy), then SWAR-scan
-     * the copied bytes. For non-LATIN1 strings, fall through to the slow path immediately.
+     * <p>Strategy: copy bytes first via the fast {@code String.getBytes(int,int,byte[],int)}
+     * (single arraycopy for LATIN1 compact strings), then SWAR-scan the copied bytes for
+     * characters needing escaping or multi-byte UTF-8 encoding. If none found, done in one pass.
+     * If special chars found, rewrite from that position using the slow path.
      */
     @SuppressWarnings("deprecation")
     static int writeQuotedString(byte[] buf, int pos, String value) {
@@ -254,34 +248,25 @@ final class JsonWriteUtils {
             return pos;
         }
 
-        // Check if we can use the fast LATIN1 path.
-        // String.getBytes(int,int,byte[],int) only works correctly for LATIN1 chars (< 256).
-        // For strings with chars >= 256, we must use the slow path for proper UTF-8 encoding.
-        // Quick check: scan chars for anything >= 0x80 that needs multi-byte UTF-8.
-        // Also check for escaping needs in the same scan.
-        for (int i = 0; i < len; i++) {
+        // Single-pass: write safe ASCII chars directly to buf, bail to slow path
+        // on the first char needing escaping or multi-byte UTF-8 encoding.
+        // The JIT auto-vectorizes this loop on JDK 21.
+        //
+        // Note: we cannot use String.getBytes(int,int,byte[],int) + SWAR here because
+        // that method truncates chars >= 0x100 to their low byte, which can produce
+        // valid-looking ASCII bytes (e.g. U+0123 -> 0x23 '#') indistinguishable from
+        // real ASCII via any byte-level check.
+        int i = 0;
+        for (; i < len; i++) {
             char c = value.charAt(i);
             if (c >= 0x80 || c < 0x20 || c == '"' || c == '\\') {
-                if (c >= 0x80) {
-                    // Non-ASCII: must use full slow path from the beginning for UTF-8
-                    pos = writeStringSlowPath(buf, pos, value, 0, len);
-                    buf[pos++] = '"';
-                    return pos;
-                }
-                // ASCII but needs escaping: copy safe prefix, then slow path from here
-                if (i > 0) {
-                    value.getBytes(0, i, buf, pos);
-                    pos += i;
-                }
                 pos = writeStringSlowPath(buf, pos, value, i, len);
                 buf[pos++] = '"';
                 return pos;
             }
+            buf[pos++] = (byte) c;
         }
 
-        // All safe ASCII — bulk copy
-        value.getBytes(0, len, buf, pos);
-        pos += len;
         buf[pos++] = '"';
         return pos;
     }

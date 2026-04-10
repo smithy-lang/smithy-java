@@ -32,7 +32,9 @@ public final class SmithyJsonSerdeProvider implements JsonSerdeProvider {
 
     @Override
     public int getPriority() {
-        return 20;
+        // Below Jackson (10) until we have more confidence from CI fuzzing and production use.
+        // Select explicitly via: -Dsmithy-java.json-provider=smithy
+        return 5;
     }
 
     @Override
