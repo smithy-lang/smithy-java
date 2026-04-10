@@ -18,6 +18,7 @@ import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
+import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonFieldMapper;
@@ -242,7 +243,15 @@ final class SmithyJsonSerializer implements ShapeSerializer {
 
     @Override
     public void writeTimestamp(Schema schema, Instant value) {
-        settings.timestampResolver().resolve(schema).writeToSerializer(schema, value, this);
+        var format = settings.timestampResolver().resolve(schema);
+        if (format == TimestampFormatter.Prelude.EPOCH_SECONDS) {
+            // Fast path: write epoch-seconds directly from Instant using integer arithmetic.
+            // Bypasses the Instant→double→Double.toString→bytes round-trip.
+            ensureCapacity(24);
+            pos = JsonWriteUtils.writeEpochSeconds(buf, pos, value.getEpochSecond(), value.getNano());
+            return;
+        }
+        format.writeToSerializer(schema, value, this);
     }
 
     @Override
