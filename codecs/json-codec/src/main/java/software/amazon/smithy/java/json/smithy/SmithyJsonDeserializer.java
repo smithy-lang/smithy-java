@@ -47,6 +47,12 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     private final boolean useJsonName;
     private int depth;
 
+    // Mutable result fields — avoids allocating arrays on every parse call.
+    // Safe because the deserializer is single-threaded (one instance per operation).
+    long parsedLong;
+    int parsedEndPos;
+    double parsedDouble;
+
     SmithyJsonDeserializer(byte[] buf, int pos, int end, JsonSettings settings) {
         this.buf = buf;
         this.pos = pos;
@@ -93,51 +99,49 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
     @Override
     public byte readByte(Schema schema) {
-        long[] result = JsonReadUtils.parseLong(buf, pos, end);
-        long value = result[0];
-        pos = (int) result[1];
-        if (value < Byte.MIN_VALUE || value > Byte.MAX_VALUE) {
-            throw new SerializationException("Value out of byte range: " + value);
+        skipWhitespace();
+        JsonReadUtils.parseLong(buf, pos, end, this);
+        pos = parsedEndPos;
+        if (parsedLong < Byte.MIN_VALUE || parsedLong > Byte.MAX_VALUE) {
+            throw new SerializationException("Value out of byte range: " + parsedLong);
         }
-        return (byte) value;
+        return (byte) parsedLong;
     }
 
     @Override
     public short readShort(Schema schema) {
-        long[] result = JsonReadUtils.parseLong(buf, pos, end);
-        long value = result[0];
-        pos = (int) result[1];
-        if (value < Short.MIN_VALUE || value > Short.MAX_VALUE) {
-            throw new SerializationException("Value out of short range: " + value);
+        skipWhitespace();
+        JsonReadUtils.parseLong(buf, pos, end, this);
+        pos = parsedEndPos;
+        if (parsedLong < Short.MIN_VALUE || parsedLong > Short.MAX_VALUE) {
+            throw new SerializationException("Value out of short range: " + parsedLong);
         }
-        return (short) value;
+        return (short) parsedLong;
     }
 
     @Override
     public int readInteger(Schema schema) {
         skipWhitespace();
-        long[] result = JsonReadUtils.parseLong(buf, pos, end);
-        long value = result[0];
-        pos = (int) result[1];
-        if (value < Integer.MIN_VALUE || value > Integer.MAX_VALUE) {
-            throw new SerializationException("Value out of integer range: " + value);
+        JsonReadUtils.parseLong(buf, pos, end, this);
+        pos = parsedEndPos;
+        if (parsedLong < Integer.MIN_VALUE || parsedLong > Integer.MAX_VALUE) {
+            throw new SerializationException("Value out of integer range: " + parsedLong);
         }
-        return (int) value;
+        return (int) parsedLong;
     }
 
     @Override
     public long readLong(Schema schema) {
         skipWhitespace();
-        long[] result = JsonReadUtils.parseLong(buf, pos, end);
-        pos = (int) result[1];
-        return result[0];
+        JsonReadUtils.parseLong(buf, pos, end, this);
+        pos = parsedEndPos;
+        return parsedLong;
     }
 
     @Override
     public float readFloat(Schema schema) {
         skipWhitespace();
         if (pos < end && buf[pos] == '"') {
-            // String form: "NaN", "Infinity", "-Infinity"
             String s = readStringValue();
             return switch (s) {
                 case "NaN" -> Float.NaN;
@@ -146,10 +150,9 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                 default -> throw new SerializationException("Expected float, found string: \"" + s + "\"");
             };
         }
-        // Numeric form
-        double[] result = JsonReadUtils.parseDouble(buf, pos, end);
-        pos = (int) Double.doubleToRawLongBits(result[1]);
-        return (float) result[0];
+        JsonReadUtils.parseDouble(buf, pos, end, this);
+        pos = parsedEndPos;
+        return (float) parsedDouble;
     }
 
     @Override
@@ -164,9 +167,9 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                 default -> throw new SerializationException("Expected double, found string: \"" + s + "\"");
             };
         }
-        double[] result = JsonReadUtils.parseDouble(buf, pos, end);
-        pos = (int) Double.doubleToRawLongBits(result[1]);
-        return result[0];
+        JsonReadUtils.parseDouble(buf, pos, end, this);
+        pos = parsedEndPos;
+        return parsedDouble;
     }
 
     @Override
@@ -228,9 +231,9 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         }
         if (pos < end && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
             // Number form
-            double[] result = JsonReadUtils.parseDouble(buf, pos, end);
-            pos = (int) Double.doubleToRawLongBits(result[1]);
-            return format.readFromNumber(result[0]);
+            JsonReadUtils.parseDouble(buf, pos, end, this);
+            pos = parsedEndPos;
+            return format.readFromNumber(parsedDouble);
         }
         throw new SerializationException(
                 "Expected a timestamp, but found " + describeCurrentToken());
@@ -303,6 +306,10 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
             // Parse field name and compute FNV-1a hash in a single pass.
             // This fuses what was previously two separate scans (scan for '"' + fnvHash).
+            // Note: Smithy member names and jsonName trait values cannot contain backslashes
+            // or characters requiring JSON escaping, so we don't need to handle escape
+            // sequences in field names for member lookup purposes. Unknown escaped field
+            // names will simply not match any member and be skipped via the unknown-field path.
             if (pos >= end || buf[pos] != '"') {
                 throw new SerializationException(
                         "Expected field name, found: " + JsonReadUtils.describePos(buf, pos, end));
@@ -312,9 +319,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             long nameHash = 0xcbf29ce484222325L; // FNV-1a offset basis
             while (pos < end && buf[pos] != '"') {
                 if (buf[pos] == '\\') {
-                    nameHash ^= buf[pos] & 0xFF;
-                    nameHash *= 0x100000001b3L;
-                    pos++; // skip escape prefix
+                    pos++; // skip escaped char (hash includes raw bytes)
                 }
                 nameHash ^= buf[pos] & 0xFF;
                 nameHash *= 0x100000001b3L;
@@ -547,8 +552,8 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
      */
     private Document parseDocumentNumber() {
         // Use parseDouble to strictly validate the number grammar
-        double[] result = JsonReadUtils.parseDouble(buf, pos, end);
-        int newPos = (int) Double.doubleToRawLongBits(result[1]);
+        JsonReadUtils.parseDouble(buf, pos, end, this);
+        int newPos = parsedEndPos;
 
         // Check if the number has fractional/exponent parts
         boolean isFloat = false;
@@ -564,7 +569,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
         Number number;
         if (isFloat) {
-            number = result[0];
+            number = parsedDouble;
         } else {
             try {
                 long lv = Long.parseLong(numStr);
