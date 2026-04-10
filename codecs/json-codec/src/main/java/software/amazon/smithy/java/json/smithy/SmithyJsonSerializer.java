@@ -66,13 +66,27 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     }
 
     /**
-     * Returns the serializer's internal buffer and position directly,
-     * avoiding the ByteBufferOutputStream copy. After calling this, the
-     * serializer transfers buffer ownership to the caller (no pool return).
+     * Creates a serializer for direct buffer extraction (no OutputStream).
+     * Use with {@link #toByteBuffer()} to get the result without intermediate copies.
+     */
+    SmithyJsonSerializer(JsonSettings settings) {
+        this.sink = null;
+        this.settings = settings;
+        this.useJsonName = settings.fieldMapper() instanceof JsonFieldMapper.UseJsonNameTrait;
+        this.buf = JsonBufferPool.acquire(JsonBufferPool.DEFAULT_SIZE);
+        this.pos = 0;
+        this.depth = 0;
+    }
+
+    /**
+     * Extracts the serialized JSON as a ByteBuffer and returns the internal
+     * buffer to the pool. Copies only the used bytes (typically small) to a
+     * right-sized array, keeping the large pooled buffer available for reuse.
      */
     ByteBuffer toByteBuffer() {
-        var result = ByteBuffer.wrap(buf, 0, pos);
-        buf = null; // transfer ownership — don't pool this buffer
+        var result = ByteBuffer.wrap(Arrays.copyOf(buf, pos));
+        JsonBufferPool.release(buf);
+        buf = null;
         return result;
     }
 
@@ -90,11 +104,11 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     @Override
     public void flush() {
         try {
-            if (pos > 0) {
+            if (sink != null && pos > 0) {
                 sink.write(buf, 0, pos);
                 pos = 0;
+                sink.flush();
             }
-            sink.flush();
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -103,12 +117,14 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     @Override
     public void close() {
         try {
-            if (pos > 0) {
+            if (sink != null && pos > 0) {
                 sink.write(buf, 0, pos);
                 pos = 0;
             }
-            JsonBufferPool.release(buf);
-            buf = null;
+            if (buf != null) {
+                JsonBufferPool.release(buf);
+                buf = null;
+            }
         } catch (Exception e) {
             throw new SerializationException(e);
         }
