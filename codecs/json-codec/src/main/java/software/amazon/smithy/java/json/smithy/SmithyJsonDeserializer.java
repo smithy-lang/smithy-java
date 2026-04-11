@@ -244,7 +244,22 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             return format.readFromNumber(parsedDouble);
         }
         if (pos < end && buf[pos] == '"') {
-            // String form
+            // Fast path: parse ISO-8601 and HTTP-date directly from bytes,
+            // bypassing String allocation and DateTimeFormatter.
+            if (format == TimestampFormatter.Prelude.DATE_TIME) {
+                Instant result = JsonReadUtils.parseIso8601(buf, pos, end, this);
+                if (result != null) {
+                    pos = parsedEndPos;
+                    return result;
+                }
+            } else if (format == TimestampFormatter.Prelude.HTTP_DATE) {
+                Instant result = JsonReadUtils.parseHttpDate(buf, pos, end, this);
+                if (result != null) {
+                    pos = parsedEndPos;
+                    return result;
+                }
+            }
+            // Fallback: parse as String and use DateTimeFormatter
             String s = readStringValue();
             return format.readFromString(s, true);
         }
