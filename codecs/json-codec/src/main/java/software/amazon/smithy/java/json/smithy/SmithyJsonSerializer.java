@@ -51,6 +51,10 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     // for all member writes — avoids per-field VarHandle acquire reads.
     private byte[][] currentFieldNameTable;
 
+    // Reusable Schubfach instances — avoids allocation per double/float write
+    private final Schubfach.DoubleToDecimal doubleToDecimal = Schubfach.createDoubleToDecimal();
+    private final Schubfach.FloatToDecimal floatToDecimal = Schubfach.createFloatToDecimal();
+
     // Inner serializers — cached (single instance per serializer)
     private final ShapeSerializer structSerializer = new StructSerializer();
     private final ShapeSerializer listElementSerializer = new ListElementSerializer();
@@ -169,7 +173,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     public void writeFloat(Schema schema, float value) {
         if (Float.isFinite(value)) {
             ensureCapacity(24);
-            pos = JsonWriteUtils.writeFloat(buf, pos, value);
+            pos = JsonWriteUtils.writeFloat(buf, pos, value, floatToDecimal);
         } else if (Float.isNaN(value)) {
             ensureCapacity(JsonWriteUtils.NAN_BYTES.length);
             System.arraycopy(JsonWriteUtils.NAN_BYTES, 0, buf, pos, JsonWriteUtils.NAN_BYTES.length);
@@ -186,7 +190,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     public void writeDouble(Schema schema, double value) {
         if (Double.isFinite(value)) {
             ensureCapacity(24);
-            pos = JsonWriteUtils.writeDouble(buf, pos, value);
+            pos = JsonWriteUtils.writeDouble(buf, pos, value, doubleToDecimal);
         } else if (Double.isNaN(value)) {
             ensureCapacity(JsonWriteUtils.NAN_BYTES.length);
             System.arraycopy(JsonWriteUtils.NAN_BYTES, 0, buf, pos, JsonWriteUtils.NAN_BYTES.length);

@@ -344,6 +344,17 @@ final class JsonWriteUtils {
     }
 
     /**
+     * Writes a double using a reusable Schubfach instance to avoid per-call allocation.
+     */
+    static int writeDouble(byte[] buf, int pos, double value, Schubfach.DoubleToDecimal dtd) {
+        long longValue = (long) value;
+        if (value == (double) longValue) {
+            return writeLong(buf, pos, longValue);
+        }
+        return Schubfach.writeDouble(buf, pos, value, dtd);
+    }
+
+    /**
      * Writes an epoch-seconds timestamp directly from an Instant using integer arithmetic.
      * Avoids the Instant → double → Double.toString → bytes round-trip that accounts for
      * ~21% of simple-serialize time. Writes "seconds" for whole seconds or "seconds.millis"
@@ -382,6 +393,17 @@ final class JsonWriteUtils {
             return writeInt(buf, pos, intValue);
         }
         return Schubfach.writeFloat(buf, pos, value);
+    }
+
+    /**
+     * Writes a float using a reusable Schubfach instance to avoid per-call allocation.
+     */
+    static int writeFloat(byte[] buf, int pos, float value, Schubfach.FloatToDecimal ftd) {
+        int intValue = (int) value;
+        if (value == (float) intValue) {
+            return writeInt(buf, pos, intValue);
+        }
+        return Schubfach.writeFloat(buf, pos, value, ftd);
     }
 
     /**
