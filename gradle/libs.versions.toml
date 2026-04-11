@@ -9,6 +9,7 @@ spotless = "8.4.0"
 smithy-gradle-plugins = "1.4.0"
 assertj = "3.27.7"
 jackson = "3.1.1"
+fastdoubleparser = "1.0.1"
 netty = "4.2.12.Final"
 dep-analysis = "3.6.1"
 aws-sdk = "2.42.30"
@@ -55,6 +56,7 @@ opentelemetry-api = {module = "io.opentelemetry:opentelemetry-api", version.ref 
 opentelemetry-test-api = {module = "io.opentelemetry:opentelemetry-sdk-testing", version.ref = "opentelemetry"}
 
 jackson-core = {module = "tools.jackson.core:jackson-core", version.ref = "jackson"}
+fastdoubleparser = {module = "ch.randelshofer:fastdoubleparser", version.ref = "fastdoubleparser"}
 
 netty-all = {module = "io.netty:netty-all", version.ref = "netty"}
 

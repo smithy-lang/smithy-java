@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.json.smithy;
 
+import ch.randelshofer.fastdoubleparser.JavaDoubleParser;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
@@ -156,9 +157,9 @@ final class JsonReadUtils {
             }
         }
 
-        // Use JDK's Double.parseDouble for the actual conversion (Eisel-Lemire on JDK 21)
-        String numStr = new String(buf, start, pos - start, StandardCharsets.US_ASCII);
-        deser.parsedDouble = Double.parseDouble(numStr);
+        // Parse directly from byte array — no String allocation.
+        // FastDoubleParser implements Eisel-Lemire with direct byte[] input.
+        deser.parsedDouble = JavaDoubleParser.parseDouble(buf, start, pos - start);
         deser.parsedEndPos = pos;
     }
 
