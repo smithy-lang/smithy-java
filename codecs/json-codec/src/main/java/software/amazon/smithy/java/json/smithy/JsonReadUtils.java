@@ -10,6 +10,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import software.amazon.smithy.java.core.serde.SerializationException;
 
 /**
@@ -408,6 +409,272 @@ final class JsonReadUtils {
             pos++;
         }
         return pos;
+    }
+
+    // Month lookup: index by first two bytes of 3-letter month abbreviation
+    // Jan=1, Feb=2, ..., Dec=12. Used by parseHttpDate.
+    private static final int[] MONTH_LOOKUP = new int[128 * 128];
+
+    // Day-of-year offsets for non-leap years (cumulative days before each month)
+    // Index 0 unused, months 1-12
+    private static final int[] DAYS_BEFORE_MONTH = {0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+
+    static {
+        // Populate month lookup: key = first_char * 128 + second_char
+        MONTH_LOOKUP['J' * 128 + 'a'] = 1;  // Jan
+        MONTH_LOOKUP['F' * 128 + 'e'] = 2;  // Feb
+        MONTH_LOOKUP['M' * 128 + 'a'] = 3;  // Mar (also May — disambiguate with 3rd char)
+        MONTH_LOOKUP['A' * 128 + 'p'] = 4;  // Apr
+        MONTH_LOOKUP['M' * 128 + 'a'] = 3;  // Mar placeholder, overwritten below for May
+        MONTH_LOOKUP['J' * 128 + 'u'] = 6;  // Jun (also Jul — disambiguate with 3rd char)
+        MONTH_LOOKUP['A' * 128 + 'u'] = 8;  // Aug
+        MONTH_LOOKUP['S' * 128 + 'e'] = 9;  // Sep
+        MONTH_LOOKUP['O' * 128 + 'c'] = 10; // Oct
+        MONTH_LOOKUP['N' * 128 + 'o'] = 11; // Nov
+        MONTH_LOOKUP['D' * 128 + 'e'] = 12; // Dec
+    }
+
+    // Full 3-letter month name validation table: third character for each month
+    private static final byte[] MONTH_THIRD_CHAR = {
+            0, 'n', 'b', 'r', 'r', 'y', 'n', 'l', 'g', 'p', 't', 'v', 'c'
+    };
+    //  Jan  Feb  Mar  Apr  May  Jun  Jul  Aug  Sep  Oct  Nov  Dec
+
+    /**
+     * Looks up month number (1-12) from a 3-letter abbreviation at buf[pos..pos+3).
+     * Validates all three characters: uses a two-char lookup table for the first two,
+     * then disambiguates Mar/May and Jun/Jul with the third character, and validates
+     * the third character for all other months.
+     */
+    private static int lookupMonth(byte[] buf, int pos) {
+        int key = (buf[pos] & 0x7F) * 128 + (buf[pos + 1] & 0x7F);
+        int month = key < MONTH_LOOKUP.length ? MONTH_LOOKUP[key] : 0;
+        if (month == 3) {
+            // Mar or May — disambiguate on third char
+            if (buf[pos + 2] == 'y') {
+                return 5; // May
+            }
+            if (buf[pos + 2] != 'r') {
+                throw new SerializationException("Invalid month: "
+                        + (char) buf[pos] + (char) buf[pos + 1] + (char) buf[pos + 2]);
+            }
+            return 3; // Mar
+        }
+        if (month == 6) {
+            // Jun or Jul — disambiguate on third char
+            if (buf[pos + 2] == 'l') {
+                return 7; // Jul
+            }
+            if (buf[pos + 2] != 'n') {
+                throw new SerializationException("Invalid month: "
+                        + (char) buf[pos] + (char) buf[pos + 1] + (char) buf[pos + 2]);
+            }
+            return 6; // Jun
+        }
+        if (month == 0 || buf[pos + 2] != MONTH_THIRD_CHAR[month]) {
+            throw new SerializationException("Invalid month: "
+                    + (char) buf[pos] + (char) buf[pos + 1] + (char) buf[pos + 2]);
+        }
+        return month;
+    }
+
+    /**
+     * Computes epoch day (days since 1970-01-01) from year/month/day using the
+     * proleptic Gregorian calendar algorithm. Pure integer arithmetic — no java.time overhead.
+     */
+    private static long computeEpochDay(int year, int month, int day) {
+        long y = year;
+        long m = month;
+        // Shift March=0..Feb=11 so Feb (the leap-day month) is at the end
+        if (m <= 2) {
+            y--;
+            m += 9;
+        } else {
+            m -= 3;
+        }
+        long era = (y >= 0 ? y : y - 399) / 400;
+        long yoe = y - era * 400;
+        long doy = (153 * m + 2) / 5 + day - 1;
+        long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        return era * 146097 + doe - 719468;
+    }
+
+    private static int digit(byte b) {
+        int d = b - '0';
+        if (d < 0 || d > 9) {
+            throw new SerializationException("Expected digit, found: " + describeChar(b));
+        }
+        return d;
+    }
+
+    /**
+     * Parses an ISO-8601 timestamp directly from a JSON quoted string in the byte buffer.
+     * Expects pos to be at the opening quote. Avoids String allocation and DateTimeFormatter.
+     *
+     * <p>On success, stores result in deser.parsedEndPos (position after closing quote)
+     * and returns the Instant. On failure (non-standard format), returns null and
+     * deser state is unchanged — caller should fall back to DateTimeFormatter.
+     */
+    static Instant parseIso8601(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
+        // Minimum: "YYYY-MM-DDThh:mm:ssZ" = 22 bytes (including quotes)
+        if (pos >= end || buf[pos] != '"' || pos + 22 > end) {
+            return null;
+        }
+        pos++; // skip opening quote
+
+        // Parse YYYY-MM-DD
+        int year = digit(buf[pos]) * 1000 + digit(buf[pos + 1]) * 100
+                + digit(buf[pos + 2]) * 10 + digit(buf[pos + 3]);
+        pos += 4;
+        if (buf[pos++] != '-') {
+            return null;
+        }
+        int month = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (buf[pos++] != '-') {
+            return null;
+        }
+        int day = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+
+        if (buf[pos] != 'T' && buf[pos] != 't') {
+            return null;
+        }
+        pos++;
+
+        // Parse hh:mm:ss
+        int hour = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (buf[pos++] != ':') {
+            return null;
+        }
+        int minute = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (buf[pos++] != ':') {
+            return null;
+        }
+        int second = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+
+        // Optional fractional seconds
+        int nano = 0;
+        if (pos < end && buf[pos] == '.') {
+            pos++;
+            int fracStart = pos;
+            while (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
+                pos++;
+            }
+            int fracLen = pos - fracStart;
+            if (fracLen == 0) {
+                return null;
+            }
+            // Parse up to 9 fractional digits, zero-padding on the right
+            for (int i = 0; i < 9; i++) {
+                nano *= 10;
+                if (i < fracLen) {
+                    nano += buf[fracStart + i] - '0';
+                }
+            }
+        }
+
+        // Must end with 'Z' for UTC fast path
+        if (pos >= end || buf[pos] != 'Z') {
+            return null; // timezone offset — fall back to DateTimeFormatter
+        }
+        pos++; // skip Z
+
+        // Expect closing quote
+        if (pos >= end || buf[pos] != '"') {
+            return null;
+        }
+        pos++; // skip closing quote
+
+        deser.parsedEndPos = pos;
+        long epochDay = computeEpochDay(year, month, day);
+        long epochSecond = epochDay * 86400 + hour * 3600 + minute * 60 + second;
+        return Instant.ofEpochSecond(epochSecond, nano);
+    }
+
+    /**
+     * Parses an HTTP-date ("EEE, dd MMM yyyy HH:mm:ss GMT") directly from a JSON
+     * quoted string. Expects pos to be at the opening quote.
+     *
+     * <p>On success, stores deser.parsedEndPos (after closing quote) and returns Instant.
+     * On failure, returns null — caller should fall back to DateTimeFormatter.
+     */
+    static Instant parseHttpDate(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
+        // Minimum: "Sun, 01 Jan 2026 00:00:00 GMT" = 31 bytes (including quotes)
+        if (pos >= end || buf[pos] != '"' || pos + 31 > end) {
+            return null;
+        }
+        pos++; // skip opening quote
+
+        // Skip day name — find comma
+        while (pos < end && buf[pos] != ',') {
+            pos++;
+        }
+        if (pos >= end) {
+            return null;
+        }
+        pos++; // skip comma
+        if (pos >= end || buf[pos] != ' ') {
+            return null;
+        }
+        pos++; // skip space
+
+        // Parse dd
+        int day = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (buf[pos++] != ' ') {
+            return null;
+        }
+
+        // Parse MMM
+        int month = lookupMonth(buf, pos);
+        pos += 3;
+        if (buf[pos++] != ' ') {
+            return null;
+        }
+
+        // Parse yyyy
+        int year = digit(buf[pos]) * 1000 + digit(buf[pos + 1]) * 100
+                + digit(buf[pos + 2]) * 10 + digit(buf[pos + 3]);
+        pos += 4;
+        if (buf[pos++] != ' ') {
+            return null;
+        }
+
+        // Parse HH:mm:ss
+        int hour = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (buf[pos++] != ':') {
+            return null;
+        }
+        int minute = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (buf[pos++] != ':') {
+            return null;
+        }
+        int second = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+
+        // Expect " GMT"
+        if (pos + 4 > end || buf[pos] != ' ' || buf[pos + 1] != 'G'
+                || buf[pos + 2] != 'M' || buf[pos + 3] != 'T') {
+            return null;
+        }
+        pos += 4; // skip " GMT"
+
+        // Expect closing quote
+        if (pos >= end || buf[pos] != '"') {
+            return null;
+        }
+        pos++; // skip closing quote
+
+        deser.parsedEndPos = pos;
+        long epochDay = computeEpochDay(year, month, day);
+        long epochSecond = epochDay * 86400 + hour * 3600 + minute * 60 + second;
+        return Instant.ofEpochSecond(epochSecond);
     }
 
     static String describeChar(byte b) {
