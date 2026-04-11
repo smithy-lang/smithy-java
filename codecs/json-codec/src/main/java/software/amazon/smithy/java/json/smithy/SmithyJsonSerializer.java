@@ -217,10 +217,21 @@ final class SmithyJsonSerializer implements ShapeSerializer {
 
     @Override
     public void writeBigDecimal(Schema schema, BigDecimal value) {
-        if (value.scale() == 0 && value.unscaledValue().bitLength() < 64) {
-            ensureCapacity(20);
-            pos = JsonWriteUtils.writeLong(buf, pos, value.longValueExact());
-            return;
+        int scale = value.scale();
+        if (value.unscaledValue().bitLength() < 64) {
+            if (scale == 0) {
+                ensureCapacity(20);
+                pos = JsonWriteUtils.writeLong(buf, pos, value.longValueExact());
+                return;
+            }
+            if (scale > 0) {
+                // Fast path: write "integerPart.fractionalPart" directly.
+                // E.g., BigDecimal("99999.99999") → unscaled=9999999999, scale=5
+                long unscaled = value.unscaledValue().longValue();
+                ensureCapacity(22 + scale); // sign + 20 digits + dot + scale digits
+                pos = JsonWriteUtils.writeBigDecimalFromLong(buf, pos, unscaled, scale);
+                return;
+            }
         }
         String s = value.toString();
         ensureCapacity(s.length());

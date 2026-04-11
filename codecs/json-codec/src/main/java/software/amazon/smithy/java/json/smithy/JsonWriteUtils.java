@@ -586,6 +586,55 @@ final class JsonWriteUtils {
         return pos;
     }
 
+    // Pre-computed powers of 10 for BigDecimal fast path
+    private static final long[] POWERS_OF_10 = {
+            1L, 10L, 100L, 1000L, 10000L, 100000L, 1000000L, 10000000L,
+            100000000L, 1000000000L, 10000000000L, 100000000000L,
+            1000000000000L, 10000000000000L, 100000000000000L,
+            1000000000000000L, 10000000000000000L, 100000000000000000L,
+            1000000000000000000L
+    };
+
+    /**
+     * Writes a BigDecimal with known unscaled long value and positive scale directly.
+     * E.g., unscaled=9999999999, scale=5 writes "99999.99999".
+     */
+    static int writeBigDecimalFromLong(byte[] buf, int pos, long unscaled, int scale) {
+        if (unscaled < 0) {
+            buf[pos++] = '-';
+            if (unscaled == Long.MIN_VALUE) {
+                // Extremely unlikely edge case — fall through won't work, but caller
+                // checks bitLength < 64 so this can't happen
+                throw new ArithmeticException("Cannot negate Long.MIN_VALUE");
+            }
+            unscaled = -unscaled;
+        }
+
+        if (scale < POWERS_OF_10.length) {
+            long divisor = POWERS_OF_10[scale];
+            long intPart = unscaled / divisor;
+            long fracPart = unscaled - intPart * divisor;
+
+            // Write integer part (or 0 if unscaled < divisor)
+            pos = writePositiveLong(buf, pos, intPart);
+            buf[pos++] = '.';
+
+            // Write fractional part with leading zeros
+            // e.g., scale=5 and fracPart=99 → "00099"
+            for (int i = scale - 1; i >= 0; i--) {
+                long p10 = POWERS_OF_10[i];
+                int d = (int) (fracPart / p10);
+                buf[pos++] = (byte) ('0' + d);
+                fracPart -= d * p10;
+            }
+        } else {
+            // Scale too large for our table — shouldn't happen for practical values
+            pos = writePositiveLong(buf, pos, unscaled);
+        }
+
+        return pos;
+    }
+
     /**
      * Writes an ASCII string directly to the buffer without quoting.
      * Used for number-to-string conversions (Double.toString, BigDecimal.toString, etc).
