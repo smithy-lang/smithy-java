@@ -14,7 +14,9 @@ extra["moduleName"] = "software.amazon.smithy.java.json"
 dependencies {
     api(project(":core"))
     compileOnly(libs.jackson.core)
+    compileOnly(libs.fastdoubleparser)
     testRuntimeOnly(libs.jackson.core)
+    testRuntimeOnly(libs.fastdoubleparser)
     smithyBuild(project(":codegen:codegen-plugin"))
 }
 
@@ -31,7 +33,15 @@ tasks {
                         .toString(),
                 ),
             )
+            include(
+                dependency(
+                    libs.fastdoubleparser
+                        .get()
+                        .toString(),
+                ),
+            )
             relocate("tools.jackson.core", "software.amazon.smithy.java.internal.shaded.tools.jackson.core")
+            relocate("ch.randelshofer", "software.amazon.smithy.java.internal.shaded.ch.randelshofer")
         }
     }
     jar {
