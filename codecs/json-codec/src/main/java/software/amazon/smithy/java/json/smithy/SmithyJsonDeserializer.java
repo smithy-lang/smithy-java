@@ -18,6 +18,7 @@ import java.util.Map;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
+import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonDocuments;
 import software.amazon.smithy.java.json.JsonFieldMapper;
@@ -225,6 +226,23 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     public Instant readTimestamp(Schema schema) {
         skipWhitespace();
         var format = settings.timestampResolver().resolve(schema);
+        if (format == TimestampFormatter.Prelude.EPOCH_SECONDS
+                && pos < end && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
+            // Fast path for epoch-seconds: try integer parsing first.
+            // Most epoch-seconds timestamps are whole numbers, so parseLong avoids
+            // the expensive FastDoubleParser path entirely.
+            JsonReadUtils.parseLong(buf, pos, end, this);
+            int endPos = parsedEndPos;
+            if (endPos >= end || (buf[endPos] != '.' && buf[endPos] != 'e' && buf[endPos] != 'E')) {
+                // Pure integer — no fractional part
+                pos = endPos;
+                return Instant.ofEpochSecond(parsedLong);
+            }
+            // Has fractional/exponent part — fall through to double parsing
+            JsonReadUtils.parseDouble(buf, pos, end, this);
+            pos = parsedEndPos;
+            return format.readFromNumber(parsedDouble);
+        }
         if (pos < end && buf[pos] == '"') {
             // String form
             String s = readStringValue();
