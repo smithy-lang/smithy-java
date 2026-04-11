@@ -56,34 +56,37 @@ final class SmithyMemberLookup implements MemberLookup {
 
     /**
      * Looks up a member by matching the field name bytes directly from the input buffer.
-     * No String allocation occurs on the common path.
+     * No String allocation on the common path.
      *
-     * <p>This method is stateless and thread-safe (the schema extension is shared).
-     * Speculative ordered matching is handled by the caller passing expectedNext.
+     * <p>Strategy:
+     * <ol>
+     *   <li><b>Speculative fast path</b>: check the expected next member via length + Arrays.equals
+     *       (JVM-intrinsified, ~2ns for short names). Fires on every field when JSON arrives in
+     *       schema definition order (the common case for smithy-to-smithy communication).
+     *   <li><b>Slow path</b>: linear scan with FNV-1a hash pre-filter. Hash is computed lazily
+     *       (only on speculative miss) to avoid the per-byte multiply+XOR cost on the hot path.
+     *       The hash rejects most non-matching members with a single {@code long ==} before
+     *       falling through to Arrays.equals.
+     * </ol>
      *
-     * @param buf input buffer containing the field name
-     * @param start start offset of the field name (after opening quote)
-     * @param end end offset of the field name (before closing quote)
-     * @param expectedNext the expected next member index for speculative matching (-1 to disable)
-     * @return the matched member Schema, or null if not found
+     * @param buf input buffer containing the field name bytes
+     * @param start start offset (after opening quote)
+     * @param end end offset (before closing quote)
+     * @param expectedNext speculative next member index (-1 to disable)
+     * @return matched Schema, or null if not found
      */
-    /**
-     * Looks up with a pre-computed hash. Avoids re-hashing the field name bytes.
-     * The hash is computed inline during field name scanning in readStruct.
-     */
-    Schema lookupWithHash(byte[] buf, int start, int end, long hash, int expectedNext) {
+    Schema lookup(byte[] buf, int start, int end, int expectedNext) {
         int nameLen = end - start;
 
-        // Speculative fast path: hash + length + byte equality.
-        // Arrays.equals is intrinsified by the JVM and very fast for short arrays.
-        if (expectedNext >= 0 && expectedNext < orderedHashes.length
-                && orderedHashes[expectedNext] == hash
+        // Speculative fast path: Arrays.equals only, no hash.
+        if (expectedNext >= 0 && expectedNext < orderedNameBytes.length
                 && orderedNameBytes[expectedNext].length == nameLen
                 && Arrays.equals(buf, start, end, orderedNameBytes[expectedNext], 0, nameLen)) {
             return orderedSchemas[expectedNext];
         }
 
-        // Slow path: linear scan with full byte verification for safety
+        // Slow path: compute hash lazily, then scan with hash + length + equals.
+        long hash = fnvHash(buf, start, end);
         for (int i = 0; i < orderedHashes.length; i++) {
             if (orderedHashes[i] == hash
                     && orderedNameBytes[i].length == nameLen

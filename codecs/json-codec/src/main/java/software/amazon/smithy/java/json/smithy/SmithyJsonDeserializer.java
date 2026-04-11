@@ -38,7 +38,7 @@ import software.amazon.smithy.model.shapes.ShapeType;
 final class SmithyJsonDeserializer implements ShapeDeserializer {
 
     private static final int MAX_DEPTH = 1000;
-    private static final Base64.Decoder BASE64_DECODER = Base64.getMimeDecoder();
+    private static final Base64.Decoder BASE64_DECODER = Base64.getDecoder();
 
     private final byte[] buf;
     private int pos;
@@ -245,8 +245,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             return "end of input";
         }
         return switch (buf[pos]) {
-            case 't' -> "Boolean value";
-            case 'f' -> "Boolean value";
+            case 't', 'f' -> "Boolean value";
             case 'n' -> "Null value";
             case '[' -> "Array value";
             case '{' -> "Object value";
@@ -305,25 +304,22 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
             skipWhitespace();
 
-            // Parse field name and compute FNV-1a hash in a single pass.
-            // This fuses what was previously two separate scans (scan for '"' + fnvHash).
-            // Note: Smithy member names and jsonName trait values cannot contain backslashes
-            // or characters requiring JSON escaping, so we don't need to handle escape
-            // sequences in field names for member lookup purposes. Unknown escaped field
-            // names will simply not match any member and be skipped via the unknown-field path.
+            // Parse field name — just scan for closing quote, no hash computation.
+            // The speculative match uses Arrays.equals (JVM-intrinsified, faster than hashing
+            // for short field names). Hash is computed lazily only when speculative match misses.
+            // Note: Smithy member names cannot contain backslashes or characters requiring
+            // JSON escaping, so escaped field names won't match any member and fall through
+            // to the unknown-field skip path.
             if (pos >= end || buf[pos] != '"') {
                 throw new SerializationException(
                         "Expected field name, found: " + JsonReadUtils.describePos(buf, pos, end));
             }
             pos++; // skip opening quote
             int nameStart = pos;
-            long nameHash = 0xcbf29ce484222325L; // FNV-1a offset basis
             while (pos < end && buf[pos] != '"') {
                 if (buf[pos] == '\\') {
-                    pos++; // skip escaped char (hash includes raw bytes)
+                    pos++; // skip escaped char
                 }
-                nameHash ^= buf[pos] & 0xFF;
-                nameHash *= 0x100000001b3L;
                 pos++;
             }
             if (pos >= end) {
@@ -337,9 +333,9 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             expect(':');
             skipWhitespace();
 
-            // Look up member using pre-computed hash + stateless lookup
+            // Look up member: speculative Arrays.equals first, hash-based scan on miss
             Schema member = lookup != null
-                    ? lookup.lookupWithHash(buf, nameStart, nameEnd, nameHash, expectedNext)
+                    ? lookup.lookup(buf, nameStart, nameEnd, expectedNext)
                     : null;
             if (member != null) {
                 expectedNext = member.memberIndex() + 1;
