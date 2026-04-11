@@ -291,82 +291,99 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
-        skipWhitespace();
-        expect('{');
+        // Localize hot fields to registers. The JIT cannot promote instance fields across
+        // virtual calls (the structMemberConsumer callback), so keeping buf/end/pos as locals
+        // between callbacks eliminates ~6 memory loads/stores per field iteration.
+        final byte[] buf = this.buf;
+        final int end = this.end;
+        int p = JsonReadUtils.skipWhitespace(buf, this.pos, end);
+
+        if (p >= end || buf[p] != '{') {
+            this.pos = p;
+            throw new SerializationException(
+                    "Expected '{', found: " + JsonReadUtils.describePos(buf, p, end));
+        }
+        p++;
         depth++;
         if (depth > MAX_DEPTH) {
+            this.pos = p;
             throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
         }
 
-        skipWhitespace();
+        p = JsonReadUtils.skipWhitespace(buf, p, end);
 
         // Empty object
-        if (pos < end && buf[pos] == '}') {
-            pos++;
+        if (p < end && buf[p] == '}') {
+            this.pos = p + 1;
             depth--;
             return;
         }
 
         // Get the member lookup for this struct.
-        // If schema is a member schema (e.g. ComplexStruct$nested), resolve to the target struct
-        // schema to get the struct-level extension with member lookups.
         Schema structSchema = schema.isMember() ? schema.memberTarget() : schema;
         var ext = structSchema.getExtension(SmithyJsonSchemaExtensions.KEY);
         SmithyMemberLookup lookup = null;
         if (ext != null) {
             lookup = useJsonName ? ext.jsonNameLookup() : ext.memberNameLookup();
         }
-        // Speculative state is local to this call (not on the shared lookup)
         int expectedNext = 0;
 
         boolean first = true;
         while (true) {
             if (!first) {
-                skipWhitespace();
-                if (pos >= end) {
+                p = JsonReadUtils.skipWhitespace(buf, p, end);
+                if (p >= end) {
+                    this.pos = p;
                     throw new SerializationException("Unterminated object");
                 }
-                if (buf[pos] == '}') {
-                    pos++;
+                if (buf[p] == '}') {
+                    this.pos = p + 1;
                     depth--;
                     return;
                 }
-                expect(',');
+                if (p >= end || buf[p] != ',') {
+                    this.pos = p;
+                    throw new SerializationException(
+                            "Expected ',', found: " + JsonReadUtils.describePos(buf, p, end));
+                }
+                p++;
             }
             first = false;
 
-            skipWhitespace();
+            p = JsonReadUtils.skipWhitespace(buf, p, end);
 
-            // Parse field name — just scan for closing quote, no hash computation.
-            // The speculative match uses Arrays.equals (JVM-intrinsified, faster than hashing
-            // for short field names). Hash is computed lazily only when speculative match misses.
-            // Note: Smithy member names cannot contain backslashes or characters requiring
-            // JSON escaping, so escaped field names won't match any member and fall through
-            // to the unknown-field skip path.
-            if (pos >= end || buf[pos] != '"') {
+            // Parse field name — scan for closing quote, no hash computation.
+            if (p >= end || buf[p] != '"') {
+                this.pos = p;
                 throw new SerializationException(
-                        "Expected field name, found: " + JsonReadUtils.describePos(buf, pos, end));
+                        "Expected field name, found: " + JsonReadUtils.describePos(buf, p, end));
             }
-            pos++; // skip opening quote
-            int nameStart = pos;
-            while (pos < end && buf[pos] != '"') {
-                if (buf[pos] == '\\') {
-                    pos++; // skip escaped char
+            p++; // skip opening quote
+            int nameStart = p;
+            while (p < end && buf[p] != '"') {
+                if (buf[p] == '\\') {
+                    p++; // skip escaped char
                 }
-                pos++;
+                p++;
             }
-            if (pos >= end) {
+            if (p >= end) {
+                this.pos = p;
                 throw new SerializationException("Unterminated field name");
             }
-            int nameEnd = pos;
-            pos++; // skip closing quote
+            int nameEnd = p;
+            p++; // skip closing quote
 
             // Skip colon
-            skipWhitespace();
-            expect(':');
-            skipWhitespace();
+            p = JsonReadUtils.skipWhitespace(buf, p, end);
+            if (p >= end || buf[p] != ':') {
+                this.pos = p;
+                throw new SerializationException(
+                        "Expected ':', found: " + JsonReadUtils.describePos(buf, p, end));
+            }
+            p++;
+            p = JsonReadUtils.skipWhitespace(buf, p, end);
 
-            // Look up member: speculative Arrays.equals first, hash-based scan on miss
+            // Look up member
             Schema member = lookup != null
                     ? lookup.lookup(buf, nameStart, nameEnd, expectedNext)
                     : null;
@@ -376,25 +393,26 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
             if (member != null) {
                 // Check for null value
-                if (pos < end && buf[pos] == 'n'
-                        && pos + 4 <= end
-                        && buf[pos + 1] == 'u'
-                        && buf[pos + 2] == 'l'
-                        && buf[pos + 3] == 'l') {
-                    pos += 4;
-                    // null value — skip (don't call consumer)
+                if (p < end && buf[p] == 'n'
+                        && p + 4 <= end
+                        && buf[p + 1] == 'u'
+                        && buf[p + 2] == 'l'
+                        && buf[p + 3] == 'l') {
+                    p += 4;
                 } else {
+                    // Write pos back before callback, reload after
+                    this.pos = p;
                     structMemberConsumer.accept(state, member, this);
+                    p = this.pos;
                 }
             } else {
-                // Unknown field
+                this.pos = p;
                 String fieldName = new String(buf, nameStart, nameEnd - nameStart, StandardCharsets.UTF_8);
 
                 if (schema.type() == ShapeType.STRUCTURE) {
                     structMemberConsumer.unknownMember(state, fieldName);
                     skipValue();
                 } else if (fieldName.equals("__type")) {
-                    // Ignore __type on unknown union members
                     skipValue();
                 } else if (settings.forbidUnknownUnionMembers()) {
                     throw new SerializationException("Unknown member " + fieldName + " encountered");
@@ -402,6 +420,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                     structMemberConsumer.unknownMember(state, fieldName);
                     skipValue();
                 }
+                p = this.pos;
             }
         }
     }
