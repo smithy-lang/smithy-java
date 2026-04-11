@@ -272,6 +272,13 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             pos = JsonWriteUtils.writeIso8601Timestamp(buf, pos, value);
             return;
         }
+        if (format == TimestampFormatter.Prelude.HTTP_DATE) {
+            // Fast path: write HTTP-date directly to buffer, bypassing DateTimeFormatter.
+            // "Sat, 01 Jan 2026 00:00:00 GMT" = 31 chars + 2 quotes = 33
+            ensureCapacity(35);
+            pos = JsonWriteUtils.writeHttpDate(buf, pos, value);
+            return;
+        }
         format.writeToSerializer(schema, value, this);
     }
 
