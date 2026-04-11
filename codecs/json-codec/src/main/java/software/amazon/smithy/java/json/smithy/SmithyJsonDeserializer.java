@@ -236,7 +236,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             if (endPos >= end || (buf[endPos] != '.' && buf[endPos] != 'e' && buf[endPos] != 'E')) {
                 // Pure integer — no fractional part
                 pos = endPos;
-                return Instant.ofEpochSecond(parsedLong);
+                try {
+                    return Instant.ofEpochSecond(parsedLong);
+                } catch (java.time.DateTimeException e) {
+                    throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
+                }
             }
             // Has fractional/exponent part — fall through to double parsing
             JsonReadUtils.parseDouble(buf, pos, end, this);
