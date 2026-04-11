@@ -429,39 +429,49 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
     @Override
     public <T> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
-        skipWhitespace();
-        if (pos >= end || buf[pos] != '[') {
+        final byte[] buf = this.buf;
+        final int end = this.end;
+        int p = JsonReadUtils.skipWhitespace(buf, this.pos, end);
+
+        if (p >= end || buf[p] != '[') {
+            this.pos = p;
             throw new SerializationException(
                     "Expected a list, but found " + describeCurrentToken());
         }
-        pos++; // skip '['
+        p++;
         depth++;
         if (depth > MAX_DEPTH) {
+            this.pos = p;
             throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
         }
 
-        skipWhitespace();
+        p = JsonReadUtils.skipWhitespace(buf, p, end);
 
         // Empty array
-        if (pos < end && buf[pos] == ']') {
-            pos++;
+        if (p < end && buf[p] == ']') {
+            this.pos = p + 1;
             depth--;
             return;
         }
 
+        this.pos = p;
         listMemberConsumer.accept(state, this);
+        p = this.pos;
         while (true) {
-            skipWhitespace();
-            if (pos < end && buf[pos] == ']') {
-                pos++;
+            p = JsonReadUtils.skipWhitespace(buf, p, end);
+            if (p < end && buf[p] == ']') {
+                this.pos = p + 1;
                 depth--;
                 return;
             }
-            if (pos < end && buf[pos] == ',') {
-                pos++;
-                skipWhitespace();
+            if (p < end && buf[p] == ',') {
+                p++;
+                p = JsonReadUtils.skipWhitespace(buf, p, end);
+                this.pos = p;
                 listMemberConsumer.accept(state, this);
+                p = this.pos;
             } else {
+                this.pos = p;
                 throw new SerializationException(
                         "Expected end of list, but found " + describeCurrentToken());
             }
@@ -472,18 +482,27 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
     @Override
     public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
-        skipWhitespace();
-        expect('{');
+        final byte[] buf = this.buf;
+        final int end = this.end;
+        int p = JsonReadUtils.skipWhitespace(buf, this.pos, end);
+
+        if (p >= end || buf[p] != '{') {
+            this.pos = p;
+            throw new SerializationException(
+                    "Expected '{', found: " + JsonReadUtils.describePos(buf, p, end));
+        }
+        p++;
         depth++;
         if (depth > MAX_DEPTH) {
+            this.pos = p;
             throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
         }
 
-        skipWhitespace();
+        p = JsonReadUtils.skipWhitespace(buf, p, end);
 
         // Empty object
-        if (pos < end && buf[pos] == '}') {
-            pos++;
+        if (p < end && buf[p] == '}') {
+            this.pos = p + 1;
             depth--;
             return;
         }
@@ -491,24 +510,37 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         boolean first = true;
         while (true) {
             if (!first) {
-                skipWhitespace();
-                if (pos < end && buf[pos] == '}') {
-                    pos++;
+                p = JsonReadUtils.skipWhitespace(buf, p, end);
+                if (p < end && buf[p] == '}') {
+                    this.pos = p + 1;
                     depth--;
                     return;
                 }
-                expect(',');
-                skipWhitespace();
+                if (p >= end || buf[p] != ',') {
+                    this.pos = p;
+                    throw new SerializationException(
+                            "Expected ',', found: " + JsonReadUtils.describePos(buf, p, end));
+                }
+                p++;
+                p = JsonReadUtils.skipWhitespace(buf, p, end);
             }
             first = false;
 
-            // Parse key
+            // Parse key — need to write pos back for readStringValue
+            this.pos = p;
             String key = readStringValue();
-            skipWhitespace();
-            expect(':');
-            skipWhitespace();
+            p = JsonReadUtils.skipWhitespace(buf, this.pos, end);
+            if (p >= end || buf[p] != ':') {
+                this.pos = p;
+                throw new SerializationException(
+                        "Expected ':', found: " + JsonReadUtils.describePos(buf, p, end));
+            }
+            p++;
+            p = JsonReadUtils.skipWhitespace(buf, p, end);
 
+            this.pos = p;
             mapMemberConsumer.accept(state, key, this);
+            p = this.pos;
         }
     }
 
