@@ -255,6 +255,13 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             pos = JsonWriteUtils.writeEpochSeconds(buf, pos, value.getEpochSecond(), value.getNano());
             return;
         }
+        if (format == TimestampFormatter.Prelude.DATE_TIME) {
+            // Fast path: write ISO-8601 directly to buffer, bypassing Instant.toString()
+            // and the writeString→writeQuotedString round-trip.
+            ensureCapacity(42);
+            pos = JsonWriteUtils.writeIso8601Timestamp(buf, pos, value);
+            return;
+        }
         format.writeToSerializer(schema, value, this);
     }
 

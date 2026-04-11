@@ -6,6 +6,8 @@
 package software.amazon.smithy.java.json.smithy;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Base64;
 
 /**
@@ -404,6 +406,84 @@ final class JsonWriteUtils {
             return writeInt(buf, pos, intValue);
         }
         return Schubfach.writeFloat(buf, pos, value, ftd);
+    }
+
+    /**
+     * Writes an ISO-8601 timestamp directly to the byte buffer as a quoted JSON string.
+     * Produces output like {@code "2025-01-15T10:30:00Z"} or {@code "2025-01-15T10:30:00.123Z"}
+     * for timestamps with sub-second precision.
+     *
+     * <p>Bypasses {@link Instant#toString()} and {@link java.time.format.DateTimeFormatter}
+     * to avoid String allocation on the hot path.
+     */
+    static int writeIso8601Timestamp(byte[] buf, int pos, Instant value) {
+        var dt = value.atOffset(ZoneOffset.UTC);
+        int year = dt.getYear();
+        int month = dt.getMonthValue();
+        int day = dt.getDayOfMonth();
+        int hour = dt.getHour();
+        int minute = dt.getMinute();
+        int second = dt.getSecond();
+        int nano = dt.getNano();
+
+        buf[pos++] = '"';
+
+        // Year (4 digits, with sign for years outside 0000-9999)
+        if (year >= 0 && year <= 9999) {
+            int hi = year / 100;
+            int lo = year - hi * 100;
+            buf[pos++] = DIGIT_PAIRS[hi * 2];
+            buf[pos++] = DIGIT_PAIRS[hi * 2 + 1];
+            buf[pos++] = DIGIT_PAIRS[lo * 2];
+            buf[pos++] = DIGIT_PAIRS[lo * 2 + 1];
+        } else {
+            // Fall back for years outside 0000-9999
+            String yearStr = String.format("%04d", year);
+            for (int i = 0; i < yearStr.length(); i++) {
+                buf[pos++] = (byte) yearStr.charAt(i);
+            }
+        }
+
+        buf[pos++] = '-';
+        buf[pos++] = DIGIT_PAIRS[month * 2];
+        buf[pos++] = DIGIT_PAIRS[month * 2 + 1];
+        buf[pos++] = '-';
+        buf[pos++] = DIGIT_PAIRS[day * 2];
+        buf[pos++] = DIGIT_PAIRS[day * 2 + 1];
+        buf[pos++] = 'T';
+        buf[pos++] = DIGIT_PAIRS[hour * 2];
+        buf[pos++] = DIGIT_PAIRS[hour * 2 + 1];
+        buf[pos++] = ':';
+        buf[pos++] = DIGIT_PAIRS[minute * 2];
+        buf[pos++] = DIGIT_PAIRS[minute * 2 + 1];
+        buf[pos++] = ':';
+        buf[pos++] = DIGIT_PAIRS[second * 2];
+        buf[pos++] = DIGIT_PAIRS[second * 2 + 1];
+
+        if (nano != 0) {
+            buf[pos++] = '.';
+            // Write up to 9 fractional digits, stripping trailing zeros
+            int frac = nano;
+            int digits = 9;
+            while (frac % 10 == 0) {
+                frac /= 10;
+                digits--;
+            }
+            // Write digits left-to-right
+            int scale = 1;
+            for (int i = 1; i < digits; i++) {
+                scale *= 10;
+            }
+            while (scale > 0) {
+                buf[pos++] = (byte) ('0' + frac / scale);
+                frac %= scale;
+                scale /= 10;
+            }
+        }
+
+        buf[pos++] = 'Z';
+        buf[pos++] = '"';
+        return pos;
     }
 
     /**
