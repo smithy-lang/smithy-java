@@ -486,6 +486,106 @@ final class JsonWriteUtils {
         return pos;
     }
 
+    // Day-of-week names as pre-computed byte arrays (Mon=1..Sun=7 per java.time DayOfWeek)
+    private static final byte[][] DAY_NAMES = {
+            null, // 0 unused
+            {'M', 'o', 'n'}, // 1 = Monday
+            {'T', 'u', 'e'}, // 2 = Tuesday
+            {'W', 'e', 'd'}, // 3 = Wednesday
+            {'T', 'h', 'u'}, // 4 = Thursday
+            {'F', 'r', 'i'}, // 5 = Friday
+            {'S', 'a', 't'}, // 6 = Saturday
+            {'S', 'u', 'n'}, // 7 = Sunday
+    };
+
+    // Month abbreviations as pre-computed byte arrays (Jan=1..Dec=12)
+    private static final byte[][] MONTH_NAMES = {
+            null, // 0 unused
+            {'J', 'a', 'n'},
+            {'F', 'e', 'b'},
+            {'M', 'a', 'r'},
+            {'A', 'p', 'r'},
+            {'M', 'a', 'y'},
+            {'J', 'u', 'n'},
+            {'J', 'u', 'l'},
+            {'A', 'u', 'g'},
+            {'S', 'e', 'p'},
+            {'O', 'c', 't'},
+            {'N', 'o', 'v'},
+            {'D', 'e', 'c'},
+    };
+
+    /**
+     * Writes an HTTP-date timestamp directly to the byte buffer as a quoted JSON string.
+     * Produces output like {@code "Sat, 01 Jan 2026 00:00:00 GMT"}.
+     *
+     * <p>Bypasses {@link java.time.format.DateTimeFormatter} to avoid String allocation
+     * and the heavy formatter machinery on the hot path.
+     */
+    static int writeHttpDate(byte[] buf, int pos, Instant value) {
+        var dt = value.atOffset(ZoneOffset.UTC);
+        int year = dt.getYear();
+        int month = dt.getMonthValue();
+        int day = dt.getDayOfMonth();
+        int hour = dt.getHour();
+        int minute = dt.getMinute();
+        int second = dt.getSecond();
+        int dow = dt.getDayOfWeek().getValue(); // 1=Monday..7=Sunday
+
+        buf[pos++] = '"';
+
+        // Day name
+        byte[] dayName = DAY_NAMES[dow];
+        buf[pos++] = dayName[0];
+        buf[pos++] = dayName[1];
+        buf[pos++] = dayName[2];
+        buf[pos++] = ',';
+        buf[pos++] = ' ';
+
+        // Day of month (2 digits)
+        buf[pos++] = DIGIT_PAIRS[day * 2];
+        buf[pos++] = DIGIT_PAIRS[day * 2 + 1];
+        buf[pos++] = ' ';
+
+        // Month name
+        byte[] monthName = MONTH_NAMES[month];
+        buf[pos++] = monthName[0];
+        buf[pos++] = monthName[1];
+        buf[pos++] = monthName[2];
+        buf[pos++] = ' ';
+
+        // Year (4 digits)
+        if (year >= 0 && year <= 9999) {
+            int hi = year / 100;
+            int lo = year - hi * 100;
+            buf[pos++] = DIGIT_PAIRS[hi * 2];
+            buf[pos++] = DIGIT_PAIRS[hi * 2 + 1];
+            buf[pos++] = DIGIT_PAIRS[lo * 2];
+            buf[pos++] = DIGIT_PAIRS[lo * 2 + 1];
+        } else {
+            String yearStr = String.format("%04d", year);
+            for (int i = 0; i < yearStr.length(); i++) {
+                buf[pos++] = (byte) yearStr.charAt(i);
+            }
+        }
+
+        buf[pos++] = ' ';
+        buf[pos++] = DIGIT_PAIRS[hour * 2];
+        buf[pos++] = DIGIT_PAIRS[hour * 2 + 1];
+        buf[pos++] = ':';
+        buf[pos++] = DIGIT_PAIRS[minute * 2];
+        buf[pos++] = DIGIT_PAIRS[minute * 2 + 1];
+        buf[pos++] = ':';
+        buf[pos++] = DIGIT_PAIRS[second * 2];
+        buf[pos++] = DIGIT_PAIRS[second * 2 + 1];
+        buf[pos++] = ' ';
+        buf[pos++] = 'G';
+        buf[pos++] = 'M';
+        buf[pos++] = 'T';
+        buf[pos++] = '"';
+        return pos;
+    }
+
     /**
      * Writes an ASCII string directly to the buffer without quoting.
      * Used for number-to-string conversions (Double.toString, BigDecimal.toString, etc).
