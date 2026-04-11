@@ -22,14 +22,25 @@ class Schubfach {
 
     }
 
-    /**
-     * Writes the decimal representation of {@code v} directly into {@code buf}
-     * starting at {@code pos}. Returns the new position after the last written byte.
-     * Produces the same output as {@link Double#toString(double)} but writes directly
-     * to the target buffer without allocating a String or intermediate byte[].
-     */
+    /** Creates a reusable DoubleToDecimal instance for hot-path serialization. */
+    static DoubleToDecimal createDoubleToDecimal() {
+        return new DoubleToDecimal();
+    }
+
+    /** Creates a reusable FloatToDecimal instance for hot-path serialization. */
+    static FloatToDecimal createFloatToDecimal() {
+        return new FloatToDecimal();
+    }
+
     public static int writeDouble(byte[] buf, int pos, double v) {
-        var dtd = new DoubleToDecimal();
+        return writeDouble(buf, pos, v, new DoubleToDecimal());
+    }
+
+    /**
+     * Writes the decimal representation of {@code v} using a reusable {@link DoubleToDecimal}
+     * instance to avoid per-call allocation on hot paths.
+     */
+    public static int writeDouble(byte[] buf, int pos, double v, DoubleToDecimal dtd) {
         dtd.bytes = buf;
         dtd.index = pos - 1; // pre-increment convention: first ++index writes to buf[pos]
         return switch (dtd.toDecimal(v)) {
@@ -51,14 +62,15 @@ class Schubfach {
         };
     }
 
-    /**
-     * Writes the decimal representation of {@code v} directly into {@code buf}
-     * starting at {@code pos}. Returns the new position after the last written byte.
-     * Produces the same output as {@link Float#toString(float)} but writes directly
-     * to the target buffer without allocating a String or intermediate byte[].
-     */
     public static int writeFloat(byte[] buf, int pos, float v) {
-        var ftd = new FloatToDecimal();
+        return writeFloat(buf, pos, v, new FloatToDecimal());
+    }
+
+    /**
+     * Writes the decimal representation of {@code v} using a reusable {@link FloatToDecimal}
+     * instance to avoid per-call allocation on hot paths.
+     */
+    public static int writeFloat(byte[] buf, int pos, float v, FloatToDecimal ftd) {
         ftd.bytes = buf;
         ftd.index = pos - 1;
         return switch (ftd.toDecimal(v)) {
