@@ -184,7 +184,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         int start = pos;
         pos = JsonReadUtils.findNumberEnd(buf, pos, end);
         String numStr = new String(buf, start, pos - start, StandardCharsets.US_ASCII);
-        return new BigInteger(numStr);
+        try {
+            return new BigInteger(numStr);
+        } catch (NumberFormatException e) {
+            throw new SerializationException("Invalid BigInteger value: " + numStr, e);
+        }
     }
 
     @Override
@@ -197,7 +201,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         int start = pos;
         pos = JsonReadUtils.findNumberEnd(buf, pos, end);
         String numStr = new String(buf, start, pos - start, StandardCharsets.US_ASCII);
-        return new BigDecimal(numStr);
+        try {
+            return new BigDecimal(numStr);
+        } catch (NumberFormatException e) {
+            throw new SerializationException("Invalid BigDecimal value: " + numStr, e);
+        }
     }
 
     @Override
@@ -227,13 +235,48 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         skipWhitespace();
         var format = settings.timestampResolver().resolve(schema);
         if (format == TimestampFormatter.Prelude.EPOCH_SECONDS
-                && pos < end && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
+                && pos < end
+                && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
             // Fast path for epoch-seconds: try integer parsing first.
             // Most epoch-seconds timestamps are whole numbers, so parseLong avoids
             // the expensive FastDoubleParser path entirely.
+            int startPos = pos;
             JsonReadUtils.parseLong(buf, pos, end, this);
             int endPos = parsedEndPos;
-            if (endPos >= end || (buf[endPos] != '.' && buf[endPos] != 'e' && buf[endPos] != 'E')) {
+            if (endPos < end && buf[endPos] == '.') {
+                // Fractional epoch-seconds: parse with full nanosecond precision
+                // instead of going through double (which truncates to ~15 significant digits).
+                int fracPos = endPos + 1;
+                int fracStart = fracPos;
+                while (fracPos < end && buf[fracPos] >= '0' && buf[fracPos] <= '9') {
+                    fracPos++;
+                }
+                int fracLen = fracPos - fracStart;
+                if (fracLen > 0) {
+                    int nano = 0;
+                    for (int i = 0; i < 9; i++) {
+                        nano *= 10;
+                        if (i < fracLen) {
+                            nano += buf[fracStart + i] - '0';
+                        }
+                    }
+                    pos = fracPos;
+                    long epochSecond = parsedLong;
+                    boolean negative = buf[startPos] == '-';
+                    if (negative && nano > 0) {
+                        // -0.5 means parsedLong=0 but the value is -0.5 = Instant(-1, 500_000_000)
+                        // -1.5 means parsedLong=-1 but the value is -1.5 = Instant(-2, 500_000_000)
+                        epochSecond -= 1;
+                        nano = 1_000_000_000 - nano;
+                    }
+                    try {
+                        return Instant.ofEpochSecond(epochSecond, nano);
+                    } catch (java.time.DateTimeException e) {
+                        throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
+                    }
+                }
+                // No digits after dot — fall through to double parsing
+            } else if (endPos >= end || (buf[endPos] != 'e' && buf[endPos] != 'E')) {
                 // Pure integer — no fractional part
                 pos = endPos;
                 try {
@@ -242,7 +285,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                     throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
                 }
             }
-            // Has fractional/exponent part — fall through to double parsing
+            // Has exponent or unparseable fraction — fall through to double parsing
             JsonReadUtils.parseDouble(buf, pos, end, this);
             pos = parsedEndPos;
             return format.readFromNumber(parsedDouble);
@@ -265,7 +308,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             }
             // Fallback: parse as String and use DateTimeFormatter
             String s = readStringValue();
-            return format.readFromString(s, true);
+            try {
+                return format.readFromString(s, true);
+            } catch (java.time.DateTimeException e) {
+                throw new SerializationException("Invalid timestamp: " + s, e);
+            }
         }
         if (pos < end && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
             // Number form
@@ -705,7 +752,8 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                 }
                 byte esc = buf[p];
                 switch (esc) {
-                    case '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> {}
+                    case '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> {
+                    }
                     case 'u' -> {
                         if (p + 4 >= end) {
                             throw new SerializationException("Unterminated \\u escape");
@@ -775,7 +823,8 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                 }
                 byte esc = buf[p];
                 switch (esc) {
-                    case '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> {}
+                    case '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> {
+                    }
                     case 'u' -> {
                         // \\uXXXX — skip 4 hex digits
                         if (p + 4 >= end) {

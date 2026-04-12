@@ -359,28 +359,53 @@ final class JsonWriteUtils {
     /**
      * Writes an epoch-seconds timestamp directly from an Instant using integer arithmetic.
      * Avoids the Instant → double → Double.toString → bytes round-trip that accounts for
-     * ~21% of simple-serialize time. Writes "seconds" for whole seconds or "seconds.millis"
-     * for fractional, stripping trailing zeros.
+     * ~21% of simple-serialize time. Writes "seconds" for whole seconds or "seconds.nanos"
+     * for fractional, with full nanosecond precision and trailing zeros stripped.
+     *
+     * <p>For negative epoch seconds with non-zero nanos, the Instant contract is:
+     * {@code Instant.ofEpochSecond(-1, 500_000_000)} = -0.5 seconds (not -1.5).
+     * The nano field is always non-negative and added to the epoch second.
      */
     static int writeEpochSeconds(byte[] buf, int pos, long epochSecond, int nano) {
         if (nano == 0) {
             return writeLong(buf, pos, epochSecond);
         }
-        // Write seconds part
-        pos = writeLong(buf, pos, epochSecond);
-        buf[pos++] = '.';
-        // Convert nano to millis (epoch-seconds uses up to 3 decimal places)
-        int millis = nano / 1_000_000;
-        // Strip trailing zeros
-        if (millis % 100 == 0) {
-            buf[pos++] = (byte) ('0' + millis / 100);
-        } else if (millis % 10 == 0) {
-            buf[pos++] = (byte) ('0' + millis / 100);
-            buf[pos++] = (byte) ('0' + (millis / 10) % 10);
+
+        int fraction = nano;
+        if (epochSecond < 0) {
+            // Instant(-1, 500_000_000) means -1 + 0.5 = -0.5 seconds.
+            // Adjust: seconds part becomes epochSecond+1, fraction becomes 1e9-nano.
+            epochSecond += 1;
+            fraction = 1_000_000_000 - nano;
+            if (epochSecond == 0) {
+                // Special case: -0.xxx (epochSecond was -1, adjusted to 0, but value is negative)
+                buf[pos++] = '-';
+                buf[pos++] = '0';
+            } else {
+                pos = writeLong(buf, pos, epochSecond);
+            }
         } else {
-            buf[pos++] = (byte) ('0' + millis / 100);
-            buf[pos++] = (byte) ('0' + (millis / 10) % 10);
-            buf[pos++] = (byte) ('0' + millis % 10);
+            pos = writeLong(buf, pos, epochSecond);
+        }
+
+        buf[pos++] = '.';
+
+        // Write all 9 fractional digits (zero-padded), then strip trailing zeros.
+        int hi = fraction / 1_000_000;
+        int mid = (fraction / 1_000) % 1_000;
+        int lo = fraction % 1_000;
+        buf[pos++] = (byte) ('0' + hi / 100);
+        buf[pos++] = (byte) ('0' + (hi / 10) % 10);
+        buf[pos++] = (byte) ('0' + hi % 10);
+        buf[pos++] = (byte) ('0' + mid / 100);
+        buf[pos++] = (byte) ('0' + (mid / 10) % 10);
+        buf[pos++] = (byte) ('0' + mid % 10);
+        buf[pos++] = (byte) ('0' + lo / 100);
+        buf[pos++] = (byte) ('0' + (lo / 10) % 10);
+        buf[pos++] = (byte) ('0' + lo % 10);
+        // Strip trailing zeros
+        while (buf[pos - 1] == '0') {
+            pos--;
         }
         return pos;
     }
@@ -588,10 +613,24 @@ final class JsonWriteUtils {
 
     // Pre-computed powers of 10 for BigDecimal fast path
     private static final long[] POWERS_OF_10 = {
-            1L, 10L, 100L, 1000L, 10000L, 100000L, 1000000L, 10000000L,
-            100000000L, 1000000000L, 10000000000L, 100000000000L,
-            1000000000000L, 10000000000000L, 100000000000000L,
-            1000000000000000L, 10000000000000000L, 100000000000000000L,
+            1L,
+            10L,
+            100L,
+            1000L,
+            10000L,
+            100000L,
+            1000000L,
+            10000000L,
+            100000000L,
+            1000000000L,
+            10000000000L,
+            100000000000L,
+            1000000000000L,
+            10000000000000L,
+            100000000000000L,
+            1000000000000000L,
+            10000000000000000L,
+            100000000000000000L,
             1000000000000000000L
     };
 
