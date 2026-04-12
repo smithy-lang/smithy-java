@@ -417,7 +417,6 @@ final class JsonReadUtils {
 
     // Day-of-year offsets for non-leap years (cumulative days before each month)
     // Index 0 unused, months 1-12
-    private static final int[] DAYS_BEFORE_MONTH = {0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
 
     static {
         // Populate month lookup: key = first_char * 128 + second_char
@@ -425,7 +424,6 @@ final class JsonReadUtils {
         MONTH_LOOKUP['F' * 128 + 'e'] = 2;  // Feb
         MONTH_LOOKUP['M' * 128 + 'a'] = 3;  // Mar (also May — disambiguate with 3rd char)
         MONTH_LOOKUP['A' * 128 + 'p'] = 4;  // Apr
-        MONTH_LOOKUP['M' * 128 + 'a'] = 3;  // Mar placeholder, overwritten below for May
         MONTH_LOOKUP['J' * 128 + 'u'] = 6;  // Jun (also Jul — disambiguate with 3rd char)
         MONTH_LOOKUP['A' * 128 + 'u'] = 8;  // Aug
         MONTH_LOOKUP['S' * 128 + 'e'] = 9;  // Sep
@@ -513,7 +511,7 @@ final class JsonReadUtils {
      *
      * <p>On success, stores result in deser.parsedEndPos (position after closing quote)
      * and returns the Instant. On failure (non-standard format), returns null and
-     * deser state is unchanged — caller should fall back to DateTimeFormatter.
+     * deser state is unchanged caller should fall back to DateTimeFormatter.
      */
     static Instant parseIso8601(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
         // Minimum: "YYYY-MM-DDThh:mm:ssZ" = 22 bytes (including quotes)
@@ -603,7 +601,7 @@ final class JsonReadUtils {
      * On failure, returns null — caller should fall back to DateTimeFormatter.
      */
     static Instant parseHttpDate(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
-        // Minimum: "Sun, 01 Jan 2026 00:00:00 GMT" = 31 bytes (including quotes)
+        // Minimum: "Thu, 01 Jan 2026 00:00:00 GMT" = 31 bytes (including quotes)
         if (pos >= end || buf[pos] != '"' || pos + 31 > end) {
             return null;
         }
