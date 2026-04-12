@@ -298,14 +298,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         // Localize hot fields to registers. The JIT cannot promote instance fields across
         // virtual calls (the structMemberConsumer callback), so keeping buf/end/pos as locals
         // between callbacks eliminates ~6 memory loads/stores per field iteration.
-        final byte[] buf = this.buf;
-        final int end = this.end;
-        int p = JsonReadUtils.skipWhitespace(buf, this.pos, end);
+        final byte[] localBuf = this.buf;
+        final int localEnd = this.end;
+        int p = JsonReadUtils.skipWhitespace(localBuf, this.pos, localEnd);
 
-        if (p >= end || buf[p] != '{') {
+        if (p >= localEnd || localBuf[p] != '{') {
             this.pos = p;
             throw new SerializationException(
-                    "Expected '{', found: " + JsonReadUtils.describePos(buf, p, end));
+                    "Expected '{', found: " + JsonReadUtils.describePos(localBuf, p, localEnd));
         }
         p++;
         depth++;
@@ -314,10 +314,10 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
         }
 
-        p = JsonReadUtils.skipWhitespace(buf, p, end);
+        p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
 
         // Empty object
-        if (p < end && buf[p] == '}') {
+        if (p < localEnd && localBuf[p] == '}') {
             this.pos = p + 1;
             depth--;
             return;
@@ -335,42 +335,42 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         boolean first = true;
         while (true) {
             if (!first) {
-                p = JsonReadUtils.skipWhitespace(buf, p, end);
-                if (p >= end) {
+                p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
+                if (p >= localEnd) {
                     this.pos = p;
                     throw new SerializationException("Unterminated object");
                 }
-                if (buf[p] == '}') {
+                if (localBuf[p] == '}') {
                     this.pos = p + 1;
                     depth--;
                     return;
                 }
-                if (p >= end || buf[p] != ',') {
+                if (p >= localEnd || localBuf[p] != ',') {
                     this.pos = p;
                     throw new SerializationException(
-                            "Expected ',', found: " + JsonReadUtils.describePos(buf, p, end));
+                            "Expected ',', found: " + JsonReadUtils.describePos(localBuf, p, localEnd));
                 }
                 p++;
             }
             first = false;
 
-            p = JsonReadUtils.skipWhitespace(buf, p, end);
+            p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
 
             // Parse field name — scan for closing quote, no hash computation.
-            if (p >= end || buf[p] != '"') {
+            if (p >= localEnd || localBuf[p] != '"') {
                 this.pos = p;
                 throw new SerializationException(
-                        "Expected field name, found: " + JsonReadUtils.describePos(buf, p, end));
+                        "Expected field name, found: " + JsonReadUtils.describePos(localBuf, p, localEnd));
             }
             p++; // skip opening quote
             int nameStart = p;
-            while (p < end && buf[p] != '"') {
-                if (buf[p] == '\\') {
+            while (p < localEnd && localBuf[p] != '"') {
+                if (localBuf[p] == '\\') {
                     p++; // skip escaped char
                 }
                 p++;
             }
-            if (p >= end) {
+            if (p >= localEnd) {
                 this.pos = p;
                 throw new SerializationException("Unterminated field name");
             }
@@ -378,18 +378,18 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             p++; // skip closing quote
 
             // Skip colon
-            p = JsonReadUtils.skipWhitespace(buf, p, end);
-            if (p >= end || buf[p] != ':') {
+            p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
+            if (p >= localEnd || localBuf[p] != ':') {
                 this.pos = p;
                 throw new SerializationException(
-                        "Expected ':', found: " + JsonReadUtils.describePos(buf, p, end));
+                        "Expected ':', found: " + JsonReadUtils.describePos(localBuf, p, localEnd));
             }
             p++;
-            p = JsonReadUtils.skipWhitespace(buf, p, end);
+            p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
 
             // Look up member
             Schema member = lookup != null
-                    ? lookup.lookup(buf, nameStart, nameEnd, expectedNext)
+                    ? lookup.lookup(localBuf, nameStart, nameEnd, expectedNext)
                     : null;
             if (member != null) {
                 expectedNext = member.memberIndex() + 1;
@@ -397,11 +397,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
             if (member != null) {
                 // Check for null value
-                if (p < end && buf[p] == 'n'
-                        && p + 4 <= end
-                        && buf[p + 1] == 'u'
-                        && buf[p + 2] == 'l'
-                        && buf[p + 3] == 'l') {
+                if (p < localEnd && localBuf[p] == 'n'
+                        && p + 4 <= localEnd
+                        && localBuf[p + 1] == 'u'
+                        && localBuf[p + 2] == 'l'
+                        && localBuf[p + 3] == 'l') {
                     p += 4;
                 } else {
                     // Write pos back before callback, reload after
@@ -410,8 +410,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                     p = this.pos;
                 }
             } else {
+                // Unknown field — validate field name bytes per RFC 8259
+                // (control chars, escape sequences). This is the cold path only.
+                validateSkippedString(localBuf, nameStart, nameEnd);
                 this.pos = p;
-                String fieldName = new String(buf, nameStart, nameEnd - nameStart, StandardCharsets.UTF_8);
+                String fieldName = new String(localBuf, nameStart, nameEnd - nameStart, StandardCharsets.UTF_8);
 
                 if (schema.type() == ShapeType.STRUCTURE) {
                     structMemberConsumer.unknownMember(state, fieldName);
@@ -685,6 +688,41 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         return null;
     }
 
+    // ---- Validation for skipped content ----
+
+    /**
+     * Validates string bytes (between quotes) for RFC 8259 compliance without building a String.
+     * Checks for unescaped control characters and valid escape sequences.
+     */
+    private static void validateSkippedString(byte[] buf, int start, int end) {
+        int p = start;
+        while (p < end) {
+            byte b = buf[p];
+            if (b == '\\') {
+                p++;
+                if (p >= end) {
+                    throw new SerializationException("Unterminated escape sequence");
+                }
+                byte esc = buf[p];
+                switch (esc) {
+                    case '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> {}
+                    case 'u' -> {
+                        if (p + 4 >= end) {
+                            throw new SerializationException("Unterminated \\u escape");
+                        }
+                        p += 4;
+                    }
+                    default -> throw new SerializationException(
+                            "Invalid escape sequence: \\" + (char) esc);
+                }
+            } else if ((b & 0xFF) < 0x20) {
+                throw new SerializationException(
+                        "Unescaped control character (0x" + Integer.toHexString(b & 0xFF) + ")");
+            }
+            p++;
+        }
+    }
+
     // ---- Value skipping for unknown fields ----
 
     private void skipValue() {
@@ -708,7 +746,10 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             }
             default -> {
                 if (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9')) {
-                    pos = JsonReadUtils.findNumberEnd(buf, pos, end);
+                    // Use parseDouble for strict RFC 8259 number validation
+                    // (rejects leading zeros, double exponents, etc.)
+                    JsonReadUtils.parseDouble(buf, pos, end, this);
+                    pos = parsedEndPos;
                 } else {
                     throw new SerializationException(
                             "Unexpected token: " + JsonReadUtils.describePos(buf, pos, end));
@@ -718,17 +759,38 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     }
 
     private void skipString() {
-        pos++; // skip opening '"'
-        while (pos < end) {
-            byte b = buf[pos];
+        int p = pos + 1; // skip opening '"'
+        final byte[] buf = this.buf;
+        final int end = this.end;
+        while (p < end) {
+            byte b = buf[p];
             if (b == '"') {
-                pos++;
+                pos = p + 1;
                 return;
             }
             if (b == '\\') {
-                pos++; // skip escape char
+                p++;
+                if (p >= end) {
+                    break;
+                }
+                byte esc = buf[p];
+                switch (esc) {
+                    case '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> {}
+                    case 'u' -> {
+                        // \\uXXXX — skip 4 hex digits
+                        if (p + 4 >= end) {
+                            throw new SerializationException("Unterminated \\u escape");
+                        }
+                        p += 4;
+                    }
+                    default -> throw new SerializationException(
+                            "Invalid escape sequence: \\" + (char) esc);
+                }
+            } else if ((b & 0xFF) < 0x20) {
+                throw new SerializationException(
+                        "Unescaped control character (0x" + Integer.toHexString(b & 0xFF) + ")");
             }
-            pos++;
+            p++;
         }
         throw new SerializationException("Unterminated string");
     }

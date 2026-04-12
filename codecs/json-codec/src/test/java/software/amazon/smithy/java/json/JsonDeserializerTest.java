@@ -574,4 +574,126 @@ public class JsonDeserializerTest extends ProviderTestBase {
             assertThat(members, contains("booleanValue"));
         }
     }
+
+    // --- Validation of skipped unknown fields ---
+    // These tests verify that invalid JSON in unknown struct fields is properly rejected
+    // (not silently skipped). The skip path must validate strings, numbers, and field names.
+
+    @PerProvider
+    public void rejectsInvalidEscapeInSkippedValue(JsonSerdeProvider provider) {
+        // Unknown field "x" has value with invalid escape \e
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                var de = codec.createDeserializer(
+                        "{\"x\":\"hello\\eworld\",\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
+                    deser.readString(member);
+                });
+            }
+        });
+    }
+
+    @PerProvider
+    public void rejectsControlCharInSkippedValue(JsonSerdeProvider provider) {
+        // Unknown field "x" has value with unescaped null byte
+        byte[] input = "{\"x\":\"ab\u0000cd\",\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8);
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                var de = codec.createDeserializer(input);
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
+                    deser.readString(member);
+                });
+            }
+        });
+    }
+
+    @PerProvider
+    public void rejectsLeadingZeroInSkippedNumber(JsonSerdeProvider provider) {
+        // Unknown field "x" has value with leading zero (00.5)
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                var de = codec.createDeserializer(
+                        "{\"x\":00.5,\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
+                    deser.readString(member);
+                });
+            }
+        });
+    }
+
+    @PerProvider
+    public void rejectsDoubleExponentInSkippedNumber(JsonSerdeProvider provider) {
+        // Unknown field "x" has malformed number with double exponent
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                var de = codec.createDeserializer(
+                        "{\"x\":1e2e3,\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
+                    deser.readString(member);
+                });
+            }
+        });
+    }
+
+    @PerProvider
+    public void rejectsControlCharInUnknownFieldName(JsonSerdeProvider provider) {
+        // Field name contains unescaped null byte
+        byte[] input = new byte[]{
+                '{', '"', 'a', 0x00, 'b', '"', ':', '1', ',', '"', 'n', 'a', 'm', 'e', '"', ':', '"', 'S', '"', '}'
+        };
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                var de = codec.createDeserializer(input);
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
+                    deser.readString(member);
+                });
+            }
+        });
+    }
+
+    @PerProvider
+    public void rejectsInvalidEscapeInUnknownFieldName(JsonSerdeProvider provider) {
+        // Field name contains invalid escape \e
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                var de = codec.createDeserializer(
+                        "{\"a\\eb\":1,\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
+                    deser.readString(member);
+                });
+            }
+        });
+    }
+
+    @PerProvider
+    public void rejectsInvalidEscapeInSkippedObjectKey(JsonSerdeProvider provider) {
+        // Unknown field "x" has an object value whose key contains invalid escape
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                var de = codec.createDeserializer(
+                        "{\"x\":{\"a\\eb\":1},\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
+                    deser.readString(member);
+                });
+            }
+        });
+    }
+
+    @PerProvider
+    public void stillSkipsValidUnknownFields(JsonSerdeProvider provider) {
+        // Valid unknown fields should still be skipped successfully
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            var de = codec.createDeserializer(
+                    "{\"unknown\":{\"a\":1,\"b\":[true,null,\"x\"]},\"name\":\"Sam\",\"extra\":1.5e10}"
+                            .getBytes(StandardCharsets.UTF_8));
+            Set<String> members = new LinkedHashSet<>();
+            de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
+                memberResult.add(member.memberName());
+                if (member.memberName().equals("name")) {
+                    assertThat(deser.readString(JsonTestData.BIRD.member("name")), equalTo("Sam"));
+                }
+            });
+            assertThat(members, contains("name"));
+        }
+    }
 }
