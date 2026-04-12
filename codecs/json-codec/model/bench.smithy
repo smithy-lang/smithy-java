@@ -154,3 +154,115 @@ map SparseStringMap {
     key: String
     value: String
 }
+
+/// Structure focused on numeric boundary testing
+structure NumericStruct {
+    byteVal: Byte
+    shortVal: Short
+    intVal: Integer
+    longVal: Long
+    floatVal: Float
+    doubleVal: Double
+    bigIntVal: BigInteger
+    bigDecVal: BigDecimal
+}
+
+/// Structure focused on string edge cases
+structure StringStruct {
+    @required
+    value: String
+}
+
+/// Structure with all three timestamp formats
+structure TimestampStruct {
+    epochSeconds: Timestamp
+
+    @timestampFormat("date-time")
+    dateTime: Timestamp
+
+    @timestampFormat("http-date")
+    httpDate: Timestamp
+}
+
+/// Structure with jsonName trait on multiple fields
+structure JsonNameStruct {
+    @jsonName("ID")
+    id: String
+
+    @jsonName("DisplayName")
+    displayName: String
+
+    normalField: String
+}
+
+/// Structure that nests itself for depth testing
+structure RecursiveStruct {
+    value: String
+    child: RecursiveStruct
+}
+
+/// Structure for blob testing
+structure BlobStruct {
+    data: Blob
+}
+
+list DoubleList {
+    member: Double
+}
+
+list BigDecimalList {
+    member: BigDecimal
+}
+
+map IntToStructMap {
+    key: String
+    value: InnerStruct
+}
+
+list BooleanList {
+    member: Boolean
+}
+
+list ByteList {
+    member: Byte
+}
+
+list ShortList {
+    member: Short
+}
+
+list LongList {
+    member: Long
+}
+
+list FloatList {
+    member: Float
+}
+
+list BigIntegerList {
+    member: BigInteger
+}
+
+list BlobList {
+    member: Blob
+}
+
+list TimestampList {
+    member: Timestamp
+}
+
+/// Structure containing lists of all types to exercise ListElementSerializer
+structure AllListsStruct {
+    booleans: BooleanList
+    bytes: ByteList
+    shorts: ShortList
+    ints: IntegerList
+    longs: LongList
+    floats: FloatList
+    doubles: DoubleList
+    bigInts: BigIntegerList
+    bigDecs: BigDecimalList
+    strings: StringList
+    blobs: BlobList
+    timestamps: TimestampList
+}

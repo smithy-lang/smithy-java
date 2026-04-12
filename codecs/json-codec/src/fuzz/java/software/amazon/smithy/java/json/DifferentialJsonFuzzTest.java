@@ -35,8 +35,11 @@ class DifferentialJsonFuzzTest extends DifferentialCodecFuzzTestBase {
     }
 
     @Override
-    protected boolean isAcceptableDivergence(SerializableShape referenceShape, SerializableShape testShape,
-            byte[] input) {
+    protected boolean isAcceptableDivergence(
+            SerializableShape referenceShape,
+            SerializableShape testShape,
+            byte[] input
+    ) {
         // Both codecs may handle malformed input (e.g., invalid UTF-8 bytes in strings)
         // differently while still producing valid output. Jackson and Smithy use different
         // replacement strategies for undecodable bytes, which causes divergence in the
@@ -115,8 +118,11 @@ class DifferentialJsonFuzzTest extends DifferentialCodecFuzzTestBase {
     }
 
     @Override
-    protected boolean isAcceptableReferenceFailure(SerializableShape testShape, Exception referenceError,
-            byte[] input) {
+    protected boolean isAcceptableReferenceFailure(
+            SerializableShape testShape,
+            Exception referenceError,
+            byte[] input
+    ) {
         // Invalid bytes in JSON input cause unpredictable parsing divergence between codecs.
         if (containsNonAsciiBytes(input)) {
             return true;

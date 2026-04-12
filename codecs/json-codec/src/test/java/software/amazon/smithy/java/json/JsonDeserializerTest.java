@@ -13,6 +13,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -638,8 +640,27 @@ public class JsonDeserializerTest extends ProviderTestBase {
     @PerProvider
     public void rejectsControlCharInUnknownFieldName(JsonSerdeProvider provider) {
         // Field name contains unescaped null byte
-        byte[] input = new byte[]{
-                '{', '"', 'a', 0x00, 'b', '"', ':', '1', ',', '"', 'n', 'a', 'm', 'e', '"', ':', '"', 'S', '"', '}'
+        byte[] input = new byte[] {
+                '{',
+                '"',
+                'a',
+                0x00,
+                'b',
+                '"',
+                ':',
+                '1',
+                ',',
+                '"',
+                'n',
+                'a',
+                'm',
+                'e',
+                '"',
+                ':',
+                '"',
+                'S',
+                '"',
+                '}'
         };
         Assertions.assertThrows(SerializationException.class, () -> {
             try (var codec = codec(provider)) {
@@ -696,4 +717,1180 @@ public class JsonDeserializerTest extends ProviderTestBase {
             assertThat(members, contains("name"));
         }
     }
+
+    // --- Number parsing boundary conditions ---
+
+    @PerProvider
+    public void deserializesLongMinValue(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            var de = codec.createDeserializer("-9223372036854775808".getBytes(StandardCharsets.UTF_8));
+            assertThat(de.readLong(PreludeSchemas.LONG), is(Long.MIN_VALUE));
+        }
+    }
+
+    @PerProvider
+    public void deserializesLongMaxValue(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            var de = codec.createDeserializer("9223372036854775807".getBytes(StandardCharsets.UTF_8));
+            assertThat(de.readLong(PreludeSchemas.LONG), is(Long.MAX_VALUE));
+        }
+    }
+
+    @PerProvider
+    public void rejectsLongOverflowPositive(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            var de = codec.createDeserializer("9223372036854775808".getBytes(StandardCharsets.UTF_8));
+            Assertions.assertThrows(SerializationException.class, () -> de.readLong(PreludeSchemas.LONG));
+        }
+    }
+
+    @PerProvider
+    public void rejectsLongOverflowNegative(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            var de = codec.createDeserializer("-9223372036854775809".getBytes(StandardCharsets.UTF_8));
+            Assertions.assertThrows(SerializationException.class, () -> de.readLong(PreludeSchemas.LONG));
+        }
+    }
+
+    @PerProvider
+    public void deserializesIntegerMinMaxValues(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            assertThat(codec.createDeserializer("-2147483648".getBytes(StandardCharsets.UTF_8))
+                    .readInteger(PreludeSchemas.INTEGER), is(Integer.MIN_VALUE));
+            assertThat(codec.createDeserializer("2147483647".getBytes(StandardCharsets.UTF_8))
+                    .readInteger(PreludeSchemas.INTEGER), is(Integer.MAX_VALUE));
+        }
+    }
+
+    @PerProvider
+    public void rejectsIntegerOverflow(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("2147483648".getBytes(StandardCharsets.UTF_8))
+                            .readInteger(PreludeSchemas.INTEGER));
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("-2147483649".getBytes(StandardCharsets.UTF_8))
+                            .readInteger(PreludeSchemas.INTEGER));
+        }
+    }
+
+    @PerProvider
+    public void rejectsLeadingZerosInLong(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("01".getBytes(StandardCharsets.UTF_8))
+                            .readLong(PreludeSchemas.LONG));
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("007".getBytes(StandardCharsets.UTF_8))
+                            .readLong(PreludeSchemas.LONG));
+        }
+    }
+
+    @PerProvider
+    public void parsesNegativeZero(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            assertThat(codec.createDeserializer("-0".getBytes(StandardCharsets.UTF_8))
+                    .readLong(PreludeSchemas.LONG), is(0L));
+        }
+    }
+
+    @PerProvider
+    public void rejectsBareMinusSign(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("-".getBytes(StandardCharsets.UTF_8))
+                            .readLong(PreludeSchemas.LONG));
+        }
+    }
+
+    @PerProvider
+    public void deserializesByteMinMax(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            assertThat(codec.createDeserializer("-128".getBytes(StandardCharsets.UTF_8))
+                    .readByte(PreludeSchemas.BYTE), is(Byte.MIN_VALUE));
+            assertThat(codec.createDeserializer("127".getBytes(StandardCharsets.UTF_8))
+                    .readByte(PreludeSchemas.BYTE), is(Byte.MAX_VALUE));
+        }
+    }
+
+    // Smithy-only: Smithy's readByte/readShort parse as long then range-check.
+    // Jackson reads the JSON number token without narrowing validation.
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsByteOverflow(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("128".getBytes(StandardCharsets.UTF_8))
+                            .readByte(PreludeSchemas.BYTE));
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("-129".getBytes(StandardCharsets.UTF_8))
+                            .readByte(PreludeSchemas.BYTE));
+        }
+    }
+
+    @PerProvider
+    public void deserializesShortMinMax(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            assertThat(codec.createDeserializer("-32768".getBytes(StandardCharsets.UTF_8))
+                    .readShort(PreludeSchemas.SHORT), is(Short.MIN_VALUE));
+            assertThat(codec.createDeserializer("32767".getBytes(StandardCharsets.UTF_8))
+                    .readShort(PreludeSchemas.SHORT), is(Short.MAX_VALUE));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsShortOverflow(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("32768".getBytes(StandardCharsets.UTF_8))
+                            .readShort(PreludeSchemas.SHORT));
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("-32769".getBytes(StandardCharsets.UTF_8))
+                            .readShort(PreludeSchemas.SHORT));
+        }
+    }
+
+    // --- Floating-point parsing edge cases ---
+
+    @PerProvider
+    public void parsesDoubleWithLeadingZeroBeforeDecimal(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            assertThat(codec.createDeserializer("0.5".getBytes(StandardCharsets.UTF_8))
+                    .readDouble(PreludeSchemas.DOUBLE), is(0.5));
+        }
+    }
+
+    @PerProvider
+    public void rejectsDoubleWithDoubleLeadingZero(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("00.5".getBytes(StandardCharsets.UTF_8))
+                            .readDouble(PreludeSchemas.DOUBLE));
+        }
+    }
+
+    @PerProvider
+    public void parsesDoubleWithExponent(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            assertThat(codec.createDeserializer("1e10".getBytes(StandardCharsets.UTF_8))
+                    .readDouble(PreludeSchemas.DOUBLE), is(1e10));
+            assertThat(codec.createDeserializer("1E-10".getBytes(StandardCharsets.UTF_8))
+                    .readDouble(PreludeSchemas.DOUBLE), is(1E-10));
+            assertThat(codec.createDeserializer("1.5e+3".getBytes(StandardCharsets.UTF_8))
+                    .readDouble(PreludeSchemas.DOUBLE), is(1.5e+3));
+        }
+    }
+
+    // --- String parsing edge cases ---
+
+    @PerProvider
+    public void parsesAllEscapeSequences(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            var de = codec.createDeserializer(
+                    "\"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\"".getBytes(StandardCharsets.UTF_8));
+            assertThat(de.readString(PreludeSchemas.STRING), equalTo("\" \\ / \b \f \n \r \t"));
+        }
+    }
+
+    @PerProvider
+    public void parsesUnicodeEscapes(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            // Basic unicode escape
+            assertThat(codec.createDeserializer("\"\\u0041\"".getBytes(StandardCharsets.UTF_8))
+                    .readString(PreludeSchemas.STRING), equalTo("A"));
+            // Lowercase hex
+            assertThat(codec.createDeserializer("\"\\u00e9\"".getBytes(StandardCharsets.UTF_8))
+                    .readString(PreludeSchemas.STRING), equalTo("\u00e9"));
+            // Uppercase hex
+            assertThat(codec.createDeserializer("\"\\u00E9\"".getBytes(StandardCharsets.UTF_8))
+                    .readString(PreludeSchemas.STRING), equalTo("\u00e9"));
+        }
+    }
+
+    @PerProvider
+    public void parsesSurrogatePair(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            // U+1F600 (grinning face emoji)
+            var de = codec.createDeserializer("\"\\uD83D\\uDE00\"".getBytes(StandardCharsets.UTF_8));
+            assertThat(de.readString(PreludeSchemas.STRING), equalTo("\uD83D\uDE00"));
+        }
+    }
+
+    // Smithy-only: Smithy validates surrogate pairs per RFC 8259 section 7.
+    // Jackson passes lone surrogates through to the JDK String constructor without validation.
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsLoneSurrogateHigh(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("\"\\uD83D\"".getBytes(StandardCharsets.UTF_8))
+                            .readString(PreludeSchemas.STRING));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsLoneSurrogateLow(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("\"\\uDE00\"".getBytes(StandardCharsets.UTF_8))
+                            .readString(PreludeSchemas.STRING));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsHighSurrogateFollowedByNonLow(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("\"\\uD83D\\u0041\"".getBytes(StandardCharsets.UTF_8))
+                            .readString(PreludeSchemas.STRING));
+        }
+    }
+
+    static List<Arguments> smithyOnly() {
+        return List.of(Arguments.of(SMITHY));
+    }
+
+    @PerProvider
+    public void rejectsInvalidEscapeSequence(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("\"\\x\"".getBytes(StandardCharsets.UTF_8))
+                            .readString(PreludeSchemas.STRING));
+        }
+    }
+
+    @PerProvider
+    public void rejectsControlCharInString(JsonSerdeProvider provider) {
+        byte[] input = new byte[] {'"', 0x01, '"'};
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(input).readString(PreludeSchemas.STRING));
+        }
+    }
+
+    @PerProvider
+    public void rejectsUnterminatedString(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("\"hello".getBytes(StandardCharsets.UTF_8))
+                            .readString(PreludeSchemas.STRING));
+        }
+    }
+
+    @PerProvider
+    public void rejectsIncompleteUnicodeEscape(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("\"\\u00\"".getBytes(StandardCharsets.UTF_8))
+                            .readString(PreludeSchemas.STRING));
+        }
+    }
+
+    @PerProvider
+    public void rejectsInvalidHexInUnicodeEscape(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("\"\\uGGGG\"".getBytes(StandardCharsets.UTF_8))
+                            .readString(PreludeSchemas.STRING));
+        }
+    }
+
+    @PerProvider
+    public void parsesLongAsciiString(JsonSerdeProvider provider) {
+        // > 8 bytes to exercise SWAR scanning path
+        String longStr = "abcdefghijklmnopqrstuvwxyz0123456789";
+        try (var codec = codec(provider)) {
+            assertThat(codec.createDeserializer(("\"" + longStr + "\"").getBytes(StandardCharsets.UTF_8))
+                    .readString(PreludeSchemas.STRING), equalTo(longStr));
+        }
+    }
+
+    @PerProvider
+    public void parsesUtf8MultiByte(JsonSerdeProvider provider) {
+        // 2-byte UTF-8: e-acute (\u00e9)
+        // 3-byte UTF-8: CJK character (\u4e2d)
+        // 4-byte UTF-8: emoji (U+1F600)
+        // Embed directly as UTF-8 bytes with an escape to trigger slow path
+        String input = "\"\u00e9\\n\u4e2d\"";
+        try (var codec = codec(provider)) {
+            assertThat(codec.createDeserializer(input.getBytes(StandardCharsets.UTF_8))
+                    .readString(PreludeSchemas.STRING), equalTo("\u00e9\n\u4e2d"));
+        }
+    }
+
+    // --- Boolean/literal edge cases ---
+
+    @PerProvider
+    public void rejectsTruncatedTrue(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("tru".getBytes(StandardCharsets.UTF_8))
+                            .readBoolean(PreludeSchemas.BOOLEAN));
+        }
+    }
+
+    @PerProvider
+    public void rejectsTruncatedFalse(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("fals".getBytes(StandardCharsets.UTF_8))
+                            .readBoolean(PreludeSchemas.BOOLEAN));
+        }
+    }
+
+    @PerProvider
+    public void rejectsCorruptLiteral(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("trux".getBytes(StandardCharsets.UTF_8))
+                            .readBoolean(PreludeSchemas.BOOLEAN));
+        }
+    }
+
+    @PerProvider
+    public void readsNullLiteral(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            var de = codec.createDeserializer("null".getBytes(StandardCharsets.UTF_8));
+            assertTrue(de.isNull());
+            assertNull(de.readNull());
+        }
+    }
+
+    @PerProvider
+    public void rejectsTruncatedNull(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                var de = codec.createDeserializer("nul".getBytes(StandardCharsets.UTF_8));
+                de.readNull();
+            }
+        });
+    }
+
+    // --- Whitespace handling ---
+
+    @PerProvider
+    public void handlesLeadingWhitespace(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            assertThat(codec.createDeserializer("  \t\n\r 42".getBytes(StandardCharsets.UTF_8))
+                    .readInteger(PreludeSchemas.INTEGER), is(42));
+        }
+    }
+
+    @PerProvider
+    public void handlesWhitespaceBetweenTokens(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            var de = codec.createDeserializer(
+                    "  {  \"name\"  :  \"Sam\"  ,  \"Color\"  :  \"red\"  }  ".getBytes(StandardCharsets.UTF_8));
+            Set<String> members = new LinkedHashSet<>();
+            de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
+                memberResult.add(member.memberName());
+                deser.readString(member);
+            });
+            assertThat(members, contains("name", "color"));
+        }
+    }
+
+    // --- Document parsing edge cases ---
+
+    @PerProvider
+    public void documentParsesLargeInteger(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            // Long range (exceeds int)
+            var de = codec.createDeserializer("3000000000".getBytes(StandardCharsets.UTF_8));
+            var doc = de.readDocument();
+            assertThat(doc.type(), is(ShapeType.LONG));
+            assertThat(doc.asLong(), is(3000000000L));
+        }
+    }
+
+    @PerProvider
+    public void documentParsesBigInteger(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            var de = codec.createDeserializer("99999999999999999999".getBytes(StandardCharsets.UTF_8));
+            var doc = de.readDocument();
+            // Should be BigInteger since it exceeds Long range
+            assertThat(doc.asBigInteger(), equalTo(new BigInteger("99999999999999999999")));
+        }
+    }
+
+    @PerProvider
+    public void documentParsesExponentAsDouble(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            var de = codec.createDeserializer("1e5".getBytes(StandardCharsets.UTF_8));
+            var doc = de.readDocument();
+            assertThat(doc.type(), is(ShapeType.DOUBLE));
+            assertThat(doc.asDouble(), is(1e5));
+        }
+    }
+
+    @PerProvider
+    public void documentParsesNegativeNumber(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            var de = codec.createDeserializer("-42".getBytes(StandardCharsets.UTF_8));
+            var doc = de.readDocument();
+            assertThat(doc.type(), is(ShapeType.INTEGER));
+            assertThat(doc.asInteger(), is(-42));
+        }
+    }
+
+    @PerProvider
+    public void rejectsTrailingContentAfterClose(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            var de = codec.createDeserializer("42 extra".getBytes(StandardCharsets.UTF_8));
+            de.readInteger(PreludeSchemas.INTEGER);
+            Assertions.assertThrows(SerializationException.class, () -> de.close());
+        }
+    }
+
+    // --- Skip validation: skipped objects with nested structures ---
+
+    @PerProvider
+    public void skipsDeepNestedUnknownFields(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            var de = codec.createDeserializer(
+                    ("{\"unknown\":{\"a\":{\"b\":[1,{\"c\":true}]},"
+                            + "\"d\":\"test\"},\"name\":\"Sam\"}")
+                            .getBytes(StandardCharsets.UTF_8));
+            Set<String> members = new LinkedHashSet<>();
+            de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
+                memberResult.add(member.memberName());
+                if (member.memberName().equals("name")) {
+                    assertThat(deser.readString(JsonTestData.BIRD.member("name")), equalTo("Sam"));
+                }
+            });
+            assertThat(members, contains("name"));
+        }
+    }
+
+    @PerProvider
+    public void rejectsInvalidEscapeInSkippedNestedObjectKey(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                var de = codec.createDeserializer(
+                        "{\"x\":{\"a\\qb\":1},\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
+                    deser.readString(member);
+                });
+            }
+        });
+    }
+
+    @PerProvider
+    public void skipsStringWithValidEscapesInUnknownValue(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            // Use JSON escapes that are valid: \n, \t, \\, \", \u0041
+            var json = "{\"x\":\"hello\\nworld\\t\\u0041\",\"name\":\"Sam\"}";
+            var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
+            Set<String> members = new LinkedHashSet<>();
+            de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
+                memberResult.add(member.memberName());
+                deser.readString(member);
+            });
+            assertThat(members, contains("name"));
+        }
+    }
+
+    // --- Additional coverage: corrupt "false" literal ---
+
+    @PerProvider
+    public void rejectsCorruptFalse(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer("faxxx".getBytes(StandardCharsets.UTF_8))
+                        .readBoolean(PreludeSchemas.BOOLEAN);
+            }
+        });
+    }
+
+    // --- Invalid base64 in blob ---
+
+    @PerProvider
+    public void rejectsInvalidBase64InBlob(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer("\"!!!not-base64!!!\"".getBytes(StandardCharsets.UTF_8))
+                        .readBlob(PreludeSchemas.BLOB);
+            }
+        });
+    }
+
+    // --- Epoch seconds out of range ---
+
+    // Smithy-only: Smithy's integer fast-path for epoch-seconds calls Instant.ofEpochSecond
+    // which rejects values outside the valid range. Jackson parses via a different path.
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsEpochSecondsOutOfRange(JsonSerdeProvider provider) {
+        // Instant.MAX.getEpochSecond() is 31556889864403199; one beyond that overflows
+        long outOfRange = Instant.MAX.getEpochSecond() + 1;
+        var schema = Schema.createTimestamp(ShapeId.from("smithy.foo#Time"));
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer(
+                        Long.toString(outOfRange).getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+    }
+
+    // --- Timestamp fallback for offset timezone ---
+
+    @PerProvider
+    public void timestampFallbackForOffsetTimezone(JsonSerdeProvider provider) {
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME));
+        try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+            // Offset timezone causes fast-path parseIso8601 to return null, falling back to DateTimeFormatter
+            var de = codec.createDeserializer(
+                    "\"2025-01-15T10:30:00+00:00\"".getBytes(StandardCharsets.UTF_8));
+            assertThat(de.readTimestamp(schema), equalTo(Instant.parse("2025-01-15T10:30:00Z")));
+        }
+    }
+
+    // --- Struct error paths ---
+
+    // Smithy-only: Smithy checks for '{' before parsing struct fields.
+    // Jackson's token-based parser handles the type mismatch differently.
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsNonObjectForStruct(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer("123".getBytes(StandardCharsets.UTF_8))
+                        .readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, m, d) -> {});
+            }
+        });
+    }
+
+    @PerProvider
+    public void rejectsNonQuotedFieldName(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer("{123:1}".getBytes(StandardCharsets.UTF_8))
+                        .readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, m, d) -> {});
+            }
+        });
+    }
+
+    @PerProvider
+    public void rejectsUnterminatedFieldName(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer("{\"unterminated".getBytes(StandardCharsets.UTF_8))
+                        .readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, m, d) -> {});
+            }
+        });
+    }
+
+    @PerProvider
+    public void rejectsMissingColonInStruct(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer("{\"name\" \"Sam\"}".getBytes(StandardCharsets.UTF_8))
+                        .readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, m, d) -> {});
+            }
+        });
+    }
+
+    // --- Null member value in struct (exercises p += 4 null skip) ---
+
+    @PerProvider
+    public void nullMemberValueSkippedInStruct(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            var de = codec.createDeserializer(
+                    "{\"name\":null,\"Color\":\"red\"}".getBytes(StandardCharsets.UTF_8));
+            Set<String> members = new LinkedHashSet<>();
+            de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
+                memberResult.add(member.memberName());
+                deser.readString(member);
+            });
+            // "name" was null so consumer was never called for it
+            assertThat(members, contains("color"));
+        }
+    }
+
+    // --- Map error paths ---
+
+    // Smithy-only: same as struct — Smithy checks for '{' explicitly.
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsNonObjectForMap(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer("[1]".getBytes(StandardCharsets.UTF_8))
+                        .readStringMap(PreludeSchemas.DOCUMENT, null, (s, k, d) -> {});
+            }
+        });
+    }
+
+    @PerProvider
+    public void rejectsMissingCommaInMap(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                Map<String, String> result = new LinkedHashMap<>();
+                codec.createDeserializer("{\"a\":\"1\" \"b\":\"2\"}".getBytes(StandardCharsets.UTF_8))
+                        .readStringMap(PreludeSchemas.DOCUMENT,
+                                result,
+                                (m, k, d) -> m.put(k, d.readString(PreludeSchemas.STRING)));
+            }
+        });
+    }
+
+    @PerProvider
+    public void rejectsMissingColonInMap(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                Map<String, String> result = new LinkedHashMap<>();
+                codec.createDeserializer("{\"a\" \"1\"}".getBytes(StandardCharsets.UTF_8))
+                        .readStringMap(PreludeSchemas.DOCUMENT,
+                                result,
+                                (m, k, d) -> m.put(k, d.readString(PreludeSchemas.STRING)));
+            }
+        });
+    }
+
+    // --- Skip: false literal, empty object, empty array, unterminated string ---
+
+    @PerProvider
+    public void skipsFalseLiteralInUnknownValue(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            var de = codec.createDeserializer(
+                    "{\"x\":false,\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
+            Set<String> members = new LinkedHashSet<>();
+            de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
+                memberResult.add(member.memberName());
+                deser.readString(member);
+            });
+            assertThat(members, contains("name"));
+        }
+    }
+
+    @PerProvider
+    public void skipsEmptyObjectInUnknownValue(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            var de = codec.createDeserializer(
+                    "{\"x\":{},\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
+            Set<String> members = new LinkedHashSet<>();
+            de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
+                memberResult.add(member.memberName());
+                deser.readString(member);
+            });
+            assertThat(members, contains("name"));
+        }
+    }
+
+    @PerProvider
+    public void skipsEmptyArrayInUnknownValue(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            var de = codec.createDeserializer(
+                    "{\"x\":[],\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
+            Set<String> members = new LinkedHashSet<>();
+            de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
+                memberResult.add(member.memberName());
+                deser.readString(member);
+            });
+            assertThat(members, contains("name"));
+        }
+    }
+
+    @PerProvider
+    public void rejectsUnterminatedStringInSkippedValue(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer("{\"x\":\"unterminated".getBytes(StandardCharsets.UTF_8))
+                        .readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, m, d) -> {});
+            }
+        });
+    }
+
+    // --- Timestamp: invalid month in HTTP-date ---
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsInvalidMonthInHttpDate(JsonSerdeProvider provider) {
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.HTTP_DATE));
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"Thu, 01 Xyz 2025 00:00:00 GMT\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+    }
+
+    // --- List: missing comma ---
+
+    @PerProvider
+    public void rejectsMissingCommaInList(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer("[1 2]".getBytes(StandardCharsets.UTF_8))
+                        .readList(PreludeSchemas.DOCUMENT, null, (s, d) -> d.readInteger(PreludeSchemas.INTEGER));
+            }
+        });
+    }
+
+    // --- describeCurrentToken branches: timestamp with wrong types ---
+
+    @PerProvider
+    public void rejectsNullAsTimestamp(JsonSerdeProvider provider) {
+        var schema = Schema.createTimestamp(ShapeId.from("smithy.foo#Time"));
+        try (var codec = codec(provider)) {
+            var de = codec.createDeserializer("null".getBytes(StandardCharsets.UTF_8));
+            var e = Assertions.assertThrows(SerializationException.class, () -> de.readTimestamp(schema));
+            assertThat(e.getMessage(), containsString("Expected a timestamp"));
+        }
+    }
+
+    @PerProvider
+    public void rejectsArrayAsTimestamp(JsonSerdeProvider provider) {
+        var schema = Schema.createTimestamp(ShapeId.from("smithy.foo#Time"));
+        try (var codec = codec(provider)) {
+            var de = codec.createDeserializer("[1]".getBytes(StandardCharsets.UTF_8));
+            var e = Assertions.assertThrows(SerializationException.class, () -> de.readTimestamp(schema));
+            assertThat(e.getMessage(), containsString("Expected a timestamp"));
+        }
+    }
+
+    // --- parseLong/parseDouble error paths ---
+    // Smithy-only: Jackson's tokenizer throws at createDeserializer time for malformed
+    // content, before our readXxx methods are called.
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void parseLongRejectsEmptyInput(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(new byte[0]).readLong(PreludeSchemas.LONG));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void parseLongRejectsNonDigitInput(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("abc".getBytes(StandardCharsets.UTF_8))
+                            .readLong(PreludeSchemas.LONG));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void parseDoubleRejectsBareMinusSign(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer("-".getBytes(StandardCharsets.UTF_8))
+                            .readDouble(PreludeSchemas.DOUBLE));
+        }
+    }
+
+    // --- UTF-8 validation in string slow path ---
+    // Smithy-only: Smithy validates UTF-8 byte sequences in the escape-handling slow path.
+    // Jackson delegates to the JDK's String constructor which replaces invalid UTF-8 silently.
+    // Each test includes a valid escape (\n) to force entry into the slow path, followed by
+    // malformed UTF-8 bytes.
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsOverlong2ByteUtf8InString(JsonSerdeProvider provider) {
+        // 0xC0 0x80 is an overlong encoding of U+0000 (RFC 3629 forbids this)
+        byte[] input = {'"', '\\', 'n', (byte) 0xC0, (byte) 0x80, '"'};
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(input).readString(PreludeSchemas.STRING));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsTruncated2ByteUtf8InString(JsonSerdeProvider provider) {
+        // 0xC2 is a 2-byte sequence lead but the continuation byte is missing
+        byte[] input = {'"', '\\', 'n', (byte) 0xC2, '"'};
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(input).readString(PreludeSchemas.STRING));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsOverlong3ByteUtf8InString(JsonSerdeProvider provider) {
+        // 0xE0 0x80 0x80 is an overlong encoding of U+0000
+        byte[] input = {'"', '\\', 'n', (byte) 0xE0, (byte) 0x80, (byte) 0x80, '"'};
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(input).readString(PreludeSchemas.STRING));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsTruncated3ByteUtf8InString(JsonSerdeProvider provider) {
+        // 0xE4 0xB8 is a 3-byte lead + first continuation, missing the third byte
+        byte[] input = {'"', '\\', 'n', (byte) 0xE4, (byte) 0xB8, '"'};
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(input).readString(PreludeSchemas.STRING));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsTruncated4ByteUtf8InString(JsonSerdeProvider provider) {
+        // 0xF0 0x9F 0x98 is a 4-byte sequence missing the last continuation byte
+        byte[] input = {'"', '\\', 'n', (byte) 0xF0, (byte) 0x9F, (byte) 0x98, '"'};
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(input).readString(PreludeSchemas.STRING));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsInvalidUtf8StartByteInString(JsonSerdeProvider provider) {
+        // 0xFF is never a valid UTF-8 start byte
+        byte[] input = {'"', '\\', 'n', (byte) 0xFF, '"'};
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(input).readString(PreludeSchemas.STRING));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsControlCharAfterEscapeInString(JsonSerdeProvider provider) {
+        // RFC 8259 requires control chars (U+0000..U+001F) to be escaped
+        byte[] input = {'"', '\\', 'n', 0x01, '"'};
+        try (var codec = codec(provider)) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(input).readString(PreludeSchemas.STRING));
+        }
+    }
+
+    // --- Malformed timestamps that the DateTimeFormatter fallback is too lenient about ---
+    // These tests document spec violations: the fast-path parser correctly rejects these
+    // inputs, but then falls back to DateTimeFormatter which silently accepts them.
+    // The underlying issue is in TimestampFormatter.Prelude (core module), not json-codec.
+    // When the core module is fixed to reject these, remove the @Disabled annotations.
+
+    @Disabled("DateTimeFormatter fallback accepts trailing garbage after Z - core module bug")
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void iso8601WithExtraCharsAfterZShouldBeRejected(JsonSerdeProvider provider) {
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME));
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"2025-01-15T10:30:00Zextra\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+    }
+
+    @Disabled("DateTimeFormatter fallback accepts missing space after comma - core module bug")
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void httpDateShouldRejectMissingSpaceAfterComma(JsonSerdeProvider provider) {
+        // RFC 7231 requires "day-name, SP" format
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.HTTP_DATE));
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"Thu,01 Jan 2025 00:00:00 GMT\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+    }
+
+    @Disabled("DateTimeFormatter fallback accepts UTC instead of GMT - core module bug")
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void httpDateShouldRejectNonGmtTimezone(JsonSerdeProvider provider) {
+        // RFC 7231 HTTP-date requires "GMT"
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.HTTP_DATE));
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"Thu, 01 Jan 2025 00:00:00 UTC\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+    }
+
+    @Disabled("DateTimeFormatter fallback accepts dash delimiters - core module bug")
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void httpDateShouldRejectDashInsteadOfSpace(JsonSerdeProvider provider) {
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.HTTP_DATE));
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"Thu, 01-Jan 2025 00:00:00 GMT\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+    }
+
+    @Disabled("DateTimeFormatter fallback accepts dash instead of colon in time - core module bug")
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void httpDateShouldRejectDashInsteadOfColonInTime(JsonSerdeProvider provider) {
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.HTTP_DATE));
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"Thu, 01 Jan 2025 00-00:00 GMT\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+    }
+
+    // --- lookupMonth: invalid 3-letter month abbreviation ---
+    // Smithy-only: Smithy's HTTP-date parser validates month abbreviations strictly.
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void httpDateRejectsInvalidMonthStartingWithMa(JsonSerdeProvider provider) {
+        // "Max" is neither "Mar" nor "May"
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.HTTP_DATE));
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"Thu, 01 Max 2025 00:00:00 GMT\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void httpDateRejectsInvalidMonthStartingWithJu(JsonSerdeProvider provider) {
+        // "Jux" is neither "Jun" nor "Jul"
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.HTTP_DATE));
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"Thu, 01 Jux 2025 00:00:00 GMT\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+    }
+
+    // --- Bug #6: parseIso8601 must validate date/time component ranges ---
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    // Smithy-only: Smithy's fast-path parseIso8601 does not validate component ranges.
+    // Jackson delegates to DateTimeFormatter which does validate.
+    public void rejectsInvalidMonthInIso8601(JsonSerdeProvider provider) {
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME));
+        // Month 13
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"2025-13-01T00:00:00Z\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+        // Month 0
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"2025-00-01T00:00:00Z\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsInvalidDayInIso8601(JsonSerdeProvider provider) {
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME));
+        // Day 32
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"2025-01-32T00:00:00Z\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+        // Day 0
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"2025-01-00T00:00:00Z\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsInvalidTimeInIso8601(JsonSerdeProvider provider) {
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME));
+        // Hour 25
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"2025-01-01T25:00:00Z\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+        // Minute 60
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"2025-01-01T00:60:00Z\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+        // Second 60
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+                codec.createDeserializer(
+                        "\"2025-01-01T00:00:60Z\"".getBytes(StandardCharsets.UTF_8))
+                        .readTimestamp(schema);
+            }
+        });
+    }
+
+    // --- Bug #4: decodeUtf8Char must validate continuation bytes ---
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    // Smithy-only: only the Smithy deserializer uses decodeUtf8Char on the slow path.
+    // RFC 3629: continuation bytes must be 10xxxxxx (0x80..0xBF).
+    public void rejectsInvalidContinuationByteInUtf8(JsonSerdeProvider provider) {
+        // 2-byte lead 0xC2 followed by ASCII 'A' (0x41) instead of valid continuation byte.
+        // Prefix with "\n" to force entry into the slow path (escape triggers decodeUtf8Char for following bytes).
+        byte[] json = new byte[] {'"', '\\', 'n', (byte) 0xC2, 0x41, '"'};
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer(json).readString(PreludeSchemas.STRING);
+            }
+        });
+    }
+
+    // --- Bug #5: decodeUtf8Char must reject surrogate code points in UTF-8 ---
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    // Smithy-only: only the Smithy deserializer validates UTF-8 on the slow path.
+    // RFC 3629 Section 3: UTF-8 must not encode surrogate code points (U+D800..U+DFFF).
+    public void rejectsSurrogateCodePointInUtf8(JsonSerdeProvider provider) {
+        // 3-byte sequence [0xED, 0xA0, 0x80] encodes U+D800 (high surrogate) as UTF-8.
+        // Prefix with "\n" to force slow path.
+        byte[] json = new byte[] {'"', '\\', 'n', (byte) 0xED, (byte) 0xA0, (byte) 0x80, '"'};
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer(json).readString(PreludeSchemas.STRING);
+            }
+        });
+    }
+
+    // --- Bug #9: readBigInteger/readBigDecimal must wrap NumberFormatException ---
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    // Smithy-only: Smithy's readBigInteger passes the raw string to new BigInteger()
+    // which throws NumberFormatException for non-integer strings. This should be wrapped
+    // in SerializationException.
+    public void readBigIntegerRejectsDecimalInput(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer("1.5".getBytes(StandardCharsets.UTF_8))
+                        .readBigInteger(PreludeSchemas.BIG_INTEGER);
+            }
+        });
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void readBigIntegerRejectsExponentInput(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                codec.createDeserializer("1e5".getBytes(StandardCharsets.UTF_8))
+                        .readBigInteger(PreludeSchemas.BIG_INTEGER);
+            }
+        });
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void readBigDecimalRejectsInvalidFormat(JsonSerdeProvider provider) {
+        // findNumberEnd accepts "++1" but BigDecimal constructor rejects it
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codec(provider)) {
+                // Start with valid digit prefix so findNumberEnd is entered, but overall format is invalid
+                codec.createDeserializer("1+1".getBytes(StandardCharsets.UTF_8))
+                        .readBigDecimal(PreludeSchemas.BIG_DECIMAL);
+            }
+        });
+    }
+
+    // --- forbidUnknownUnionMembers ---
+
+    @PerProvider
+    public void forbidUnknownUnionMembersThrows(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).forbidUnknownUnionMembers(true).build()) {
+                var de = codec.createDeserializer(
+                        "{\"totallyUnknown\":42}".getBytes(StandardCharsets.UTF_8));
+                Set<String> members = new LinkedHashSet<>();
+                de.readStruct(JsonTestData.UNION, members, new ShapeDeserializer.StructMemberConsumer<Set<String>>() {
+                    @Override
+                    public void accept(Set<String> state, Schema member, ShapeDeserializer deser) {}
+
+                    @Override
+                    public void unknownMember(Set<String> state, String memberName) {}
+                });
+            }
+        });
+    }
+
+    // --- Unterminated object (after first field, missing '}' or ',') ---
+
+    @PerProvider
+    public void rejectsUnterminatedObject(JsonSerdeProvider provider) {
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+                // After reading first field, no '}' or ',' -> unterminated
+                var de = codec.createDeserializer("{\"name\":\"Sam\"".getBytes(StandardCharsets.UTF_8));
+                Set<String> members = new LinkedHashSet<>();
+                de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
+                    memberResult.add(member.memberName());
+                    deser.readString(member);
+                });
+            }
+        });
+    }
+
 }

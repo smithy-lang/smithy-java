@@ -348,6 +348,8 @@ final class JsonReadUtils {
     /**
      * Decodes a single UTF-8 character starting at pos.
      * Returns [codePoint, newPos].
+     * Validates continuation bytes (must be 10xxxxxx per RFC 3629) and rejects
+     * surrogate code points (U+D800..U+DFFF) which are forbidden in UTF-8.
      */
     private static int[] decodeUtf8Char(byte[] buf, int pos, int end) {
         byte b = buf[pos];
@@ -358,6 +360,7 @@ final class JsonReadUtils {
             if (pos + 2 > end) {
                 throw new SerializationException("Truncated UTF-8 sequence");
             }
+            validateContinuationByte(buf[pos + 1]);
             int cp = ((b & 0x1F) << 6) | (buf[pos + 1] & 0x3F);
             if (cp < 0x80) {
                 throw new SerializationException("Overlong UTF-8 sequence");
@@ -368,9 +371,15 @@ final class JsonReadUtils {
             if (pos + 3 > end) {
                 throw new SerializationException("Truncated UTF-8 sequence");
             }
+            validateContinuationByte(buf[pos + 1]);
+            validateContinuationByte(buf[pos + 2]);
             int cp = ((b & 0x0F) << 12) | ((buf[pos + 1] & 0x3F) << 6) | (buf[pos + 2] & 0x3F);
             if (cp < 0x800) {
                 throw new SerializationException("Overlong UTF-8 sequence");
+            }
+            if (cp >= 0xD800 && cp <= 0xDFFF) {
+                throw new SerializationException(
+                        "UTF-8 encoded surrogate code point: U+" + Integer.toHexString(cp));
             }
             return new int[] {cp, pos + 3};
         } else if ((b & 0xF8) == 0xF0) {
@@ -378,6 +387,9 @@ final class JsonReadUtils {
             if (pos + 4 > end) {
                 throw new SerializationException("Truncated UTF-8 sequence");
             }
+            validateContinuationByte(buf[pos + 1]);
+            validateContinuationByte(buf[pos + 2]);
+            validateContinuationByte(buf[pos + 3]);
             int cp = ((b & 0x07) << 18) | ((buf[pos + 1] & 0x3F) << 12)
                     | ((buf[pos + 2] & 0x3F) << 6)
                     | (buf[pos + 3] & 0x3F);
@@ -387,6 +399,13 @@ final class JsonReadUtils {
             return new int[] {cp, pos + 4};
         } else {
             throw new SerializationException("Invalid UTF-8 start byte: 0x" + Integer.toHexString(b & 0xFF));
+        }
+    }
+
+    private static void validateContinuationByte(byte b) {
+        if ((b & 0xC0) != 0x80) {
+            throw new SerializationException(
+                    "Invalid UTF-8 continuation byte: 0x" + Integer.toHexString(b & 0xFF));
         }
     }
 
@@ -420,13 +439,13 @@ final class JsonReadUtils {
 
     static {
         // Populate month lookup: key = first_char * 128 + second_char
-        MONTH_LOOKUP['J' * 128 + 'a'] = 1;  // Jan
-        MONTH_LOOKUP['F' * 128 + 'e'] = 2;  // Feb
-        MONTH_LOOKUP['M' * 128 + 'a'] = 3;  // Mar (also May — disambiguate with 3rd char)
-        MONTH_LOOKUP['A' * 128 + 'p'] = 4;  // Apr
-        MONTH_LOOKUP['J' * 128 + 'u'] = 6;  // Jun (also Jul — disambiguate with 3rd char)
-        MONTH_LOOKUP['A' * 128 + 'u'] = 8;  // Aug
-        MONTH_LOOKUP['S' * 128 + 'e'] = 9;  // Sep
+        MONTH_LOOKUP['J' * 128 + 'a'] = 1; // Jan
+        MONTH_LOOKUP['F' * 128 + 'e'] = 2; // Feb
+        MONTH_LOOKUP['M' * 128 + 'a'] = 3; // Mar (also May — disambiguate with 3rd char)
+        MONTH_LOOKUP['A' * 128 + 'p'] = 4; // Apr
+        MONTH_LOOKUP['J' * 128 + 'u'] = 6; // Jun (also Jul — disambiguate with 3rd char)
+        MONTH_LOOKUP['A' * 128 + 'u'] = 8; // Aug
+        MONTH_LOOKUP['S' * 128 + 'e'] = 9; // Sep
         MONTH_LOOKUP['O' * 128 + 'c'] = 10; // Oct
         MONTH_LOOKUP['N' * 128 + 'o'] = 11; // Nov
         MONTH_LOOKUP['D' * 128 + 'e'] = 12; // Dec
@@ -434,7 +453,19 @@ final class JsonReadUtils {
 
     // Full 3-letter month name validation table: third character for each month
     private static final byte[] MONTH_THIRD_CHAR = {
-            0, 'n', 'b', 'r', 'r', 'y', 'n', 'l', 'g', 'p', 't', 'v', 'c'
+            0,
+            'n',
+            'b',
+            'r',
+            'r',
+            'y',
+            'n',
+            'l',
+            'g',
+            'p',
+            't',
+            'v',
+            'c'
     };
     //  Jan  Feb  Mar  Apr  May  Jun  Jul  Aug  Sep  Oct  Nov  Dec
 
@@ -522,18 +553,25 @@ final class JsonReadUtils {
 
         // Parse YYYY-MM-DD
         int year = digit(buf[pos]) * 1000 + digit(buf[pos + 1]) * 100
-                + digit(buf[pos + 2]) * 10 + digit(buf[pos + 3]);
+                + digit(buf[pos + 2]) * 10
+                + digit(buf[pos + 3]);
         pos += 4;
         if (buf[pos++] != '-') {
             return null;
         }
         int month = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
         pos += 2;
+        if (month < 1 || month > 12) {
+            throw new SerializationException("Invalid ISO-8601 month: " + month);
+        }
         if (buf[pos++] != '-') {
             return null;
         }
         int day = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
         pos += 2;
+        if (day < 1 || day > 31) {
+            throw new SerializationException("Invalid ISO-8601 day: " + day);
+        }
 
         if (buf[pos] != 'T' && buf[pos] != 't') {
             return null;
@@ -553,6 +591,10 @@ final class JsonReadUtils {
         }
         int second = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
         pos += 2;
+        if (hour > 23 || minute > 59 || second > 59) {
+            throw new SerializationException(
+                    "Invalid ISO-8601 time: " + hour + ":" + minute + ":" + second);
+        }
 
         // Optional fractional seconds
         int nano = 0;
@@ -636,7 +678,8 @@ final class JsonReadUtils {
 
         // Parse yyyy
         int year = digit(buf[pos]) * 1000 + digit(buf[pos + 1]) * 100
-                + digit(buf[pos + 2]) * 10 + digit(buf[pos + 3]);
+                + digit(buf[pos + 2]) * 10
+                + digit(buf[pos + 3]);
         pos += 4;
         if (buf[pos++] != ' ') {
             return null;
@@ -657,8 +700,10 @@ final class JsonReadUtils {
         pos += 2;
 
         // Expect " GMT"
-        if (pos + 4 > end || buf[pos] != ' ' || buf[pos + 1] != 'G'
-                || buf[pos + 2] != 'M' || buf[pos + 3] != 'T') {
+        if (pos + 4 > end || buf[pos] != ' '
+                || buf[pos + 1] != 'G'
+                || buf[pos + 2] != 'M'
+                || buf[pos + 3] != 'T') {
             return null;
         }
         pos += 4; // skip " GMT"

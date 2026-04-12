@@ -272,7 +272,8 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         if (format == TimestampFormatter.Prelude.EPOCH_SECONDS) {
             // Fast path: write epoch-seconds directly from Instant using integer arithmetic.
             // Bypasses the Instant→double→Double.toString→bytes round-trip.
-            ensureCapacity(24);
+            // Max: '-' + 19 digits (Long.MIN_VALUE) + '.' + 9 nano digits = 30 bytes
+            ensureCapacity(30);
             pos = JsonWriteUtils.writeEpochSeconds(buf, pos, value.getEpochSecond(), value.getNano());
             return;
         }
@@ -662,6 +663,9 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             parent.ensureCapacity(2);
             parent.buf[parent.pos++] = '{';
             parent.depth++;
+            if (parent.depth >= MAX_DEPTH) {
+                throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+            }
             parent.needsComma[parent.depth] = false;
             if (parent.settings.serializeTypeInDocuments()) {
                 parent.needsComma[parent.depth] = true;
@@ -675,6 +679,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             }
             struct.serializeMembers(parent.structSerializer);
             parent.depth--;
+            parent.ensureCapacity(1);
             parent.buf[parent.pos++] = '}';
         }
     }

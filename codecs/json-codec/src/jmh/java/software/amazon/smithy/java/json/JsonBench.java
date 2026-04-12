@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.json;
 
+import static tools.jackson.core.JsonToken.PROPERTY_NAME;
+
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -42,7 +44,6 @@ import software.amazon.smithy.java.json.bench.model.NestedStruct;
 import software.amazon.smithy.java.json.bench.model.SimpleStruct;
 import software.amazon.smithy.java.json.jackson.JacksonJsonSerdeProvider;
 import software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider;
-import static tools.jackson.core.JsonToken.PROPERTY_NAME;
 import tools.jackson.core.ObjectReadContext;
 import tools.jackson.core.ObjectWriteContext;
 import tools.jackson.core.json.JsonFactory;
@@ -194,41 +195,37 @@ public class JsonBench {
      * Only used at setup time.
      */
     private static byte[] reverseJsonFieldOrder(byte[] json) {
-        try {
-            var factory = JsonFactory.builder().build();
+        var factory = JsonFactory.builder().build();
 
-            // Parse top-level fields and capture each value as raw bytes
-            List<Map.Entry<String, byte[]>> fields = new ArrayList<>();
-            try (var parser = factory.createParser(ObjectReadContext.empty(), json)) {
-                parser.nextToken(); // START_OBJECT
-                while (parser.nextToken() == PROPERTY_NAME) {
-                    String name = parser.currentName();
-                    parser.nextToken(); // advance to value
-                    var baos = new ByteArrayOutputStream();
-                    try (var gen = factory.createGenerator(ObjectWriteContext.empty(), baos)) {
-                        gen.copyCurrentStructure(parser);
-                    }
-                    fields.add(new AbstractMap.SimpleEntry<>(name, baos.toByteArray()));
+        // Parse top-level fields and capture each value as raw bytes
+        List<Map.Entry<String, byte[]>> fields = new ArrayList<>();
+        try (var parser = factory.createParser(ObjectReadContext.empty(), json)) {
+            parser.nextToken(); // START_OBJECT
+            while (parser.nextToken() == PROPERTY_NAME) {
+                String name = parser.currentName();
+                parser.nextToken(); // advance to value
+                var baos = new ByteArrayOutputStream();
+                try (var gen = factory.createGenerator(ObjectWriteContext.empty(), baos)) {
+                    gen.copyCurrentStructure(parser);
                 }
+                fields.add(new AbstractMap.SimpleEntry<>(name, baos.toByteArray()));
             }
-
-            // Re-emit in reverse order
-            Collections.reverse(fields);
-            var out = new ByteArrayOutputStream();
-            try (var gen = factory.createGenerator(ObjectWriteContext.empty(), out)) {
-                gen.writeStartObject();
-                for (var field : fields) {
-                    gen.writeName(field.getKey());
-                    try (var p = factory.createParser(ObjectReadContext.empty(), field.getValue())) {
-                        p.nextToken();
-                        gen.copyCurrentStructure(p);
-                    }
-                }
-                gen.writeEndObject();
-            }
-            return out.toByteArray();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to reverse JSON field order", e);
         }
+
+        // Re-emit in reverse order
+        Collections.reverse(fields);
+        var out = new ByteArrayOutputStream();
+        try (var gen = factory.createGenerator(ObjectWriteContext.empty(), out)) {
+            gen.writeStartObject();
+            for (var field : fields) {
+                gen.writeName(field.getKey());
+                try (var p = factory.createParser(ObjectReadContext.empty(), field.getValue())) {
+                    p.nextToken();
+                    gen.copyCurrentStructure(p);
+                }
+            }
+            gen.writeEndObject();
+        }
+        return out.toByteArray();
     }
 }

@@ -8,6 +8,7 @@ package software.amazon.smithy.java.fuzz;
 import com.code_intelligence.jazzer.junit.DictionaryFile;
 import com.code_intelligence.jazzer.junit.FuzzTest;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -97,8 +98,8 @@ public abstract class DifferentialCodecFuzzTestBase {
                                         + "Reference output: %s%n"
                                         + "Test output:      %s",
                                 Base64.getEncoder().encodeToString(input),
-                                new String(refBytes),
-                                new String(testBytes)));
+                                new String(refBytes, StandardCharsets.UTF_8),
+                                new String(testBytes, StandardCharsets.UTF_8)));
                     }
                 }
                 continue;
@@ -142,7 +143,7 @@ public abstract class DifferentialCodecFuzzTestBase {
 
     private static String safeSerializeToString(Codec codec, SerializableShape shape) {
         byte[] bytes = trySerialize(codec, shape);
-        return bytes != null ? new String(bytes) : "<serialization failed>";
+        return bytes != null ? new String(bytes, StandardCharsets.UTF_8) : "<serialization failed>";
     }
 
     private record DeserializeResult(SerializableShape shape, Exception error) {}
@@ -183,8 +184,11 @@ public abstract class DifferentialCodecFuzzTestBase {
      * @param input the raw fuzz input bytes
      * @return true if the divergence is acceptable
      */
-    protected boolean isAcceptableDivergence(SerializableShape referenceShape, SerializableShape testShape,
-            byte[] input) {
+    protected boolean isAcceptableDivergence(
+            SerializableShape referenceShape,
+            SerializableShape testShape,
+            byte[] input
+    ) {
         return false;
     }
 
@@ -212,8 +216,11 @@ public abstract class DifferentialCodecFuzzTestBase {
      * @param input the raw fuzz input bytes
      * @return true if the reference failure is acceptable
      */
-    protected boolean isAcceptableReferenceFailure(SerializableShape testShape, Exception referenceError,
-            byte[] input) {
+    protected boolean isAcceptableReferenceFailure(
+            SerializableShape testShape,
+            Exception referenceError,
+            byte[] input
+    ) {
         return false;
     }
 
