@@ -7,7 +7,6 @@ package software.amazon.smithy.java.json.smithy;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.Base64;
 
 /**
@@ -438,18 +437,30 @@ final class JsonWriteUtils {
      * Produces output like {@code "2025-01-15T10:30:00Z"} or {@code "2025-01-15T10:30:00.123Z"}
      * for timestamps with sub-second precision.
      *
-     * <p>Bypasses {@link Instant#toString()} and {@link java.time.format.DateTimeFormatter}
-     * to avoid String allocation on the hot path.
+     * <p>Uses pure integer arithmetic from epoch seconds to compute date/time components,
+     * avoiding the 4 object allocations from {@code Instant.atOffset(ZoneOffset.UTC)}.
      */
     static int writeIso8601Timestamp(byte[] buf, int pos, Instant value) {
-        var dt = value.atOffset(ZoneOffset.UTC);
-        int year = dt.getYear();
-        int month = dt.getMonthValue();
-        int day = dt.getDayOfMonth();
-        int hour = dt.getHour();
-        int minute = dt.getMinute();
-        int second = dt.getSecond();
-        int nano = dt.getNano();
+        long epochSecond = value.getEpochSecond();
+        int nano = value.getNano();
+
+        // Compute time-of-day from epoch second
+        int secondOfDay = (int) Math.floorMod(epochSecond, 86400);
+        int hour = secondOfDay / 3600;
+        int minute = (secondOfDay % 3600) / 60;
+        int second = secondOfDay % 60;
+
+        // Compute date from epoch day using civil calendar algorithm (inlined to avoid allocation)
+        long epochDay = Math.floorDiv(epochSecond, 86400);
+        long z = epochDay + 719468;
+        long era = (z >= 0 ? z : z - 146096) / 146097;
+        long doe = z - era * 146097;
+        long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+        long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+        long mp = (5 * doy + 2) / 153;
+        int day = (int) (doy - (153 * mp + 2) / 5 + 1);
+        int month = (int) (mp < 10 ? mp + 3 : mp - 9);
+        int year = (int) (yoe + era * 400 + (month <= 2 ? 1 : 0));
 
         buf[pos++] = '"';
 
@@ -544,18 +555,33 @@ final class JsonWriteUtils {
      * Writes an HTTP-date timestamp directly to the byte buffer as a quoted JSON string.
      * Produces output like {@code "Sat, 01 Jan 2026 00:00:00 GMT"}.
      *
-     * <p>Bypasses {@link java.time.format.DateTimeFormatter} to avoid String allocation
-     * and the heavy formatter machinery on the hot path.
+     * <p>Uses pure integer arithmetic from epoch seconds, avoiding the 4 object allocations
+     * from {@code Instant.atOffset(ZoneOffset.UTC)} and the heavy DateTimeFormatter machinery.
      */
     static int writeHttpDate(byte[] buf, int pos, Instant value) {
-        var dt = value.atOffset(ZoneOffset.UTC);
-        int year = dt.getYear();
-        int month = dt.getMonthValue();
-        int day = dt.getDayOfMonth();
-        int hour = dt.getHour();
-        int minute = dt.getMinute();
-        int second = dt.getSecond();
-        int dow = dt.getDayOfWeek().getValue(); // 1=Monday..7=Sunday
+        long epochSecond = value.getEpochSecond();
+
+        // Compute time-of-day
+        int secondOfDay = (int) Math.floorMod(epochSecond, 86400);
+        int hour = secondOfDay / 3600;
+        int minute = (secondOfDay % 3600) / 60;
+        int second = secondOfDay % 60;
+
+        // Compute date from epoch day using civil calendar algorithm (inlined to avoid allocation)
+        long epochDay = Math.floorDiv(epochSecond, 86400);
+        long z = epochDay + 719468;
+        long era = (z >= 0 ? z : z - 146096) / 146097;
+        long doe = z - era * 146097;
+        long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+        long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+        long mp = (5 * doy + 2) / 153;
+        int day = (int) (doy - (153 * mp + 2) / 5 + 1);
+        int month = (int) (mp < 10 ? mp + 3 : mp - 9);
+        int year = (int) (yoe + era * 400 + (month <= 2 ? 1 : 0));
+
+        // Day of week: epoch day 0 (1970-01-01) was Thursday (4).
+        // 1=Monday..7=Sunday per java.time convention.
+        int dow = (int) Math.floorMod(epochDay + 3, 7) + 1;
 
         buf[pos++] = '"';
 
