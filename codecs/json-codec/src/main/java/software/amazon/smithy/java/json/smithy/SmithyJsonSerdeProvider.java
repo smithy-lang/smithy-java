@@ -51,10 +51,12 @@ public final class SmithyJsonSerdeProvider implements JsonSerdeProvider {
         // Direct path: acquire a pooled serializer, serialize, extract result, release.
         // Avoids 7 object allocations (~296 bytes) per call on the common path.
         var serializer = SmithyJsonSerializer.acquire(settings);
-        shape.serialize(serializer);
-        var result = serializer.extractResult();
-        SmithyJsonSerializer.release(serializer);
-        return result;
+        try {
+            shape.serialize(serializer);
+            return serializer.extractResult();
+        } finally {
+            SmithyJsonSerializer.release(serializer);
+        }
     }
 
     @Override
