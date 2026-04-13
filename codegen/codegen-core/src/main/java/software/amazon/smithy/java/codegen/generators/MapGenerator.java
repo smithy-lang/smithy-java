@@ -57,9 +57,10 @@ public final class MapGenerator
 
                                                 @Override
                                                 public void accept(${shape:T} values, ${mapSerializer:T} serializer) {
+                                                    var $$k = ${keySchema:L}.mapKeyMember();
                                                     for (var valueEntry : values.entrySet()) {
                                                         serializer.writeEntry(
-                                                            ${keySchema:L}.mapKeyMember(),
+                                                            $$k,
                                                             valueEntry.getKey()${?enumKey}.getValue()${/enumKey},
                                                             valueEntry.getValue(),
                                                             ${name:U}$$ValueSerializer.INSTANCE

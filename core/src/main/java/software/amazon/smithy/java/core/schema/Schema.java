@@ -553,7 +553,7 @@ public abstract sealed class Schema implements MemberLookup
     public final Schema listMember() {
         var result = listMember;
         if (result == null) {
-            listMember = result = members().get(0);
+            listMember = result = members().getFirst();
             if (!"member".equals(result.memberName)) {
                 throw new IllegalStateException("Expected list member, got " + result);
             }
@@ -571,7 +571,7 @@ public abstract sealed class Schema implements MemberLookup
     public final Schema mapKeyMember() {
         var result = mapKeyMember;
         if (result == null) {
-            mapKeyMember = result = members().get(0);
+            mapKeyMember = result = members().getFirst();
             if (!"key".equals(result.memberName)) {
                 throw new IllegalStateException("Expected map key member at position 0, got " + result);
             }
