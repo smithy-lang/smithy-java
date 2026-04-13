@@ -293,9 +293,11 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             pos = JsonWriteUtils.writeLong(buf, pos, value.longValue());
             return;
         }
-        String s = value.toString();
-        ensureCapacity(s.length());
-        pos = JsonWriteUtils.writeAsciiString(buf, pos, s);
+        // Write directly to byte buffer by splitting into 18-digit groups via
+        // divideAndRemainder(10^18). Avoids BigInteger.toString() which does expensive
+        // recursive division and allocates a String.
+        ensureCapacity(value.bitLength() / 3 + 2);
+        pos = JsonWriteUtils.writeBigInteger(buf, pos, value);
     }
 
     @Override
