@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.RandomAccess;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.directed.GenerateListDirective;
@@ -49,12 +50,24 @@ public final class ListGenerator
 
                                                 @Override
                                                 public void accept(${shape:B} values, ${shapeSerializer:T} serializer) {
-                                                    for (var value : values) {
-                                                        ${?sparse}if (value == null) {
-                                                            serializer.writeNull(${valueSchema:L});
-                                                            continue;
+                                                    var $$m = ${valueSchema:L};
+                                                    if (values instanceof ${randomAccess:T}) {
+                                                        for (int i = 0, size = values.size(); i < size; i++) {
+                                                            var value = values.get(i);
+                                                            ${?sparse}if (value == null) {
+                                                                serializer.writeNull($$m);
+                                                                continue;
+                                                            }
+                                                            ${/sparse}${memberSerializer:C|};
                                                         }
-                                                        ${/sparse}${memberSerializer:C|};
+                                                    } else {
+                                                        for (var value : values) {
+                                                            ${?sparse}if (value == null) {
+                                                                serializer.writeNull($$m);
+                                                                continue;
+                                                            }
+                                                            ${/sparse}${memberSerializer:C|};
+                                                        }
                                                     }
                                                 }
                                             }
@@ -92,13 +105,15 @@ public final class ListGenerator
                             writer.putContext("serdeException", SerializationException.class);
                             writer.putContext("sparse", directive.shape().hasTrait(SparseTrait.class));
                             writer.putContext("valueSchema", valueSchema);
+                            writer.putContext("randomAccess", RandomAccess.class);
                             writer.putContext(
                                     "memberSerializer",
                                     new SerializerMemberGenerator(
                                             directive,
                                             writer,
                                             directive.shape().getMember(),
-                                            "value"));
+                                            "value",
+                                            "$m"));
                             writer.putContext(
                                     "memberDeserializer",
                                     new DeserializerGenerator(

@@ -49,12 +49,23 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     private final Shape shape;
     private final String state;
     private final ContextualDirective<CodeGenerationContext, ?> directive;
+    private final String schemaNameOverride;
 
     SerializerMemberGenerator(
             ContextualDirective<CodeGenerationContext, ?> directive,
             JavaWriter writer,
             Shape shape,
             String state
+    ) {
+        this(directive, writer, shape, state, null);
+    }
+
+    SerializerMemberGenerator(
+            ContextualDirective<CodeGenerationContext, ?> directive,
+            JavaWriter writer,
+            Shape shape,
+            String state,
+            String schemaNameOverride
     ) {
         this.directive = directive;
         this.writer = writer;
@@ -63,6 +74,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
         this.service = directive.service();
         this.shape = shape;
         this.state = state;
+        this.schemaNameOverride = schemaNameOverride;
     }
 
     @Override
@@ -212,17 +224,21 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
             return null;
         }
         var container = model.expectShape(memberShape.getContainer());
-        var schemaFieldOder = directive.context().schemaFieldOrder();
-        if (container.isListShape()) {
-            var memberSchema =
-                    schemaFieldOder.getSchemaFieldName(container, writer) + ".listMember()";
-            writer.putContext("schema", memberSchema);
-        } else if (container.isMapShape()) {
-            var memberSchema =
-                    schemaFieldOder.getSchemaFieldName(container, writer) + ".mapValueMember()";
-            writer.putContext("schema", memberSchema);
+        if (schemaNameOverride != null && (container.isListShape() || container.isMapShape())) {
+            writer.putContext("schema", schemaNameOverride);
         } else {
-            writer.putContext("schema", CodegenUtils.toMemberSchemaName(memberName));
+            var schemaFieldOder = directive.context().schemaFieldOrder();
+            if (container.isListShape()) {
+                var memberSchema =
+                        schemaFieldOder.getSchemaFieldName(container, writer) + ".listMember()";
+                writer.putContext("schema", memberSchema);
+            } else if (container.isMapShape()) {
+                var memberSchema =
+                        schemaFieldOder.getSchemaFieldName(container, writer) + ".mapValueMember()";
+                writer.putContext("schema", memberSchema);
+            } else {
+                writer.putContext("schema", CodegenUtils.toMemberSchemaName(memberName));
+            }
         }
         return model.expectShape(memberShape.getTarget()).accept(this);
     }
