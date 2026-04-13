@@ -123,7 +123,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
                 int idx = (base + i) & POOL_MASK;
                 SmithyJsonSerializer s = POOL.getAndSet(idx, null);
                 if (s != null) {
-                    if (s.settings == settings) {
+                    if (s.settings.equals(settings)) {
                         s.pos = 0;
                         s.depth = 0;
                         s.currentFieldNameTable = null;
