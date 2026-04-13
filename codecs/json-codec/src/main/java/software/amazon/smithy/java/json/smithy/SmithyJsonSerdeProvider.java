@@ -48,12 +48,13 @@ public final class SmithyJsonSerdeProvider implements JsonSerdeProvider {
         if (settings.prettyPrint()) {
             return getJacksonFallback().serialize(shape, settings);
         }
-        // Direct path: serialize to the internal buffer, extract with a single small copy.
-        // Avoids: ByteBufferOutputStream allocation + zero-fill + flush arraycopy.
-        // The pooled buffer is returned immediately after copying the used portion.
-        var serializer = new SmithyJsonSerializer(settings);
+        // Direct path: acquire a pooled serializer, serialize, extract result, release.
+        // Avoids 7 object allocations (~296 bytes) per call on the common path.
+        var serializer = SmithyJsonSerializer.acquire(settings);
         shape.serialize(serializer);
-        return serializer.toByteBuffer();
+        var result = serializer.extractResult();
+        SmithyJsonSerializer.release(serializer);
+        return result;
     }
 
     @Override

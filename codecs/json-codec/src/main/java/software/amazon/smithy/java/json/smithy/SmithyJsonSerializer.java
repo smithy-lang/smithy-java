@@ -11,6 +11,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -35,6 +36,22 @@ import software.amazon.smithy.model.shapes.ShapeType;
 final class SmithyJsonSerializer implements ShapeSerializer {
 
     private static final int MAX_DEPTH = 64;
+
+    // Striped serializer pool — same pattern as JsonBufferPool.
+    // Avoids 7 object allocations (~296 bytes) per serialize call.
+    private static final int POOL_SLOTS;
+    private static final int POOL_MASK;
+    private static final AtomicReferenceArray<SmithyJsonSerializer> POOL;
+    private static final int MAX_PROBE = 3;
+    private static final int MAX_CACHEABLE_BUF = JsonBufferPool.DEFAULT_SIZE * 4;
+
+    static {
+        int processors = Runtime.getRuntime().availableProcessors();
+        int raw = processors * 4;
+        POOL_SLOTS = Integer.highestOneBit(raw - 1) << 1;
+        POOL_MASK = POOL_SLOTS - 1;
+        POOL = new AtomicReferenceArray<>(POOL_SLOTS);
+    }
 
     private byte[] buf;
     private int pos;
@@ -93,6 +110,72 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         JsonBufferPool.release(buf);
         buf = null;
         return result;
+    }
+
+    /**
+     * Acquires a serializer from the pool, or creates a new one.
+     * The returned serializer is ready for use with a fresh buffer.
+     */
+    static SmithyJsonSerializer acquire(JsonSettings settings) {
+        if (!Thread.currentThread().isVirtual()) {
+            int base = poolProbe();
+            for (int i = 0; i < MAX_PROBE; i++) {
+                int idx = (base + i) & POOL_MASK;
+                SmithyJsonSerializer s = POOL.getAndSet(idx, null);
+                if (s != null) {
+                    if (s.settings == settings) {
+                        s.pos = 0;
+                        s.depth = 0;
+                        s.currentFieldNameTable = null;
+                        return s;
+                    }
+                    POOL.lazySet(idx, s); // wrong settings, put back
+                }
+            }
+        }
+        return new SmithyJsonSerializer(settings);
+    }
+
+    /**
+     * Returns a serializer to the pool for reuse. If the pool is full or the
+     * buffer is oversized, the buffer is released to the buffer pool instead.
+     */
+    static void release(SmithyJsonSerializer serializer) {
+        if (serializer.buf == null || Thread.currentThread().isVirtual()) {
+            if (serializer.buf != null) {
+                JsonBufferPool.release(serializer.buf);
+                serializer.buf = null;
+            }
+            return;
+        }
+        // Downsize oversized buffers before pooling
+        if (serializer.buf.length > MAX_CACHEABLE_BUF) {
+            JsonBufferPool.release(serializer.buf);
+            serializer.buf = JsonBufferPool.acquire(JsonBufferPool.DEFAULT_SIZE);
+        }
+        int base = poolProbe();
+        for (int i = 0; i < MAX_PROBE; i++) {
+            int idx = (base + i) & POOL_MASK;
+            if (POOL.compareAndSet(idx, null, serializer)) {
+                return;
+            }
+        }
+        // Pool full — release buffer and discard serializer
+        JsonBufferPool.release(serializer.buf);
+        serializer.buf = null;
+    }
+
+    /**
+     * Extracts the serialized JSON as a ByteBuffer without releasing the internal
+     * buffer. Used with {@link #acquire}/{@link #release} for pooled serializers.
+     */
+    ByteBuffer extractResult() {
+        return ByteBuffer.wrap(Arrays.copyOf(buf, pos));
+    }
+
+    private static int poolProbe() {
+        long id = Thread.currentThread().threadId();
+        return (int) (id ^ (id >>> 16)) & POOL_MASK;
     }
 
     private void ensureCapacity(int needed) {
