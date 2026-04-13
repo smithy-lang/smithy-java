@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.json.smithy;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -403,26 +404,49 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
             p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
 
-            // Parse field name — scan for closing quote, no hash computation.
+            // Parse field name
             if (p >= localEnd || localBuf[p] != '"') {
                 this.pos = p;
                 throw new SerializationException(
                         "Expected field name, found: " + JsonReadUtils.describePos(localBuf, p, localEnd));
             }
             p++; // skip opening quote
-            int nameStart = p;
-            while (p < localEnd && localBuf[p] != '"') {
-                if (localBuf[p] == '\\') {
-                    p++; // skip escaped char
+
+            // Fused speculative path: check expected field name directly at current
+            // position without scanning for the closing quote byte-by-byte. If the
+            // expected name matches and the byte after it is '"', we skip the scan
+            // entirely. This eliminates the per-byte scan loop on the common path
+            // where JSON fields arrive in schema definition order.
+            Schema member = null;
+            if (lookup != null && expectedNext >= 0 && expectedNext < lookup.orderedNameBytes.length) {
+                byte[] expected = lookup.orderedNameBytes[expectedNext];
+                int expLen = expected.length;
+                if (p + expLen < localEnd
+                        && localBuf[p + expLen] == '"'
+                        && Arrays.equals(localBuf, p, p + expLen, expected, 0, expLen)) {
+                    member = lookup.orderedSchemas[expectedNext];
+                    expectedNext = member.memberIndex() + 1;
+                    p += expLen + 1; // skip name + closing quote
                 }
-                p++;
             }
-            if (p >= localEnd) {
-                this.pos = p;
-                throw new SerializationException("Unterminated field name");
+
+            // Slow path: scan for closing quote and look up member by hash
+            int nameStart = -1, nameEnd = -1;
+            if (member == null) {
+                nameStart = p;
+                while (p < localEnd && localBuf[p] != '"') {
+                    if (localBuf[p] == '\\') {
+                        p++; // skip escaped char
+                    }
+                    p++;
+                }
+                if (p >= localEnd) {
+                    this.pos = p;
+                    throw new SerializationException("Unterminated field name");
+                }
+                nameEnd = p;
+                p++; // skip closing quote
             }
-            int nameEnd = p;
-            p++; // skip closing quote
 
             // Skip colon
             p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
@@ -434,12 +458,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             p++;
             p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
 
-            // Look up member
-            Schema member = lookup != null
-                    ? lookup.lookup(localBuf, nameStart, nameEnd, expectedNext)
-                    : null;
-            if (member != null) {
-                expectedNext = member.memberIndex() + 1;
+            // Slow path member lookup (only when speculative check missed)
+            if (member == null) {
+                member = lookup != null
+                        ? lookup.lookup(localBuf, nameStart, nameEnd, expectedNext)
+                        : null;
+                if (member != null) {
+                    expectedNext = member.memberIndex() + 1;
+                }
             }
 
             if (member != null) {
