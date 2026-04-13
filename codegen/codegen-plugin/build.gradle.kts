@@ -11,6 +11,7 @@ extra["moduleName"] = "software.amazon.smithy.java.codegen.plugin"
 
 dependencies {
     api(project(":codegen:codegen-core"))
+    implementation(project(":framework-errors"))
     compileOnly(project(":client:client-core"))
     compileOnly(project(":client:client-rulesengine"))
     compileOnly(project(":client:client-waiters"))
