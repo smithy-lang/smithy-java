@@ -104,21 +104,27 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     /**
      * Acquires a serializer from the pool, or creates a new one.
      * The returned serializer is ready for use with a fresh buffer.
+     *
+     * <p>Uses getPlain to peek at slots cheaply (plain read, no ordering), then
+     * compareAndExchangeAcquire to atomically claim a non-null entry (acquire
+     * semantics ensure we see the serializer's fully-written state). This pays
+     * the atomic price only once per acquire — empty slots are skipped with a
+     * plain read instead of a full getAndSet.
      */
     static SmithyJsonSerializer acquire(JsonSettings settings) {
         if (!Thread.currentThread().isVirtual()) {
             int base = poolProbe();
             for (int i = 0; i < MAX_PROBE; i++) {
                 int idx = (base + i) & POOL_MASK;
-                SmithyJsonSerializer s = POOL.getAndSet(idx, null);
-                if (s != null) {
+                SmithyJsonSerializer s = (SmithyJsonSerializer) POOL.getPlain(idx);
+                if (s != null && POOL.compareAndExchangeAcquire(idx, s, null) == s) {
                     if (s.settings.equals(settings)) {
                         s.pos = 0;
                         s.depth = 0;
                         s.currentFieldNameTable = null;
                         return s;
                     }
-                    POOL.lazySet(idx, s); // wrong settings, put back
+                    POOL.setRelease(idx, s); // wrong settings, put back
                 }
             }
         }
@@ -128,6 +134,10 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     /**
      * Returns a serializer to the pool for reuse. If the pool is full, the
      * buffer is oversized, or we're on a virtual thread, the serializer is discarded.
+     *
+     * <p>Uses getPlain to peek for empty slots, then compareAndExchangeRelease to
+     * store the serializer with release semantics (ensures all serializer state is
+     * visible to the thread that later acquires it).
      */
     static void release(SmithyJsonSerializer serializer) {
         if (serializer.buf == null || Thread.currentThread().isVirtual()) {
@@ -140,7 +150,8 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         int base = poolProbe();
         for (int i = 0; i < MAX_PROBE; i++) {
             int idx = (base + i) & POOL_MASK;
-            if (POOL.compareAndSet(idx, null, serializer)) {
+            if (POOL.getPlain(idx) == null
+                    && POOL.compareAndExchangeRelease(idx, null, serializer) == null) {
                 return;
             }
         }
