@@ -71,12 +71,19 @@ public final class JavaCodegenPlugin implements SmithyBuildPlugin {
         }
     }
 
+    private void setIntegrationsSettings(CodegenDirector runner, ObjectNode settingsNode) {
+        settingsNode.asObjectNode()
+                .flatMap(node -> node.getObjectMember("integrations"))
+                .ifPresent(runner::integrationSettings);
+    }
+
     private void executeServiceMode(PluginContext context, ObjectNode settingsNode, Set<CodegenMode> modes) {
         CodegenDirector<JavaWriter, JavaCodegenIntegration, CodeGenerationContext, JavaCodegenSettings> runner =
                 new CodegenDirector<>();
 
         var settings = JavaCodegenSettings.fromNode(settingsNode);
         runner.settings(settings);
+        setIntegrationsSettings(runner, settingsNode);
         runner.directedCodegen(new DirectedJavaCodegen(modes));
         runner.fileManifest(context.getFileManifest());
         runner.service(settings.service());
@@ -101,6 +108,7 @@ public final class JavaCodegenPlugin implements SmithyBuildPlugin {
         var settings = TypeCodegenSettings.fromNode(settingsNode);
         var codegenSettings = settings.codegenSettings();
         runner.settings(codegenSettings);
+        setIntegrationsSettings(runner, settingsNode);
         runner.directedCodegen(new DirectedJavaCodegen(modes));
         runner.fileManifest(context.getFileManifest());
         runner.service(codegenSettings.service());
