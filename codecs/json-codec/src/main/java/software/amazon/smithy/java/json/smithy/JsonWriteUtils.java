@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.json.smithy;
 
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
@@ -229,6 +230,63 @@ final class JsonWriteUtils {
         if (value < 1000000000000000000L)
             return 18;
         return 19;
+    }
+
+    private static final BigInteger TEN_TO_18 = BigInteger.valueOf(1_000_000_000_000_000_000L);
+
+    /**
+     * Writes a BigInteger directly to the byte buffer by splitting into 18-digit groups.
+     * Avoids BigInteger.toString() which does expensive recursive division and String allocation.
+     */
+    static int writeBigInteger(byte[] buf, int pos, BigInteger value) {
+        if (value.signum() < 0) {
+            buf[pos++] = '-';
+            value = value.negate();
+        }
+
+        // Split into groups of up to 18 decimal digits (each fits in a long)
+        if (value.compareTo(TEN_TO_18) < 0) {
+            return writePositiveLong(buf, pos, value.longValue());
+        }
+
+        BigInteger[] qr = value.divideAndRemainder(TEN_TO_18);
+        BigInteger high = qr[0];
+        long low = qr[1].longValue();
+
+        if (high.compareTo(TEN_TO_18) < 0) {
+            // Two groups: high (no padding) + low (18-digit padded)
+            pos = writePositiveLong(buf, pos, high.longValue());
+            return writePaddedLong18(buf, pos, low);
+        }
+
+        // Three or more groups (handles numbers up to ~54 digits)
+        BigInteger[] qr2 = high.divideAndRemainder(TEN_TO_18);
+        long mid = qr2[1].longValue();
+
+        if (qr2[0].compareTo(TEN_TO_18) < 0) {
+            pos = writePositiveLong(buf, pos, qr2[0].longValue());
+            pos = writePaddedLong18(buf, pos, mid);
+            return writePaddedLong18(buf, pos, low);
+        }
+
+        // Extremely large: fall back to toString for safety
+        String s = value.toString();
+        return writeAsciiString(buf, pos, s);
+    }
+
+    /**
+     * Writes a long value zero-padded to exactly 18 digits.
+     */
+    private static int writePaddedLong18(byte[] buf, int pos, long value) {
+        int end = pos + 18;
+        int p = end;
+        for (int i = 0; i < 9; i++) {
+            int r = (int) (value % 100) * 2;
+            value /= 100;
+            buf[--p] = DIGIT_PAIRS[r + 1];
+            buf[--p] = DIGIT_PAIRS[r];
+        }
+        return end;
     }
 
     /**
