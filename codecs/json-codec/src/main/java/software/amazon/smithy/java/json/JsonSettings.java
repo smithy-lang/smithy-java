@@ -124,6 +124,33 @@ public final class JsonSettings {
         return prettyPrint;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof JsonSettings that)) {
+            return false;
+        }
+        return forbidUnknownUnionMembers == that.forbidUnknownUnionMembers
+                && serializeTypeInDocuments == that.serializeTypeInDocuments
+                && prettyPrint == that.prettyPrint
+                && timestampResolver.getClass() == that.timestampResolver.getClass()
+                && fieldMapper.getClass() == that.fieldMapper.getClass()
+                && Objects.equals(defaultNamespace, that.defaultNamespace);
+    }
+
+    @Override
+    public int hashCode() {
+        int h = Boolean.hashCode(forbidUnknownUnionMembers);
+        h = 31 * h + Boolean.hashCode(serializeTypeInDocuments);
+        h = 31 * h + Boolean.hashCode(prettyPrint);
+        h = 31 * h + timestampResolver.getClass().hashCode();
+        h = 31 * h + fieldMapper.getClass().hashCode();
+        h = 31 * h + Objects.hashCode(defaultNamespace);
+        return h;
+    }
+
     JsonSerdeProvider provider() {
         return provider;
     }
