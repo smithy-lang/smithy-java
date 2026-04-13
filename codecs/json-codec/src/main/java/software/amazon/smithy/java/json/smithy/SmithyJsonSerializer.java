@@ -36,14 +36,15 @@ import software.amazon.smithy.model.shapes.ShapeType;
 final class SmithyJsonSerializer implements ShapeSerializer {
 
     private static final int MAX_DEPTH = 64;
+    private static final int DEFAULT_BUF_SIZE = 8192;
+    private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 4;
 
-    // Striped serializer pool — same pattern as JsonBufferPool.
-    // Avoids 7 object allocations (~296 bytes) per serialize call.
+    // Striped serializer pool. Pools the entire serializer (including its buffer),
+    // eliminating both object allocation and buffer allocation on the hot path.
     private static final int POOL_SLOTS;
     private static final int POOL_MASK;
     private static final AtomicReferenceArray<SmithyJsonSerializer> POOL;
     private static final int MAX_PROBE = 3;
-    private static final int MAX_CACHEABLE_BUF = JsonBufferPool.DEFAULT_SIZE * 4;
 
     static {
         int processors = Runtime.getRuntime().availableProcessors();
@@ -82,34 +83,22 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         this.sink = sink;
         this.settings = settings;
         this.useJsonName = settings.fieldMapper() instanceof JsonFieldMapper.UseJsonNameTrait;
-        this.buf = JsonBufferPool.acquire(JsonBufferPool.DEFAULT_SIZE);
+        this.buf = new byte[DEFAULT_BUF_SIZE];
         this.pos = 0;
         this.depth = 0;
     }
 
     /**
      * Creates a serializer for direct buffer extraction (no OutputStream).
-     * Use with {@link #toByteBuffer()} to get the result without intermediate copies.
+     * Use with {@link #acquire} for the pooled path, or construct directly for one-off use.
      */
     SmithyJsonSerializer(JsonSettings settings) {
         this.sink = null;
         this.settings = settings;
         this.useJsonName = settings.fieldMapper() instanceof JsonFieldMapper.UseJsonNameTrait;
-        this.buf = JsonBufferPool.acquire(JsonBufferPool.DEFAULT_SIZE);
+        this.buf = new byte[DEFAULT_BUF_SIZE];
         this.pos = 0;
         this.depth = 0;
-    }
-
-    /**
-     * Extracts the serialized JSON as a ByteBuffer and returns the internal
-     * buffer to the pool. Copies only the used bytes (typically small) to a
-     * right-sized array, keeping the large pooled buffer available for reuse.
-     */
-    ByteBuffer toByteBuffer() {
-        var result = ByteBuffer.wrap(Arrays.copyOf(buf, pos));
-        JsonBufferPool.release(buf);
-        buf = null;
-        return result;
     }
 
     /**
@@ -137,21 +126,16 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     }
 
     /**
-     * Returns a serializer to the pool for reuse. If the pool is full or the
-     * buffer is oversized, the buffer is released to the buffer pool instead.
+     * Returns a serializer to the pool for reuse. If the pool is full, the
+     * buffer is oversized, or we're on a virtual thread, the serializer is discarded.
      */
     static void release(SmithyJsonSerializer serializer) {
         if (serializer.buf == null || Thread.currentThread().isVirtual()) {
-            if (serializer.buf != null) {
-                JsonBufferPool.release(serializer.buf);
-                serializer.buf = null;
-            }
             return;
         }
-        // Downsize oversized buffers before pooling
+        // Downsize oversized buffers before pooling to bound memory
         if (serializer.buf.length > MAX_CACHEABLE_BUF) {
-            JsonBufferPool.release(serializer.buf);
-            serializer.buf = JsonBufferPool.acquire(JsonBufferPool.DEFAULT_SIZE);
+            serializer.buf = new byte[DEFAULT_BUF_SIZE];
         }
         int base = poolProbe();
         for (int i = 0; i < MAX_PROBE; i++) {
@@ -160,9 +144,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
                 return;
             }
         }
-        // Pool full — release buffer and discard serializer
-        JsonBufferPool.release(serializer.buf);
-        serializer.buf = null;
+        // Pool full — let GC collect
     }
 
     /**
@@ -209,10 +191,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
                 sink.write(buf, 0, pos);
                 pos = 0;
             }
-            if (buf != null) {
-                JsonBufferPool.release(buf);
-                buf = null;
-            }
+            buf = null;
         } catch (Exception e) {
             throw new SerializationException(e);
         }
