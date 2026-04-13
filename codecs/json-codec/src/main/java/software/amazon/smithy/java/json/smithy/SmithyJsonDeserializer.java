@@ -6,12 +6,12 @@
 package software.amazon.smithy.java.json.smithy;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
