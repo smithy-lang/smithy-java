@@ -449,26 +449,26 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         }
     }
 
-    // ---- Field name writing (fused comma + name for single ensureCapacity call) ----
+    // ---- Field name writing ----
 
-    private void writeFieldNameBytes(Schema schema) {
-        // Use cached field name table (resolved once per writeStruct) — plain array index,
-        // no VarHandle acquire per field. Falls back to per-member extension for edge cases.
-        byte[] nameBytes;
+    /**
+     * Resolves the pre-computed field name bytes for a schema member.
+     */
+    private byte[] resolveFieldNameBytes(Schema schema) {
         byte[][] table = currentFieldNameTable;
         int idx = schema.memberIndex();
         if (table != null && idx >= 0 && idx < table.length && table[idx] != null) {
-            nameBytes = table[idx];
-        } else {
-            // Fallback for edge cases (e.g., document struct members without a parent table)
-            var ext = schema.getExtension(SmithyJsonSchemaExtensions.KEY);
-            nameBytes = useJsonName ? ext.jsonNameBytes() : ext.memberNameBytes();
+            return table[idx];
         }
-        int needed = nameBytes.length + 1; // +1 for potential comma
-        if (pos + needed > buf.length) {
-            grow(needed);
-        }
-        // Inline comma logic to avoid separate method call + capacity check
+        var ext = schema.getExtension(SmithyJsonSchemaExtensions.KEY);
+        return useJsonName ? ext.jsonNameBytes() : ext.memberNameBytes();
+    }
+
+    /**
+     * Writes comma (if needed) + field name bytes. Caller must have already ensured
+     * sufficient capacity for nameBytes.length + 1 + value bytes.
+     */
+    private void writeFieldNameBytesUnchecked(byte[] nameBytes) {
         if (needsComma[depth]) {
             buf[pos++] = ',';
         } else {
@@ -478,51 +478,112 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         pos += nameBytes.length;
     }
 
+    /**
+     * Resolves field name, ensures capacity for name + comma, and writes them.
+     * Used by write methods that need separate capacity logic for their value.
+     */
+    private void writeFieldNameBytes(Schema schema) {
+        byte[] nameBytes = resolveFieldNameBytes(schema);
+        int needed = nameBytes.length + 1;
+        if (pos + needed > buf.length) {
+            grow(needed);
+        }
+        writeFieldNameBytesUnchecked(nameBytes);
+    }
+
     // ---- Inner struct serializer: writes field name + value ----
 
     private final class StructSerializer implements ShapeSerializer {
 
+        // Fused capacity check: resolve field name + ensure capacity for name + comma + max value
+        // in a single check, then write both without separate capacity checks.
+
         @Override
         public void writeBoolean(Schema schema, boolean value) {
-            writeFieldNameBytes(schema);
-            SmithyJsonSerializer.this.writeBoolean(schema, value);
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 1 + 5); // +5 for "false"
+            writeFieldNameBytesUnchecked(nameBytes);
+            byte[] bytes = value ? JsonWriteUtils.TRUE_BYTES : JsonWriteUtils.FALSE_BYTES;
+            System.arraycopy(bytes, 0, buf, pos, bytes.length);
+            pos += bytes.length;
         }
 
         @Override
         public void writeByte(Schema schema, byte value) {
-            writeFieldNameBytes(schema);
-            SmithyJsonSerializer.this.writeByte(schema, value);
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 1 + 4);
+            writeFieldNameBytesUnchecked(nameBytes);
+            pos = JsonWriteUtils.writeInt(buf, pos, value);
         }
 
         @Override
         public void writeShort(Schema schema, short value) {
-            writeFieldNameBytes(schema);
-            SmithyJsonSerializer.this.writeShort(schema, value);
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 1 + 6);
+            writeFieldNameBytesUnchecked(nameBytes);
+            pos = JsonWriteUtils.writeInt(buf, pos, value);
         }
 
         @Override
         public void writeInteger(Schema schema, int value) {
-            writeFieldNameBytes(schema);
-            SmithyJsonSerializer.this.writeInteger(schema, value);
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 1 + 11);
+            writeFieldNameBytesUnchecked(nameBytes);
+            pos = JsonWriteUtils.writeInt(buf, pos, value);
         }
 
         @Override
         public void writeLong(Schema schema, long value) {
-            writeFieldNameBytes(schema);
-            SmithyJsonSerializer.this.writeLong(schema, value);
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 1 + 20);
+            writeFieldNameBytesUnchecked(nameBytes);
+            pos = JsonWriteUtils.writeLong(buf, pos, value);
         }
 
         @Override
         public void writeFloat(Schema schema, float value) {
-            writeFieldNameBytes(schema);
-            SmithyJsonSerializer.this.writeFloat(schema, value);
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 1 + 24);
+            writeFieldNameBytesUnchecked(nameBytes);
+            if (Float.isFinite(value)) {
+                pos = JsonWriteUtils.writeFloat(buf, pos, value, floatToDecimal);
+            } else if (Float.isNaN(value)) {
+                System.arraycopy(JsonWriteUtils.NAN_BYTES, 0, buf, pos, JsonWriteUtils.NAN_BYTES.length);
+                pos += JsonWriteUtils.NAN_BYTES.length;
+            } else {
+                byte[] bytes = value > 0 ? JsonWriteUtils.INF_BYTES : JsonWriteUtils.NEG_INF_BYTES;
+                System.arraycopy(bytes, 0, buf, pos, bytes.length);
+                pos += bytes.length;
+            }
         }
 
         @Override
         public void writeDouble(Schema schema, double value) {
-            writeFieldNameBytes(schema);
-            SmithyJsonSerializer.this.writeDouble(schema, value);
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 1 + 24);
+            writeFieldNameBytesUnchecked(nameBytes);
+            if (Double.isFinite(value)) {
+                pos = JsonWriteUtils.writeDouble(buf, pos, value, doubleToDecimal);
+            } else if (Double.isNaN(value)) {
+                System.arraycopy(JsonWriteUtils.NAN_BYTES, 0, buf, pos, JsonWriteUtils.NAN_BYTES.length);
+                pos += JsonWriteUtils.NAN_BYTES.length;
+            } else {
+                byte[] bytes = value > 0 ? JsonWriteUtils.INF_BYTES : JsonWriteUtils.NEG_INF_BYTES;
+                System.arraycopy(bytes, 0, buf, pos, bytes.length);
+                pos += bytes.length;
+            }
         }
+
+        @Override
+        public void writeNull(Schema schema) {
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 1 + 4);
+            writeFieldNameBytesUnchecked(nameBytes);
+            System.arraycopy(JsonWriteUtils.NULL_BYTES, 0, buf, pos, JsonWriteUtils.NULL_BYTES.length);
+            pos += JsonWriteUtils.NULL_BYTES.length;
+        }
+
+        // Variable-size and recursive types: delegate to outer class (separate capacity checks)
 
         @Override
         public void writeBigInteger(Schema schema, BigInteger value) {
@@ -538,8 +599,10 @@ final class SmithyJsonSerializer implements ShapeSerializer {
 
         @Override
         public void writeString(Schema schema, String value) {
-            writeFieldNameBytes(schema);
-            SmithyJsonSerializer.this.writeString(schema, value);
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 1 + JsonWriteUtils.maxQuotedStringBytes(value));
+            writeFieldNameBytesUnchecked(nameBytes);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, value);
         }
 
         @Override
@@ -576,12 +639,6 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         public void writeDocument(Schema schema, Document value) {
             writeFieldNameBytes(schema);
             SmithyJsonSerializer.this.writeDocument(schema, value);
-        }
-
-        @Override
-        public void writeNull(Schema schema) {
-            writeFieldNameBytes(schema);
-            SmithyJsonSerializer.this.writeNull(schema);
         }
     }
 
