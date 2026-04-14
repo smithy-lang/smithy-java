@@ -647,6 +647,81 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
 
     @ParameterizedTest
     @MethodSource
+    void nonStructDocumentRoundtrip(JsonSerdeProvider ser, JsonSerdeProvider de, Document original) {
+        try (var serCodec = JsonCodec.builder()
+                .overrideSerdeProvider(ser)
+                .useJsonName(true)
+                .useTimestampFormat(true)
+                .build();
+                var deCodec = JsonCodec.builder()
+                        .overrideSerdeProvider(de)
+                        .useJsonName(true)
+                        .useTimestampFormat(true)
+                        .build()) {
+            ByteBuffer serialized = serCodec.serialize(original);
+            Document result = deCodec.createDeserializer(serialized).readDocument();
+            assertThat(Document.equals(result, original)).isTrue();
+        }
+    }
+
+    static Stream<Arguments> nonStructDocumentRoundtrip() {
+        List<Document> documents = List.of(
+                Document.of("hello world"),
+                Document.of(true),
+                Document.of(false),
+                Document.of(42),
+                Document.of(Long.MAX_VALUE),
+                Document.of(3.14),
+                Document.of(List.of()),
+                Document.of(List.of(Document.of(1), Document.of("two"), Document.of(true))),
+                Document.of(Map.of()),
+                Document.of(Map.of("key1", Document.of("value1"), "key2", Document.of(42))),
+                Document.of(Map.of(
+                        "list",
+                        Document.of(List.of(Document.of(1), Document.of(2))),
+                        "nested",
+                        Document.of(Map.of("inner", Document.of("value"))),
+                        "scalar",
+                        Document.of("hello"))));
+        return crossProviders().stream()
+                .flatMap(cp -> documents.stream()
+                        .map(doc -> Arguments.of(cp.get()[0], cp.get()[1], doc)));
+    }
+
+    @ParameterizedTest
+    @MethodSource
+    void nonStructDocumentInStructRoundtrip(JsonSerdeProvider ser, JsonSerdeProvider de, Document freeform) {
+        var original = ComplexStruct.builder()
+                .id("doc-test")
+                .count(1)
+                .nested(NestedStruct.builder().field1("f").field2(0).build())
+                .freeformData(freeform)
+                .build();
+        var result = roundtrip(ser, de, original, ComplexStruct.builder());
+        assertThat(Document.equals(result.getFreeformData(), freeform)).isTrue();
+    }
+
+    static Stream<Arguments> nonStructDocumentInStructRoundtrip() {
+        List<Document> documents = List.of(
+                Document.of("a string"),
+                Document.of(true),
+                Document.of(42),
+                Document.of(Long.MAX_VALUE),
+                Document.of(3.14),
+                Document.of(List.of(Document.of(1), Document.of("two"))),
+                Document.of(Map.of("key", Document.of("value"))),
+                Document.of(Map.of(
+                        "list",
+                        Document.of(List.of(Document.of(1), Document.of(2))),
+                        "nested",
+                        Document.of(Map.of("inner", Document.of("value"))))));
+        return crossProviders().stream()
+                .flatMap(cp -> documents.stream()
+                        .map(doc -> Arguments.of(cp.get()[0], cp.get()[1], doc)));
+    }
+
+    @ParameterizedTest
+    @MethodSource
     void invalidInputs(JsonSerdeProvider provider, String input, boolean isB64) {
         byte[] bytes;
         if (isB64) {

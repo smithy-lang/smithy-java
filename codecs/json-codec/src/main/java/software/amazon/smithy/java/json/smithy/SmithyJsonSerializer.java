@@ -104,15 +104,17 @@ final class SmithyJsonSerializer implements ShapeSerializer {
      * <p>Uses getPlain to peek at slots cheaply (plain read, no ordering), then
      * compareAndExchangeAcquire to atomically claim a non-null entry (acquire
      * semantics ensure we see the serializer's fully-written state). This pays
-     * the atomic price only once per acquire — empty slots are skipped with a
+     * the atomic price only once per acquire - empty slots are skipped with a
      * plain read instead of a full getAndSet.
      */
     static SmithyJsonSerializer acquire(JsonSettings settings) {
+        //TODO Have a different strat for VTs,
+        // we still some sort of pooling for VTs but the current strategy won't work.
         if (!Thread.currentThread().isVirtual()) {
             int base = poolProbe();
             for (int i = 0; i < MAX_PROBE; i++) {
                 int idx = (base + i) & POOL_MASK;
-                SmithyJsonSerializer s = (SmithyJsonSerializer) POOL.getPlain(idx);
+                SmithyJsonSerializer s = POOL.getPlain(idx);
                 if (s != null && POOL.compareAndExchangeAcquire(idx, s, null) == s) {
                     if (s.settings.equals(settings)) {
                         s.pos = 0;

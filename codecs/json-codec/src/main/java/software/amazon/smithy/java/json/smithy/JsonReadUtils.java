@@ -12,6 +12,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Base64;
 import software.amazon.smithy.java.core.serde.SerializationException;
 
 /**
@@ -32,7 +33,7 @@ final class JsonReadUtils {
     private static final int[] HEX_VALUES = new int[128];
 
     static {
-        java.util.Arrays.fill(HEX_VALUES, -1);
+        Arrays.fill(HEX_VALUES, -1);
         for (int i = '0'; i <= '9'; i++) {
             HEX_VALUES[i] = i - '0';
         }
@@ -716,7 +717,7 @@ final class JsonReadUtils {
         return Instant.ofEpochSecond(epochSecond);
     }
 
-    private static final java.util.Base64.Decoder BASE64_DECODER = java.util.Base64.getDecoder();
+    private static final Base64.Decoder BASE64_DECODER = Base64.getDecoder();
 
     /**
      * Decodes a base64-encoded JSON string from the byte buffer, bypassing String allocation.
