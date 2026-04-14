@@ -12,7 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +34,6 @@ import software.amazon.smithy.model.shapes.ShapeType;
 final class SmithyJsonDeserializer implements ShapeDeserializer {
 
     private static final int MAX_DEPTH = 1000;
-    private static final Base64.Decoder BASE64_DECODER = Base64.getDecoder();
 
     private final byte[] buf;
     private int pos;
@@ -44,7 +42,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     private final boolean useJsonName;
     private int depth;
 
-    // Mutable result fields — avoids allocating arrays on every parse call.
+    // Mutable result fields, avoids allocating arrays on every parse call.
     // Safe because the deserializer is single-threaded (one instance per operation).
     long parsedLong;
     int parsedEndPos;
@@ -218,12 +216,10 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
     @Override
     public ByteBuffer readBlob(Schema schema) {
-        String base64 = readString(schema);
-        try {
-            return ByteBuffer.wrap(BASE64_DECODER.decode(base64));
-        } catch (IllegalArgumentException e) {
-            throw new SerializationException("Invalid base64 in blob value", e);
-        }
+        skipWhitespace();
+        byte[] decoded = JsonReadUtils.decodeBase64String(buf, pos, end, this);
+        pos = parsedEndPos;
+        return ByteBuffer.wrap(decoded);
     }
 
     @Override
@@ -827,6 +823,10 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     }
 
     private void skipString() {
+        if (pos >= end || buf[pos] != '"') {
+            throw new SerializationException(
+                    "Expected '\"', found: " + JsonReadUtils.describePos(buf, pos, end));
+        }
         int p = pos + 1; // skip opening '"'
         final byte[] buf = this.buf;
         final int end = this.end;
@@ -882,6 +882,9 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         while (true) {
             if (!first) {
                 skipWhitespace();
+                if (pos >= end) {
+                    throw new SerializationException("Unexpected end of input in object");
+                }
                 if (buf[pos] == '}') {
                     pos++;
                     depth--;
@@ -916,6 +919,9 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         while (true) {
             if (!first) {
                 skipWhitespace();
+                if (pos >= end) {
+                    throw new SerializationException("Unexpected end of input in array");
+                }
                 if (buf[pos] == ']') {
                     pos++;
                     depth--;

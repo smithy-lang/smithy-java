@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.json;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -14,15 +15,20 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.bench.model.BenchUnion;
 import software.amazon.smithy.java.json.bench.model.BlobStruct;
@@ -637,5 +643,31 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
                 .build();
         assertThat(serializeToJson(oneNano)).contains("1000.000000001");
         assertThat(roundtrip(SMITHY, oneNano, TimestampStruct.builder())).isEqualTo(oneNano);
+    }
+
+    @ParameterizedTest
+    @MethodSource
+    void invalidInputs(JsonSerdeProvider provider, String input, boolean isB64) {
+        byte[] bytes;
+        if (isB64) {
+            bytes = Base64.getDecoder()
+                    .decode(input);
+        } else {
+            bytes = input.getBytes(StandardCharsets.UTF_8);
+        }
+        var codec = codec(provider);
+        assertThrows(SerializationException.class,
+                () -> codec.deserializeShape(bytes, NestedStruct.builder()));
+    }
+
+    static Stream<Arguments> invalidInputs() {
+        List<Arguments> arguments = new ArrayList<>();
+        for (var provider : List.of(JACKSON, SMITHY)) {
+            arguments.add(Arguments.of(provider,
+                    "eyJ2YWx1ZSI6e2JpdWUiOntiaW50VmE6e2JpbnRWYXJpnm50VmE6e2JpbnRWYXJpnpF0IjotMjA3fQ==",
+                    true));
+            arguments.add(Arguments.of(provider, "{\"value\":[true", false));
+        }
+        return arguments.stream();
     }
 }

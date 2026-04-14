@@ -8,6 +8,7 @@ package software.amazon.smithy.java.json.smithy;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Base64;
 
 /**
@@ -763,7 +764,7 @@ final class JsonWriteUtils {
         // Use JDK Base64 encoder — produces standard base64 with +/ alphabet, no line breaks.
         // This matches Jackson's MIME_NO_LINEFEEDS variant for JSON.
         byte[] encoded = BASE64_ENCODER.encode(
-                off == 0 && len == data.length ? data : java.util.Arrays.copyOfRange(data, off, off + len));
+                off == 0 && len == data.length ? data : Arrays.copyOfRange(data, off, off + len));
         System.arraycopy(encoded, 0, buf, pos, encoded.length);
         pos += encoded.length;
         buf[pos++] = '"';

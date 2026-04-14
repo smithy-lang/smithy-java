@@ -19,7 +19,7 @@ class DeserializationFuzzTest {
         }
 
         @Override
-        protected boolean isErrorAcceptable(Exception exception) throws Exception {
+        protected boolean isErrorAcceptable(Exception exception) {
             if (exception instanceof XMLStreamException
                     || exception.getCause() instanceof XMLStreamException) {
                 return true;

@@ -11,6 +11,7 @@ import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Arrays;
 import software.amazon.smithy.java.core.serde.SerializationException;
 
 /**
@@ -713,6 +714,57 @@ final class JsonReadUtils {
         long epochDay = computeEpochDay(year, month, day);
         long epochSecond = epochDay * 86400 + hour * 3600 + minute * 60 + second;
         return Instant.ofEpochSecond(epochSecond);
+    }
+
+    private static final java.util.Base64.Decoder BASE64_DECODER = java.util.Base64.getDecoder();
+
+    /**
+     * Decodes a base64-encoded JSON string from the byte buffer, bypassing String allocation.
+     * Scans for the closing quote to find the base64 content boundaries, then uses the JDK
+     * Base64 decoder which is backed by @IntrinsicCandidate SIMD on HotSpot.
+     *
+     * <p>Expects {@code pos} at the opening quote. Stores the position after the closing
+     * quote in {@code deser.parsedEndPos}.
+     *
+     * @return the decoded bytes
+     * @throws SerializationException on unterminated string or invalid base64
+     */
+    static byte[] decodeBase64String(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
+        if (pos >= end || buf[pos] != '"') {
+            throw new SerializationException("Expected '\"', found: " + describePos(buf, pos, end));
+        }
+        pos++; // skip opening quote
+
+        // Find closing quote using SWAR (8 bytes at a time).
+        // Base64 chars never include '"', so a simple quote scan suffices.
+        int contentStart = pos;
+        while (pos + 8 <= end) {
+            long word = (long) LONG_HANDLE.get(buf, pos);
+            long xorQuote = word ^ 0x2222222222222222L;
+            if (((xorQuote - 0x0101010101010101L) & ~xorQuote & 0x8080808080808080L) != 0) {
+                break;
+            }
+            pos += 8;
+        }
+        while (pos < end && buf[pos] != '"') {
+            pos++;
+        }
+        if (pos >= end) {
+            throw new SerializationException("Unterminated base64 string");
+        }
+        int contentEnd = pos;
+        deser.parsedEndPos = pos + 1; // after closing quote
+
+        if (contentStart == contentEnd) {
+            return new byte[0];
+        }
+
+        byte[] base64Bytes = Arrays.copyOfRange(buf, contentStart, contentEnd);
+        try {
+            return BASE64_DECODER.decode(base64Bytes);
+        } catch (IllegalArgumentException e) {
+            throw new SerializationException("Invalid base64 in blob value", e);
+        }
     }
 
     static String describeChar(byte b) {
