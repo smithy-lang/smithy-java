@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.core.schema;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -513,11 +514,14 @@ public abstract sealed class Schema implements MemberLookup
     private static final class ExtensionInitializerHolder {
         static final SchemaExtensionProvider[] PROVIDER_BY_KEY;
         static {
-            var providers = ServiceLoader
-                    .load(SchemaExtensionProvider.class, SchemaExtensionProvider.class.getClassLoader())
-                    .stream()
-                    .map(ServiceLoader.Provider::get)
-                    .toList();
+            var loader = ServiceLoader
+                    .load(SchemaExtensionProvider.class, SchemaExtensionProvider.class.getClassLoader());
+            // Instantiate all providers first so their SchemaExtensionKey static fields
+            // are loaded before we call SchemaExtensionKey.count().
+            var providers = new ArrayList<SchemaExtensionProvider>();
+            for (var provider : loader) {
+                providers.add(provider);
+            }
             if (providers.isEmpty()) {
                 PROVIDER_BY_KEY = new SchemaExtensionProvider[0];
             } else {
