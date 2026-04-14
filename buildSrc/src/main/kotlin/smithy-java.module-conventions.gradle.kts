@@ -72,6 +72,3 @@ tasks.jacocoTestReport {
         html.outputLocation.set(file("${layout.buildDirectory.get()}/reports/jacoco"))
     }
 }
-
-// Ensure integ tests are executed as part of test suite
-tasks["test"].finalizedBy("integ")

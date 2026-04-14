@@ -86,35 +86,9 @@
         <Bug pattern="DCN_NULLPOINTER_EXCEPTION" />
     </Match>
 
+    <!-- JMH benchmark files - not production code -->
     <Match>
-        <Class name="software.amazon.smithy.java.io.uri.SmithyUri" />
-        <Bug pattern="SF_SWITCH_NO_DEFAULT" />
-    </Match>
-
-    <Match>
-        <Class name="software.amazon.smithy.java.mcp.server.McpServerIntegrationTest" />
-        <Bug pattern="CNT_ROUGH_CONSTANT_VALUE" />
-    </Match>
-
-    <Match classregex="software\.amazon\.smithy\.java\.mcp\.server\.ProtocolVersion\$.*">
-        <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS" />
-    </Match>
-
-    <!-- Intentional pointer comparison (==) for interned header names. -->
-    <Match>
-        <Class name="~software\.amazon\.smithy\.java\.http\.api\.(.*HttpHeaders|HeaderName)" />
-        <Bug pattern="ES_COMPARING_STRINGS_WITH_EQ" />
-    </Match>
-
-    <Match>
-        <Class name="~software\.amazon\.smithy\.java\.http\.api\.(HeaderName|ArrayHttpHeaders)" />
-        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ" />
-    </Match>
-
-    <!-- Intentional pointer comparison (==) for interned header names in transport. -->
-    <Match>
-        <Class name="software.amazon.smithy.java.client.http.JavaHttpClientTransport" />
-        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ" />
+        <Class name="~.*\.http\.client\.VirtualThreadScalingBenchmark.*"/>
     </Match>
 
 </FindBugsFilter>
