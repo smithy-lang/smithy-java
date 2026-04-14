@@ -40,11 +40,15 @@ public final class SmithyJsonSerdeProvider implements JsonSerdeProvider {
             return getJacksonFallback().serialize(shape, settings);
         }
         var serializer = SmithyJsonSerializer.acquire(settings);
+        boolean exception = false;
         try {
             shape.serialize(serializer);
             return serializer.extractResult();
+        } catch (Exception t) {
+            exception = true;
+            throw t;
         } finally {
-            SmithyJsonSerializer.release(serializer);
+            SmithyJsonSerializer.release(serializer, exception);
         }
     }
 

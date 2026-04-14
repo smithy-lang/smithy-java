@@ -137,9 +137,14 @@ final class SmithyJsonSerializer implements ShapeSerializer {
      * store the serializer with release semantics (ensures all serializer state is
      * visible to the thread that later acquires it).
      */
-    static void release(SmithyJsonSerializer serializer) {
+    static void release(SmithyJsonSerializer serializer, boolean exception) {
         if (serializer.buf == null || Thread.currentThread().isVirtual()) {
             return;
+        }
+        // If an exception occurred, the needsComma array may be in an inconsistent state.
+        // Clear it before pooling so the next acquire gets a clean serializer.
+        if (exception) {
+            Arrays.fill(serializer.needsComma, false);
         }
         // Downsize oversized buffers before pooling to bound memory
         if (serializer.buf.length > MAX_CACHEABLE_BUF) {
