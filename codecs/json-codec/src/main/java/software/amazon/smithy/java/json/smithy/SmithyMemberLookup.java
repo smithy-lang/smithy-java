@@ -13,13 +13,9 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
 
 /**
- * FNV-1a hash-based field name lookup that avoids String allocation during deserialization.
+ * Hash-based field name lookup that operates directly on UTF-8 bytes during deserialization.
  *
- * <p>Computes hashes directly from UTF-8 bytes in the input buffer and matches against
- * pre-computed hashes of known member field names. Supports speculative ordered matching
- * for the common case where JSON fields arrive in schema definition order.
- *
- * <p>Also implements {@link MemberLookup} for compatibility with the existing field mapper API.
+ * <p>Also implements {@link MemberLookup} for compatibility with the field mapper API.
  */
 final class SmithyMemberLookup implements MemberLookup {
 
@@ -99,8 +95,7 @@ final class SmithyMemberLookup implements MemberLookup {
     }
 
     /**
-     * MemberLookup interface implementation for compatibility with JsonFieldMapper.
-     * This path allocates a String→byte[] conversion but is only used by non-performance-critical code.
+     * MemberLookup interface implementation. Allocates a String to byte[] conversion.
      */
     @Override
     public Schema member(String memberName) {
@@ -117,10 +112,7 @@ final class SmithyMemberLookup implements MemberLookup {
         return null;
     }
 
-    /**
-     * Computes FNV-1a 64-bit hash of bytes in the given range.
-     */
-    static long fnvHash(byte[] buf, int start, int end) {
+    private static long fnvHash(byte[] buf, int start, int end) {
         long hash = FNV_OFFSET;
         for (int i = start; i < end; i++) {
             hash ^= buf[i] & 0xFF;

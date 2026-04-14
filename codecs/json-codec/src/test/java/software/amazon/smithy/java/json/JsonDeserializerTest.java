@@ -577,10 +577,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Validation of skipped unknown fields ---
-    // These tests verify that invalid JSON in unknown struct fields is properly rejected
-    // (not silently skipped). The skip path must validate strings, numbers, and field names.
-
     @PerProvider
     public void rejectsInvalidEscapeInSkippedValue(JsonSerdeProvider provider) {
         // Unknown field "x" has value with invalid escape \e
@@ -718,8 +714,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Number parsing boundary conditions ---
-
     @PerProvider
     public void deserializesLongMinValue(JsonSerdeProvider provider) {
         try (var codec = codec(provider)) {
@@ -813,8 +807,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         }
     }
 
-    // Smithy-only: Smithy's readByte/readShort parse as long then range-check.
-    // Jackson reads the JSON number token without narrowing validation.
     @ParameterizedTest
     @MethodSource("smithyOnly")
     public void rejectsByteOverflow(JsonSerdeProvider provider) {
@@ -851,8 +843,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Floating-point parsing edge cases ---
-
     @PerProvider
     public void parsesDoubleWithLeadingZeroBeforeDecimal(JsonSerdeProvider provider) {
         try (var codec = codec(provider)) {
@@ -881,8 +871,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
                     .readDouble(PreludeSchemas.DOUBLE), is(1.5e+3));
         }
     }
-
-    // --- String parsing edge cases ---
 
     @PerProvider
     public void parsesAllEscapeSequences(JsonSerdeProvider provider) {
@@ -916,9 +904,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
             assertThat(de.readString(PreludeSchemas.STRING), equalTo("\uD83D\uDE00"));
         }
     }
-
-    // Smithy-only: Smithy validates surrogate pairs per RFC 8259 section 7.
-    // Jackson passes lone surrogates through to the JDK String constructor without validation.
 
     @ParameterizedTest
     @MethodSource("smithyOnly")
@@ -1022,8 +1007,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Boolean/literal edge cases ---
-
     @PerProvider
     public void rejectsTruncatedTrue(JsonSerdeProvider provider) {
         try (var codec = codec(provider)) {
@@ -1070,8 +1053,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    // --- Whitespace handling ---
-
     @PerProvider
     public void handlesLeadingWhitespace(JsonSerdeProvider provider) {
         try (var codec = codec(provider)) {
@@ -1093,8 +1074,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
             assertThat(members, contains("name", "color"));
         }
     }
-
-    // --- Document parsing edge cases ---
 
     @PerProvider
     public void documentParsesLargeInteger(JsonSerdeProvider provider) {
@@ -1146,8 +1125,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Skip validation: skipped objects with nested structures ---
-
     @PerProvider
     public void skipsDeepNestedUnknownFields(JsonSerdeProvider provider) {
         try (var codec = codecBuilder(provider).useJsonName(true).build()) {
@@ -1194,8 +1171,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Additional coverage: corrupt "false" literal ---
-
     @PerProvider
     public void rejectsCorruptFalse(JsonSerdeProvider provider) {
         Assertions.assertThrows(SerializationException.class, () -> {
@@ -1205,8 +1180,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
             }
         });
     }
-
-    // --- Invalid base64 in blob ---
 
     @PerProvider
     public void rejectsInvalidBase64InBlob(JsonSerdeProvider provider) {
@@ -1218,10 +1191,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    // --- Epoch seconds out of range ---
-
-    // Smithy-only: Smithy's integer fast-path for epoch-seconds calls Instant.ofEpochSecond
-    // which rejects values outside the valid range. Jackson parses via a different path.
     @ParameterizedTest
     @MethodSource("smithyOnly")
     public void rejectsEpochSecondsOutOfRange(JsonSerdeProvider provider) {
@@ -1237,8 +1206,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    // --- Timestamp fallback for offset timezone ---
-
     @PerProvider
     public void timestampFallbackForOffsetTimezone(JsonSerdeProvider provider) {
         var schema = Schema.createTimestamp(
@@ -1252,10 +1219,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Struct error paths ---
-
-    // Smithy-only: Smithy checks for '{' before parsing struct fields.
-    // Jackson's token-based parser handles the type mismatch differently.
     @ParameterizedTest
     @MethodSource("smithyOnly")
     public void rejectsNonObjectForStruct(JsonSerdeProvider provider) {
@@ -1297,8 +1260,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    // --- Null member value in struct (exercises p += 4 null skip) ---
-
     @PerProvider
     public void nullMemberValueSkippedInStruct(JsonSerdeProvider provider) {
         try (var codec = codecBuilder(provider).useJsonName(true).build()) {
@@ -1314,9 +1275,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Map error paths ---
-
-    // Smithy-only: same as struct — Smithy checks for '{' explicitly.
     @ParameterizedTest
     @MethodSource("smithyOnly")
     public void rejectsNonObjectForMap(JsonSerdeProvider provider) {
@@ -1353,8 +1311,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
             }
         });
     }
-
-    // --- Skip: false literal, empty object, empty array, unterminated string ---
 
     @PerProvider
     public void skipsFalseLiteralInUnknownValue(JsonSerdeProvider provider) {
@@ -1408,8 +1364,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    // --- Timestamp: invalid month in HTTP-date ---
-
     @ParameterizedTest
     @MethodSource("smithyOnly")
     public void rejectsInvalidMonthInHttpDate(JsonSerdeProvider provider) {
@@ -1425,8 +1379,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    // --- List: missing comma ---
-
     @PerProvider
     public void rejectsMissingCommaInList(JsonSerdeProvider provider) {
         Assertions.assertThrows(SerializationException.class, () -> {
@@ -1436,8 +1388,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
             }
         });
     }
-
-    // --- describeCurrentToken branches: timestamp with wrong types ---
 
     @PerProvider
     public void rejectsNullAsTimestamp(JsonSerdeProvider provider) {
@@ -1458,10 +1408,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
             assertThat(e.getMessage(), containsString("Expected a timestamp"));
         }
     }
-
-    // --- parseLong/parseDouble error paths ---
-    // Smithy-only: Jackson's tokenizer throws at createDeserializer time for malformed
-    // content, before our readXxx methods are called.
 
     @ParameterizedTest
     @MethodSource("smithyOnly")
@@ -1491,12 +1437,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
                             .readDouble(PreludeSchemas.DOUBLE));
         }
     }
-
-    // --- UTF-8 validation in string slow path ---
-    // Smithy-only: Smithy validates UTF-8 byte sequences in the escape-handling slow path.
-    // Jackson delegates to the JDK's String constructor which replaces invalid UTF-8 silently.
-    // Each test includes a valid escape (\n) to force entry into the slow path, followed by
-    // malformed UTF-8 bytes.
 
     @ParameterizedTest
     @MethodSource("smithyOnly")
@@ -1575,13 +1515,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Malformed timestamps that the DateTimeFormatter fallback is too lenient about ---
-    // These tests document spec violations: the fast-path parser correctly rejects these
-    // inputs, but then falls back to DateTimeFormatter which silently accepts them.
-    // The underlying issue is in TimestampFormatter.Prelude (core module), not json-codec.
-    // When the core module is fixed to reject these, remove the @Disabled annotations.
-
-    @Disabled("DateTimeFormatter fallback accepts trailing garbage after Z - core module bug")
+    @Disabled("DateTimeFormatter fallback accepts trailing garbage after Z")
     @ParameterizedTest
     @MethodSource("smithyOnly")
     public void iso8601WithExtraCharsAfterZShouldBeRejected(JsonSerdeProvider provider) {
@@ -1597,7 +1531,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    @Disabled("DateTimeFormatter fallback accepts missing space after comma - core module bug")
+    @Disabled("DateTimeFormatter fallback accepts missing space after comma")
     @ParameterizedTest
     @MethodSource("smithyOnly")
     public void httpDateShouldRejectMissingSpaceAfterComma(JsonSerdeProvider provider) {
@@ -1614,7 +1548,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    @Disabled("DateTimeFormatter fallback accepts UTC instead of GMT - core module bug")
+    @Disabled("DateTimeFormatter fallback accepts UTC instead of GMT")
     @ParameterizedTest
     @MethodSource("smithyOnly")
     public void httpDateShouldRejectNonGmtTimezone(JsonSerdeProvider provider) {
@@ -1631,7 +1565,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    @Disabled("DateTimeFormatter fallback accepts dash delimiters - core module bug")
+    @Disabled("DateTimeFormatter fallback accepts dash delimiters")
     @ParameterizedTest
     @MethodSource("smithyOnly")
     public void httpDateShouldRejectDashInsteadOfSpace(JsonSerdeProvider provider) {
@@ -1647,7 +1581,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    @Disabled("DateTimeFormatter fallback accepts dash instead of colon in time - core module bug")
+    @Disabled("DateTimeFormatter fallback accepts dash instead of colon in time")
     @ParameterizedTest
     @MethodSource("smithyOnly")
     public void httpDateShouldRejectDashInsteadOfColonInTime(JsonSerdeProvider provider) {
@@ -1662,9 +1596,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
             }
         });
     }
-
-    // --- lookupMonth: invalid 3-letter month abbreviation ---
-    // Smithy-only: Smithy's HTTP-date parser validates month abbreviations strictly.
 
     @ParameterizedTest
     @MethodSource("smithyOnly")
@@ -1698,12 +1629,8 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    // --- Bug #6: parseIso8601 must validate date/time component ranges ---
-
     @ParameterizedTest
     @MethodSource("smithyOnly")
-    // Smithy-only: Smithy's fast-path parseIso8601 does not validate component ranges.
-    // Jackson delegates to DateTimeFormatter which does validate.
     public void rejectsInvalidMonthInIso8601(JsonSerdeProvider provider) {
         var schema = Schema.createTimestamp(
                 ShapeId.from("smithy.foo#Time"),
@@ -1782,12 +1709,8 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    // --- Bug #4: decodeUtf8Char must validate continuation bytes ---
-
     @ParameterizedTest
     @MethodSource("smithyOnly")
-    // Smithy-only: only the Smithy deserializer uses decodeUtf8Char on the slow path.
-    // RFC 3629: continuation bytes must be 10xxxxxx (0x80..0xBF).
     public void rejectsInvalidContinuationByteInUtf8(JsonSerdeProvider provider) {
         // 2-byte lead 0xC2 followed by ASCII 'A' (0x41) instead of valid continuation byte.
         // Prefix with "\n" to force entry into the slow path (escape triggers decodeUtf8Char for following bytes).
@@ -1799,12 +1722,8 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    // --- Bug #5: decodeUtf8Char must reject surrogate code points in UTF-8 ---
-
     @ParameterizedTest
     @MethodSource("smithyOnly")
-    // Smithy-only: only the Smithy deserializer validates UTF-8 on the slow path.
-    // RFC 3629 Section 3: UTF-8 must not encode surrogate code points (U+D800..U+DFFF).
     public void rejectsSurrogateCodePointInUtf8(JsonSerdeProvider provider) {
         // 3-byte sequence [0xED, 0xA0, 0x80] encodes U+D800 (high surrogate) as UTF-8.
         // Prefix with "\n" to force slow path.
@@ -1816,13 +1735,8 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    // --- Bug #9: readBigInteger/readBigDecimal must wrap NumberFormatException ---
-
     @ParameterizedTest
     @MethodSource("smithyOnly")
-    // Smithy-only: Smithy's readBigInteger passes the raw string to new BigInteger()
-    // which throws NumberFormatException for non-integer strings. This should be wrapped
-    // in SerializationException.
     public void readBigIntegerRejectsDecimalInput(JsonSerdeProvider provider) {
         Assertions.assertThrows(SerializationException.class, () -> {
             try (var codec = codec(provider)) {
@@ -1856,8 +1770,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
-    // --- forbidUnknownUnionMembers ---
-
     @PerProvider
     public void forbidUnknownUnionMembersThrows(JsonSerdeProvider provider) {
         Assertions.assertThrows(SerializationException.class, () -> {
@@ -1875,8 +1787,6 @@ public class JsonDeserializerTest extends ProviderTestBase {
             }
         });
     }
-
-    // --- Unterminated object (after first field, missing '}' or ',') ---
 
     @PerProvider
     public void rejectsUnterminatedObject(JsonSerdeProvider provider) {

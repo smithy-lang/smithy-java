@@ -16,11 +16,7 @@ import software.amazon.smithy.model.shapes.ShapeType;
  * Pre-computes native JSON codec data on Schema objects.
  *
  * <p>For member schemas: pre-encoded UTF-8 byte arrays for field name prefixes ({@code "fieldName":}).
- * For struct/union schemas: {@link SmithyMemberLookup} instances for FNV-1a hash-based field matching.
- *
- * <p>This is a separate extension from {@link software.amazon.smithy.java.json.JsonSchemaExtensions}
- * (which stores Jackson-specific {@code SerializableString} types). Both extensions coexist on the same
- * Schema via independent {@link SchemaExtensionKey}s, with O(1) lookup and lazy computation.
+ * For struct/union schemas: {@link SmithyMemberLookup} instances for hash-based field matching.
  */
 public final class SmithyJsonSchemaExtensions
         implements SchemaExtensionProvider<SmithyJsonSchemaExtensions.NativeJsonExtension> {

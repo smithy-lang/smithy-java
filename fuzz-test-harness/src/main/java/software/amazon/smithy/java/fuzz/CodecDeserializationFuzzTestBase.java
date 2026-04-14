@@ -47,22 +47,19 @@ public abstract class CodecDeserializationFuzzTestBase {
 
     protected final void runTestsOn(byte[] input) throws Exception {
         var shapeBuilders = getShapeBuilders();
-        var codecs = this.codecsToFuzz();
-        for (var codec : codecs) {
-            for (var shapeBuilder : shapeBuilders) {
-                try {
-                    shapeBuilder.get().deserialize(codec.createDeserializer(input)).build();
-                } catch (Exception e) {
-                    isErrorAcceptable(e);
-                }
+        var codec = this.codecToFuzz();
+        for (var shapeBuilder : shapeBuilders) {
+            try {
+                shapeBuilder.get().deserialize(codec.createDeserializer(input)).build();
+            } catch (Exception e) {
+                isErrorAcceptable(e);
             }
         }
     }
 
     private Stream<byte[]> seed() {
         var shapeBuilders = getShapeBuilders();
-        // Use the first codec for seed generation
-        var codec = this.codecsToFuzz().getFirst();
+        var codec = this.codecToFuzz();
         return shapeBuilders.stream()
                 .flatMap(b -> Stream.generate(() -> b).limit(10))
                 .map(Supplier::get)
@@ -72,9 +69,9 @@ public abstract class CodecDeserializationFuzzTestBase {
     }
 
     /**
-     * Returns the list of codecs to fuzz. Each fuzz input will be tested against all codecs.
+     * Returns the codec to fuzz.
      */
-    protected abstract List<Codec> codecsToFuzz();
+    protected abstract Codec codecToFuzz();
 
     @SuppressFBWarnings("DCN_NULLPOINTER_EXCEPTION")
     protected boolean isErrorAcceptable(Exception exception) throws Exception {

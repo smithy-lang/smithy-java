@@ -27,11 +27,10 @@ import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
- * High-performance JSON serializer that writes directly to a byte array buffer.
+ * JSON serializer that writes directly to a byte array buffer.
  *
- * <p>Eliminates Jackson's intermediate buffering by writing JSON bytes directly.
- * Uses pre-computed field name byte arrays from {@link SmithyJsonSchemaExtensions}
- * for zero-cost field name emission via {@link System#arraycopy}.
+ * <p>Uses pre-computed field name byte arrays from {@link SmithyJsonSchemaExtensions}
+ * for field name emission via {@link System#arraycopy}.
  */
 final class SmithyJsonSerializer implements ShapeSerializer {
 
@@ -39,8 +38,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     private static final int DEFAULT_BUF_SIZE = 8192;
     private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 4;
 
-    // Striped serializer pool. Pools the entire serializer (including its buffer),
-    // eliminating both object allocation and buffer allocation on the hot path.
+    // Striped serializer pool.
     private static final int POOL_SLOTS;
     private static final int POOL_MASK;
     private static final AtomicReferenceArray<SmithyJsonSerializer> POOL;
@@ -65,15 +63,13 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     private final boolean[] needsComma = new boolean[MAX_DEPTH];
 
     // Cached field name table for the current struct being serialized.
-    // Resolved once per writeStruct call via a single getExtension, then used
-    // for all member writes — avoids per-field VarHandle acquire reads.
+    // Resolved once per writeStruct call, then used for all member writes.
     private byte[][] currentFieldNameTable;
 
-    // Reusable Schubfach instances — avoids allocation per double/float write
+    // Reusable Schubfach instances for double/float write
     private final Schubfach.DoubleToDecimal doubleToDecimal = Schubfach.createDoubleToDecimal();
     private final Schubfach.FloatToDecimal floatToDecimal = Schubfach.createFloatToDecimal();
 
-    // Inner serializers — cached (single instance per serializer)
     private final ShapeSerializer structSerializer = new StructSerializer();
     private final ShapeSerializer listElementSerializer = new ListElementSerializer();
     private final MapSerializer mapSerializer = new SmithyMapSerializer();
@@ -283,9 +279,6 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             pos = JsonWriteUtils.writeLong(buf, pos, value.longValue());
             return;
         }
-        // Write directly to byte buffer by splitting into 18-digit groups via
-        // divideAndRemainder(10^18). Avoids BigInteger.toString() which does expensive
-        // recursive division and allocates a String.
         ensureCapacity(value.bitLength() / 3 + 2);
         pos = JsonWriteUtils.writeBigInteger(buf, pos, value);
     }
@@ -301,7 +294,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             }
             if (scale > 0) {
                 // Fast path: write "integerPart.fractionalPart" directly.
-                // E.g., BigDecimal("99999.99999") → unscaled=9999999999, scale=5
+                // E.g., BigDecimal("99999.99999") -> unscaled=9999999999, scale=5
                 long unscaled = value.unscaledValue().longValue();
                 ensureCapacity(22 + scale); // sign + 20 digits + dot + scale digits
                 pos = JsonWriteUtils.writeBigDecimalFromLong(buf, pos, unscaled, scale);
@@ -345,22 +338,17 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     public void writeTimestamp(Schema schema, Instant value) {
         var format = settings.timestampResolver().resolve(schema);
         if (format == TimestampFormatter.Prelude.EPOCH_SECONDS) {
-            // Fast path: write epoch-seconds directly from Instant using integer arithmetic.
-            // Bypasses the Instant→double→Double.toString→bytes round-trip.
-            // Max: '-' + 19 digits (Long.MIN_VALUE) + '.' + 9 nano digits = 30 bytes
+            // '-' + 19 digits (Long.MIN_VALUE) + '.' + 9 nano digits = 30 bytes
             ensureCapacity(30);
             pos = JsonWriteUtils.writeEpochSeconds(buf, pos, value.getEpochSecond(), value.getNano());
             return;
         }
         if (format == TimestampFormatter.Prelude.DATE_TIME) {
-            // Fast path: write ISO-8601 directly to buffer, bypassing Instant.toString()
-            // and the writeString→writeQuotedString round-trip.
             ensureCapacity(42);
             pos = JsonWriteUtils.writeIso8601Timestamp(buf, pos, value);
             return;
         }
         if (format == TimestampFormatter.Prelude.HTTP_DATE) {
-            // Fast path: write HTTP-date directly to buffer, bypassing DateTimeFormatter.
             // "Sat, 01 Jan 2026 00:00:00 GMT" = 31 chars + 2 quotes = 33
             ensureCapacity(35);
             pos = JsonWriteUtils.writeHttpDate(buf, pos, value);
@@ -379,8 +367,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         }
         needsComma[depth] = false;
 
-        // Resolve field name table ONCE per struct (single VarHandle acquire read),
-        // then all member writes use plain array indexing — no per-field getExtension.
+        // Resolve field name table once per struct for all member writes.
         byte[][] savedTable = currentFieldNameTable;
         Schema structSchema = schema.isMember() ? schema.memberTarget() : schema;
         var ext = structSchema.getExtension(SmithyJsonSchemaExtensions.KEY);

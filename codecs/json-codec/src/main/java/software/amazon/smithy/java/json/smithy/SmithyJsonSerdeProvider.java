@@ -15,26 +15,17 @@ import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.json.jackson.JacksonJsonSerdeProvider;
 
 /**
- * High-performance native JSON serde provider for smithy-java.
- *
- * <p>Writes and parses JSON bytes directly without Jackson on the hot path.
- * Registered via SPI with priority 20 (higher than Jackson's 10), so it is
- * selected by default. Jackson is used as a fallback for pretty-printing.
+ * Native JSON serde provider for smithy-java.
  *
  * <p>Can be explicitly selected via system property:
  * {@code -Dsmithy-java.json-provider=smithy}
- *
- * <p>Jackson can be forced via: {@code -Dsmithy-java.json-provider=jackson}
  */
 public final class SmithyJsonSerdeProvider implements JsonSerdeProvider {
 
-    // Lazy-init Jackson fallback for prettyPrint
     private volatile JacksonJsonSerdeProvider jacksonFallback;
 
     @Override
     public int getPriority() {
-        // Below Jackson (10) until we have more confidence from CI fuzzing and production use.
-        // Select explicitly via: -Dsmithy-java.json-provider=smithy
         return 5;
     }
 
@@ -48,8 +39,6 @@ public final class SmithyJsonSerdeProvider implements JsonSerdeProvider {
         if (settings.prettyPrint()) {
             return getJacksonFallback().serialize(shape, settings);
         }
-        // Direct path: acquire a pooled serializer, serialize, extract result, release.
-        // Avoids 7 object allocations (~296 bytes) per call on the common path.
         var serializer = SmithyJsonSerializer.acquire(settings);
         try {
             shape.serialize(serializer);

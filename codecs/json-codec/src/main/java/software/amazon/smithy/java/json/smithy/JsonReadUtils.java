@@ -159,7 +159,6 @@ final class JsonReadUtils {
         }
 
         // Parse directly from byte array — no String allocation.
-        // FastDoubleParser implements Eisel-Lemire with direct byte[] input.
         deser.parsedDouble = JavaDoubleParser.parseDouble(buf, start, pos - start);
         deser.parsedEndPos = pos;
     }
@@ -418,8 +417,7 @@ final class JsonReadUtils {
         if (pos < end && buf[pos] > ' ') {
             return pos;
         }
-        // Scalar loop — simple and correct. The fast check above makes this rarely execute
-        // more than 1-2 iterations.
+        // Scalar loop for remaining bytes
         while (pos < end) {
             byte b = buf[pos];
             if (b != ' ' && b != '\n' && b != '\r' && b != '\t') {
@@ -433,9 +431,6 @@ final class JsonReadUtils {
     // Month lookup: index by first two bytes of 3-letter month abbreviation
     // Jan=1, Feb=2, ..., Dec=12. Used by parseHttpDate.
     private static final int[] MONTH_LOOKUP = new int[128 * 128];
-
-    // Day-of-year offsets for non-leap years (cumulative days before each month)
-    // Index 0 unused, months 1-12
 
     static {
         // Populate month lookup: key = first_char * 128 + second_char

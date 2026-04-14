@@ -38,7 +38,6 @@ final class JsonWriteUtils {
         }
     }
 
-    // Hex digits for unicode escapes
     private static final byte[] HEX = {
             '0',
             '1',
@@ -64,14 +63,12 @@ final class JsonWriteUtils {
     private static final boolean[] NEEDS_ESCAPE = new boolean[128];
 
     static {
-        // All control characters need escaping
         for (int i = 0; i < 0x20; i++) {
             NEEDS_ESCAPE[i] = true;
         }
         NEEDS_ESCAPE['"'] = true;
         NEEDS_ESCAPE['\\'] = true;
 
-        // Two-character escape sequences
         ESCAPE_TABLE['"'] = '"';
         ESCAPE_TABLE['\\'] = '\\';
         ESCAPE_TABLE['\b'] = 'b';
@@ -107,12 +104,10 @@ final class JsonWriteUtils {
     }
 
     private static int writePositiveInt(byte[] buf, int pos, int value) {
-        // Determine digit count to write left-to-right
         int digits = digitCount(value);
         int end = pos + digits;
         int p = end;
 
-        // Process two digits at a time from least significant
         while (value >= 100) {
             int q = value / 100;
             int r = (value - q * 100) * 2;
@@ -121,7 +116,6 @@ final class JsonWriteUtils {
             buf[--p] = DIGIT_PAIRS[r];
         }
 
-        // Handle remaining 1-2 digits
         if (value >= 10) {
             int r = value * 2;
             buf[--p] = DIGIT_PAIRS[r + 1];
@@ -157,7 +151,6 @@ final class JsonWriteUtils {
     }
 
     private static int writePositiveLong(byte[] buf, int pos, long value) {
-        // For values that fit in int, use the int path
         if (value <= Integer.MAX_VALUE) {
             return writePositiveInt(buf, pos, (int) value);
         }
@@ -166,7 +159,6 @@ final class JsonWriteUtils {
         int end = pos + digits;
         int p = end;
 
-        // Process two digits at a time
         while (value >= 100) {
             long q = value / 100;
             int r = (int) (value - q * 100) * 2;
@@ -187,7 +179,6 @@ final class JsonWriteUtils {
     }
 
     private static int digitCount(int value) {
-        // Fast digit count for positive integers
         if (value < 10)
             return 1;
         if (value < 100)
@@ -290,12 +281,7 @@ final class JsonWriteUtils {
     }
 
     /**
-     * Writes a JSON quoted string. Single-pass for safe ASCII strings.
-     *
-     * <p>Strategy: copy bytes first via the fast {@code String.getBytes(int,int,byte[],int)}
-     * (single arraycopy for LATIN1 compact strings), then SWAR-scan the copied bytes for
-     * characters needing escaping or multi-byte UTF-8 encoding. If none found, done in one pass.
-     * If special chars found, rewrite from that position using the slow path.
+     * Writes a JSON quoted string. Returns new position.
      */
     @SuppressWarnings("deprecation")
     static int writeQuotedString(byte[] buf, int pos, String value) {
@@ -356,7 +342,7 @@ final class JsonWriteUtils {
                 buf[pos++] = (byte) (0x80 | ((c >> 6) & 0x3F));
                 buf[pos++] = (byte) (0x80 | (c & 0x3F));
             } else {
-                // Surrogate pair → 4-byte UTF-8
+                // Surrogate pair -> 4-byte UTF-8
                 if (Character.isHighSurrogate(c) && i + 1 < len) {
                     char low = value.charAt(++i);
                     if (Character.isLowSurrogate(low)) {
@@ -394,7 +380,7 @@ final class JsonWriteUtils {
      * Returns new position.
      */
     static int writeDouble(byte[] buf, int pos, double value) {
-        // Avoid writing 1.0 when 1 suffices — match Jackson behavior
+        // Avoid writing 1.0 when 1 suffices
         long longValue = (long) value;
         if (value == (double) longValue) {
             return writeLong(buf, pos, longValue);
@@ -415,8 +401,7 @@ final class JsonWriteUtils {
 
     /**
      * Writes an epoch-seconds timestamp directly from an Instant using integer arithmetic.
-     * Avoids the Instant → double → Double.toString → bytes round-trip that accounts for
-     * ~21% of simple-serialize time. Writes "seconds" for whole seconds or "seconds.nanos"
+     * Writes "seconds" for whole seconds or "seconds.nanos"
      * for fractional, with full nanosecond precision and trailing zeros stripped.
      *
      * <p>For negative epoch seconds with non-zero nanos, the Instant contract is:
@@ -743,7 +728,7 @@ final class JsonWriteUtils {
             buf[pos++] = '.';
 
             // Write fractional part with leading zeros
-            // e.g., scale=5 and fracPart=99 → "00099"
+            // e.g., scale=5 and fracPart=99 -> "00099"
             for (int i = scale - 1; i >= 0; i--) {
                 long p10 = POWERS_OF_10[i];
                 int d = (int) (fracPart / p10);

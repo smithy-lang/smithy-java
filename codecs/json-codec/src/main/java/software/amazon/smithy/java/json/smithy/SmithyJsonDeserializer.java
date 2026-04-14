@@ -29,11 +29,6 @@ import software.amazon.smithy.model.shapes.ShapeType;
 /**
  * High-performance JSON deserializer that parses directly from a byte array.
  *
- * <p>Operates on raw bytes with position/end pointers — no token abstraction,
- * no symbol table, no intermediate String allocation for field names.
- * Uses FNV-1a hash-based field matching via {@link SmithyMemberLookup} with
- * speculative ordered matching for the common case.
- *
  * <p>Implements strict RFC 8259 compliance: validates all tokens, rejects
  * malformed input, enforces depth limits.
  */
@@ -316,7 +311,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             }
         }
         if (pos < end && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
-            // Number form
             JsonReadUtils.parseDouble(buf, pos, end, this);
             pos = parsedEndPos;
             return format.readFromNumber(parsedDouble);

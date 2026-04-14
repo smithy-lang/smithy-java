@@ -100,7 +100,6 @@ public class JsonSerializerTest extends ProviderTestBase {
                 }), "{\"a\":\"av\",\"b\":\"bv\",\"c\":1,\"d\":[1,2],\"e\":{\"ek\":\"ek1\"}}"));
     }
 
-    // Cross-product: each provider x each json value
     static List<Arguments> serializesJsonValuesWithProvider() {
         var values = serializesJsonValuesProvider();
         var provs = providers();
@@ -125,7 +124,6 @@ public class JsonSerializerTest extends ProviderTestBase {
         }
     }
 
-    // Cross-product: each provider x each timestamp config
     static List<Arguments> configurableTimestampFormatWithProvider() {
         var configs = List.of(
                 Arguments.of(true, "\"1970-01-01T00:00:00Z\""),
@@ -163,7 +161,6 @@ public class JsonSerializerTest extends ProviderTestBase {
         }
     }
 
-    // Cross-product: each provider x each jsonName config
     static List<Arguments> configurableJsonNameWithProvider() {
         var configs = List.of(
                 Arguments.of(true, "{\"name\":\"Toucan\",\"Color\":\"red\"}"),
@@ -356,11 +353,8 @@ public class JsonSerializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Integer writing boundary conditions ---
-
     @PerProvider
     public void writesIntegerBoundaryValues(JsonSerdeProvider provider) throws Exception {
-        // Tests writeInt for zero, MIN_VALUE, MAX_VALUE, and various digit counts
         var testCases = Map.of(
                 0,
                 "0",
@@ -395,7 +389,6 @@ public class JsonSerializerTest extends ProviderTestBase {
 
     @PerProvider
     public void writesLongBoundaryValues(JsonSerdeProvider provider) throws Exception {
-        // Tests writeLong for zero, MIN_VALUE, MAX_VALUE, and various digit counts
         var testCases = Map.of(
                 0L,
                 "0",
@@ -426,11 +419,8 @@ public class JsonSerializerTest extends ProviderTestBase {
         }
     }
 
-    // --- String writing edge cases ---
-
     @PerProvider
     public void writesStringWithControlChars(JsonSerdeProvider provider) throws Exception {
-        // Control chars should be escaped as unicode escapes or named escapes
         try (var codec = codec(provider); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeString(PreludeSchemas.STRING, "a\u0000b\u001Fc");
@@ -445,13 +435,11 @@ public class JsonSerializerTest extends ProviderTestBase {
 
     @PerProvider
     public void writesStringWithUnicode(JsonSerdeProvider provider) throws Exception {
-        // BMP and SMP characters
         try (var codec = codec(provider); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeString(PreludeSchemas.STRING, "\u00e9\u4e2d\uD83D\uDE00");
             }
             String result = output.toString(StandardCharsets.UTF_8);
-            // Should roundtrip correctly via parsing
             var de = codec.createDeserializer(result.getBytes(StandardCharsets.UTF_8));
             assertThat(de.readString(PreludeSchemas.STRING), equalTo("\u00e9\u4e2d\uD83D\uDE00"));
         }
@@ -466,8 +454,6 @@ public class JsonSerializerTest extends ProviderTestBase {
             assertThat(output.toString(StandardCharsets.UTF_8), equalTo("\"\""));
         }
     }
-
-    // --- BigDecimal writing edge cases ---
 
     @PerProvider
     public void writesBigDecimalVariousScales(JsonSerdeProvider provider) throws Exception {
@@ -490,8 +476,6 @@ public class JsonSerializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Buffer growth ---
-
     @PerProvider
     public void handlesLargeStringsWithBufferGrowth(JsonSerdeProvider provider) throws Exception {
         // String > 8192 bytes to trigger buffer growth
@@ -505,11 +489,8 @@ public class JsonSerializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Float/Double writing edge cases ---
-
     @PerProvider
     public void doubleSerializationRoundtrips(JsonSerdeProvider provider) throws Exception {
-        // Verify various double values roundtrip through serialize -> parse
         for (double v : new double[] {0.0, 1.0, -1.0, 3.14, 1e100, Double.MIN_VALUE, Double.MAX_VALUE}) {
             try (var codec = codec(provider); var output = new ByteArrayOutputStream()) {
                 try (var serializer = codec.createSerializer(output)) {
@@ -533,8 +514,6 @@ public class JsonSerializerTest extends ProviderTestBase {
             }
         }
     }
-
-    // --- Provider-specific features ---
 
     @Test
     public void smithyProviderNameAndPriority() {
@@ -580,8 +559,6 @@ public class JsonSerializerTest extends ProviderTestBase {
         assertThat(de.readString(PreludeSchemas.STRING), equalTo("hi"));
     }
 
-    // --- Additional digit count coverage ---
-
     @PerProvider
     public void writesIntegersOfAllDigitCounts(JsonSerdeProvider provider) throws Exception {
         // Cover digitCount branches for 6 and 8 digits
@@ -618,11 +595,8 @@ public class JsonSerializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Lone surrogate writing ---
-
     @PerProvider
     public void writesStringWithLoneSurrogate(JsonSerdeProvider provider) throws Exception {
-        // Lone high surrogate should be escaped as unicode escape
         String loneSurrogate = "a\uD800b";
         try (var codec = codec(provider); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
@@ -633,8 +607,6 @@ public class JsonSerializerTest extends ProviderTestBase {
             assertThat(result.toLowerCase().contains("\\ud800"), equalTo(true));
         }
     }
-
-    // --- writeBlob(byte[]) direct call ---
 
     @PerProvider
     public void writesBlobFromByteArray(JsonSerdeProvider provider) throws Exception {
@@ -647,8 +619,6 @@ public class JsonSerializerTest extends ProviderTestBase {
             assertThat(result, equalTo("\"aGVsbG8=\""));
         }
     }
-
-    // --- writeBlob(ByteBuffer) direct buffer ---
 
     @PerProvider
     public void writesBlobFromDirectByteBuffer(JsonSerdeProvider provider) throws Exception {
@@ -664,22 +634,11 @@ public class JsonSerializerTest extends ProviderTestBase {
         }
     }
 
-    // --- Serializer flush IOException path ---
-
-    // --- Bug #3: SerializeDocumentContents.writeStruct missing depth check ---
-
     @Test
     public void documentStructAtDepthLimitThrowsSerializationException() {
-        // Build a Document wrapping nested SerializableStructs to exceed MAX_DEPTH (64).
-        // SerializeDocumentContents.writeStruct increments depth but does not check MAX_DEPTH,
-        // causing ArrayIndexOutOfBoundsException on needsComma[64] instead of SerializationException.
-        // Use Document.of(SerializableStruct) to enter the SerializeDocumentContents path.
-        var innerStruct = new NestedStruct(); // depth cost: 1 (struct itself)
+        var innerStruct = new NestedStruct();
         Document innerDoc = Document.of(innerStruct);
 
-        // Each SerializeDocumentContents.writeStruct call increments depth by 1.
-        // needsComma array is new boolean[64], so depth=64 → ArrayIndexOutOfBoundsException.
-        // We need 64 nesting levels through SerializeDocumentContents (not the main writeStruct).
         Document nested = innerDoc;
         for (int i = 0; i < 64; i++) {
             // Wrap in a struct document via a SerializableStruct that contains the nested doc

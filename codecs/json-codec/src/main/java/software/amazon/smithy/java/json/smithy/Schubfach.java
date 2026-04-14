@@ -16,7 +16,7 @@ import static software.amazon.smithy.java.json.smithy.Schubfach.MathUtils.g0;
 import static software.amazon.smithy.java.json.smithy.Schubfach.MathUtils.g1;
 import static software.amazon.smithy.java.json.smithy.Schubfach.MathUtils.multiplyHigh;
 
-class Schubfach {
+final class Schubfach {
 
     private Schubfach() {
 

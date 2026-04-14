@@ -562,8 +562,6 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
                 software.amazon.smithy.java.json.bench.model.AllListsStruct.builder())).isEqualTo(original);
     }
 
-    // --- Bug #1: Negative epoch seconds with non-zero nanos ---
-
     private static String serializeToJson(SerializableShape shape) {
         try (var codec = JsonCodec.builder()
                 .overrideSerdeProvider(SMITHY)
@@ -615,8 +613,6 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
         assertThat(serializeToJson(neg15)).contains("-1.5");
         assertThat(roundtrip(SMITHY, neg15, TimestampStruct.builder())).isEqualTo(neg15);
     }
-
-    // --- Bug #8: Sub-millisecond precision must be preserved ---
 
     @Test
     void epochSecondsPreservesSubMillisecondPrecision() {

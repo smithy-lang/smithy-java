@@ -5,21 +5,17 @@
 
 package software.amazon.smithy.java.xml;
 
-import java.util.List;
 import javax.xml.stream.XMLStreamException;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.fuzz.CodecDeserializationFuzzTestBase;
 
-/**
- * Fuzz tests for XmlCodec with various configurations.
- */
 class DeserializationFuzzTest {
 
     static class DefaultTest extends CodecDeserializationFuzzTestBase {
 
         @Override
-        protected List<Codec> codecsToFuzz() {
-            return List.of(XmlCodec.builder().build());
+        protected Codec codecToFuzz() {
+            return XmlCodec.builder().build();
         }
 
         @Override
@@ -31,5 +27,4 @@ class DeserializationFuzzTest {
             return super.isErrorAcceptable(exception);
         }
     }
-
 }
