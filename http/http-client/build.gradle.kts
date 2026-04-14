@@ -1,15 +1,17 @@
 import java.net.Socket
+import java.util.Properties
 
 plugins {
-    java
+    id("smithy-java.module-conventions")
     id("me.champeau.jmh") version "0.7.3"
 }
 
-repositories {
-    mavenLocal()
-    mavenCentral()
-}
+description = "Smithy's generic blocking HTTP client with bidirectional streaming"
 
+extra["displayName"] = "Smithy :: Java :: HTTP :: Client"
+extra["moduleName"] = "software.amazon.smithy.java.http.client"
+
+// Separate source set for benchmark server (runs in separate process for clean flame graphs)
 sourceSets {
     create("jmhServer") {
         java.srcDir("src/jmhServer/java")
@@ -19,16 +21,47 @@ sourceSets {
 val jmhServerImplementation by configurations.getting
 
 dependencies {
-    jmh(project(":client:client-http"))
+    api(project(":http:http-api"))
+    api(project(":http:http-hpack"))
+    api(project(":context"))
+    api(project(":logging"))
 
-    jmhServerImplementation("io.netty:netty-all:4.2.13.Final")
-    jmhServerImplementation("org.bouncycastle:bcpkix-jdk18on:1.84")
+    // Netty for HTTP/2 integration tests
+    testImplementation("io.netty:netty-all:4.2.7.Final")
+    testImplementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
+    // Jackson for HPACK test suite JSON parsing
+    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
+
+    // Jazzer for fuzz testing
+    testImplementation(libs.jazzer.junit)
+    testImplementation(libs.jazzer.api)
+
+    // Add Apache HttpClient for benchmarking comparison
+    jmh("org.apache.httpcomponents.client5:httpclient5:5.3.1")
+
+    // Helidon WebClient for benchmarking comparison
+    jmh("io.helidon.webclient:helidon-webclient:4.1.6")
+    jmh("io.helidon.webclient:helidon-webclient-http2:4.1.6")
+
+    // Netty for raw HTTP/2 benchmarking
+    jmh("io.netty:netty-all:4.2.7.Final")
+
+    // Benchmark server dependencies (Netty runs in separate process)
+    jmhServerImplementation("io.netty:netty-all:4.2.7.Final")
+    jmhServerImplementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
 }
 
+// Fixed ports for benchmark server (matches BenchmarkServer.java defaults)
+val benchmarkH1Port = 18080
+val benchmarkH2Port = 18443
 val benchmarkH2cPort = 18081
+
 val benchmarkPidFile = layout.buildDirectory.file("benchmark-server.pid")
+
+// Capture classpath at configuration time for config cache compatibility
 val jmhServerClasspath = sourceSets["jmhServer"].runtimeClasspath
 
+// Task to start the benchmark server in a background process
 val startBenchmarkServer by tasks.registering {
     dependsOn("jmhServerClasses")
     notCompatibleWithConfigurationCache("Starts external process")
@@ -37,30 +70,34 @@ val startBenchmarkServer by tasks.registering {
         val pidFile = benchmarkPidFile.get().asFile
         pidFile.parentFile.mkdirs()
 
-        val process =
+        // Build classpath for server
+        val serverClasspath = jmhServerClasspath.asPath
+
+        val processBuilder =
             ProcessBuilder(
                 "java",
                 "-cp",
-                jmhServerClasspath.asPath,
+                serverClasspath,
                 "software.amazon.smithy.java.http.client.BenchmarkServer",
-            ).inheritIO().start()
+            )
+        processBuilder.inheritIO()
 
+        val process = processBuilder.start()
+
+        // Store PID for later cleanup
         pidFile.writeText(process.pid().toString())
 
+        // Wait for server to be ready (try connecting)
         var attempts = 0
         var ready = false
         while (!ready && attempts < 50) {
             Thread.sleep(100)
             attempts++
-            if (!process.isAlive) {
-                pidFile.delete()
-                throw GradleException("Benchmark server process exited before becoming ready")
-            }
             try {
                 Socket("localhost", benchmarkH2cPort).close()
                 ready = true
-            } catch (_: Exception) {
-                // Server not ready yet.
+            } catch (e: Exception) {
+                // Server not ready yet
             }
         }
 
@@ -68,9 +105,15 @@ val startBenchmarkServer by tasks.registering {
             process.destroyForcibly()
             throw GradleException("Benchmark server failed to start (not ready after 5s)")
         }
+
+        println("Benchmark server started (PID: ${process.pid()})")
+        println("  H1:  http://localhost:$benchmarkH1Port")
+        println("  H2:  https://localhost:$benchmarkH2Port")
+        println("  H2C: http://localhost:$benchmarkH2cPort")
     }
 }
 
+// Task to stop the benchmark server
 val stopBenchmarkServer by tasks.registering {
     notCompatibleWithConfigurationCache("Stops external process")
 
@@ -79,45 +122,39 @@ val stopBenchmarkServer by tasks.registering {
         if (pidFile.exists()) {
             val pid = pidFile.readText().trim().toLong()
             try {
-                ProcessHandle.of(pid).ifPresent { handle -> handle.destroy() }
-            } catch (_: Exception) {
-                // Best effort cleanup.
+                ProcessHandle.of(pid).ifPresent { handle ->
+                    handle.destroy()
+                    println("Stopped benchmark server (PID: $pid)")
+                }
+            } catch (e: Exception) {
+                println("Warning: Could not stop server: ${e.message}")
             }
             pidFile.delete()
         }
     }
 }
 
+// Configure JMH
+// Run with: ./gradlew :http:http-client:jmh -Pjmh.includes="H2cScalingBenchmark.smithy"
+// To customize params, edit @Param annotations in benchmark source files
 jmh {
     val includesProp = project.findProperty("jmh.includes")?.toString()
-    val jvmArgsProp = project.findProperty("jmh.jvmArgsAppend")?.toString()
-    val profilersProp = project.findProperty("jmh.profilers")?.toString()
-    val defaultJvmArgs = listOf("-Djdk.httpclient.allowRestrictedHeaders=host")
-
     includes = if (includesProp != null) listOf(includesProp) else listOf(".*")
+
     warmupIterations = 3
     iterations = 3
     fork = 1
-    resultFormat = "CSV"
-    resultsFile = project.file("build/reports/jmh/results.csv")
-
-    if (jvmArgsProp != null) {
-        jvmArgsAppend = defaultJvmArgs + jvmArgsProp.split(Regex("\\s*;\\s*")).filter { it.isNotEmpty() }
-    } else {
-        jvmArgsAppend = defaultJvmArgs
-    }
-    if (profilersProp != null) {
-        val profilerSpecs =
-            if (profilersProp.contains(";;")) {
-                profilersProp.split(Regex("\\s*;;\\s*")).filter { it.isNotEmpty() }
-            } else {
-                listOf(profilersProp)
-            }
-        profilers.addAll(profilerSpecs)
-    }
+//    profilers.add("async:output=flamegraph")
+    profilers.add("async:output=collapsed")
+    // profilers.add("gc")
 }
 
+// Make jmh task auto-start/stop the benchmark server
 tasks.named("jmh") {
     dependsOn(startBenchmarkServer)
     finalizedBy(stopBenchmarkServer)
+}
+
+tasks.test {
+    maxHeapSize = "2g"
 }

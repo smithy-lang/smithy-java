@@ -6,56 +6,63 @@
 package software.amazon.smithy.java.http.client;
 
 import java.io.OutputStream;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse.BodyHandlers;
+import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
-import java.util.UUID;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.client.dns.DnsResolver;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 
 /**
- * Shared utilities for JDK transport benchmarks.
+ * Shared utilities for HTTP client benchmarks.
+ * This class is not a benchmark - JMH only measures @Benchmark methods.
  */
 public final class BenchmarkSupport {
-
-    static {
-        System.setProperty("jdk.httpclient.allowRestrictedHeaders", "host");
-    }
 
     public static final String H1_URL = "http://localhost:18080";
     public static final String H2C_URL = "http://localhost:18081";
     public static final String H2_URL = "https://localhost:18443";
 
+    // Small JSON payload for POST benchmarks
     public static final byte[] POST_PAYLOAD = "{\"id\":12345,\"name\":\"benchmark\"}".getBytes(StandardCharsets.UTF_8);
+
+    // 1MB payload for large transfer benchmarks
     public static final byte[] MB_PAYLOAD = new byte[1024 * 1024];
 
     private BenchmarkSupport() {}
 
-    public record IoStats(long getMbRequests, long getMbBytesSent, long putMbRequests, long putMbBytesReceived) {}
+    /**
+     * Create a DNS resolver that maps localhost to loopback, avoiding DNS overhead.
+     */
+    public static DnsResolver staticDns() {
+        return DnsResolver.staticMapping(Map.of(
+                "localhost",
+                List.of(InetAddress.getLoopbackAddress())));
+    }
 
+    /**
+     * Create an SSL context that trusts all certificates (for benchmarking only).
+     */
     public static SSLContext trustAllSsl() throws Exception {
         TrustManager[] trustAllCerts = new TrustManager[] {
                 new X509TrustManager() {
-                    @Override
                     public X509Certificate[] getAcceptedIssuers() {
                         return new X509Certificate[0];
                     }
 
-                    @Override
                     public void checkClientTrusted(X509Certificate[] certs, String authType) {}
 
-                    @Override
                     public void checkServerTrusted(X509Certificate[] certs, String authType) {}
                 }
         };
@@ -65,44 +72,38 @@ public final class BenchmarkSupport {
         return sslContext;
     }
 
+    /**
+     * Reset server state and trigger GC.
+     */
     public static void resetServer(HttpClient client, String baseUrl) throws Exception {
-        sendAndDrain(client, baseUrl + "/reset", "POST");
-        sendAndDrain(client, baseUrl + "/reset-io-stats", "POST");
+        try (var res = client.send(HttpRequest.create()
+                .setUri(SmithyUri.of(baseUrl + "/reset"))
+                .setMethod("POST"))) {
+            res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+        }
         Thread.sleep(100);
     }
 
+    /**
+     * Get server stats as JSON string.
+     */
     public static String getServerStats(HttpClient client, String baseUrl) throws Exception {
-        return getServerStats(client, baseUrl, null);
-    }
-
-    public static String getServerStats(HttpClient client, String baseUrl, String runId)
-            throws Exception {
-        String url = runId == null ? baseUrl + "/stats" : baseUrl + "/stats?runId=" + runId;
-        var request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
-        var response = client.send(request, BodyHandlers.ofInputStream());
-        try (var body = response.body()) {
-            return new String(body.readAllBytes(), StandardCharsets.UTF_8);
+        try (var res = client.send(HttpRequest.create()
+                .setUri(SmithyUri.of(baseUrl + "/stats"))
+                .setMethod("GET"))) {
+            return new String(res.body().asInputStream().readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 
-    public static String createRunId(String prefix) {
-        return prefix + "-" + UUID.randomUUID();
-    }
-
-    public static IoStats parseIoStats(String json) {
-        return new IoStats(
-                parseLongField(json, "getMbRequests"),
-                parseLongField(json, "getMbBytesSent"),
-                parseLongField(json, "putMbRequests"),
-                parseLongField(json, "putMbBytesReceived"));
-    }
-
-    public static void assertIoStats(String label, IoStats actual, IoStats expected) {
-        if (!actual.equals(expected)) {
-            throw new IllegalStateException(label + " mismatch. expected=" + expected + ", actual=" + actual);
-        }
-    }
-
+    /**
+     * Run a benchmark loop with virtual threads until totalRequests is reached.
+     *
+     * @param concurrency number of virtual threads generating load
+     * @param totalRequests total requests to complete before stopping
+     * @param task the task each thread runs in a loop
+     * @param context context passed to task (avoids lambda allocation)
+     * @param counter output counter for requests/errors
+     */
     public static <T> void runBenchmark(
             int concurrency,
             int totalRequests,
@@ -117,7 +118,6 @@ public final class BenchmarkSupport {
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < concurrency; i++) {
-                final int threadId = i;
                 executor.submit(() -> {
                     try {
                         while (completed.getAndIncrement() < totalRequests) {
@@ -126,24 +126,13 @@ public final class BenchmarkSupport {
                     } catch (Exception e) {
                         errors.incrementAndGet();
                         firstError.compareAndSet(null, e);
-                    } catch (Throwable t) {
-                        errors.incrementAndGet();
-                        firstError.compareAndSet(null, new RuntimeException("Thread " + threadId + " error", t));
                     } finally {
                         latch.countDown();
                     }
                 });
             }
 
-            if (!latch.await(10, TimeUnit.SECONDS)) {
-                Throwable err = firstError.get();
-                System.err.println("BENCHMARK TIMEOUT: " + (concurrency - (int) latch.getCount())
-                        + "/" + concurrency + " threads completed, errors=" + errors.get()
-                        + (err != null ? ", firstError=" + err : ""));
-                if (err != null) {
-                    err.printStackTrace(System.err);
-                }
-            }
+            latch.await(); // Wait for all work to complete
         }
 
         counter.requests = completed.get();
@@ -156,11 +145,16 @@ public final class BenchmarkSupport {
         void run(T context) throws Exception;
     }
 
+    /**
+     * Simple counter for benchmark results. Used with @AuxCounters.
+     * JMH picks up public fields OR getter methods for aux counters.
+     */
     public static class RequestCounter {
         public long requests;
         public long errors;
         public Throwable firstError;
 
+        // Getter methods for JMH aux counters (some versions need these)
         public long requests() {
             return requests;
         }
@@ -181,47 +175,5 @@ public final class BenchmarkSupport {
                 firstError.printStackTrace(System.err);
             }
         }
-
-        public void throwIfErrored(String label) {
-            if (firstError == null) {
-                return;
-            }
-            throw new IllegalStateException(label + " failed with " + errors + " error(s)", firstError);
-        }
-    }
-
-    public static String getH2ConnectionStats(HttpClient client) {
-        return "(stats unavailable for java.net.http.HttpClient)";
-    }
-
-    private static void sendAndDrain(HttpClient client, String url, String method) throws Exception {
-        var builder = HttpRequest.newBuilder().uri(URI.create(url));
-        if ("POST".equals(method)) {
-            builder.POST(HttpRequest.BodyPublishers.noBody());
-        } else {
-            builder.GET();
-        }
-        var response = client.send(builder.build(), BodyHandlers.ofInputStream());
-        try (var body = response.body()) {
-            body.transferTo(OutputStream.nullOutputStream());
-        }
-    }
-
-    private static long parseLongField(String json, String fieldName) {
-        String needle = "\"" + fieldName + "\":";
-        int start = json.indexOf(needle);
-        if (start < 0) {
-            throw new IllegalArgumentException("Missing field `" + fieldName + "` in stats: " + json);
-        }
-        start += needle.length();
-        int end = start;
-        while (end < json.length()) {
-            char c = json.charAt(end);
-            if ((c < '0' || c > '9') && c != '-') {
-                break;
-            }
-            end++;
-        }
-        return Long.parseLong(json.substring(start, end));
     }
 }

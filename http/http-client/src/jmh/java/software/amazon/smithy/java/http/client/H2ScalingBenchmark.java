@@ -8,13 +8,9 @@ package software.amazon.smithy.java.http.client;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpClient.Version;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.time.Duration;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -31,15 +27,16 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
-import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
-import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
+import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
 /**
- * HTTP/2 over TLS (h2) benchmark focused on the JDK transport.
+ * HTTP/2 over TLS (h2) benchmark comparing Smithy and Java HttpClient.
+ *
+ * <p>Run with: ./gradlew :http:http-client:jmh -Pjmh.includes="H2ScalingBenchmark"
  */
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
@@ -52,6 +49,7 @@ public class H2ScalingBenchmark {
     @Param({
             "1",
             "10"
+            //, "100", "1000"
     })
     private int concurrency;
 
@@ -61,14 +59,11 @@ public class H2ScalingBenchmark {
     @Param({"4096"})
     private int streamsPerConnection;
 
-    private HttpClient benchmarkClient;
-    private HttpClient javaClient;
-    private ExecutorService javaExecutor;
-    private JavaHttpClientTransport javaTransport;
-    private Context transportContext;
+    private HttpClient smithyClient;
+    private java.net.http.HttpClient javaClient;
 
     @Setup(Level.Trial)
-    public void setup() throws Exception {
+    public void setupIteration() throws Exception {
         closeClients();
 
         System.out.println("H2 setup: concurrency=" + concurrency
@@ -77,47 +72,46 @@ public class H2ScalingBenchmark {
 
         var sslContext = BenchmarkSupport.trustAllSsl();
 
-        benchmarkClient = HttpClient.newBuilder()
-                .version(Version.HTTP_2)
-                .sslContext(sslContext)
-                .connectTimeout(Duration.ofSeconds(30))
+        // Smithy H2 client
+        smithyClient = HttpClient.builder()
+                .connectionPool(HttpConnectionPool.builder()
+                        .maxConnectionsPerRoute(connections)
+                        .maxTotalConnections(connections)
+                        .h2StreamsPerConnection(streamsPerConnection)
+                        .h2InitialWindowSize(1024 * 1024)
+                        .maxIdleTime(Duration.ofMinutes(2))
+                        .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
+                        .sslContext(sslContext)
+                        .dnsResolver(BenchmarkSupport.staticDns())
+                        .build())
                 .build();
 
-        javaExecutor = Executors.newVirtualThreadPerTaskExecutor();
-        javaClient = HttpClient.newBuilder()
-                .version(Version.HTTP_2)
+        // Java HttpClient (HTTP/2 over TLS)
+        javaClient = java.net.http.HttpClient.newBuilder()
+                .version(java.net.http.HttpClient.Version.HTTP_2)
                 .sslContext(sslContext)
-                .executor(javaExecutor)
                 .build();
-        javaTransport = new JavaHttpClientTransport(javaClient);
-        transportContext = Context.create();
 
-        BenchmarkSupport.resetServer(benchmarkClient, BenchmarkSupport.H2_URL);
+        BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H2_URL);
     }
 
     @TearDown(Level.Trial)
     public void teardown() throws Exception {
-        String stats = BenchmarkSupport.getServerStats(benchmarkClient, BenchmarkSupport.H2_URL);
+        String stats = BenchmarkSupport.getServerStats(smithyClient, BenchmarkSupport.H2_URL);
         System.out.println("H2 stats [c=" + concurrency + ", conn=" + connections
                 + ", streams=" + streamsPerConnection + "]: " + stats);
-        System.out.println("H2 client stats: " + BenchmarkSupport.getH2ConnectionStats(benchmarkClient));
         closeClients();
     }
 
     private void closeClients() throws Exception {
-        if (benchmarkClient != null) {
-            benchmarkClient.close();
-            benchmarkClient = null;
+        if (smithyClient != null) {
+            smithyClient.close();
+            smithyClient = null;
         }
         if (javaClient != null) {
             javaClient.close();
             javaClient = null;
         }
-        if (javaExecutor != null) {
-            javaExecutor.close();
-            javaExecutor = null;
-        }
-        javaTransport = null;
     }
 
     @AuxCounters(AuxCounters.Type.EVENTS)
@@ -131,7 +125,22 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void h2JdkGet(Counter counter) throws InterruptedException {
+    public void smithy(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/get");
+        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var res = smithyClient.send(req)) {
+                res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Smithy H2");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void javaHttpClient(Counter counter) throws InterruptedException {
         var request = java.net.http.HttpRequest.newBuilder()
                 .uri(URI.create(BenchmarkSupport.H2_URL + "/get"))
                 .GET()
@@ -149,7 +158,25 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void h2JdkPost(Counter counter) throws InterruptedException {
+    public void smithyPost(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/post");
+        var request = HttpRequest.create()
+                .setUri(uri)
+                .setMethod("POST")
+                .setBody(DataStream.ofBytes(BenchmarkSupport.POST_PAYLOAD));
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var res = smithyClient.send(req)) {
+                res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Smithy H2 POST");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void javaHttpClientPost(Counter counter) throws InterruptedException {
         var request = java.net.http.HttpRequest.newBuilder()
                 .uri(URI.create(BenchmarkSupport.H2_URL + "/post"))
                 .POST(BodyPublishers.ofByteArray(BenchmarkSupport.POST_PAYLOAD))
@@ -167,7 +194,25 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void h2JdkPutMb(Counter counter) throws InterruptedException {
+    public void smithyPutMb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
+        var request = HttpRequest.create()
+                .setUri(uri)
+                .setMethod("PUT")
+                .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var res = smithyClient.send(req)) {
+                res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Smithy H2 PUT 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void javaHttpClientPutMb(Counter counter) throws InterruptedException {
         var request = java.net.http.HttpRequest.newBuilder()
                 .uri(URI.create(BenchmarkSupport.H2_URL + "/putmb"))
                 .PUT(BodyPublishers.ofByteArray(BenchmarkSupport.MB_PAYLOAD))
@@ -185,43 +230,24 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void h2JavaWrapperPutMb(Counter counter) throws InterruptedException {
-        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
-        var request = HttpRequest.create()
-                .setUri(uri)
-                .setHttpVersion(HttpVersion.HTTP_2)
-                .setMethod("PUT")
-                .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
-
-        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
-            try (var response = javaTransport.send(transportContext, req)) {
-                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
-            }
-        }, request, counter);
-
-        counter.logErrors("Java wrapper H2 PUT 1MB");
-    }
-
-    @Benchmark
-    @Threads(1)
-    public void h2JavaWrapperGetMb(Counter counter) throws InterruptedException {
+    public void smithyGetMb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb");
-        var request = HttpRequest.create().setUri(uri).setHttpVersion(HttpVersion.HTTP_2).setMethod("GET");
+        var request = HttpRequest.create().setUri(uri).setMethod("GET");
 
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
-            try (var response = javaTransport.send(transportContext, req)) {
-                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            try (var res = smithyClient.send(req)) {
+                res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
             }
         }, request, counter);
 
-        counter.logErrors("Java Wrapper H2 GET 1MB");
+        counter.logErrors("Smithy H2 GET 1MB");
     }
 
     @Benchmark
     @Threads(1)
-    public void h2JdkGetMb(Counter counter) throws InterruptedException {
+    public void javaHttpClientGetMb(Counter counter) throws InterruptedException {
         var request = java.net.http.HttpRequest.newBuilder()
-                .uri(URI.create(BenchmarkSupport.H2_URL + "/getmb"))
+                .uri(java.net.URI.create(BenchmarkSupport.H2_URL + "/getmb"))
                 .GET()
                 .build();
 
@@ -233,20 +259,5 @@ public class H2ScalingBenchmark {
         }, request, counter);
 
         counter.logErrors("Java HttpClient H2 GET 1MB");
-    }
-
-    @Benchmark
-    @Threads(1)
-    public void h2JavaWrapperGet10Mb(Counter counter) throws InterruptedException {
-        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/get10mb");
-        var request = HttpRequest.create().setUri(uri).setHttpVersion(HttpVersion.HTTP_2).setMethod("GET");
-
-        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
-            try (var response = javaTransport.send(transportContext, req)) {
-                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
-            }
-        }, request, counter);
-
-        counter.logErrors("Java Wrapper H2 GET 10MB");
     }
 }
