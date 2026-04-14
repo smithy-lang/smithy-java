@@ -3,6 +3,12 @@ plugins {
     id("software.amazon.smithy.java.gradle.smithy-java")
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 dependencies {
     testImplementation("org.hamcrest:hamcrest:3.0")
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")

@@ -3,6 +3,12 @@ plugins {
     id("software.amazon.smithy.gradle.smithy-base")
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 dependencies {
     val smithyJavaVersion: String by project
     val smithyVersion: String by project
