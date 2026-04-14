@@ -5,6 +5,12 @@ plugins {
     id("smithy-java.jmh-conventions")
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 dependencies {
     val smithyJavaVersion: String by project
 

@@ -4,6 +4,12 @@ plugins {
     application
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 application {
     mainClass = "software.amazon.smithy.java.server.example.BasicServerExample"
 }

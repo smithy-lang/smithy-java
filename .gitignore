@@ -1,6 +1,8 @@
 # Ignore Gradle project-specific cache directory
 .gradle
 
+.tool-versions
+
 # Ignore kotlin cache dir
 .kotlin
 
