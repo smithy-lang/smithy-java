@@ -36,10 +36,11 @@ public class CborParserTest {
     private static byte[] write(Consumer<CborSerializer> consumer) {
         try (
                 var stream = new ByteBufferOutputStream();
-                var ser = new CborSerializer(new Sink.OutputStreamSink(stream))) {
+                var ser = new CborSerializer(stream)) {
             try {
                 consumer.accept(ser);
             } catch (StopWritingException ignored) {}
+            ser.flush();
             return ByteBufferUtils.getBytes(stream.toByteBuffer());
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -589,8 +590,8 @@ public class CborParserTest {
         });
 
         parser = new CborParser(cbor);
-        token(Token.EPOCH_F);
-        num(d.getTime() / 1000d);
+        // Whole-second timestamps are now encoded as integers (more compact)
+        token(Token.EPOCH_INEG);
         finished();
     }
 

@@ -10,15 +10,12 @@ import static software.amazon.smithy.java.cbor.CborReadUtil.readByteString;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.smithy.java.cbor.CborParser.Token;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -27,71 +24,6 @@ import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 
 final class CborDeserializer implements ShapeDeserializer {
-    private static final class Canonicalizer {
-        private record Canonical(Schema member, byte[] utf8) implements Comparable<Canonical> {
-            @Override
-            public int compareTo(Canonical o) {
-                return Arrays.compare(utf8, o.utf8);
-            }
-
-            private Schema isSame(byte[] bytes, int off, int len) {
-                if (Arrays.compare(utf8, 0, utf8.length, bytes, off, off + len) == 0) {
-                    return member;
-                }
-                return null;
-            }
-        }
-
-        private final Object[][] canonicals;
-
-        Canonicalizer(Schema schema) {
-            int biggest = 0;
-            Map<Integer, List<Canonical>> bySize = new HashMap<>();
-            for (var member : schema.members()) {
-                byte[] utf8 = member.memberName().getBytes(StandardCharsets.UTF_8);
-                biggest = Math.max(biggest, utf8.length);
-                bySize.computeIfAbsent(utf8.length, $ -> new ArrayList<>())
-                        .add(new Canonical(member, utf8));
-            }
-
-            canonicals = new Object[biggest + 1][];
-            for (var entry : bySize.entrySet()) {
-                int len = entry.getKey();
-                var canonsForLen = entry.getValue().toArray(new Canonical[0]);
-                Arrays.sort(canonsForLen);
-                canonicals[len] = canonsForLen;
-            }
-        }
-
-        Schema resolve(byte[] payload, int off, int len) {
-            if (len >= canonicals.length) {
-                return null;
-            }
-
-            Object[] canonicals = this.canonicals[len];
-            if (canonicals == null) {
-                return null;
-            }
-
-            if (canonicals.length == 1) {
-                return getMemberIfSame(canonicals[0], payload, off, len);
-            } else {
-                for (int i = 0; i < canonicals.length; i++) {
-                    var member = getMemberIfSame(canonicals[i], payload, off, len);
-                    if (member != null) {
-                        return member;
-                    }
-                }
-                return null;
-            }
-        }
-
-        private Schema getMemberIfSame(Object o, byte[] bytes, int off, int len) {
-            return ((Canonical) o).isSame(bytes, off, len);
-        }
-    }
-
-    private static final Map<Schema, Canonicalizer> CANONICALIZERS = new ConcurrentHashMap<>();
 
     private final CborParser parser;
     private final CborSettings settings;
@@ -347,8 +279,10 @@ final class CborDeserializer implements ShapeDeserializer {
         byte token = parser.currentToken();
         byte actual = (byte) (token ^ Token.TAG_FLAG);
         if (actual <= Token.NEG_INT) {
-            return Instant.ofEpochMilli(readLong("timestamp", token) * 1000);
+            // Integer epoch-seconds timestamp
+            return Instant.ofEpochSecond(readLong("timestamp", actual));
         } else if (actual == Token.FLOAT) {
+            // Floating-point epoch-seconds with millisecond precision per RPCv2 spec
             double d = readDouble("timestamp", actual);
             return Instant.ofEpochMilli(Math.round(d * 1000d));
         }
@@ -366,7 +300,12 @@ final class CborDeserializer implements ShapeDeserializer {
             throw badType("struct", token);
         }
 
-        var canonicalizer = getCanonicalizer(schema);
+        // Use Schema extension for O(1) lookup instead of ConcurrentHashMap
+        Schema structSchema = schema.isMember() ? schema.memberTarget() : schema;
+        var ext = structSchema.getExtension(CborSchemaExtensions.KEY);
+        CborMemberLookup lookup = ext != null ? ext.memberLookup() : null;
+        int expectedNext = 0;
+
         for (token = parser.advance(); token != Token.END_OBJECT; token = parser.advance()) {
             if (token != Token.KEY) {
                 throw badType("struct member", token);
@@ -379,14 +318,48 @@ final class CborDeserializer implements ShapeDeserializer {
                 continue;
             }
 
-            // wait to resolve the member until we know an event will be dispatched
-            Object member = resolveMember(schema, canonicalizer, payload, memberPos, memberLen);
-            if (member.getClass() == String.class) {
-                consumer.unknownMember(state, (String) member);
-                skipUnknownMember();
-            } else {
-                consumer.accept(state, (Schema) member, this);
+            Schema member = null;
+
+            // Fast path: only for definite-length member names (the common case)
+            if (!CborParser.isIndefinite(memberLen) && lookup != null) {
+                // Speculative fast path: check expected next member via Arrays.equals
+                if (expectedNext >= 0 && expectedNext < lookup.orderedNameBytes.length) {
+                    byte[] expected = lookup.orderedNameBytes[expectedNext];
+                    if (expected.length == memberLen
+                            && Arrays.equals(
+                                    payload,
+                                    memberPos,
+                                    memberPos + memberLen,
+                                    expected,
+                                    0,
+                                    memberLen)) {
+                        member = lookup.orderedSchemas[expectedNext];
+                        expectedNext = member.memberIndex() + 1;
+                    }
+                }
+                // Slow path: hash-based lookup
+                if (member == null) {
+                    member = lookup.lookup(payload, memberPos, memberPos + memberLen, -1);
+                    if (member != null) {
+                        expectedNext = member.memberIndex() + 1;
+                    }
+                }
             }
+
+            // Fallback: string decode for indefinite-length or unknown members
+            if (member == null) {
+                String name = CborReadUtil.readTextString(payload, memberPos, memberLen);
+                member = structSchema.member(name);
+                if (member != null) {
+                    expectedNext = member.memberIndex() + 1;
+                } else {
+                    consumer.unknownMember(state, name);
+                    skipUnknownMember();
+                    continue;
+                }
+            }
+
+            consumer.accept(state, member, this);
         }
     }
 
@@ -405,36 +378,6 @@ final class CborDeserializer implements ShapeDeserializer {
             }
             current = parser.advance();
         }
-    }
-
-    private static Object resolveMember(Schema host, Canonicalizer canonicalizer, byte[] payload, int pos, int len) {
-        // this method is static for safety. the parser has already advanced past the member field by the time
-        // resolveMember is called, so don't touch the parser or any other instance state.
-        if (CborParser.isIndefinite(len)) {
-            return resolveSlow(host, payload, pos, len);
-        }
-
-        var schema = canonicalizer.resolve(payload, pos, len);
-        if (schema != null) {
-            return schema;
-        }
-        return CborReadUtil.readTextString(payload, pos, len);
-    }
-
-    private static Object resolveSlow(Schema host, byte[] payload, int pos, int len) {
-        var name = CborReadUtil.readTextString(payload, pos, len);
-        var schema = host.member(name);
-        return schema != null ? schema : host;
-    }
-
-    private Canonicalizer getCanonicalizer(Schema schema) {
-        var canonicalizer = CANONICALIZERS.get(schema);
-        if (canonicalizer == null) {
-            canonicalizer = new Canonicalizer(schema);
-            CANONICALIZERS.put(schema, canonicalizer);
-        }
-
-        return canonicalizer;
     }
 
     @Override
