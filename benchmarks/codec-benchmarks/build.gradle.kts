@@ -47,5 +47,10 @@ jmh {
             .map { listOf(it) }
             .orElse(emptyList()),
     )
-    profilers.add("async:output=jfr;dir=${layout.buildDirectory.get()}/jmh-profiler")
+    profilers.addAll(
+        providers
+            .gradleProperty("jmh.profilers")
+            .map { it.split("|") }
+            .orElse(listOf("async:output=jfr;dir=${layout.buildDirectory.get()}/jmh-profiler")),
+    )
 }

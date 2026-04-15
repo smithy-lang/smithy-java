@@ -33,6 +33,7 @@ import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -420,13 +421,34 @@ final class CborSerializer implements ShapeSerializer {
 
     @SuppressWarnings("deprecation")
     private void writeStringValue(String value) {
-        int len = value.length();
-        // Worst case for UTF-8: 3 bytes per char (for BMP). tagAndLength max is 5.
-        ensureCapacity(5 + len * 3);
-        tagAndLengthUnchecked(TYPE_TEXTSTRING, len);
-        // Fast path: ASCII-only strings (all Smithy member names, most string values)
-        value.getBytes(0, len, buf, pos);
-        pos += len;
+        int charLen = value.length();
+        if (charLen == 0) {
+            ensureCapacity(1);
+            buf[pos++] = (byte) TYPE_TEXTSTRING;
+            return;
+        }
+        // Optimistic ASCII path: copy with deprecated getBytes (zero alloc, correct for ASCII).
+        // Use branchless OR accumulator to detect any non-ASCII byte.
+        ensureCapacity(5 + charLen * 3); // worst case for UTF-8
+        int headerStart = pos;
+        tagAndLengthUnchecked(TYPE_TEXTSTRING, charLen);
+        int dataStart = pos;
+        value.getBytes(0, charLen, buf, pos);
+        int orAccum = 0;
+        for (int i = 0; i < charLen; i++) {
+            orAccum |= buf[pos + i];
+        }
+        if (orAccum >= 0) {
+            // All bytes have high bit clear — pure ASCII, encoding is correct
+            pos += charLen;
+            return;
+        }
+        // Non-ASCII: rewind and use proper UTF-8 encoding
+        pos = headerStart;
+        byte[] utf8 = value.getBytes(StandardCharsets.UTF_8);
+        tagAndLengthUnchecked(TYPE_TEXTSTRING, utf8.length);
+        System.arraycopy(utf8, 0, buf, pos, utf8.length);
+        pos += utf8.length;
     }
 
     @Override
@@ -753,11 +775,23 @@ final class CborSerializer implements ShapeSerializer {
                 BiConsumer<T, ShapeSerializer> valueSerializer
         ) {
             int keyLen = key.length();
-            // CBOR text string header (max 5 bytes) + key bytes
-            ensureCapacity(5 + keyLen);
+            ensureCapacity(5 + keyLen * 3);
+            int headerStart = pos;
             tagAndLengthUnchecked(TYPE_TEXTSTRING, keyLen);
             key.getBytes(0, keyLen, buf, pos);
-            pos += keyLen;
+            int orAccum = 0;
+            for (int i = 0; i < keyLen; i++) {
+                orAccum |= buf[pos + i];
+            }
+            if (orAccum >= 0) {
+                pos += keyLen;
+            } else {
+                pos = headerStart;
+                byte[] utf8 = key.getBytes(StandardCharsets.UTF_8);
+                tagAndLengthUnchecked(TYPE_TEXTSTRING, utf8.length);
+                System.arraycopy(utf8, 0, buf, pos, utf8.length);
+                pos += utf8.length;
+            }
             valueSerializer.accept(state, CborSerializer.this);
         }
     }
