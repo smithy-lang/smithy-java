@@ -7,6 +7,7 @@ package software.amazon.smithy.java.cbor;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -20,6 +21,11 @@ public final class Rpcv2CborCodec implements Codec {
 
     public static Builder builder() {
         return new Builder();
+    }
+
+    @Override
+    public ByteBuffer serialize(SerializableShape shape) {
+        return settings.provider().serialize(shape, settings);
     }
 
     @Override

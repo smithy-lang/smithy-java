@@ -7,7 +7,7 @@ package software.amazon.smithy.java.cbor;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 
@@ -22,5 +22,5 @@ public interface CborSerdeProvider {
 
     ShapeSerializer newSerializer(OutputStream sink, CborSettings settings);
 
-    ByteBuffer serialize(SerializableStruct struct, CborSettings settings);
+    ByteBuffer serialize(SerializableShape shape, CborSettings settings);
 }
