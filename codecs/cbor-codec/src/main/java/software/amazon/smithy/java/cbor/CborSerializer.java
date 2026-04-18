@@ -34,7 +34,6 @@ import java.lang.invoke.VarHandle;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -438,7 +437,6 @@ final class CborSerializer implements ShapeSerializer {
         ensureCapacity(5 + charLen * 3); // worst case for UTF-8
         int headerStart = pos;
         tagAndLengthUnchecked(TYPE_TEXTSTRING, charLen);
-        int dataStart = pos;
         value.getBytes(0, charLen, buf, pos);
         int orAccum = 0;
         for (int i = 0; i < charLen; i++) {
@@ -449,12 +447,60 @@ final class CborSerializer implements ShapeSerializer {
             pos += charLen;
             return;
         }
-        // Non-ASCII: rewind and use proper UTF-8 encoding
+        // Non-ASCII: rewind and inline-encode UTF-8 directly into buf (zero alloc).
+        encodeUtf8TextStringRewind(value, charLen, headerStart);
+    }
+
+    /**
+     * Encodes {@code value} as a CBOR text string starting at {@code headerStart}. Caller must have
+     * reserved {@code 5 + charLen * 3} bytes from {@code headerStart}. Writes data into a 5-byte-header
+     * scratch area, backpatches the header with the actual UTF-8 byte length, and shifts the payload
+     * left if the real header is shorter than 5 bytes. On exit, {@code pos} points past the payload.
+     */
+    private void encodeUtf8TextStringRewind(String value, int charLen, int headerStart) {
+        int writeStart = headerStart + 5;
+        int p = writeStart;
+        for (int j = 0; j < charLen; j++) {
+            int c = value.charAt(j);
+            if (c < 0x80) {
+                buf[p++] = (byte) c;
+            } else if (c < 0x800) {
+                buf[p++] = (byte) (0xC0 | (c >> 6));
+                buf[p++] = (byte) (0x80 | (c & 0x3F));
+            } else if (c >= 0xD800 && c <= 0xDBFF && j + 1 < charLen) {
+                char low = value.charAt(j + 1);
+                if (low >= 0xDC00 && low <= 0xDFFF) {
+                    int cp = Character.toCodePoint((char) c, low);
+                    buf[p++] = (byte) (0xF0 | (cp >> 18));
+                    buf[p++] = (byte) (0x80 | ((cp >> 12) & 0x3F));
+                    buf[p++] = (byte) (0x80 | ((cp >> 6) & 0x3F));
+                    buf[p++] = (byte) (0x80 | (cp & 0x3F));
+                    j++;
+                } else {
+                    buf[p++] = (byte) 0xEF;
+                    buf[p++] = (byte) 0xBF;
+                    buf[p++] = (byte) 0xBD;
+                }
+            } else if (c >= 0xDC00 && c <= 0xDFFF) {
+                // Unpaired low surrogate → U+FFFD, matching JDK getBytes(UTF_8) replacement
+                buf[p++] = (byte) 0xEF;
+                buf[p++] = (byte) 0xBF;
+                buf[p++] = (byte) 0xBD;
+            } else {
+                buf[p++] = (byte) (0xE0 | (c >> 12));
+                buf[p++] = (byte) (0x80 | ((c >> 6) & 0x3F));
+                buf[p++] = (byte) (0x80 | (c & 0x3F));
+            }
+        }
+        int byteLen = p - writeStart;
         pos = headerStart;
-        byte[] utf8 = value.getBytes(StandardCharsets.UTF_8);
-        tagAndLengthUnchecked(TYPE_TEXTSTRING, utf8.length);
-        System.arraycopy(utf8, 0, buf, pos, utf8.length);
-        pos += utf8.length;
+        tagAndLengthUnchecked(TYPE_TEXTSTRING, byteLen);
+        int actualHeaderLen = pos - headerStart;
+        int shift = 5 - actualHeaderLen;
+        if (shift > 0) {
+            System.arraycopy(buf, writeStart, buf, writeStart - shift, byteLen);
+        }
+        pos = headerStart + actualHeaderLen + byteLen;
     }
 
     @Override
@@ -764,31 +810,13 @@ final class CborSerializer implements ShapeSerializer {
 
     private final class CborMapSerializer implements MapSerializer {
         @Override
-        @SuppressWarnings("deprecation")
         public <T> void writeEntry(
                 Schema keySchema,
                 String key,
                 T state,
                 BiConsumer<T, ShapeSerializer> valueSerializer
         ) {
-            int keyLen = key.length();
-            ensureCapacity(5 + keyLen * 3);
-            int headerStart = pos;
-            tagAndLengthUnchecked(TYPE_TEXTSTRING, keyLen);
-            key.getBytes(0, keyLen, buf, pos);
-            int orAccum = 0;
-            for (int i = 0; i < keyLen; i++) {
-                orAccum |= buf[pos + i];
-            }
-            if (orAccum >= 0) {
-                pos += keyLen;
-            } else {
-                pos = headerStart;
-                byte[] utf8 = key.getBytes(StandardCharsets.UTF_8);
-                tagAndLengthUnchecked(TYPE_TEXTSTRING, utf8.length);
-                System.arraycopy(utf8, 0, buf, pos, utf8.length);
-                pos += utf8.length;
-            }
+            writeStringValue(key);
             valueSerializer.accept(state, CborSerializer.this);
         }
     }
