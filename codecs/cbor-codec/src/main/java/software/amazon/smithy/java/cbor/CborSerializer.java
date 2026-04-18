@@ -30,6 +30,7 @@ import static software.amazon.smithy.java.cbor.CborConstants.TYPE_TEXTSTRING;
 import static software.amazon.smithy.java.cbor.CborReadUtil.flipBytes;
 
 import java.io.OutputStream;
+import java.lang.invoke.VarHandle;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -48,6 +49,11 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class CborSerializer implements ShapeSerializer {
+
+    private static final VarHandle BE_SHORT = CborReadUtil.BE_SHORT;
+    private static final VarHandle BE_INT = CborReadUtil.BE_INT;
+    private static final VarHandle BE_LONG = CborReadUtil.BE_LONG;
+
     private static final int MAP_STREAM = TYPE_MAP | INDEFINITE;
     private static final int ARRAY_STREAM = TYPE_ARRAY | INDEFINITE;
 
@@ -189,22 +195,7 @@ final class CborSerializer implements ShapeSerializer {
 
     private void tagAndLength(int type, int len) {
         ensureCapacity(5); // max: 1 type byte + 4 length bytes (int)
-        if (len < ONE_BYTE) {
-            buf[pos++] = (byte) (type | len);
-        } else if (len <= 0xFF) {
-            buf[pos++] = (byte) (type | ONE_BYTE);
-            buf[pos++] = (byte) len;
-        } else if (len <= 0xFFFF) {
-            buf[pos++] = (byte) (type | TWO_BYTES);
-            buf[pos++] = (byte) (len >> 8);
-            buf[pos++] = (byte) len;
-        } else {
-            buf[pos++] = (byte) (type | FOUR_BYTES);
-            buf[pos++] = (byte) (len >> 24);
-            buf[pos++] = (byte) (len >> 16);
-            buf[pos++] = (byte) (len >> 8);
-            buf[pos++] = (byte) len;
-        }
+        tagAndLengthUnchecked(type, len);
     }
 
     /** Write tag+length without ensureCapacity — caller must have reserved space. */
@@ -216,14 +207,12 @@ final class CborSerializer implements ShapeSerializer {
             buf[pos++] = (byte) len;
         } else if (len <= 0xFFFF) {
             buf[pos++] = (byte) (type | TWO_BYTES);
-            buf[pos++] = (byte) (len >> 8);
-            buf[pos++] = (byte) len;
+            BE_SHORT.set(buf, pos, (short) len);
+            pos += 2;
         } else {
             buf[pos++] = (byte) (type | FOUR_BYTES);
-            buf[pos++] = (byte) (len >> 24);
-            buf[pos++] = (byte) (len >> 16);
-            buf[pos++] = (byte) (len >> 8);
-            buf[pos++] = (byte) len;
+            BE_INT.set(buf, pos, len);
+            pos += 4;
         }
     }
 
@@ -249,37 +238,23 @@ final class CborSerializer implements ShapeSerializer {
             buf[pos++] = (byte) l;
         } else if (l <= 0xFFFFL) {
             buf[pos++] = (byte) (type | TWO_BYTES);
-            buf[pos++] = (byte) (l >> 8);
-            buf[pos++] = (byte) l;
+            BE_SHORT.set(buf, pos, (short) l);
+            pos += 2;
         } else if (l <= 0xFFFF_FFFFL) {
             buf[pos++] = (byte) (type | FOUR_BYTES);
-            buf[pos++] = (byte) (l >> 24);
-            buf[pos++] = (byte) (l >> 16);
-            buf[pos++] = (byte) (l >> 8);
-            buf[pos++] = (byte) l;
+            BE_INT.set(buf, pos, (int) l);
+            pos += 4;
         } else {
             buf[pos++] = (byte) (type | EIGHT_BYTES);
-            buf[pos++] = (byte) (l >> 56);
-            buf[pos++] = (byte) (l >> 48);
-            buf[pos++] = (byte) (l >> 40);
-            buf[pos++] = (byte) (l >> 32);
-            buf[pos++] = (byte) (l >> 24);
-            buf[pos++] = (byte) (l >> 16);
-            buf[pos++] = (byte) (l >> 8);
-            buf[pos++] = (byte) l;
+            BE_LONG.set(buf, pos, l);
+            pos += 8;
         }
     }
 
     private void writeDoubleUnchecked(long bits) {
         buf[pos++] = (byte) TYPE_SIMPLE_DOUBLE;
-        buf[pos++] = (byte) (bits >> 56);
-        buf[pos++] = (byte) (bits >> 48);
-        buf[pos++] = (byte) (bits >> 40);
-        buf[pos++] = (byte) (bits >> 32);
-        buf[pos++] = (byte) (bits >> 24);
-        buf[pos++] = (byte) (bits >> 16);
-        buf[pos++] = (byte) (bits >> 8);
-        buf[pos++] = (byte) bits;
+        BE_LONG.set(buf, pos, bits);
+        pos += 8;
     }
 
     private void writeBytes0(int type, byte[] b, int off, int len) {
@@ -401,11 +376,8 @@ final class CborSerializer implements ShapeSerializer {
     public void writeFloat(Schema schema, float value) {
         ensureCapacity(5);
         buf[pos++] = (byte) TYPE_SIMPLE_FLOAT;
-        int bits = Float.floatToRawIntBits(value);
-        buf[pos++] = (byte) (bits >> 24);
-        buf[pos++] = (byte) (bits >> 16);
-        buf[pos++] = (byte) (bits >> 8);
-        buf[pos++] = (byte) bits;
+        BE_INT.set(buf, pos, Float.floatToRawIntBits(value));
+        pos += 4;
     }
 
     @Override
@@ -534,14 +506,8 @@ final class CborSerializer implements ShapeSerializer {
                 ensureCapacity(9);
                 buf[pos++] = (byte) (type | EIGHT_BYTES);
                 long v = value.longValue() ^ signum;
-                buf[pos++] = (byte) (v >> 56);
-                buf[pos++] = (byte) (v >> 48);
-                buf[pos++] = (byte) (v >> 40);
-                buf[pos++] = (byte) (v >> 32);
-                buf[pos++] = (byte) (v >> 24);
-                buf[pos++] = (byte) (v >> 16);
-                buf[pos++] = (byte) (v >> 8);
-                buf[pos++] = (byte) v;
+                BE_LONG.set(buf, pos, v);
+                pos += 8;
             } else {
                 byte[] bytes = value.toByteArray();
                 byte tag;
@@ -668,11 +634,8 @@ final class CborSerializer implements ShapeSerializer {
             System.arraycopy(nameBytes, 0, buf, pos, nameBytes.length);
             pos += nameBytes.length;
             buf[pos++] = (byte) TYPE_SIMPLE_FLOAT;
-            int bits = Float.floatToRawIntBits(value);
-            buf[pos++] = (byte) (bits >> 24);
-            buf[pos++] = (byte) (bits >> 16);
-            buf[pos++] = (byte) (bits >> 8);
-            buf[pos++] = (byte) bits;
+            BE_INT.set(buf, pos, Float.floatToRawIntBits(value));
+            pos += 4;
         }
 
         @Override

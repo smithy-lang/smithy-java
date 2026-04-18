@@ -17,15 +17,25 @@ import static software.amazon.smithy.java.cbor.CborParser.TYPE_POSINT;
 import static software.amazon.smithy.java.cbor.CborParser.TYPE_TAG;
 import static software.amazon.smithy.java.cbor.CborParser.ZERO_BYTES;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
 public final class CborReadUtil {
+
+    static final VarHandle BE_SHORT =
+            MethodHandles.byteArrayViewVarHandle(short[].class, ByteOrder.BIG_ENDIAN);
+    static final VarHandle BE_INT =
+            MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.BIG_ENDIAN);
+    static final VarHandle BE_LONG =
+            MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.BIG_ENDIAN);
+
     public static int argLength(int minorType) {
         if (minorType <= ZERO_BYTES)
             return 0;
@@ -72,23 +82,16 @@ public final class CborReadUtil {
             return val;
     }
 
-    @SuppressFBWarnings("SF_SWITCH_FALLTHROUGH")
     private static long readLong0(byte[] buffer, int off, int len) {
-        long acc = 0;
-        // case order is important here, do not reorder
         switch (len) {
-            case 8:
-                acc = ((long) buffer[off++] & 0xff) << 56
-                        | ((long) buffer[off++] & 0xff) << 48
-                        | ((long) buffer[off++] & 0xff) << 40
-                        | ((long) buffer[off++] & 0xff) << 32;
-            case 4:
-                acc |= ((long) buffer[off++] & 0xff) << 24
-                        | ((long) buffer[off++] & 0xff) << 16;
-            case 2:
-                acc |= ((long) buffer[off++] & 0xff) << 8;
             case 1:
-                return acc | ((long) buffer[off] & 0xff);
+                return buffer[off] & 0xffL;
+            case 2:
+                return ((short) BE_SHORT.get(buffer, off)) & 0xffffL;
+            case 4:
+                return ((int) BE_INT.get(buffer, off)) & 0xffffffffL;
+            case 8:
+                return (long) BE_LONG.get(buffer, off);
             default:
                 return invalidLength(len);
         }
