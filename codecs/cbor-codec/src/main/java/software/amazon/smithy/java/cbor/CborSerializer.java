@@ -82,8 +82,11 @@ final class CborSerializer implements ShapeSerializer {
     private final OutputStream sink;
 
     // Collection nesting state (for indefinite-length tracking).
-    private boolean[] collection = new boolean[4];
-    private int collectionIdx = -1;
+    // Bit i of collectionMask records whether level i was opened as indefinite-length.
+    // Overflow storage is lazily allocated for depths >= 64.
+    private long collectionMask = 0L;
+    private int collectionDepth = 0;
+    private long[] collectionOverflow;
 
     // Pre-resolved field name table for the current struct being serialized.
     private byte[][] currentFieldNameTable;
@@ -117,7 +120,8 @@ final class CborSerializer implements ShapeSerializer {
                 CborSerializer s = POOL.getPlain(idx);
                 if (s != null && POOL.compareAndExchangeAcquire(idx, s, null) == s) {
                     s.pos = 0;
-                    s.collectionIdx = -1;
+                    s.collectionMask = 0L;
+                    s.collectionDepth = 0;
                     s.currentFieldNameTable = null;
                     return s;
                 }
@@ -289,24 +293,54 @@ final class CborSerializer implements ShapeSerializer {
     }
 
     private void startCollection(boolean indefinite) {
-        int idx = ++collectionIdx;
-        boolean[] coll = collection;
-        int l = coll.length;
-        if (idx == l) {
-            collection = (coll = Arrays.copyOf(coll, l + (l >> 1)));
+        int d = collectionDepth;
+        if (d < 64) {
+            if (indefinite) {
+                collectionMask |= 1L << d;
+            } else {
+                collectionMask &= ~(1L << d);
+            }
+        } else {
+            pushOverflow(d, indefinite);
         }
-        coll[idx] = indefinite;
+        collectionDepth = d + 1;
+    }
+
+    private void pushOverflow(int d, boolean indefinite) {
+        int overflowIdx = d - 64;
+        long[] stack = collectionOverflow;
+        if (stack == null) {
+            stack = collectionOverflow = new long[Math.max(4, (overflowIdx >> 6) + 1)];
+        } else if ((overflowIdx >> 6) >= stack.length) {
+            stack = collectionOverflow = Arrays.copyOf(stack, stack.length * 2);
+        }
+        long bit = 1L << (overflowIdx & 63);
+        int slot = overflowIdx >>> 6;
+        if (indefinite) {
+            stack[slot] |= bit;
+        } else {
+            stack[slot] &= ~bit;
+        }
+    }
+
+    private boolean popIndefinite() {
+        int d = --collectionDepth;
+        if (d < 64) {
+            return ((collectionMask >>> d) & 1L) != 0L;
+        }
+        int overflowIdx = d - 64;
+        return ((collectionOverflow[overflowIdx >>> 6] >>> (overflowIdx & 63)) & 1L) != 0L;
     }
 
     private void endMap() {
-        if (collection[collectionIdx--]) {
+        if (popIndefinite()) {
             ensureCapacity(1);
             buf[pos++] = (byte) TYPE_SIMPLE_BREAK_STREAM;
         }
     }
 
     private void endArray() {
-        if (collection[collectionIdx--]) {
+        if (popIndefinite()) {
             ensureCapacity(1);
             buf[pos++] = (byte) TYPE_SIMPLE_BREAK_STREAM;
         }
