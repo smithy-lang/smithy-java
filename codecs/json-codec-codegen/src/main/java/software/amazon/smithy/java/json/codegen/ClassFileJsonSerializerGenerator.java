@@ -2029,6 +2029,7 @@ final class ClassFileJsonSerializerGenerator {
                 Class<?> tc = field.schema().memberTarget().shapeClass();
                 yield tc != null ? ClassDesc.of(tc.getName()) : CD_Object;
             }
+            case DOCUMENT -> ClassDesc.of("software.amazon.smithy.java.core.serde.document.Document");
             default -> CD_Object;
         };
     }
