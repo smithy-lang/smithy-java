@@ -5,7 +5,9 @@
 
 package software.amazon.smithy.java.json.codegen;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import software.amazon.smithy.java.codegen.rt.plan.FieldCategory;
 import software.amazon.smithy.java.codegen.rt.plan.FieldPlan;
 import software.amazon.smithy.java.codegen.rt.plan.StructCodePlan;
@@ -20,6 +22,7 @@ import software.amazon.smithy.java.json.smithy.JsonWriteUtils;
 final class JsonSerializerCodegen {
 
     private int varSeq;
+    private final Map<String, String> nestedSerCaches = new LinkedHashMap<>();
 
     private String v(String base) {
         return base + varSeq;
@@ -27,6 +30,11 @@ final class JsonSerializerCodegen {
 
     String generate(StructCodePlan plan, String className, String packageName) {
         varSeq = 0;
+        nestedSerCaches.clear();
+
+        // First pass: collect nested struct types by scanning all fields
+        collectNestedStructTypes(plan);
+
         SourceBuilder sb = new SourceBuilder();
 
         sb.line("package " + packageName + ";");
@@ -49,6 +57,15 @@ final class JsonSerializerCodegen {
 
         String fqcn = packageName + "." + plan.shapeClass().getSimpleName();
 
+        // Emit cached serializer fields for nested struct types
+        for (var entry : nestedSerCaches.entrySet()) {
+            sb.line("private static final GeneratedStructSerializer[] " + entry.getValue()
+                    + " = new GeneratedStructSerializer[1];");
+        }
+        if (!nestedSerCaches.isEmpty()) {
+            sb.emptyLine();
+        }
+
         if (plan.isUnion()) {
             generateUnionFieldConstants(sb, plan);
             sb.emptyLine();
@@ -62,6 +79,55 @@ final class JsonSerializerCodegen {
         sb.endBlock(); // class
 
         return sb.toString();
+    }
+
+    private void collectNestedStructTypes(StructCodePlan plan) {
+        for (FieldPlan field : plan.fields()) {
+            collectNestedStructType(field);
+        }
+    }
+
+    private void collectNestedStructType(FieldPlan field) {
+        switch (field.category()) {
+            case STRUCT:
+            case UNION:
+                registerNestedSerCache(field.schema().memberTarget().shapeClass());
+                break;
+            case LIST:
+                Class<?> elemClass = field.elementClass();
+                if (elemClass != null && !isSimpleType(elemClass)) {
+                    registerNestedSerCache(elemClass);
+                }
+                break;
+            case MAP:
+                Class<?> valClass = field.mapValueClass();
+                if (valClass != null && !isSimpleType(valClass)) {
+                    registerNestedSerCache(valClass);
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void registerNestedSerCache(Class<?> clazz) {
+        if (clazz != null) {
+            String fqcn = clazz.getName();
+            nestedSerCaches.computeIfAbsent(fqcn, k -> "_SER_" + clazz.getSimpleName());
+        }
+    }
+
+    private String getSerCacheField(Class<?> clazz) {
+        return nestedSerCaches.get(clazz.getName());
+    }
+
+    private static boolean isSimpleType(Class<?> clazz) {
+        return clazz == String.class || clazz == Integer.class || clazz == Long.class
+                || clazz == Double.class || clazz == Float.class || clazz == Boolean.class
+                || clazz == Short.class || clazz == Byte.class
+                || clazz == int.class || clazz == long.class || clazz == double.class
+                || clazz == float.class || clazz == boolean.class || clazz == short.class
+                || clazz == byte.class || SmithyEnum.class.isAssignableFrom(clazz);
     }
 
     private void generateFieldConstants(SourceBuilder sb, StructCodePlan plan) {
@@ -118,8 +184,7 @@ final class JsonSerializerCodegen {
         boolean hasVariableFields = fixedFieldEnd < serOrder.size();
 
         sb.line("// Upfront capacity for '{', all required fixed-size fields, and '}'");
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(" + fixedCapacity + ");");
+        sb.line("buf = ctx.ensure(pos," + fixedCapacity + ");");
         sb.line("buf = ctx.buf; pos = ctx.pos;");
         sb.line("buf[pos++] = '{';");
         sb.emptyLine();
@@ -152,9 +217,8 @@ final class JsonSerializerCodegen {
         // Closing brace (capacity was pre-allocated if no variable fields;
         // otherwise need a check since variable fields may have resized the buffer)
         if (hasVariableFields) {
-            sb.line("ctx.pos = pos;");
-            sb.line("ctx.ensureCapacity(1);");
-            sb.line("buf = ctx.buf; pos = ctx.pos;");
+            sb.line("buf = ctx.ensure(pos, 1);");
+            sb.line("pos = ctx.pos;");
         }
         sb.line("buf[pos++] = '}';");
         sb.emptyLine();
@@ -185,9 +249,8 @@ final class JsonSerializerCodegen {
             sb.line(variantClass + " variant = (" + variantClass + ") typed;");
 
             // Ensure capacity for { + field name + value + }
-            sb.line("ctx.pos = pos;");
-            sb.line("ctx.ensureCapacity(2);");
-            sb.line("buf = ctx.buf; pos = ctx.pos;");
+            sb.line("buf = ctx.ensure(pos, 2);");
+            sb.line("pos = ctx.pos;");
             sb.line("buf[pos++] = '{';");
 
             sb.line("System.arraycopy(FN_" + i + ", 0, buf, pos, FN_" + i + ".length);");
@@ -196,9 +259,8 @@ final class JsonSerializerCodegen {
             String getter = "variant." + field.getterName() + "()";
             emitWriteValueWithCapacity(sb, field, fqcn, getter);
 
-            sb.line("ctx.pos = pos;");
-            sb.line("ctx.ensureCapacity(1);");
-            sb.line("buf = ctx.buf; pos = ctx.pos;");
+            sb.line("buf = ctx.ensure(pos, 1);");
+            sb.line("pos = ctx.pos;");
             sb.line("buf[pos++] = '}';");
 
             sb.endBlock();
@@ -216,8 +278,7 @@ final class JsonSerializerCodegen {
         // Write field name - need capacity for field name bytes
         byte[] nameBytes = JsonWriteUtils.precomputeFieldNameBytes(field.memberName());
         int nameBytesLen = nameBytes.length + (fieldIndex > 0 ? 1 : 0);
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(" + nameBytesLen + ");");
+        sb.line("buf = ctx.ensure(pos," + nameBytesLen + ");");
         sb.line("buf = ctx.buf; pos = ctx.pos;");
         sb.line("System.arraycopy(FN_" + fieldIndex + ", 0, buf, pos, FN_" + fieldIndex + ".length);");
         sb.line("pos += FN_" + fieldIndex + ".length;");
@@ -263,16 +324,14 @@ final class JsonSerializerCodegen {
 
         if (field.category().isFixedSize()) {
             int totalCapacity = nameBytesLen + field.fixedSizeUpperBound();
-            sb.line("ctx.pos = pos;");
-            sb.line("ctx.ensureCapacity(" + totalCapacity + ");");
-            sb.line("buf = ctx.buf; pos = ctx.pos;");
+            sb.line("buf = ctx.ensure(pos, " + totalCapacity + ");");
+            sb.line("pos = ctx.pos;");
             sb.line("System.arraycopy(FN_" + fieldIndex + ", 0, buf, pos, FN_" + fieldIndex + ".length);");
             sb.line("pos += FN_" + fieldIndex + ".length;");
             emitWriteValue(sb, field, fqcn, valueExpr, isPrimitiveUnboxed);
         } else {
-            sb.line("ctx.pos = pos;");
-            sb.line("ctx.ensureCapacity(" + nameBytesLen + ");");
-            sb.line("buf = ctx.buf; pos = ctx.pos;");
+            sb.line("buf = ctx.ensure(pos, " + nameBytesLen + ");");
+            sb.line("pos = ctx.pos;");
             sb.line("System.arraycopy(FN_" + fieldIndex + ", 0, buf, pos, FN_" + fieldIndex + ".length);");
             sb.line("pos += FN_" + fieldIndex + ".length;");
             emitWriteValueWithCapacity(sb, field, fqcn, valueExpr);
@@ -305,7 +364,7 @@ final class JsonSerializerCodegen {
                 break;
             case STRUCT:
             case UNION:
-                emitWriteValueWithCapacity_Struct(sb, valueExpr);
+                emitWriteValueWithCapacity_Struct(sb, field, valueExpr);
                 break;
             case DOCUMENT:
                 emitWriteValueWithCapacity_Document(sb, valueExpr);
@@ -313,9 +372,8 @@ final class JsonSerializerCodegen {
             case FLOAT:
             case DOUBLE:
                 // These are fixed-size but need individual capacity
-                sb.line("ctx.pos = pos;");
-                sb.line("ctx.ensureCapacity(24);");
-                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("buf = ctx.ensure(pos, 24);");
+                sb.line("pos = ctx.pos;");
                 emitWriteValue(sb, field, fqcn, valueExpr, false);
                 break;
             default:
@@ -375,13 +433,24 @@ final class JsonSerializerCodegen {
         varSeq++;
         String bb = v("_bb");
         String data = v("_data");
+        String off = v("_off");
+        String len = v("_len");
         sb.line("ByteBuffer " + bb + " = " + valueExpr + ";");
-        sb.line("byte[] " + data + " = new byte[" + bb + ".remaining()];");
+        sb.line("int " + len + " = " + bb + ".remaining();");
+        sb.line("byte[] " + data + ";");
+        sb.line("int " + off + ";");
+        sb.beginBlock("if (" + bb + ".hasArray())");
+        sb.line(data + " = " + bb + ".array();");
+        sb.line(off + " = " + bb + ".arrayOffset() + " + bb + ".position();");
+        sb.endBlock();
+        sb.beginBlock("else");
+        sb.line(data + " = new byte[" + len + "];");
         sb.line(bb + ".duplicate().get(" + data + ");");
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(JsonWriteUtils.maxBase64Bytes(" + data + ".length));");
-        sb.line("buf = ctx.buf; pos = ctx.pos;");
-        sb.line("pos = JsonWriteUtils.writeBase64String(buf, pos, " + data + ", 0, " + data + ".length);");
+        sb.line(off + " = 0;");
+        sb.endBlock();
+        sb.line("buf = ctx.ensure(pos, JsonWriteUtils.maxBase64Bytes(" + len + "));");
+        sb.line("pos = ctx.pos;");
+        sb.line("pos = JsonWriteUtils.writeBase64String(buf, pos, " + data + ", " + off + ", " + len + ");");
     }
 
     private void emitWriteValueWithCapacity_BigInteger(SourceBuilder sb, String valueExpr) {
@@ -390,9 +459,8 @@ final class JsonSerializerCodegen {
         sb.line("BigInteger " + bi + " = " + valueExpr + ";");
         // writeBigInteger handles up to ~54 digits directly via long groups, avoiding toString()
         // Max capacity: sign + 55 digits
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(56);");
-        sb.line("buf = ctx.buf; pos = ctx.pos;");
+        sb.line("buf = ctx.ensure(pos,56);");
+        sb.line("pos = ctx.pos;");
         sb.line("pos = JsonWriteUtils.writeBigInteger(buf, pos, " + bi + ");");
     }
 
@@ -402,8 +470,7 @@ final class JsonSerializerCodegen {
         sb.line("BigDecimal " + bd + " = " + valueExpr + ";");
         // Fast path: if unscaled value fits in a long, use direct integer arithmetic
         sb.beginBlock("if (" + bd + ".scale() >= 0 && " + bd + ".unscaledValue().bitLength() < 64)");
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(22);"); // sign + 19 digits + dot
+        sb.line("buf = ctx.ensure(pos,22);"); // sign + 19 digits + dot
         sb.line("buf = ctx.buf; pos = ctx.pos;");
         sb.line("pos = JsonWriteUtils.writeBigDecimalFromLong(buf, pos, "
                 + bd + ".unscaledValue().longValue(), " + bd + ".scale());");
@@ -411,8 +478,7 @@ final class JsonSerializerCodegen {
         sb.beginBlock("else");
         String s = v("_bds");
         sb.line("String " + s + " = " + bd + ".toPlainString();");
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(" + s + ".length() + 2);");
+        sb.line("buf = ctx.ensure(pos," + s + ".length() + 2);");
         sb.line("buf = ctx.buf; pos = ctx.pos;");
         sb.line("pos = JsonWriteUtils.writeAsciiString(buf, pos, " + s + ");");
         sb.endBlock();
@@ -424,21 +490,18 @@ final class JsonSerializerCodegen {
             varSeq++;
             String ts = v("_ts");
             sb.line("Instant " + ts + " = " + valueExpr + ";");
-            sb.line("ctx.pos = pos;");
-            sb.line("ctx.ensureCapacity(24);");
-            sb.line("buf = ctx.buf; pos = ctx.pos;");
+            sb.line("buf = ctx.ensure(pos, 24);");
+            sb.line("pos = ctx.pos;");
             sb.line("pos = JsonWriteUtils.writeEpochSeconds(buf, pos, " + ts + ".getEpochSecond(), " + ts
                     + ".getNano());");
         } else if ("HTTP_DATE".equals(format)) {
-            sb.line("ctx.pos = pos;");
-            sb.line("ctx.ensureCapacity(40);");
-            sb.line("buf = ctx.buf; pos = ctx.pos;");
+            sb.line("buf = ctx.ensure(pos, 40);");
+            sb.line("pos = ctx.pos;");
             sb.line("pos = JsonWriteUtils.writeHttpDate(buf, pos, " + valueExpr + ");");
         } else {
             // Unknown format, default to ISO 8601
-            sb.line("ctx.pos = pos;");
-            sb.line("ctx.ensureCapacity(40);");
-            sb.line("buf = ctx.buf; pos = ctx.pos;");
+            sb.line("buf = ctx.ensure(pos, 40);");
+            sb.line("pos = ctx.pos;");
             sb.line("pos = JsonWriteUtils.writeIso8601Timestamp(buf, pos, " + valueExpr + ");");
         }
     }
@@ -474,9 +537,8 @@ final class JsonSerializerCodegen {
             sb.line("buf[pos++] = ']';");
         } else {
             // Variable-size elements: fold comma into element capacity
-            sb.line("ctx.pos = pos;");
-            sb.line("ctx.ensureCapacity(1);");
-            sb.line("buf = ctx.buf; pos = ctx.pos;");
+            sb.line("buf = ctx.ensure(pos, 1);");
+            sb.line("pos = ctx.pos;");
             sb.line("buf[pos++] = '[';");
 
             sb.beginBlock("for (int " + idx + " = 0; " + idx + " < " + list + ".size(); " + idx + "++)");
@@ -501,9 +563,8 @@ final class JsonSerializerCodegen {
 
             sb.endBlock(); // for loop
 
-            sb.line("ctx.pos = pos;");
-            sb.line("ctx.ensureCapacity(1);");
-            sb.line("buf = ctx.buf; pos = ctx.pos;");
+            sb.line("buf = ctx.ensure(pos, 1);");
+            sb.line("pos = ctx.pos;");
             sb.line("buf[pos++] = ']';");
         }
     }
@@ -520,9 +581,8 @@ final class JsonSerializerCodegen {
         String entry = v("_entry");
         String key = v("_key");
 
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(1);");
-        sb.line("buf = ctx.buf; pos = ctx.pos;");
+        sb.line("buf = ctx.ensure(pos,1);");
+        sb.line("pos = ctx.pos;");
         sb.line("buf[pos++] = '{';");
 
         String valueType = resolveMapValueType(field);
@@ -533,9 +593,8 @@ final class JsonSerializerCodegen {
 
         // Write comma (if not first), key, and colon
         sb.line("String " + key + " = (String) " + entry + ".getKey();");
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(1);");
-        sb.line("buf = ctx.buf; pos = ctx.pos;");
+        sb.line("buf = ctx.ensure(pos,1);");
+        sb.line("pos = ctx.pos;");
         sb.beginBlock("if (!" + first + ")");
         sb.line("buf[pos++] = ',';");
         sb.endBlock();
@@ -543,18 +602,16 @@ final class JsonSerializerCodegen {
         sb.line("ctx.buf = buf; ctx.pos = pos;");
         sb.line("JsonCodegenHelpers.writeQuotedStringFused(ctx, " + key + ");");
         sb.line("buf = ctx.buf; pos = ctx.pos;");
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(1);");
-        sb.line("buf = ctx.buf; pos = ctx.pos;");
+        sb.line("buf = ctx.ensure(pos,1);");
+        sb.line("pos = ctx.pos;");
         sb.line("buf[pos++] = ':';");
 
         // Write value
         FieldCategory valCategory = resolveMapValueCategory(field);
         if (field.sparse()) {
             sb.beginBlock("if (" + entry + ".getValue() == null)");
-            sb.line("ctx.pos = pos;");
-            sb.line("ctx.ensureCapacity(4);");
-            sb.line("buf = ctx.buf; pos = ctx.pos;");
+            sb.line("buf = ctx.ensure(pos, 4);");
+            sb.line("pos = ctx.pos;");
             sb.line("pos = JsonCodegenHelpers.writeNull(buf, pos);");
             sb.endBlock();
             sb.beginBlock("else");
@@ -567,9 +624,8 @@ final class JsonSerializerCodegen {
 
         sb.endBlock(); // while
 
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(1);");
-        sb.line("buf = ctx.buf; pos = ctx.pos;");
+        sb.line("buf = ctx.ensure(pos,1);");
+        sb.line("pos = ctx.pos;");
         sb.line("buf[pos++] = '}';");
     }
 
@@ -582,35 +638,30 @@ final class JsonSerializerCodegen {
     ) {
         switch (category) {
             case BOOLEAN:
-                sb.line("ctx.pos = pos;");
-                sb.line("ctx.ensureCapacity(5);");
-                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("buf = ctx.ensure(pos, 5);");
+                sb.line("pos = ctx.pos;");
                 sb.line("pos = JsonWriteUtils.writeBoolean(buf, pos, ((Boolean) " + elemExpr + ").booleanValue());");
                 break;
             case BYTE:
             case SHORT:
             case INTEGER:
-                sb.line("ctx.pos = pos;");
-                sb.line("ctx.ensureCapacity(11);");
-                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("buf = ctx.ensure(pos, 11);");
+                sb.line("pos = ctx.pos;");
                 sb.line("pos = JsonWriteUtils.writeInt(buf, pos, ((Number) " + elemExpr + ").intValue());");
                 break;
             case LONG:
-                sb.line("ctx.pos = pos;");
-                sb.line("ctx.ensureCapacity(20);");
-                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("buf = ctx.ensure(pos, 20);");
+                sb.line("pos = ctx.pos;");
                 sb.line("pos = JsonWriteUtils.writeLong(buf, pos, ((Number) " + elemExpr + ").longValue());");
                 break;
             case FLOAT:
-                sb.line("ctx.pos = pos;");
-                sb.line("ctx.ensureCapacity(24);");
-                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("buf = ctx.ensure(pos, 24);");
+                sb.line("pos = ctx.pos;");
                 sb.line("pos = JsonWriteUtils.writeFloatReusable(buf, pos, ((Number) " + elemExpr + ").floatValue());");
                 break;
             case DOUBLE:
-                sb.line("ctx.pos = pos;");
-                sb.line("ctx.ensureCapacity(24);");
-                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("buf = ctx.ensure(pos, 24);");
+                sb.line("pos = ctx.pos;");
                 sb.line("pos = JsonWriteUtils.writeDoubleReusable(buf, pos, ((Number) " + elemExpr + ").doubleValue());");
                 break;
             case STRING:
@@ -630,7 +681,8 @@ final class JsonSerializerCodegen {
             default:
                 // For complex elements (struct, list, etc), delegate
                 sb.line("ctx.buf = buf; ctx.pos = pos;");
-                sb.line("JsonCodegenHelpers.serializeNestedStruct(" + elemExpr + ", ctx);");
+                Class<?> elemStructClass = field.elementClass() != null ? field.elementClass() : field.mapValueClass();
+                emitSerializeNestedCall(sb, elemExpr, elemStructClass);
                 sb.line("buf = ctx.buf; pos = ctx.pos;");
                 break;
         }
@@ -720,18 +772,16 @@ final class JsonSerializerCodegen {
                 varSeq++;
                 String elem = v("_elem");
                 sb.line("String " + elem + " = (String) " + elemExpr + ";");
-                sb.line("ctx.pos = pos;");
-                sb.line("ctx.ensureCapacity(1);");
-                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("buf = ctx.ensure(pos, 1);");
+                sb.line("pos = ctx.pos;");
                 sb.line("if (" + idxVar + " > 0) buf[pos++] = ',';");
                 sb.line("ctx.buf = buf; ctx.pos = pos;");
                 sb.line("JsonCodegenHelpers.writeQuotedStringFused(ctx, " + elem + ");");
                 sb.line("buf = ctx.buf; pos = ctx.pos;");
                 break;
             case ENUM_STRING:
-                sb.line("ctx.pos = pos;");
-                sb.line("ctx.ensureCapacity(1);");
-                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("buf = ctx.ensure(pos, 1);");
+                sb.line("pos = ctx.pos;");
                 sb.line("if (" + idxVar + " > 0) buf[pos++] = ',';");
                 sb.line("ctx.buf = buf; ctx.pos = pos;");
                 sb.line("JsonCodegenHelpers.writeQuotedStringFused(ctx, "
@@ -741,22 +791,39 @@ final class JsonSerializerCodegen {
             default:
                 // Complex elements: write comma separately, then delegate
                 sb.beginBlock("if (" + idxVar + " > 0)");
-                sb.line("ctx.pos = pos;");
-                sb.line("ctx.ensureCapacity(1);");
-                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("buf = ctx.ensure(pos, 1);");
+                sb.line("pos = ctx.pos;");
                 sb.line("buf[pos++] = ',';");
                 sb.endBlock();
                 sb.line("ctx.buf = buf; ctx.pos = pos;");
-                sb.line("JsonCodegenHelpers.serializeNestedStruct(" + elemExpr + ", ctx);");
+                Class<?> commaElemClass = field.elementClass();
+                emitSerializeNestedCall(sb, elemExpr, commaElemClass);
                 sb.line("buf = ctx.buf; pos = ctx.pos;");
                 break;
         }
     }
 
-    private void emitWriteValueWithCapacity_Struct(SourceBuilder sb, String valueExpr) {
+    private void emitWriteValueWithCapacity_Struct(SourceBuilder sb, FieldPlan field, String valueExpr) {
         sb.line("ctx.buf = buf; ctx.pos = pos;");
-        sb.line("JsonCodegenHelpers.serializeNestedStruct(" + valueExpr + ", ctx);");
+        Class<?> targetClass = field.schema().memberTarget().shapeClass();
+        String cacheField = targetClass != null ? getSerCacheField(targetClass) : null;
+        if (cacheField != null) {
+            sb.line("JsonCodegenHelpers.serializeNestedStructDirect(" + valueExpr + ", ctx, "
+                    + cacheField + ", " + targetClass.getName() + ".class);");
+        } else {
+            sb.line("JsonCodegenHelpers.serializeNestedStruct(" + valueExpr + ", ctx);");
+        }
         sb.line("buf = ctx.buf; pos = ctx.pos;");
+    }
+
+    private void emitSerializeNestedCall(SourceBuilder sb, String elemExpr, Class<?> targetClass) {
+        String cacheField = targetClass != null ? getSerCacheField(targetClass) : null;
+        if (cacheField != null) {
+            sb.line("JsonCodegenHelpers.serializeNestedStructDirect(" + elemExpr + ", ctx, "
+                    + cacheField + ", " + targetClass.getName() + ".class);");
+        } else {
+            sb.line("JsonCodegenHelpers.serializeNestedStruct(" + elemExpr + ", ctx);");
+        }
     }
 
     private void emitWriteValueWithCapacity_Document(SourceBuilder sb, String valueExpr) {
