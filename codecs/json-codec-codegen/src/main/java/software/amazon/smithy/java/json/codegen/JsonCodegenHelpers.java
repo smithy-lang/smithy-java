@@ -84,8 +84,8 @@ public final class JsonCodegenHelpers {
      */
     public static void serializeNestedStruct(Object obj, WriterContext ctx) {
         if (obj == null) {
-            writeNull(ctx.buf, ctx.pos);
-            ctx.pos += 4;
+            ctx.ensureCapacity(4);
+            ctx.pos = writeNull(ctx.buf, ctx.pos);
             return;
         }
 
@@ -102,6 +102,38 @@ public final class JsonCodegenHelpers {
     }
 
     /**
+     * Serializes a nested struct with a cached serializer reference, avoiding ConcurrentHashMap
+     * lookup on every call. The single-element array acts as a mutable holder; benign race
+     * on population is safe since reference writes are atomic.
+     */
+    public static void serializeNestedStructDirect(
+            Object obj,
+            WriterContext ctx,
+            GeneratedStructSerializer[] cached,
+            Class<?> structClass
+    ) {
+        if (obj == null) {
+            ctx.ensureCapacity(4);
+            ctx.pos = writeNull(ctx.buf, ctx.pos);
+            return;
+        }
+        GeneratedStructSerializer ser = cached[0];
+        if (ser == null) {
+            if (obj instanceof SerializableStruct struct) {
+                ser = ctx.registry.getSerializer(struct.schema(), structClass);
+                if (ser != null) {
+                    cached[0] = ser;
+                }
+            }
+        }
+        if (ser != null) {
+            ser.serialize(obj, ctx);
+        } else {
+            serializeViaDispatch((SerializableShape) obj, ctx);
+        }
+    }
+
+    /**
      * Deserializes a nested struct/union using the registry for specialized dispatch.
      */
     public static Object deserializeNestedStruct(JsonReaderContext ctx, Class<?> structClass) {
@@ -113,6 +145,32 @@ public final class JsonCodegenHelpers {
         } else {
             return deserializeViaDispatch(ctx, schema);
         }
+    }
+
+    /**
+     * Deserializes a nested struct with a cached deserializer and schema reference,
+     * avoiding both ConcurrentHashMap and ClassValue lookups on every call.
+     * cached[0] = GeneratedStructDeserializer, cached[1] = Schema.
+     */
+    public static Object deserializeNestedStructDirect(
+            JsonReaderContext ctx,
+            Object[] cached,
+            Class<?> structClass
+    ) {
+        GeneratedStructDeserializer de = (GeneratedStructDeserializer) cached[0];
+        Schema schema = (Schema) cached[1];
+        if (de == null) {
+            schema = SCHEMA_CACHE.get(structClass);
+            de = ctx.registry.getDeserializer(schema, structClass);
+            if (de != null) {
+                cached[0] = de;
+                cached[1] = schema;
+            } else {
+                return deserializeViaDispatch(ctx, schema);
+            }
+        }
+        ShapeBuilder<?> builder = schema.shapeBuilder();
+        return de.deserialize(ctx, builder);
     }
 
     /**
