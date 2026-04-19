@@ -14,13 +14,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import software.amazon.smithy.java.benchmarks.codec.model.BenchUnion;
 import software.amazon.smithy.java.benchmarks.codec.model.Color;
 import software.amazon.smithy.java.benchmarks.codec.model.ComplexStruct;
 import software.amazon.smithy.java.benchmarks.codec.model.InnerStruct;
 import software.amazon.smithy.java.benchmarks.codec.model.NestedStruct;
 import software.amazon.smithy.java.benchmarks.codec.model.SimpleStruct;
-import software.amazon.smithy.java.core.serde.document.Document;
 
 public final class BenchData {
 
@@ -74,14 +72,12 @@ public final class BenchData {
                         .build())
                 .structList(List.of(nested, nested))
                 .structMap(Map.of("first", nested, "second", nested))
-                .choice(new BenchUnion.StringValueMember("union-string"))
                 .color(Color.GREEN)
                 .colorList(List.of(Color.RED, Color.BLUE, Color.YELLOW))
                 .sparseStrings(Arrays.asList("a", null, "c"))
                 .sparseMap(sparseMap)
                 .bigIntValue(new BigInteger("123456789012345678901234567890"))
                 .bigDecValue(new BigDecimal("99999.99999"))
-                .freeformData(Document.of(Map.of("key", Document.of("value"), "num", Document.of(42))))
                 .build();
     }
 }
