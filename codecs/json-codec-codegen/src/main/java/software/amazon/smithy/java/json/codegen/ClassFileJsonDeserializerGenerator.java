@@ -897,32 +897,38 @@ final class ClassFileJsonDeserializerGenerator {
             case MAP -> emitMapDeserialization(code, thisClass, builderClass, field, plan);
             case ENUM_STRING -> {
                 emitParseString(code);
-                ClassDesc enumClass = ClassDesc.of(field.schema().memberTarget().shapeClass().getName());
+                Class<?> enumJavaClass = field.schema().memberTarget().shapeClass();
+                ClassDesc enumClass = ClassDesc.of(enumJavaClass.getName());
+                boolean isIface = enumJavaClass.isInterface();
                 code.aload(SLOT_BUILDER);
                 code.aload(SLOT_CTX);
                 code.getfield(CD_JsonReaderContext, "parsedString", CD_String);
                 code.invokestatic(enumClass,
                         "from",
-                        MethodTypeDesc.of(enumClass, CD_String));
+                        MethodTypeDesc.of(enumClass, CD_String),
+                        isIface);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, enumClass));
+                        MethodTypeDesc.of(builderClass, setterParam));
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);
             }
             case INT_ENUM -> {
                 emitParseLong(code);
-                ClassDesc enumClass = ClassDesc.of(field.schema().memberTarget().shapeClass().getName());
+                Class<?> enumJavaClass = field.schema().memberTarget().shapeClass();
+                ClassDesc enumClass = ClassDesc.of(enumJavaClass.getName());
+                boolean isIface = enumJavaClass.isInterface();
                 code.aload(SLOT_BUILDER);
                 code.aload(SLOT_CTX);
                 code.getfield(CD_JsonReaderContext, "parsedLong", CD_long);
                 code.l2i();
                 code.invokestatic(enumClass,
                         "from",
-                        MethodTypeDesc.of(enumClass, CD_int));
+                        MethodTypeDesc.of(enumClass, CD_int),
+                        isIface);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, enumClass));
+                        MethodTypeDesc.of(builderClass, setterParam));
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);
             }
@@ -1316,13 +1322,15 @@ final class ClassFileJsonDeserializerGenerator {
             }
             case ENUM_STRING -> {
                 emitParseString(code);
-                ClassDesc enumClass = ClassDesc.of(field.elementClass().getName());
+                Class<?> elemEnumClass = field.elementClass();
+                ClassDesc enumClass = ClassDesc.of(elemEnumClass.getName());
                 code.aload(listSlot);
                 code.aload(SLOT_CTX);
                 code.getfield(CD_JsonReaderContext, "parsedString", CD_String);
                 code.invokestatic(enumClass,
                         "from",
-                        MethodTypeDesc.of(enumClass, CD_String));
+                        MethodTypeDesc.of(enumClass, CD_String),
+                        elemEnumClass.isInterface());
                 code.invokevirtual(CD_ArrayList, "add", MethodTypeDesc.of(CD_boolean, CD_Object));
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);

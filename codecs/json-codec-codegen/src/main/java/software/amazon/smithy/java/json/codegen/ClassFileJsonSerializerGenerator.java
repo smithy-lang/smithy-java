@@ -541,16 +541,19 @@ final class ClassFileJsonSerializerGenerator {
                 code.istore(SLOT_POS);
             }
             case INT_ENUM -> {
+                Class<?> enumJavaClass = field.schema().memberTarget().shapeClass();
+                ClassDesc enumClass = ClassDesc.of(enumJavaClass.getName());
                 code.aload(SLOT_BUF);
                 code.iload(SLOT_POS);
                 code.aload(SLOT_TYPED);
-                ClassDesc enumClass = ClassDesc.of(field.schema().memberTarget().shapeClass().getName());
                 code.invokevirtual(shapeClass,
                         field.getterName(),
                         MethodTypeDesc.of(enumClass));
-                code.invokevirtual(enumClass,
-                        "getValue",
-                        MethodTypeDesc.of(CD_int));
+                if (enumJavaClass.isInterface()) {
+                    code.invokeinterface(enumClass, "getValue", MethodTypeDesc.of(CD_int));
+                } else {
+                    code.invokevirtual(enumClass, "getValue", MethodTypeDesc.of(CD_int));
+                }
                 code.invokestatic(CD_JsonWriteUtils,
                         "writeInt",
                         MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int));
@@ -681,7 +684,11 @@ final class ClassFileJsonSerializerGenerator {
                 code.iload(SLOT_POS);
                 code.aload(valSlot);
                 code.checkcast(enumClass);
-                code.invokevirtual(enumClass, "getValue", MethodTypeDesc.of(CD_int));
+                if (field.schema().memberTarget().shapeClass().isInterface()) {
+                    code.invokeinterface(enumClass, "getValue", MethodTypeDesc.of(CD_int));
+                } else {
+                    code.invokevirtual(enumClass, "getValue", MethodTypeDesc.of(CD_int));
+                }
                 code.invokestatic(CD_JsonWriteUtils,
                         "writeInt",
                         MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int));
@@ -745,7 +752,7 @@ final class ClassFileJsonSerializerGenerator {
                 code.aload(2);
                 code.aload(valSlot);
                 code.checkcast(CD_SmithyEnum);
-                code.invokevirtual(CD_SmithyEnum, "getValue", MethodTypeDesc.of(CD_String));
+                code.invokeinterface(CD_SmithyEnum, "getValue", MethodTypeDesc.of(CD_String));
                 code.invokestatic(CD_JsonCodegenHelpers,
                         "writeQuotedStringFused",
                         MethodTypeDesc.of(CD_void, CD_WriterContext, CD_String));
@@ -876,7 +883,11 @@ final class ClassFileJsonSerializerGenerator {
                 code.invokevirtual(ownerClass,
                         field.getterName(),
                         MethodTypeDesc.of(enumClass));
-                code.invokevirtual(enumClass, "getValue", MethodTypeDesc.of(CD_int));
+                if (field.schema().memberTarget().shapeClass().isInterface()) {
+                    code.invokeinterface(enumClass, "getValue", MethodTypeDesc.of(CD_int));
+                } else {
+                    code.invokevirtual(enumClass, "getValue", MethodTypeDesc.of(CD_int));
+                }
                 code.invokestatic(CD_JsonWriteUtils,
                         "writeInt",
                         MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int));
@@ -899,11 +910,16 @@ final class ClassFileJsonSerializerGenerator {
         code.aload(2); // ctx
         code.aload(ownerSlot);
         if (field.category() == FieldCategory.ENUM_STRING) {
-            ClassDesc enumClass = ClassDesc.of(field.schema().memberTarget().shapeClass().getName());
+            Class<?> enumJavaClass = field.schema().memberTarget().shapeClass();
+            ClassDesc enumClass = ClassDesc.of(enumJavaClass.getName());
             code.invokevirtual(ownerClass,
                     field.getterName(),
                     MethodTypeDesc.of(enumClass));
-            code.invokevirtual(enumClass, "getValue", MethodTypeDesc.of(CD_String));
+            if (enumJavaClass.isInterface()) {
+                code.invokeinterface(enumClass, "getValue", MethodTypeDesc.of(CD_String));
+            } else {
+                code.invokevirtual(enumClass, "getValue", MethodTypeDesc.of(CD_String));
+            }
         } else {
             code.invokevirtual(ownerClass,
                     field.getterName(),
@@ -1490,17 +1506,8 @@ final class ClassFileJsonSerializerGenerator {
                         MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_double));
                 code.istore(SLOT_POS);
             }
-            case INT_ENUM -> {
-                code.aload(SLOT_BUF);
-                code.iload(SLOT_POS);
-                code.aload(elemSlot);
-                code.checkcast(CD_SmithyEnum);
-                code.invokevirtual(CD_SmithyEnum, "getValue", MethodTypeDesc.of(CD_int));
-                code.invokestatic(CD_JsonWriteUtils,
-                        "writeInt",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int));
-                code.istore(SLOT_POS);
-            }
+            case INT_ENUM -> throw new UnsupportedOperationException(
+                    "INT_ENUM list elements not yet supported in ClassFile codegen");
             default -> throw new IllegalArgumentException(
                     "emitWriteElementInline: unsupported " + category);
         }
@@ -1601,7 +1608,7 @@ final class ClassFileJsonSerializerGenerator {
                 code.iload(idxSlot);
                 code.invokeinterface(CD_List, "get", MethodTypeDesc.of(CD_Object, CD_int));
                 code.checkcast(CD_SmithyEnum);
-                code.invokevirtual(CD_SmithyEnum, "getValue", MethodTypeDesc.of(CD_String));
+                code.invokeinterface(CD_SmithyEnum, "getValue", MethodTypeDesc.of(CD_String));
                 code.invokestatic(CD_JsonCodegenHelpers,
                         "writeQuotedStringFused",
                         MethodTypeDesc.of(CD_void, CD_WriterContext, CD_String));
@@ -1850,7 +1857,7 @@ final class ClassFileJsonSerializerGenerator {
                 code.aload(2);
                 code.aload(valSlot);
                 code.checkcast(CD_SmithyEnum);
-                code.invokevirtual(CD_SmithyEnum, "getValue", MethodTypeDesc.of(CD_String));
+                code.invokeinterface(CD_SmithyEnum, "getValue", MethodTypeDesc.of(CD_String));
                 code.invokestatic(CD_JsonCodegenHelpers,
                         "writeQuotedStringFused",
                         MethodTypeDesc.of(CD_void, CD_WriterContext, CD_String));
@@ -1878,12 +1885,13 @@ final class ClassFileJsonSerializerGenerator {
             int ownerSlot
     ) {
         emitSyncBufPosToCtx(code);
+        Class<?> targetClass = field.schema().memberTarget().shapeClass();
+        ClassDesc targetDesc = targetClass != null ? ClassDesc.of(targetClass.getName()) : CD_Object;
         code.aload(ownerSlot);
         code.invokevirtual(ownerClass,
                 field.getterName(),
-                MethodTypeDesc.of(CD_Object));
+                MethodTypeDesc.of(targetDesc));
         code.aload(2);
-        Class<?> targetClass = field.schema().memberTarget().shapeClass();
         emitSerializeNestedCall(code, thisClass, targetClass);
         emitSyncFromCtx(code);
     }
@@ -1938,11 +1946,12 @@ final class ClassFileJsonSerializerGenerator {
             FieldPlan field,
             int ownerSlot
     ) {
+        ClassDesc CD_Document = ClassDesc.of("software.amazon.smithy.java.core.serde.document.Document");
         emitSyncBufPosToCtx(code);
         code.aload(ownerSlot);
         code.invokevirtual(ownerClass,
                 field.getterName(),
-                MethodTypeDesc.of(CD_Object));
+                MethodTypeDesc.of(CD_Document));
         code.aload(2);
         code.invokestatic(CD_JsonCodegenHelpers,
                 "serializeDocument",
