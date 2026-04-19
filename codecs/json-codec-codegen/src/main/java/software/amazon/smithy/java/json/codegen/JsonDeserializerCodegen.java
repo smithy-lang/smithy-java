@@ -712,12 +712,21 @@ final class JsonDeserializerCodegen {
     }
 
     private static boolean isSimpleType(Class<?> clazz) {
-        return clazz == String.class || clazz == Integer.class || clazz == Long.class
-                || clazz == Double.class || clazz == Float.class || clazz == Boolean.class
-                || clazz == Short.class || clazz == Byte.class
-                || clazz == int.class || clazz == long.class || clazz == double.class
-                || clazz == float.class || clazz == boolean.class || clazz == short.class
-                || clazz == byte.class || SmithyEnum.class.isAssignableFrom(clazz);
+        return clazz == String.class || clazz == Integer.class
+                || clazz == Long.class
+                || clazz == Double.class
+                || clazz == Float.class
+                || clazz == Boolean.class
+                || clazz == Short.class
+                || clazz == Byte.class
+                || clazz == int.class
+                || clazz == long.class
+                || clazz == double.class
+                || clazz == float.class
+                || clazz == boolean.class
+                || clazz == short.class
+                || clazz == byte.class
+                || SmithyEnum.class.isAssignableFrom(clazz);
     }
 
     private String deserializeNestedCallExpr(Class<?> targetClass) {
