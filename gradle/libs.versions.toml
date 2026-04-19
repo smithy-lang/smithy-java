@@ -9,6 +9,7 @@ spotless = "8.4.0"
 smithy-gradle-plugins = "1.4.0"
 assertj = "3.27.7"
 jackson = "3.1.1"
+janino = "3.1.12"
 fastdoubleparser = "1.0.1"
 netty = "4.2.12.Final"
 dep-analysis = "3.6.1"
@@ -57,6 +58,8 @@ opentelemetry-test-api = {module = "io.opentelemetry:opentelemetry-sdk-testing",
 
 jackson-core = {module = "tools.jackson.core:jackson-core", version.ref = "jackson"}
 fastdoubleparser = {module = "ch.randelshofer:fastdoubleparser", version.ref = "fastdoubleparser"}
+janino-compiler = {module = "org.codehaus.janino:janino", version.ref = "janino"}
+janino-commons-compiler = {module = "org.codehaus.janino:commons-compiler", version.ref = "janino"}
 
 netty-all = {module = "io.netty:netty-all", version.ref = "netty"}
 

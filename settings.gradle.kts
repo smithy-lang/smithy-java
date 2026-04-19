@@ -35,7 +35,9 @@ include(":retries-api")
 
 // Codecs
 include(":codecs:cbor-codec")
+include(":codecs:codec-codegen")
 include(":codecs:json-codec")
+include(":codecs:json-codec-codegen")
 include(":codecs:xml-codec")
 
 // Benchmarks

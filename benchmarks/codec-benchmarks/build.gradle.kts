@@ -12,6 +12,8 @@ dependencies {
     implementation(project(":core"))
     jmhImplementation(project(":codecs:json-codec", configuration = "shadow"))
     jmhImplementation(project(":codecs:cbor-codec"))
+    jmhImplementation(project(":codecs:codec-codegen", configuration = "shadow"))
+    jmhImplementation(project(":codecs:json-codec-codegen"))
     // Jackson classes needed for the reverseJsonFieldOrder helper in JsonBench
     jmhImplementation(libs.jackson.core)
 }

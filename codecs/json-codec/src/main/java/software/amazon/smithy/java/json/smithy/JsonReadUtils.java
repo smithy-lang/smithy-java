@@ -21,7 +21,7 @@ import software.amazon.smithy.java.core.serde.SerializationException;
  * <p>All methods implement strict RFC 8259 compliance: no leading zeros on numbers,
  * no unescaped control characters in strings, full UTF-8 validation.
  */
-final class JsonReadUtils {
+public final class JsonReadUtils {
 
     private JsonReadUtils() {}
 
@@ -169,7 +169,7 @@ final class JsonReadUtils {
      * Finds the end position of a JSON number starting at pos.
      * Returns the position of the first non-number character.
      */
-    static int findNumberEnd(byte[] buf, int pos, int end) {
+    public static int findNumberEnd(byte[] buf, int pos, int end) {
         while (pos < end) {
             byte b = buf[pos];
             if ((b >= '0' && b <= '9') || b == '-' || b == '+' || b == '.' || b == 'e' || b == 'E') {
@@ -414,7 +414,7 @@ final class JsonReadUtils {
      * Skips JSON whitespace (space 0x20, tab 0x09, LF 0x0A, CR 0x0D) and returns the new position.
      * The fast check at the top covers the common case (next byte is not whitespace).
      */
-    static int skipWhitespace(byte[] buf, int pos, int end) {
+    public static int skipWhitespace(byte[] buf, int pos, int end) {
         // Fast check: most common case is next byte is not whitespace
         if (pos < end && buf[pos] > ' ') {
             return pos;
@@ -768,17 +768,564 @@ final class JsonReadUtils {
         }
     }
 
-    static String describeChar(byte b) {
+    public static String describeChar(byte b) {
         if (b >= 0x20 && b < 0x7F) {
             return "'" + (char) b + "'";
         }
         return "0x" + Integer.toHexString(b & 0xFF);
     }
 
-    static String describePos(byte[] buf, int pos, int end) {
+    public static String describePos(byte[] buf, int pos, int end) {
         if (pos >= end) {
             return "end of input";
         }
         return describeChar(buf[pos]);
+    }
+
+    // ---- Overloads accepting JsonParseState (for runtime-generated deserializers) ----
+
+    /**
+     * Parses a JSON integer value. Stores result in state.parsedLong and state.parsedEndPos.
+     */
+    public static void parseLong(byte[] buf, int pos, int end, JsonParseState state) {
+        if (pos >= end) {
+            throw new SerializationException("Unexpected end of input while parsing number");
+        }
+
+        boolean negative = false;
+        if (buf[pos] == '-') {
+            negative = true;
+            pos++;
+            if (pos >= end) {
+                throw new SerializationException("Unexpected end of input after '-'");
+            }
+        }
+
+        byte first = buf[pos];
+        if (first < '0' || first > '9') {
+            throw new SerializationException("Expected digit, found: " + describeChar(first));
+        }
+
+        if (first == '0' && pos + 1 < end && buf[pos + 1] >= '0' && buf[pos + 1] <= '9') {
+            throw new SerializationException("Leading zeros not allowed in JSON numbers");
+        }
+
+        long value = -(first - '0');
+        pos++;
+
+        while (pos < end) {
+            byte b = buf[pos];
+            if (b < '0' || b > '9') {
+                break;
+            }
+            long prev = value;
+            value = value * 10 - (b - '0');
+            if (value > prev) {
+                throw new SerializationException("Number overflow");
+            }
+            pos++;
+        }
+
+        state.parsedLong = negative ? value : -value;
+        state.parsedEndPos = pos;
+
+        if (!negative && state.parsedLong < 0) {
+            throw new SerializationException("Number overflow");
+        }
+    }
+
+    /**
+     * Parses a JSON number (integer or floating point). Stores result in state.parsedDouble and state.parsedEndPos.
+     */
+    public static void parseDouble(byte[] buf, int pos, int end, JsonParseState state) {
+        int start = pos;
+
+        if (pos < end && buf[pos] == '-') {
+            pos++;
+        }
+
+        if (pos >= end) {
+            throw new SerializationException("Unexpected end of input while parsing number");
+        }
+
+        byte first = buf[pos];
+        if (first < '0' || first > '9') {
+            throw new SerializationException("Expected digit, found: " + describeChar(first));
+        }
+        if (first == '0') {
+            pos++;
+            if (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
+                throw new SerializationException("Leading zeros not allowed in JSON numbers");
+            }
+        } else {
+            while (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
+                pos++;
+            }
+        }
+
+        if (pos < end && buf[pos] == '.') {
+            pos++;
+            if (pos >= end || buf[pos] < '0' || buf[pos] > '9') {
+                throw new SerializationException("Expected digit after decimal point");
+            }
+            while (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
+                pos++;
+            }
+        }
+
+        if (pos < end && (buf[pos] == 'e' || buf[pos] == 'E')) {
+            pos++;
+            if (pos < end && (buf[pos] == '+' || buf[pos] == '-')) {
+                pos++;
+            }
+            if (pos >= end || buf[pos] < '0' || buf[pos] > '9') {
+                throw new SerializationException("Expected digit in exponent");
+            }
+            while (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
+                pos++;
+            }
+        }
+
+        state.parsedDouble = JavaDoubleParser.parseDouble(buf, start, pos - start);
+        state.parsedEndPos = pos;
+    }
+
+    /**
+     * Parses a JSON string. Stores result in state.parsedString and state.parsedEndPos.
+     */
+    public static void parseString(byte[] buf, int pos, int end, JsonParseState state) {
+        if (pos >= end || buf[pos] != '"') {
+            throw new SerializationException("Expected '\"', found: " + describePos(buf, pos, end));
+        }
+        pos++;
+
+        int start = pos;
+
+        while (pos + 8 <= end) {
+            long word = (long) LONG_HANDLE.get(buf, pos);
+            if (hasSpecialStringByte(word)) {
+                break;
+            }
+            pos += 8;
+        }
+
+        while (pos < end) {
+            byte b = buf[pos];
+            if (b == '"') {
+                state.parsedString = new String(buf, start, pos - start, StandardCharsets.UTF_8);
+                state.parsedEndPos = pos + 1;
+                return;
+            }
+            if (b == '\\') {
+                parseStringWithEscapes(buf, start, pos, end, state);
+                return;
+            }
+            if ((b & 0xFF) < 0x20) {
+                throw new SerializationException(
+                        "Unescaped control character 0x" + Integer.toHexString(b & 0xFF) + " in string");
+            }
+            pos++;
+        }
+
+        throw new SerializationException("Unterminated string");
+    }
+
+    private static void parseStringWithEscapes(
+            byte[] buf,
+            int start,
+            int escapePos,
+            int end,
+            JsonParseState state
+    ) {
+        StringBuilder sb = new StringBuilder(escapePos - start + 16);
+        sb.append(new String(buf, start, escapePos - start, StandardCharsets.UTF_8));
+
+        int pos = escapePos;
+        while (pos < end) {
+            byte b = buf[pos];
+            if (b == '"') {
+                state.parsedString = sb.toString();
+                state.parsedEndPos = pos + 1;
+                return;
+            }
+
+            if ((b & 0xFF) < 0x20) {
+                throw new SerializationException(
+                        "Unescaped control character 0x" + Integer.toHexString(b & 0xFF) + " in string");
+            }
+
+            if (b == '\\') {
+                pos++;
+                if (pos >= end) {
+                    throw new SerializationException("Unterminated escape sequence");
+                }
+                byte escaped = buf[pos++];
+                switch (escaped) {
+                    case '"' -> sb.append('"');
+                    case '\\' -> sb.append('\\');
+                    case '/' -> sb.append('/');
+                    case 'b' -> sb.append('\b');
+                    case 'f' -> sb.append('\f');
+                    case 'n' -> sb.append('\n');
+                    case 'r' -> sb.append('\r');
+                    case 't' -> sb.append('\t');
+                    case 'u' -> {
+                        if (pos + 4 > end) {
+                            throw new SerializationException("Incomplete \\uXXXX escape");
+                        }
+                        char c = parseHex4(buf, pos);
+                        pos += 4;
+                        if (Character.isHighSurrogate(c)) {
+                            if (pos + 6 > end || buf[pos] != '\\' || buf[pos + 1] != 'u') {
+                                throw new SerializationException("Expected low surrogate after high surrogate");
+                            }
+                            pos += 2;
+                            char low = parseHex4(buf, pos);
+                            pos += 4;
+                            if (!Character.isLowSurrogate(low)) {
+                                throw new SerializationException("Expected low surrogate, got \\u"
+                                        + Integer.toHexString(low));
+                            }
+                            sb.append(c);
+                            sb.append(low);
+                        } else if (Character.isLowSurrogate(c)) {
+                            throw new SerializationException(
+                                    "Unexpected low surrogate without preceding high surrogate");
+                        } else {
+                            sb.append(c);
+                        }
+                    }
+                    default -> throw new SerializationException(
+                            "Invalid escape character: \\" + (char) escaped);
+                }
+            } else {
+                if ((b & 0x80) == 0) {
+                    sb.append((char) b);
+                    pos++;
+                } else {
+                    int[] result = decodeUtf8Char(buf, pos, end);
+                    sb.appendCodePoint(result[0]);
+                    pos = result[1];
+                }
+            }
+        }
+        throw new SerializationException("Unterminated string");
+    }
+
+    /**
+     * Parses an ISO-8601 timestamp from a JSON quoted string.
+     * Stores state.parsedEndPos on success, returns null on non-standard format.
+     */
+    public static Instant parseIso8601(byte[] buf, int pos, int end, JsonParseState state) {
+        if (pos >= end || buf[pos] != '"' || pos + 22 > end) {
+            return null;
+        }
+        pos++;
+
+        int year = digit(buf[pos]) * 1000 + digit(buf[pos + 1]) * 100
+                + digit(buf[pos + 2]) * 10
+                + digit(buf[pos + 3]);
+        pos += 4;
+        if (buf[pos++] != '-') {
+            return null;
+        }
+        int month = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (month < 1 || month > 12) {
+            throw new SerializationException("Invalid ISO-8601 month: " + month);
+        }
+        if (buf[pos++] != '-') {
+            return null;
+        }
+        int day = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (day < 1 || day > 31) {
+            throw new SerializationException("Invalid ISO-8601 day: " + day);
+        }
+
+        if (buf[pos] != 'T' && buf[pos] != 't') {
+            return null;
+        }
+        pos++;
+
+        int hour = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (buf[pos++] != ':') {
+            return null;
+        }
+        int minute = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (buf[pos++] != ':') {
+            return null;
+        }
+        int second = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (hour > 23 || minute > 59 || second > 59) {
+            throw new SerializationException(
+                    "Invalid ISO-8601 time: " + hour + ":" + minute + ":" + second);
+        }
+
+        int nano = 0;
+        if (pos < end && buf[pos] == '.') {
+            pos++;
+            int fracStart = pos;
+            while (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
+                pos++;
+            }
+            int fracLen = pos - fracStart;
+            if (fracLen == 0) {
+                return null;
+            }
+            for (int i = 0; i < 9; i++) {
+                nano *= 10;
+                if (i < fracLen) {
+                    nano += buf[fracStart + i] - '0';
+                }
+            }
+        }
+
+        if (pos >= end || buf[pos] != 'Z') {
+            return null;
+        }
+        pos++;
+
+        if (pos >= end || buf[pos] != '"') {
+            return null;
+        }
+        pos++;
+
+        state.parsedEndPos = pos;
+        long epochDay = computeEpochDay(year, month, day);
+        long epochSecond = epochDay * 86400 + hour * 3600 + minute * 60 + second;
+        return Instant.ofEpochSecond(epochSecond, nano);
+    }
+
+    /**
+     * Parses an HTTP-date timestamp from a JSON quoted string.
+     * Stores state.parsedEndPos on success, returns null on non-standard format.
+     */
+    public static Instant parseHttpDate(byte[] buf, int pos, int end, JsonParseState state) {
+        if (pos >= end || buf[pos] != '"' || pos + 31 > end) {
+            return null;
+        }
+        pos++;
+
+        while (pos < end && buf[pos] != ',') {
+            pos++;
+        }
+        if (pos >= end) {
+            return null;
+        }
+        pos++;
+        if (pos >= end || buf[pos] != ' ') {
+            return null;
+        }
+        pos++;
+
+        int day = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (buf[pos++] != ' ') {
+            return null;
+        }
+
+        int month = lookupMonth(buf, pos);
+        pos += 3;
+        if (buf[pos++] != ' ') {
+            return null;
+        }
+
+        int year = digit(buf[pos]) * 1000 + digit(buf[pos + 1]) * 100
+                + digit(buf[pos + 2]) * 10
+                + digit(buf[pos + 3]);
+        pos += 4;
+        if (buf[pos++] != ' ') {
+            return null;
+        }
+
+        int hour = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (buf[pos++] != ':') {
+            return null;
+        }
+        int minute = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+        if (buf[pos++] != ':') {
+            return null;
+        }
+        int second = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
+        pos += 2;
+
+        if (pos + 4 > end || buf[pos] != ' '
+                || buf[pos + 1] != 'G'
+                || buf[pos + 2] != 'M'
+                || buf[pos + 3] != 'T') {
+            return null;
+        }
+        pos += 4;
+
+        if (pos >= end || buf[pos] != '"') {
+            return null;
+        }
+        pos++;
+
+        state.parsedEndPos = pos;
+        long epochDay = computeEpochDay(year, month, day);
+        long epochSecond = epochDay * 86400 + hour * 3600 + minute * 60 + second;
+        return Instant.ofEpochSecond(epochSecond);
+    }
+
+    /**
+     * Decodes a base64-encoded JSON string. Stores state.parsedEndPos after the closing quote.
+     */
+    public static byte[] decodeBase64String(byte[] buf, int pos, int end, JsonParseState state) {
+        if (pos >= end || buf[pos] != '"') {
+            throw new SerializationException("Expected '\"', found: " + describePos(buf, pos, end));
+        }
+        pos++;
+
+        int contentStart = pos;
+        while (pos + 8 <= end) {
+            long word = (long) LONG_HANDLE.get(buf, pos);
+            long xorQuote = word ^ 0x2222222222222222L;
+            if (((xorQuote - 0x0101010101010101L) & ~xorQuote & 0x8080808080808080L) != 0) {
+                break;
+            }
+            pos += 8;
+        }
+        while (pos < end && buf[pos] != '"') {
+            pos++;
+        }
+        if (pos >= end) {
+            throw new SerializationException("Unterminated base64 string");
+        }
+        int contentEnd = pos;
+        state.parsedEndPos = pos + 1;
+
+        if (contentStart == contentEnd) {
+            return new byte[0];
+        }
+
+        byte[] base64Bytes = Arrays.copyOfRange(buf, contentStart, contentEnd);
+        try {
+            return BASE64_DECODER.decode(base64Bytes);
+        } catch (IllegalArgumentException e) {
+            throw new SerializationException("Invalid base64 in blob value", e);
+        }
+    }
+
+    /**
+     * Skips a complete JSON value starting at the given position.
+     * Returns the position after the skipped value.
+     */
+    public static int skipValue(byte[] buf, int pos, int end, JsonParseState state) {
+        pos = skipWhitespace(buf, pos, end);
+        if (pos >= end) {
+            throw new SerializationException("Unexpected end of input");
+        }
+
+        switch (buf[pos]) {
+            case '"':
+                return skipQuotedString(buf, pos, end);
+            case '{':
+                return skipJsonObject(buf, pos + 1, end, state);
+            case '[':
+                return skipJsonArray(buf, pos + 1, end, state);
+            case 't':
+                if (pos + 4 <= end && buf[pos + 1] == 'r' && buf[pos + 2] == 'u' && buf[pos + 3] == 'e') {
+                    return pos + 4;
+                }
+                throw new SerializationException("Invalid token at " + describePos(buf, pos, end));
+            case 'f':
+                if (pos + 5 <= end && buf[pos + 1] == 'a'
+                        && buf[pos + 2] == 'l'
+                        && buf[pos + 3] == 's'
+                        && buf[pos + 4] == 'e') {
+                    return pos + 5;
+                }
+                throw new SerializationException("Invalid token at " + describePos(buf, pos, end));
+            case 'n':
+                if (pos + 4 <= end && buf[pos + 1] == 'u' && buf[pos + 2] == 'l' && buf[pos + 3] == 'l') {
+                    return pos + 4;
+                }
+                throw new SerializationException("Invalid token at " + describePos(buf, pos, end));
+            default:
+                if (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9')) {
+                    parseDouble(buf, pos, end, state);
+                    return state.parsedEndPos;
+                }
+                throw new SerializationException(
+                        "Unexpected token: " + describePos(buf, pos, end));
+        }
+    }
+
+    private static int skipQuotedString(byte[] buf, int pos, int end) {
+        pos++; // skip opening '"'
+        while (pos < end) {
+            byte b = buf[pos];
+            if (b == '"') {
+                return pos + 1;
+            }
+            if (b == '\\') {
+                pos++;
+                if (pos >= end) {
+                    break;
+                }
+            }
+            pos++;
+        }
+        throw new SerializationException("Unterminated string");
+    }
+
+    private static int skipJsonObject(byte[] buf, int pos, int end, JsonParseState state) {
+        pos = skipWhitespace(buf, pos, end);
+        if (pos < end && buf[pos] == '}') {
+            return pos + 1;
+        }
+
+        boolean first = true;
+        while (true) {
+            if (!first) {
+                pos = skipWhitespace(buf, pos, end);
+                if (pos < end && buf[pos] == '}') {
+                    return pos + 1;
+                }
+                if (pos >= end || buf[pos] != ',') {
+                    throw new SerializationException("Expected ',' in object");
+                }
+                pos++;
+                pos = skipWhitespace(buf, pos, end);
+            }
+            first = false;
+            pos = skipQuotedString(buf, pos, end);
+            pos = skipWhitespace(buf, pos, end);
+            if (pos >= end || buf[pos] != ':') {
+                throw new SerializationException("Expected ':' in object");
+            }
+            pos++;
+            pos = skipValue(buf, pos, end, state);
+        }
+    }
+
+    private static int skipJsonArray(byte[] buf, int pos, int end, JsonParseState state) {
+        pos = skipWhitespace(buf, pos, end);
+        if (pos < end && buf[pos] == ']') {
+            return pos + 1;
+        }
+
+        boolean first = true;
+        while (true) {
+            if (!first) {
+                pos = skipWhitespace(buf, pos, end);
+                if (pos < end && buf[pos] == ']') {
+                    return pos + 1;
+                }
+                if (pos >= end || buf[pos] != ',') {
+                    throw new SerializationException("Expected ',' in array");
+                }
+                pos++;
+            }
+            first = false;
+            pos = skipValue(buf, pos, end, state);
+        }
     }
 }
