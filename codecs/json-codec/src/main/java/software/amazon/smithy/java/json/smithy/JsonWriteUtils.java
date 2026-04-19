@@ -475,6 +475,33 @@ public final class JsonWriteUtils {
         return Schubfach.writeFloat(buf, pos, value, ftd);
     }
 
+    private static final ThreadLocal<Schubfach.DoubleToDecimal> REUSABLE_DTD =
+            ThreadLocal.withInitial(Schubfach::createDoubleToDecimal);
+    private static final ThreadLocal<Schubfach.FloatToDecimal> REUSABLE_FTD =
+            ThreadLocal.withInitial(Schubfach::createFloatToDecimal);
+
+    /**
+     * Writes a double using a thread-local reusable Schubfach instance, avoiding per-call allocation.
+     */
+    public static int writeDoubleReusable(byte[] buf, int pos, double value) {
+        long longValue = (long) value;
+        if (value == (double) longValue) {
+            return writeLong(buf, pos, longValue);
+        }
+        return Schubfach.writeDouble(buf, pos, value, REUSABLE_DTD.get());
+    }
+
+    /**
+     * Writes a float using a thread-local reusable Schubfach instance, avoiding per-call allocation.
+     */
+    public static int writeFloatReusable(byte[] buf, int pos, float value) {
+        int intValue = (int) value;
+        if (value == (float) intValue) {
+            return writeInt(buf, pos, intValue);
+        }
+        return Schubfach.writeFloat(buf, pos, value, REUSABLE_FTD.get());
+    }
+
     /**
      * Writes an ISO-8601 timestamp directly to the byte buffer as a quoted JSON string.
      * Produces output like {@code "2025-01-15T10:30:00Z"} or {@code "2025-01-15T10:30:00.123Z"}
@@ -777,6 +804,25 @@ public final class JsonWriteUtils {
     public static int maxQuotedStringBytes(String value) {
         // Worst case: every char is a control char needing unicode escape (6 bytes) + 2 quotes
         return value.length() * 6 + 2;
+    }
+
+    /**
+     * Returns a tighter estimate of bytes needed to write a JSON-quoted string.
+     * For pure safe ASCII strings (common case), returns length + 2.
+     * Falls back to the worst-case length * 6 + 2 on first non-safe char.
+     */
+    public static int estimateQuotedStringBytes(String value) {
+        int len = value.length();
+        if (len == 0) {
+            return 2;
+        }
+        for (int i = 0; i < len; i++) {
+            char c = value.charAt(i);
+            if (c < 0x20 || c == '"' || c == '\\' || c >= 0x80) {
+                return len * 6 + 2;
+            }
+        }
+        return len + 2;
     }
 
     /**

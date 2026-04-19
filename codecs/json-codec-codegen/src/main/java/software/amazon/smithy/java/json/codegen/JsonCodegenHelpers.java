@@ -20,6 +20,7 @@ import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.smithy.JsonParseState;
 import software.amazon.smithy.java.json.smithy.JsonReadUtils;
+import software.amazon.smithy.java.json.smithy.JsonWriteUtils;
 
 /**
  * Static runtime helpers called by generated JSON serializer/deserializer code.
@@ -248,5 +249,36 @@ public final class JsonCodegenHelpers {
         buf[pos + 2] = 'l';
         buf[pos + 3] = 'l';
         return pos + 4;
+    }
+
+    /**
+     * Writes a JSON quoted string with fused capacity check + writing in a single string scan.
+     * Avoids the double-scan of estimateQuotedStringBytes() followed by writeQuotedString().
+     *
+     * <p>Optimistic: ensures capacity for len+2 (safe ASCII), writes opening quote + chars
+     * in one pass. On first special char, re-ensures worst-case capacity and delegates to
+     * writeQuotedString which rewrites from the saved start position.
+     */
+    public static void writeQuotedStringFused(WriterContext ctx, String value) {
+        int len = value.length();
+        ctx.ensureCapacity(len + 2);
+        byte[] buf = ctx.buf;
+        int pos = ctx.pos;
+        int startPos = pos;
+        buf[pos++] = '"';
+
+        for (int i = 0; i < len; i++) {
+            char c = value.charAt(i);
+            if (c >= 0x80 || c < 0x20 || c == '"' || c == '\\') {
+                ctx.pos = startPos;
+                ctx.ensureCapacity(len * 6 + 2);
+                ctx.pos = JsonWriteUtils.writeQuotedString(ctx.buf, ctx.pos, value);
+                return;
+            }
+            buf[pos++] = (byte) c;
+        }
+
+        buf[pos++] = '"';
+        ctx.pos = pos;
     }
 }
