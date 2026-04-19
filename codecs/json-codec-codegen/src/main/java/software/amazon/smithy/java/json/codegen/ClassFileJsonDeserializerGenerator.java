@@ -421,56 +421,30 @@ final class ClassFileJsonDeserializerGenerator {
         }
         code.lookupswitch(defaultLabel, cases);
 
+        int matchResultSlot = nextTempSlot++;
         for (int i = 0; i < fields.size(); i++) {
             code.labelBinding(caseLabels[i]);
-            byte[] dn = fieldNameBytesList.get(i);
 
-            // if (pos + DN_i.length < end && buf[pos + DN_i.length] == '"'
-            //     && Arrays.equals(buf, pos, pos+len, DN_i, 0, len))
-            Label noMatch = code.newLabel();
-
+            // int result = JsonReadUtils.matchFieldName(buf, pos, end, DN_i)
+            code.aload(SLOT_BUF);
             code.iload(SLOT_POS);
-            code.ldc(dn.length);
-            code.iadd();
             code.iload(SLOT_END);
-            code.if_icmpge(noMatch);
-
-            code.aload(SLOT_BUF);
-            code.iload(SLOT_POS);
-            code.ldc(dn.length);
-            code.iadd();
-            code.baload();
-            code.bipush('"');
-            code.if_icmpne(noMatch);
-
-            // Arrays.equals(buf, pos, pos+len, DN_i, 0, len)
-            code.aload(SLOT_BUF);
-            code.iload(SLOT_POS);
-            code.iload(SLOT_POS);
-            code.ldc(dn.length);
-            code.iadd();
             code.getstatic(thisClass, "DN_" + i, CD_byte_array);
-            code.iconst_0();
-            code.ldc(dn.length);
-            code.invokestatic(CD_Arrays,
-                    "equals",
-                    MethodTypeDesc.of(CD_boolean,
-                            CD_byte_array,
-                            CD_int,
-                            CD_int,
-                            CD_byte_array,
-                            CD_int,
-                            CD_int));
-            code.ifeq(noMatch);
+            code.invokestatic(CD_JsonReadUtils,
+                    "matchFieldName",
+                    MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int, CD_byte_array));
+            code.istore(matchResultSlot);
+            code.iload(matchResultSlot);
+            code.iconst_m1();
+            Label noMatch = code.newLabel();
+            code.if_icmpeq(noMatch);
 
             // Match!
             code.ldc(i);
             code.istore(SLOT_MATCHED);
             code.ldc(i + 1);
             code.istore(SLOT_EXPECTED_NEXT);
-            code.iload(SLOT_POS);
-            code.ldc(dn.length + 1); // skip name + closing quote
-            code.iadd();
+            code.iload(matchResultSlot);
             code.istore(SLOT_POS);
             code.goto_(afterSpeculative);
 

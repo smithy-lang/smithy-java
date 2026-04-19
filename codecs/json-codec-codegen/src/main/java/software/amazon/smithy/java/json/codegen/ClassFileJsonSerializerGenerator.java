@@ -387,13 +387,13 @@ final class ClassFileJsonSerializerGenerator {
     private void emitEnsure(CodeBuilder code, ClassDesc thisClass, int needed) {
         // buf = ctx.ensure(pos, needed); pos = ctx.pos;
         code.aload(2); // ctx
+        code.dup(); // ctx, ctx - keep for pos read
         code.iload(SLOT_POS);
         code.ldc(needed);
         code.invokevirtual(CD_WriterContext,
                 "ensure",
                 MethodTypeDesc.of(CD_byte_array, CD_int, CD_int));
-        code.astore(SLOT_BUF);
-        code.aload(2);
+        code.astore(SLOT_BUF); // stack: ctx
         code.getfield(CD_WriterContext, "pos", CD_int);
         code.istore(SLOT_POS);
     }
@@ -421,18 +421,18 @@ final class ClassFileJsonSerializerGenerator {
 
     private void emitSyncToCtx(CodeBuilder code) {
         code.aload(2);
+        code.dup();
         code.aload(SLOT_BUF);
         code.putfield(CD_WriterContext, "buf", CD_byte_array);
-        code.aload(2);
         code.iload(SLOT_POS);
         code.putfield(CD_WriterContext, "pos", CD_int);
     }
 
     private void emitSyncFromCtx(CodeBuilder code) {
         code.aload(2);
+        code.dup();
         code.getfield(CD_WriterContext, "buf", CD_byte_array);
         code.astore(SLOT_BUF);
-        code.aload(2);
         code.getfield(CD_WriterContext, "pos", CD_int);
         code.istore(SLOT_POS);
     }
@@ -1347,11 +1347,13 @@ final class ClassFileJsonSerializerGenerator {
             emitWriteByte(code, ',');
             code.labelBinding(skipComma);
 
-            // Get element and write inline
+            // Get element and write inline (save/restore temp slots for loop reuse)
+            int savedTempSlot = nextTempSlot;
             code.aload(listSlot);
             code.iload(idxSlot);
             code.invokeinterface(CD_List, "get", MethodTypeDesc.of(CD_Object, CD_int));
             emitWriteElementInline(code, elemCategory);
+            nextTempSlot = savedTempSlot;
 
             code.iinc(idxSlot, 1);
             code.goto_(loopStart);
@@ -1374,6 +1376,7 @@ final class ClassFileJsonSerializerGenerator {
             code.invokeinterface(CD_List, "size", MethodTypeDesc.of(CD_int));
             code.if_icmpge(loopEnd);
 
+            int savedTempSlot2 = nextTempSlot;
             if (field.sparse()) {
                 Label notNullLabel = code.newLabel();
                 Label afterNullLabel = code.newLabel();
@@ -1407,6 +1410,7 @@ final class ClassFileJsonSerializerGenerator {
             } else {
                 emitWriteVariableElementWithComma(code, thisClass, elemCategory, field, listSlot, idxSlot);
             }
+            nextTempSlot = savedTempSlot2;
 
             code.iinc(idxSlot, 1);
             code.goto_(loopStart);
