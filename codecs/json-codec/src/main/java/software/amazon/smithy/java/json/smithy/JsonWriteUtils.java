@@ -16,14 +16,13 @@ import java.util.Base64;
  *
  * <p>All methods write UTF-8 encoded JSON bytes and return the new write position.
  */
-final class JsonWriteUtils {
+public final class JsonWriteUtils {
 
     private JsonWriteUtils() {}
 
-    // Pre-computed byte arrays for JSON literals
-    static final byte[] TRUE_BYTES = {'t', 'r', 'u', 'e'};
-    static final byte[] FALSE_BYTES = {'f', 'a', 'l', 's', 'e'};
-    static final byte[] NULL_BYTES = {'n', 'u', 'l', 'l'};
+    public static final byte[] TRUE_BYTES = {'t', 'r', 'u', 'e'};
+    public static final byte[] FALSE_BYTES = {'f', 'a', 'l', 's', 'e'};
+    public static final byte[] NULL_BYTES = {'n', 'u', 'l', 'l'};
     static final byte[] NAN_BYTES = {'"', 'N', 'a', 'N', '"'};
     static final byte[] INF_BYTES = {'"', 'I', 'n', 'f', 'i', 'n', 'i', 't', 'y', '"'};
     static final byte[] NEG_INF_BYTES = {'"', '-', 'I', 'n', 'f', 'i', 'n', 'i', 't', 'y', '"'};
@@ -86,7 +85,7 @@ final class JsonWriteUtils {
      *
      * <p>Handles Integer.MIN_VALUE correctly.
      */
-    static int writeInt(byte[] buf, int pos, int value) {
+    public static int writeInt(byte[] buf, int pos, int value) {
         if (value == 0) {
             buf[pos] = '0';
             return pos + 1;
@@ -131,7 +130,7 @@ final class JsonWriteUtils {
     /**
      * Writes a long value as JSON number bytes. Returns new position.
      */
-    static int writeLong(byte[] buf, int pos, long value) {
+    public static int writeLong(byte[] buf, int pos, long value) {
         if (value == 0) {
             buf[pos] = '0';
             return pos + 1;
@@ -230,7 +229,7 @@ final class JsonWriteUtils {
      * Writes a BigInteger directly to the byte buffer by splitting into 18-digit groups.
      * Avoids BigInteger.toString() which does expensive recursive division and String allocation.
      */
-    static int writeBigInteger(byte[] buf, int pos, BigInteger value) {
+    public static int writeBigInteger(byte[] buf, int pos, BigInteger value) {
         if (value.signum() < 0) {
             buf[pos++] = '-';
             value = value.negate();
@@ -285,7 +284,7 @@ final class JsonWriteUtils {
      * Writes a JSON quoted string. Returns new position.
      */
     @SuppressWarnings("deprecation")
-    static int writeQuotedString(byte[] buf, int pos, String value) {
+    public static int writeQuotedString(byte[] buf, int pos, String value) {
         int len = value.length();
         buf[pos++] = '"';
 
@@ -380,7 +379,7 @@ final class JsonWriteUtils {
      * Writes a double value as JSON. Handles integer-valued doubles optimization.
      * Returns new position.
      */
-    static int writeDouble(byte[] buf, int pos, double value) {
+    public static int writeDouble(byte[] buf, int pos, double value) {
         // Avoid writing 1.0 when 1 suffices
         long longValue = (long) value;
         if (value == (double) longValue) {
@@ -392,7 +391,7 @@ final class JsonWriteUtils {
     /**
      * Writes a double using a reusable Schubfach instance to avoid per-call allocation.
      */
-    static int writeDouble(byte[] buf, int pos, double value, Schubfach.DoubleToDecimal dtd) {
+    public static int writeDouble(byte[] buf, int pos, double value, Schubfach.DoubleToDecimal dtd) {
         long longValue = (long) value;
         if (value == (double) longValue) {
             return writeLong(buf, pos, longValue);
@@ -409,7 +408,7 @@ final class JsonWriteUtils {
      * {@code Instant.ofEpochSecond(-1, 500_000_000)} = -0.5 seconds (not -1.5).
      * The nano field is always non-negative and added to the epoch second.
      */
-    static int writeEpochSeconds(byte[] buf, int pos, long epochSecond, int nano) {
+    public static int writeEpochSeconds(byte[] buf, int pos, long epochSecond, int nano) {
         if (nano == 0) {
             return writeLong(buf, pos, epochSecond);
         }
@@ -457,7 +456,7 @@ final class JsonWriteUtils {
      * Writes a float value as JSON. Handles integer-valued floats optimization.
      * Returns new position.
      */
-    static int writeFloat(byte[] buf, int pos, float value) {
+    public static int writeFloat(byte[] buf, int pos, float value) {
         int intValue = (int) value;
         if (value == (float) intValue) {
             return writeInt(buf, pos, intValue);
@@ -468,7 +467,7 @@ final class JsonWriteUtils {
     /**
      * Writes a float using a reusable Schubfach instance to avoid per-call allocation.
      */
-    static int writeFloat(byte[] buf, int pos, float value, Schubfach.FloatToDecimal ftd) {
+    public static int writeFloat(byte[] buf, int pos, float value, Schubfach.FloatToDecimal ftd) {
         int intValue = (int) value;
         if (value == (float) intValue) {
             return writeInt(buf, pos, intValue);
@@ -484,7 +483,7 @@ final class JsonWriteUtils {
      * <p>Uses pure integer arithmetic from epoch seconds to compute date/time components,
      * avoiding the 4 object allocations from {@code Instant.atOffset(ZoneOffset.UTC)}.
      */
-    static int writeIso8601Timestamp(byte[] buf, int pos, Instant value) {
+    public static int writeIso8601Timestamp(byte[] buf, int pos, Instant value) {
         long epochSecond = value.getEpochSecond();
         int nano = value.getNano();
 
@@ -602,7 +601,7 @@ final class JsonWriteUtils {
      * <p>Uses pure integer arithmetic from epoch seconds, avoiding the 4 object allocations
      * from {@code Instant.atOffset(ZoneOffset.UTC)} and the heavy DateTimeFormatter machinery.
      */
-    static int writeHttpDate(byte[] buf, int pos, Instant value) {
+    public static int writeHttpDate(byte[] buf, int pos, Instant value) {
         long epochSecond = value.getEpochSecond();
 
         // Compute time-of-day
@@ -708,7 +707,7 @@ final class JsonWriteUtils {
      * Writes a BigDecimal with known unscaled long value and positive scale directly.
      * E.g., unscaled=9999999999, scale=5 writes "99999.99999".
      */
-    static int writeBigDecimalFromLong(byte[] buf, int pos, long unscaled, int scale) {
+    public static int writeBigDecimalFromLong(byte[] buf, int pos, long unscaled, int scale) {
         if (unscaled < 0) {
             buf[pos++] = '-';
             if (unscaled == Long.MIN_VALUE) {
@@ -749,7 +748,7 @@ final class JsonWriteUtils {
      * Used for number-to-string conversions (Double.toString, BigDecimal.toString, etc).
      */
     @SuppressWarnings("deprecation")
-    static int writeAsciiString(byte[] buf, int pos, String s) {
+    public static int writeAsciiString(byte[] buf, int pos, String s) {
         int len = s.length();
         s.getBytes(0, len, buf, pos);
         return pos + len;
@@ -759,7 +758,7 @@ final class JsonWriteUtils {
      * Base64-encodes the given data and writes it as a JSON quoted string.
      * Returns the new write position.
      */
-    static int writeBase64String(byte[] buf, int pos, byte[] data, int off, int len) {
+    public static int writeBase64String(byte[] buf, int pos, byte[] data, int off, int len) {
         buf[pos++] = '"';
         // Use JDK Base64 encoder — produces standard base64 with +/ alphabet, no line breaks.
         // This matches Jackson's MIME_NO_LINEFEEDS variant for JSON.
@@ -775,7 +774,7 @@ final class JsonWriteUtils {
      * Returns the maximum number of bytes needed to write a JSON-quoted string.
      * Used for buffer capacity estimation.
      */
-    static int maxQuotedStringBytes(String value) {
+    public static int maxQuotedStringBytes(String value) {
         // Worst case: every char is a control char needing unicode escape (6 bytes) + 2 quotes
         return value.length() * 6 + 2;
     }
@@ -783,7 +782,7 @@ final class JsonWriteUtils {
     /**
      * Returns the maximum number of bytes needed for a base64-encoded string.
      */
-    static int maxBase64Bytes(int dataLen) {
+    public static int maxBase64Bytes(int dataLen) {
         // Base64: 4 bytes per 3 input bytes, rounded up, plus 2 quotes
         return ((dataLen + 2) / 3) * 4 + 2;
     }
@@ -793,7 +792,7 @@ final class JsonWriteUtils {
      * The result includes the opening quote, the field name, the closing quote, and the colon.
      * Example: for field name "foo", returns bytes for {@code "foo":}
      */
-    static byte[] precomputeFieldNameBytes(String fieldName) {
+    public static byte[] precomputeFieldNameBytes(String fieldName) {
         byte[] nameUtf8 = fieldName.getBytes(StandardCharsets.UTF_8);
         // "fieldName":
         byte[] result = new byte[nameUtf8.length + 3]; // quote + name + quote + colon
@@ -802,5 +801,18 @@ final class JsonWriteUtils {
         result[nameUtf8.length + 1] = '"';
         result[nameUtf8.length + 2] = ':';
         return result;
+    }
+
+    /**
+     * Writes a boolean value as JSON literal ("true" or "false"). Returns new position.
+     */
+    public static int writeBoolean(byte[] buf, int pos, boolean value) {
+        if (value) {
+            System.arraycopy(TRUE_BYTES, 0, buf, pos, 4);
+            return pos + 4;
+        } else {
+            System.arraycopy(FALSE_BYTES, 0, buf, pos, 5);
+            return pos + 5;
+        }
     }
 }

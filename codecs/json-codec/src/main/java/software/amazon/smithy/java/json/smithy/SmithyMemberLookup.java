@@ -17,7 +17,7 @@ import software.amazon.smithy.java.core.schema.TraitKey;
  *
  * <p>Also implements {@link MemberLookup} for compatibility with the field mapper API.
  */
-final class SmithyMemberLookup implements MemberLookup {
+public final class SmithyMemberLookup implements MemberLookup {
 
     // FNV-1a constants
     private static final long FNV_OFFSET = 0xcbf29ce484222325L;
