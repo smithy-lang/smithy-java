@@ -74,7 +74,7 @@ final class JsonDeserializerCodegen {
         sb.emptyLine();
 
         // Expect opening brace
-        sb.line("pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
+        sb.line("if (pos < end && buf[pos] <= ' ') pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
         sb.beginBlock("if (pos >= end || buf[pos] != '{')");
         sb.line("throw new SerializationException(\"Expected '{' at position \" + pos);");
         sb.endBlock();
@@ -88,7 +88,7 @@ final class JsonDeserializerCodegen {
         sb.beginBlock("while (true)");
 
         // Check for closing brace
-        sb.line("pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
+        sb.line("if (pos < end && buf[pos] <= ' ') pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
         sb.beginBlock("if (pos < end && buf[pos] == '}')");
         sb.line("pos++;");
         sb.line("break;");
@@ -100,7 +100,7 @@ final class JsonDeserializerCodegen {
         sb.line("throw new SerializationException(\"Expected ',' at position \" + pos);");
         sb.endBlock();
         sb.line("pos++;");
-        sb.line("pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
+        sb.line("if (pos < end && buf[pos] <= ' ') pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
         sb.endBlock();
         sb.line("first = false;");
         sb.emptyLine();
@@ -135,8 +135,8 @@ final class JsonDeserializerCodegen {
         sb.endBlock(); // switch
         sb.emptyLine();
 
-        // Slow path: scan for closing quote and match linearly
-        sb.line("// Slow path: scan for closing quote and linear match");
+        // Slow path: hash-based field dispatch
+        sb.line("// Slow path: FNV-1a hash dispatch");
         sb.beginBlock("if (matched == -1)");
         sb.line("int nameStart = pos;");
         sb.beginBlock("while (pos < end && buf[pos] != '\"')");
@@ -148,34 +148,49 @@ final class JsonDeserializerCodegen {
         sb.endBlock();
         sb.line("int nameEnd = pos;");
         sb.line("pos++;"); // skip closing quote
+        sb.line("int nameLen = nameEnd - nameStart;");
         sb.emptyLine();
 
-        sb.beginBlock("for (int i = 0; i < " + fields.size() + "; i++)");
-        sb.line("byte[] dn;");
-        sb.beginBlock("switch (i)");
-        for (int i = 0; i < fields.size(); i++) {
-            sb.line("case " + i + ": dn = DN_" + i + "; break;");
-        }
-        sb.line("default: dn = null;");
-        sb.endBlock(); // switch
-        sb.beginBlock("if (dn != null && dn.length == nameEnd - nameStart"
-                + " && Arrays.equals(buf, nameStart, nameEnd, dn, 0, dn.length))");
-        sb.line("matched = i;");
-        sb.line("expectedNext = i + 1;");
-        sb.line("break;");
+        // Inline FNV-1a hash computation in generated code
+        sb.line("int hash = 0x811c9dc5;");
+        sb.beginBlock("for (int h = nameStart; h < nameEnd; h++)");
+        sb.line("hash ^= buf[h] & 0xFF;");
+        sb.line("hash *= 0x01000193;");
         sb.endBlock();
-        sb.endBlock(); // for
+        sb.emptyLine();
+
+        // Build hash -> field index(es) map for collision detection
+        java.util.Map<Integer, java.util.List<Integer>> hashToFields = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < fields.size(); i++) {
+            int hash = computeFnv1a(fields.get(i).memberName());
+            hashToFields.computeIfAbsent(hash, k -> new java.util.ArrayList<>()).add(i);
+        }
+
+        sb.beginBlock("switch (hash)");
+        for (var entry : hashToFields.entrySet()) {
+            sb.line("case " + formatHashLiteral(entry.getKey()) + ":");
+            List<Integer> fieldIndices = entry.getValue();
+            for (int fi : fieldIndices) {
+                sb.beginBlock("if (nameLen == DN_" + fi + ".length"
+                        + " && Arrays.equals(buf, nameStart, nameEnd, DN_" + fi + ", 0, DN_" + fi + ".length))");
+                sb.line("matched = " + fi + ";");
+                sb.line("expectedNext = " + (fi + 1) + ";");
+                sb.endBlock();
+            }
+            sb.line("break;");
+        }
+        sb.endBlock(); // switch
         sb.endBlock(); // if matched == -1
         sb.emptyLine();
 
         // Skip colon
         sb.line("// Skip colon");
-        sb.line("pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
+        sb.line("if (pos < end && buf[pos] <= ' ') pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
         sb.beginBlock("if (pos >= end || buf[pos] != ':')");
         sb.line("throw new SerializationException(\"Expected ':' at position \" + pos);");
         sb.endBlock();
         sb.line("pos++;");
-        sb.line("pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
+        sb.line("if (pos < end && buf[pos] <= ' ') pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
         sb.emptyLine();
 
         // Check for null
@@ -391,14 +406,14 @@ final class JsonDeserializerCodegen {
         FieldCategory elemCategory = resolveElementCategory(field);
         String list = v("_list");
 
-        sb.line("ArrayList " + list + " = new ArrayList();");
+        sb.line("ArrayList " + list + " = new ArrayList(4);");
         sb.beginBlock("if (pos < end && buf[pos] == '[')");
         sb.line("pos++;");
-        sb.line("pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
+        sb.line("if (pos < end && buf[pos] <= ' ') pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
         sb.beginBlock("if (pos < end && buf[pos] != ']')");
 
         sb.beginBlock("while (true)");
-        sb.line("pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
+        sb.line("if (pos < end && buf[pos] <= ' ') pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
 
         // Check for null element
         sb.beginBlock("if (pos + 4 <= end && buf[pos] == 'n' && buf[pos+1] == 'u'"
@@ -410,7 +425,7 @@ final class JsonDeserializerCodegen {
         emitElementDeserialization(sb, elemCategory, field, list);
         sb.endBlock();
 
-        sb.line("pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
+        sb.line("if (pos < end && buf[pos] <= ' ') pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
         sb.beginBlock("if (pos < end && buf[pos] == ']')");
         sb.line("break;");
         sb.endBlock();
@@ -433,22 +448,22 @@ final class JsonDeserializerCodegen {
         String map = v("_map");
         String key = v("_mkey");
 
-        sb.line("LinkedHashMap " + map + " = new LinkedHashMap();");
+        sb.line("LinkedHashMap " + map + " = new LinkedHashMap(4);");
         sb.beginBlock("if (pos < end && buf[pos] == '{')");
         sb.line("pos++;");
-        sb.line("pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
+        sb.line("if (pos < end && buf[pos] <= ' ') pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
         sb.beginBlock("if (pos < end && buf[pos] != '}')");
 
         sb.beginBlock("while (true)");
-        sb.line("pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
+        sb.line("if (pos < end && buf[pos] <= ' ') pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
         // Parse key (always string)
         sb.line("JsonReadUtils.parseString(buf, pos, end, ctx);");
         sb.line("String " + key + " = ctx.parsedString;");
         sb.line("pos = ctx.parsedEndPos;");
         // Skip colon
-        sb.line("pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
+        sb.line("if (pos < end && buf[pos] <= ' ') pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
         sb.line("pos++;"); // skip :
-        sb.line("pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
+        sb.line("if (pos < end && buf[pos] <= ' ') pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
 
         // Check for null value
         sb.beginBlock("if (pos + 4 <= end && buf[pos] == 'n' && buf[pos+1] == 'u'"
@@ -460,7 +475,7 @@ final class JsonDeserializerCodegen {
         emitMapValueDeserialization(sb, valCategory, field, map, key);
         sb.endBlock();
 
-        sb.line("pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
+        sb.line("if (pos < end && buf[pos] <= ' ') pos = JsonReadUtils.skipWhitespace(buf, pos, end);");
         sb.beginBlock("if (pos < end && buf[pos] == '}')");
         sb.line("break;");
         sb.endBlock();
@@ -650,5 +665,19 @@ final class JsonDeserializerCodegen {
             return FieldCategory.ENUM_STRING;
         }
         return FieldCategory.STRUCT;
+    }
+
+    private static int computeFnv1a(String fieldName) {
+        byte[] bytes = fieldName.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        int hash = 0x811c9dc5;
+        for (byte b : bytes) {
+            hash ^= b & 0xFF;
+            hash *= 0x01000193;
+        }
+        return hash;
+    }
+
+    private static String formatHashLiteral(int hash) {
+        return Integer.toString(hash);
     }
 }

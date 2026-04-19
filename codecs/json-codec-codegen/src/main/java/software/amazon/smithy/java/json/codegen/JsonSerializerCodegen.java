@@ -100,62 +100,62 @@ final class JsonSerializerCodegen {
         sb.line("int pos = ctx.pos;");
         sb.emptyLine();
 
-        // Opening brace
-        sb.line("// Opening brace");
+        List<FieldPlan> serOrder = plan.serializationOrder();
+
+        // Compute upfront capacity for opening '{', all required fixed-size fields, and closing '}'
+        int fixedCapacity = 2; // { and }
+        int fixedFieldEnd = 0;
+        for (int i = 0; i < serOrder.size(); i++) {
+            FieldPlan f = serOrder.get(i);
+            if (f.required() && f.category().isFixedSize()) {
+                byte[] nameBytes = JsonWriteUtils.precomputeFieldNameBytes(f.memberName());
+                int nameBytesLen = nameBytes.length + (i > 0 ? 1 : 0); // +1 for comma if not first
+                fixedCapacity += nameBytesLen + f.fixedSizeUpperBound();
+                fixedFieldEnd = i + 1;
+            }
+        }
+
+        boolean hasVariableFields = fixedFieldEnd < serOrder.size();
+
+        sb.line("// Upfront capacity for '{', all required fixed-size fields, and '}'");
         sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(1);");
+        sb.line("ctx.ensureCapacity(" + fixedCapacity + ");");
         sb.line("buf = ctx.buf; pos = ctx.pos;");
         sb.line("buf[pos++] = '{';");
         sb.emptyLine();
 
-        List<FieldPlan> serOrder = plan.serializationOrder();
-
-        // Generate batched fixed-size required fields
+        // Write required fixed-size fields (no ensureCapacity needed)
         int i = 0;
-        while (i < serOrder.size()) {
-            FieldPlan field = serOrder.get(i);
-
-            if (field.required() && field.category().isFixedSize()) {
-                // Batch consecutive required fixed-size fields
-                int batchStart = i;
-                int totalCapacity = 0;
-                while (i < serOrder.size()
-                        && serOrder.get(i).required()
-                        && serOrder.get(i).category().isFixedSize()) {
-                    FieldPlan f = serOrder.get(i);
-                    // field name bytes length + value upper bound
-                    byte[] nameBytes = JsonWriteUtils.precomputeFieldNameBytes(f.memberName());
-                    int nameBytesLen = nameBytes.length + (i > 0 ? 1 : 0); // +1 for comma if not first
-                    totalCapacity += nameBytesLen + f.fixedSizeUpperBound();
-                    i++;
-                }
-
-                sb.line("// Batch: " + (i - batchStart) + " required fixed-size field(s)");
-                sb.line("ctx.pos = pos;");
-                sb.line("ctx.ensureCapacity(" + totalCapacity + ");");
-                sb.line("buf = ctx.buf; pos = ctx.pos;");
-
-                for (int j = batchStart; j < i; j++) {
-                    FieldPlan f = serOrder.get(j);
-                    sb.line("System.arraycopy(FN_" + j + ", 0, buf, pos, FN_" + j + ".length);");
-                    sb.line("pos += FN_" + j + ".length;");
-                    emitWriteValue(sb, f, fqcn, "typed." + f.getterName() + "()", false);
-                    sb.emptyLine();
-                }
-            } else if (field.nullable()) {
-                emitOptionalField(sb, field, i, fqcn);
-                i++;
-            } else {
-                emitRequiredVariableField(sb, field, i, fqcn);
-                i++;
+        if (fixedFieldEnd > 0) {
+            sb.line("// Required fixed-size fields (capacity pre-allocated)");
+            for (int j = 0; j < fixedFieldEnd; j++) {
+                FieldPlan f = serOrder.get(j);
+                sb.line("System.arraycopy(FN_" + j + ", 0, buf, pos, FN_" + j + ".length);");
+                sb.line("pos += FN_" + j + ".length;");
+                emitWriteValue(sb, f, fqcn, "typed." + f.getterName() + "()", false);
+                sb.emptyLine();
             }
+            i = fixedFieldEnd;
         }
 
-        // Closing brace
-        sb.line("// Closing brace");
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(1);");
-        sb.line("buf = ctx.buf; pos = ctx.pos;");
+        // Generate remaining fields (required variable-size and optional)
+        while (i < serOrder.size()) {
+            FieldPlan field = serOrder.get(i);
+            if (field.nullable()) {
+                emitOptionalField(sb, field, i, fqcn);
+            } else {
+                emitRequiredVariableField(sb, field, i, fqcn);
+            }
+            i++;
+        }
+
+        // Closing brace (capacity was pre-allocated if no variable fields;
+        // otherwise need a check since variable fields may have resized the buffer)
+        if (hasVariableFields) {
+            sb.line("ctx.pos = pos;");
+            sb.line("ctx.ensureCapacity(1);");
+            sb.line("buf = ctx.buf; pos = ctx.pos;");
+        }
         sb.line("buf[pos++] = '}';");
         sb.emptyLine();
         sb.line("ctx.buf = buf;");
@@ -348,10 +348,10 @@ final class JsonSerializerCodegen {
                 sb.line("pos = JsonWriteUtils.writeLong(buf, pos, " + valueExpr + ");");
                 break;
             case FLOAT:
-                sb.line("pos = JsonWriteUtils.writeFloat(buf, pos, " + valueExpr + ");");
+                sb.line("pos = JsonWriteUtils.writeFloatReusable(buf, pos, " + valueExpr + ");");
                 break;
             case DOUBLE:
-                sb.line("pos = JsonWriteUtils.writeDouble(buf, pos, " + valueExpr + ");");
+                sb.line("pos = JsonWriteUtils.writeDoubleReusable(buf, pos, " + valueExpr + ");");
                 break;
             case INT_ENUM:
                 sb.line("pos = JsonWriteUtils.writeInt(buf, pos, " + valueExpr + ".getValue());");
@@ -366,10 +366,9 @@ final class JsonSerializerCodegen {
         if (field.category() == FieldCategory.ENUM_STRING) {
             strExpr = valueExpr + ".getValue()";
         }
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(" + strExpr + "));");
+        sb.line("ctx.buf = buf; ctx.pos = pos;");
+        sb.line("JsonCodegenHelpers.writeQuotedStringFused(ctx, " + strExpr + ");");
         sb.line("buf = ctx.buf; pos = ctx.pos;");
-        sb.line("pos = JsonWriteUtils.writeQuotedString(buf, pos, " + strExpr + ");");
     }
 
     private void emitWriteValueWithCapacity_Blob(SourceBuilder sb, String valueExpr) {
@@ -387,22 +386,36 @@ final class JsonSerializerCodegen {
 
     private void emitWriteValueWithCapacity_BigInteger(SourceBuilder sb, String valueExpr) {
         varSeq++;
-        String s = v("_bis");
-        sb.line("String " + s + " = " + valueExpr + ".toString();");
+        String bi = v("_bi");
+        sb.line("BigInteger " + bi + " = " + valueExpr + ";");
+        // writeBigInteger handles up to ~54 digits directly via long groups, avoiding toString()
+        // Max capacity: sign + 55 digits
         sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(" + s + ".length() + 2);");
+        sb.line("ctx.ensureCapacity(56);");
         sb.line("buf = ctx.buf; pos = ctx.pos;");
-        sb.line("pos = JsonWriteUtils.writeAsciiString(buf, pos, " + s + ");");
+        sb.line("pos = JsonWriteUtils.writeBigInteger(buf, pos, " + bi + ");");
     }
 
     private void emitWriteValueWithCapacity_BigDecimal(SourceBuilder sb, String valueExpr) {
         varSeq++;
+        String bd = v("_bd");
+        sb.line("BigDecimal " + bd + " = " + valueExpr + ";");
+        // Fast path: if unscaled value fits in a long, use direct integer arithmetic
+        sb.beginBlock("if (" + bd + ".scale() >= 0 && " + bd + ".unscaledValue().bitLength() < 64)");
+        sb.line("ctx.pos = pos;");
+        sb.line("ctx.ensureCapacity(22);"); // sign + 19 digits + dot
+        sb.line("buf = ctx.buf; pos = ctx.pos;");
+        sb.line("pos = JsonWriteUtils.writeBigDecimalFromLong(buf, pos, "
+                + bd + ".unscaledValue().longValue(), " + bd + ".scale());");
+        sb.endBlock();
+        sb.beginBlock("else");
         String s = v("_bds");
-        sb.line("String " + s + " = " + valueExpr + ".toPlainString();");
+        sb.line("String " + s + " = " + bd + ".toPlainString();");
         sb.line("ctx.pos = pos;");
         sb.line("ctx.ensureCapacity(" + s + ".length() + 2);");
         sb.line("buf = ctx.buf; pos = ctx.pos;");
         sb.line("pos = JsonWriteUtils.writeAsciiString(buf, pos, " + s + ");");
+        sb.endBlock();
     }
 
     private void emitWriteValueWithCapacity_Timestamp(SourceBuilder sb, FieldPlan field, String valueExpr) {
@@ -440,43 +453,59 @@ final class JsonSerializerCodegen {
         String list = v("_list");
         String idx = v("_i");
 
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(1);");
-        sb.line("buf = ctx.buf; pos = ctx.pos;");
-        sb.line("buf[pos++] = '[';");
-
+        FieldCategory elemCategory = resolveElementCategory(field);
         String elementType = resolveElementType(field);
         sb.line("List " + list + " = " + valueExpr + ";");
-        sb.beginBlock("for (int " + idx + " = 0; " + idx + " < " + list + ".size(); " + idx + "++)");
-        sb.beginBlock("if (" + idx + " > 0)");
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(1);");
-        sb.line("buf = ctx.buf; pos = ctx.pos;");
-        sb.line("buf[pos++] = ',';");
-        sb.endBlock();
 
-        FieldCategory elemCategory = resolveElementCategory(field);
-        if (field.sparse()) {
-            sb.beginBlock("if (" + list + ".get(" + idx + ") == null)");
+        if (elemCategory.isFixedSize() && !field.sparse()) {
+            // Batch capacity for entire list: [ + ] + N * (element upper bound + comma)
+            int elemBound = elemCategory.fixedSizeUpperBound();
             sb.line("ctx.pos = pos;");
-            sb.line("ctx.ensureCapacity(4);");
+            sb.line("ctx.ensureCapacity(2 + " + list + ".size() * " + (elemBound + 1) + ");");
             sb.line("buf = ctx.buf; pos = ctx.pos;");
-            sb.line("pos = JsonCodegenHelpers.writeNull(buf, pos);");
-            sb.endBlock();
-            sb.beginBlock("else");
-        }
-        String elemExpr = "(" + elementType + ") " + list + ".get(" + idx + ")";
-        emitWriteElement(sb, elemCategory, elemExpr, field, fqcn);
-        if (field.sparse()) {
-            sb.endBlock();
-        }
+            sb.line("buf[pos++] = '[';");
 
-        sb.endBlock(); // for loop
+            sb.beginBlock("for (int " + idx + " = 0; " + idx + " < " + list + ".size(); " + idx + "++)");
+            sb.line("if (" + idx + " > 0) buf[pos++] = ',';");
+            String elemExpr = "(" + elementType + ") " + list + ".get(" + idx + ")";
+            emitWriteElementInline(sb, elemCategory, elemExpr);
+            sb.endBlock(); // for loop
 
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(1);");
-        sb.line("buf = ctx.buf; pos = ctx.pos;");
-        sb.line("buf[pos++] = ']';");
+            sb.line("buf[pos++] = ']';");
+        } else {
+            // Variable-size elements: fold comma into element capacity
+            sb.line("ctx.pos = pos;");
+            sb.line("ctx.ensureCapacity(1);");
+            sb.line("buf = ctx.buf; pos = ctx.pos;");
+            sb.line("buf[pos++] = '[';");
+
+            sb.beginBlock("for (int " + idx + " = 0; " + idx + " < " + list + ".size(); " + idx + "++)");
+
+            if (field.sparse()) {
+                sb.beginBlock("if (" + list + ".get(" + idx + ") == null)");
+                sb.line("ctx.pos = pos;");
+                sb.line("ctx.ensureCapacity(5);"); // 4 for null + 1 for comma
+                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("if (" + idx + " > 0) buf[pos++] = ',';");
+                sb.line("pos = JsonCodegenHelpers.writeNull(buf, pos);");
+                sb.endBlock();
+                sb.beginBlock("else");
+            }
+
+            String elemExpr = "(" + elementType + ") " + list + ".get(" + idx + ")";
+            emitWriteElementWithComma(sb, elemCategory, elemExpr, field, fqcn, idx);
+
+            if (field.sparse()) {
+                sb.endBlock();
+            }
+
+            sb.endBlock(); // for loop
+
+            sb.line("ctx.pos = pos;");
+            sb.line("ctx.ensureCapacity(1);");
+            sb.line("buf = ctx.buf; pos = ctx.pos;");
+            sb.line("buf[pos++] = ']';");
+        }
     }
 
     private void emitWriteValueWithCapacity_Map(
@@ -501,20 +530,22 @@ final class JsonSerializerCodegen {
         sb.line("boolean " + first + " = true;");
         sb.beginBlock("while (" + it + ".hasNext())");
         sb.line("Map.Entry " + entry + " = (Map.Entry) " + it + ".next();");
-        sb.beginBlock("if (!" + first + ")");
+
+        // Write comma (if not first), key, and colon
+        sb.line("String " + key + " = (String) " + entry + ".getKey();");
         sb.line("ctx.pos = pos;");
         sb.line("ctx.ensureCapacity(1);");
         sb.line("buf = ctx.buf; pos = ctx.pos;");
+        sb.beginBlock("if (!" + first + ")");
         sb.line("buf[pos++] = ',';");
         sb.endBlock();
         sb.line(first + " = false;");
-
-        // Write key (always a String)
-        sb.line("String " + key + " = (String) " + entry + ".getKey();");
-        sb.line("ctx.pos = pos;");
-        sb.line("ctx.ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(" + key + ") + 1);");
+        sb.line("ctx.buf = buf; ctx.pos = pos;");
+        sb.line("JsonCodegenHelpers.writeQuotedStringFused(ctx, " + key + ");");
         sb.line("buf = ctx.buf; pos = ctx.pos;");
-        sb.line("pos = JsonWriteUtils.writeQuotedString(buf, pos, " + key + ");");
+        sb.line("ctx.pos = pos;");
+        sb.line("ctx.ensureCapacity(1);");
+        sb.line("buf = ctx.buf; pos = ctx.pos;");
         sb.line("buf[pos++] = ':';");
 
         // Write value
@@ -574,33 +605,147 @@ final class JsonSerializerCodegen {
                 sb.line("ctx.pos = pos;");
                 sb.line("ctx.ensureCapacity(24);");
                 sb.line("buf = ctx.buf; pos = ctx.pos;");
-                sb.line("pos = JsonWriteUtils.writeFloat(buf, pos, ((Number) " + elemExpr + ").floatValue());");
+                sb.line("pos = JsonWriteUtils.writeFloatReusable(buf, pos, ((Number) " + elemExpr + ").floatValue());");
                 break;
             case DOUBLE:
                 sb.line("ctx.pos = pos;");
                 sb.line("ctx.ensureCapacity(24);");
                 sb.line("buf = ctx.buf; pos = ctx.pos;");
-                sb.line("pos = JsonWriteUtils.writeDouble(buf, pos, ((Number) " + elemExpr + ").doubleValue());");
+                sb.line("pos = JsonWriteUtils.writeDoubleReusable(buf, pos, ((Number) " + elemExpr + ").doubleValue());");
+                break;
+            case STRING:
+                varSeq++;
+                String elem = v("_elem");
+                sb.line("String " + elem + " = (String) " + elemExpr + ";");
+                sb.line("ctx.buf = buf; ctx.pos = pos;");
+                sb.line("JsonCodegenHelpers.writeQuotedStringFused(ctx, " + elem + ");");
+                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                break;
+            case ENUM_STRING:
+                sb.line("ctx.buf = buf; ctx.pos = pos;");
+                sb.line("JsonCodegenHelpers.writeQuotedStringFused(ctx, "
+                        + "((software.amazon.smithy.java.core.schema.SmithyEnum) " + elemExpr + ").getValue());");
+                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                break;
+            default:
+                // For complex elements (struct, list, etc), delegate
+                sb.line("ctx.buf = buf; ctx.pos = pos;");
+                sb.line("JsonCodegenHelpers.serializeNestedStruct(" + elemExpr + ", ctx);");
+                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                break;
+        }
+    }
+
+    /**
+     * Emits inline value write for fixed-size elements (no ensureCapacity — caller pre-allocated).
+     */
+    private void emitWriteElementInline(SourceBuilder sb, FieldCategory category, String elemExpr) {
+        switch (category) {
+            case BOOLEAN:
+                sb.line("pos = JsonWriteUtils.writeBoolean(buf, pos, ((Boolean) " + elemExpr + ").booleanValue());");
+                break;
+            case BYTE:
+            case SHORT:
+            case INTEGER:
+                sb.line("pos = JsonWriteUtils.writeInt(buf, pos, ((Number) " + elemExpr + ").intValue());");
+                break;
+            case LONG:
+                sb.line("pos = JsonWriteUtils.writeLong(buf, pos, ((Number) " + elemExpr + ").longValue());");
+                break;
+            case FLOAT:
+                sb.line("pos = JsonWriteUtils.writeFloatReusable(buf, pos, ((Number) " + elemExpr + ").floatValue());");
+                break;
+            case DOUBLE:
+                sb.line("pos = JsonWriteUtils.writeDoubleReusable(buf, pos, ((Number) " + elemExpr + ").doubleValue());");
+                break;
+            case INT_ENUM:
+                sb.line("pos = JsonWriteUtils.writeInt(buf, pos, "
+                        + "((software.amazon.smithy.java.core.schema.SmithyEnum) " + elemExpr + ").getValue());");
+                break;
+            default:
+                throw new IllegalArgumentException("emitWriteElementInline: unsupported fixed category " + category);
+        }
+    }
+
+    /**
+     * Emits element write with comma folded into element's capacity check.
+     */
+    private void emitWriteElementWithComma(
+            SourceBuilder sb,
+            FieldCategory category,
+            String elemExpr,
+            FieldPlan field,
+            String fqcn,
+            String idxVar
+    ) {
+        switch (category) {
+            case BOOLEAN:
+                sb.line("ctx.pos = pos;");
+                sb.line("ctx.ensureCapacity(6);"); // 5 + comma
+                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("if (" + idxVar + " > 0) buf[pos++] = ',';");
+                sb.line("pos = JsonWriteUtils.writeBoolean(buf, pos, ((Boolean) " + elemExpr + ").booleanValue());");
+                break;
+            case BYTE:
+            case SHORT:
+            case INTEGER:
+                sb.line("ctx.pos = pos;");
+                sb.line("ctx.ensureCapacity(12);"); // 11 + comma
+                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("if (" + idxVar + " > 0) buf[pos++] = ',';");
+                sb.line("pos = JsonWriteUtils.writeInt(buf, pos, ((Number) " + elemExpr + ").intValue());");
+                break;
+            case LONG:
+                sb.line("ctx.pos = pos;");
+                sb.line("ctx.ensureCapacity(21);"); // 20 + comma
+                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("if (" + idxVar + " > 0) buf[pos++] = ',';");
+                sb.line("pos = JsonWriteUtils.writeLong(buf, pos, ((Number) " + elemExpr + ").longValue());");
+                break;
+            case FLOAT:
+                sb.line("ctx.pos = pos;");
+                sb.line("ctx.ensureCapacity(25);"); // 24 + comma
+                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("if (" + idxVar + " > 0) buf[pos++] = ',';");
+                sb.line("pos = JsonWriteUtils.writeFloatReusable(buf, pos, ((Number) " + elemExpr + ").floatValue());");
+                break;
+            case DOUBLE:
+                sb.line("ctx.pos = pos;");
+                sb.line("ctx.ensureCapacity(25);"); // 24 + comma
+                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("if (" + idxVar + " > 0) buf[pos++] = ',';");
+                sb.line("pos = JsonWriteUtils.writeDoubleReusable(buf, pos, ((Number) " + elemExpr + ").doubleValue());");
                 break;
             case STRING:
                 varSeq++;
                 String elem = v("_elem");
                 sb.line("String " + elem + " = (String) " + elemExpr + ";");
                 sb.line("ctx.pos = pos;");
-                sb.line("ctx.ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(" + elem + "));");
+                sb.line("ctx.ensureCapacity(1);");
                 sb.line("buf = ctx.buf; pos = ctx.pos;");
-                sb.line("pos = JsonWriteUtils.writeQuotedString(buf, pos, " + elem + ");");
+                sb.line("if (" + idxVar + " > 0) buf[pos++] = ',';");
+                sb.line("ctx.buf = buf; ctx.pos = pos;");
+                sb.line("JsonCodegenHelpers.writeQuotedStringFused(ctx, " + elem + ");");
+                sb.line("buf = ctx.buf; pos = ctx.pos;");
                 break;
             case ENUM_STRING:
                 sb.line("ctx.pos = pos;");
-                sb.line("ctx.ensureCapacity(JsonWriteUtils.maxQuotedStringBytes("
-                        + "((software.amazon.smithy.java.core.schema.SmithyEnum) " + elemExpr + ").getValue()));");
+                sb.line("ctx.ensureCapacity(1);");
                 sb.line("buf = ctx.buf; pos = ctx.pos;");
-                sb.line("pos = JsonWriteUtils.writeQuotedString(buf, pos, "
+                sb.line("if (" + idxVar + " > 0) buf[pos++] = ',';");
+                sb.line("ctx.buf = buf; ctx.pos = pos;");
+                sb.line("JsonCodegenHelpers.writeQuotedStringFused(ctx, "
                         + "((software.amazon.smithy.java.core.schema.SmithyEnum) " + elemExpr + ").getValue());");
+                sb.line("buf = ctx.buf; pos = ctx.pos;");
                 break;
             default:
-                // For complex elements (struct, list, etc), delegate
+                // Complex elements: write comma separately, then delegate
+                sb.beginBlock("if (" + idxVar + " > 0)");
+                sb.line("ctx.pos = pos;");
+                sb.line("ctx.ensureCapacity(1);");
+                sb.line("buf = ctx.buf; pos = ctx.pos;");
+                sb.line("buf[pos++] = ',';");
+                sb.endBlock();
                 sb.line("ctx.buf = buf; ctx.pos = pos;");
                 sb.line("JsonCodegenHelpers.serializeNestedStruct(" + elemExpr + ", ctx);");
                 sb.line("buf = ctx.buf; pos = ctx.pos;");
