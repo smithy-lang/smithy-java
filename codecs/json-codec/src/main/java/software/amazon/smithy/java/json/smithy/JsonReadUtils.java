@@ -430,6 +430,23 @@ public final class JsonReadUtils {
         return pos;
     }
 
+    /**
+     * Checks if the bytes at buf[pos..pos+expected.length) match expected, followed by a closing quote.
+     * Returns pos + expected.length + 1 (past the closing quote) on match, or -1 on no match.
+     */
+    public static int matchFieldName(byte[] buf, int pos, int end, byte[] expected) {
+        int len = expected.length;
+        if (pos + len >= end || buf[pos + len] != '"') {
+            return -1;
+        }
+        for (int i = 0; i < len; i++) {
+            if (buf[pos + i] != expected[i]) {
+                return -1;
+            }
+        }
+        return pos + len + 1;
+    }
+
     // Month lookup: index by first two bytes of 3-letter month abbreviation
     // Jan=1, Feb=2, ..., Dec=12. Used by parseHttpDate.
     private static final int[] MONTH_LOOKUP = new int[128 * 128];
