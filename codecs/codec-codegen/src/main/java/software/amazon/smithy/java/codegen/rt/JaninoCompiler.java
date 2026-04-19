@@ -54,6 +54,7 @@ public final class JaninoCompiler {
                     sourceFinder,
                     new ClassLoaderIClassLoader(parentClassLoader));
             compiler.setClassFileCreator(classCreator);
+            compiler.setTargetVersion(21);
             compiler.setDebugSource(true);
             compiler.setDebugLines(true);
 

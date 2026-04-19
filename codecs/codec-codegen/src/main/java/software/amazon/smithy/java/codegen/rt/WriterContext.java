@@ -46,6 +46,19 @@ public final class WriterContext {
         }
     }
 
+    /**
+     * Sets pos, ensures capacity, and returns buf. Reduces the 3-line pattern
+     * {@code ctx.pos = pos; ctx.ensureCapacity(N); buf = ctx.buf; pos = ctx.pos;}
+     * to {@code buf = ctx.ensure(pos, N); pos = ctx.pos;}.
+     */
+    public byte[] ensure(int pos, int needed) {
+        this.pos = pos;
+        if (pos + needed > buf.length) {
+            buf = Arrays.copyOf(buf, Math.max(buf.length * 2, pos + needed));
+        }
+        return buf;
+    }
+
     public byte[] toByteArray() {
         return Arrays.copyOf(buf, pos);
     }

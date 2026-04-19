@@ -5,7 +5,9 @@
 
 package software.amazon.smithy.java.json.codegen;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import software.amazon.smithy.java.codegen.rt.plan.FieldCategory;
 import software.amazon.smithy.java.codegen.rt.plan.FieldPlan;
 import software.amazon.smithy.java.codegen.rt.plan.StructCodePlan;
@@ -19,6 +21,7 @@ import software.amazon.smithy.java.core.schema.SmithyEnum;
 final class JsonDeserializerCodegen {
 
     private int varSeq;
+    private final Map<String, String> nestedDeCaches = new LinkedHashMap<>();
 
     private String v(String base) {
         return base + varSeq;
@@ -26,6 +29,11 @@ final class JsonDeserializerCodegen {
 
     String generate(StructCodePlan plan, String className, String packageName) {
         varSeq = 0;
+        nestedDeCaches.clear();
+
+        // Collect nested struct types
+        collectNestedStructTypes(plan);
+
         SourceBuilder sb = new SourceBuilder();
 
         sb.line("package " + packageName + ";");
@@ -59,6 +67,12 @@ final class JsonDeserializerCodegen {
             FieldPlan field = fields.get(i);
             sb.line("private static final byte[] DN_" + i
                     + " = \"" + field.memberName() + "\".getBytes(java.nio.charset.StandardCharsets.UTF_8);");
+        }
+
+        // Cached deserializer + schema fields for nested struct types
+        for (var entry : nestedDeCaches.entrySet()) {
+            sb.line("private static final Object[] " + entry.getValue()
+                    + " = new Object[2];");
         }
         sb.emptyLine();
 
@@ -310,28 +324,26 @@ final class JsonDeserializerCodegen {
                 break;
             case ENUM_STRING:
                 sb.line("JsonReadUtils.parseString(buf, pos, end, ctx);");
-                sb.line(builderSetter + "(("
+                sb.line(builderSetter + "("
                         + field.schema().memberTarget().shapeClass().getName()
-                        + ") JsonCodegenHelpers.resolveEnum(ctx.parsedString, "
-                        + field.schema().memberTarget().shapeClass().getName() + ".class));");
+                        + ".from(ctx.parsedString));");
                 sb.line("pos = ctx.parsedEndPos;");
                 break;
             case INT_ENUM:
                 sb.line("JsonReadUtils.parseLong(buf, pos, end, ctx);");
-                sb.line(builderSetter + "(("
+                sb.line(builderSetter + "("
                         + field.schema().memberTarget().shapeClass().getName()
-                        + ") JsonCodegenHelpers.resolveIntEnum((int) ctx.parsedLong, "
-                        + field.schema().memberTarget().shapeClass().getName() + ".class));");
+                        + ".from((int) ctx.parsedLong));");
                 sb.line("pos = ctx.parsedEndPos;");
                 break;
             case STRUCT:
             case UNION:
-                String structClass = field.schema().memberTarget().shapeClass().getName();
+                Class<?> structTargetClass = field.schema().memberTarget().shapeClass();
+                String structClassName = structTargetClass.getName();
                 String nested = v("_nested");
                 sb.line("ctx.pos = pos;");
-                sb.line("Object " + nested + " = JsonCodegenHelpers.deserializeNestedStruct(ctx, "
-                        + structClass + ".class);");
-                sb.line(builderSetter + "((" + structClass + ") " + nested + ");");
+                sb.line("Object " + nested + " = " + deserializeNestedCallExpr(structTargetClass) + ";");
+                sb.line(builderSetter + "((" + structClassName + ") " + nested + ");");
                 sb.line("pos = ctx.pos;");
                 break;
             case DOCUMENT:
@@ -543,15 +555,13 @@ final class JsonDeserializerCodegen {
                 break;
             case ENUM_STRING:
                 sb.line("JsonReadUtils.parseString(buf, pos, end, ctx);");
-                sb.line(listVar + ".add(JsonCodegenHelpers.resolveEnum(ctx.parsedString, "
-                        + field.elementClass().getName() + ".class));");
+                sb.line(listVar + ".add(" + field.elementClass().getName() + ".from(ctx.parsedString));");
                 sb.line("pos = ctx.parsedEndPos;");
                 break;
             default:
                 // For complex elements, delegate
                 sb.line("ctx.pos = pos;");
-                sb.line(listVar + ".add(JsonCodegenHelpers.deserializeNestedStruct(ctx, "
-                        + field.elementClass().getName() + ".class));");
+                sb.line(listVar + ".add(" + deserializeNestedCallExpr(field.elementClass()) + ");");
                 sb.line("pos = ctx.pos;");
                 break;
         }
@@ -606,15 +616,14 @@ final class JsonDeserializerCodegen {
                 break;
             case ENUM_STRING:
                 sb.line("JsonReadUtils.parseString(buf, pos, end, ctx);");
-                sb.line(mapVar + ".put(" + keyVar + ", JsonCodegenHelpers.resolveEnum(ctx.parsedString, "
-                        + field.mapValueClass().getName() + ".class));");
+                sb.line(mapVar + ".put(" + keyVar + ", " + field.mapValueClass().getName()
+                        + ".from(ctx.parsedString));");
                 sb.line("pos = ctx.parsedEndPos;");
                 break;
             default:
                 // For complex values, delegate
                 sb.line("ctx.pos = pos;");
-                sb.line(mapVar + ".put(" + keyVar + ", JsonCodegenHelpers.deserializeNestedStruct(ctx, "
-                        + field.mapValueClass().getName() + ".class));");
+                sb.line(mapVar + ".put(" + keyVar + ", " + deserializeNestedCallExpr(field.mapValueClass()) + ");");
                 sb.line("pos = ctx.pos;");
                 break;
         }
@@ -665,6 +674,61 @@ final class JsonDeserializerCodegen {
             return FieldCategory.ENUM_STRING;
         }
         return FieldCategory.STRUCT;
+    }
+
+    private void collectNestedStructTypes(StructCodePlan plan) {
+        for (FieldPlan field : plan.fields()) {
+            switch (field.category()) {
+                case STRUCT:
+                case UNION:
+                    registerNestedDeCache(field.schema().memberTarget().shapeClass());
+                    break;
+                case LIST:
+                    Class<?> elemClass = field.elementClass();
+                    if (elemClass != null && !isSimpleType(elemClass)) {
+                        registerNestedDeCache(elemClass);
+                    }
+                    break;
+                case MAP:
+                    Class<?> valClass = field.mapValueClass();
+                    if (valClass != null && !isSimpleType(valClass)) {
+                        registerNestedDeCache(valClass);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    private void registerNestedDeCache(Class<?> clazz) {
+        if (clazz != null) {
+            nestedDeCaches.computeIfAbsent(clazz.getName(), k -> "_DE_" + clazz.getSimpleName());
+        }
+    }
+
+    private String getDeCacheField(Class<?> clazz) {
+        return nestedDeCaches.get(clazz.getName());
+    }
+
+    private static boolean isSimpleType(Class<?> clazz) {
+        return clazz == String.class || clazz == Integer.class || clazz == Long.class
+                || clazz == Double.class || clazz == Float.class || clazz == Boolean.class
+                || clazz == Short.class || clazz == Byte.class
+                || clazz == int.class || clazz == long.class || clazz == double.class
+                || clazz == float.class || clazz == boolean.class || clazz == short.class
+                || clazz == byte.class || SmithyEnum.class.isAssignableFrom(clazz);
+    }
+
+    private String deserializeNestedCallExpr(Class<?> targetClass) {
+        String cacheField = targetClass != null ? getDeCacheField(targetClass) : null;
+        if (cacheField != null) {
+            return "JsonCodegenHelpers.deserializeNestedStructDirect(ctx, "
+                    + cacheField + ", " + targetClass.getName() + ".class)";
+        } else {
+            return "JsonCodegenHelpers.deserializeNestedStruct(ctx, "
+                    + targetClass.getName() + ".class)";
+        }
     }
 
     private static int computeFnv1a(String fieldName) {
