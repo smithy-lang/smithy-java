@@ -385,17 +385,16 @@ final class ClassFileJsonSerializerGenerator {
     // ---- Bytecode emit helpers ----
 
     private void emitEnsure(CodeBuilder code, ClassDesc thisClass, int needed) {
-        // buf = ctx.ensure(pos, needed); pos = ctx.pos;
+        // buf = ctx.ensure(pos, needed)
+        // Note: ensure() sets ctx.pos = pos (unchanged) and may grow buf.
+        // We only need the returned buf; pos stays in our local slot.
         code.aload(2); // ctx
-        code.dup(); // ctx, ctx - keep for pos read
         code.iload(SLOT_POS);
         code.ldc(needed);
         code.invokevirtual(CD_WriterContext,
                 "ensure",
                 MethodTypeDesc.of(CD_byte_array, CD_int, CD_int));
-        code.astore(SLOT_BUF); // stack: ctx
-        code.getfield(CD_WriterContext, "pos", CD_int);
-        code.istore(SLOT_POS);
+        code.astore(SLOT_BUF);
     }
 
     private void emitWriteByte(CodeBuilder code, char b) {
@@ -1330,18 +1329,19 @@ final class ClassFileJsonSerializerGenerator {
         if (elemCategory.isFixedSize() && !field.sparse()) {
             // Batch capacity: [ + ] + N * (element bound + comma)
             int elemBound = elemCategory.fixedSizeUpperBound();
-            emitSyncPosToCtx(code);
-            code.aload(2);
+            // Use ensure(pos, needed) to avoid ctx.pos round-trip
+            code.aload(2); // ctx
+            code.iload(SLOT_POS);
             code.iconst_2();
             code.aload(listSlot);
             code.invokeinterface(CD_List, "size", MethodTypeDesc.of(CD_int));
             code.ldc(elemBound + 1);
             code.imul();
-            code.iadd();
+            code.iadd(); // needed = 2 + size * (elemBound + 1)
             code.invokevirtual(CD_WriterContext,
-                    "ensureCapacity",
-                    MethodTypeDesc.of(CD_void, CD_int));
-            emitSyncFromCtx(code);
+                    "ensure",
+                    MethodTypeDesc.of(CD_byte_array, CD_int, CD_int));
+            code.astore(SLOT_BUF); // buf may have changed
 
             emitWriteByte(code, '[');
 
