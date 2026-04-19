@@ -3,6 +3,16 @@ plugins {
     alias(libs.plugins.shadow)
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+tasks.withType<JavaCompile> {
+    options.release.set(25)
+}
+
 description = "Runtime code generation framework for specialized codec serializers/deserializers"
 
 extra["displayName"] = "Smithy :: Java :: Codec Codegen"

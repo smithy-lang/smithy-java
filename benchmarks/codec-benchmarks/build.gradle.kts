@@ -4,6 +4,16 @@ plugins {
     id("software.amazon.smithy.gradle.smithy-base")
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+tasks.withType<JavaCompile> {
+    options.release.set(25)
+}
+
 description = "Codec benchmarks for Smithy Java serialization codecs"
 
 dependencies {

@@ -3,6 +3,16 @@ plugins {
     id("software.amazon.smithy.gradle.smithy-base")
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+tasks.withType<JavaCompile> {
+    options.release.set(25)
+}
+
 description = "Runtime code generation for specialized JSON serializers/deserializers"
 
 extra["displayName"] = "Smithy :: Java :: JSON Codec Codegen"

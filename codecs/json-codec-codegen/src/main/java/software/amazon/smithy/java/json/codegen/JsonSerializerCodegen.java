@@ -122,12 +122,21 @@ final class JsonSerializerCodegen {
     }
 
     private static boolean isSimpleType(Class<?> clazz) {
-        return clazz == String.class || clazz == Integer.class || clazz == Long.class
-                || clazz == Double.class || clazz == Float.class || clazz == Boolean.class
-                || clazz == Short.class || clazz == Byte.class
-                || clazz == int.class || clazz == long.class || clazz == double.class
-                || clazz == float.class || clazz == boolean.class || clazz == short.class
-                || clazz == byte.class || SmithyEnum.class.isAssignableFrom(clazz);
+        return clazz == String.class || clazz == Integer.class
+                || clazz == Long.class
+                || clazz == Double.class
+                || clazz == Float.class
+                || clazz == Boolean.class
+                || clazz == Short.class
+                || clazz == Byte.class
+                || clazz == int.class
+                || clazz == long.class
+                || clazz == double.class
+                || clazz == float.class
+                || clazz == boolean.class
+                || clazz == short.class
+                || clazz == byte.class
+                || SmithyEnum.class.isAssignableFrom(clazz);
     }
 
     private void generateFieldConstants(SourceBuilder sb, StructCodePlan plan) {
@@ -662,7 +671,8 @@ final class JsonSerializerCodegen {
             case DOUBLE:
                 sb.line("buf = ctx.ensure(pos, 24);");
                 sb.line("pos = ctx.pos;");
-                sb.line("pos = JsonWriteUtils.writeDoubleReusable(buf, pos, ((Number) " + elemExpr + ").doubleValue());");
+                sb.line("pos = JsonWriteUtils.writeDoubleReusable(buf, pos, ((Number) " + elemExpr
+                        + ").doubleValue());");
                 break;
             case STRING:
                 varSeq++;
@@ -708,7 +718,8 @@ final class JsonSerializerCodegen {
                 sb.line("pos = JsonWriteUtils.writeFloatReusable(buf, pos, ((Number) " + elemExpr + ").floatValue());");
                 break;
             case DOUBLE:
-                sb.line("pos = JsonWriteUtils.writeDoubleReusable(buf, pos, ((Number) " + elemExpr + ").doubleValue());");
+                sb.line("pos = JsonWriteUtils.writeDoubleReusable(buf, pos, ((Number) " + elemExpr
+                        + ").doubleValue());");
                 break;
             case INT_ENUM:
                 sb.line("pos = JsonWriteUtils.writeInt(buf, pos, "
@@ -766,7 +777,8 @@ final class JsonSerializerCodegen {
                 sb.line("ctx.ensureCapacity(25);"); // 24 + comma
                 sb.line("buf = ctx.buf; pos = ctx.pos;");
                 sb.line("if (" + idxVar + " > 0) buf[pos++] = ',';");
-                sb.line("pos = JsonWriteUtils.writeDoubleReusable(buf, pos, ((Number) " + elemExpr + ").doubleValue());");
+                sb.line("pos = JsonWriteUtils.writeDoubleReusable(buf, pos, ((Number) " + elemExpr
+                        + ").doubleValue());");
                 break;
             case STRING:
                 varSeq++;
