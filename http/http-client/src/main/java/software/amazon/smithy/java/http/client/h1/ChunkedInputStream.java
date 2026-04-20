@@ -36,18 +36,18 @@ final class ChunkedInputStream extends InputStream {
     }
 
     private static long readMaxChunkSize() {
-        String property = System.getProperty("SMITHY_HTTP_CLIENT_MAX_CHUNK_SIZE");
+        String property = System.getProperty("smithy.http.client.maxChunkSize");
         if (property == null) {
             return DEFAULT_MAX_CHUNK_SIZE;
         }
         try {
             long size = Long.parseLong(property);
             if (size <= 0) {
-                throw new IllegalArgumentException("SMITHY_HTTP_CLIENT_MAX_CHUNK_SIZE must be positive: " + size);
+                throw new IllegalArgumentException("smithy.http.client.maxChunkSize must be positive: " + size);
             }
             return size;
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid SMITHY_HTTP_CLIENT_MAX_CHUNK_SIZE: " + property, e);
+            throw new IllegalArgumentException("Invalid smithy.http.client.maxChunkSize: " + property, e);
         }
     }
 

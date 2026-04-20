@@ -122,6 +122,7 @@ final class H2Muxer implements AutoCloseable {
     private final H2FrameCodec frameCodec;
     private final ByteAllocator allocator;
     private final int initialWindowSize;
+    private volatile Runnable streamReleaseCallback;
 
     // === WORK QUEUES ===
     // CLQ + LockSupport for lock-free work submission without DelayScheduler overhead
@@ -262,11 +263,19 @@ final class H2Muxer implements AutoCloseable {
     void releaseStream(int streamId) {
         if (streams.remove(streamId)) {
             activeStreamCount.decrementAndGet();
+            Runnable cb = streamReleaseCallback;
+            if (cb != null) {
+                cb.run();
+            }
         }
     }
 
     void releaseStreamSlot() {
         activeStreamCount.decrementAndGet();
+        Runnable cb = streamReleaseCallback;
+        if (cb != null) {
+            cb.run();
+        }
     }
 
     int allocateAndRegisterStream(H2Exchange exchange) {
@@ -428,7 +437,7 @@ final class H2Muxer implements AutoCloseable {
             case RST_STREAM -> new H2MuxerWorkItem.WriteRst(streamId, (Integer) payload);
             case WINDOW_UPDATE -> new H2MuxerWorkItem.WriteWindowUpdate(streamId, (Integer) payload);
             case SETTINGS_ACK -> SETTINGS_ACK;
-            case PING -> new H2MuxerWorkItem.WritePing((byte[]) payload, false);
+            case PING -> new H2MuxerWorkItem.WritePing((byte[]) payload, true); // PING needs ACK
             case GOAWAY -> {
                 Object[] args = (Object[]) payload;
                 yield new H2MuxerWorkItem.WriteGoaway((Integer) args[0], (Integer) args[1], (String) args[2]);
@@ -485,6 +494,10 @@ final class H2Muxer implements AutoCloseable {
 
     int getInitialWindowSize() {
         return initialWindowSize;
+    }
+
+    void setStreamReleaseCallback(Runnable callback) {
+        this.streamReleaseCallback = callback;
     }
 
     /**

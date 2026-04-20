@@ -197,13 +197,16 @@ public final class H1Exchange implements HttpExchange {
     public void close() throws IOException {
         if (!closed) {
             closed = true;
-            if (responseIn != null) {
-                responseIn.close();
+            try {
+                if (responseIn != null) {
+                    responseIn.close();
+                }
+                if (requestOut != null) {
+                    requestOut.close();
+                }
+            } finally {
+                connection.releaseExchange();
             }
-            if (requestOut != null) {
-                requestOut.close();
-            }
-            connection.releaseExchange();
         }
     }
 
@@ -285,7 +288,6 @@ public final class H1Exchange implements HttpExchange {
         } catch (SocketTimeoutException e) {
             // Timeout waiting for 100 Continue - proceed with body anyway
             // Some servers don't support 100-continue and just ignore it
-            return;
         } finally {
             // Restore original timeout
             try {
@@ -467,7 +469,7 @@ public final class H1Exchange implements HttpExchange {
 
         ModifiableHttpHeaders headers = HttpHeaders.ofModifiable();
         int headerCount = 0;
-        boolean sawConnectionClose = false;
+        Boolean keepAlive = null;
 
         int lineLen;
         while ((lineLen = readLine(in)) > 0) {
@@ -483,23 +485,20 @@ public final class H1Exchange implements HttpExchange {
                         + new String(responseLineBuffer, 0, lineLen, StandardCharsets.US_ASCII));
             }
 
-            // Check Connection header to determine keep-alive behavior
-            // HTTP/1.1 defaults to keep-alive, HTTP/1.0 defaults to close
             if ("connection".equals(name)) {
                 String value = headers.firstValue(name);
                 if ("close".equalsIgnoreCase(value)) {
-                    sawConnectionClose = true;
+                    keepAlive = false;
                 } else if ("keep-alive".equalsIgnoreCase(value)) {
-                    // Explicit keep-alive (needed for HTTP/1.0)
-                    connection.setKeepAlive(true);
+                    keepAlive = true;
                 }
             }
         }
 
         this.responseHeaders = headers;
 
-        if (sawConnectionClose) {
-            connection.setKeepAlive(false);
+        if (keepAlive != null) {
+            connection.setKeepAlive(keepAlive);
         }
     }
 
