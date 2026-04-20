@@ -24,7 +24,7 @@ import software.amazon.smithy.java.http.api.HttpVersion;
 final class BufferedHttpExchange implements HttpExchange {
     private final HttpRequest request;
     private final HttpResponse response;
-    private final OutputStream noopRequestBody = OutputStream.nullOutputStream();
+    private static final OutputStream NO_OP = OutputStream.nullOutputStream();
 
     BufferedHttpExchange(HttpRequest request, HttpResponse response) {
         this.request = request;
@@ -39,7 +39,7 @@ final class BufferedHttpExchange implements HttpExchange {
     @Override
     public OutputStream requestBody() {
         // No-op - request was never sent (short-circuited)
-        return noopRequestBody;
+        return NO_OP;
     }
 
     @Override

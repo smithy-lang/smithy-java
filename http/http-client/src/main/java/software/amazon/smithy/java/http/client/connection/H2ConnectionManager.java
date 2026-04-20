@@ -55,7 +55,6 @@ final class H2ConnectionManager {
     private static final int DEFAULT_SOFT_LIMIT_FLOOR = 25;
 
     private final ConcurrentHashMap<Route, RouteState> routes = new ConcurrentHashMap<>();
-    private final int streamsPerConnection;
     private final H2LoadBalancer loadBalancer;
     private final long acquireTimeoutMs;
     private final List<ConnectionPoolListener> listeners;
@@ -73,7 +72,6 @@ final class H2ConnectionManager {
             List<ConnectionPoolListener> listeners,
             ConnectionFactory connectionFactory
     ) {
-        this.streamsPerConnection = streamsPerConnection;
         this.acquireTimeoutMs = acquireTimeoutMs;
         this.listeners = listeners;
         this.connectionFactory = connectionFactory;
@@ -134,6 +132,22 @@ final class H2ConnectionManager {
                     notifyAcquire(snapshot[selected], true);
                     return snapshot[selected];
                 } else if (selected == H2LoadBalancer.CREATE_NEW && canExpand) {
+                    if (state.pendingCreations > 0) {
+                        // Another thread is already creating a connection, wait for it
+                        // instead of creating a redundant one.
+                        long remainingNanos = deadlineNanos - System.nanoTime();
+                        if (remainingNanos <= 0) {
+                            throw new IOException("Acquire timeout: no connection available after "
+                                    + acquireTimeoutMs + "ms for " + route);
+                        }
+                        try {
+                            state.available.awaitNanos(remainingNanos);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            throw new IOException("Interrupted while waiting for connection", e);
+                        }
+                        continue;
+                    }
                     state.pendingCreations++;
                     break;
                 }
@@ -167,6 +181,15 @@ final class H2ConnectionManager {
         IOException createException = null;
         try {
             newConn = connectionFactory.create(route);
+            // Signal waiters when a stream is released so they can re-check capacity
+            newConn.setStreamReleaseCallback(() -> {
+                state.lock.lock();
+                try {
+                    state.available.signalAll();
+                } finally {
+                    state.lock.unlock();
+                }
+            });
         } catch (IOException e) {
             createException = e;
         } finally {

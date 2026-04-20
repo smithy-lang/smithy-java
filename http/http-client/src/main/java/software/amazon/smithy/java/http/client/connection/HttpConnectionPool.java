@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.http.client.connection;
 
 import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -15,7 +14,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import javax.net.ssl.SSLContext;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 import software.amazon.smithy.java.http.client.h2.H2Connection;
 
@@ -160,22 +158,13 @@ public final class HttpConnectionPool implements ConnectionPool {
         this.acquireTimeoutMs = builder.acquireTimeout.toMillis();
         this.versionPolicy = builder.versionPolicy;
         DnsResolver dnsResolver = builder.dnsResolver != null ? builder.dnsResolver : DnsResolver.system();
-        SSLContext sslContext = builder.sslContext;
-
-        if (sslContext == null) {
-            try {
-                sslContext = SSLContext.getDefault();
-            } catch (NoSuchAlgorithmException e) {
-                throw new IllegalStateException("No default SSLContext available", e);
-            }
-        }
 
         this.connectionFactory = new HttpConnectionFactory(
                 builder.connectTimeout,
                 builder.tlsNegotiationTimeout,
                 builder.readTimeout,
                 builder.writeTimeout,
-                sslContext,
+                builder.sslContext,
                 builder.sslParameters,
                 builder.versionPolicy,
                 dnsResolver,

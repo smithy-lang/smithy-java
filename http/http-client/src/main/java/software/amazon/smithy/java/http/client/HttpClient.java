@@ -152,7 +152,7 @@ public interface HttpClient extends AutoCloseable {
         }
 
         /**
-         * Add an interceptor to the front of the list of interceptors ot apply.
+         * Add an interceptor to the front of the list of interceptors to apply.
          *
          * @param interceptor the interceptor to add to the front.
          * @return this builder
