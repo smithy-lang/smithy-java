@@ -169,6 +169,14 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         this.readerThread = Thread.ofVirtual().name("h2-reader-" + route.host()).start(this::readerLoop);
     }
 
+    /**
+     * Set a callback to be invoked when an H2 stream is released.
+     * Used by the connection manager to signal waiters when capacity becomes available.
+     */
+    public void setStreamReleaseCallback(Runnable callback) {
+        muxer.setStreamReleaseCallback(callback);
+    }
+
     // ==================== ConnectionCallback implementation ====================
 
     @Override
@@ -189,7 +197,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
 
     private void readerLoop() {
         try {
-            while (state.get() == State.CONNECTED) {
+            while (state.get() != State.CLOSED) {
                 int type = frameCodec.nextFrame();
                 if (type < 0) {
                     break; // EOF

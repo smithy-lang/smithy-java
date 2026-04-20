@@ -6,7 +6,9 @@
 package software.amazon.smithy.java.http.client.h2;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 class FlowControlWindowTest {
@@ -96,5 +98,60 @@ class FlowControlWindowTest {
         }
 
         assertEquals(1000, window.available(), "Window should be back to initial");
+    }
+
+    @Nested
+    class BlockingAcquireTest {
+
+        @Test
+        void tryAcquireUpToReturnsImmediatelyWhenWindowAvailable() throws InterruptedException {
+            var window = new FlowControlWindow(1000);
+            int acquired = window.tryAcquireUpTo(500, 1000);
+
+            assertEquals(500, acquired);
+            assertEquals(500, window.available());
+        }
+
+        @Test
+        void tryAcquireUpToReturnsPartialWhenWindowSmaller() throws InterruptedException {
+            var window = new FlowControlWindow(100);
+            int acquired = window.tryAcquireUpTo(500, 1000);
+
+            assertEquals(100, acquired);
+            assertEquals(0, window.available());
+        }
+
+        @Test
+        void tryAcquireUpToTimesOutWhenWindowEmpty() throws InterruptedException {
+            var window = new FlowControlWindow(0);
+            long start = System.nanoTime();
+            int acquired = window.tryAcquireUpTo(100, 50);
+            long elapsed = (System.nanoTime() - start) / 1_000_000;
+
+            assertEquals(0, acquired);
+            assertTrue(elapsed >= 40, "Should have waited ~50ms, waited " + elapsed + "ms");
+        }
+
+        @Test
+        void tryAcquireUpToWakesOnRelease() throws InterruptedException {
+            var window = new FlowControlWindow(0);
+
+            Thread releaser = Thread.startVirtualThread(() -> {
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                window.release(200);
+            });
+
+            long start = System.nanoTime();
+            int acquired = window.tryAcquireUpTo(100, 5000);
+            long elapsed = (System.nanoTime() - start) / 1_000_000;
+
+            assertEquals(100, acquired);
+            assertTrue(elapsed < 2000, "Should have woken up quickly after release, took " + elapsed + "ms");
+            releaser.join(1000);
+        }
     }
 }
