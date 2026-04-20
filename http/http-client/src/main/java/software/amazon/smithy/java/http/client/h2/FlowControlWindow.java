@@ -75,14 +75,14 @@ final class FlowControlWindow {
             }
 
             // Slow path: poll with short intervals to avoid timed-wait contention
-            long remainingNs = TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+            long deadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
             while (window <= 0) {
+                long remainingNs = deadlineNs - System.nanoTime();
                 if (remainingNs <= 0) {
                     return 0; // Timeout
                 }
                 // Use short poll interval instead of full timeout
-                long waitNs = Math.min(remainingNs, POLL_INTERVAL_NS);
-                remainingNs = available.awaitNanos(waitNs);
+                available.awaitNanos(Math.min(remainingNs, POLL_INTERVAL_NS));
             }
 
             int acquired = (int) Math.min(window, maxBytes);

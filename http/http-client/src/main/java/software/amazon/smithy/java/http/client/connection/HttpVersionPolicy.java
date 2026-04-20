@@ -35,7 +35,7 @@ public enum HttpVersionPolicy {
      * @return array of ALPN protocol strings in preference order
      */
     public String[] alpnProtocols() {
-        return alpnProtocols;
+        return alpnProtocols.clone();
     }
 
     /**
