@@ -7,6 +7,7 @@ package software.amazon.smithy.java.http.client.h1;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 
@@ -174,15 +175,16 @@ final class ChunkedOutputStream extends OutputStream {
         delegate.writeAscii("0\r\n");
 
         if (trailers != null) {
-            for (var entry : trailers.map().entrySet()) {
-                String name = entry.getKey();
-                for (String value : entry.getValue()) {
-                    delegate.writeAscii(name);
-                    delegate.writeAscii(": ");
-                    delegate.writeAscii(value);
-                    delegate.writeAscii("\r\n");
+            trailers.forEachEntry(delegate, (d, name, value) -> {
+                try {
+                    d.writeAscii(name);
+                    d.writeAscii(": ");
+                    d.writeAscii(value);
+                    d.writeAscii("\r\n");
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
                 }
-            }
+            });
         }
 
         delegate.writeAscii("\r\n");
