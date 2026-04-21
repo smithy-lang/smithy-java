@@ -76,7 +76,7 @@ public final class H1Connection implements HttpConnection {
      */
     public H1Connection(Socket socket, Route route, Duration readTimeout) throws IOException {
         this.socket = socket;
-        this.socketIn = new UnsyncBufferedInputStream(socket.getInputStream(), 8192);
+        this.socketIn = new UnsyncBufferedInputStream(socket.getInputStream(), 16384);
         this.socketOut = new UnsyncBufferedOutputStream(socket.getOutputStream(), 8192);
         this.route = route;
         this.lineBuffer = new byte[RESPONSE_LINE_BUFFER_SIZE];

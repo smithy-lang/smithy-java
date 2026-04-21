@@ -504,20 +504,17 @@ public final class H2Exchange implements HttpExchange {
                 }
 
                 // Wait for data to arrive using lock-free signaling
-                // 1. Register ourselves as the waiting thread
-                // 2. Release lock (so producer can add data)
-                // 3. Park (will be unparked by producer)
-                // 4. Reacquire lock and clear waiting thread
-                waitingThread = Thread.currentThread();
+                // Release lock so producer can add data, then wait
                 dataLock.unlock();
                 try {
+                    waitingThread = Thread.currentThread();
                     LockSupport.park();
                     if (Thread.interrupted()) {
                         throw new IOException("Interrupted waiting for data");
                     }
                 } finally {
-                    dataLock.lock();
                     waitingThread = null;
+                    dataLock.lock();
                 }
             }
 

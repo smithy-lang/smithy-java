@@ -669,15 +669,19 @@ final class H2Muxer implements AutoCloseable {
         int streamId = exchange.getStreamId();
         PendingWrite pw;
         while ((pw = exchange.pendingWrites.poll()) != null) {
-            byte[] buffer = pw.data;
+            byte[] buffer = pw.borrowed ? pw.data : null;
             try {
                 frameCodec.writeFrame(FRAME_TYPE_DATA, pw.flags, streamId, pw.data, pw.offset, pw.length);
             } catch (IOException e) {
-                exchange.returnBuffer(buffer);
+                if (buffer != null) {
+                    exchange.returnBuffer(buffer);
+                }
                 failWriter(e);
                 return;
             }
-            exchange.returnBuffer(buffer);
+            if (buffer != null) {
+                exchange.returnBuffer(buffer);
+            }
             pw.reset();
         }
 
@@ -754,8 +758,13 @@ final class H2Muxer implements AutoCloseable {
             exchange.onHeadersEncoded(req.endStream);
             frameCodec.writeHeaders(streamId, headerEncoder.buffer(), 0, headerEncoder.size(), req.endStream);
 
-            // Stream ID is already set on exchange by allocateAndRegisterStream
-            // Caller will read it after awaitWriteCompletion returns
+            // For end-stream requests (e.g. GET), signal the VT immediately after headers are buffered.
+            // The VT can start waiting for the response while the flush happens asynchronously.
+            // For requests with a body, the VT needs to wait for the flush before sending data frames.
+            if (req.endStream) {
+                exchange.signalWriteSuccess();
+                req.signaled = true;
+            }
 
         } catch (Exception e) {
             releaseStream(streamId);
@@ -773,8 +782,12 @@ final class H2Muxer implements AutoCloseable {
 
     private void completeItem(H2MuxerWorkItem item, IOException error) {
         // Get the exchange to signal (only EncodeHeaders has an exchange directly)
-        H2Exchange exchange = (item instanceof H2MuxerWorkItem.EncodeHeaders h) ? h.exchange : null;
-        if (exchange != null) {
+        if (item instanceof H2MuxerWorkItem.EncodeHeaders h) {
+            // Skip if already signaled early (end-stream fast path)
+            if (h.signaled && error == null) {
+                return;
+            }
+            H2Exchange exchange = h.exchange;
             if (error == null) {
                 exchange.signalWriteSuccess();
             } else {

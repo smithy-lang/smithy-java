@@ -60,8 +60,6 @@ final class DefaultHttpClient implements HttpClient {
                 try (OutputStream out = exchange.requestBody()) {
                     requestBody.writeTo(out);
                 }
-            } else {
-                exchange.requestBody().close();
             }
         } catch (IOException e) {
             exchange.close();

@@ -10,7 +10,7 @@ package software.amazon.smithy.java.http.client.h2;
  */
 final class PendingWrite {
     /**
-     * The data buffer (borrowed from ByteAllocator).
+     * The data buffer (borrowed from ByteAllocator, or direct reference).
      */
     byte[] data;
 
@@ -34,6 +34,11 @@ final class PendingWrite {
     int flags;
 
     /**
+     * Whether the data buffer was borrowed from the pool and should be returned.
+     */
+    boolean borrowed;
+
+    /**
      * Initialize this pending write with data.
      *
      * @param data   the data buffer
@@ -46,6 +51,16 @@ final class PendingWrite {
         this.offset = offset;
         this.length = length;
         this.flags = flags;
+        this.borrowed = true;
+        return this;
+    }
+
+    PendingWrite initDirect(byte[] data, int offset, int length, int flags) {
+        this.data = data;
+        this.offset = offset;
+        this.length = length;
+        this.flags = flags;
+        this.borrowed = false;
         return this;
     }
 
@@ -57,5 +72,6 @@ final class PendingWrite {
         this.offset = 0;
         this.length = 0;
         this.flags = 0;
+        this.borrowed = false;
     }
 }
