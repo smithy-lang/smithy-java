@@ -28,7 +28,7 @@ final class H2DataInputStream extends InputStream {
     /**
      * Number of chunks to pull in a single batch. This reduces lock acquisitions by 8x for large responses.
      */
-    private static final int BATCH_SIZE = 8;
+    private static final int BATCH_SIZE = 32;
 
     private final H2Exchange exchange;
     private final Consumer<byte[]> bufferReturner;
