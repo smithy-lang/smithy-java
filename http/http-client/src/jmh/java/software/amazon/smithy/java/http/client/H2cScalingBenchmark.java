@@ -230,7 +230,7 @@ public class H2cScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void smithy(Counter counter) throws InterruptedException {
+    public void h2cSmithyGet(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2C_URL + "/get");
         var request = HttpRequest.create().setUri(uri).setMethod("GET");
 
@@ -245,7 +245,7 @@ public class H2cScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void helidon(Counter counter) throws InterruptedException {
+    public void h2cHelidonGet(Counter counter) throws InterruptedException {
         BenchmarkSupport.runBenchmark(concurrency, totalRequests, (Http2Client client) -> {
             try (HttpClientResponse response = client.get("/get").request()) {
                 response.entity().consume();
@@ -257,7 +257,7 @@ public class H2cScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void smithyPost(Counter counter) throws InterruptedException {
+    public void h2cSmithyPost(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2C_URL + "/post");
         var request = HttpRequest.create()
                 .setUri(uri)
@@ -275,7 +275,7 @@ public class H2cScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void smithyPutMb(Counter counter) throws InterruptedException {
+    public void h2cSmithyPutMb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2C_URL + "/putmb");
         var request = HttpRequest.create()
                 .setUri(uri)
@@ -293,7 +293,7 @@ public class H2cScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void smithyGetMb(Counter counter) throws InterruptedException {
+    public void h2cSmithyGetMb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2C_URL + "/getmb");
         var request = HttpRequest.create().setUri(uri).setMethod("GET");
 
@@ -308,7 +308,7 @@ public class H2cScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void netty(Counter counter) throws Exception {
+    public void h2cNettyGet(Counter counter) throws Exception {
         DefaultHttp2Headers headers = new DefaultHttp2Headers();
         headers.method("GET");
         headers.path("/get");
@@ -366,7 +366,7 @@ public class H2cScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void nettyGetMb(Counter counter) throws Exception {
+    public void h2cNettyGetMb(Counter counter) throws Exception {
         DefaultHttp2Headers headers = new DefaultHttp2Headers();
         headers.method("GET");
         headers.path("/getmb");
@@ -431,7 +431,7 @@ public class H2cScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void nettyPost(Counter counter) throws Exception {
+    public void h2cNettyPost(Counter counter) throws Exception {
         DefaultHttp2Headers headers = new DefaultHttp2Headers();
         headers.method("POST");
         headers.path("/post");
@@ -495,7 +495,7 @@ public class H2cScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void nettyPutMb(Counter counter) throws Exception {
+    public void h2cNettyPutMb(Counter counter) throws Exception {
         DefaultHttp2Headers headers = new DefaultHttp2Headers();
         headers.method("PUT");
         headers.path("/putmb");

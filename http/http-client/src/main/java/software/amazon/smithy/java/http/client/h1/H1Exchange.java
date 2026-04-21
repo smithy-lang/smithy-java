@@ -8,6 +8,7 @@ package software.amazon.smithy.java.http.client.h1;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.http.api.HeaderUtils;
@@ -358,15 +359,16 @@ public final class H1Exchange implements HttpExchange {
         }
 
         // Write all headers
-        for (var entry : headers.map().entrySet()) {
-            String name = entry.getKey();
-            for (String value : entry.getValue()) {
-                out.writeAscii(name);
-                out.write(COLON_SPACE);
-                out.writeAscii(value);
-                out.write(CRLF);
+        headers.forEachEntry(out, (o, name, value) -> {
+            try {
+                o.writeAscii(name);
+                o.write(COLON_SPACE);
+                o.writeAscii(value);
+                o.write(CRLF);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
             }
-        }
+        });
 
         // Blank line to end headers
         out.write(CRLF);
