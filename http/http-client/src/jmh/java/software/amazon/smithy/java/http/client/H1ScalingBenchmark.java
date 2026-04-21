@@ -161,7 +161,7 @@ public class H1ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void smithy(Counter counter) throws InterruptedException {
+    public void h1SmithyGet(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H1_URL + "/get");
         var request = HttpRequest.create().setUri(uri).setMethod("GET");
 
@@ -174,7 +174,7 @@ public class H1ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void apache(Counter counter) throws InterruptedException {
+    public void h1ApacheGet(Counter counter) throws InterruptedException {
         var target = BenchmarkSupport.H1_URL + "/get";
 
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (String url) -> {
@@ -188,7 +188,7 @@ public class H1ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void helidon(Counter counter) throws InterruptedException {
+    public void h1HelidonGet(Counter counter) throws InterruptedException {
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (WebClient client) -> {
             try (HttpClientResponse response = client.get("/get").request()) {
                 response.entity().consume();
@@ -200,7 +200,7 @@ public class H1ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void javaHttpClient(Counter counter) throws InterruptedException {
+    public void h1JdkGet(Counter counter) throws InterruptedException {
         var request = java.net.http.HttpRequest.newBuilder()
                 .uri(URI.create(BenchmarkSupport.H1_URL + "/get"))
                 .GET()
@@ -218,7 +218,7 @@ public class H1ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void smithyPost(Counter counter) throws InterruptedException {
+    public void h1SmithyPost(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H1_URL + "/post");
         var request = HttpRequest.create()
                 .setUri(uri)
@@ -234,7 +234,7 @@ public class H1ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void apachePost(Counter counter) throws InterruptedException {
+    public void h1ApachePost(Counter counter) throws InterruptedException {
         var target = BenchmarkSupport.H1_URL + "/post";
 
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (String url) -> {
@@ -250,7 +250,7 @@ public class H1ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void javaHttpClientPost(Counter counter) throws InterruptedException {
+    public void h1JdkPost(Counter counter) throws InterruptedException {
         var request = java.net.http.HttpRequest.newBuilder()
                 .uri(URI.create(BenchmarkSupport.H1_URL + "/post"))
                 .POST(BodyPublishers.ofByteArray(BenchmarkSupport.POST_PAYLOAD))

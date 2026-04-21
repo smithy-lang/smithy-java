@@ -125,7 +125,7 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void smithy(Counter counter) throws InterruptedException {
+    public void h2SmithyGet(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/get");
         var request = HttpRequest.create().setUri(uri).setMethod("GET");
 
@@ -140,7 +140,7 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void javaHttpClient(Counter counter) throws InterruptedException {
+    public void h2JdkGet(Counter counter) throws InterruptedException {
         var request = java.net.http.HttpRequest.newBuilder()
                 .uri(URI.create(BenchmarkSupport.H2_URL + "/get"))
                 .GET()
@@ -158,7 +158,7 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void smithyPost(Counter counter) throws InterruptedException {
+    public void h2SmithyPost(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/post");
         var request = HttpRequest.create()
                 .setUri(uri)
@@ -176,7 +176,7 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void javaHttpClientPost(Counter counter) throws InterruptedException {
+    public void h2JdkPost(Counter counter) throws InterruptedException {
         var request = java.net.http.HttpRequest.newBuilder()
                 .uri(URI.create(BenchmarkSupport.H2_URL + "/post"))
                 .POST(BodyPublishers.ofByteArray(BenchmarkSupport.POST_PAYLOAD))
@@ -194,7 +194,7 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void smithyPutMb(Counter counter) throws InterruptedException {
+    public void h2SmithyPutMb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
         var request = HttpRequest.create()
                 .setUri(uri)
@@ -212,7 +212,7 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void javaHttpClientPutMb(Counter counter) throws InterruptedException {
+    public void h2JdkPutMb(Counter counter) throws InterruptedException {
         var request = java.net.http.HttpRequest.newBuilder()
                 .uri(URI.create(BenchmarkSupport.H2_URL + "/putmb"))
                 .PUT(BodyPublishers.ofByteArray(BenchmarkSupport.MB_PAYLOAD))
@@ -230,7 +230,7 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void smithyGetMb(Counter counter) throws InterruptedException {
+    public void h2SmithyGetMb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb");
         var request = HttpRequest.create().setUri(uri).setMethod("GET");
 
@@ -245,7 +245,7 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
-    public void javaHttpClientGetMb(Counter counter) throws InterruptedException {
+    public void h2JdkGetMb(Counter counter) throws InterruptedException {
         var request = java.net.http.HttpRequest.newBuilder()
                 .uri(java.net.URI.create(BenchmarkSupport.H2_URL + "/getmb"))
                 .GET()
