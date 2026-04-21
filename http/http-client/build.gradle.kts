@@ -144,9 +144,24 @@ jmh {
     warmupIterations = 3
     iterations = 3
     fork = 1
-//    profilers.add("async:output=flamegraph")
-    profilers.add("async:output=collapsed")
+    resultFormat = "CSV"
+    resultsFile = project.file("build/reports/jmh/results.csv")
+    // Use standalone asprof for profiling instead of bundled async profiler
+    // profilers.add("async:output=flamegraph")
     // profilers.add("gc")
+
+    // JIT diagnostics - uncomment for trace-abort analysis
+    // jvmArgsAppend = listOf(
+    //     "-XX:+UnlockDiagnosticVMOptions",
+    //     "-XX:+LogCompilation",
+    //     "-XX:LogFile=build/reports/jmh/jit.log",
+    //     "-XX:+TraceDeoptimization",
+    //     "-XX:+PrintInlining"
+    // )
+
+    // Attach async-profiler via agentpath for profiling
+    // val apLib = ...
+    // jvmArgsAppend = listOf(...)
 }
 
 // Make jmh task auto-start/stop the benchmark server

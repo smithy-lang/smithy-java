@@ -76,6 +76,12 @@ public class H1ScalingBenchmark {
     private WebClient helidonClient;
     private java.net.http.HttpClient javaClient;
 
+    // Pre-built requests (read-only during benchmark)
+    private HttpRequest smithyGetRequest;
+    private HttpRequest smithyPostRequest;
+    private java.net.http.HttpRequest jdkGetRequest;
+    private java.net.http.HttpRequest jdkPostRequest;
+
     @Setup(Level.Trial)
     public void setupIteration() throws Exception {
         closeClients();
@@ -122,6 +128,23 @@ public class H1ScalingBenchmark {
                 .build();
 
         BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H1_URL);
+
+        // Pre-build requests
+        smithyGetRequest = HttpRequest.create()
+                .setUri(SmithyUri.of(BenchmarkSupport.H1_URL + "/get"))
+                .setMethod("GET");
+        smithyPostRequest = HttpRequest.create()
+                .setUri(SmithyUri.of(BenchmarkSupport.H1_URL + "/post"))
+                .setMethod("POST")
+                .setBody(DataStream.ofBytes(BenchmarkSupport.POST_PAYLOAD));
+        jdkGetRequest = java.net.http.HttpRequest.newBuilder()
+                .uri(URI.create(BenchmarkSupport.H1_URL + "/get"))
+                .GET()
+                .build();
+        jdkPostRequest = java.net.http.HttpRequest.newBuilder()
+                .uri(URI.create(BenchmarkSupport.H1_URL + "/post"))
+                .POST(BodyPublishers.ofByteArray(BenchmarkSupport.POST_PAYLOAD))
+                .build();
     }
 
     @TearDown(Level.Trial)
@@ -162,12 +185,9 @@ public class H1ScalingBenchmark {
     @Benchmark
     @Threads(1)
     public void h1SmithyGet(Counter counter) throws InterruptedException {
-        var uri = SmithyUri.of(BenchmarkSupport.H1_URL + "/get");
-        var request = HttpRequest.create().setUri(uri).setMethod("GET");
-
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             smithyClient.send(req).close();
-        }, request, counter);
+        }, smithyGetRequest, counter);
 
         counter.logErrors("Smithy H1");
     }
@@ -201,17 +221,12 @@ public class H1ScalingBenchmark {
     @Benchmark
     @Threads(1)
     public void h1JdkGet(Counter counter) throws InterruptedException {
-        var request = java.net.http.HttpRequest.newBuilder()
-                .uri(URI.create(BenchmarkSupport.H1_URL + "/get"))
-                .GET()
-                .build();
-
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (java.net.http.HttpRequest req) -> {
             var response = javaClient.send(req, BodyHandlers.ofInputStream());
             try (InputStream body = response.body()) {
                 body.transferTo(OutputStream.nullOutputStream());
             }
-        }, request, counter);
+        }, jdkGetRequest, counter);
 
         counter.logErrors("Java HttpClient H1");
     }
@@ -219,15 +234,9 @@ public class H1ScalingBenchmark {
     @Benchmark
     @Threads(1)
     public void h1SmithyPost(Counter counter) throws InterruptedException {
-        var uri = SmithyUri.of(BenchmarkSupport.H1_URL + "/post");
-        var request = HttpRequest.create()
-                .setUri(uri)
-                .setMethod("POST")
-                .setBody(DataStream.ofBytes(BenchmarkSupport.POST_PAYLOAD));
-
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             smithyClient.send(req).close();
-        }, request, counter);
+        }, smithyPostRequest, counter);
 
         counter.logErrors("Smithy H1 POST");
     }
@@ -251,17 +260,12 @@ public class H1ScalingBenchmark {
     @Benchmark
     @Threads(1)
     public void h1JdkPost(Counter counter) throws InterruptedException {
-        var request = java.net.http.HttpRequest.newBuilder()
-                .uri(URI.create(BenchmarkSupport.H1_URL + "/post"))
-                .POST(BodyPublishers.ofByteArray(BenchmarkSupport.POST_PAYLOAD))
-                .build();
-
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (java.net.http.HttpRequest req) -> {
             var response = javaClient.send(req, BodyHandlers.ofInputStream());
             try (InputStream body = response.body()) {
                 body.transferTo(OutputStream.nullOutputStream());
             }
-        }, request, counter);
+        }, jdkPostRequest, counter);
 
         counter.logErrors("Java HttpClient H1 POST");
     }
