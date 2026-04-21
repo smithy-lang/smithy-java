@@ -23,6 +23,7 @@ abstract sealed class H2MuxerWorkItem {
         final HttpRequest request;
         final H2Exchange exchange;
         final boolean endStream;
+        boolean signaled;
 
         EncodeHeaders(HttpRequest request, H2Exchange exchange, boolean endStream) {
             this.request = request;

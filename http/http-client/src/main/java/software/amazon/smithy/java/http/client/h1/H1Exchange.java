@@ -105,6 +105,7 @@ public final class H1Exchange implements HttpExchange {
         // Only flush if no body - otherwise body write will flush
         if (request.body() == null || request.body().contentLength() == 0) {
             out.flush();
+            requestWritten = true;
         }
     }
 
