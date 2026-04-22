@@ -189,4 +189,45 @@ public final class BenchmarkSupport {
             }
         }
     }
+
+    /**
+     * Extract H2ConnectionStats from the client via reflection.
+     */
+    public static String getH2ConnectionStats(HttpClient client) {
+        try {
+            // HttpClient -> DefaultHttpClient.pool -> HttpConnectionPool.h2Manager -> H2ConnectionManager.routes
+            var poolField = client.getClass().getDeclaredField("connectionPool");
+            poolField.setAccessible(true);
+            var pool = poolField.get(client);
+
+            var h2Field = pool.getClass().getDeclaredField("h2Manager");
+            h2Field.setAccessible(true);
+            var h2Manager = h2Field.get(pool);
+
+            var routesField = h2Manager.getClass().getDeclaredField("routes");
+            routesField.setAccessible(true);
+            var routes = (java.util.concurrent.ConcurrentHashMap<?, ?>) routesField.get(h2Manager);
+
+            var sb = new StringBuilder();
+            for (var entry : routes.values()) {
+                var connsField = entry.getClass().getDeclaredField("conns");
+                connsField.setAccessible(true);
+                var conns = (Object[]) connsField.get(entry);
+                for (var conn : conns) {
+                    if (conn != null) {
+                        var statsMethod = conn.getClass().getDeclaredMethod("getStats");
+                        statsMethod.setAccessible(true);
+                        var stats = statsMethod.invoke(conn);
+                        if (stats != null) {
+                            if (!sb.isEmpty()) sb.append("; ");
+                            sb.append(stats);
+                        }
+                    }
+                }
+            }
+            return sb.isEmpty() ? "(no stats)" : sb.toString();
+        } catch (Exception e) {
+            return "(stats unavailable: " + e.getMessage() + ")";
+        }
+    }
 }

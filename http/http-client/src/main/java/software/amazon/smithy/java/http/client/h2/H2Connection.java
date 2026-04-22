@@ -90,6 +90,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     private final Route route;
     private final H2FrameCodec frameCodec;
     private final H2Muxer muxer;
+    private final H2ConnectionStats stats = new H2ConnectionStats();
     private final HpackDecoder hpackDecoder;
     private final Thread readerThread;
     private final long readTimeoutMs;
@@ -154,6 +155,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
                 DEFAULT_HEADER_TABLE_SIZE,
                 "h2-writer-" + route.host(),
                 initialWindowSize);
+        this.muxer.setStats(stats);
 
         // Perform connection preface
         try {
@@ -271,25 +273,27 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
 
         if (exchange != null) {
             if (dataLength > 0) {
-                // Borrow ByteBuffer from pool and read payload directly via channel.
-                // ChannelFrameReader.readIntoDirect drains any buffered data first,
-                // then reads remaining directly from the channel into the pooled buffer,
-                // bypassing the internal read buffer — zero intermediate copies.
                 ByteBuffer buffer = muxer.borrowBuffer(dataLength);
                 frameCodec.readPayloadDirect(buffer, dataLength);
                 buffer.flip();
-                // Check if more data is buffered - used for adaptive signaling to reduce wakeups
                 boolean moreDataBuffered = frameCodec.hasBufferedData();
                 debitConnectionRecvWindow(payloadLength);
                 exchange.enqueueData(buffer, endStream, moreDataBuffered, payloadLength);
-                // Always signal immediately on END_STREAM so the consumer thread wakes up.
-                // Otherwise, defer signaling when more data is buffered (stream-switch detection
-                // will flush it on the next frame).
+
+                stats.dataFramesRead.increment();
+                stats.dataBytesRead.add(dataLength);
+
                 if (endStream) {
                     exchange.signalDataAvailable();
+                    stats.signalsSent.increment();
                     lastDataExchange = null;
+                } else if (moreDataBuffered) {
+                    lastDataExchange = exchange;
+                    stats.signalsDeferred.increment();
                 } else {
-                    lastDataExchange = moreDataBuffered ? exchange : null;
+                    lastDataExchange = null;
+                    // signal happens via enqueueData when !moreDataBuffered
+                    stats.signalsSent.increment();
                 }
             } else if (endStream) {
                 if (payloadLength > 0) {
@@ -659,6 +663,14 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     }
 
     /**
+     * Get internal diagnostic stats for this connection.
+     * Package-private — for tests and benchmarks only.
+     */
+    H2ConnectionStats getStats() {
+        return stats;
+    }
+
+    /**
      * Check if this connection can accept more streams.
      *
      * <p>This is the primary check used in the connection acquisition hot path. It combines active state, write error,
@@ -836,6 +848,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         }
 
         if (increment > 0) {
+            stats.connectionWindowUpdates.increment();
             muxer.queueControlFrame(0, H2Muxer.ControlFrameType.WINDOW_UPDATE, increment, writeTimeoutMs);
         }
     }

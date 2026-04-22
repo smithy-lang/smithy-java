@@ -166,6 +166,7 @@ public class H2ScalingBenchmark {
         String stats = BenchmarkSupport.getServerStats(smithyClient, BenchmarkSupport.H2_URL);
         System.out.println("H2 stats [c=" + concurrency + ", conn=" + connections
                 + ", streams=" + streamsPerConnection + "]: " + stats);
+        System.out.println("H2 client stats: " + BenchmarkSupport.getH2ConnectionStats(smithyClient));
         closeClients();
     }
 

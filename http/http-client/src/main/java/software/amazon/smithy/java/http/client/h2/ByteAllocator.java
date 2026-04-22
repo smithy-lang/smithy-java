@@ -26,6 +26,11 @@ final class ByteAllocator {
     private final int maxBufferSize;
     private final int maxPoolableSize;
     private final int defaultBufferSize;
+    private H2ConnectionStats stats;
+
+    void setStats(H2ConnectionStats stats) {
+        this.stats = stats;
+    }
 
     /**
      * @param maxPoolCount maximum buffers to keep in pool
@@ -79,6 +84,10 @@ final class ByteAllocator {
                     ByteBuffer buffer = stack.getAndSet(newTop, null);
                     if (buffer != null && buffer.capacity() >= minSize) {
                         buffer.clear();
+                        if (stats != null) {
+                            stats.buffersBorrowed.increment();
+                            stats.buffersReused.increment();
+                        }
                         return buffer;
                     }
                     break;
@@ -89,6 +98,10 @@ final class ByteAllocator {
         int size = Math.max(minSize, defaultBufferSize);
         if (size > maxBufferSize) {
             size = maxBufferSize;
+        }
+        if (stats != null) {
+            stats.buffersBorrowed.increment();
+            stats.buffersAllocated.increment();
         }
         return ByteBuffer.allocate(size);
     }
@@ -103,12 +116,18 @@ final class ByteAllocator {
             return;
         }
         if (buffer.capacity() > maxPoolableSize) {
+            if (stats != null) {
+                stats.buffersDropped.increment();
+            }
             return;
         }
 
         while (true) {
             int currentTop = top.get();
             if (currentTop >= capacity) {
+                if (stats != null) {
+                    stats.buffersDropped.increment();
+                }
                 return;
             }
             if (top.compareAndSet(currentTop, currentTop + 1)) {

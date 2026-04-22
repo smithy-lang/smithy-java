@@ -414,6 +414,10 @@ public final class H2Exchange implements HttpExchange {
             if (data != null && length > 0) {
                 streamRecvWindow -= flowControlBytes;
                 dataQueue.add(new DataChunk(data, endStream, flowControlBytes));
+                H2ConnectionStats s = muxer.getStats();
+                if (s != null) {
+                    s.dataBytesQueued.add(length);
+                }
             } else if (data != null) {
                 muxer.returnBuffer(data);
             }
@@ -561,6 +565,11 @@ public final class H2Exchange implements HttpExchange {
 
         muxer.releaseConnectionReceiveWindow(bytes);
         if (increment > 0 && streamId > 0) {
+            H2ConnectionStats s = muxer.getStats();
+            if (s != null) {
+                s.streamWindowUpdates.increment();
+                s.dataBytesReleased.add(bytes);
+            }
             muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.WINDOW_UPDATE, increment, writeTimeoutMs);
         }
     }

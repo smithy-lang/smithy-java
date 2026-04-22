@@ -511,6 +511,17 @@ final class H2Muxer implements AutoCloseable {
         return initialWindowSize;
     }
 
+    private H2ConnectionStats stats;
+
+    void setStats(H2ConnectionStats stats) {
+        this.stats = stats;
+        allocator.setStats(stats);
+    }
+
+    H2ConnectionStats getStats() {
+        return stats;
+    }
+
     void setStreamReleaseCallback(Runnable callback) {
         this.streamReleaseCallback = callback;
     }
