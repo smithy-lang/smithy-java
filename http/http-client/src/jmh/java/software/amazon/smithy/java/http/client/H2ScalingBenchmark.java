@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.http.client;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -269,6 +270,78 @@ public class H2ScalingBenchmark {
         }, nettyChannel, counter);
 
         counter.logErrors("Netty H2");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2NettyPost(Counter counter) throws InterruptedException {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (Channel ch) -> {
+            var future = new CompletableFuture<Void>();
+            Http2StreamChannel stream = new Http2StreamChannelBootstrap(ch).open().sync().getNow();
+            stream.pipeline().addLast(new SimpleChannelInboundHandler<Http2StreamFrame>() {
+                @Override
+                protected void channelRead0(ChannelHandlerContext ctx, Http2StreamFrame msg) {
+                    if (msg instanceof Http2DataFrame data && data.isEndStream()) {
+                        future.complete(null);
+                    } else if (msg instanceof Http2HeadersFrame headers && headers.isEndStream()) {
+                        future.complete(null);
+                    }
+                }
+
+                @Override
+                public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                    future.completeExceptionally(cause);
+                }
+            });
+            var headers = new DefaultHttp2Headers()
+                    .method("POST")
+                    .path("/post")
+                    .scheme("https")
+                    .authority("localhost:18443");
+            stream.write(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, false));
+            stream.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2DataFrame(
+                    Unpooled.wrappedBuffer(BenchmarkSupport.POST_PAYLOAD),
+                    true));
+            future.join();
+        }, nettyChannel, counter);
+
+        counter.logErrors("Netty H2 POST");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2NettyPutMb(Counter counter) throws InterruptedException {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (Channel ch) -> {
+            var future = new CompletableFuture<Void>();
+            Http2StreamChannel stream = new Http2StreamChannelBootstrap(ch).open().sync().getNow();
+            stream.pipeline().addLast(new SimpleChannelInboundHandler<Http2StreamFrame>() {
+                @Override
+                protected void channelRead0(ChannelHandlerContext ctx, Http2StreamFrame msg) {
+                    if (msg instanceof Http2DataFrame data && data.isEndStream()) {
+                        future.complete(null);
+                    } else if (msg instanceof Http2HeadersFrame headers && headers.isEndStream()) {
+                        future.complete(null);
+                    }
+                }
+
+                @Override
+                public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                    future.completeExceptionally(cause);
+                }
+            });
+            var headers = new DefaultHttp2Headers()
+                    .method("PUT")
+                    .path("/putmb")
+                    .scheme("https")
+                    .authority("localhost:18443");
+            stream.write(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, false));
+            stream.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2DataFrame(
+                    Unpooled.wrappedBuffer(BenchmarkSupport.MB_PAYLOAD),
+                    true));
+            future.join();
+        }, nettyChannel, counter);
+
+        counter.logErrors("Netty H2 PUT 1MB");
     }
 
     @Benchmark

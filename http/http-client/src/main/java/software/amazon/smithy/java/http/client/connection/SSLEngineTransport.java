@@ -12,6 +12,7 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.net.ssl.SSLEngine;
@@ -39,6 +40,7 @@ final class SSLEngineTransport implements AutoCloseable {
     private final SSLEngine engine;
     private final ReentrantLock engineLock = new ReentrantLock();
     private final Socket socket;
+    private final SocketChannel socketChannel;
 
     // Network-side buffers (ciphertext). netIn is always in "write" mode (position = end of data).
     private ByteBuffer netIn;
@@ -54,14 +56,16 @@ final class SSLEngineTransport implements AutoCloseable {
         this.socket = socket;
         this.socketIn = socket.getInputStream();
         this.socketOut = socket.getOutputStream();
+        this.socketChannel = socket.getChannel();
         this.engine = engine;
 
         SSLSession session = engine.getSession();
         int packetSize = session.getPacketBufferSize();
         int appSize = session.getApplicationBufferSize();
 
-        this.netIn = ByteBuffer.allocate(packetSize);
-        this.netOut = ByteBuffer.allocate(packetSize);
+        boolean direct = socketChannel != null;
+        this.netIn = direct ? ByteBuffer.allocateDirect(packetSize) : ByteBuffer.allocate(packetSize);
+        this.netOut = direct ? ByteBuffer.allocateDirect(packetSize) : ByteBuffer.allocate(packetSize);
         this.appIn = ByteBuffer.allocate(appSize);
         this.appIn.flip(); // start empty (read mode, nothing to read)
     }
@@ -88,7 +92,7 @@ final class SSLEngineTransport implements AutoCloseable {
         netOut.clear();
         SSLEngineResult result = engine.wrap(empty, netOut);
         if (result.getStatus() == Status.BUFFER_OVERFLOW) {
-            netOut = ByteBuffer.allocate(engine.getSession().getPacketBufferSize());
+            netOut = allocateNetBuffer(engine.getSession().getPacketBufferSize());
             return result.getHandshakeStatus();
         }
         if (result.getStatus() == Status.CLOSED) {
@@ -96,8 +100,8 @@ final class SSLEngineTransport implements AutoCloseable {
         }
         netOut.flip();
         if (netOut.hasRemaining()) {
-            socketOut.write(netOut.array(), netOut.arrayOffset() + netOut.position(), netOut.remaining());
-            socketOut.flush();
+            writeNetOut();
+            flushSocket();
         }
         return result.getHandshakeStatus();
     }
@@ -159,16 +163,45 @@ final class SSLEngineTransport implements AutoCloseable {
         int space = netIn.remaining();
         if (space == 0) {
             netIn = ensureCapacity(netIn, netIn.capacity() * 2);
-            space = netIn.remaining();
         }
-        // Read directly into the heap ByteBuffer's backing array — no intermediate byte[]
-        int n = socketIn.read(netIn.array(), netIn.arrayOffset() + netIn.position(), space);
+        int n;
+        if (socketChannel != null) {
+            n = socketChannel.read(netIn);
+        } else {
+            n = socketIn.read(netIn.array(), netIn.arrayOffset() + netIn.position(), netIn.remaining());
+            if (n > 0) {
+                netIn.position(netIn.position() + n);
+            }
+        }
         if (n <= 0) {
             eof = true;
             return false;
         }
-        netIn.position(netIn.position() + n);
         return true;
+    }
+
+    private void writeNetOut() throws IOException {
+        if (!netOut.hasRemaining()) {
+            return;
+        }
+        if (socketChannel != null) {
+            while (netOut.hasRemaining()) {
+                socketChannel.write(netOut);
+            }
+        } else {
+            socketOut.write(netOut.array(), netOut.arrayOffset() + netOut.position(), netOut.remaining());
+            netOut.position(netOut.limit());
+        }
+    }
+
+    private void flushSocket() throws IOException {
+        if (socketChannel == null) {
+            socketOut.flush();
+        }
+    }
+
+    private ByteBuffer allocateNetBuffer(int size) {
+        return socketChannel != null ? ByteBuffer.allocateDirect(size) : ByteBuffer.allocate(size);
     }
 
     boolean isClosed() {
@@ -432,7 +465,7 @@ final class SSLEngineTransport implements AutoCloseable {
             totalConsumed += result.bytesConsumed();
 
             if (result.getStatus() == Status.BUFFER_OVERFLOW) {
-                netOut = ByteBuffer.allocate(engine.getSession().getPacketBufferSize());
+                netOut = allocateNetBuffer(engine.getSession().getPacketBufferSize());
                 continue;
             }
             if (result.getStatus() == Status.CLOSED) {
@@ -441,7 +474,7 @@ final class SSLEngineTransport implements AutoCloseable {
 
             netOut.flip();
             if (netOut.hasRemaining()) {
-                socketOut.write(netOut.array(), netOut.arrayOffset() + netOut.position(), netOut.remaining());
+                writeNetOut();
             }
             handlePostResult(result);
         }
@@ -466,7 +499,7 @@ final class SSLEngineTransport implements AutoCloseable {
             }
 
             if (result.getStatus() == Status.BUFFER_OVERFLOW) {
-                netOut = ByteBuffer.allocate(engine.getSession().getPacketBufferSize());
+                netOut = allocateNetBuffer(engine.getSession().getPacketBufferSize());
                 continue;
             }
             if (result.getStatus() == Status.CLOSED) {
@@ -475,14 +508,14 @@ final class SSLEngineTransport implements AutoCloseable {
 
             netOut.flip();
             if (netOut.hasRemaining()) {
-                socketOut.write(netOut.array(), netOut.arrayOffset() + netOut.position(), netOut.remaining());
+                writeNetOut();
             }
             handlePostResult(result);
         }
     }
 
     void flush() throws IOException {
-        socketOut.flush();
+        flushSocket();
     }
 
     private void handlePostResult(SSLEngineResult result) {
@@ -559,8 +592,8 @@ final class SSLEngineTransport implements AutoCloseable {
                 engine.wrap(ByteBuffer.allocate(0), netOut);
                 netOut.flip();
                 if (netOut.hasRemaining()) {
-                    socketOut.write(netOut.array(), netOut.arrayOffset() + netOut.position(), netOut.remaining());
-                    socketOut.flush();
+                    writeNetOut();
+                    flushSocket();
                 }
             } finally {
                 engineLock.unlock();
@@ -576,7 +609,9 @@ final class SSLEngineTransport implements AutoCloseable {
         if (buf.capacity() >= minCapacity) {
             return buf;
         }
-        ByteBuffer newBuf = ByteBuffer.allocate(minCapacity);
+        ByteBuffer newBuf = buf.isDirect()
+                ? ByteBuffer.allocateDirect(minCapacity)
+                : ByteBuffer.allocate(minCapacity);
         buf.flip();
         newBuf.put(buf);
         return newBuf;
