@@ -13,8 +13,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 
 class H2PingAckTest {
 
@@ -23,8 +21,9 @@ class H2PingAckTest {
         // Write a PING frame with ACK=true (as a PING response should be)
         var out = new ByteArrayOutputStream();
         var codec = new H2FrameCodec(
-                new UnsyncBufferedInputStream(new ByteArrayInputStream(new byte[0]), 256),
-                new UnsyncBufferedOutputStream(out, 256),
+                new ChannelFrameReader(java.nio.channels.Channels.newChannel(new ByteArrayInputStream(new byte[0])),
+                        256),
+                new ChannelFrameWriter(java.nio.channels.Channels.newChannel(out), 256),
                 16384);
 
         byte[] pingPayload = {1, 2, 3, 4, 5, 6, 7, 8};
@@ -33,8 +32,10 @@ class H2PingAckTest {
 
         // Read it back and verify ACK flag is set
         var readCodec = new H2FrameCodec(
-                new UnsyncBufferedInputStream(new ByteArrayInputStream(out.toByteArray()), 256),
-                new UnsyncBufferedOutputStream(new ByteArrayOutputStream(), 256),
+                new ChannelFrameReader(
+                        java.nio.channels.Channels.newChannel(new ByteArrayInputStream(out.toByteArray())),
+                        256),
+                new ChannelFrameWriter(java.nio.channels.Channels.newChannel(new ByteArrayOutputStream()), 256),
                 16384);
         int type = readCodec.nextFrame();
 
@@ -48,8 +49,9 @@ class H2PingAckTest {
         // Write a PING frame without ACK (a PING request)
         var out = new ByteArrayOutputStream();
         var codec = new H2FrameCodec(
-                new UnsyncBufferedInputStream(new ByteArrayInputStream(new byte[0]), 256),
-                new UnsyncBufferedOutputStream(out, 256),
+                new ChannelFrameReader(java.nio.channels.Channels.newChannel(new ByteArrayInputStream(new byte[0])),
+                        256),
+                new ChannelFrameWriter(java.nio.channels.Channels.newChannel(out), 256),
                 16384);
 
         byte[] pingPayload = {1, 2, 3, 4, 5, 6, 7, 8};
@@ -57,8 +59,10 @@ class H2PingAckTest {
         codec.flush();
 
         var readCodec = new H2FrameCodec(
-                new UnsyncBufferedInputStream(new ByteArrayInputStream(out.toByteArray()), 256),
-                new UnsyncBufferedOutputStream(new ByteArrayOutputStream(), 256),
+                new ChannelFrameReader(
+                        java.nio.channels.Channels.newChannel(new ByteArrayInputStream(out.toByteArray())),
+                        256),
+                new ChannelFrameWriter(java.nio.channels.Channels.newChannel(new ByteArrayOutputStream()), 256),
                 16384);
         int type = readCodec.nextFrame();
 

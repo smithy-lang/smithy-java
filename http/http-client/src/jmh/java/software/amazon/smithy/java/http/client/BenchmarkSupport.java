@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -118,6 +119,7 @@ public final class BenchmarkSupport {
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < concurrency; i++) {
+                final int threadId = i;
                 executor.submit(() -> {
                     try {
                         while (completed.getAndIncrement() < totalRequests) {
@@ -126,13 +128,24 @@ public final class BenchmarkSupport {
                     } catch (Exception e) {
                         errors.incrementAndGet();
                         firstError.compareAndSet(null, e);
+                    } catch (Throwable t) {
+                        errors.incrementAndGet();
+                        firstError.compareAndSet(null, new RuntimeException("Thread " + threadId + " error", t));
                     } finally {
                         latch.countDown();
                     }
                 });
             }
 
-            latch.await(); // Wait for all work to complete
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                Throwable err = firstError.get();
+                System.err.println("BENCHMARK TIMEOUT: " + (concurrency - (int) latch.getCount())
+                        + "/" + concurrency + " threads completed, errors=" + errors.get()
+                        + (err != null ? ", firstError=" + err : ""));
+                if (err != null) {
+                    err.printStackTrace(System.err);
+                }
+            }
         }
 
         counter.requests = completed.get();
@@ -174,6 +187,49 @@ public final class BenchmarkSupport {
                 System.err.println(label + " errors: " + errors + ", first:");
                 firstError.printStackTrace(System.err);
             }
+        }
+    }
+
+    /**
+     * Extract H2ConnectionStats from the client via reflection.
+     */
+    public static String getH2ConnectionStats(HttpClient client) {
+        try {
+            // HttpClient -> DefaultHttpClient.pool -> HttpConnectionPool.h2Manager -> H2ConnectionManager.routes
+            var poolField = client.getClass().getDeclaredField("connectionPool");
+            poolField.setAccessible(true);
+            var pool = poolField.get(client);
+
+            var h2Field = pool.getClass().getDeclaredField("h2Manager");
+            h2Field.setAccessible(true);
+            var h2Manager = h2Field.get(pool);
+
+            var routesField = h2Manager.getClass().getDeclaredField("routes");
+            routesField.setAccessible(true);
+            var routes = (java.util.concurrent.ConcurrentHashMap<?, ?>) routesField.get(h2Manager);
+
+            var sb = new StringBuilder();
+            for (var entry : routes.values()) {
+                var connsField = entry.getClass().getDeclaredField("conns");
+                connsField.setAccessible(true);
+                var conns = (Object[]) connsField.get(entry);
+                for (var conn : conns) {
+                    if (conn != null) {
+                        var statsMethod = conn.getClass().getDeclaredMethod("getStats");
+                        statsMethod.setAccessible(true);
+                        var stats = statsMethod.invoke(conn);
+                        if (stats != null) {
+                            if (!sb.isEmpty()) {
+                                sb.append("; ");
+                            }
+                            sb.append(stats);
+                        }
+                    }
+                }
+            }
+            return sb.isEmpty() ? "(no stats)" : sb.toString();
+        } catch (Exception e) {
+            return "(stats unavailable: " + e.getMessage() + ")";
         }
     }
 }

@@ -8,6 +8,7 @@ package software.amazon.smithy.java.http.client.connection;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.nio.channels.SocketChannel;
 import java.util.List;
 
 /**
@@ -48,7 +49,7 @@ public interface HttpSocketFactory {
      * Default factory that creates sockets with TCP_NODELAY=true, SO_KEEPALIVE=true, and 64KB send/receive buffers.
      */
     HttpSocketFactory DEFAULT = (route, endpoints) -> {
-        Socket socket = new Socket();
+        Socket socket = SocketChannel.open().socket();
         socket.setTcpNoDelay(true);
         socket.setKeepAlive(true);
         socket.setSendBufferSize(64 * 1024);

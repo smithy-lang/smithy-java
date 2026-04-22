@@ -8,6 +8,9 @@ package software.amazon.smithy.java.http.client;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.util.List;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
@@ -44,7 +47,6 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  */
 final class ManagedHttpExchange implements HttpExchange {
 
-    // No need to allocate or track closed with a volatile like the built-in version does.
     private static final OutputStream NULL_OUTPUT_STREAM = new OutputStream() {
         @Override
         public void write(int b) {}
@@ -63,10 +65,11 @@ final class ManagedHttpExchange implements HttpExchange {
 
     // State
     private boolean closed;
-    private boolean connectionHandled; // true after pool.release() or pool.evict() called
+    private boolean connectionHandled;
     private boolean errored;
     private boolean intercepted;
     private HttpResponse interceptedResponse;
+    private HttpVersion cachedVersion; // cached for use in close()
     private InputStream responseIn; // wrapper returned to caller
     private InputStream underlyingResponseBody; // actual body stream to drain on close
     private InputStream interceptorReplacementBody; // body from interceptor, needs closing
@@ -109,20 +112,65 @@ final class ManagedHttpExchange implements HttpExchange {
             ensureIntercepted();
             InputStream body;
             if (interceptedResponse != null) {
-                // Interceptor replaced response - use replacement body and track for closing
                 body = interceptedResponse.body().asInputStream();
                 interceptorReplacementBody = body;
             } else if (underlyingResponseBody != null) {
-                // Interceptors ran but didn't replace - use captured original
                 body = underlyingResponseBody;
             } else {
-                // No interceptors - get body directly and track for draining
+                cacheDelegateVersionBestEffort();
                 body = delegate.responseBody();
                 underlyingResponseBody = body;
             }
-            // Wrap so closing the response body releases the connection to the pool
             responseIn = new DelegatedClosingInputStream(body, in -> close());
             return responseIn;
+        } catch (IOException e) {
+            errored = true;
+            throw e;
+        }
+    }
+
+    @Override
+    public ReadableByteChannel responseBodyChannel() throws IOException {
+        // If stream path was already used, wrap it
+        if (responseIn != null) {
+            return Channels.newChannel(responseIn);
+        }
+
+        try {
+            ensureIntercepted();
+
+            if (interceptedResponse != null) {
+                // Interceptor replaced response — fall back to stream-wrapped channel
+                InputStream body = interceptedResponse.body().asInputStream();
+                interceptorReplacementBody = body;
+                responseIn = new DelegatedClosingInputStream(body, in -> close());
+                return Channels.newChannel(responseIn);
+            }
+
+            // No replacement — delegate to native channel (preserves H2 zero-copy path)
+            cacheDelegateVersionBestEffort();
+            ReadableByteChannel channel = delegate.responseBodyChannel();
+
+            return new ReadableByteChannel() {
+                @Override
+                public int read(ByteBuffer dst) throws IOException {
+                    return channel.read(dst);
+                }
+
+                @Override
+                public boolean isOpen() {
+                    return channel.isOpen();
+                }
+
+                @Override
+                public void close() throws IOException {
+                    try {
+                        channel.close();
+                    } finally {
+                        ManagedHttpExchange.this.close();
+                    }
+                }
+            };
         } catch (IOException e) {
             errored = true;
             throw e;
@@ -133,6 +181,9 @@ final class ManagedHttpExchange implements HttpExchange {
     public HttpHeaders responseHeaders() throws IOException {
         try {
             ensureIntercepted();
+            if (interceptedResponse == null) {
+                cacheDelegateVersionBestEffort();
+            }
             return interceptedResponse != null ? interceptedResponse.headers() : delegate.responseHeaders();
         } catch (IOException e) {
             errored = true;
@@ -140,13 +191,6 @@ final class ManagedHttpExchange implements HttpExchange {
         }
     }
 
-    /**
-     * Returns trailer headers from the underlying connection.
-     *
-     * <p>Trailers are read from the wire after the response body completes and cannot be
-     * replaced by interceptors. This method always returns trailers from the actual HTTP
-     * response, regardless of any interceptor modifications.
-     */
     @Override
     public HttpHeaders responseTrailerHeaders() {
         return delegate.responseTrailerHeaders();
@@ -156,6 +200,9 @@ final class ManagedHttpExchange implements HttpExchange {
     public int responseStatusCode() throws IOException {
         try {
             ensureIntercepted();
+            if (interceptedResponse == null) {
+                cacheDelegateVersionBestEffort();
+            }
             return interceptedResponse != null ? interceptedResponse.statusCode() : delegate.responseStatusCode();
         } catch (IOException e) {
             errored = true;
@@ -167,7 +214,11 @@ final class ManagedHttpExchange implements HttpExchange {
     public HttpVersion responseVersion() throws IOException {
         try {
             ensureIntercepted();
-            return interceptedResponse != null ? interceptedResponse.httpVersion() : delegate.responseVersion();
+            HttpVersion v = interceptedResponse != null
+                    ? interceptedResponse.httpVersion()
+                    : delegate.responseVersion();
+            cachedVersion = v;
+            return v;
         } catch (IOException e) {
             errored = true;
             throw e;
@@ -191,19 +242,18 @@ final class ManagedHttpExchange implements HttpExchange {
         }
         closed = true;
 
-        // Drain the underlying response body before releasing connection (required for HTTP/1.1 reuse).
-        // We drain underlyingResponseBody directly, not responseIn, to avoid circular calls since
-        // responseIn's close() callback invokes this method.
-        try {
-            if (underlyingResponseBody != null) {
+        // Only drain for HTTP/1.1 where the connection can't be reused until body is consumed.
+        // For HTTP/2, delegate.close() sends RST_STREAM, releases buffers, and frees the stream.
+        boolean shouldDrain = cachedVersion == null || cachedVersion == HttpVersion.HTTP_1_1;
+
+        if (shouldDrain && underlyingResponseBody != null) {
+            try {
                 underlyingResponseBody.transferTo(NULL_OUTPUT_STREAM);
+            } catch (IOException ignored) {
+                errored = true;
             }
-        } catch (IOException ignored) {
-            // Drain failed, so the connection cannot be reused safely
-            errored = true;
         }
 
-        // Close interceptor replacement body if present (separate from connection body)
         if (interceptorReplacementBody != null) {
             try {
                 interceptorReplacementBody.close();
@@ -218,7 +268,6 @@ final class ManagedHttpExchange implements HttpExchange {
             errored = true;
             throw e;
         } finally {
-            // Ensure connection is returned to pool exactly once
             if (!connectionHandled) {
                 connectionHandled = true;
                 if (errored) {
@@ -230,20 +279,17 @@ final class ManagedHttpExchange implements HttpExchange {
         }
     }
 
-    /**
-     * Call interceptResponse() once, when response is first accessed.
-     *
-     * <p>This method eagerly reads status code, headers, and obtains the body stream
-     * from the delegate to build an HttpResponse for interceptors. If interceptors
-     * replace the response, subsequent calls use the replacement.
-     *
-     * <p>The intercepted flag is set before calling delegate methods. If delegate
-     * methods throw, subsequent calls will skip interception and call delegate
-     * directly, allowing partial recovery.
-     *
-     * <p>If an interceptor throws an IOException, the error is passed to onError
-     * interceptors for potential recovery.
-     */
+    private void cacheDelegateVersionBestEffort() {
+        if (cachedVersion != null) {
+            return;
+        }
+        try {
+            cachedVersion = delegate.responseVersion();
+        } catch (IOException ignored) {
+            // If version is not available, close() defaults to drain to preserve H1 reuse safety.
+        }
+    }
+
     private void ensureIntercepted() throws IOException {
         if (intercepted) {
             return;
@@ -254,8 +300,9 @@ final class ManagedHttpExchange implements HttpExchange {
             return;
         }
 
-        // Capture original body stream - needs to be drained on close for connection reuse
         underlyingResponseBody = delegate.responseBody();
+
+        cacheDelegateVersionBestEffort();
 
         HttpResponse currentResponse = HttpResponse.create()
                 .setStatusCode(delegate.responseStatusCode())
