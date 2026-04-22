@@ -7,6 +7,7 @@ package software.amazon.smithy.java.http.client.it.h2;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -17,6 +18,9 @@ import io.netty.handler.codec.http2.Http2HeadersFrame;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPoolBuilder;
@@ -33,6 +37,7 @@ public class ResponseChannelHttp2Test extends BaseHttpClientIntegTest {
     private static final int LARGE_RESPONSE_SIZE = 1024 * 1024;
     private static final int CHUNK_SIZE = 16 * 1024;
     private static final String SMALL_RESPONSE = "small response";
+    private static final String PADDED_RESPONSE = "padded response";
 
     @Override
     protected NettyTestServer.Builder configureServer(NettyTestServer.Builder builder) {
@@ -89,6 +94,46 @@ public class ResponseChannelHttp2Test extends BaseHttpClientIntegTest {
         assertEquals(SMALL_RESPONSE, readBody(smallResponse));
     }
 
+    @Test
+    void slowChannelConsumerAllowsAnotherStreamToCompleteOnSameConnection() throws Exception {
+        var largeResponse = client.send(request("/large"));
+        var firstRead = new CountDownLatch(1);
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var largeBody = executor.submit(() -> {
+                var actual = new ByteArrayOutputStream(LARGE_RESPONSE_SIZE);
+                var buffer = ByteBuffer.allocate(1024);
+                try (var channel = largeResponse.body().asChannel()) {
+                    while (channel.read(buffer) != -1) {
+                        buffer.flip();
+                        while (buffer.hasRemaining()) {
+                            actual.write(buffer.get());
+                        }
+                        buffer.clear();
+                        firstRead.countDown();
+                        Thread.sleep(1);
+                    }
+                }
+                return actual.toByteArray();
+            });
+
+            assertTrue(firstRead.await(5, TimeUnit.SECONDS), "large response should start reading");
+
+            var smallResponse = client.send(request("/small"));
+            assertEquals(SMALL_RESPONSE, readBody(smallResponse));
+            assertArrayEquals(expectedLargeResponse(), largeBody.get(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void readsPaddedDataFrameAndKeepsConnectionUsable() throws Exception {
+        var paddedResponse = client.send(request("/padded"));
+        assertEquals(PADDED_RESPONSE, readBody(paddedResponse));
+
+        var smallResponse = client.send(request("/small"));
+        assertEquals(SMALL_RESPONSE, readBody(smallResponse));
+    }
+
     private software.amazon.smithy.java.http.api.HttpRequest request(String path) {
         return TestUtils.plainTextRequest(HttpVersion.HTTP_2, uri(path), "");
     }
@@ -108,6 +153,8 @@ public class ResponseChannelHttp2Test extends BaseHttpClientIntegTest {
             String path = frame.headers().path().toString();
             if ("/small".equals(path)) {
                 sendSmallResponse(ctx);
+            } else if ("/padded".equals(path)) {
+                sendPaddedResponse(ctx);
             } else {
                 sendLargeResponse(ctx);
             }
@@ -121,6 +168,16 @@ public class ResponseChannelHttp2Test extends BaseHttpClientIntegTest {
             headers.setInt("content-length", body.length);
             ctx.write(new DefaultHttp2HeadersFrame(headers));
             ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(body), true));
+        }
+
+        private static void sendPaddedResponse(ChannelHandlerContext ctx) {
+            byte[] body = PADDED_RESPONSE.getBytes(StandardCharsets.UTF_8);
+            var headers = new DefaultHttp2Headers();
+            headers.status("200");
+            headers.set("content-type", "text/plain");
+            headers.setInt("content-length", body.length);
+            ctx.write(new DefaultHttp2HeadersFrame(headers));
+            ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(body), true, 10));
         }
 
         private static void sendLargeResponse(ChannelHandlerContext ctx) {
