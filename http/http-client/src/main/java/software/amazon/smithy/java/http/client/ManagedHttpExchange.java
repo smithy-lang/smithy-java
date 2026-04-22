@@ -117,6 +117,7 @@ final class ManagedHttpExchange implements HttpExchange {
             } else if (underlyingResponseBody != null) {
                 body = underlyingResponseBody;
             } else {
+                cacheDelegateVersionBestEffort();
                 body = delegate.responseBody();
                 underlyingResponseBody = body;
             }
@@ -147,12 +148,8 @@ final class ManagedHttpExchange implements HttpExchange {
             }
 
             // No replacement — delegate to native channel (preserves H2 zero-copy path)
+            cacheDelegateVersionBestEffort();
             ReadableByteChannel channel = delegate.responseBodyChannel();
-
-            // Track underlying body for close accounting
-            if (underlyingResponseBody == null) {
-                underlyingResponseBody = delegate.responseBody();
-            }
 
             return new ReadableByteChannel() {
                 @Override
@@ -167,7 +164,11 @@ final class ManagedHttpExchange implements HttpExchange {
 
                 @Override
                 public void close() throws IOException {
-                    ManagedHttpExchange.this.close();
+                    try {
+                        channel.close();
+                    } finally {
+                        ManagedHttpExchange.this.close();
+                    }
                 }
             };
         } catch (IOException e) {
@@ -180,6 +181,9 @@ final class ManagedHttpExchange implements HttpExchange {
     public HttpHeaders responseHeaders() throws IOException {
         try {
             ensureIntercepted();
+            if (interceptedResponse == null) {
+                cacheDelegateVersionBestEffort();
+            }
             return interceptedResponse != null ? interceptedResponse.headers() : delegate.responseHeaders();
         } catch (IOException e) {
             errored = true;
@@ -196,6 +200,9 @@ final class ManagedHttpExchange implements HttpExchange {
     public int responseStatusCode() throws IOException {
         try {
             ensureIntercepted();
+            if (interceptedResponse == null) {
+                cacheDelegateVersionBestEffort();
+            }
             return interceptedResponse != null ? interceptedResponse.statusCode() : delegate.responseStatusCode();
         } catch (IOException e) {
             errored = true;
@@ -272,6 +279,17 @@ final class ManagedHttpExchange implements HttpExchange {
         }
     }
 
+    private void cacheDelegateVersionBestEffort() {
+        if (cachedVersion != null) {
+            return;
+        }
+        try {
+            cachedVersion = delegate.responseVersion();
+        } catch (IOException ignored) {
+            // If version is not available, close() defaults to drain to preserve H1 reuse safety.
+        }
+    }
+
     private void ensureIntercepted() throws IOException {
         if (intercepted) {
             return;
@@ -284,12 +302,7 @@ final class ManagedHttpExchange implements HttpExchange {
 
         underlyingResponseBody = delegate.responseBody();
 
-        // Cache version during interception so close() can use it
-        try {
-            cachedVersion = delegate.responseVersion();
-        } catch (IOException ignored) {
-            // Version not available yet — close() will default to drain (safe)
-        }
+        cacheDelegateVersionBestEffort();
 
         HttpResponse currentResponse = HttpResponse.create()
                 .setStatusCode(delegate.responseStatusCode())

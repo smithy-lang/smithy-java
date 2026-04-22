@@ -75,7 +75,7 @@ public class ResponseChannelHttp2Test extends BaseHttpClientIntegTest {
 
     @Test
     void partialChannelReadCloseAllowsNextStreamOnSameConnection() throws Exception {
-        var largeResponse = client.send(request("/large"));
+        var largeResponse = client.send(request("/streaming-large"));
         var buffer = ByteBuffer.allocate(8192);
 
         try (var channel = largeResponse.body().asChannel()) {
@@ -155,6 +155,8 @@ public class ResponseChannelHttp2Test extends BaseHttpClientIntegTest {
                 sendSmallResponse(ctx);
             } else if ("/padded".equals(path)) {
                 sendPaddedResponse(ctx);
+            } else if ("/streaming-large".equals(path)) {
+                sendStreamingLargeResponse(ctx);
             } else {
                 sendLargeResponse(ctx);
             }
@@ -200,6 +202,41 @@ public class ResponseChannelHttp2Test extends BaseHttpClientIntegTest {
                         position == LARGE_RESPONSE_SIZE));
             }
             ctx.flush();
+        }
+
+        private static void sendStreamingLargeResponse(ChannelHandlerContext ctx) {
+            var headers = new DefaultHttp2Headers();
+            headers.status("200");
+            headers.set("content-type", "application/octet-stream");
+            headers.setInt("content-length", LARGE_RESPONSE_SIZE);
+            ctx.writeAndFlush(new DefaultHttp2HeadersFrame(headers))
+                    .addListener(future -> {
+                        if (future.isSuccess()) {
+                            writeStreamingChunk(ctx, 0);
+                        }
+                    });
+        }
+
+        private static void writeStreamingChunk(ChannelHandlerContext ctx, int position) {
+            if (position >= LARGE_RESPONSE_SIZE || !ctx.channel().isActive()) {
+                return;
+            }
+
+            int size = Math.min(CHUNK_SIZE, LARGE_RESPONSE_SIZE - position);
+            byte[] chunk = new byte[size];
+            for (int i = 0; i < size; i++) {
+                chunk[i] = (byte) ((position + i) & 0xFF);
+            }
+
+            int nextPosition = position + size;
+            ctx.writeAndFlush(new DefaultHttp2DataFrame(
+                    Unpooled.wrappedBuffer(chunk),
+                    nextPosition == LARGE_RESPONSE_SIZE))
+                    .addListener(future -> {
+                        if (future.isSuccess()) {
+                            ctx.executor().execute(() -> writeStreamingChunk(ctx, nextPosition));
+                        }
+                    });
         }
     }
 }

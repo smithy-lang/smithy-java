@@ -14,6 +14,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -448,9 +451,9 @@ class ManagedHttpExchangeTest {
         var responseBodyCalled = new AtomicBoolean(false);
         var delegate = new TestHttpExchange() {
             @Override
-            public java.nio.channels.ReadableByteChannel responseBodyChannel() {
+            public ReadableByteChannel responseBodyChannel() {
                 nativeChannelUsed.set(true);
-                return java.nio.channels.Channels.newChannel(new ByteArrayInputStream("native".getBytes()));
+                return Channels.newChannel(new ByteArrayInputStream("native".getBytes()));
             }
 
             @Override
@@ -462,13 +465,14 @@ class ManagedHttpExchangeTest {
         var exchange = createExchange(new TestConnectionPool(), List.of(), delegate);
 
         var channel = exchange.responseBodyChannel();
-        var buf = java.nio.ByteBuffer.allocate(64);
+        var buf = ByteBuffer.allocate(64);
         channel.read(buf);
         buf.flip();
         var data = new byte[buf.remaining()];
         buf.get(data);
 
         assertTrue(nativeChannelUsed.get(), "Should use delegate's native channel");
+        assertFalse(responseBodyCalled.get(), "Native channel path should not create response body stream");
         assertEquals("native", new String(data));
     }
 
@@ -477,9 +481,9 @@ class ManagedHttpExchangeTest {
         var nativeChannelUsed = new AtomicBoolean(false);
         var delegate = new TestHttpExchange() {
             @Override
-            public java.nio.channels.ReadableByteChannel responseBodyChannel() {
+            public ReadableByteChannel responseBodyChannel() {
                 nativeChannelUsed.set(true);
-                return java.nio.channels.Channels.newChannel(new ByteArrayInputStream("native".getBytes()));
+                return Channels.newChannel(new ByteArrayInputStream("native".getBytes()));
             }
         };
         var interceptor = new HttpInterceptor() {
@@ -494,7 +498,7 @@ class ManagedHttpExchangeTest {
         var exchange = createExchange(new TestConnectionPool(), List.of(interceptor), delegate);
 
         var channel = exchange.responseBodyChannel();
-        var buf = java.nio.ByteBuffer.allocate(64);
+        var buf = ByteBuffer.allocate(64);
         channel.read(buf);
         buf.flip();
         var data = new byte[buf.remaining()];
@@ -506,6 +510,74 @@ class ManagedHttpExchangeTest {
 
     @Test
     void closeDoesNotDrainHttp2Body() throws IOException {
+        assertHttp2CloseDoesNotDrain(List.of(new HttpInterceptor() {}));
+    }
+
+    @Test
+    void closeDoesNotDrainHttp2BodyWithoutInterceptors() throws IOException {
+        assertHttp2CloseDoesNotDrain(List.of());
+    }
+
+    @Test
+    void responseBodyChannelCloseDoesNotDrainHttp2BodyWithoutInterceptors() throws IOException {
+        var bodyDrained = new AtomicBoolean(false);
+        var channelClosed = new AtomicBoolean(false);
+        var delegateClosed = new AtomicBoolean(false);
+        var delegate = new TestHttpExchange() {
+            @Override
+            public HttpVersion responseVersion() {
+                return HttpVersion.HTTP_2;
+            }
+
+            @Override
+            public ReadableByteChannel responseBodyChannel() {
+                var delegateChannel = Channels.newChannel(new ByteArrayInputStream("body".getBytes()));
+                return new ReadableByteChannel() {
+                    @Override
+                    public int read(ByteBuffer dst) throws IOException {
+                        return delegateChannel.read(dst);
+                    }
+
+                    @Override
+                    public boolean isOpen() {
+                        return delegateChannel.isOpen();
+                    }
+
+                    @Override
+                    public void close() throws IOException {
+                        channelClosed.set(true);
+                        delegateChannel.close();
+                    }
+                };
+            }
+
+            @Override
+            public InputStream responseBody() {
+                return new ByteArrayInputStream("body".getBytes()) {
+                    @Override
+                    public long transferTo(OutputStream out) throws IOException {
+                        bodyDrained.set(true);
+                        return super.transferTo(out);
+                    }
+                };
+            }
+
+            @Override
+            public void close() {
+                delegateClosed.set(true);
+            }
+        };
+        var exchange = createExchange(new TestConnectionPool(), List.of(), delegate);
+
+        exchange.responseStatusCode();
+        exchange.responseBodyChannel().close();
+
+        assertFalse(bodyDrained.get(), "H2 channel close should NOT drain the response body");
+        assertTrue(channelClosed.get(), "Native channel should be closed before managed exchange cleanup");
+        assertTrue(delegateClosed.get(), "Delegate should be closed");
+    }
+
+    private void assertHttp2CloseDoesNotDrain(List<HttpInterceptor> interceptors) throws IOException {
         var bodyDrained = new AtomicBoolean(false);
         var delegateClosed = new AtomicBoolean(false);
         var delegate = new TestHttpExchange() {
@@ -530,7 +602,7 @@ class ManagedHttpExchangeTest {
                 delegateClosed.set(true);
             }
         };
-        var exchange = createExchange(new TestConnectionPool(), List.of(new HttpInterceptor() {}), delegate);
+        var exchange = createExchange(new TestConnectionPool(), interceptors, delegate);
 
         // Access response to trigger interception (captures body and version)
         exchange.responseHeaders();
