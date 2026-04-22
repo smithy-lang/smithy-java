@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.connection.Route;
+import software.amazon.smithy.java.http.client.connection.SocketTransport;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
 class H1ConnectionTest {
@@ -35,7 +36,7 @@ class H1ConnectionTest {
     @Test
     void createsConnectionSuccessfully() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
 
         assertTrue(connection.isActive());
         assertEquals(HttpVersion.HTTP_1_1, connection.httpVersion());
@@ -45,7 +46,7 @@ class H1ConnectionTest {
     @Test
     void createsExchangeSuccessfully() throws IOException {
         var socket = new FakeSocket("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
         var request = HttpRequest.create()
                 .setMethod("GET")
                 .setUri(SmithyUri.of("https://example.com/test"));
@@ -58,7 +59,7 @@ class H1ConnectionTest {
     @Test
     void throwsOnConcurrentExchange() throws IOException {
         var socket = new FakeSocket("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
         var request = HttpRequest.create()
                 .setMethod("GET")
                 .setUri(SmithyUri.of("https://example.com/test"));
@@ -71,7 +72,7 @@ class H1ConnectionTest {
     @Test
     void throwsOnClosedConnection() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
         var request = HttpRequest.create()
                 .setMethod("GET")
                 .setUri(SmithyUri.of("https://example.com/test"));
@@ -84,7 +85,7 @@ class H1ConnectionTest {
     @Test
     void isActiveReturnsFalseAfterClose() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
         connection.close();
 
         assertFalse(connection.isActive());
@@ -93,7 +94,7 @@ class H1ConnectionTest {
     @Test
     void isActiveReturnsFalseWhenKeepAliveDisabled() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
         connection.setKeepAlive(false);
 
         assertFalse(connection.isActive());
@@ -102,7 +103,7 @@ class H1ConnectionTest {
     @Test
     void validateForReuseReturnsTrueForHealthyConnection() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
 
         assertTrue(connection.validateForReuse());
     }
@@ -110,7 +111,7 @@ class H1ConnectionTest {
     @Test
     void validateForReuseReturnsFalseWhenInactive() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
         connection.markInactive();
 
         assertFalse(connection.validateForReuse());
@@ -119,7 +120,7 @@ class H1ConnectionTest {
     @Test
     void validateForReuseReturnsFalseWhenKeepAliveDisabled() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
         connection.setKeepAlive(false);
 
         assertFalse(connection.validateForReuse());
@@ -128,7 +129,7 @@ class H1ConnectionTest {
     @Test
     void validateForReuseReturnsFalseWhenSocketClosed() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
         socket.close();
 
         assertFalse(connection.validateForReuse());
@@ -138,7 +139,7 @@ class H1ConnectionTest {
     @Test
     void validateForReuseReturnsFalseWhenDataAvailableOnIdleConnection() throws IOException {
         var socket = new FakeSocket("HTTP/1.1 200 OK\r\n");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
 
         assertFalse(connection.validateForReuse());
         assertFalse(connection.isActive());
@@ -147,7 +148,7 @@ class H1ConnectionTest {
     @Test
     void validateForReuseReturnsFalseWhenAvailableThrows() throws IOException {
         var socket = new FailingAvailableSocket();
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
 
         assertFalse(connection.validateForReuse());
         assertFalse(connection.isActive());
@@ -156,7 +157,7 @@ class H1ConnectionTest {
     @Test
     void sslSessionReturnsNullForPlainSocket() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
 
         assertNull(connection.sslSession());
     }
@@ -164,7 +165,7 @@ class H1ConnectionTest {
     @Test
     void negotiatedProtocolReturnsNullForPlainSocket() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
 
         assertNull(connection.negotiatedProtocol());
     }
@@ -172,7 +173,7 @@ class H1ConnectionTest {
     @Test
     void setAndGetSocketTimeout() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
         connection.setSocketTimeout(1000);
 
         assertEquals(1000, connection.getSocketTimeout());
@@ -181,7 +182,7 @@ class H1ConnectionTest {
     @Test
     void keepAliveDefaultsToTrue() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
 
         assertTrue(connection.isKeepAlive());
     }
@@ -189,7 +190,7 @@ class H1ConnectionTest {
     @Test
     void markInactiveSetsConnectionInactive() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
         connection.markInactive();
 
         assertFalse(connection.isActive());
@@ -198,7 +199,7 @@ class H1ConnectionTest {
     @Test
     void nullReadTimeoutDoesNotSetSocketTimeout() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, null);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, null);
 
         assertEquals(0, connection.getSocketTimeout());
     }
@@ -206,7 +207,7 @@ class H1ConnectionTest {
     @Test
     void zeroReadTimeoutDoesNotSetSocketTimeout() throws IOException {
         var socket = new FakeSocket("");
-        var connection = new H1Connection(socket, TEST_ROUTE, Duration.ZERO);
+        var connection = new H1Connection(new SocketTransport(socket), TEST_ROUTE, Duration.ZERO);
 
         assertEquals(0, connection.getSocketTimeout());
     }

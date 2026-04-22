@@ -21,6 +21,9 @@ import java.io.OutputStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -56,7 +59,7 @@ import software.amazon.smithy.java.http.client.HttpExchange;
  * <p>The reader thread enqueues DATA frame payloads via {@link #enqueueData}. The user
  * thread drains chunks in batches via {@link #drainChunks} (used by H2DataInputStream).
  * Pooled byte[] buffers are returned after consumption. Flow control sends WINDOW_UPDATE
- * after data is consumed via {@link #onDataConsumed}.
+ * after DATA frame bytes are consumed or discarded.
  */
 public final class H2Exchange implements HttpExchange {
 
@@ -93,11 +96,8 @@ public final class H2Exchange implements HttpExchange {
 
     // Read-side synchronization (state is in packedState)
     private final ReentrantLock dataLock = new ReentrantLock();
+    private final java.util.concurrent.locks.Condition dataAvailable = dataLock.newCondition();
     private volatile IOException readError;
-
-    // Lock-free signaling: waiting thread parks itself, producer unparks it without holding lock.
-    // This allows stream-switch signaling without double lock acquisition.
-    private volatile Thread waitingThread;
 
     // Stream-level timeouts (tick-based: 1 tick = TIMEOUT_POLL_INTERVAL_MS)
     private final long readTimeoutMs;
@@ -123,6 +123,7 @@ public final class H2Exchange implements HttpExchange {
 
     // Response body input stream
     private volatile InputStream responseIn;
+    private volatile H2DataInputStream responseDataStream;
 
     // Close guard
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -137,6 +138,7 @@ public final class H2Exchange implements HttpExchange {
     private final FlowControlWindow sendWindow;
     private final int initialWindowSize;
     private int streamRecvWindow;
+    private int pendingStreamWindowUpdate;
 
     // === OUTBOUND PATH (VT → Writer) ===
     // Pending writes queued by VT, drained by writer thread
@@ -336,7 +338,7 @@ public final class H2Exchange implements HttpExchange {
      *
      * @param buffer the buffer to return
      */
-    void returnBuffer(byte[] buffer) {
+    void returnBuffer(ByteBuffer buffer) {
         muxer.returnBuffer(buffer);
     }
 
@@ -353,13 +355,9 @@ public final class H2Exchange implements HttpExchange {
         dataLock.lock();
         try {
             pendingHeadersQueue.add(new PendingHeadersEvent(fields, endStream));
+            dataAvailable.signal();
         } finally {
             dataLock.unlock();
-        }
-        // Signal outside lock - lock-free wakeup
-        Thread t = waitingThread;
-        if (t != null) {
-            LockSupport.unpark(t);
         }
     }
 
@@ -369,13 +367,13 @@ public final class H2Exchange implements HttpExchange {
      * <p>Signals the user thread that the connection has closed with an error.
      */
     void signalConnectionClosed(Throwable error) {
-        // Set error state without updating stream state (unlike normal end-stream)
-        state.setErrorState();
-        this.readError = (error instanceof IOException ioe) ? ioe : new IOException("Connection closed", error);
-        // Signal outside lock - lock-free wakeup
-        Thread t = waitingThread;
-        if (t != null) {
-            LockSupport.unpark(t);
+        dataLock.lock();
+        try {
+            state.setErrorState();
+            this.readError = (error instanceof IOException ioe) ? ioe : new IOException("Connection closed", error);
+            dataAvailable.signal();
+        } finally {
+            dataLock.unlock();
         }
     }
 
@@ -386,13 +384,13 @@ public final class H2Exchange implements HttpExchange {
      * instead of timing out.
      */
     void signalStreamError(H2Exception error) {
-        // Set error state without updating stream state (unlike normal end-stream)
-        state.setErrorState();
-        this.readError = new IOException("Stream error", error);
-        // Signal outside lock - lock-free wakeup
-        Thread t = waitingThread;
-        if (t != null) {
-            LockSupport.unpark(t);
+        dataLock.lock();
+        try {
+            state.setErrorState();
+            this.readError = new IOException("Stream error", error);
+            dataAvailable.signal();
+        } finally {
+            dataLock.unlock();
         }
     }
 
@@ -402,59 +400,39 @@ public final class H2Exchange implements HttpExchange {
      * <p>This method is called by the reader thread to add a byte[] containing
      * DATA frame payload to the queue.
      *
-     * @param data the byte array containing data, or null for end-stream-only signal
-     * @param length the number of valid bytes in data
+     * @param data the byte buffer containing data, or null for end-stream-only signal
      * @param endStream whether END_STREAM flag was set
      * @param moreDataBuffered true if more data is already buffered in the socket read buffer,
      *                         used to defer signaling when processing a burst of frames
+     * @param flowControlBytes DATA frame payload bytes charged to HTTP/2 receive windows
      */
-    void enqueueData(byte[] data, int length, boolean endStream, boolean moreDataBuffered) {
-        boolean sendWindowUpdate = false;
-        int windowIncrement = 0;
+    void enqueueData(ByteBuffer data, boolean endStream, boolean moreDataBuffered, int flowControlBytes) {
+        int length = data != null ? data.remaining() : 0;
 
         dataLock.lock();
         try {
             if (data != null && length > 0) {
-                dataQueue.add(new DataChunk(data, length, endStream));
-
-                // Update stream receive window immediately when data arrives.
-                // This allows the server to keep sending without waiting for consumer to read.
-                // Buffering is bounded by initialWindowSize - server cannot send more than
-                // the window allows, so a slow consumer can buffer at most initialWindowSize bytes.
-                streamRecvWindow -= length;
-                if (streamRecvWindow < initialWindowSize / H2Constants.WINDOW_UPDATE_THRESHOLD_DIVISOR) {
-                    windowIncrement = initialWindowSize - streamRecvWindow;
-                    streamRecvWindow += windowIncrement;
-                    sendWindowUpdate = true;
+                streamRecvWindow -= flowControlBytes;
+                dataQueue.add(new DataChunk(data, endStream, flowControlBytes));
+                H2ConnectionStats s = muxer.getStats();
+                if (s != null) {
+                    s.dataBytesQueued.add(length);
                 }
             } else if (data != null) {
-                // Empty buffer - return to pool immediately
                 muxer.returnBuffer(data);
             }
 
             if (endStream) {
-                state.setEndStreamReceivedFlag(); // Just set flag + readState, don't update stream state
-                clearReadDeadline(); // No more data expected, clear timeout
+                state.setEndStreamReceivedFlag();
+                clearReadDeadline();
+            }
+
+            // Signal inside the lock to prevent lost-wakeup
+            if (endStream || !moreDataBuffered) {
+                dataAvailable.signal();
             }
         } finally {
             dataLock.unlock();
-        }
-
-        // Send WINDOW_UPDATE outside lock to avoid blocking reader thread
-        if (sendWindowUpdate) {
-            muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.WINDOW_UPDATE, windowIncrement, writeTimeoutMs);
-        }
-
-        // Signal consumer only when necessary to reduce wakeup overhead:
-        // - endStream: response complete, consumer must finish
-        // - !moreDataBuffered: no more data in socket buffer, signal now before reader blocks
-        // When moreDataBuffered=true, defer signaling - H2Connection will call signalDataAvailable()
-        // when switching streams or when buffer empties.
-        if (endStream || !moreDataBuffered) {
-            Thread t = waitingThread;
-            if (t != null) {
-                LockSupport.unpark(t);
-            }
         }
     }
 
@@ -466,9 +444,11 @@ public final class H2Exchange implements HttpExchange {
      * This is lock-free and can be called without holding any locks.
      */
     void signalDataAvailable() {
-        Thread t = waitingThread;
-        if (t != null) {
-            LockSupport.unpark(t);
+        dataLock.lock();
+        try {
+            dataAvailable.signal();
+        } finally {
+            dataLock.unlock();
         }
     }
 
@@ -503,18 +483,13 @@ public final class H2Exchange implements HttpExchange {
                     }
                 }
 
-                // Wait for data to arrive using lock-free signaling
-                // Release lock so producer can add data, then wait
-                dataLock.unlock();
+                // Wait for data to arrive.
+                // Use Condition.await() which atomically releases the lock and waits,
+                // preventing lost-wakeup races.
                 try {
-                    waitingThread = Thread.currentThread();
-                    LockSupport.park();
-                    if (Thread.interrupted()) {
-                        throw new IOException("Interrupted waiting for data");
-                    }
-                } finally {
-                    waitingThread = null;
-                    dataLock.lock();
+                    dataAvailable.await();
+                } catch (InterruptedException e) {
+                    throw new IOException("Interrupted waiting for data");
                 }
             }
 
@@ -557,13 +532,67 @@ public final class H2Exchange implements HttpExchange {
     /**
      * Called by H2DataInputStream when data is consumed.
      *
-     * <p>Updates content length tracking. Note: flow control WINDOW_UPDATE is sent
-     * in {@link #enqueueData} when data arrives, not here.
+     * <p>Updates content length tracking for actual body bytes only. HTTP/2 receive
+     * window credit is released separately when the containing DATA chunk is retired.
      *
      * @param bytesConsumed number of bytes consumed
      */
     void onDataConsumed(int bytesConsumed) {
         receivedContentLength += bytesConsumed;
+    }
+
+    /**
+     * Release receive-window credit for DATA frame payload bytes that have been consumed
+     * by the application or discarded locally.
+     */
+    void releaseDataCredit(int bytes) {
+        if (bytes <= 0) {
+            return;
+        }
+
+        int increment = 0;
+        dataLock.lock();
+        try {
+            streamRecvWindow += bytes;
+            pendingStreamWindowUpdate += bytes;
+            if (pendingStreamWindowUpdate >= receiveWindowUpdateThreshold()) {
+                increment = pendingStreamWindowUpdate;
+                pendingStreamWindowUpdate = 0;
+            }
+        } finally {
+            dataLock.unlock();
+        }
+
+        muxer.releaseConnectionReceiveWindow(bytes);
+        if (increment > 0 && streamId > 0) {
+            H2ConnectionStats s = muxer.getStats();
+            if (s != null) {
+                s.streamWindowUpdates.increment();
+                s.dataBytesReleased.add(bytes);
+            }
+            muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.WINDOW_UPDATE, increment, writeTimeoutMs);
+        }
+    }
+
+    /**
+     * Account for DATA frame payload bytes that were read and discarded without
+     * becoming application-visible body bytes, such as padding-only DATA frames.
+     */
+    void releaseDiscardedData(int flowControlBytes) {
+        if (flowControlBytes <= 0) {
+            return;
+        }
+        dataLock.lock();
+        try {
+            streamRecvWindow -= flowControlBytes;
+        } finally {
+            dataLock.unlock();
+        }
+        releaseDataCredit(flowControlBytes);
+    }
+
+    private int receiveWindowUpdateThreshold() {
+        return Math.max(1, initialWindowSize / H2Constants.WINDOW_UPDATE_THRESHOLD_DIVISOR);
     }
 
     /**
@@ -611,10 +640,37 @@ public final class H2Exchange implements HttpExchange {
                 responseIn = new DelegatedClosingInputStream(nio, this::onResponseStreamClosed);
             } else {
                 H2DataInputStream dataStream = new H2DataInputStream(this, muxer::returnBuffer);
+                responseDataStream = dataStream;
                 responseIn = new DelegatedClosingInputStream(dataStream, this::onResponseStreamClosed);
             }
         }
         return responseIn;
+    }
+
+    @Override
+    public ReadableByteChannel responseBodyChannel() throws IOException {
+        // Ensure responseBody() is called to initialize the stream
+        responseBody();
+        if (responseDataStream != null) {
+            ReadableByteChannel channel = responseDataStream.channel();
+            return new ReadableByteChannel() {
+                @Override
+                public int read(ByteBuffer dst) throws IOException {
+                    return channel.read(dst);
+                }
+
+                @Override
+                public boolean isOpen() {
+                    return channel.isOpen();
+                }
+
+                @Override
+                public void close() throws IOException {
+                    responseIn.close();
+                }
+            };
+        }
+        return Channels.newChannel(responseIn);
     }
 
     private void onRequestStreamClosed() throws IOException {
@@ -679,23 +735,27 @@ public final class H2Exchange implements HttpExchange {
             muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.RST_STREAM, ERROR_CANCEL, 100);
             // Signal end to any waiting consumers
             state.setReadStateDone();
-            // Signal outside lock - lock-free wakeup
-            Thread t = waitingThread;
-            if (t != null) {
-                LockSupport.unpark(t);
+            dataLock.lock();
+            try {
+                dataAvailable.signal();
+            } finally {
+                dataLock.unlock();
             }
         }
 
         // Return all queued buffers to connection pool for reuse
+        int discardedCredit = 0;
         dataLock.lock();
         try {
             DataChunk chunk;
             while ((chunk = dataQueue.poll()) != null) {
+                discardedCredit += chunk.flowControlBytes();
                 muxer.returnBuffer(chunk.data());
             }
         } finally {
             dataLock.unlock();
         }
+        releaseDataCredit(discardedCredit);
 
         // Mark stream as closed
         state.setStreamStateClosed();
@@ -721,17 +781,10 @@ public final class H2Exchange implements HttpExchange {
             // Wait for headers, error, or data (which also signals)
             int rs;
             while (pendingHeadersQueue.isEmpty() && (rs = state.getReadState()) != RS_ERROR && rs != RS_DONE) {
-                // Wait using lock-free signaling
-                waitingThread = Thread.currentThread();
-                dataLock.unlock();
                 try {
-                    LockSupport.park(); // Untimed: muxer watchdog handles timeout
-                    if (Thread.interrupted()) {
-                        throw new IOException("Interrupted waiting for response");
-                    }
-                } finally {
-                    dataLock.lock();
-                    waitingThread = null;
+                    dataAvailable.await();
+                } catch (InterruptedException e) {
+                    throw new IOException("Interrupted waiting for response");
                 }
             }
 
@@ -899,14 +952,22 @@ public final class H2Exchange implements HttpExchange {
      * @throws SocketTimeoutException if write timeout expires waiting for flow control window
      */
     void writeData(byte[] data, int offset, int length, boolean endStream) throws IOException {
-        // If trailers are set and this is the last data, don't set END_STREAM on DATA frame
-        // - trailers will carry END_STREAM instead
+        // Wrap byte[] in ByteBuffer and delegate
+        ByteBuffer buf = ByteBuffer.wrap(data, offset, length);
+        writeData(buf, endStream);
+    }
+
+    /**
+     * Write data from a ByteBuffer as DATA frames. Zero-copy path.
+     */
+    void writeData(ByteBuffer data, boolean endStream) throws IOException {
         boolean hasTrailers = requestTrailers != null;
         int maxFrameSize = muxer.getRemoteMaxFrameSize();
+        int length = data.remaining();
 
-        while (length > 0) {
-            // Acquire as much stream-level flow control as we can (up to remaining length)
-            int batchSize = Math.min(length, maxFrameSize * FLOW_CONTROL_BATCH_FRAMES);
+        while (data.hasRemaining()) {
+            int remaining = data.remaining();
+            int batchSize = Math.min(remaining, maxFrameSize * FLOW_CONTROL_BATCH_FRAMES);
             int streamAcquired;
             try {
                 streamAcquired = sendWindow.tryAcquireUpTo(batchSize, writeTimeoutMs);
@@ -920,7 +981,6 @@ public final class H2Exchange implements HttpExchange {
                 throw new IOException("Interrupted waiting for stream flow control window", e);
             }
 
-            // Acquire connection-level flow control for what we got from stream
             int connAcquired;
             try {
                 connAcquired = muxer.acquireConnectionWindowUpTo(streamAcquired, writeTimeoutMs);
@@ -930,7 +990,6 @@ public final class H2Exchange implements HttpExchange {
                             "Write timed out after %dms waiting for connection flow control window",
                             writeTimeoutMs));
                 }
-                // Release excess stream permits if connection gave us less
                 if (connAcquired < streamAcquired) {
                     sendWindow.release(streamAcquired - connAcquired);
                 }
@@ -943,19 +1002,21 @@ public final class H2Exchange implements HttpExchange {
                 throw e;
             }
 
-            // Write frames using the acquired window
             int batchRemaining = connAcquired;
-            while (batchRemaining > 0 && length > 0) {
-                int toSend = Math.min(Math.min(length, maxFrameSize), batchRemaining);
-                boolean isLastChunk = (toSend == length);
+            while (batchRemaining > 0 && data.hasRemaining()) {
+                int toSend = Math.min(Math.min(data.remaining(), maxFrameSize), batchRemaining);
+                boolean isLastChunk = (toSend == data.remaining());
                 int flags = (endStream && isLastChunk && !hasTrailers) ? FLAG_END_STREAM : 0;
-                byte[] buf = muxer.borrowBuffer(toSend);
-                System.arraycopy(data, offset, buf, 0, toSend);
 
-                pendingWrites.add(new PendingWrite().init(buf, 0, toSend, flags));
+                // Copy into pooled buffer for async write
+                ByteBuffer buf = muxer.borrowBuffer(toSend);
+                int oldLimit = data.limit();
+                data.limit(data.position() + toSend);
+                buf.put(data);
+                data.limit(oldLimit);
+                buf.flip();
 
-                offset += toSend;
-                length -= toSend;
+                pendingWrites.add(new PendingWrite().init(buf, flags));
                 batchRemaining -= toSend;
             }
         }
@@ -985,7 +1046,7 @@ public final class H2Exchange implements HttpExchange {
                 muxer.queueTrailers(streamId, requestTrailers);
             } else {
                 // Use pendingWrites queue (same as writeData) to ensure ordering
-                pendingWrites.add(new PendingWrite().init(H2Constants.EMPTY_BYTES, 0, 0, FLAG_END_STREAM));
+                pendingWrites.add(new PendingWrite().initDirect(ByteBuffer.allocate(0), FLAG_END_STREAM));
 
                 // Signal writer thread
                 if (IN_WORK_QUEUE_HANDLE.compareAndSet(this, false, true)) {

@@ -12,6 +12,7 @@ import java.net.Socket;
 import java.time.Duration;
 import java.util.List;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
 import software.amazon.smithy.java.http.client.ProxyConfiguration;
@@ -89,36 +90,37 @@ record HttpConnectionFactory(
             throw e;
         }
 
+        Transport transport;
         if (route.isSecure()) {
-            socket = performTlsHandshake(socket, route);
+            transport = performTlsHandshake(socket, route);
+        } else {
+            transport = new SocketTransport(socket);
         }
 
-        return createProtocolConnection(socket, route);
+        return createProtocolConnection(transport, route);
     }
 
-    private Socket performTlsHandshake(Socket socket, Route route) throws IOException {
+    private Transport performTlsHandshake(Socket socket, Route route) throws IOException {
         try {
-            SSLSocket sslSocket = (SSLSocket) sslContext.getSocketFactory()
-                    .createSocket(socket, route.host(), route.port(), true);
+            SSLEngine engine = sslContext.createSSLEngine(route.host(), route.port());
+            engine.setUseClientMode(true);
 
-            // Start with custom params if provided, otherwise use socket defaults
             SSLParameters params = sslParameters != null
                     ? copyParameters(sslParameters)
-                    : sslSocket.getSSLParameters();
+                    : engine.getSSLParameters();
             params.setEndpointIdentificationAlgorithm("HTTPS");
-            // ALPN is always set based on version policy (overrides any custom setting)
             params.setApplicationProtocols(versionPolicy.alpnProtocols());
-            sslSocket.setSSLParameters(params);
+            engine.setSSLParameters(params);
 
-            int originalTimeout = sslSocket.getSoTimeout();
-            sslSocket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
+            int originalTimeout = socket.getSoTimeout();
+            socket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
             try {
-                sslSocket.startHandshake();
+                SSLEngineTransport transport = new SSLEngineTransport(socket, engine);
+                transport.handshake();
+                return new SSLEngineBackedTransport(transport);
             } finally {
-                sslSocket.setSoTimeout(originalTimeout);
+                socket.setSoTimeout(originalTimeout);
             }
-
-            return sslSocket;
         } catch (IOException e) {
             closeQuietly(socket);
             throw new IOException("TLS handshake failed for " + route.host(), e);
@@ -142,21 +144,19 @@ record HttpConnectionFactory(
         return dst;
     }
 
-    private HttpConnection createProtocolConnection(Socket socket, Route route) throws IOException {
+    private HttpConnection createProtocolConnection(Transport transport, Route route) throws IOException {
         String protocol = "http/1.1";
 
-        if (socket instanceof SSLSocket sslSocket) {
-            String negotiated = sslSocket.getApplicationProtocol();
-            if (negotiated != null && !negotiated.isEmpty()) {
-                protocol = negotiated;
-            }
+        String negotiated = transport.negotiatedProtocol();
+        if (negotiated != null) {
+            protocol = negotiated;
         } else if (versionPolicy.usesH2cForCleartext()) {
             protocol = "h2c";
         }
 
         try {
             if ("h2".equals(protocol) || "h2c".equals(protocol)) {
-                return new H2Connection(socket,
+                return new H2Connection(transport,
                         route,
                         readTimeout,
                         writeTimeout,
@@ -164,10 +164,14 @@ record HttpConnectionFactory(
                         h2MaxFrameSize,
                         h2BufferSize);
             } else {
-                return new H1Connection(socket, route, readTimeout);
+                return new H1Connection(transport, route, readTimeout);
             }
         } catch (IOException e) {
-            closeQuietly(socket);
+            try {
+                transport.close();
+            } catch (IOException ignored) {
+                // ignored
+            }
             throw e;
         }
     }
@@ -214,6 +218,7 @@ record HttpConnectionFactory(
 
             // Connect to the proxy over TLS if the scheme is https
             if ("https".equalsIgnoreCase(proxy.proxyUri().getScheme())) {
+                // Use SSLSocket for proxy TLS (proxy tunnel doesn't need zero-copy)
                 proxySocket = performTlsHandshakeToProxy(proxySocket, proxy);
             }
 
@@ -230,10 +235,12 @@ record HttpConnectionFactory(
                     throw new IOException("Proxy CONNECT failed: " + result.statusCode());
                 }
 
-                proxySocket = performTlsHandshake(proxySocket, route);
+                // Proxy tunnel uses SSLSocket fallback (no SocketChannel through tunnel)
+                Transport transport = performTlsHandshake(proxySocket, route);
+                return createProtocolConnection(transport, route);
             }
 
-            return createProtocolConnection(proxySocket, route);
+            return createProtocolConnection(new SocketTransport(proxySocket), route);
         } catch (IOException e) {
             closeQuietly(proxySocket);
             throw new IOException(

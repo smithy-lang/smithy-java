@@ -11,6 +11,9 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,6 +24,16 @@ import java.util.concurrent.Flow;
  * Abstraction for reading streams of data.
  */
 public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
+    /**
+     * Supplies an I/O object and may throw {@link IOException}.
+     *
+     * @param <T> type of object supplied
+     */
+    @FunctionalInterface
+    interface IOSupplier<T> {
+        T get() throws IOException;
+    }
+
     /**
      * Length of the data stream, if known.
      *
@@ -102,6 +115,41 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
     }
 
     /**
+     * Write the contents of this stream to a writable byte channel.
+     *
+     * <p>This is the zero-copy path for transferring data. Implementations backed by
+     * files can use {@code FileChannel.transferTo()} for kernel-level zero-copy.
+     * Implementations backed by ByteBuffers can write directly without intermediate copies.
+     *
+     * @param channel the channel to write to
+     * @throws IOException if an I/O error occurs
+     */
+    default void writeTo(WritableByteChannel channel) throws IOException {
+        try (var is = asInputStream()) {
+            ByteBuffer buf = ByteBuffer.allocate(8192);
+            int n;
+            while ((n = is.read(buf.array(), 0, buf.capacity())) > 0) {
+                buf.position(0).limit(n);
+                while (buf.hasRemaining()) {
+                    channel.write(buf);
+                }
+            }
+        }
+    }
+
+    /**
+     * Get a readable byte channel for zero-copy consumption.
+     *
+     * <p>Implementations backed by files can return a {@code FileChannel} directly.
+     * The default wraps {@link #asInputStream()} via {@code Channels.newChannel()}.
+     *
+     * @return a readable byte channel
+     */
+    default ReadableByteChannel asChannel() {
+        return Channels.newChannel(asInputStream());
+    }
+
+    /**
      * Read the contents of the stream into a ByteBuffer by reading all bytes from {@link #asInputStream()}.
      *
      * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,
@@ -175,6 +223,95 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      */
     static DataStream ofInputStream(InputStream inputStream, String contentType, long contentLength) {
         return new InputStreamDataStream(inputStream, contentType, contentLength);
+    }
+
+    /**
+     * Create a non-replayable DataStream from a lazily supplied InputStream.
+     *
+     * @param inputStream InputStream supplier.
+     * @param contentType Content-Type of the stream if known, or null.
+     * @param contentLength Bytes in the stream if known, or -1.
+     * @return the created DataStream.
+     */
+    static DataStream ofInputStream(IOSupplier<InputStream> inputStream, String contentType, long contentLength) {
+        return ofStreamOrChannel(inputStream, null, contentType, contentLength, false);
+    }
+
+    /**
+     * Create a non-replayable DataStream from a lazily supplied readable channel.
+     *
+     * @param channel channel supplier.
+     * @return the created DataStream.
+     */
+    static DataStream ofChannel(IOSupplier<ReadableByteChannel> channel) {
+        return ofChannel(channel, null);
+    }
+
+    /**
+     * Create a non-replayable DataStream from a lazily supplied readable channel.
+     *
+     * @param channel channel supplier.
+     * @param contentType Content-Type of the stream if known, or null.
+     * @return the created DataStream.
+     */
+    static DataStream ofChannel(IOSupplier<ReadableByteChannel> channel, String contentType) {
+        return ofChannel(channel, contentType, -1);
+    }
+
+    /**
+     * Create a non-replayable DataStream from a lazily supplied readable channel.
+     *
+     * @param channel channel supplier.
+     * @param contentType Content-Type of the stream if known, or null.
+     * @param contentLength Bytes in the stream if known, or -1.
+     * @return the created DataStream.
+     */
+    static DataStream ofChannel(IOSupplier<ReadableByteChannel> channel, String contentType, long contentLength) {
+        return ofStreamOrChannel(null, channel, contentType, contentLength, false);
+    }
+
+    /**
+     * Create a non-replayable DataStream with lazy InputStream and ReadableByteChannel views.
+     *
+     * <p>Only the view requested by the caller is created. For non-replayable streams,
+     * calling either {@link #asInputStream()} or {@link #asChannel()} consumes the stream.
+     *
+     * @param inputStream InputStream supplier, or null to adapt the channel supplier.
+     * @param channel channel supplier, or null to adapt the input stream supplier.
+     * @param contentType Content-Type of the stream if known, or null.
+     * @param contentLength Bytes in the stream if known, or -1.
+     * @return the created DataStream.
+     */
+    static DataStream ofStreamOrChannel(
+            IOSupplier<InputStream> inputStream,
+            IOSupplier<ReadableByteChannel> channel,
+            String contentType,
+            long contentLength
+    ) {
+        return ofStreamOrChannel(inputStream, channel, contentType, contentLength, false);
+    }
+
+    /**
+     * Create a DataStream with lazy InputStream and ReadableByteChannel views.
+     *
+     * @param inputStream InputStream supplier, or null to adapt the channel supplier.
+     * @param channel channel supplier, or null to adapt the input stream supplier.
+     * @param contentType Content-Type of the stream if known, or null.
+     * @param contentLength Bytes in the stream if known, or -1.
+     * @param isReplayable true if suppliers can create independent views from the beginning.
+     * @return the created DataStream.
+     */
+    static DataStream ofStreamOrChannel(
+            IOSupplier<InputStream> inputStream,
+            IOSupplier<ReadableByteChannel> channel,
+            String contentType,
+            long contentLength,
+            boolean isReplayable
+    ) {
+        if (inputStream == null && channel == null) {
+            throw new IllegalArgumentException("Either inputStream or channel must be provided");
+        }
+        return new ChannelDataStream(inputStream, channel, contentType, contentLength, isReplayable);
     }
 
     /**

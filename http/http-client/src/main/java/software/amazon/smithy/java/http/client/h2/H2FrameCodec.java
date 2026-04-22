@@ -27,8 +27,7 @@ import static software.amazon.smithy.java.http.client.h2.H2Constants.FRAME_TYPE_
 import static software.amazon.smithy.java.http.client.h2.H2Constants.frameTypeName;
 
 import java.io.IOException;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
+import java.nio.ByteBuffer;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
 
 /**
@@ -49,8 +48,8 @@ import software.amazon.smithy.java.io.ByteBufferOutputStream;
  */
 final class H2FrameCodec {
 
-    private final UnsyncBufferedInputStream in;
-    private final UnsyncBufferedOutputStream out;
+    private final ChannelFrameReader reader;
+    private final ChannelFrameWriter writer;
     private final int maxFrameSize;
 
     // Write header buffer - used by writer thread only.
@@ -69,9 +68,9 @@ final class H2FrameCodec {
     private int currentStreamId;
     private int currentPayloadLength;
 
-    H2FrameCodec(UnsyncBufferedInputStream in, UnsyncBufferedOutputStream out, int maxFrameSize) {
-        this.in = in;
-        this.out = out;
+    H2FrameCodec(ChannelFrameReader reader, ChannelFrameWriter writer, int maxFrameSize) {
+        this.reader = reader;
+        this.writer = writer;
         this.maxFrameSize = maxFrameSize;
     }
 
@@ -80,7 +79,7 @@ final class H2FrameCodec {
      * This must be sent by the client before any frames.
      */
     void writeConnectionPreface() throws IOException {
-        out.write(CONNECTION_PREFACE);
+        writer.write(CONNECTION_PREFACE);
     }
 
     // ==================== Stateful Parser API ====================
@@ -102,30 +101,26 @@ final class H2FrameCodec {
      * @throws IOException if reading fails or frame is malformed
      */
     int nextFrame() throws IOException {
-        // Zero-copy: ensure 9 bytes in buffer, then parse directly
-        if (!in.ensure(FRAME_HEADER_SIZE)) {
-            // EOF or incomplete header
-            if (in.buffered() == 0) {
+        // Ensure 9 bytes in buffer, then parse directly from ByteBuffer
+        if (!reader.ensure(FRAME_HEADER_SIZE)) {
+            if (reader.buffered() == 0) {
                 return -1; // Clean EOF
             }
-            throw new IOException("Incomplete frame header: read " + in.buffered() + " bytes");
+            throw new IOException("Incomplete frame header: read " + reader.buffered() + " bytes");
         }
 
-        // Parse header directly from input buffer (zero-copy)
-        byte[] buf = in.buffer();
-        int p = in.position();
+        // Parse header directly from reader's ByteBuffer (zero-copy)
+        ByteBuffer buf = reader.buffer();
 
-        currentPayloadLength = ((buf[p] & 0xFF) << 16)
-                | ((buf[p + 1] & 0xFF) << 8)
-                | (buf[p + 2] & 0xFF);
-        currentType = buf[p + 3] & 0xFF;
-        currentFlags = buf[p + 4] & 0xFF;
-        currentStreamId = ((buf[p + 5] & 0x7F) << 24) // Mask off reserved bit
-                | ((buf[p + 6] & 0xFF) << 16)
-                | ((buf[p + 7] & 0xFF) << 8)
-                | (buf[p + 8] & 0xFF);
-
-        in.consume(FRAME_HEADER_SIZE);
+        currentPayloadLength = ((buf.get() & 0xFF) << 16)
+                | ((buf.get() & 0xFF) << 8)
+                | (buf.get() & 0xFF);
+        currentType = buf.get() & 0xFF;
+        currentFlags = buf.get() & 0xFF;
+        currentStreamId = ((buf.get() & 0x7F) << 24)
+                | ((buf.get() & 0xFF) << 16)
+                | ((buf.get() & 0xFF) << 8)
+                | (buf.get() & 0xFF);
 
         // Validate frame size
         if (currentPayloadLength > maxFrameSize) {
@@ -198,7 +193,7 @@ final class H2FrameCodec {
      * @return true if more data is immediately available without blocking
      */
     boolean hasBufferedData() {
-        return in.buffered() > 0;
+        return reader.hasBufferedData();
     }
 
     // ==================== Payload Parsing Methods ====================
@@ -304,19 +299,16 @@ final class H2FrameCodec {
         }
 
         // Zero-copy: ensure 4 bytes in buffer, then parse directly
-        if (!in.ensure(4)) {
+        if (!reader.ensure(4)) {
             throw new IOException("Unexpected EOF reading WINDOW_UPDATE payload");
         }
 
-        byte[] buf = in.buffer();
-        int p = in.position();
+        ByteBuffer buf = reader.buffer();
 
-        int increment = ((buf[p] & 0x7F) << 24)
-                | ((buf[p + 1] & 0xFF) << 16)
-                | ((buf[p + 2] & 0xFF) << 8)
-                | (buf[p + 3] & 0xFF);
-
-        in.consume(4);
+        int increment = ((buf.get() & 0x7F) << 24)
+                | ((buf.get() & 0xFF) << 16)
+                | ((buf.get() & 0xFF) << 8)
+                | (buf.get() & 0xFF);
 
         if (increment == 0) {
             throw new H2Exception(ERROR_PROTOCOL_ERROR, "WINDOW_UPDATE increment must be non-zero");
@@ -361,19 +353,16 @@ final class H2FrameCodec {
         }
 
         // Zero-copy: ensure 4 bytes in buffer, then parse directly
-        if (!in.ensure(4)) {
+        if (!reader.ensure(4)) {
             throw new IOException("Unexpected EOF reading RST_STREAM payload");
         }
 
-        byte[] buf = in.buffer();
-        int p = in.position();
+        ByteBuffer buf = reader.buffer();
 
-        int errorCode = ((buf[p] & 0xFF) << 24)
-                | ((buf[p + 1] & 0xFF) << 16)
-                | ((buf[p + 2] & 0xFF) << 8)
-                | (buf[p + 3] & 0xFF);
-
-        in.consume(4);
+        int errorCode = ((buf.get() & 0xFF) << 24)
+                | ((buf.get() & 0xFF) << 16)
+                | ((buf.get() & 0xFF) << 8)
+                | (buf.get() & 0xFF);
 
         return errorCode;
     }
@@ -661,11 +650,39 @@ final class H2FrameCodec {
         writeHeaderBuf[7] = (byte) ((streamId >> 8) & 0xFF);
         writeHeaderBuf[8] = (byte) (streamId & 0xFF);
 
-        out.write(writeHeaderBuf);
+        writer.write(writeHeaderBuf);
 
         // Write payload
         if (length > 0 && payload != null) {
-            out.write(payload, offset, length);
+            writer.write(payload, offset, length);
+        }
+    }
+
+    /**
+     * Write a frame with a ByteBuffer payload. Zero-copy path for DATA frames.
+     * The buffer must be in read mode (position at start of data, limit at end).
+     */
+    void writeFrame(int type, int flags, int streamId, ByteBuffer payload) throws IOException {
+        if (streamId < 0) {
+            throw new IllegalArgumentException("Invalid stream ID: " + streamId);
+        }
+
+        int length = payload != null ? payload.remaining() : 0;
+
+        writeHeaderBuf[0] = (byte) ((length >> 16) & 0xFF);
+        writeHeaderBuf[1] = (byte) ((length >> 8) & 0xFF);
+        writeHeaderBuf[2] = (byte) (length & 0xFF);
+        writeHeaderBuf[3] = (byte) type;
+        writeHeaderBuf[4] = (byte) flags;
+        writeHeaderBuf[5] = (byte) ((streamId >> 24) & 0x7F);
+        writeHeaderBuf[6] = (byte) ((streamId >> 16) & 0xFF);
+        writeHeaderBuf[7] = (byte) ((streamId >> 8) & 0xFF);
+        writeHeaderBuf[8] = (byte) (streamId & 0xFF);
+
+        writer.write(writeHeaderBuf);
+
+        if (length > 0 && payload != null) {
+            writer.write(payload);
         }
     }
 
@@ -731,7 +748,7 @@ final class H2FrameCodec {
      * Write SETTINGS acknowledgment.
      */
     void writeSettingsAck() throws IOException {
-        writeFrame(FRAME_TYPE_SETTINGS, FLAG_ACK, 0, null);
+        writeFrame(FRAME_TYPE_SETTINGS, FLAG_ACK, 0, (byte[]) null);
     }
 
     /**
@@ -754,7 +771,7 @@ final class H2FrameCodec {
         writeHeaderBuf[6] = 0;
         writeHeaderBuf[7] = 0;
         writeHeaderBuf[8] = 0;
-        out.write(writeHeaderBuf);
+        writer.write(writeHeaderBuf);
 
         // Write fixed 8-byte GOAWAY payload (lastStreamId + errorCode) using scratch buffer
         writeScratch[0] = (byte) ((lastStreamId >> 24) & 0x7F);
@@ -765,11 +782,11 @@ final class H2FrameCodec {
         writeScratch[5] = (byte) ((errorCode >> 16) & 0xFF);
         writeScratch[6] = (byte) ((errorCode >> 8) & 0xFF);
         writeScratch[7] = (byte) (errorCode & 0xFF);
-        out.write(writeScratch, 0, 8);
+        writer.write(writeScratch, 0, 8);
 
         // Write debug data directly as ASCII (avoids String.getBytes allocation)
         if (debugLen > 0) {
-            out.writeAscii(debugData);
+            writer.writeAscii(debugData);
         }
     }
 
@@ -809,7 +826,7 @@ final class H2FrameCodec {
      * <p>Caller must ensure exclusive access to the output stream.
      */
     void flush() throws IOException {
-        out.flush();
+        writer.flush();
     }
 
     /**
@@ -828,32 +845,19 @@ final class H2FrameCodec {
      * @throws IOException if reading fails or EOF is reached before all bytes are read
      */
     void readPayloadInto(byte[] dest, int offset, int length) throws IOException {
-        // Fast path: if entirely buffered, single arraycopy (zero-copy from network perspective)
-        int buffered = in.buffered();
-        if (length <= buffered) {
-            System.arraycopy(in.buffer(), in.position(), dest, offset, length);
-            in.consume(length);
-            return;
-        }
+        reader.readInto(dest, offset, length);
+    }
 
-        // Drain what's buffered first
-        if (buffered > 0) {
-            System.arraycopy(in.buffer(), in.position(), dest, offset, buffered);
-            in.consume(buffered);
-            offset += buffered;
-            length -= buffered;
-        }
-
-        // Read remainder directly from underlying stream (buffer is now empty).
-        // Using readDirect avoids the buffer fill/check overhead in read().
-        while (length > 0) {
-            int n = in.readDirect(dest, offset, length);
-            if (n < 0) {
-                throw new IOException("Incomplete payload: unexpected EOF");
-            }
-            offset += n;
-            length -= n;
-        }
+    /**
+     * Read DATA frame payload directly into a pooled ByteBuffer.
+     * Zero-copy path: data goes from channel → destination, bypassing internal buffer
+     * when possible.
+     *
+     * @param dest ByteBuffer in write mode
+     * @param length bytes to read
+     */
+    void readPayloadDirect(ByteBuffer dest, int length) throws IOException {
+        reader.readIntoDirect(dest, length);
     }
 
     /**
@@ -865,34 +869,12 @@ final class H2FrameCodec {
      * @throws IOException if reading fails or EOF is reached before all bytes are read
      */
     private void readPayloadIntoBuffer(int length) throws IOException {
-        // Fast path: if entirely buffered, write directly to headerBlockBuffer
-        int buffered = in.buffered();
-        if (length <= buffered) {
-            headerBlockBuffer.write(in.buffer(), in.position(), length);
-            in.consume(length);
-            return;
-        }
-
-        // Drain what's buffered first
-        if (buffered > 0) {
-            headerBlockBuffer.write(in.buffer(), in.position(), buffered);
-            in.consume(buffered);
-            length -= buffered;
-        }
-
-        // Read remainder in chunks using scratch buffer
+        // Read into headerBlockBuffer via scratch
         while (length > 0) {
             int toRead = Math.min(length, writeScratch.length);
-            int totalRead = 0;
-            while (totalRead < toRead) {
-                int n = in.readDirect(writeScratch, totalRead, toRead - totalRead);
-                if (n < 0) {
-                    throw new IOException("Incomplete payload: unexpected EOF");
-                }
-                totalRead += n;
-            }
-            headerBlockBuffer.write(writeScratch, 0, totalRead);
-            length -= totalRead;
+            reader.readInto(writeScratch, 0, toRead);
+            headerBlockBuffer.write(writeScratch, 0, toRead);
+            length -= toRead;
         }
     }
 
@@ -906,12 +888,7 @@ final class H2FrameCodec {
      * @throws IOException if reading fails or EOF is reached
      */
     int readByte() throws IOException {
-        if (!in.ensure(1)) {
-            throw new IOException("Unexpected EOF reading byte");
-        }
-        int b = in.buffer()[in.position()] & 0xFF;
-        in.consume(1);
-        return b;
+        return reader.readByte();
     }
 
     /**
@@ -925,27 +902,6 @@ final class H2FrameCodec {
      * @throws IOException if skipping fails or EOF is reached before all bytes are skipped
      */
     void skipBytes(int length) throws IOException {
-        // Fast path: if entirely buffered, just consume (common for padding)
-        int buffered = in.buffered();
-        if (length <= buffered) {
-            in.consume(length);
-            return;
-        }
-
-        // Consume what's buffered
-        if (buffered > 0) {
-            in.consume(buffered);
-            length -= buffered;
-        }
-
-        // Skip remainder in underlying stream
-        long remaining = length;
-        while (remaining > 0) {
-            long skipped = in.skip(remaining);
-            if (skipped <= 0) {
-                throw new IOException("Unexpected EOF while skipping bytes");
-            }
-            remaining -= skipped;
-        }
+        reader.skip(length);
     }
 }
