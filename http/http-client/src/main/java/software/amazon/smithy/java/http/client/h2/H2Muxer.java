@@ -54,6 +54,8 @@ final class H2Muxer implements AutoCloseable {
         boolean isAcceptingStreams();
 
         int getRemoteMaxHeaderListSize();
+
+        default void releaseConnectionReceiveWindow(int bytes) {}
     }
 
     enum ControlFrameType {
@@ -364,6 +366,10 @@ final class H2Muxer implements AutoCloseable {
         }
 
         wakeWaiters();
+    }
+
+    void releaseConnectionReceiveWindow(int bytes) {
+        connectionCallback.releaseConnectionReceiveWindow(bytes);
     }
 
     /**

@@ -41,6 +41,19 @@ public interface Transport extends AutoCloseable {
     ReadableByteChannel readableChannel() throws IOException;
 
     /**
+     * Returns true if this transport already has plaintext bytes buffered below
+     * the channel returned by {@link #readableChannel()}.
+     *
+     * <p>This is a non-blocking hint used for read batching. Returning false is
+     * always safe; it only means callers may wake a consumer earlier than necessary.
+     *
+     * @return true if plaintext data is available without socket I/O.
+     */
+    default boolean hasBufferedData() {
+        return false;
+    }
+
+    /**
      * Get a writable channel for zero-copy writes from ByteBuffers.
      *
      * <p>For TLS transports, this wraps data directly from the caller's

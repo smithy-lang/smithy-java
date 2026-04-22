@@ -42,6 +42,7 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.net.ssl.SSLSession;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -101,8 +102,10 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     private volatile int remoteMaxConcurrentStreams = DEFAULT_MAX_CONCURRENT_STREAMS;
     private volatile int remoteMaxHeaderListSize = Integer.MAX_VALUE;
 
-    // Connection receive window (send window is managed by muxer). Only accessed by reader thread.
+    // Connection receive window. Debited by reader thread, credited by application threads as data is consumed.
+    private final ReentrantLock connectionRecvWindowLock = new ReentrantLock();
     private int connectionRecvWindow;
+    private int pendingConnectionWindowUpdate;
     private final int initialWindowSize;
 
     // Connection state (AtomicReference for safe concurrent close)
@@ -135,7 +138,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     ) throws IOException {
         this.transport = transport;
         this.maxFrameSize = maxFrameSize;
-        var channelReader = new ChannelFrameReader(transport.readableChannel(), bufferSize);
+        var channelReader = new ChannelFrameReader(transport.readableChannel(), bufferSize, transport::hasBufferedData);
         var channelWriter = new ChannelFrameWriter(transport.writableChannel(), bufferSize);
         this.route = route;
         this.readTimeoutMs = readTimeout.toMillis();
@@ -277,8 +280,8 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
                 buffer.flip();
                 // Check if more data is buffered - used for adaptive signaling to reduce wakeups
                 boolean moreDataBuffered = frameCodec.hasBufferedData();
-                exchange.enqueueData(buffer, endStream, moreDataBuffered);
-                consumeConnectionRecvWindow(dataLength);
+                debitConnectionRecvWindow(payloadLength);
+                exchange.enqueueData(buffer, endStream, moreDataBuffered, payloadLength);
                 // Always signal immediately on END_STREAM so the consumer thread wakes up.
                 // Otherwise, defer signaling when more data is buffered (stream-switch detection
                 // will flush it on the next frame).
@@ -289,14 +292,24 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
                     lastDataExchange = moreDataBuffered ? exchange : null;
                 }
             } else if (endStream) {
-                exchange.enqueueData(null, true, false);
+                if (payloadLength > 0) {
+                    debitConnectionRecvWindow(payloadLength);
+                    exchange.releaseDiscardedData(payloadLength);
+                }
+                exchange.enqueueData(null, true, false, 0);
                 exchange.signalDataAvailable();
                 lastDataExchange = null;
+            } else if (payloadLength > 0) {
+                debitConnectionRecvWindow(payloadLength);
+                exchange.releaseDiscardedData(payloadLength);
             }
         } else {
-            if (dataLength > 0) {
-                frameCodec.skipBytes(dataLength);
-                consumeConnectionRecvWindow(dataLength);
+            if (payloadLength > 0) {
+                if (dataLength > 0) {
+                    frameCodec.skipBytes(dataLength);
+                }
+                debitConnectionRecvWindow(payloadLength);
+                releaseConnectionReceiveWindow(payloadLength);
             }
             LOGGER.trace("Ignoring DATA frame for closed stream {}", streamId);
             // Clear tracker if buffer empty (even for unknown streams)
@@ -791,16 +804,44 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         return headers;
     }
 
-    // Called only from reader thread - no synchronization needed
-    void consumeConnectionRecvWindow(int bytes) throws IOException {
-        connectionRecvWindow -= bytes;
-        // Send WINDOW_UPDATE when window drops below threshold to reduce control frame overhead
-        // while still leaving enough buffer to avoid server stalls
-        if (connectionRecvWindow < initialWindowSize / H2Constants.WINDOW_UPDATE_THRESHOLD_DIVISOR) {
-            int increment = initialWindowSize - connectionRecvWindow;
-            connectionRecvWindow += increment;
+    void debitConnectionRecvWindow(int bytes) {
+        if (bytes <= 0) {
+            return;
+        }
+        connectionRecvWindowLock.lock();
+        try {
+            connectionRecvWindow -= bytes;
+        } finally {
+            connectionRecvWindowLock.unlock();
+        }
+    }
+
+    @Override
+    public void releaseConnectionReceiveWindow(int bytes) {
+        if (bytes <= 0) {
+            return;
+        }
+
+        int increment = 0;
+        connectionRecvWindowLock.lock();
+        try {
+            connectionRecvWindow += bytes;
+            pendingConnectionWindowUpdate += bytes;
+            if (pendingConnectionWindowUpdate >= receiveWindowUpdateThreshold()) {
+                increment = pendingConnectionWindowUpdate;
+                pendingConnectionWindowUpdate = 0;
+            }
+        } finally {
+            connectionRecvWindowLock.unlock();
+        }
+
+        if (increment > 0) {
             muxer.queueControlFrame(0, H2Muxer.ControlFrameType.WINDOW_UPDATE, increment, writeTimeoutMs);
         }
+    }
+
+    private int receiveWindowUpdateThreshold() {
+        return Math.max(1, initialWindowSize / H2Constants.WINDOW_UPDATE_THRESHOLD_DIVISOR);
     }
 
     void handleGoaway(int lastStreamId, int errorCode) {

@@ -59,7 +59,7 @@ import software.amazon.smithy.java.http.client.HttpExchange;
  * <p>The reader thread enqueues DATA frame payloads via {@link #enqueueData}. The user
  * thread drains chunks in batches via {@link #drainChunks} (used by H2DataInputStream).
  * Pooled byte[] buffers are returned after consumption. Flow control sends WINDOW_UPDATE
- * after data is consumed via {@link #onDataConsumed}.
+ * after DATA frame bytes are consumed or discarded.
  */
 public final class H2Exchange implements HttpExchange {
 
@@ -138,6 +138,7 @@ public final class H2Exchange implements HttpExchange {
     private final FlowControlWindow sendWindow;
     private final int initialWindowSize;
     private int streamRecvWindow;
+    private int pendingStreamWindowUpdate;
 
     // === OUTBOUND PATH (VT → Writer) ===
     // Pending writes queued by VT, drained by writer thread
@@ -399,29 +400,20 @@ public final class H2Exchange implements HttpExchange {
      * <p>This method is called by the reader thread to add a byte[] containing
      * DATA frame payload to the queue.
      *
-     * @param data the byte array containing data, or null for end-stream-only signal
-     * @param length the number of valid bytes in data
+     * @param data the byte buffer containing data, or null for end-stream-only signal
      * @param endStream whether END_STREAM flag was set
      * @param moreDataBuffered true if more data is already buffered in the socket read buffer,
      *                         used to defer signaling when processing a burst of frames
+     * @param flowControlBytes DATA frame payload bytes charged to HTTP/2 receive windows
      */
-    void enqueueData(ByteBuffer data, boolean endStream, boolean moreDataBuffered) {
-        boolean sendWindowUpdate = false;
-        boolean signal = false;
-        int windowIncrement = 0;
+    void enqueueData(ByteBuffer data, boolean endStream, boolean moreDataBuffered, int flowControlBytes) {
         int length = data != null ? data.remaining() : 0;
 
         dataLock.lock();
         try {
             if (data != null && length > 0) {
-                dataQueue.add(new DataChunk(data, endStream));
-
-                streamRecvWindow -= length;
-                if (streamRecvWindow < initialWindowSize / H2Constants.WINDOW_UPDATE_THRESHOLD_DIVISOR) {
-                    windowIncrement = initialWindowSize - streamRecvWindow;
-                    streamRecvWindow += windowIncrement;
-                    sendWindowUpdate = true;
-                }
+                streamRecvWindow -= flowControlBytes;
+                dataQueue.add(new DataChunk(data, endStream, flowControlBytes));
             } else if (data != null) {
                 muxer.returnBuffer(data);
             }
@@ -437,10 +429,6 @@ public final class H2Exchange implements HttpExchange {
             }
         } finally {
             dataLock.unlock();
-        }
-
-        if (sendWindowUpdate) {
-            muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.WINDOW_UPDATE, windowIncrement, writeTimeoutMs);
         }
     }
 
@@ -540,13 +528,62 @@ public final class H2Exchange implements HttpExchange {
     /**
      * Called by H2DataInputStream when data is consumed.
      *
-     * <p>Updates content length tracking. Note: flow control WINDOW_UPDATE is sent
-     * in {@link #enqueueData} when data arrives, not here.
+     * <p>Updates content length tracking for actual body bytes only. HTTP/2 receive
+     * window credit is released separately when the containing DATA chunk is retired.
      *
      * @param bytesConsumed number of bytes consumed
      */
     void onDataConsumed(int bytesConsumed) {
         receivedContentLength += bytesConsumed;
+    }
+
+    /**
+     * Release receive-window credit for DATA frame payload bytes that have been consumed
+     * by the application or discarded locally.
+     */
+    void releaseDataCredit(int bytes) {
+        if (bytes <= 0) {
+            return;
+        }
+
+        int increment = 0;
+        dataLock.lock();
+        try {
+            streamRecvWindow += bytes;
+            pendingStreamWindowUpdate += bytes;
+            if (pendingStreamWindowUpdate >= receiveWindowUpdateThreshold()) {
+                increment = pendingStreamWindowUpdate;
+                pendingStreamWindowUpdate = 0;
+            }
+        } finally {
+            dataLock.unlock();
+        }
+
+        muxer.releaseConnectionReceiveWindow(bytes);
+        if (increment > 0 && streamId > 0) {
+            muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.WINDOW_UPDATE, increment, writeTimeoutMs);
+        }
+    }
+
+    /**
+     * Account for DATA frame payload bytes that were read and discarded without
+     * becoming application-visible body bytes, such as padding-only DATA frames.
+     */
+    void releaseDiscardedData(int flowControlBytes) {
+        if (flowControlBytes <= 0) {
+            return;
+        }
+        dataLock.lock();
+        try {
+            streamRecvWindow -= flowControlBytes;
+        } finally {
+            dataLock.unlock();
+        }
+        releaseDataCredit(flowControlBytes);
+    }
+
+    private int receiveWindowUpdateThreshold() {
+        return Math.max(1, initialWindowSize / H2Constants.WINDOW_UPDATE_THRESHOLD_DIVISOR);
     }
 
     /**
@@ -606,7 +643,23 @@ public final class H2Exchange implements HttpExchange {
         // Ensure responseBody() is called to initialize the stream
         responseBody();
         if (responseDataStream != null) {
-            return responseDataStream.channel();
+            ReadableByteChannel channel = responseDataStream.channel();
+            return new ReadableByteChannel() {
+                @Override
+                public int read(ByteBuffer dst) throws IOException {
+                    return channel.read(dst);
+                }
+
+                @Override
+                public boolean isOpen() {
+                    return channel.isOpen();
+                }
+
+                @Override
+                public void close() throws IOException {
+                    responseIn.close();
+                }
+            };
         }
         return Channels.newChannel(responseIn);
     }
@@ -682,15 +735,18 @@ public final class H2Exchange implements HttpExchange {
         }
 
         // Return all queued buffers to connection pool for reuse
+        int discardedCredit = 0;
         dataLock.lock();
         try {
             DataChunk chunk;
             while ((chunk = dataQueue.poll()) != null) {
+                discardedCredit += chunk.flowControlBytes();
                 muxer.returnBuffer(chunk.data());
             }
         } finally {
             dataLock.unlock();
         }
+        releaseDataCredit(discardedCredit);
 
         // Mark stream as closed
         state.setStreamStateClosed();

@@ -39,6 +39,11 @@ final class SSLEngineBackedTransport implements Transport {
     }
 
     @Override
+    public boolean hasBufferedData() {
+        return transport.hasBufferedData();
+    }
+
+    @Override
     public WritableByteChannel writableChannel() {
         return transport.writableChannel();
     }

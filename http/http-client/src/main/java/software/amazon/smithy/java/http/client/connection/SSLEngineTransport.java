@@ -183,6 +183,10 @@ final class SSLEngineTransport implements AutoCloseable {
         return socket.getSoTimeout();
     }
 
+    boolean hasBufferedData() {
+        return appIn.hasRemaining();
+    }
+
     SSLSession getSession() {
         return engine.getSession();
     }

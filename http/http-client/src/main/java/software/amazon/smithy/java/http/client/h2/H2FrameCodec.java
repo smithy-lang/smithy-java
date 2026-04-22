@@ -193,7 +193,7 @@ final class H2FrameCodec {
      * @return true if more data is immediately available without blocking
      */
     boolean hasBufferedData() {
-        return reader.buffered() > 0;
+        return reader.hasBufferedData();
     }
 
     // ==================== Payload Parsing Methods ====================
@@ -682,9 +682,7 @@ final class H2FrameCodec {
         writer.write(writeHeaderBuf);
 
         if (length > 0 && payload != null) {
-            // Write from ByteBuffer's backing array directly — no copy
-            writer.write(payload.array(), payload.arrayOffset() + payload.position(), length);
-            payload.position(payload.limit());
+            writer.write(payload);
         }
     }
 

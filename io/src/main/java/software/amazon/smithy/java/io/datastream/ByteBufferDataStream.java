@@ -10,6 +10,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 
@@ -51,8 +53,21 @@ final class ByteBufferDataStream implements DataStream {
     }
 
     @Override
+    public ReadableByteChannel asChannel() {
+        return new ByteBufferChannel(buffer.duplicate());
+    }
+
+    @Override
     public void writeTo(OutputStream out) throws IOException {
         out.write(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());
+    }
+
+    @Override
+    public void writeTo(WritableByteChannel channel) throws IOException {
+        ByteBuffer duplicate = buffer.duplicate();
+        while (duplicate.hasRemaining()) {
+            channel.write(duplicate);
+        }
     }
 
     @Override
@@ -75,5 +90,40 @@ final class ByteBufferDataStream implements DataStream {
         HttpRequest.BodyPublishers
                 .ofByteArray(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining())
                 .subscribe(subscriber);
+    }
+
+    private static final class ByteBufferChannel implements ReadableByteChannel {
+        private final ByteBuffer source;
+        private boolean open = true;
+
+        private ByteBufferChannel(ByteBuffer source) {
+            this.source = source;
+        }
+
+        @Override
+        public int read(ByteBuffer dst) {
+            if (!open) {
+                return -1;
+            }
+            if (!source.hasRemaining()) {
+                return -1;
+            }
+            int toCopy = Math.min(source.remaining(), dst.remaining());
+            int oldLimit = source.limit();
+            source.limit(source.position() + toCopy);
+            dst.put(source);
+            source.limit(oldLimit);
+            return toCopy;
+        }
+
+        @Override
+        public boolean isOpen() {
+            return open;
+        }
+
+        @Override
+        public void close() {
+            open = false;
+        }
     }
 }

@@ -8,6 +8,7 @@ package software.amazon.smithy.java.http.client.h2;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
+import java.util.function.BooleanSupplier;
 
 /**
  * ByteBuffer-based frame reader that replaces UnsyncBufferedInputStream for H2.
@@ -24,10 +25,16 @@ import java.nio.channels.ReadableByteChannel;
 final class ChannelFrameReader {
 
     private final ReadableByteChannel channel;
+    private final BooleanSupplier transportHasBufferedData;
     private ByteBuffer buf;
 
     ChannelFrameReader(ReadableByteChannel channel, int bufferSize) {
+        this(channel, bufferSize, () -> false);
+    }
+
+    ChannelFrameReader(ReadableByteChannel channel, int bufferSize, BooleanSupplier transportHasBufferedData) {
         this.channel = channel;
+        this.transportHasBufferedData = transportHasBufferedData;
         this.buf = ByteBuffer.allocate(bufferSize);
         this.buf.flip(); // start empty in read mode
     }
@@ -62,6 +69,13 @@ final class ChannelFrameReader {
      */
     int buffered() {
         return buf.remaining();
+    }
+
+    /**
+     * Returns true if plaintext is buffered in this reader or in the transport below it.
+     */
+    boolean hasBufferedData() {
+        return buf.hasRemaining() || transportHasBufferedData.getAsBoolean();
     }
 
     /**

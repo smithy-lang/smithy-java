@@ -29,10 +29,12 @@ final class H2DataInputStream extends InputStream {
     private int batchIndex = 0;
     private int batchCount = 0;
 
+    private DataChunk currentChunk;
     private ByteBuffer current;
     private boolean eof = false;
     private boolean closed = false;
     private final byte[] singleBuff = new byte[1];
+    private final byte[] transferBuffer = new byte[8192];
 
     H2DataInputStream(H2Exchange exchange, Consumer<ByteBuffer> bufferReturner) {
         this.exchange = exchange;
@@ -122,9 +124,8 @@ final class H2DataInputStream extends InputStream {
     }
 
     private boolean pullNextChunk() throws IOException {
-        if (current != null) {
-            bufferReturner.accept(current);
-            current = null;
+        if (currentChunk != null) {
+            releaseCurrentChunk();
         }
 
         if (batchIndex >= batchCount) {
@@ -141,8 +142,16 @@ final class H2DataInputStream extends InputStream {
         localBatch[batchIndex] = null;
         batchIndex++;
 
+        currentChunk = chunk;
         current = chunk.data();
         return true;
+    }
+
+    private void releaseCurrentChunk() {
+        exchange.releaseDataCredit(currentChunk.flowControlBytes());
+        bufferReturner.accept(currentChunk.data());
+        currentChunk = null;
+        current = null;
     }
 
     @Override
@@ -187,13 +196,14 @@ final class H2DataInputStream extends InputStream {
         }
         closed = true;
 
-        if (current != null) {
-            bufferReturner.accept(current);
-            current = null;
+        if (currentChunk != null) {
+            releaseCurrentChunk();
         }
 
         while (batchIndex < batchCount) {
-            bufferReturner.accept(localBatch[batchIndex].data());
+            DataChunk chunk = localBatch[batchIndex];
+            exchange.releaseDataCredit(chunk.flowControlBytes());
+            bufferReturner.accept(chunk.data());
             localBatch[batchIndex] = null;
             batchIndex++;
         }
@@ -208,21 +218,33 @@ final class H2DataInputStream extends InputStream {
         long transferred = 0;
 
         if (current != null && current.hasRemaining()) {
-            int remaining = current.remaining();
-            out.write(current.array(), current.arrayOffset() + current.position(), remaining);
-            current.position(current.limit());
-            transferred += remaining;
-            exchange.onDataConsumed(remaining);
+            transferred += writeCurrentTo(out);
         }
 
         while (pullNextChunk()) {
-            int remaining = current.remaining();
-            out.write(current.array(), current.arrayOffset() + current.position(), remaining);
-            current.position(current.limit());
-            transferred += remaining;
-            exchange.onDataConsumed(remaining);
+            transferred += writeCurrentTo(out);
         }
 
         return transferred;
+    }
+
+    private int writeCurrentTo(OutputStream out) throws IOException {
+        int remaining = current.remaining();
+        if (current.hasArray()) {
+            out.write(current.array(), current.arrayOffset() + current.position(), remaining);
+            current.position(current.limit());
+            exchange.onDataConsumed(remaining);
+            return remaining;
+        }
+
+        int written = 0;
+        while (current.hasRemaining()) {
+            int toCopy = Math.min(current.remaining(), transferBuffer.length);
+            current.get(transferBuffer, 0, toCopy);
+            out.write(transferBuffer, 0, toCopy);
+            written += toCopy;
+            exchange.onDataConsumed(toCopy);
+        }
+        return written;
     }
 }

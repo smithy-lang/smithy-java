@@ -25,6 +25,16 @@ import java.util.concurrent.Flow;
  */
 public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
     /**
+     * Supplies an I/O object and may throw {@link IOException}.
+     *
+     * @param <T> type of object supplied
+     */
+    @FunctionalInterface
+    interface IOSupplier<T> {
+        T get() throws IOException;
+    }
+
+    /**
      * Length of the data stream, if known.
      *
      * <p>Return a negative number to indicate an unknown length.
@@ -213,6 +223,95 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      */
     static DataStream ofInputStream(InputStream inputStream, String contentType, long contentLength) {
         return new InputStreamDataStream(inputStream, contentType, contentLength);
+    }
+
+    /**
+     * Create a non-replayable DataStream from a lazily supplied InputStream.
+     *
+     * @param inputStream InputStream supplier.
+     * @param contentType Content-Type of the stream if known, or null.
+     * @param contentLength Bytes in the stream if known, or -1.
+     * @return the created DataStream.
+     */
+    static DataStream ofInputStream(IOSupplier<InputStream> inputStream, String contentType, long contentLength) {
+        return ofStreamOrChannel(inputStream, null, contentType, contentLength, false);
+    }
+
+    /**
+     * Create a non-replayable DataStream from a lazily supplied readable channel.
+     *
+     * @param channel channel supplier.
+     * @return the created DataStream.
+     */
+    static DataStream ofChannel(IOSupplier<ReadableByteChannel> channel) {
+        return ofChannel(channel, null);
+    }
+
+    /**
+     * Create a non-replayable DataStream from a lazily supplied readable channel.
+     *
+     * @param channel channel supplier.
+     * @param contentType Content-Type of the stream if known, or null.
+     * @return the created DataStream.
+     */
+    static DataStream ofChannel(IOSupplier<ReadableByteChannel> channel, String contentType) {
+        return ofChannel(channel, contentType, -1);
+    }
+
+    /**
+     * Create a non-replayable DataStream from a lazily supplied readable channel.
+     *
+     * @param channel channel supplier.
+     * @param contentType Content-Type of the stream if known, or null.
+     * @param contentLength Bytes in the stream if known, or -1.
+     * @return the created DataStream.
+     */
+    static DataStream ofChannel(IOSupplier<ReadableByteChannel> channel, String contentType, long contentLength) {
+        return ofStreamOrChannel(null, channel, contentType, contentLength, false);
+    }
+
+    /**
+     * Create a non-replayable DataStream with lazy InputStream and ReadableByteChannel views.
+     *
+     * <p>Only the view requested by the caller is created. For non-replayable streams,
+     * calling either {@link #asInputStream()} or {@link #asChannel()} consumes the stream.
+     *
+     * @param inputStream InputStream supplier, or null to adapt the channel supplier.
+     * @param channel channel supplier, or null to adapt the input stream supplier.
+     * @param contentType Content-Type of the stream if known, or null.
+     * @param contentLength Bytes in the stream if known, or -1.
+     * @return the created DataStream.
+     */
+    static DataStream ofStreamOrChannel(
+            IOSupplier<InputStream> inputStream,
+            IOSupplier<ReadableByteChannel> channel,
+            String contentType,
+            long contentLength
+    ) {
+        return ofStreamOrChannel(inputStream, channel, contentType, contentLength, false);
+    }
+
+    /**
+     * Create a DataStream with lazy InputStream and ReadableByteChannel views.
+     *
+     * @param inputStream InputStream supplier, or null to adapt the channel supplier.
+     * @param channel channel supplier, or null to adapt the input stream supplier.
+     * @param contentType Content-Type of the stream if known, or null.
+     * @param contentLength Bytes in the stream if known, or -1.
+     * @param isReplayable true if suppliers can create independent views from the beginning.
+     * @return the created DataStream.
+     */
+    static DataStream ofStreamOrChannel(
+            IOSupplier<InputStream> inputStream,
+            IOSupplier<ReadableByteChannel> channel,
+            String contentType,
+            long contentLength,
+            boolean isReplayable
+    ) {
+        if (inputStream == null && channel == null) {
+            throw new IllegalArgumentException("Either inputStream or channel must be provided");
+        }
+        return new ChannelDataStream(inputStream, channel, contentType, contentLength, isReplayable);
     }
 
     /**

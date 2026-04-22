@@ -16,5 +16,6 @@ import java.nio.ByteBuffer;
  *
  * @param data buffer containing frame data (ready for reading)
  * @param endStream true if this is the final chunk (END_STREAM flag was set)
+ * @param flowControlBytes DATA frame payload bytes charged to HTTP/2 receive windows
  */
-record DataChunk(ByteBuffer data, boolean endStream) {}
+record DataChunk(ByteBuffer data, boolean endStream, int flowControlBytes) {}
