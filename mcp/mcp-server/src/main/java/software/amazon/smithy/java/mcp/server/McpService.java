@@ -56,6 +56,7 @@ import software.amazon.smithy.java.mcp.model.PromptInfo;
 import software.amazon.smithy.java.mcp.model.Prompts;
 import software.amazon.smithy.java.mcp.model.ServerInfo;
 import software.amazon.smithy.java.mcp.model.TextContent;
+import software.amazon.smithy.java.mcp.model.ToolAnnotations;
 import software.amazon.smithy.java.mcp.model.ToolInfo;
 import software.amazon.smithy.java.mcp.model.Tools;
 import software.amazon.smithy.java.server.Operation;
@@ -250,12 +251,11 @@ public final class McpService {
     }
 
     private JsonRpcResponse handleToolsList(JsonRpcRequest req, ProtocolVersion protocolVersion) {
-        var supportsOutputSchema = supportsOutputSchema(protocolVersion);
         var result = ListToolsResult.builder()
                 .tools(tools.values()
                         .stream()
                         .filter(t -> toolFilter.allowTool(t.serverId(), t.toolInfo().getName()))
-                        .map(tool -> extractToolInfo(tool, supportsOutputSchema))
+                        .map(tool -> extractToolInfo(tool, protocolVersion))
                         .toList())
                 .build();
         return createSuccessResponse(req.getId(), result);
@@ -467,6 +467,10 @@ public final class McpService {
         return protocolVersion != null && protocolVersion.compareTo(ProtocolVersion.v2025_06_18.INSTANCE) >= 0;
     }
 
+    private boolean supportsAnnotations(ProtocolVersion protocolVersion) {
+        return protocolVersion != null && protocolVersion.compareTo(ProtocolVersion.v2025_03_26.INSTANCE) >= 0;
+    }
+
     private CallToolResult formatStructuredContent(
             Tool tool,
             SerializableShape output,
@@ -485,14 +489,21 @@ public final class McpService {
         return result.build();
     }
 
-    private ToolInfo extractToolInfo(Tool tool, boolean supportsOutput) {
+    private ToolInfo extractToolInfo(Tool tool, ProtocolVersion protocolVersion) {
         var toolInfo = tool.toolInfo();
-        if (supportsOutput || toolInfo.getOutputSchema() == null) {
+        boolean stripOutput = !supportsOutputSchema(protocolVersion) && toolInfo.getOutputSchema() != null;
+        boolean stripAnnotations = !supportsAnnotations(protocolVersion) && toolInfo.getAnnotations() != null;
+        if (!stripOutput && !stripAnnotations) {
             return toolInfo;
         }
-        return toolInfo.toBuilder()
-                .outputSchema(null)
-                .build();
+        var builder = toolInfo.toBuilder();
+        if (stripOutput) {
+            builder.outputSchema(null);
+        }
+        if (stripAnnotations) {
+            builder.annotations(null);
+        }
+        return builder.build();
     }
 
     private void validate(JsonRpcRequest req) {
@@ -588,11 +599,28 @@ public final class McpService {
                                 operation.getApiOperation().outputSchema(),
                                 new HashSet<>(),
                                 cache))
+                        .annotations(createAnnotations(schema))
                         .build();
                 tools.put(operationName, new Tool(toolInfo, id, operation));
             }
         }
         return tools;
+    }
+
+    private ToolAnnotations createAnnotations(Schema operationSchema) {
+        boolean isReadOnly = operationSchema.hasTrait(TraitKey.READ_ONLY_TRAIT);
+        boolean isIdempotent = operationSchema.hasTrait(TraitKey.IDEMPOTENT_TRAIT);
+        if (!isReadOnly && !isIdempotent) {
+            return null;
+        }
+        var builder = ToolAnnotations.builder();
+        if (isReadOnly) {
+            builder.readOnlyHint(true);
+        }
+        if (isIdempotent) {
+            builder.idempotentHint(true);
+        }
+        return builder.build();
     }
 
     private JsonObjectSchema createJsonObjectSchema(

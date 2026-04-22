@@ -165,7 +165,7 @@ public class McpServerTest {
         var result = response.getResult().asStringMap();
         var tools = result.get("tools").asList();
 
-        assertEquals(4, tools.size());
+        assertEquals(6, tools.size());
 
         var toolNames = tools.stream()
                 .map(tool -> tool.asStringMap().get("name").asString())
@@ -175,6 +175,8 @@ public class McpServerTest {
         assertTrue(toolNames.contains("NoOutputOperation"));
         assertTrue(toolNames.contains("TestOperation"));
         assertTrue(toolNames.contains("NoInputOperation"));
+        assertTrue(toolNames.contains("ReadOnlyOperation"));
+        assertTrue(toolNames.contains("IdempotentOperation"));
     }
 
     @Test
@@ -329,6 +331,130 @@ public class McpServerTest {
 
         validateTestInputSchema(tool.get("inputSchema").asStringMap());
         validateTestInputSchema(tool.get("outputSchema").asStringMap());
+    }
+
+    @Test
+    void readOnlyOperationHasReadOnlyHintAnnotation() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(null);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("ReadOnlyOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        var annotations = tool.get("annotations").asStringMap();
+        assertTrue(annotations.get("readOnlyHint").asBoolean());
+        assertNull(annotations.get("idempotentHint"));
+    }
+
+    @Test
+    void idempotentOperationHasIdempotentHintAnnotation() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(null);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("IdempotentOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        var annotations = tool.get("annotations").asStringMap();
+        assertTrue(annotations.get("idempotentHint").asBoolean());
+        assertNull(annotations.get("readOnlyHint"));
+    }
+
+    @Test
+    void plainOperationHasNoAnnotations() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(null);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("TestOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertNull(tool.get("annotations"));
+    }
+
+    @Test
+    void annotationsStrippedForOldProtocolVersion() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(ProtocolVersion.v2024_11_05.INSTANCE);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("ReadOnlyOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertNull(tool.get("annotations"));
     }
 
     @Test
@@ -1086,7 +1212,7 @@ public class McpServerTest {
                         search_users: { description: "Test Template", template: "Search for if many results expected." }
                     })
                     service TestService {
-                        operations: [TestOperation, NoInputOperation, NoOutputOperation, NoIOOperation]
+                        operations: [TestOperation, NoInputOperation, NoOutputOperation, NoIOOperation, ReadOnlyOperation, IdempotentOperation]
                     }
 
                     operation NoOutputOperation {
@@ -1102,6 +1228,26 @@ public class McpServerTest {
                     }
 
                     operation NoIOOperation {}
+
+                    @readonly
+                    operation ReadOnlyOperation {
+                        input := {
+                            query: String
+                        }
+                        output := {
+                            result: String
+                        }
+                    }
+
+                    @idempotent
+                    operation IdempotentOperation {
+                        input := {
+                            key: String
+                        }
+                        output := {
+                            value: String
+                        }
+                    }
 
                     /// A TestOperation
                     @prompts({

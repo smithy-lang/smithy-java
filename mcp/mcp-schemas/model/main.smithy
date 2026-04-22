@@ -96,6 +96,13 @@ structure ToolInfo {
     inputSchema: JsonObjectSchema
 
     outputSchema: JsonObjectSchema
+
+    annotations: ToolAnnotations
+}
+
+structure ToolAnnotations {
+    readOnlyHint: Boolean
+    idempotentHint: Boolean
 }
 
 list ToolInfoList {
