@@ -8,6 +8,8 @@ package software.amazon.smithy.java.http.client;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -148,6 +150,19 @@ public interface HttpExchange extends AutoCloseable {
      * @return the response input stream to read.
      */
     InputStream responseBody() throws IOException;
+
+    /**
+     * Get a readable byte channel for the response body. Zero-copy path.
+     *
+     * <p>Default wraps {@link #responseBody()} via Channels.newChannel().
+     * H2 exchanges override this to return a native channel that avoids
+     * intermediate byte[] copies.
+     *
+     * @return a readable byte channel for the response body
+     */
+    default ReadableByteChannel responseBodyChannel() throws IOException {
+        return Channels.newChannel(responseBody());
+    }
 
     /**
      * Response headers. Blocks until received.

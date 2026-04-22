@@ -37,20 +37,18 @@ import static software.amazon.smithy.java.http.client.h2.H2Constants.SETTINGS_MA
 import static software.amazon.smithy.java.http.client.h2.H2Constants.SETTINGS_MAX_HEADER_LIST_SIZE;
 
 import java.io.IOException;
-import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLSession;
-import javax.net.ssl.SSLSocket;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpExchange;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
 import software.amazon.smithy.java.http.client.connection.Route;
+import software.amazon.smithy.java.http.client.connection.Transport;
 import software.amazon.smithy.java.http.hpack.HpackDecoder;
 import software.amazon.smithy.java.logging.InternalLogger;
 
@@ -87,7 +85,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     private static final int SETTINGS_TIMEOUT_MS = 10_000;
     private static final int GRACEFUL_SHUTDOWN_MS = 1000;
 
-    private final Socket socket;
+    private final Transport transport;
     private final Route route;
     private final H2FrameCodec frameCodec;
     private final H2Muxer muxer;
@@ -127,7 +125,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
      * @param bufferSize I/O buffer size in bytes
      */
     public H2Connection(
-            Socket socket,
+            Transport transport,
             Route route,
             Duration readTimeout,
             Duration writeTimeout,
@@ -135,14 +133,14 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
             int maxFrameSize,
             int bufferSize
     ) throws IOException {
-        this.socket = socket;
+        this.transport = transport;
         this.maxFrameSize = maxFrameSize;
-        var socketIn = new UnsyncBufferedInputStream(socket.getInputStream(), bufferSize);
-        var socketOut = new UnsyncBufferedOutputStream(socket.getOutputStream(), bufferSize);
+        var channelReader = new ChannelFrameReader(transport.readableChannel(), bufferSize);
+        var channelWriter = new ChannelFrameWriter(transport.writableChannel(), bufferSize);
         this.route = route;
         this.readTimeoutMs = readTimeout.toMillis();
         this.writeTimeoutMs = writeTimeout.toMillis();
-        this.frameCodec = new H2FrameCodec(socketIn, socketOut, maxFrameSize);
+        this.frameCodec = new H2FrameCodec(channelReader, channelWriter, maxFrameSize);
         this.hpackDecoder = new HpackDecoder(DEFAULT_HEADER_TABLE_SIZE);
         this.initialWindowSize = initialWindowSize;
         this.connectionRecvWindow = initialWindowSize;
@@ -233,7 +231,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
             muxer.onConnectionClosing(readerError);
             state.set(State.CLOSED);
             try {
-                socket.close();
+                transport.close();
             } catch (IOException ignored) {}
         }
     }
@@ -270,17 +268,29 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
 
         if (exchange != null) {
             if (dataLength > 0) {
-                // Borrow byte[] from pool and read payload into it
-                byte[] buffer = muxer.borrowBuffer(dataLength);
-                frameCodec.readPayloadInto(buffer, 0, dataLength);
+                // Borrow ByteBuffer from pool and read payload directly via channel.
+                // ChannelFrameReader.readIntoDirect drains any buffered data first,
+                // then reads remaining directly from the channel into the pooled buffer,
+                // bypassing the internal read buffer — zero intermediate copies.
+                ByteBuffer buffer = muxer.borrowBuffer(dataLength);
+                frameCodec.readPayloadDirect(buffer, dataLength);
+                buffer.flip();
                 // Check if more data is buffered - used for adaptive signaling to reduce wakeups
                 boolean moreDataBuffered = frameCodec.hasBufferedData();
-                exchange.enqueueData(buffer, dataLength, endStream, moreDataBuffered);
+                exchange.enqueueData(buffer, endStream, moreDataBuffered);
                 consumeConnectionRecvWindow(dataLength);
-                // Track for stream-switch detection; clear if buffer empty (we just signaled)
-                lastDataExchange = moreDataBuffered ? exchange : null;
+                // Always signal immediately on END_STREAM so the consumer thread wakes up.
+                // Otherwise, defer signaling when more data is buffered (stream-switch detection
+                // will flush it on the next frame).
+                if (endStream) {
+                    exchange.signalDataAvailable();
+                    lastDataExchange = null;
+                } else {
+                    lastDataExchange = moreDataBuffered ? exchange : null;
+                }
             } else if (endStream) {
-                exchange.enqueueData(null, 0, true, false);
+                exchange.enqueueData(null, true, false);
+                exchange.signalDataAvailable();
                 lastDataExchange = null;
             }
         } else {
@@ -334,12 +344,12 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
             return;
         }
 
-        // Standard path: read payload into pooled buffer
+        // Standard path: read payload into byte[] for control frame parsing
         byte[] payload;
         if (length == 0) {
             payload = H2Constants.EMPTY_BYTES;
         } else {
-            payload = muxer.borrowBuffer(length);
+            payload = muxer.borrowByteArray(length);
             frameCodec.readPayloadInto(payload, 0, length);
         }
 
@@ -355,7 +365,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
                     headerLength = frameCodec.headerBlockSize();
                     // Return original payload, headerPayload is a view into frameCodec's buffer
                     if (payload != H2Constants.EMPTY_BYTES) {
-                        muxer.returnBuffer(payload);
+                        // payload is a plain byte[] from borrowByteArray, not pooled
                     }
                     payload = null; // Mark as already returned
                 }
@@ -368,10 +378,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
                 }
             }
         } finally {
-            // Return pooled buffer (only if not already returned)
-            if (payload != null && payload != H2Constants.EMPTY_BYTES) {
-                muxer.returnBuffer(payload);
-            }
+            // Non-DATA payloads are plain byte[] from borrowByteArray, not pooled — no return needed
         }
     }
 
@@ -467,9 +474,9 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     }
 
     private void receiveServerPreface() throws IOException {
-        int originalTimeout = socket.getSoTimeout();
+        int originalTimeout = transport.getReadTimeout();
         try {
-            socket.setSoTimeout(SETTINGS_TIMEOUT_MS);
+            transport.setReadTimeout(SETTINGS_TIMEOUT_MS);
 
             int type;
             try {
@@ -504,7 +511,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
             frameCodec.writeSettingsAck();
             frameCodec.flush();
         } finally {
-            socket.setSoTimeout(originalTimeout);
+            transport.setReadTimeout(originalTimeout);
         }
     }
 
@@ -521,9 +528,9 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
      * Any other frame type is a protocol error.
      */
     private void receiveInitialWindowUpdate() throws IOException {
-        int originalTimeout = socket.getSoTimeout();
+        int originalTimeout = transport.getReadTimeout();
         try {
-            socket.setSoTimeout(50); // Short timeout - don't block long if server doesn't send one
+            transport.setReadTimeout(50); // Short timeout - don't block long if server doesn't send one
             int type = frameCodec.nextFrame();
             switch (type) {
                 case -1, FRAME_TYPE_SETTINGS:
@@ -543,7 +550,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         } catch (SocketTimeoutException e) {
             // No initial WINDOW_UPDATE - that's fine, proceed with default window
         } finally {
-            socket.setSoTimeout(originalTimeout);
+            transport.setReadTimeout(originalTimeout);
         }
     }
 
@@ -717,19 +724,13 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
 
     @Override
     public SSLSession sslSession() {
-        if (socket instanceof SSLSocket sslSocket) {
-            return sslSocket.getSession();
-        }
-        return null;
+        return transport.sslSession();
     }
 
     @Override
     public String negotiatedProtocol() {
-        if (socket instanceof SSLSocket sslSocket) {
-            String protocol = sslSocket.getApplicationProtocol();
-            return (protocol != null && !protocol.isEmpty()) ? protocol : "h2";
-        }
-        return "h2";
+        String protocol = transport.negotiatedProtocol();
+        return protocol != null ? protocol : "h2";
     }
 
     @Override
@@ -748,7 +749,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         muxer.close();
         muxer.closeExchanges(Duration.ofMillis(GRACEFUL_SHUTDOWN_MS));
         state.set(State.CLOSED);
-        socket.close();
+        transport.close();
 
         try {
             readerThread.join(100);

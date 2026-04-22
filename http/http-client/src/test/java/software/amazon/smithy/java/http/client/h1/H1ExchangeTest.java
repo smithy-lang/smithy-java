@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.connection.Route;
+import software.amazon.smithy.java.http.client.connection.SocketTransport;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
 class H1ExchangeTest {
@@ -24,7 +25,7 @@ class H1ExchangeTest {
 
     private H1Connection connection(String response) throws IOException {
         var socket = new H1ConnectionTest.FakeSocket(response);
-        return new H1Connection(socket, TEST_ROUTE, READ_TIMEOUT);
+        return new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
     }
 
     private HttpRequest getRequest() {

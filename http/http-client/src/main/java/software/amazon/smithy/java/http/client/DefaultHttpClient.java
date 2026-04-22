@@ -6,7 +6,9 @@
 package software.amazon.smithy.java.http.client;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.channels.ReadableByteChannel;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -67,10 +69,52 @@ final class DefaultHttpClient implements HttpClient {
         }
 
         // Build streaming response. The response body stream auto-closes the exchange when closed.
+        DataStream bodyStream = DataStream.ofInputStream(exchange.responseBody());
+        // Wrap to expose the native channel for zero-copy reads
+        DataStream channelAware = new DataStream() {
+            @Override
+            public long contentLength() {
+                return bodyStream.contentLength();
+            }
+
+            @Override
+            public String contentType() {
+                return bodyStream.contentType();
+            }
+
+            @Override
+            public boolean isReplayable() {
+                return bodyStream.isReplayable();
+            }
+
+            @Override
+            public boolean isAvailable() {
+                return bodyStream.isAvailable();
+            }
+
+            @Override
+            public InputStream asInputStream() {
+                return bodyStream.asInputStream();
+            }
+
+            @Override
+            public void close() {
+                bodyStream.close();
+            }
+
+            @Override
+            public ReadableByteChannel asChannel() {
+                try {
+                    return exchange.responseBodyChannel();
+                } catch (IOException e) {
+                    throw new java.io.UncheckedIOException(e);
+                }
+            }
+        };
         return HttpResponse.create()
                 .setStatusCode(exchange.responseStatusCode())
                 .setHeaders(exchange.responseHeaders())
-                .setBody(DataStream.ofInputStream(exchange.responseBody()));
+                .setBody(channelAware);
     }
 
     @Override

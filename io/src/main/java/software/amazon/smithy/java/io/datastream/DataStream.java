@@ -11,6 +11,9 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -99,6 +102,41 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
         try (var is = asInputStream()) {
             is.transferTo(out);
         }
+    }
+
+    /**
+     * Write the contents of this stream to a writable byte channel.
+     *
+     * <p>This is the zero-copy path for transferring data. Implementations backed by
+     * files can use {@code FileChannel.transferTo()} for kernel-level zero-copy.
+     * Implementations backed by ByteBuffers can write directly without intermediate copies.
+     *
+     * @param channel the channel to write to
+     * @throws IOException if an I/O error occurs
+     */
+    default void writeTo(WritableByteChannel channel) throws IOException {
+        try (var is = asInputStream()) {
+            ByteBuffer buf = ByteBuffer.allocate(8192);
+            int n;
+            while ((n = is.read(buf.array(), 0, buf.capacity())) > 0) {
+                buf.position(0).limit(n);
+                while (buf.hasRemaining()) {
+                    channel.write(buf);
+                }
+            }
+        }
+    }
+
+    /**
+     * Get a readable byte channel for zero-copy consumption.
+     *
+     * <p>Implementations backed by files can return a {@code FileChannel} directly.
+     * The default wraps {@link #asInputStream()} via {@code Channels.newChannel()}.
+     *
+     * @return a readable byte channel
+     */
+    default ReadableByteChannel asChannel() {
+        return Channels.newChannel(asInputStream());
     }
 
     /**

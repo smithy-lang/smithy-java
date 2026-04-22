@@ -14,6 +14,7 @@ import static software.amazon.smithy.java.http.client.h2.H2Constants.FRAME_TYPE_
 
 import java.io.IOException;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -474,12 +475,20 @@ final class H2Muxer implements AutoCloseable {
 
     // ==================== BUFFER ALLOCATION ====================
 
-    byte[] borrowBuffer(int minSize) {
+    ByteBuffer borrowBuffer(int minSize) {
         return allocator.borrow(minSize);
     }
 
-    void returnBuffer(byte[] buffer) {
+    void returnBuffer(ByteBuffer buffer) {
         allocator.release(buffer);
+    }
+
+    /**
+     * Borrow a raw byte[] for control frame payloads (HEADERS, SETTINGS, etc.).
+     * These are small, short-lived, and parsed with byte[]-based APIs.
+     */
+    byte[] borrowByteArray(int size) {
+        return new byte[size];
     }
 
     // ==================== SETTINGS ====================
@@ -669,9 +678,9 @@ final class H2Muxer implements AutoCloseable {
         int streamId = exchange.getStreamId();
         PendingWrite pw;
         while ((pw = exchange.pendingWrites.poll()) != null) {
-            byte[] buffer = pw.borrowed ? pw.data : null;
+            ByteBuffer buffer = pw.borrowed ? pw.data : null;
             try {
-                frameCodec.writeFrame(FRAME_TYPE_DATA, pw.flags, streamId, pw.data, pw.offset, pw.length);
+                frameCodec.writeFrame(FRAME_TYPE_DATA, pw.flags, streamId, pw.data);
             } catch (IOException e) {
                 if (buffer != null) {
                     exchange.returnBuffer(buffer);

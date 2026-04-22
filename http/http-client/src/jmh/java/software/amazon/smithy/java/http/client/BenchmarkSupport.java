@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -118,6 +119,7 @@ public final class BenchmarkSupport {
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < concurrency; i++) {
+                final int threadId = i;
                 executor.submit(() -> {
                     try {
                         while (completed.getAndIncrement() < totalRequests) {
@@ -126,13 +128,24 @@ public final class BenchmarkSupport {
                     } catch (Exception e) {
                         errors.incrementAndGet();
                         firstError.compareAndSet(null, e);
+                    } catch (Throwable t) {
+                        errors.incrementAndGet();
+                        firstError.compareAndSet(null, new RuntimeException("Thread " + threadId + " error", t));
                     } finally {
                         latch.countDown();
                     }
                 });
             }
 
-            latch.await(); // Wait for all work to complete
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                Throwable err = firstError.get();
+                System.err.println("BENCHMARK TIMEOUT: " + (concurrency - (int) latch.getCount())
+                        + "/" + concurrency + " threads completed, errors=" + errors.get()
+                        + (err != null ? ", firstError=" + err : ""));
+                if (err != null) {
+                    err.printStackTrace(System.err);
+                }
+            }
         }
 
         counter.requests = completed.get();

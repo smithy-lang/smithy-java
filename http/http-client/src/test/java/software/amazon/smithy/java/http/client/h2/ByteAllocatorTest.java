@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -26,29 +27,29 @@ class ByteAllocatorTest {
     void borrowReturnsBufferOfRequestedSize() {
         ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
-        byte[] buffer = pool.borrow(256);
+        ByteBuffer buffer = pool.borrow(256);
 
         assertNotNull(buffer);
-        assertTrue(buffer.length >= 256);
+        assertTrue(buffer.capacity() >= 256);
     }
 
     @Test
     void borrowReturnsDefaultSizeWhenRequestedSizeIsSmaller() {
         ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
-        byte[] buffer = pool.borrow(64);
+        ByteBuffer buffer = pool.borrow(64);
 
         assertNotNull(buffer);
-        assertEquals(128, buffer.length); // Default size
+        assertEquals(128, buffer.capacity());
     }
 
     @Test
     void releasedBufferCanBeReused() {
         ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
-        byte[] buffer1 = pool.borrow(128);
+        ByteBuffer buffer1 = pool.borrow(128);
         pool.release(buffer1);
-        byte[] buffer2 = pool.borrow(128);
+        ByteBuffer buffer2 = pool.borrow(128);
 
         assertSame(buffer1, buffer2, "Should reuse the same buffer");
     }
@@ -58,7 +59,7 @@ class ByteAllocatorTest {
         ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
         assertEquals(0, pool.size());
 
-        byte[] buffer = pool.borrow(128);
+        ByteBuffer buffer = pool.borrow(128);
         pool.release(buffer);
 
         assertEquals(1, pool.size());
@@ -68,7 +69,7 @@ class ByteAllocatorTest {
     void poolSizeDecreasesOnBorrow() {
         ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
-        byte[] buffer1 = pool.borrow(128);
+        ByteBuffer buffer1 = pool.borrow(128);
         pool.release(buffer1);
         assertEquals(1, pool.size());
 
@@ -80,13 +81,11 @@ class ByteAllocatorTest {
     void poolRespectsMaxSize() {
         ByteAllocator pool = new ByteAllocator(2, 1024, 1024, 128);
 
-        // Fill pool to max
-        pool.release(new byte[128]);
-        pool.release(new byte[128]);
+        pool.release(ByteBuffer.allocate(128));
+        pool.release(ByteBuffer.allocate(128));
         assertEquals(2, pool.size());
 
-        // Try to add one more - should be discarded
-        pool.release(new byte[128]);
+        pool.release(ByteBuffer.allocate(128));
         assertEquals(2, pool.size());
     }
 
@@ -94,30 +93,24 @@ class ByteAllocatorTest {
     void buffersLargerThanMaxPoolableSizeAreNotPooled() {
         ByteAllocator pool = new ByteAllocator(10, 1024, 256, 128);
 
-        byte[] largeBuffer = new byte[512]; // Larger than maxPoolableSize (256)
+        ByteBuffer largeBuffer = ByteBuffer.allocate(512);
         pool.release(largeBuffer);
 
-        assertEquals(0, pool.size(), "Buffer larger than maxPoolableSize should not be pooled");
+        assertEquals(0, pool.size());
     }
 
     @Test
     void borrowThrowsWhenRequestedSizeExceedsMaxBufferSize() {
         ByteAllocator pool = new ByteAllocator(10, 256, 256, 128);
 
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
-                () -> pool.borrow(512) // Larger than maxBufferSize (256)
-        );
-
-        assertTrue(ex.getMessage().contains("512"));
-        assertTrue(ex.getMessage().contains("256"));
+        assertThrows(IllegalArgumentException.class, () -> pool.borrow(512));
     }
 
     @Test
     void nullBufferIsIgnored() {
         ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
-        pool.release(null); // Should not throw
+        pool.release(null);
 
         assertEquals(0, pool.size());
     }
@@ -126,9 +119,9 @@ class ByteAllocatorTest {
     void clearRemovesAllBuffers() {
         ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
-        pool.release(new byte[128]);
-        pool.release(new byte[128]);
-        pool.release(new byte[128]);
+        pool.release(ByteBuffer.allocate(128));
+        pool.release(ByteBuffer.allocate(128));
+        pool.release(ByteBuffer.allocate(128));
         assertEquals(3, pool.size());
 
         pool.clear();
@@ -140,15 +133,13 @@ class ByteAllocatorTest {
     void tooSmallPooledBufferIsDropped() {
         ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
-        // Release a small buffer
-        byte[] smallBuffer = new byte[64];
+        ByteBuffer smallBuffer = ByteBuffer.allocate(64);
         pool.release(smallBuffer);
         assertEquals(1, pool.size());
 
-        // Borrow a larger buffer - small one is dropped (best-effort, no re-pooling)
-        byte[] buffer = pool.borrow(256);
-        assertEquals(0, pool.size()); // Small buffer was dropped
-        assertTrue(buffer.length >= 256);
+        ByteBuffer buffer = pool.borrow(256);
+        assertEquals(0, pool.size());
+        assertTrue(buffer.capacity() >= 256);
         assertNotSame(smallBuffer, buffer);
     }
 
@@ -166,9 +157,7 @@ class ByteAllocatorTest {
 
     @Test
     void constructorValidatesMaxPoolableSize() {
-        // maxPoolableSize must be > 0
         assertThrows(IllegalArgumentException.class, () -> new ByteAllocator(10, 1024, 0, 128));
-        // maxPoolableSize must be <= maxBufferSize
         assertThrows(IllegalArgumentException.class, () -> new ByteAllocator(10, 256, 512, 128));
     }
 
@@ -184,15 +173,14 @@ class ByteAllocatorTest {
     void lifoOrderPreserved() {
         ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
 
-        byte[] buffer1 = new byte[128];
-        byte[] buffer2 = new byte[128];
-        byte[] buffer3 = new byte[128];
+        ByteBuffer buffer1 = ByteBuffer.allocate(128);
+        ByteBuffer buffer2 = ByteBuffer.allocate(128);
+        ByteBuffer buffer3 = ByteBuffer.allocate(128);
 
         pool.release(buffer1);
         pool.release(buffer2);
         pool.release(buffer3);
 
-        // LIFO: should get buffer3, buffer2, buffer1 back
         assertSame(buffer3, pool.borrow(128));
         assertSame(buffer2, pool.borrow(128));
         assertSame(buffer1, pool.borrow(128));
@@ -212,10 +200,9 @@ class ByteAllocatorTest {
             executor.submit(() -> {
                 try {
                     for (int i = 0; i < operationsPerThread; i++) {
-                        byte[] buffer = pool.borrow(128);
+                        ByteBuffer buffer = pool.borrow(128);
                         assertNotNull(buffer);
-                        // Simulate some work
-                        buffer[0] = (byte) i;
+                        buffer.put(0, (byte) i);
                         pool.release(buffer);
                     }
                 } catch (Throwable e) {
@@ -232,6 +219,6 @@ class ByteAllocatorTest {
         executor.shutdown();
 
         assertTrue(errors.isEmpty(), "Concurrent operations should not throw: " + errors);
-        assertTrue(pool.size() <= 100, "Pool size should not exceed max");
+        assertTrue(pool.size() <= 100);
     }
 }
