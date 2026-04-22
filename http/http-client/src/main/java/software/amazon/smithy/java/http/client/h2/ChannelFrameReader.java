@@ -21,6 +21,11 @@ import java.util.function.BooleanSupplier;
  * fills from the channel when more data is needed.
  *
  * <p>Thread safety: single reader thread only (H2Connection reader thread).
+ * After construction, this object must be the only reader of the transport
+ * channel. DATA payloads may bypass {@link #buf} via {@link #readIntoDirect},
+ * but any extra decrypted/plaintext bytes remain in the transport and are
+ * drained by subsequent reads through this same reader. Response body channels
+ * read from queued DATA buffers, not from the transport channel.
  */
 final class ChannelFrameReader {
 
