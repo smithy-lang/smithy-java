@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.Flow;
 
 final class WrappedDataStream implements DataStream {
@@ -48,6 +50,16 @@ final class WrappedDataStream implements DataStream {
     @Override
     public void discard() throws IOException {
         delegate.discard();
+    }
+
+    @Override
+    public void writeTo(WritableByteChannel channel) throws IOException {
+        delegate.writeTo(channel);
+    }
+
+    @Override
+    public ReadableByteChannel asChannel() {
+        return delegate.asChannel();
     }
 
     @Override

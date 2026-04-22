@@ -15,8 +15,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 
 class H2FrameCodecTest {
 
@@ -452,12 +450,16 @@ class H2FrameCodecTest {
     // Helpers
     private static final int BUF_SIZE = 8192;
 
-    private UnsyncBufferedInputStream wrapIn(byte[] data) {
-        return new UnsyncBufferedInputStream(new ByteArrayInputStream(data), BUF_SIZE);
+    private ChannelFrameReader wrapIn(byte[] data) {
+        return new ChannelFrameReader(
+                java.nio.channels.Channels.newChannel(new ByteArrayInputStream(data)),
+                BUF_SIZE);
     }
 
-    private UnsyncBufferedOutputStream wrapOut(ByteArrayOutputStream out) {
-        return new UnsyncBufferedOutputStream(out, BUF_SIZE);
+    private ChannelFrameWriter wrapOut(ByteArrayOutputStream out) {
+        return new ChannelFrameWriter(
+                java.nio.channels.Channels.newChannel(out),
+                BUF_SIZE);
     }
 
     private H2FrameCodec codec(ByteArrayOutputStream out) {

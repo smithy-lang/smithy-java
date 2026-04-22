@@ -37,20 +37,19 @@ import static software.amazon.smithy.java.http.client.h2.H2Constants.SETTINGS_MA
 import static software.amazon.smithy.java.http.client.h2.H2Constants.SETTINGS_MAX_HEADER_LIST_SIZE;
 
 import java.io.IOException;
-import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.net.ssl.SSLSession;
-import javax.net.ssl.SSLSocket;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpExchange;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
 import software.amazon.smithy.java.http.client.connection.Route;
+import software.amazon.smithy.java.http.client.connection.Transport;
 import software.amazon.smithy.java.http.hpack.HpackDecoder;
 import software.amazon.smithy.java.logging.InternalLogger;
 
@@ -87,10 +86,11 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     private static final int SETTINGS_TIMEOUT_MS = 10_000;
     private static final int GRACEFUL_SHUTDOWN_MS = 1000;
 
-    private final Socket socket;
+    private final Transport transport;
     private final Route route;
     private final H2FrameCodec frameCodec;
     private final H2Muxer muxer;
+    private final H2ConnectionStats stats = new H2ConnectionStats();
     private final HpackDecoder hpackDecoder;
     private final Thread readerThread;
     private final long readTimeoutMs;
@@ -103,8 +103,10 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     private volatile int remoteMaxConcurrentStreams = DEFAULT_MAX_CONCURRENT_STREAMS;
     private volatile int remoteMaxHeaderListSize = Integer.MAX_VALUE;
 
-    // Connection receive window (send window is managed by muxer). Only accessed by reader thread.
+    // Connection receive window. Debited by reader thread, credited by application threads as data is consumed.
+    private final ReentrantLock connectionRecvWindowLock = new ReentrantLock();
     private int connectionRecvWindow;
+    private int pendingConnectionWindowUpdate;
     private final int initialWindowSize;
 
     // Connection state (AtomicReference for safe concurrent close)
@@ -127,7 +129,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
      * @param bufferSize I/O buffer size in bytes
      */
     public H2Connection(
-            Socket socket,
+            Transport transport,
             Route route,
             Duration readTimeout,
             Duration writeTimeout,
@@ -135,14 +137,14 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
             int maxFrameSize,
             int bufferSize
     ) throws IOException {
-        this.socket = socket;
+        this.transport = transport;
         this.maxFrameSize = maxFrameSize;
-        var socketIn = new UnsyncBufferedInputStream(socket.getInputStream(), bufferSize);
-        var socketOut = new UnsyncBufferedOutputStream(socket.getOutputStream(), bufferSize);
+        var channelReader = new ChannelFrameReader(transport.readableChannel(), bufferSize, transport::hasBufferedData);
+        var channelWriter = new ChannelFrameWriter(transport.writableChannel(), bufferSize);
         this.route = route;
         this.readTimeoutMs = readTimeout.toMillis();
         this.writeTimeoutMs = writeTimeout.toMillis();
-        this.frameCodec = new H2FrameCodec(socketIn, socketOut, maxFrameSize);
+        this.frameCodec = new H2FrameCodec(channelReader, channelWriter, maxFrameSize);
         this.hpackDecoder = new HpackDecoder(DEFAULT_HEADER_TABLE_SIZE);
         this.initialWindowSize = initialWindowSize;
         this.connectionRecvWindow = initialWindowSize;
@@ -153,6 +155,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
                 DEFAULT_HEADER_TABLE_SIZE,
                 "h2-writer-" + route.host(),
                 initialWindowSize);
+        this.muxer.setStats(stats);
 
         // Perform connection preface
         try {
@@ -233,7 +236,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
             muxer.onConnectionClosing(readerError);
             state.set(State.CLOSED);
             try {
-                socket.close();
+                transport.close();
             } catch (IOException ignored) {}
         }
     }
@@ -270,23 +273,47 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
 
         if (exchange != null) {
             if (dataLength > 0) {
-                // Borrow byte[] from pool and read payload into it
-                byte[] buffer = muxer.borrowBuffer(dataLength);
-                frameCodec.readPayloadInto(buffer, 0, dataLength);
-                // Check if more data is buffered - used for adaptive signaling to reduce wakeups
+                ByteBuffer buffer = muxer.borrowBuffer(dataLength);
+                frameCodec.readPayloadDirect(buffer, dataLength);
+                buffer.flip();
                 boolean moreDataBuffered = frameCodec.hasBufferedData();
-                exchange.enqueueData(buffer, dataLength, endStream, moreDataBuffered);
-                consumeConnectionRecvWindow(dataLength);
-                // Track for stream-switch detection; clear if buffer empty (we just signaled)
-                lastDataExchange = moreDataBuffered ? exchange : null;
+                debitConnectionRecvWindow(payloadLength);
+                exchange.enqueueData(buffer, endStream, moreDataBuffered, payloadLength);
+
+                stats.dataFramesRead.increment();
+                stats.dataBytesRead.add(dataLength);
+
+                if (endStream) {
+                    exchange.signalDataAvailable();
+                    stats.signalsSent.increment();
+                    lastDataExchange = null;
+                } else if (moreDataBuffered) {
+                    lastDataExchange = exchange;
+                    stats.signalsDeferred.increment();
+                } else {
+                    lastDataExchange = null;
+                    // signal happens via enqueueData when !moreDataBuffered
+                    stats.signalsSent.increment();
+                }
             } else if (endStream) {
-                exchange.enqueueData(null, 0, true, false);
+                if (payloadLength > 0) {
+                    debitConnectionRecvWindow(payloadLength);
+                    exchange.releaseDiscardedData(payloadLength);
+                }
+                exchange.enqueueData(null, true, false, 0);
+                exchange.signalDataAvailable();
                 lastDataExchange = null;
+            } else if (payloadLength > 0) {
+                debitConnectionRecvWindow(payloadLength);
+                exchange.releaseDiscardedData(payloadLength);
             }
         } else {
-            if (dataLength > 0) {
-                frameCodec.skipBytes(dataLength);
-                consumeConnectionRecvWindow(dataLength);
+            if (payloadLength > 0) {
+                if (dataLength > 0) {
+                    frameCodec.skipBytes(dataLength);
+                }
+                debitConnectionRecvWindow(payloadLength);
+                releaseConnectionReceiveWindow(payloadLength);
             }
             LOGGER.trace("Ignoring DATA frame for closed stream {}", streamId);
             // Clear tracker if buffer empty (even for unknown streams)
@@ -334,12 +361,12 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
             return;
         }
 
-        // Standard path: read payload into pooled buffer
+        // Standard path: read payload into byte[] for control frame parsing
         byte[] payload;
         if (length == 0) {
             payload = H2Constants.EMPTY_BYTES;
         } else {
-            payload = muxer.borrowBuffer(length);
+            payload = muxer.borrowByteArray(length);
             frameCodec.readPayloadInto(payload, 0, length);
         }
 
@@ -355,7 +382,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
                     headerLength = frameCodec.headerBlockSize();
                     // Return original payload, headerPayload is a view into frameCodec's buffer
                     if (payload != H2Constants.EMPTY_BYTES) {
-                        muxer.returnBuffer(payload);
+                        // payload is a plain byte[] from borrowByteArray, not pooled
                     }
                     payload = null; // Mark as already returned
                 }
@@ -368,10 +395,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
                 }
             }
         } finally {
-            // Return pooled buffer (only if not already returned)
-            if (payload != null && payload != H2Constants.EMPTY_BYTES) {
-                muxer.returnBuffer(payload);
-            }
+            // Non-DATA payloads are plain byte[] from borrowByteArray, not pooled — no return needed
         }
     }
 
@@ -467,9 +491,9 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     }
 
     private void receiveServerPreface() throws IOException {
-        int originalTimeout = socket.getSoTimeout();
+        int originalTimeout = transport.getReadTimeout();
         try {
-            socket.setSoTimeout(SETTINGS_TIMEOUT_MS);
+            transport.setReadTimeout(SETTINGS_TIMEOUT_MS);
 
             int type;
             try {
@@ -504,7 +528,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
             frameCodec.writeSettingsAck();
             frameCodec.flush();
         } finally {
-            socket.setSoTimeout(originalTimeout);
+            transport.setReadTimeout(originalTimeout);
         }
     }
 
@@ -521,9 +545,9 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
      * Any other frame type is a protocol error.
      */
     private void receiveInitialWindowUpdate() throws IOException {
-        int originalTimeout = socket.getSoTimeout();
+        int originalTimeout = transport.getReadTimeout();
         try {
-            socket.setSoTimeout(50); // Short timeout - don't block long if server doesn't send one
+            transport.setReadTimeout(50); // Short timeout - don't block long if server doesn't send one
             int type = frameCodec.nextFrame();
             switch (type) {
                 case -1, FRAME_TYPE_SETTINGS:
@@ -543,7 +567,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         } catch (SocketTimeoutException e) {
             // No initial WINDOW_UPDATE - that's fine, proceed with default window
         } finally {
-            socket.setSoTimeout(originalTimeout);
+            transport.setReadTimeout(originalTimeout);
         }
     }
 
@@ -639,6 +663,14 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
     }
 
     /**
+     * Get internal diagnostic stats for this connection.
+     * Package-private — for tests and benchmarks only.
+     */
+    H2ConnectionStats getStats() {
+        return stats;
+    }
+
+    /**
      * Check if this connection can accept more streams.
      *
      * <p>This is the primary check used in the connection acquisition hot path. It combines active state, write error,
@@ -717,19 +749,13 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
 
     @Override
     public SSLSession sslSession() {
-        if (socket instanceof SSLSocket sslSocket) {
-            return sslSocket.getSession();
-        }
-        return null;
+        return transport.sslSession();
     }
 
     @Override
     public String negotiatedProtocol() {
-        if (socket instanceof SSLSocket sslSocket) {
-            String protocol = sslSocket.getApplicationProtocol();
-            return (protocol != null && !protocol.isEmpty()) ? protocol : "h2";
-        }
-        return "h2";
+        String protocol = transport.negotiatedProtocol();
+        return protocol != null ? protocol : "h2";
     }
 
     @Override
@@ -748,7 +774,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         muxer.close();
         muxer.closeExchanges(Duration.ofMillis(GRACEFUL_SHUTDOWN_MS));
         state.set(State.CLOSED);
-        socket.close();
+        transport.close();
 
         try {
             readerThread.join(100);
@@ -790,16 +816,45 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         return headers;
     }
 
-    // Called only from reader thread - no synchronization needed
-    void consumeConnectionRecvWindow(int bytes) throws IOException {
-        connectionRecvWindow -= bytes;
-        // Send WINDOW_UPDATE when window drops below threshold to reduce control frame overhead
-        // while still leaving enough buffer to avoid server stalls
-        if (connectionRecvWindow < initialWindowSize / H2Constants.WINDOW_UPDATE_THRESHOLD_DIVISOR) {
-            int increment = initialWindowSize - connectionRecvWindow;
-            connectionRecvWindow += increment;
+    void debitConnectionRecvWindow(int bytes) {
+        if (bytes <= 0) {
+            return;
+        }
+        connectionRecvWindowLock.lock();
+        try {
+            connectionRecvWindow -= bytes;
+        } finally {
+            connectionRecvWindowLock.unlock();
+        }
+    }
+
+    @Override
+    public void releaseConnectionReceiveWindow(int bytes) {
+        if (bytes <= 0) {
+            return;
+        }
+
+        int increment = 0;
+        connectionRecvWindowLock.lock();
+        try {
+            connectionRecvWindow += bytes;
+            pendingConnectionWindowUpdate += bytes;
+            if (pendingConnectionWindowUpdate >= receiveWindowUpdateThreshold()) {
+                increment = pendingConnectionWindowUpdate;
+                pendingConnectionWindowUpdate = 0;
+            }
+        } finally {
+            connectionRecvWindowLock.unlock();
+        }
+
+        if (increment > 0) {
+            stats.connectionWindowUpdates.increment();
             muxer.queueControlFrame(0, H2Muxer.ControlFrameType.WINDOW_UPDATE, increment, writeTimeoutMs);
         }
+    }
+
+    private int receiveWindowUpdateThreshold() {
+        return Math.max(1, initialWindowSize / H2Constants.WINDOW_UPDATE_THRESHOLD_DIVISOR);
     }
 
     void handleGoaway(int lastStreamId, int errorCode) {

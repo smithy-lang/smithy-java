@@ -66,11 +66,10 @@ final class DefaultHttpClient implements HttpClient {
             throw e;
         }
 
-        // Build streaming response. The response body stream auto-closes the exchange when closed.
         return HttpResponse.create()
                 .setStatusCode(exchange.responseStatusCode())
                 .setHeaders(exchange.responseHeaders())
-                .setBody(DataStream.ofInputStream(exchange.responseBody()));
+                .setBody(DataStream.ofStreamOrChannel(exchange::responseBody, exchange::responseBodyChannel, null, -1));
     }
 
     @Override
