@@ -25,8 +25,6 @@ import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 
 /**
  * HTTP/2 frame codec test suite using test vectors from http2jp/http2-frame-test-case.
@@ -353,11 +351,11 @@ class H2FrameTestSuiteTest {
 
     private static final int BUF_SIZE = 8192;
 
-    private static UnsyncBufferedInputStream wrapIn(byte[] data) {
-        return new UnsyncBufferedInputStream(new ByteArrayInputStream(data), BUF_SIZE);
+    private static ChannelFrameReader wrapIn(byte[] data) {
+        return new ChannelFrameReader(java.nio.channels.Channels.newChannel(new ByteArrayInputStream(data)), BUF_SIZE);
     }
 
-    private static UnsyncBufferedOutputStream wrapOut(ByteArrayOutputStream out) {
-        return new UnsyncBufferedOutputStream(out, BUF_SIZE);
+    private static ChannelFrameWriter wrapOut(ByteArrayOutputStream out) {
+        return new ChannelFrameWriter(java.nio.channels.Channels.newChannel(out), BUF_SIZE);
     }
 }

@@ -13,8 +13,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 
 class H2MuxerStreamReleaseTest {
 
@@ -23,8 +21,9 @@ class H2MuxerStreamReleaseTest {
     @BeforeEach
     void setUp() {
         var codec = new H2FrameCodec(
-                new UnsyncBufferedInputStream(new ByteArrayInputStream(new byte[0]), 256),
-                new UnsyncBufferedOutputStream(new ByteArrayOutputStream(), 256),
+                new ChannelFrameReader(java.nio.channels.Channels.newChannel(new ByteArrayInputStream(new byte[0])),
+                        256),
+                new ChannelFrameWriter(java.nio.channels.Channels.newChannel(new ByteArrayOutputStream()), 256),
                 16384);
         muxer = new H2Muxer(
                 new H2Muxer.ConnectionCallback() {

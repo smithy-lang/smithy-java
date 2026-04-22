@@ -14,6 +14,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -440,6 +443,205 @@ class ManagedHttpExchangeTest {
 
         assertEquals("original-body", body, "Body should be from original response");
         assertTrue(originalBodyRead.get(), "Original body stream should be read");
+    }
+
+    @Test
+    void responseBodyChannelDelegatesToNativeChannelWhenResponseNotReplaced() throws IOException {
+        var nativeChannelUsed = new AtomicBoolean(false);
+        var responseBodyCalled = new AtomicBoolean(false);
+        var delegate = new TestHttpExchange() {
+            @Override
+            public ReadableByteChannel responseBodyChannel() {
+                nativeChannelUsed.set(true);
+                return Channels.newChannel(new ByteArrayInputStream("native".getBytes()));
+            }
+
+            @Override
+            public InputStream responseBody() {
+                responseBodyCalled.set(true);
+                return new ByteArrayInputStream("stream".getBytes());
+            }
+        };
+        var exchange = createExchange(new TestConnectionPool(), List.of(), delegate);
+
+        var channel = exchange.responseBodyChannel();
+        var buf = ByteBuffer.allocate(64);
+        channel.read(buf);
+        buf.flip();
+        var data = new byte[buf.remaining()];
+        buf.get(data);
+
+        assertTrue(nativeChannelUsed.get(), "Should use delegate's native channel");
+        assertFalse(responseBodyCalled.get(), "Native channel path should not create response body stream");
+        assertEquals("native", new String(data));
+    }
+
+    @Test
+    void responseBodyChannelUsesReplacementBodyWhenInterceptorReplacesResponse() throws IOException {
+        var nativeChannelUsed = new AtomicBoolean(false);
+        var delegate = new TestHttpExchange() {
+            @Override
+            public ReadableByteChannel responseBodyChannel() {
+                nativeChannelUsed.set(true);
+                return Channels.newChannel(new ByteArrayInputStream("native".getBytes()));
+            }
+        };
+        var interceptor = new HttpInterceptor() {
+            @Override
+            public HttpResponse interceptResponse(
+                    HttpClient client,
+                    HttpRequest request,
+                    Context context,
+                    HttpResponse response
+            ) {
+                return HttpResponse.create()
+                        .setStatusCode(200)
+                        .setBody(DataStream.ofString("replaced"));
+            }
+        };
+        var exchange = createExchange(new TestConnectionPool(), List.of(interceptor), delegate);
+
+        var channel = exchange.responseBodyChannel();
+        var buf = ByteBuffer.allocate(64);
+        channel.read(buf);
+        buf.flip();
+        var data = new byte[buf.remaining()];
+        buf.get(data);
+
+        assertFalse(nativeChannelUsed.get(), "Should NOT use native channel when interceptor replaced body");
+        assertEquals("replaced", new String(data));
+    }
+
+    @Test
+    void closeDoesNotDrainHttp2Body() throws IOException {
+        assertHttp2CloseDoesNotDrain(List.of(new HttpInterceptor() {}));
+    }
+
+    @Test
+    void closeDoesNotDrainHttp2BodyWithoutInterceptors() throws IOException {
+        assertHttp2CloseDoesNotDrain(List.of());
+    }
+
+    @Test
+    void responseBodyChannelCloseDoesNotDrainHttp2BodyWithoutInterceptors() throws IOException {
+        var bodyDrained = new AtomicBoolean(false);
+        var channelClosed = new AtomicBoolean(false);
+        var delegateClosed = new AtomicBoolean(false);
+        var delegate = new TestHttpExchange() {
+            @Override
+            public HttpVersion responseVersion() {
+                return HttpVersion.HTTP_2;
+            }
+
+            @Override
+            public ReadableByteChannel responseBodyChannel() {
+                var delegateChannel = Channels.newChannel(new ByteArrayInputStream("body".getBytes()));
+                return new ReadableByteChannel() {
+                    @Override
+                    public int read(ByteBuffer dst) throws IOException {
+                        return delegateChannel.read(dst);
+                    }
+
+                    @Override
+                    public boolean isOpen() {
+                        return delegateChannel.isOpen();
+                    }
+
+                    @Override
+                    public void close() throws IOException {
+                        channelClosed.set(true);
+                        delegateChannel.close();
+                    }
+                };
+            }
+
+            @Override
+            public InputStream responseBody() {
+                return new ByteArrayInputStream("body".getBytes()) {
+                    @Override
+                    public long transferTo(OutputStream out) throws IOException {
+                        bodyDrained.set(true);
+                        return super.transferTo(out);
+                    }
+                };
+            }
+
+            @Override
+            public void close() {
+                delegateClosed.set(true);
+            }
+        };
+        var exchange = createExchange(new TestConnectionPool(), List.of(), delegate);
+
+        exchange.responseStatusCode();
+        exchange.responseBodyChannel().close();
+
+        assertFalse(bodyDrained.get(), "H2 channel close should NOT drain the response body");
+        assertTrue(channelClosed.get(), "Native channel should be closed before managed exchange cleanup");
+        assertTrue(delegateClosed.get(), "Delegate should be closed");
+    }
+
+    private void assertHttp2CloseDoesNotDrain(List<HttpInterceptor> interceptors) throws IOException {
+        var bodyDrained = new AtomicBoolean(false);
+        var delegateClosed = new AtomicBoolean(false);
+        var delegate = new TestHttpExchange() {
+            @Override
+            public HttpVersion responseVersion() {
+                return HttpVersion.HTTP_2;
+            }
+
+            @Override
+            public InputStream responseBody() {
+                return new ByteArrayInputStream("body".getBytes()) {
+                    @Override
+                    public long transferTo(OutputStream out) throws IOException {
+                        bodyDrained.set(true);
+                        return super.transferTo(out);
+                    }
+                };
+            }
+
+            @Override
+            public void close() {
+                delegateClosed.set(true);
+            }
+        };
+        var exchange = createExchange(new TestConnectionPool(), interceptors, delegate);
+
+        // Access response to trigger interception (captures body and version)
+        exchange.responseHeaders();
+        exchange.close();
+
+        assertFalse(bodyDrained.get(), "H2 body should NOT be drained — delegate.close() sends RST_STREAM");
+        assertTrue(delegateClosed.get(), "Delegate should be closed");
+    }
+
+    @Test
+    void closeDrainsHttp11Body() throws IOException {
+        var bodyDrained = new AtomicBoolean(false);
+        var delegate = new TestHttpExchange() {
+            @Override
+            public HttpVersion responseVersion() {
+                return HttpVersion.HTTP_1_1;
+            }
+
+            @Override
+            public InputStream responseBody() {
+                return new ByteArrayInputStream("body".getBytes()) {
+                    @Override
+                    public long transferTo(OutputStream out) throws IOException {
+                        bodyDrained.set(true);
+                        return super.transferTo(out);
+                    }
+                };
+            }
+        };
+        var exchange = createExchange(new TestConnectionPool(), List.of(new HttpInterceptor() {}), delegate);
+
+        exchange.responseHeaders();
+        exchange.close();
+
+        assertTrue(bodyDrained.get(), "H1 body should be drained for connection reuse");
     }
 
     private ManagedHttpExchange createExchange(ConnectionPool pool, List<HttpInterceptor> interceptors) {

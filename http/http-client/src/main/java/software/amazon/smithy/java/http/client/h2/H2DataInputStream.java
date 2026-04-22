@@ -8,45 +8,88 @@ package software.amazon.smithy.java.http.client.h2;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
 import java.util.function.Consumer;
 
 /**
  * Input stream for reading response body from DATA frames.
  *
- * <p>This implementation uses batch dequeuing to pull multiple data chunks from the exchange
- * in a single lock acquisition, reducing lock contention. The InputStream manages its own
- * buffer state (currentBuffer, readPosition) and a local batch of chunks.
+ * <p>Uses batch dequeuing to pull multiple data chunks from the exchange
+ * in a single lock acquisition. Chunks are ByteBuffers from the pool.
  *
- * <p>Buffer lifecycle:
- * <ol>
- *   <li>Connection borrows buffer from muxer pool, fills from socket, enqueues chunk to exchange</li>
- *   <li>InputStream drains chunks in batches when local batch is exhausted</li>
- *   <li>InputStream returns exhausted buffer to pool via consumer</li>
- * </ol>
+ * <p>Also provides a {@link #channel()} for zero-copy ByteBuffer reads.
  */
 final class H2DataInputStream extends InputStream {
-    /**
-     * Number of chunks to pull in a single batch. This reduces lock acquisitions by 8x for large responses.
-     */
     private static final int BATCH_SIZE = 32;
 
     private final H2Exchange exchange;
-    private final Consumer<byte[]> bufferReturner;
+    private final Consumer<ByteBuffer> bufferReturner;
     private final DataChunk[] localBatch = new DataChunk[BATCH_SIZE];
     private int batchIndex = 0;
     private int batchCount = 0;
 
-    // Current buffer state
-    private byte[] currentBuffer;
-    private int currentLength;
-    private int readPosition;
+    private DataChunk currentChunk;
+    private ByteBuffer current;
     private boolean eof = false;
     private boolean closed = false;
     private final byte[] singleBuff = new byte[1];
+    private final byte[] transferBuffer = new byte[8192];
 
-    H2DataInputStream(H2Exchange exchange, Consumer<byte[]> bufferReturner) {
+    H2DataInputStream(H2Exchange exchange, Consumer<ByteBuffer> bufferReturner) {
         this.exchange = exchange;
         this.bufferReturner = bufferReturner;
+    }
+
+    /**
+     * Get a zero-copy readable channel backed by this stream's data chunks.
+     * Reads transfer ByteBuffer data directly without byte[] intermediaries.
+     */
+    ReadableByteChannel channel() {
+        return new ReadableByteChannel() {
+            @Override
+            public int read(ByteBuffer dst) throws IOException {
+                return readChannel(dst);
+            }
+
+            @Override
+            public boolean isOpen() {
+                return !closed && !eof;
+            }
+
+            @Override
+            public void close() throws IOException {
+                H2DataInputStream.this.close();
+            }
+        };
+    }
+
+    /**
+     * Zero-copy read into a ByteBuffer. Transfers data directly from pooled
+     * chunk buffers into the destination without going through byte[].
+     */
+    int readChannel(ByteBuffer dst) throws IOException {
+        if (closed || eof) {
+            return -1;
+        }
+        if (!dst.hasRemaining()) {
+            return 0;
+        }
+
+        if (current == null || !current.hasRemaining()) {
+            if (!pullNextChunk()) {
+                return -1;
+            }
+        }
+
+        int toCopy = Math.min(current.remaining(), dst.remaining());
+        int oldLimit = current.limit();
+        current.limit(current.position() + toCopy);
+        dst.put(current);
+        current.limit(oldLimit);
+
+        exchange.onDataConsumed(toCopy);
+        return toCopy;
     }
 
     @Override
@@ -54,7 +97,6 @@ final class H2DataInputStream extends InputStream {
         if (closed || eof) {
             return -1;
         }
-
         int n = read(singleBuff, 0, 1);
         return n == 1 ? (singleBuff[0] & 0xFF) : -1;
     }
@@ -69,45 +111,24 @@ final class H2DataInputStream extends InputStream {
             return 0;
         }
 
-        // Ensure we have data
-        if (currentBuffer == null || readPosition >= currentLength) {
+        if (current == null || !current.hasRemaining()) {
             if (!pullNextChunk()) {
-                return -1; // EOF
+                return -1;
             }
         }
 
-        // Copy from current buffer
-        int available = currentLength - readPosition;
-        int toCopy = Math.min(available, len);
-        System.arraycopy(currentBuffer, readPosition, b, off, toCopy);
-        readPosition += toCopy;
-
-        // Notify exchange of bytes consumed (for flow control)
+        int toCopy = Math.min(current.remaining(), len);
+        current.get(b, off, toCopy);
         exchange.onDataConsumed(toCopy);
-
         return toCopy;
     }
 
-    /**
-     * Pull the next data chunk, using batch dequeuing to reduce lock contention.
-     *
-     * <p>Chunks are pulled from a local batch first (no lock). When the local batch
-     * is exhausted, we drain multiple chunks from the exchange in a single lock
-     * acquisition.
-     *
-     * @return true if a chunk was pulled, false if EOF
-     */
     private boolean pullNextChunk() throws IOException {
-        // Return previous buffer to pool
-        if (currentBuffer != null) {
-            bufferReturner.accept(currentBuffer);
-            currentBuffer = null;
-            currentLength = 0;
+        if (currentChunk != null) {
+            releaseCurrentChunk();
         }
 
-        // Try local batch first (no lock needed)
         if (batchIndex >= batchCount) {
-            // Local batch empty - drain more chunks from exchange (one lock acquisition)
             int drained = exchange.drainChunks(localBatch, BATCH_SIZE);
             if (drained < 0) {
                 eof = true;
@@ -121,21 +142,24 @@ final class H2DataInputStream extends InputStream {
         localBatch[batchIndex] = null;
         batchIndex++;
 
-        currentBuffer = chunk.data();
-        currentLength = chunk.length();
-        readPosition = 0;
-
+        currentChunk = chunk;
+        current = chunk.data();
         return true;
+    }
+
+    private void releaseCurrentChunk() {
+        exchange.releaseDataCredit(currentChunk.flowControlBytes());
+        bufferReturner.accept(currentChunk.data());
+        currentChunk = null;
+        current = null;
     }
 
     @Override
     public int available() {
-        if (closed || eof) {
-            return 0;
-        } else if (currentBuffer == null) {
+        if (closed || eof || current == null) {
             return 0;
         }
-        return currentLength - readPosition;
+        return current.remaining();
     }
 
     @Override
@@ -146,20 +170,17 @@ final class H2DataInputStream extends InputStream {
 
         long skipped = 0;
 
-        // Skip from current buffer first
-        if (currentBuffer != null && readPosition < currentLength) {
-            int available = currentLength - readPosition;
-            int toSkip = (int) Math.min(available, n);
-            readPosition += toSkip;
+        if (current != null && current.hasRemaining()) {
+            int toSkip = (int) Math.min(current.remaining(), n);
+            current.position(current.position() + toSkip);
             exchange.onDataConsumed(toSkip);
             skipped += toSkip;
             n -= toSkip;
         }
 
-        // Skip whole chunks without copying
         while (n > 0 && pullNextChunk()) {
-            int toSkip = (int) Math.min(currentLength, n);
-            readPosition = toSkip;
+            int toSkip = (int) Math.min(current.remaining(), n);
+            current.position(current.position() + toSkip);
             exchange.onDataConsumed(toSkip);
             skipped += toSkip;
             n -= toSkip;
@@ -175,15 +196,14 @@ final class H2DataInputStream extends InputStream {
         }
         closed = true;
 
-        // Return current buffer to pool
-        if (currentBuffer != null) {
-            bufferReturner.accept(currentBuffer);
-            currentBuffer = null;
+        if (currentChunk != null) {
+            releaseCurrentChunk();
         }
 
-        // Return any remaining batched buffers to pool
         while (batchIndex < batchCount) {
-            bufferReturner.accept(localBatch[batchIndex].data());
+            DataChunk chunk = localBatch[batchIndex];
+            exchange.releaseDataCredit(chunk.flowControlBytes());
+            bufferReturner.accept(chunk.data());
             localBatch[batchIndex] = null;
             batchIndex++;
         }
@@ -197,25 +217,34 @@ final class H2DataInputStream extends InputStream {
 
         long transferred = 0;
 
-        // First, transfer any remaining data in current buffer
-        if (currentBuffer != null && readPosition < currentLength) {
-            int remaining = currentLength - readPosition;
-            out.write(currentBuffer, readPosition, remaining);
-            transferred += remaining;
-            exchange.onDataConsumed(remaining);
-            readPosition = currentLength;
+        if (current != null && current.hasRemaining()) {
+            transferred += writeCurrentTo(out);
         }
 
-        // Pull and write chunks directly - no intermediate buffer, no double copy
-        // Note: pullNextChunk() returns the previous buffer to pool before getting next,
-        // so when it returns false (EOF), currentBuffer is already null.
         while (pullNextChunk()) {
-            out.write(currentBuffer, 0, currentLength);
-            transferred += currentLength;
-            exchange.onDataConsumed(currentLength);
-            readPosition = currentLength;
+            transferred += writeCurrentTo(out);
         }
 
         return transferred;
+    }
+
+    private int writeCurrentTo(OutputStream out) throws IOException {
+        int remaining = current.remaining();
+        if (current.hasArray()) {
+            out.write(current.array(), current.arrayOffset() + current.position(), remaining);
+            current.position(current.limit());
+            exchange.onDataConsumed(remaining);
+            return remaining;
+        }
+
+        int written = 0;
+        while (current.hasRemaining()) {
+            int toCopy = Math.min(current.remaining(), transferBuffer.length);
+            current.get(transferBuffer, 0, toCopy);
+            out.write(transferBuffer, 0, toCopy);
+            written += toCopy;
+            exchange.onDataConsumed(toCopy);
+        }
+        return written;
     }
 }

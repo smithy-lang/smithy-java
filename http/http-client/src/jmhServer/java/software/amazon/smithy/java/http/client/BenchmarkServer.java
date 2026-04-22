@@ -75,6 +75,7 @@ public final class BenchmarkServer {
 
     private static final byte[] CONTENT = "{\"status\":\"ok\"}".getBytes(StandardCharsets.UTF_8);
     private static final byte[] MB_CONTENT = new byte[1024 * 1024]; // 1MB for large transfer tests
+    private static final byte[] MB10_CONTENT = new byte[10 * 1024 * 1024]; // 10MB for bulk transfer tests
 
     // Fixed ports for benchmark server (avoids dynamic port discovery complexity)
     public static final int DEFAULT_H1_PORT = 18080;
@@ -265,6 +266,13 @@ public final class BenchmarkServer {
                 response.headers()
                         .set(CONNECTION, KEEP_ALIVE)
                         .setInt(CONTENT_LENGTH, 0);
+            } else if (uri.startsWith("/get10mb")) {
+                // Return 10MB response
+                response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.wrappedBuffer(MB10_CONTENT));
+                response.headers()
+                        .set(CONTENT_TYPE, "application/octet-stream")
+                        .set(CONNECTION, KEEP_ALIVE)
+                        .setInt(CONTENT_LENGTH, MB10_CONTENT.length);
             } else if (uri.startsWith("/getmb")) {
                 // Return 1MB response
                 response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.wrappedBuffer(MB_CONTENT));
@@ -344,6 +352,11 @@ public final class BenchmarkServer {
                 .set("content-type", "application/octet-stream")
                 .setInt("content-length", MB_CONTENT.length);
 
+        private static final Http2Headers MB10_RESPONSE_HEADERS = new DefaultHttp2Headers(true, 3)
+                .status("200")
+                .set("content-type", "application/octet-stream")
+                .setInt("content-length", MB10_CONTENT.length);
+
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, Http2StreamFrame frame) {
             if (frame instanceof Http2HeadersFrame headersFrame) {
@@ -373,6 +386,11 @@ public final class BenchmarkServer {
                         ctx.writeAndFlush(new DefaultHttp2HeadersFrame(EMPTY_RESPONSE_HEADERS, true));
                     }
                     // else: wait for DATA frames with endStream
+                } else if ("/get10mb".contentEquals(path)) {
+                    if (headersFrame.isEndStream()) {
+                        ctx.write(new DefaultHttp2HeadersFrame(MB10_RESPONSE_HEADERS, false));
+                        ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(MB10_CONTENT), true));
+                    }
                 } else if ("/getmb".contentEquals(path)) {
                     if (headersFrame.isEndStream()) {
                         ctx.write(new DefaultHttp2HeadersFrame(MB_RESPONSE_HEADERS, false));

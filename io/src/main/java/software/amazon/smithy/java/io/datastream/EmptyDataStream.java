@@ -8,6 +8,9 @@ package software.amazon.smithy.java.io.datastream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -59,6 +62,16 @@ final class EmptyDataStream implements DataStream {
     @Override
     public void writeTo(OutputStream out) {
         // No-op
+    }
+
+    @Override
+    public void writeTo(WritableByteChannel channel) {
+        // No-op
+    }
+
+    @Override
+    public ReadableByteChannel asChannel() {
+        return Channels.newChannel(InputStream.nullInputStream());
     }
 
     @Override

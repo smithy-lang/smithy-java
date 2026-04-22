@@ -16,6 +16,7 @@ import software.amazon.smithy.java.http.api.ModifiableHttpRequest;
 import software.amazon.smithy.java.http.client.HttpCredentials;
 import software.amazon.smithy.java.http.client.HttpExchange;
 import software.amazon.smithy.java.http.client.connection.Route;
+import software.amazon.smithy.java.http.client.connection.SocketTransport;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
 /**
@@ -59,7 +60,7 @@ public final class ProxyTunnel {
                 "http",
                 proxySocket.getInetAddress().getHostAddress(),
                 proxySocket.getPort());
-        H1Connection conn = new H1Connection(proxySocket, proxyRoute, readTimeout);
+        H1Connection conn = new H1Connection(new SocketTransport(proxySocket), proxyRoute, readTimeout);
 
         HttpResponse priorResponse = null;
 

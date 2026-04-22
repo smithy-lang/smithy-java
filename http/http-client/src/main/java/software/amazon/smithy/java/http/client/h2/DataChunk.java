@@ -5,11 +5,17 @@
 
 package software.amazon.smithy.java.http.client.h2;
 
+import java.nio.ByteBuffer;
+
 /**
  * Data chunk from an HTTP/2 DATA frame.
  *
- * @param data buffer containing frame data (ownership transferred to consumer)
- * @param length actual data length (can be less than {@code data.length})
+ * <p>The buffer is in read mode (position=0, limit=length of data).
+ * Ownership is transferred to the consumer, who must return it to the pool
+ * when done.
+ *
+ * @param data buffer containing frame data (ready for reading)
  * @param endStream true if this is the final chunk (END_STREAM flag was set)
+ * @param flowControlBytes DATA frame payload bytes charged to HTTP/2 receive windows
  */
-record DataChunk(byte[] data, int length, boolean endStream) {}
+record DataChunk(ByteBuffer data, boolean endStream, int flowControlBytes) {}
