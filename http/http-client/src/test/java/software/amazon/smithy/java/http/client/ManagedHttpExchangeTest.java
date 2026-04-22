@@ -489,7 +489,11 @@ class ManagedHttpExchangeTest {
         var interceptor = new HttpInterceptor() {
             @Override
             public HttpResponse interceptResponse(
-                    HttpClient client, HttpRequest request, Context context, HttpResponse response) {
+                    HttpClient client,
+                    HttpRequest request,
+                    Context context,
+                    HttpResponse response
+            ) {
                 return HttpResponse.create()
                         .setStatusCode(200)
                         .setBody(DataStream.ofString("replaced"));

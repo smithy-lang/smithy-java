@@ -219,7 +219,9 @@ public final class BenchmarkSupport {
                         statsMethod.setAccessible(true);
                         var stats = statsMethod.invoke(conn);
                         if (stats != null) {
-                            if (!sb.isEmpty()) sb.append("; ");
+                            if (!sb.isEmpty()) {
+                                sb.append("; ");
+                            }
                             sb.append(stats);
                         }
                     }
