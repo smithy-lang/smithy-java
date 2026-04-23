@@ -29,8 +29,16 @@ final class H2ConnectionStats {
     // --- Flow control ---
     final LongAdder streamWindowUpdates = new LongAdder();
     final LongAdder connectionWindowUpdates = new LongAdder();
+    final LongAdder connWindowUpdatesReceived = new LongAdder();
+    final LongAdder connWindowBytesReceived = new LongAdder();
     final LongAdder dataBytesQueued = new LongAdder();
     final LongAdder dataBytesReleased = new LongAdder();
+
+    // --- Send window contention (muxer-writer / VT sender) ---
+    final LongAdder connWindowAcquires = new LongAdder();  // total acquireConnectionWindowUpTo calls
+    final LongAdder connWindowWaits = new LongAdder();     // calls that had to queue (slow path)
+    final LongAdder connWindowWaitNs = new LongAdder();    // total nanos spent parked waiting
+    final AtomicLong maxConnWindowWaiters = new AtomicLong();  // peak waiter queue depth
 
     // --- Buffer pool ---
     final LongAdder buffersBorrowed = new LongAdder();
@@ -60,6 +68,12 @@ final class H2ConnectionStats {
                 + ", signalsDeferred=" + signalsDeferred.sum()
                 + ", streamWU=" + streamWindowUpdates.sum()
                 + ", connWU=" + connectionWindowUpdates.sum()
+                + ", connWURx=" + connWindowUpdatesReceived.sum()
+                + ", connWUBytesRx=" + connWindowBytesReceived.sum()
+                + ", connAcq=" + connWindowAcquires.sum()
+                + ", connWaits=" + connWindowWaits.sum()
+                + ", connWaitMs=" + (connWindowWaitNs.sum() / 1_000_000)
+                + ", maxConnWaiters=" + maxConnWindowWaiters.get()
                 + ", queued=" + dataBytesQueued.sum()
                 + ", released=" + dataBytesReleased.sum()
                 + ", borrowed=" + buffersBorrowed.sum()
