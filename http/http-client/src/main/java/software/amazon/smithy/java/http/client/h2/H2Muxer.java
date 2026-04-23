@@ -664,6 +664,12 @@ final class H2Muxer implements AutoCloseable {
                     }
                 }
 
+                // Re-check to close the race: a VT may have offered to dataWorkQueue AFTER we drained
+                // but BEFORE we reset dataWorkPending - in that case its CAS failed and it didn't unpark us.
+                if (!dataWorkQueue.isEmpty() || !workQueue.isEmpty()) {
+                    continue;
+                }
+
                 // Check for timeouts periodically using tick-based system
                 long now = System.currentTimeMillis();
                 if (now - lastTimeoutCheck >= TIMEOUT_POLL_INTERVAL_MS) {
