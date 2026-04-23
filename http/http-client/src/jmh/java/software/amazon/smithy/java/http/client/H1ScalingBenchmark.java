@@ -40,6 +40,10 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport;
+import software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -75,6 +79,9 @@ public class H1ScalingBenchmark {
     private CloseableHttpClient apacheClient;
     private WebClient helidonClient;
     private java.net.http.HttpClient javaClient;
+    private JavaHttpClientTransport javaTransport;
+    private CrtHttpClientTransport crtTransport;
+    private Context transportContext;
 
     // Pre-built requests (read-only during benchmark)
     private HttpRequest smithyGetRequest;
@@ -126,6 +133,14 @@ public class H1ScalingBenchmark {
         javaClient = java.net.http.HttpClient.newBuilder()
                 .version(java.net.http.HttpClient.Version.HTTP_1_1)
                 .build();
+        javaTransport = new JavaHttpClientTransport(javaClient);
+
+        // CRT transport
+        var crtConfig = new CrtHttpTransportConfig()
+                .maxConnectionsPerHost(maxConnections);
+        crtConfig.httpVersion(software.amazon.smithy.java.http.api.HttpVersion.HTTP_1_1);
+        crtTransport = new CrtHttpClientTransport(crtConfig);
+        transportContext = Context.create();
 
         BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H1_URL);
 
@@ -170,6 +185,13 @@ public class H1ScalingBenchmark {
         if (javaClient != null) {
             javaClient.close();
             javaClient = null;
+        }
+        if (javaTransport != null) {
+            javaTransport = null;
+        }
+        if (crtTransport != null) {
+            crtTransport.close();
+            crtTransport = null;
         }
     }
 
@@ -233,12 +255,48 @@ public class H1ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
+    public void h1JavaWrapperGet(Counter counter) throws InterruptedException {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var response = javaTransport.send(transportContext, req)) {
+                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, smithyGetRequest, counter);
+
+        counter.logErrors("Java Wrapper H1");
+    }
+
+    @Benchmark
+    @Threads(1)
     public void h1SmithyPost(Counter counter) throws InterruptedException {
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             smithyClient.send(req).close();
         }, smithyPostRequest, counter);
 
         counter.logErrors("Smithy H1 POST");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h1CrtGet(Counter counter) throws InterruptedException {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var response = crtTransport.send(transportContext, req)) {
+                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, smithyGetRequest, counter);
+
+        counter.logErrors("CRT H1");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h1CrtPost(Counter counter) throws InterruptedException {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var response = crtTransport.send(transportContext, req)) {
+                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, smithyPostRequest, counter);
+
+        counter.logErrors("CRT H1 POST");
     }
 
     @Benchmark
@@ -268,5 +326,17 @@ public class H1ScalingBenchmark {
         }, jdkPostRequest, counter);
 
         counter.logErrors("Java HttpClient H1 POST");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h1JavaWrapperPost(Counter counter) throws InterruptedException {
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var response = javaTransport.send(transportContext, req)) {
+                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, smithyPostRequest, counter);
+
+        counter.logErrors("Java wrapper H1 POST");
     }
 }

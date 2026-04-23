@@ -24,7 +24,6 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.hpack.HpackEncoder;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
 
 /**
@@ -68,6 +67,9 @@ final class H2Muxer implements AutoCloseable {
 
     // The resolution of the tick-based timeout system, used to check for read timeouts.
     static final int TIMEOUT_POLL_INTERVAL_MS = 100;
+    private static final int DEFAULT_POOLED_BUFFER_COUNT = 128;
+    private static final int DEFAULT_POOLED_BUFFER_SIZE = 4 * 1024;
+    private static final int MAX_POOLED_BUFFER_SIZE = 64 * 1024;
 
     // Reusable singleton work items
     private static final H2MuxerWorkItem.CheckDataQueue CHECK_DATA_QUEUE = H2MuxerWorkItem.CheckDataQueue.INSTANCE;
@@ -160,11 +162,18 @@ final class H2Muxer implements AutoCloseable {
         this.frameCodec = frameCodec;
         this.initialWindowSize = initialWindowSize;
         this.connectionSendWindow = new FlowControlWindow(DEFAULT_INITIAL_WINDOW_SIZE);
-        this.allocator = new ByteAllocator(64, initialWindowSize, initialWindowSize, 1024);
+        this.allocator = new ByteAllocator(
+                DEFAULT_POOLED_BUFFER_COUNT,
+                initialWindowSize,
+                Math.min(initialWindowSize, MAX_POOLED_BUFFER_SIZE),
+                Math.min(DEFAULT_POOLED_BUFFER_SIZE, Math.min(initialWindowSize, MAX_POOLED_BUFFER_SIZE)));
         this.headerEncoder = new H2RequestHeaderEncoder(
                 new HpackEncoder(initialTableSize),
                 new ByteBufferOutputStream(512));
-        this.workerThread = Thread.ofVirtual().name(threadName).start(this::workerLoop);
+        // Platform thread (not virtual) because this worker runs a tight I/O loop with
+        // frequent socket writes and is always busy when there's traffic. VTs add
+        // continuation/ForkJoinPool overhead.
+        this.workerThread = Thread.ofPlatform().name(threadName).daemon(true).start(this::workerLoop);
     }
 
     // ==================== LIFECYCLE ====================
@@ -330,6 +339,9 @@ final class H2Muxer implements AutoCloseable {
      * @return bytes acquired (0 if timeout)
      */
     int acquireConnectionWindowUpTo(int maxBytes, long timeoutMs) throws SocketTimeoutException, InterruptedException {
+        if (stats != null) {
+            stats.connWindowAcquires.increment();
+        }
         // Fast path: no waiters and window available
         if (sendWindowWaiters.isEmpty()) {
             int acquired = connectionSendWindow.tryAcquireNonBlocking(maxBytes);
@@ -339,9 +351,14 @@ final class H2Muxer implements AutoCloseable {
         }
 
         // Slow path: queue and wait for fair access
-        long deadlineNs = System.nanoTime() + timeoutMs * 1_000_000L;
+        long waitStart = System.nanoTime();
+        long deadlineNs = waitStart + timeoutMs * 1_000_000L;
         var waiter = new SendWindowWaiter(Thread.currentThread(), maxBytes, deadlineNs);
         sendWindowWaiters.add(waiter);
+        if (stats != null) {
+            stats.connWindowWaits.increment();
+            stats.updateMaxQueued(stats.maxConnWindowWaiters, sendWindowWaiters.size());
+        }
 
         try {
             while (!waiter.done) {
@@ -352,6 +369,9 @@ final class H2Muxer implements AutoCloseable {
                 if (Thread.interrupted()) {
                     throw new InterruptedException();
                 }
+            }
+            if (stats != null) {
+                stats.connWindowWaitNs.add(System.nanoTime() - waitStart);
             }
             return waiter.acquired;
         } finally {
@@ -628,11 +648,12 @@ final class H2Muxer implements AutoCloseable {
 
         try {
             while (running) {
+                boolean wroteFrames = false;
                 // Drain all available work items from the queue
                 H2MuxerWorkItem item;
                 while ((item = workQueue.poll()) != null) {
                     if (item instanceof H2MuxerWorkItem.Shutdown) {
-                        processBatch(batch);
+                        completeBatch(batch, new IOException("Muxer shutting down"));
                         return;
                     }
                     if (!(item instanceof H2MuxerWorkItem.CheckDataQueue)) {
@@ -641,7 +662,7 @@ final class H2Muxer implements AutoCloseable {
                 }
 
                 if (!batch.isEmpty()) {
-                    processBatch(batch);
+                    wroteFrames = processBatch(batch);
                 }
 
                 boolean processedData = false;
@@ -655,13 +676,21 @@ final class H2Muxer implements AutoCloseable {
                 // causing extra wake-ups and flushes
                 dataWorkPending.set(false);
 
-                if (processedData) {
+                if (wroteFrames || processedData) {
                     try {
                         frameCodec.flush();
+                        completeBatch(batch, null);
                     } catch (IOException e) {
+                        completeBatch(batch, e);
                         failWriter(e);
                         return;
                     }
+                }
+
+                // Re-check to close the race: a VT may have offered to dataWorkQueue AFTER we drained
+                // but BEFORE we reset dataWorkPending - in that case its CAS failed and it didn't unpark us.
+                if (!dataWorkQueue.isEmpty() || !workQueue.isEmpty()) {
+                    continue;
                 }
 
                 // Check for timeouts periodically using tick-based system
@@ -724,22 +753,24 @@ final class H2Muxer implements AutoCloseable {
         }
     }
 
-    private void processBatch(ArrayList<H2MuxerWorkItem> batch) {
+    private boolean processBatch(ArrayList<H2MuxerWorkItem> batch) throws IOException {
+        if (batch.isEmpty()) {
+            return false;
+        }
+
+        for (H2MuxerWorkItem item : batch) {
+            processItem(item);
+        }
+        return true;
+    }
+
+    private void completeBatch(ArrayList<H2MuxerWorkItem> batch, IOException error) {
         if (batch.isEmpty()) {
             return;
         }
-
         try {
             for (H2MuxerWorkItem item : batch) {
-                processItem(item);
-            }
-            frameCodec.flush();
-            for (H2MuxerWorkItem item : batch) {
-                completeItem(item, null);
-            }
-        } catch (IOException e) {
-            for (H2MuxerWorkItem item : batch) {
-                completeItem(item, e);
+                completeItem(item, error);
             }
         } finally {
             batch.clear();

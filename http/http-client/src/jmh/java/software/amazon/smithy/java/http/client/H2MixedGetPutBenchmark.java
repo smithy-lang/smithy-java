@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.http.client;
 
 import java.io.OutputStream;
-import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,14 +28,19 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
+import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
+import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
+import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
+import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
 /**
- * Mixed H2 benchmark that interleaves 1 MB GETs and 1 MB PUTs on the JDK transport.
+ * Mixed H2 benchmark that interleaves 1 MB GETs and 1 MB PUTs on the same client.
  */
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
@@ -58,10 +62,14 @@ public class H2MixedGetPutBenchmark {
     @Param({"4096"})
     private int streamsPerConnection;
 
-    private HttpClient benchmarkClient;
-    private HttpClient javaClient;
+    private HttpClient smithyClient;
+    private HttpClient smithyPlatformReaderClient;
+    private HttpClient connectionAgentClient;
+    private java.net.http.HttpClient javaClient;
     private ExecutorService javaExecutor;
     private JavaHttpClientTransport javaTransport;
+    private ApacheHttpClientTransport apacheTransport;
+    private NettyHttpClientTransport productionNettyTransport;
     private Context transportContext;
     private MixedRequests mixedRequests;
     private String runId;
@@ -70,29 +78,76 @@ public class H2MixedGetPutBenchmark {
     public void setup() throws Exception {
         var sslContext = BenchmarkSupport.trustAllSsl();
 
-        benchmarkClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_2)
-                .sslContext(sslContext)
-                .connectTimeout(Duration.ofSeconds(30))
+        smithyClient = HttpClient.builder()
+                .connectionPool(HttpConnectionPool.builder()
+                        .maxConnectionsPerRoute(connections)
+                        .maxTotalConnections(connections)
+                        .h2StreamsPerConnection(streamsPerConnection)
+                        .h2InitialWindowSize(16 * 1024 * 1024)
+                        .maxIdleTime(Duration.ofMinutes(2))
+                        .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
+                        .sslContext(sslContext)
+                        .dnsResolver(BenchmarkSupport.staticDns())
+                        .build())
+                .build();
+
+        smithyPlatformReaderClient = HttpClient.builder()
+                .connectionPool(HttpConnectionPool.builder()
+                        .maxConnectionsPerRoute(connections)
+                        .maxTotalConnections(connections)
+                        .h2StreamsPerConnection(streamsPerConnection)
+                        .h2InitialWindowSize(16 * 1024 * 1024)
+                        .maxIdleTime(Duration.ofMinutes(2))
+                        .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
+                        .sslContext(sslContext)
+                        .dnsResolver(BenchmarkSupport.staticDns())
+                        .usePlatformReaderForH2(true)
+                        .build())
+                .build();
+
+        connectionAgentClient = HttpClient.builder()
+                .connectionPool(HttpConnectionPool.builder()
+                        .maxConnectionsPerRoute(connections)
+                        .maxTotalConnections(connections)
+                        .h2StreamsPerConnection(streamsPerConnection)
+                        .h2InitialWindowSize(16 * 1024 * 1024)
+                        .maxIdleTime(Duration.ofMinutes(2))
+                        .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
+                        .sslContext(sslContext)
+                        .dnsResolver(BenchmarkSupport.staticDns())
+                        .useConnectionAgentForH2(true)
+                        .build())
                 .build();
 
         javaExecutor = Executors.newVirtualThreadPerTaskExecutor();
-        javaClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_2)
+        javaClient = java.net.http.HttpClient.newBuilder()
+                .version(java.net.http.HttpClient.Version.HTTP_2)
                 .sslContext(sslContext)
                 .executor(javaExecutor)
                 .build();
         javaTransport = new JavaHttpClientTransport(javaClient);
+        var apacheConfig = new ApacheHttpTransportConfig();
+        apacheConfig.httpVersion(software.amazon.smithy.java.http.api.HttpVersion.HTTP_2);
+        apacheConfig.maxConnectionsPerHost(connections);
+        apacheConfig.h2StreamsPerConnection(streamsPerConnection);
+        apacheConfig.ioThreads(1);
+        apacheTransport = new ApacheHttpClientTransport(apacheConfig, sslContext);
+
+        var nettyTransportConfig = new NettyHttpTransportConfig()
+                .maxConnectionsPerHost(connections)
+                .h2StreamsPerConnection(streamsPerConnection)
+                .httpVersionPolicy(software.amazon.smithy.java.client.http.netty.HttpVersionPolicy.ENFORCE_HTTP_2);
+        productionNettyTransport =
+                new NettyHttpClientTransport(nettyTransportConfig);
         transportContext = Context.create();
 
-        BenchmarkSupport.resetServer(benchmarkClient, BenchmarkSupport.H2_URL);
+        BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H2_URL);
         runId = BenchmarkSupport.createRunId("h2-mixed");
 
         mixedRequests = new MixedRequests(
                 new RequestPlan(
                         HttpRequest.create()
                                 .setUri(SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb?runId=" + runId))
-                                .setHttpVersion(HttpVersion.HTTP_2)
                                 .setMethod("GET"),
                         true,
                         0,
@@ -100,7 +155,6 @@ public class H2MixedGetPutBenchmark {
                 new RequestPlan(
                         HttpRequest.create()
                                 .setUri(SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb?runId=" + runId))
-                                .setHttpVersion(HttpVersion.HTTP_2)
                                 .setMethod("PUT")
                                 .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD)),
                         false,
@@ -111,26 +165,36 @@ public class H2MixedGetPutBenchmark {
     @TearDown(Level.Trial)
     public void teardown() throws Exception {
         try {
-            if (benchmarkClient != null) {
-                String stats = BenchmarkSupport.getServerStats(benchmarkClient, BenchmarkSupport.H2_URL, runId);
+            if (smithyClient != null) {
+                String stats = BenchmarkSupport.getServerStats(smithyClient, BenchmarkSupport.H2_URL, runId);
                 var actualStats = BenchmarkSupport.parseIoStats(stats);
                 var expectedStats = mixedRequests.expectedIoStats();
                 BenchmarkSupport.assertIoStats("H2 mixed server IO stats", actualStats, expectedStats);
                 mixedRequests.assertClientIoMatches(expectedStats);
                 System.out.println("H2 mixed GET+PUT stats [c=" + concurrency + ", conn=" + connections
                         + ", streams=" + streamsPerConnection + "]: " + stats);
-                System.out.println("H2 client stats: " + BenchmarkSupport.getH2ConnectionStats(benchmarkClient));
-                System.out.println("JDK mixed config: executor=vt"
-                        + ", transferScratchSize="
-                        + Integer.getInteger("smithy.java.client.http.jdk.transferScratchSize", 16 * 1024)
-                        + ", jdk.httpclient.maxframesize=" + System.getProperty("jdk.httpclient.maxframesize")
-                        + ", jdk.httpclient.bufsize=" + System.getProperty("jdk.httpclient.bufsize")
-                        + ", jdk.httpclient.maxstreams=" + System.getProperty("jdk.httpclient.maxstreams"));
+                System.out.println("H2 client stats: " + BenchmarkSupport.getH2ConnectionStats(smithyClient));
+            }
+            if (smithyPlatformReaderClient != null) {
+                System.out.println("H2 platform-reader client stats: "
+                        + BenchmarkSupport.getH2ConnectionStats(smithyPlatformReaderClient));
+            }
+            if (connectionAgentClient != null) {
+                System.out.println("Connection-agent H2 stats: "
+                        + BenchmarkSupport.getH2ConnectionStats(connectionAgentClient));
             }
         } finally {
-            if (benchmarkClient != null) {
-                benchmarkClient.close();
-                benchmarkClient = null;
+            if (connectionAgentClient != null) {
+                connectionAgentClient.close();
+                connectionAgentClient = null;
+            }
+            if (smithyClient != null) {
+                smithyClient.close();
+                smithyClient = null;
+            }
+            if (smithyPlatformReaderClient != null) {
+                smithyPlatformReaderClient.close();
+                smithyPlatformReaderClient = null;
             }
             if (javaClient != null) {
                 javaClient.close();
@@ -140,7 +204,17 @@ public class H2MixedGetPutBenchmark {
                 javaExecutor.close();
                 javaExecutor = null;
             }
-            javaTransport = null;
+            if (javaTransport != null) {
+                javaTransport = null;
+            }
+            if (apacheTransport != null) {
+                apacheTransport.close();
+                apacheTransport = null;
+            }
+            if (productionNettyTransport != null) {
+                productionNettyTransport.close();
+                productionNettyTransport = null;
+            }
         }
     }
 
@@ -216,6 +290,63 @@ public class H2MixedGetPutBenchmark {
 
     @Benchmark
     @Threads(1)
+    public void h2SmithyMixedGetPutMb(Counter counter) throws InterruptedException {
+        long startGet = mixedRequests.totalGetRequests.get();
+        long startPut = mixedRequests.totalPutRequests.get();
+        BenchmarkSupport.runBenchmark(concurrency, concurrency * 2, (MixedRequests requests) -> {
+            var request = requests.next();
+            try (var response = smithyClient.send(request.request())) {
+                long responseBytes = response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+                requests.recordCompletion(request, responseBytes);
+            }
+        }, mixedRequests, counter);
+        counter.getRequests = mixedRequests.totalGetRequests.get() - startGet;
+        counter.putRequests = mixedRequests.totalPutRequests.get() - startPut;
+
+        counter.logErrors("Smithy H2 mixed GET+PUT");
+        counter.throwIfErrored("Smithy H2 mixed GET+PUT");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2ConnectionAgentMixedGetPutMb(Counter counter) throws InterruptedException {
+        long startGet = mixedRequests.totalGetRequests.get();
+        long startPut = mixedRequests.totalPutRequests.get();
+        BenchmarkSupport.runBenchmark(concurrency, concurrency * 2, (MixedRequests requests) -> {
+            var request = requests.next();
+            try (var response = connectionAgentClient.send(request.request())) {
+                long responseBytes = response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+                requests.recordCompletion(request, responseBytes);
+            }
+        }, mixedRequests, counter);
+        counter.getRequests = mixedRequests.totalGetRequests.get() - startGet;
+        counter.putRequests = mixedRequests.totalPutRequests.get() - startPut;
+
+        counter.logErrors("Connection-agent H2 mixed GET+PUT");
+        counter.throwIfErrored("Connection-agent H2 mixed GET+PUT");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2SmithyPlatformReaderMixedGetPutMb(Counter counter) throws InterruptedException {
+        long startGet = mixedRequests.totalGetRequests.get();
+        long startPut = mixedRequests.totalPutRequests.get();
+        BenchmarkSupport.runBenchmark(concurrency, concurrency * 2, (MixedRequests requests) -> {
+            var request = requests.next();
+            try (var response = smithyPlatformReaderClient.send(request.request())) {
+                long responseBytes = response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+                requests.recordCompletion(request, responseBytes);
+            }
+        }, mixedRequests, counter);
+        counter.getRequests = mixedRequests.totalGetRequests.get() - startGet;
+        counter.putRequests = mixedRequests.totalPutRequests.get() - startPut;
+
+        counter.logErrors("Smithy H2 platform-reader mixed GET+PUT");
+        counter.throwIfErrored("Smithy H2 platform-reader mixed GET+PUT");
+    }
+
+    @Benchmark
+    @Threads(1)
     public void h2JavaWrapperMixedGetPutMb(Counter counter) throws InterruptedException {
         long startGet = mixedRequests.totalGetRequests.get();
         long startPut = mixedRequests.totalPutRequests.get();
@@ -231,5 +362,43 @@ public class H2MixedGetPutBenchmark {
 
         counter.logErrors("Java-wrapper H2 mixed GET+PUT");
         counter.throwIfErrored("Java-wrapper H2 mixed GET+PUT");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2ProductionNettyMixedGetPutMb(Counter counter) throws InterruptedException {
+        long startGet = mixedRequests.totalGetRequests.get();
+        long startPut = mixedRequests.totalPutRequests.get();
+        BenchmarkSupport.runBenchmark(concurrency, concurrency * 2, (MixedRequests requests) -> {
+            var request = requests.next();
+            try (var response = productionNettyTransport.send(transportContext, request.request())) {
+                long responseBytes = response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+                requests.recordCompletion(request, responseBytes);
+            }
+        }, mixedRequests, counter);
+        counter.getRequests = mixedRequests.totalGetRequests.get() - startGet;
+        counter.putRequests = mixedRequests.totalPutRequests.get() - startPut;
+
+        counter.logErrors("Production-Netty H2 mixed GET+PUT");
+        counter.throwIfErrored("Production-Netty H2 mixed GET+PUT");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2ApacheAsyncMixedGetPutMb(Counter counter) throws InterruptedException {
+        long startGet = mixedRequests.totalGetRequests.get();
+        long startPut = mixedRequests.totalPutRequests.get();
+        BenchmarkSupport.runBenchmark(concurrency, concurrency * 2, (MixedRequests requests) -> {
+            var request = requests.next();
+            try (var response = apacheTransport.send(transportContext, request.request())) {
+                long responseBytes = response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+                requests.recordCompletion(request, responseBytes);
+            }
+        }, mixedRequests, counter);
+        counter.getRequests = mixedRequests.totalGetRequests.get() - startGet;
+        counter.putRequests = mixedRequests.totalPutRequests.get() - startPut;
+
+        counter.logErrors("Apache-async H2 mixed GET+PUT");
+        counter.throwIfErrored("Apache-async H2 mixed GET+PUT");
     }
 }

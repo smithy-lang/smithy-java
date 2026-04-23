@@ -15,30 +15,32 @@ import java.util.function.Consumer;
 /**
  * Input stream for reading response body from DATA frames.
  *
- * <p>Uses batch dequeuing to pull multiple data chunks from the exchange
- * in a single lock acquisition. Chunks are ByteBuffers from the pool.
+ * <p>Reads directly from per-stream pooled DATA-frame buffers owned by the exchange.
+ * Chunks are borrowed {@link ByteBuffer}s that are returned to the pool when retired.
  *
  * <p>Also provides a {@link #channel()} for zero-copy ByteBuffer reads.
  */
 final class H2DataInputStream extends InputStream {
-    private static final int BATCH_SIZE = 32;
+    private static final int BATCH_SIZE = 128;
 
     private final H2Exchange exchange;
     private final Consumer<ByteBuffer> bufferReturner;
-    private final DataChunk[] localBatch = new DataChunk[BATCH_SIZE];
-    private int batchIndex = 0;
-    private int batchCount = 0;
+    private final H2StreamBody.ChunkSlot[] localBatch = new H2StreamBody.ChunkSlot[BATCH_SIZE];
+    private final H2StreamBody.ChunkSlot currentChunk = new H2StreamBody.ChunkSlot();
 
-    private DataChunk currentChunk;
     private ByteBuffer current;
+    private int currentFlowControlBytes;
     private boolean eof = false;
     private boolean closed = false;
     private final byte[] singleBuff = new byte[1];
-    private final byte[] transferBuffer = new byte[8192];
+    private final byte[] transferBuffer = new byte[65536];
 
     H2DataInputStream(H2Exchange exchange, Consumer<ByteBuffer> bufferReturner) {
         this.exchange = exchange;
         this.bufferReturner = bufferReturner;
+        for (int i = 0; i < BATCH_SIZE; i++) {
+            localBatch[i] = new H2StreamBody.ChunkSlot();
+        }
     }
 
     /**
@@ -124,34 +126,25 @@ final class H2DataInputStream extends InputStream {
     }
 
     private boolean pullNextChunk() throws IOException {
-        if (currentChunk != null) {
+        if (current != null) {
             releaseCurrentChunk();
         }
 
-        if (batchIndex >= batchCount) {
-            int drained = exchange.drainChunks(localBatch, BATCH_SIZE);
-            if (drained < 0) {
-                eof = true;
-                return false;
-            }
-            batchIndex = 0;
-            batchCount = drained;
+        if (!exchange.awaitNextChunk(currentChunk)) {
+            eof = true;
+            return false;
         }
-
-        DataChunk chunk = localBatch[batchIndex];
-        localBatch[batchIndex] = null;
-        batchIndex++;
-
-        currentChunk = chunk;
-        current = chunk.data();
+        current = currentChunk.data;
+        currentFlowControlBytes = currentChunk.flowControlBytes;
         return true;
     }
 
     private void releaseCurrentChunk() {
-        exchange.releaseDataCredit(currentChunk.flowControlBytes());
-        bufferReturner.accept(currentChunk.data());
-        currentChunk = null;
+        exchange.releaseDataCredit(currentFlowControlBytes);
+        bufferReturner.accept(currentChunk.data);
+        currentChunk.clear();
         current = null;
+        currentFlowControlBytes = 0;
     }
 
     @Override
@@ -199,14 +192,6 @@ final class H2DataInputStream extends InputStream {
         if (currentChunk != null) {
             releaseCurrentChunk();
         }
-
-        while (batchIndex < batchCount) {
-            DataChunk chunk = localBatch[batchIndex];
-            exchange.releaseDataCredit(chunk.flowControlBytes());
-            bufferReturner.accept(chunk.data());
-            localBatch[batchIndex] = null;
-            batchIndex++;
-        }
     }
 
     @Override
@@ -221,11 +206,23 @@ final class H2DataInputStream extends InputStream {
             transferred += writeCurrentTo(out);
         }
 
-        while (pullNextChunk()) {
-            transferred += writeCurrentTo(out);
-        }
+        while (true) {
+            int drained = exchange.awaitChunks(localBatch, BATCH_SIZE);
+            if (drained < 0) {
+                eof = true;
+                return transferred;
+            }
 
-        return transferred;
+            for (int i = 0; i < drained; i++) {
+                H2StreamBody.ChunkSlot chunk = localBatch[i];
+                currentChunk.set(chunk.data, chunk.flowControlBytes);
+                chunk.clear();
+                current = currentChunk.data;
+                currentFlowControlBytes = currentChunk.flowControlBytes;
+                transferred += writeCurrentTo(out);
+                releaseCurrentChunk();
+            }
+        }
     }
 
     private int writeCurrentTo(OutputStream out) throws IOException {

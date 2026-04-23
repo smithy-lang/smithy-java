@@ -22,7 +22,6 @@ val jmhServerImplementation by configurations.getting
 
 dependencies {
     api(project(":http:http-api"))
-    api(project(":http:http-hpack"))
     api(project(":context"))
     api(project(":logging"))
 
@@ -37,7 +36,7 @@ dependencies {
     testImplementation(libs.jazzer.api)
 
     // Add Apache HttpClient for benchmarking comparison
-    jmh("org.apache.httpcomponents.client5:httpclient5:5.3.1")
+    jmh("org.apache.httpcomponents.client5:httpclient5:5.5")
 
     // Helidon WebClient for benchmarking comparison
     jmh("io.helidon.webclient:helidon-webclient:4.1.6")
@@ -45,6 +44,13 @@ dependencies {
 
     // Netty for raw HTTP/2 benchmarking
     jmh("io.netty:netty-all:4.2.7.Final")
+
+    // Client-http-netty productionized transport for benchmarking
+    jmh(project(":client:client-http"))
+    jmh(project(":client:client-http-apache"))
+    jmh(project(":client:client-http-netty"))
+    jmh(project(":client:client-http-crt"))
+    jmh(project(":client:client-core"))
 
     // Benchmark server dependencies (Netty runs in separate process)
     jmhServerImplementation("io.netty:netty-all:4.2.7.Final")
@@ -93,6 +99,10 @@ val startBenchmarkServer by tasks.registering {
         while (!ready && attempts < 50) {
             Thread.sleep(100)
             attempts++
+            if (!process.isAlive) {
+                pidFile.delete()
+                throw GradleException("Benchmark server process exited before becoming ready")
+            }
             try {
                 Socket("localhost", benchmarkH2cPort).close()
                 ready = true
@@ -104,6 +114,11 @@ val startBenchmarkServer by tasks.registering {
         if (!ready) {
             process.destroyForcibly()
             throw GradleException("Benchmark server failed to start (not ready after 5s)")
+        }
+
+        if (!process.isAlive) {
+            pidFile.delete()
+            throw GradleException("Benchmark server exited during startup")
         }
 
         println("Benchmark server started (PID: ${process.pid()})")
@@ -139,6 +154,8 @@ val stopBenchmarkServer by tasks.registering {
 // To customize params, edit @Param annotations in benchmark source files
 jmh {
     val includesProp = project.findProperty("jmh.includes")?.toString()
+    val jvmArgsProp = project.findProperty("jmh.jvmArgsAppend")?.toString()
+    val profilersProp = project.findProperty("jmh.profilers")?.toString()
     includes = if (includesProp != null) listOf(includesProp) else listOf(".*")
 
     warmupIterations = 3
@@ -146,6 +163,18 @@ jmh {
     fork = 1
     resultFormat = "CSV"
     resultsFile = project.file("build/reports/jmh/results.csv")
+    if (jvmArgsProp != null) {
+        jvmArgsAppend = jvmArgsProp.split(Regex("\\s*;\\s*")).filter { it.isNotEmpty() }
+    }
+    if (profilersProp != null) {
+        val profilerSpecs =
+            if (profilersProp.contains(";;")) {
+                profilersProp.split(Regex("\\s*;;\\s*")).filter { it.isNotEmpty() }
+            } else {
+                listOf(profilersProp)
+            }
+        profilers.addAll(profilerSpecs)
+    }
     // Use standalone asprof for profiling instead of bundled async profiler
     // profilers.add("async:output=flamegraph")
     // profilers.add("gc")

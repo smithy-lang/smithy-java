@@ -28,6 +28,9 @@ public final class HttpConnectionPoolBuilder {
     int h2InitialWindowSize = 65535; // RFC 9113 default
     int h2MaxFrameSize = 16384; // RFC 9113 default
     int h2BufferSize = 256 * 1024; // 256KB default
+    boolean useConnectionAgentForH2c;
+    boolean useConnectionAgentForH2;
+    boolean usePlatformReaderForH2;
     final Map<String, Integer> perHostLimits = new HashMap<>();
 
     Duration maxIdleTime = Duration.ofMinutes(2);
@@ -41,6 +44,9 @@ public final class HttpConnectionPoolBuilder {
     HttpVersionPolicy versionPolicy = HttpVersionPolicy.AUTOMATIC;
     DnsResolver dnsResolver;
     HttpSocketFactory socketFactory = HttpSocketFactory.DEFAULT;
+    boolean socketFactoryExplicit;
+    Integer socketReceiveBufferSize;
+    Integer socketSendBufferSize;
     final List<ConnectionPoolListener> listeners = new LinkedList<>();
 
     /**
@@ -388,6 +394,53 @@ public final class HttpConnectionPoolBuilder {
      */
     public HttpConnectionPoolBuilder socketFactory(HttpSocketFactory socketFactory) {
         this.socketFactory = Objects.requireNonNull(socketFactory, "socketFactory");
+        this.socketFactoryExplicit = true;
+        return this;
+    }
+
+    /**
+     * Set the SO_RCVBUF (TCP receive buffer) size in bytes for new connection sockets.
+     *
+     * <p>Has no effect when an explicit {@link #socketFactory} has been set; that factory is then
+     * fully responsible for socket configuration. When unset, the default factory uses 64 KiB.
+     * Pass {@code -1} to leave SO_RCVBUF unset and let the kernel autotune.
+     *
+     * <p><b>Tuning guidance:</b> A larger receive buffer helps low-concurrency throughput on
+     * high-bandwidth/high-latency links because each connection needs a window large enough to
+     * cover the bandwidth-delay product. At high concurrency, however, large per-connection
+     * receive buffers can cause bufferbloat: each connection holds bytes the application has not
+     * yet read, inflating tail latency. 64 KiB is the conservative default; raising to 96-128 KiB
+     * (or {@code -1} for kernel autotune) improves low-VT GET throughput on fat pipes at some
+     * cost in high-VT P99.
+     *
+     * @param bytes SO_RCVBUF in bytes, or {@code -1} to defer to the kernel
+     * @return this builder
+     * @throws IllegalArgumentException if {@code bytes} is 0 or less than -1
+     */
+    public HttpConnectionPoolBuilder socketReceiveBufferSize(int bytes) {
+        if (bytes < -1 || bytes == 0) {
+            throw new IllegalArgumentException("socketReceiveBufferSize must be positive or -1: " + bytes);
+        }
+        this.socketReceiveBufferSize = bytes;
+        return this;
+    }
+
+    /**
+     * Set the SO_SNDBUF (TCP send buffer) size in bytes for new connection sockets.
+     *
+     * <p>Has no effect when an explicit {@link #socketFactory} has been set; that factory is then
+     * fully responsible for socket configuration. When unset, the default factory uses 64 KiB.
+     * Pass {@code -1} to leave SO_SNDBUF unset and let the kernel autotune.
+     *
+     * @param bytes SO_SNDBUF in bytes, or {@code -1} to defer to the kernel
+     * @return this builder
+     * @throws IllegalArgumentException if {@code bytes} is 0 or less than -1
+     */
+    public HttpConnectionPoolBuilder socketSendBufferSize(int bytes) {
+        if (bytes < -1 || bytes == 0) {
+            throw new IllegalArgumentException("socketSendBufferSize must be positive or -1: " + bytes);
+        }
+        this.socketSendBufferSize = bytes;
         return this;
     }
 
@@ -528,6 +581,39 @@ public final class HttpConnectionPoolBuilder {
             throw new IllegalArgumentException("h2BufferSize must be at least 16KB: " + bufferSize);
         }
         this.h2BufferSize = bufferSize;
+        return this;
+    }
+
+    /**
+     * Use the experimental connection-agent transport for cleartext H2C connections.
+     *
+     * <p>This only affects non-TLS H2C connections. TLS HTTP/2 continues to use the
+     * standard {@code H2Connection} path.
+     */
+    public HttpConnectionPoolBuilder useConnectionAgentForH2c(boolean enabled) {
+        this.useConnectionAgentForH2c = enabled;
+        return this;
+    }
+
+    /**
+     * Use the experimental connection-agent transport for TLS HTTP/2 connections.
+     *
+     * <p>This only affects HTTPS routes that negotiate ALPN `h2`. Cleartext H2C
+     * continues to use {@link #useConnectionAgentForH2c(boolean)}.
+     */
+    public HttpConnectionPoolBuilder useConnectionAgentForH2(boolean enabled) {
+        this.useConnectionAgentForH2 = enabled;
+        return this;
+    }
+
+    /**
+     * Use a dedicated platform thread for the HTTP/2 reader loop instead of a virtual thread.
+     *
+     * <p>This is an experimental toggle intended for benchmarking the interaction between
+     * the shipped split read/write H2 architecture and JSSE TLS.
+     */
+    public HttpConnectionPoolBuilder usePlatformReaderForH2(boolean enabled) {
+        this.usePlatformReaderForH2 = enabled;
         return this;
     }
 

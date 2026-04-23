@@ -5,9 +5,13 @@
 
 package software.amazon.smithy.java.http.client;
 
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -39,16 +43,16 @@ final class DefaultHttpClient implements HttpClient {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(DefaultHttpClient.class);
     private static final OutputStream NULL_OUTPUT_STREAM = OutputStream.nullOutputStream();
-
+    // Reused per-thread drain buffer; allocated once per virtual thread when first body needs
+    // draining. Sized to drain a typical 256 KiB response in 4 trips.
+    private static final ThreadLocal<byte[]> DRAIN_BUFFER = ThreadLocal.withInitial(() -> new byte[64 * 1024]);
     private final ConnectionPool connectionPool;
     private final ProxySelector proxySelector;
-    private final List<HttpInterceptor> interceptors;
     private final Duration requestTimeout;
     private final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
     DefaultHttpClient(Builder builder) {
         this.connectionPool = builder.connectionPool;
-        this.interceptors = List.copyOf(builder.interceptors);
         this.proxySelector = builder.proxySelector;
         this.requestTimeout = builder.requestTimeout;
     }
@@ -60,44 +64,15 @@ final class DefaultHttpClient implements HttpClient {
     }
 
     private HttpResponse sendInternal(HttpRequest request, RequestOptions options) throws IOException {
-        var resolvedInterceptors = options.resolveInterceptors(interceptors);
         Context context = options.context();
 
-        // 1. beforeRequest interceptors
-        request = applyBeforeRequest(resolvedInterceptors, request, context);
-
-        // 2. preemptRequest interceptors
-        HttpResponse preempted = applyPreemptRequest(resolvedInterceptors, request, context);
-        if (preempted != null) {
-            try {
-                return applyResponseInterceptors(resolvedInterceptors, request, context, preempted);
-            } catch (IOException e) {
-                HttpResponse recovery = applyOnError(resolvedInterceptors, request, context, e);
-                if (recovery != null) {
-                    return recovery;
-                }
-                throw e;
-            }
-        }
-
-        // 3. Acquire connection and open stream
-        AcquiredStream acquired;
-        try {
-            acquired = acquireAndOpenStream(request, context);
-        } catch (IOException e) {
-            HttpResponse recovery = applyOnError(resolvedInterceptors, request, context, e);
-            if (recovery != null) {
-                return recovery;
-            }
-            throw e;
-        }
-
+        // Acquire connection and open stream
+        AcquiredStream acquired = acquireAndOpenStream(request, context);
         HttpConnection conn = acquired.conn();
         HttpExchange exchange = acquired.exchange();
 
-        boolean errored = false;
         try {
-            // 5. Write request body
+            // Write request body
             DataStream requestBody = request.body();
             boolean hasBody = requestBody != null && requestBody.contentLength() != 0;
 
@@ -106,67 +81,57 @@ final class DefaultHttpClient implements HttpClient {
                 exchange.setRequestTrailers(ts.trailerHeaders());
             }
 
-            if (hasBody && exchange.supportsBidirectionalStreaming()) {
+            if (hasBody && exchange.supportsBidirectionalStreaming() && !shouldWriteH2BodyInline(requestBody)) {
                 // H2: write body on background VT for full duplex
                 final DataStream body = requestBody;
                 Thread.startVirtualThread(() -> {
-                    try (OutputStream out = exchange.requestBody()) {
-                        body.writeTo(out);
+                    try {
+                        exchange.writeRequestBody(body);
                     } catch (IOException e) {
                         LOGGER.debug("Error writing request body: {}", e.getMessage());
                     }
                 });
             } else if (hasBody) {
-                // H1: write body inline
-                try (OutputStream out = exchange.requestBody()) {
-                    requestBody.writeTo(out);
-                }
+                // H1, or replayable bounded H2 bodies: write inline
+                exchange.writeRequestBody(requestBody);
             } else {
                 // No body — close request stream to send END_STREAM
                 exchange.requestBody().close();
             }
 
-            // 6. Build response
+            // Build response
             int statusCode = exchange.responseStatusCode();
             HttpHeaders headers = exchange.responseHeaders();
             HttpVersion version = exchange.responseVersion();
-
-            // Determine close behavior based on protocol
             boolean isH2 = version == HttpVersion.HTTP_2;
+            String contentType = exchange.responseContentType();
+            long contentLength = exchange.responseContentLength();
 
             DataStream responseBody = DataStream.ofStreamOrChannel(
                     exchange::responseBody,
                     exchange::responseBodyChannel,
-                    headers.contentType(),
-                    headers.contentLength() != null ? headers.contentLength() : -1);
+                    contentType,
+                    contentLength);
 
             // Wrap body so close releases connection
             DataStream managedBody = new ManagedResponseBody(responseBody, exchange, conn, isH2);
 
-            HttpResponse response = HttpResponse.create()
+            return HttpResponse.create()
                     .setStatusCode(statusCode)
                     .setHeaders(headers)
                     .setHttpVersion(version)
                     .setBody(managedBody);
-
-            // 7. interceptResponse
-            response = applyResponseInterceptors(resolvedInterceptors, request, context, response);
-
-            return response;
-
         } catch (IOException e) {
-            errored = true;
             try {
                 exchange.close();
             } catch (IOException ignored) {}
             connectionPool.evict(conn, true);
-
-            HttpResponse recovery = applyOnError(resolvedInterceptors, request, context, e);
-            if (recovery != null) {
-                return recovery;
-            }
             throw e;
         }
+    }
+
+    private static boolean shouldWriteH2BodyInline(DataStream body) {
+        return body.isReplayable() && body.hasKnownLength();
     }
 
     /**
@@ -187,14 +152,49 @@ final class DefaultHttpClient implements HttpClient {
             this.isH2 = isH2;
         }
 
-        @Override public long contentLength() { return delegate.contentLength(); }
-        @Override public String contentType() { return delegate.contentType(); }
-        @Override public boolean isReplayable() { return false; }
-        @Override public boolean isAvailable() { return !closed; }
-        @Override public InputStream asInputStream() {
+        @Override
+        public long contentLength() {
+            return delegate.contentLength();
+        }
+
+        @Override
+        public String contentType() {
+            return delegate.contentType();
+        }
+
+        @Override
+        public boolean isReplayable() {
+            return false;
+        }
+
+        @Override
+        public boolean isAvailable() {
+            return !closed;
+        }
+
+        @Override
+        public InputStream asInputStream() {
             InputStream inner = delegate.asInputStream();
             wrappedStream = inner;
-            return new java.io.FilterInputStream(inner) {
+            return new FilterInputStream(inner) {
+                @Override
+                public int read() throws IOException {
+                    int b = super.read();
+                    if (b == -1) {
+                        ManagedResponseBody.this.close();
+                    }
+                    return b;
+                }
+
+                @Override
+                public int read(byte[] b, int off, int len) throws IOException {
+                    int n = super.read(b, off, len);
+                    if (n == -1) {
+                        ManagedResponseBody.this.close();
+                    }
+                    return n;
+                }
+
                 @Override
                 public void close() throws IOException {
                     try {
@@ -205,11 +205,25 @@ final class DefaultHttpClient implements HttpClient {
                 }
             };
         }
-        @Override public java.nio.channels.ReadableByteChannel asChannel() {
-            java.nio.channels.ReadableByteChannel inner = delegate.asChannel();
-            return new java.nio.channels.ReadableByteChannel() {
-                @Override public int read(java.nio.ByteBuffer dst) throws IOException { return inner.read(dst); }
-                @Override public boolean isOpen() { return inner.isOpen(); }
+
+        @Override
+        public ReadableByteChannel asChannel() {
+            ReadableByteChannel inner = delegate.asChannel();
+            return new ReadableByteChannel() {
+                @Override
+                public int read(ByteBuffer dst) throws IOException {
+                    int n = inner.read(dst);
+                    if (n == -1) {
+                        ManagedResponseBody.this.close();
+                    }
+                    return n;
+                }
+
+                @Override
+                public boolean isOpen() {
+                    return inner.isOpen();
+                }
+
                 @Override
                 public void close() throws IOException {
                     try {
@@ -220,8 +234,57 @@ final class DefaultHttpClient implements HttpClient {
                 }
             };
         }
-        @Override public void writeTo(OutputStream out) throws IOException { delegate.writeTo(out); }
-        @Override public void writeTo(java.nio.channels.WritableByteChannel ch) throws IOException { delegate.writeTo(ch); }
+
+        @Override
+        public void writeTo(OutputStream out) throws IOException {
+            delegate.writeTo(out);
+        }
+
+        @Override
+        public void writeTo(WritableByteChannel ch) throws IOException {
+            delegate.writeTo(ch);
+        }
+
+        @Override
+        public void discard() throws IOException {
+            if (closed) {
+                return;
+            }
+            closed = true;
+
+            boolean errored = false;
+            try {
+                if (!isH2) {
+                    if (wrappedStream == null) {
+                        exchange.discardResponseBody();
+                    } else {
+                        byte[] buf = DRAIN_BUFFER.get();
+                        while (wrappedStream.read(buf) != -1) {
+                            // discard
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                errored = true;
+                throw e;
+            } finally {
+                try {
+                    delegate.close();
+                } catch (Exception ignored) {}
+
+                try {
+                    exchange.close();
+                } catch (Exception e) {
+                    errored = true;
+                }
+
+                if (errored) {
+                    connectionPool.evict(conn, true);
+                } else {
+                    connectionPool.release(conn);
+                }
+            }
+        }
 
         @Override
         public void close() {
@@ -233,9 +296,23 @@ final class DefaultHttpClient implements HttpClient {
             boolean errored = false;
 
             // H1: drain body for connection reuse. H2: skip — exchange.close() sends RST_STREAM.
+            // The body may not have been read at all (wrappedStream == null) — e.g. when the
+            // SDK calls discard() without first opening the stream. In that case we still need
+            // to drain through the exchange so the H1 keepalive contract is honored; reusing the
+            // connection without consuming the response body would corrupt the next exchange.
+            //
+            // Use a 64 KiB drain buffer rather than InputStream.transferTo's 16 KiB default so
+            // a typical 256 KiB body drains in 4 read trips instead of 16.
             if (!isH2) {
                 try {
-                    if (wrappedStream != null) { wrappedStream.transferTo(NULL_OUTPUT_STREAM); }
+                    if (wrappedStream == null) {
+                        exchange.discardResponseBody();
+                    } else {
+                        byte[] buf = DRAIN_BUFFER.get();
+                        while (wrappedStream.read(buf) != -1) {
+                            // discard
+                        }
+                    }
                 } catch (IOException ignored) {
                     errored = true;
                 }
@@ -299,57 +376,6 @@ final class DefaultHttpClient implements HttpClient {
             }
             throw new IOException("Failed to create exchange", e);
         }
-    }
-
-    private HttpResponse applyResponseInterceptors(
-            List<HttpInterceptor> resolved,
-            HttpRequest request,
-            Context context,
-            HttpResponse response
-    ) throws IOException {
-        HttpResponse current = response;
-        for (int i = resolved.size() - 1; i >= 0; i--) {
-            HttpResponse replacement = resolved.get(i).interceptResponse(this, request, context, current);
-            if (replacement != null) {
-                current = replacement;
-            }
-        }
-        return current;
-    }
-
-    private HttpRequest applyBeforeRequest(List<HttpInterceptor> resolved, HttpRequest request, Context context)
-            throws IOException {
-        HttpRequest modified = request;
-        for (HttpInterceptor interceptor : resolved) {
-            modified = interceptor.beforeRequest(this, modified, context);
-        }
-        return modified;
-    }
-
-    private HttpResponse applyPreemptRequest(List<HttpInterceptor> resolved, HttpRequest request, Context context)
-            throws IOException {
-        for (HttpInterceptor interceptor : resolved) {
-            HttpResponse response = interceptor.preemptRequest(this, request, context);
-            if (response != null) {
-                return response;
-            }
-        }
-        return null;
-    }
-
-    private HttpResponse applyOnError(
-            List<HttpInterceptor> resolved,
-            HttpRequest request,
-            Context context,
-            IOException exception
-    ) throws IOException {
-        for (int i = resolved.size() - 1; i >= 0; i--) {
-            HttpResponse recovery = resolved.get(i).onError(this, request, context, exception);
-            if (recovery != null) {
-                return recovery;
-            }
-        }
-        return null;
     }
 
     private HttpResponse sendWithTimeout(HttpRequest request, RequestOptions options, Duration timeout)

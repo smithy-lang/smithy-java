@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.util.Set;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.hpack.HpackEncoder;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
 
 /**

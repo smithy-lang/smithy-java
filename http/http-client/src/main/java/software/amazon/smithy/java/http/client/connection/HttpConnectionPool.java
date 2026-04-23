@@ -6,6 +6,8 @@
 package software.amazon.smithy.java.http.client.connection;
 
 import java.io.IOException;
+import java.net.Socket;
+import java.nio.channels.SocketChannel;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -15,7 +17,6 @@ import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
-import software.amazon.smithy.java.http.client.h2.H2Connection;
 
 /**
  * HTTP connection pool optimized for virtual threads.
@@ -168,7 +169,10 @@ public final class HttpConnectionPool implements ConnectionPool {
                 builder.sslParameters,
                 builder.versionPolicy,
                 dnsResolver,
-                builder.socketFactory,
+                resolveSocketFactory(builder),
+                builder.useConnectionAgentForH2c,
+                builder.useConnectionAgentForH2,
+                builder.usePlatformReaderForH2,
                 builder.h2InitialWindowSize,
                 builder.h2MaxFrameSize,
                 builder.h2BufferSize);
@@ -262,7 +266,7 @@ public final class HttpConnectionPool implements ConnectionPool {
     }
 
     // Called by H2ConnectionManager when a new connection is needed.
-    private H2Connection onNewH2Connection(Route route) throws IOException {
+    private MultiplexedHttpConnection onNewH2Connection(Route route) throws IOException {
         // Note: cleanupDead was removed from here - it caused lock contention under load.
         // Background cleanup thread handles dead connection removal every 30 seconds.
 
@@ -274,7 +278,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         try {
             conn = connectionFactory.create(route);
             notifyConnected(conn);
-            if (conn instanceof H2Connection h2conn) {
+            if (conn instanceof MultiplexedHttpConnection h2conn) {
                 success = true;
                 return h2conn;
             }
@@ -320,7 +324,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         notifyReturn(connection);
 
         // H2 connections stay active for multiplexing - don't pool them
-        if (connection instanceof H2Connection h2conn) {
+        if (connection instanceof MultiplexedHttpConnection h2conn) {
             if (!connection.isActive() || closed) {
                 h2Manager.unregister(route, h2conn);
                 closeAndReleasePermit(connection, CloseReason.UNEXPECTED_CLOSE);
@@ -340,7 +344,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         Objects.requireNonNull(connection, "connection cannot be null");
         Route route = connection.route();
 
-        if (connection instanceof H2Connection h2conn) {
+        if (connection instanceof MultiplexedHttpConnection h2conn) {
             h2Manager.unregister(route, h2conn);
         } else {
             h1Manager.remove(route, connection);
@@ -536,5 +540,38 @@ public final class HttpConnectionPool implements ConnectionPool {
                 break;
             }
         }
+    }
+
+    /**
+     * Resolve the effective socket factory. If the user supplied an explicit {@code socketFactory}
+     * we honor it verbatim. Otherwise, if either of the buffer-size knobs was set on the builder,
+     * build a factory that uses the library defaults (TCP_NODELAY, SO_KEEPALIVE, 64 KiB send/recv)
+     * and overrides whichever buffer knob the user supplied. {@code -1} means "kernel autotune"
+     * — that direction is omitted from the socket configuration entirely.
+     */
+    private static HttpSocketFactory resolveSocketFactory(HttpConnectionPoolBuilder builder) {
+        if (builder.socketFactoryExplicit) {
+            return builder.socketFactory;
+        }
+        Integer recv = builder.socketReceiveBufferSize;
+        Integer send = builder.socketSendBufferSize;
+        if (recv == null && send == null) {
+            return builder.socketFactory;
+        }
+        // Treat unset as the library default (64 KiB); -1 sentinel means "leave unset, kernel autotunes".
+        int effectiveRecv = recv != null ? recv : 64 * 1024;
+        int effectiveSend = send != null ? send : 64 * 1024;
+        return (route, endpoints) -> {
+            Socket socket = SocketChannel.open().socket();
+            socket.setTcpNoDelay(true);
+            socket.setKeepAlive(true);
+            if (effectiveSend != -1) {
+                socket.setSendBufferSize(effectiveSend);
+            }
+            if (effectiveRecv != -1) {
+                socket.setReceiveBufferSize(effectiveRecv);
+            }
+            return socket;
+        };
     }
 }

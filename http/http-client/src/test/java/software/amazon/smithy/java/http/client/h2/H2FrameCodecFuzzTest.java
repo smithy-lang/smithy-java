@@ -9,6 +9,7 @@ import com.code_intelligence.jazzer.junit.FuzzTest;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.channels.Channels;
 
 /**
  * Fuzz test for H2 frame codec — feeds random bytes as a stream of H2 frames.
@@ -23,8 +24,8 @@ class H2FrameCodecFuzzTest {
             return;
         }
         var codec = new H2FrameCodec(
-                new ChannelFrameReader(java.nio.channels.Channels.newChannel(new ByteArrayInputStream(data)), 1024),
-                new ChannelFrameWriter(java.nio.channels.Channels.newChannel(new ByteArrayOutputStream()), 1024),
+                new ChannelFrameReader(Channels.newChannel(new ByteArrayInputStream(data)), 1024),
+                new ChannelFrameWriter(Channels.newChannel(new ByteArrayOutputStream()), 1024),
                 16384);
         for (int i = 0; i < 10; i++) {
             try {

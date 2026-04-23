@@ -46,7 +46,14 @@ public interface HttpSocketFactory {
     Socket newSocket(Route route, List<InetAddress> endpoints) throws IOException;
 
     /**
-     * Default factory that creates sockets with TCP_NODELAY=true, SO_KEEPALIVE=true, and 64KB send/receive buffers.
+     * Default factory that creates sockets with TCP_NODELAY=true, SO_KEEPALIVE=true, and 64 KiB send/receive buffers.
+     *
+     * <p>The receive buffer size is a tradeoff: a larger window helps low-concurrency throughput
+     * (fewer connections sharing the link, each needs a big window to keep the pipe full), but
+     * encourages bufferbloat at high concurrency (many connections each holding kilobytes of
+     * unread bytes inflates tail latency). 64 KiB is a balanced default; callers running at very
+     * low concurrency on high-bandwidth links may benefit from raising it or leaving it unset to
+     * let the kernel autotune.
      */
     HttpSocketFactory DEFAULT = (route, endpoints) -> {
         Socket socket = SocketChannel.open().socket();

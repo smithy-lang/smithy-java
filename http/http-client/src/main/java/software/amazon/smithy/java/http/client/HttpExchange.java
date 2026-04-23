@@ -12,8 +12,8 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
  * HTTP request/response exchange.
@@ -95,8 +95,21 @@ public interface HttpExchange extends AutoCloseable {
      * @throws IOException if an I/O error occurs
      */
     default void writeRequestBody() throws IOException {
+        writeRequestBody(request().body());
+    }
+
+    /**
+     * Write the given request body to the exchange.
+     *
+     * <p>The default implementation streams through {@link #requestBody()}. Protocol-specific implementations may
+     * override this to use more efficient body transfer paths for certain {@link DataStream} implementations.
+     *
+     * @param body the body to write
+     * @throws IOException if an I/O error occurs
+     */
+    default void writeRequestBody(DataStream body) throws IOException {
         try (OutputStream out = requestBody()) {
-            request().body().writeTo(out);
+            body.writeTo(out);
         }
     }
 
@@ -140,6 +153,18 @@ public interface HttpExchange extends AutoCloseable {
     InputStream responseBody() throws IOException;
 
     /**
+     * Drain and discard the response body while preserving connection reuse when possible.
+     *
+     * <p>The default implementation uses {@link #responseBody()}. Protocol-specific implementations can override
+     * this to avoid constructing generic stream adapters for common response forms.
+     *
+     * @throws IOException if an I/O error occurs
+     */
+    default void discardResponseBody() throws IOException {
+        responseBody().transferTo(OutputStream.nullOutputStream());
+    }
+
+    /**
      * Get a readable byte channel for the response body. Zero-copy path.
      *
      * <p>Default wraps {@link #responseBody()} via Channels.newChannel().
@@ -161,6 +186,27 @@ public interface HttpExchange extends AutoCloseable {
      * @return HTTP response headers.
      */
     HttpHeaders responseHeaders() throws IOException;
+
+    /**
+     * Get the response content type, if known.
+     *
+     * @return response content type, or null if not present.
+     * @throws IOException if an I/O error occurs while reading response headers.
+     */
+    default String responseContentType() throws IOException {
+        return responseHeaders().contentType();
+    }
+
+    /**
+     * Get the response content length, if known.
+     *
+     * @return response content length, or -1 if not present.
+     * @throws IOException if an I/O error occurs while reading response headers.
+     */
+    default long responseContentLength() throws IOException {
+        Long length = responseHeaders().contentLength();
+        return length == null ? -1 : length;
+    }
 
     /**
      * Get trailer headers if any were received.

@@ -34,11 +34,13 @@ import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
 import io.netty.handler.codec.http2.Http2DataFrame;
+import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
+import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2StreamFrame;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -50,8 +52,11 @@ import io.netty.handler.ssl.util.SelfSignedCertificate;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Standalone Netty-based benchmark server.
@@ -86,10 +91,22 @@ public final class BenchmarkServer {
     private static final int H2_MAX_CONCURRENT_STREAMS = 20000;
     private static final int H2_INITIAL_WINDOW_SIZE = 1024 * 1024 * 2;
     private static final int H2_MAX_FRAME_SIZE = 1024 * 64;
+    // Additional connection-level receive window credit for h2c.
+    // Without this, concurrent uploads can bottleneck on the RFC default 64KB connection window.
+    private static final int H2_CONNECTION_WINDOW_INCREMENT = 64 * 1024 * 1024;
 
     // HTTP/2 TLS settings (slightly more conservative)
     private static final int H2_TLS_MAX_CONCURRENT_STREAMS = 10000;
     private static final int H2_TLS_INITIAL_WINDOW_SIZE = 1024 * 1024;
+    // Additional connection-level receive window credit beyond the RFC default 64KB.
+    // With default 64KB, 10 concurrent 1MB uploads must serialize WINDOW_UPDATE roundtrips.
+    // Bumping by 64MB leaves only per-stream flow control as a throttling factor.
+    private static final int H2_TLS_CONNECTION_WINDOW_INCREMENT = 64 * 1024 * 1024;
+    private static final AtomicLong GET_MB_BYTES_SENT = new AtomicLong();
+    private static final AtomicLong PUT_MB_BYTES_RECEIVED = new AtomicLong();
+    private static final AtomicLong GET_MB_REQUESTS = new AtomicLong();
+    private static final AtomicLong PUT_MB_REQUESTS = new AtomicLong();
+    private static final ConcurrentHashMap<String, IoStatsAccumulator> RUN_IO_STATS = new ConcurrentHashMap<>();
 
     private final EventLoopGroup bossGroup;
     private final EventLoopGroup workerGroup;
@@ -133,6 +150,119 @@ public final class BenchmarkServer {
 
     public int getH2cPort() {
         return h2cPort;
+    }
+
+    private static void resetIoStats() {
+        GET_MB_BYTES_SENT.set(0);
+        PUT_MB_BYTES_RECEIVED.set(0);
+        GET_MB_REQUESTS.set(0);
+        PUT_MB_REQUESTS.set(0);
+        RUN_IO_STATS.clear();
+    }
+
+    private static String extractPath(String uri) {
+        try {
+            URI parsed = URI.create(uri);
+            String path = parsed.getPath();
+            if (path != null && !path.isEmpty()) {
+                return path;
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Fall back to raw request-target handling below.
+        }
+        int query = uri.indexOf('?');
+        if (query >= 0) {
+            uri = uri.substring(0, query);
+        }
+        return uri;
+    }
+
+    private static boolean pathMatches(String uri, String path) {
+        return path.contentEquals(extractPath(uri));
+    }
+
+    private static boolean pathMatches(CharSequence uri, String path) {
+        return uri != null && path.contentEquals(extractPath(uri.toString()));
+    }
+
+    private static String extractQueryParam(String uri, String name) {
+        int queryStart = uri.indexOf('?');
+        if (queryStart < 0 || queryStart == uri.length() - 1) {
+            return null;
+        }
+        int index = queryStart + 1;
+        while (index < uri.length()) {
+            int nextAmp = uri.indexOf('&', index);
+            if (nextAmp < 0) {
+                nextAmp = uri.length();
+            }
+            int equals = uri.indexOf('=', index);
+            if (equals > index && equals < nextAmp && uri.regionMatches(index, name, 0, name.length())) {
+                return uri.substring(equals + 1, nextAmp);
+            }
+            index = nextAmp + 1;
+        }
+        return null;
+    }
+
+    private static IoStatsAccumulator ioStatsFor(String uri) {
+        String runId = extractQueryParam(uri, "runId");
+        if (runId == null || runId.isEmpty()) {
+            return null;
+        }
+        return RUN_IO_STATS.computeIfAbsent(runId, ignored -> new IoStatsAccumulator());
+    }
+
+    private static byte[] statsJson(String uri) {
+        IoStatsAccumulator runStats = ioStatsFor(uri);
+        if (runStats == null) {
+            return statsJson();
+        }
+        return statsJson(runStats.getMbRequests.get(),
+                runStats.getMbBytesSent.get(),
+                runStats.putMbRequests.get(),
+                runStats.putMbBytesReceived.get());
+    }
+
+    private static byte[] ioStatsJson() {
+        return ioStatsJson(GET_MB_REQUESTS.get(),
+                GET_MB_BYTES_SENT.get(),
+                PUT_MB_REQUESTS.get(),
+                PUT_MB_BYTES_RECEIVED.get());
+    }
+
+    private static byte[] statsJson() {
+        return statsJson(GET_MB_REQUESTS.get(),
+                GET_MB_BYTES_SENT.get(),
+                PUT_MB_REQUESTS.get(),
+                PUT_MB_BYTES_RECEIVED.get());
+    }
+
+    private static byte[] ioStatsJson(long getRequests, long getBytesSent, long putRequests, long putBytesReceived) {
+        String json = "{"
+                + "\"getMbRequests\":" + getRequests + ","
+                + "\"getMbBytesSent\":" + getBytesSent + ","
+                + "\"putMbRequests\":" + putRequests + ","
+                + "\"putMbBytesReceived\":" + putBytesReceived
+                + "}";
+        return json.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static byte[] statsJson(long getRequests, long getBytesSent, long putRequests, long putBytesReceived) {
+        String json = "{"
+                + "\"settings\":{"
+                + "\"maxConcurrentStreams\":" + H2_MAX_CONCURRENT_STREAMS + ","
+                + "\"initialWindowSize\":" + H2_INITIAL_WINDOW_SIZE + ","
+                + "\"maxFrameSize\":" + H2_MAX_FRAME_SIZE
+                + "},"
+                + "\"io\":{"
+                + "\"getMbRequests\":" + getRequests + ","
+                + "\"getMbBytesSent\":" + getBytesSent + ","
+                + "\"putMbRequests\":" + putRequests + ","
+                + "\"putMbBytesReceived\":" + putBytesReceived
+                + "}"
+                + "}";
+        return json.getBytes(StandardCharsets.UTF_8);
     }
 
     private Channel startH1Server(int port) throws InterruptedException {
@@ -210,23 +340,36 @@ public final class BenchmarkServer {
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) {
-                        var settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings()
+                        var settings = Http2Settings.defaultSettings()
                                 .maxConcurrentStreams(H2_MAX_CONCURRENT_STREAMS)
                                 .initialWindowSize(H2_INITIAL_WINDOW_SIZE)
                                 .maxFrameSize(H2_MAX_FRAME_SIZE);
+                        var frameCodec = Http2FrameCodecBuilder.forServer()
+                                .initialSettings(settings)
+                                .autoAckSettingsFrame(true)
+                                .autoAckPingFrame(true)
+                                .build();
                         ch.pipeline()
                                 .addLast(
-                                        Http2FrameCodecBuilder.forServer()
-                                                .initialSettings(settings)
-                                                .autoAckSettingsFrame(true)
-                                                .autoAckPingFrame(true)
-                                                .build(),
+                                        frameCodec,
                                         new Http2MultiplexHandler(new ChannelInitializer<Channel>() {
                                             @Override
                                             protected void initChannel(Channel ch) {
                                                 ch.pipeline().addLast(new Http2StreamHandler());
                                             }
                                         }));
+                        ch.eventLoop().execute(() -> {
+                            try {
+                                var connection = frameCodec.connection();
+                                connection.local()
+                                        .flowController()
+                                        .incrementWindowSize(
+                                                connection.connectionStream(),
+                                                H2_CONNECTION_WINDOW_INCREMENT);
+                            } catch (Http2Exception e) {
+                                ch.pipeline().fireExceptionCaught(e);
+                            }
+                        });
                     }
                 });
 
@@ -260,20 +403,63 @@ public final class BenchmarkServer {
             String uri = msg.uri();
             FullHttpResponse response;
 
-            if (uri.startsWith("/post") || uri.startsWith("/putmb")) {
+            if (pathMatches(uri, "/rpc")) {
+                response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.wrappedBuffer(CONTENT));
+                response.headers()
+                        .set(CONTENT_TYPE, "application/json")
+                        .set(CONNECTION, KEEP_ALIVE)
+                        .setInt(CONTENT_LENGTH, CONTENT.length);
+            } else if (pathMatches(uri, "/reset-io-stats")) {
+                resetIoStats();
+                response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.EMPTY_BUFFER);
+                response.headers()
+                        .set(CONNECTION, KEEP_ALIVE)
+                        .setInt(CONTENT_LENGTH, 0);
+            } else if (pathMatches(uri, "/io-stats")) {
+                byte[] body = ioStatsJson();
+                response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.wrappedBuffer(body));
+                response.headers()
+                        .set(CONTENT_TYPE, "application/json")
+                        .set(CONNECTION, KEEP_ALIVE)
+                        .setInt(CONTENT_LENGTH, body.length);
+            } else if (pathMatches(uri, "/stats")) {
+                byte[] body = statsJson(uri);
+                System.out.println("[H1 stats] " + new String(body, StandardCharsets.UTF_8));
+                response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.wrappedBuffer(body));
+                response.headers()
+                        .set(CONTENT_TYPE, "application/json")
+                        .set(CONNECTION, KEEP_ALIVE)
+                        .setInt(CONTENT_LENGTH, body.length);
+            } else if (pathMatches(uri, "/post") || pathMatches(uri, "/putmb")) {
+                if (pathMatches(uri, "/putmb")) {
+                    IoStatsAccumulator runStats = ioStatsFor(uri);
+                    PUT_MB_REQUESTS.incrementAndGet();
+                    PUT_MB_BYTES_RECEIVED.addAndGet(msg.content().readableBytes());
+                    if (runStats != null) {
+                        runStats.putMbRequests.incrementAndGet();
+                        runStats.putMbBytesReceived.addAndGet(msg.content().readableBytes());
+                    }
+                }
                 // POST/PUT returns empty 200 OK
                 response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.EMPTY_BUFFER);
                 response.headers()
                         .set(CONNECTION, KEEP_ALIVE)
                         .setInt(CONTENT_LENGTH, 0);
-            } else if (uri.startsWith("/get10mb")) {
+            } else if (pathMatches(uri, "/get10mb")) {
                 // Return 10MB response
                 response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.wrappedBuffer(MB10_CONTENT));
                 response.headers()
                         .set(CONTENT_TYPE, "application/octet-stream")
                         .set(CONNECTION, KEEP_ALIVE)
                         .setInt(CONTENT_LENGTH, MB10_CONTENT.length);
-            } else if (uri.startsWith("/getmb")) {
+            } else if (pathMatches(uri, "/getmb")) {
+                IoStatsAccumulator runStats = ioStatsFor(uri);
+                GET_MB_REQUESTS.incrementAndGet();
+                GET_MB_BYTES_SENT.addAndGet(MB_CONTENT.length);
+                if (runStats != null) {
+                    runStats.getMbRequests.incrementAndGet();
+                    runStats.getMbBytesSent.addAndGet(MB_CONTENT.length);
+                }
                 // Return 1MB response
                 response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.wrappedBuffer(MB_CONTENT));
                 response.headers()
@@ -308,21 +494,38 @@ public final class BenchmarkServer {
         @Override
         protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
-                var settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings()
+                var settings = Http2Settings.defaultSettings()
                         .maxConcurrentStreams(H2_TLS_MAX_CONCURRENT_STREAMS)
                         .initialWindowSize(H2_TLS_INITIAL_WINDOW_SIZE)
                         .maxFrameSize(H2_MAX_FRAME_SIZE);
+                var frameCodec = Http2FrameCodecBuilder.forServer()
+                        .initialSettings(settings)
+                        .build();
                 ctx.pipeline()
                         .addLast(
-                                Http2FrameCodecBuilder.forServer()
-                                        .initialSettings(settings)
-                                        .build(),
+                                frameCodec,
                                 new Http2MultiplexHandler(new ChannelInitializer<Channel>() {
                                     @Override
                                     protected void initChannel(Channel ch) {
                                         ch.pipeline().addLast(new Http2StreamHandler());
                                     }
                                 }));
+                // Grow the connection-level receive window so it isn't the bottleneck under
+                // concurrent uploads. RFC default is 64KB, which forces frequent WINDOW_UPDATE
+                // roundtrips when many streams share one connection. We run in the event loop
+                // because flow-controller methods require it.
+                ctx.channel().eventLoop().execute(() -> {
+                    try {
+                        var connection = frameCodec.connection();
+                        connection.local()
+                                .flowController()
+                                .incrementWindowSize(
+                                        connection.connectionStream(),
+                                        H2_TLS_CONNECTION_WINDOW_INCREMENT);
+                    } catch (Http2Exception e) {
+                        ctx.fireExceptionCaught(e);
+                    }
+                });
             } else {
                 ctx.pipeline()
                         .addLast(
@@ -356,64 +559,140 @@ public final class BenchmarkServer {
                 .status("200")
                 .set("content-type", "application/octet-stream")
                 .setInt("content-length", MB10_CONTENT.length);
+        private RequestKind requestKind = RequestKind.OTHER;
+        private String requestUri;
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, Http2StreamFrame frame) {
             if (frame instanceof Http2HeadersFrame headersFrame) {
                 CharSequence path = headersFrame.headers().path();
-                if ("/reset".contentEquals(path)) {
+                requestUri = path == null ? null : path.toString();
+                if (pathMatches(path, "/reset")) {
                     System.gc();
-                    System.out.println("[H2] Reset triggered");
                     Http2Headers resetHeaders = new DefaultHttp2Headers(true, 1).status("200");
                     ctx.writeAndFlush(new DefaultHttp2HeadersFrame(resetHeaders, true));
-                } else if ("/stats".contentEquals(path)) {
-                    StringBuilder json = new StringBuilder("{");
-                    json.append("\"settings\":{");
-                    json.append("\"maxConcurrentStreams\":").append(H2_MAX_CONCURRENT_STREAMS).append(",");
-                    json.append("\"initialWindowSize\":").append(H2_INITIAL_WINDOW_SIZE).append(",");
-                    json.append("\"maxFrameSize\":").append(H2_MAX_FRAME_SIZE);
-                    json.append("}}");
-                    byte[] body = json.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                } else if (pathMatches(path, "/reset-io-stats")) {
+                    resetIoStats();
+                    Http2Headers resetHeaders = new DefaultHttp2Headers(true, 2)
+                            .status("200")
+                            .setInt("content-length", 0);
+                    ctx.writeAndFlush(new DefaultHttp2HeadersFrame(resetHeaders, true));
+                } else if (pathMatches(path, "/io-stats")) {
+                    byte[] body = ioStatsJson();
+                    Http2Headers ioHeaders = new DefaultHttp2Headers(true, 3)
+                            .status("200")
+                            .set("content-type", "application/json")
+                            .setInt("content-length", body.length);
+                    ctx.write(new DefaultHttp2HeadersFrame(ioHeaders, false));
+                    ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(body), true));
+                } else if (pathMatches(path, "/stats")) {
+                    byte[] body = statsJson(path.toString());
+                    System.out.println("[H2 stats] " + new String(body, StandardCharsets.UTF_8));
                     Http2Headers statsHeaders = new DefaultHttp2Headers(true, 2)
+                            .set("content-type", "application/json")
                             .status("200")
                             .setInt("content-length", body.length);
                     ctx.write(new DefaultHttp2HeadersFrame(statsHeaders, false));
                     ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(body), true));
-                } else if ("/post".contentEquals(path) || "/putmb".contentEquals(path)) {
+                } else if (pathMatches(path, "/rpc")) {
+                    requestKind = RequestKind.RPC;
+                    if (headersFrame.isEndStream()) {
+                        writeResponse(ctx, requestKind);
+                    }
+                } else if (pathMatches(path, "/post") || pathMatches(path, "/putmb")) {
+                    requestKind = RequestKind.EMPTY;
+                    if (pathMatches(path, "/putmb")) {
+                        PUT_MB_REQUESTS.incrementAndGet();
+                        IoStatsAccumulator runStats = ioStatsFor(requestUri);
+                        if (runStats != null) {
+                            runStats.putMbRequests.incrementAndGet();
+                        }
+                    }
                     // POST/PUT with body - wait for data frames
                     if (headersFrame.isEndStream()) {
                         // No body, respond immediately
-                        ctx.writeAndFlush(new DefaultHttp2HeadersFrame(EMPTY_RESPONSE_HEADERS, true));
+                        writeResponse(ctx, requestKind);
                     }
                     // else: wait for DATA frames with endStream
-                } else if ("/get10mb".contentEquals(path)) {
+                } else if (pathMatches(path, "/get10mb")) {
+                    requestKind = RequestKind.GET_10MB;
                     if (headersFrame.isEndStream()) {
-                        ctx.write(new DefaultHttp2HeadersFrame(MB10_RESPONSE_HEADERS, false));
-                        ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(MB10_CONTENT), true));
+                        writeResponse(ctx, requestKind);
                     }
-                } else if ("/getmb".contentEquals(path)) {
+                } else if (pathMatches(path, "/getmb")) {
+                    requestKind = RequestKind.GET_MB;
                     if (headersFrame.isEndStream()) {
-                        ctx.write(new DefaultHttp2HeadersFrame(MB_RESPONSE_HEADERS, false));
-                        ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(MB_CONTENT), true));
+                        writeResponse(ctx, requestKind);
                     }
                 } else if (headersFrame.isEndStream()) {
+                    requestKind = RequestKind.OTHER;
                     // Simple GET - respond with JSON body
-                    ctx.write(new DefaultHttp2HeadersFrame(RESPONSE_HEADERS, false));
-                    ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(CONTENT), true));
+                    writeResponse(ctx, requestKind);
                 }
             } else if (frame instanceof Http2DataFrame dataFrame) {
                 // Data consumed - flow control handled automatically by Http2MultiplexHandler
+                if (requestKind == RequestKind.EMPTY) {
+                    PUT_MB_BYTES_RECEIVED.addAndGet(dataFrame.content().readableBytes());
+                    IoStatsAccumulator runStats = ioStatsFor(requestUri);
+                    if (runStats != null) {
+                        runStats.putMbBytesReceived.addAndGet(dataFrame.content().readableBytes());
+                    }
+                }
                 if (dataFrame.isEndStream()) {
-                    // POST/PUT complete - send empty response
-                    ctx.writeAndFlush(new DefaultHttp2HeadersFrame(EMPTY_RESPONSE_HEADERS, true));
+                    writeResponse(ctx, requestKind);
                 }
             }
+        }
+
+        private void writeResponse(ChannelHandlerContext ctx, RequestKind kind) {
+            switch (kind) {
+                case RPC -> {
+                    ctx.write(new DefaultHttp2HeadersFrame(RESPONSE_HEADERS, false));
+                    ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(CONTENT), true));
+                }
+                case EMPTY -> ctx.writeAndFlush(new DefaultHttp2HeadersFrame(EMPTY_RESPONSE_HEADERS, true));
+                case GET_MB -> {
+                    IoStatsAccumulator runStats = ioStatsFor(requestUri);
+                    GET_MB_REQUESTS.incrementAndGet();
+                    GET_MB_BYTES_SENT.addAndGet(MB_CONTENT.length);
+                    if (runStats != null) {
+                        runStats.getMbRequests.incrementAndGet();
+                        runStats.getMbBytesSent.addAndGet(MB_CONTENT.length);
+                    }
+                    ctx.write(new DefaultHttp2HeadersFrame(MB_RESPONSE_HEADERS, false));
+                    ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(MB_CONTENT), true));
+                }
+                case GET_10MB -> {
+                    ctx.write(new DefaultHttp2HeadersFrame(MB10_RESPONSE_HEADERS, false));
+                    ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(MB10_CONTENT), true));
+                }
+                case OTHER -> {
+                    ctx.write(new DefaultHttp2HeadersFrame(RESPONSE_HEADERS, false));
+                    ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(CONTENT), true));
+                }
+            }
+            requestKind = RequestKind.OTHER;
+        }
+
+        private enum RequestKind {
+            RPC,
+            EMPTY,
+            GET_MB,
+            GET_10MB,
+            OTHER
         }
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             ctx.close();
         }
+    }
+
+    private static final class IoStatsAccumulator {
+        private final AtomicLong getMbRequests = new AtomicLong();
+        private final AtomicLong getMbBytesSent = new AtomicLong();
+        private final AtomicLong putMbRequests = new AtomicLong();
+        private final AtomicLong putMbBytesReceived = new AtomicLong();
     }
 
     /**

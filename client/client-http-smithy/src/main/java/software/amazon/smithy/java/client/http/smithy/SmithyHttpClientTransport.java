@@ -88,7 +88,20 @@ public final class SmithyHttpClientTransport implements ClientTransport<HttpRequ
             }
             if (config.maxConnections() != null) {
                 poolBuilder.maxTotalConnections(config.maxConnections());
-                poolBuilder.maxConnectionsPerRoute(config.maxConnections());
+                // If maxConnectionsPerRoute is not explicitly set, default it to maxConnections
+                // for back-compat with prior behavior.
+                if (config.maxConnectionsPerRoute() == null) {
+                    poolBuilder.maxConnectionsPerRoute(config.maxConnections());
+                }
+            }
+            if (config.maxConnectionsPerRoute() != null) {
+                poolBuilder.maxConnectionsPerRoute(config.maxConnectionsPerRoute());
+            }
+            if (config.socketReceiveBufferSize() != null) {
+                poolBuilder.socketReceiveBufferSize(config.socketReceiveBufferSize());
+            }
+            if (config.socketSendBufferSize() != null) {
+                poolBuilder.socketSendBufferSize(config.socketSendBufferSize());
             }
             if (config.h2StreamsPerConnection() != null) {
                 poolBuilder.h2StreamsPerConnection(config.h2StreamsPerConnection());

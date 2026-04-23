@@ -300,18 +300,24 @@ public final class WorkloadRunner {
     }
 
     public static void main(String[] args) throws Exception {
-        // Allow the JDK HttpClient to set a "host" header before anything
-        // creates an HttpRequest.Builder. JavaHttpClientTransport sets this
-        // in its static initializer, but we hit a chicken-and-egg problem:
-        // the IMDS credential provider builds an HttpClient before
-        // JavaHttpClientTransport ever loads, by which time the "host"
-        // header restriction is locked in. Setting it here, first thing,
-        // sidesteps the whole ordering issue.
+        // Set JDK HttpClient system properties BEFORE anything (including IMDS) constructs an
+        // HttpClient. The JDK HttpClient reads these in its static initializers and caches the
+        // values; later changes have no effect on already-constructed clients. The benchmark
+        // runner's main() is the only safe place to set them — earlier than the IMDS credential
+        // provider's bootstrap and earlier than JavaHttpClientTransport's class load.
         var restricted = System.getProperty("jdk.httpclient.allowRestrictedHeaders");
         if (restricted == null || restricted.isEmpty()) {
             System.setProperty("jdk.httpclient.allowRestrictedHeaders", "host");
         } else if (!restricted.contains("host")) {
             System.setProperty("jdk.httpclient.allowRestrictedHeaders", restricted + ",host");
+        }
+        // Buffer + frame sizes — overridable via -Djdk.httpclient.bufsize / -Djdk.httpclient.maxframesize
+        // on the command line. We default to 64 KiB but only set the property if the user didn't.
+        if (System.getProperty("jdk.httpclient.bufsize") == null) {
+            System.setProperty("jdk.httpclient.bufsize", "65536");
+        }
+        if (System.getProperty("jdk.httpclient.maxframesize") == null) {
+            System.setProperty("jdk.httpclient.maxframesize", "65536");
         }
         // Force smithy-java's native JSON provider over Jackson. Jackson is
         // bundled because some smithy-java modules pull it in transitively;

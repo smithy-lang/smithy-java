@@ -251,6 +251,50 @@ class UnsyncBufferedInputStreamTest {
     }
 
     @Test
+    void discardConsumesBufferedAndUnderlyingBytes() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3, 4, 5, 6, 7, 8});
+        var stream = new UnsyncBufferedInputStream(delegate, 4);
+
+        assertEquals(1, stream.read());
+        stream.discard(5);
+
+        assertEquals(7, stream.read());
+        assertEquals(8, stream.read());
+        assertEquals(-1, stream.read());
+    }
+
+    @Test
+    void discardPreservesBufferedBytesAfterDiscardedRange() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3, 4, 5});
+        var stream = new UnsyncBufferedInputStream(delegate, 4);
+
+        assertEquals(1, stream.read());
+        stream.discard(1);
+
+        assertEquals(3, stream.read());
+        assertEquals(4, stream.read());
+        assertEquals(5, stream.read());
+        assertEquals(-1, stream.read());
+    }
+
+    @Test
+    void discardThrowsOnPrematureEof() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3});
+        var stream = new UnsyncBufferedInputStream(delegate, 4);
+
+        assertThrows(IOException.class, () -> stream.discard(4));
+    }
+
+    @Test
+    void discardThrowsWhenClosed() throws IOException {
+        var delegate = new ByteArrayInputStream(new byte[] {1, 2, 3});
+        var stream = new UnsyncBufferedInputStream(delegate, 4);
+        stream.close();
+
+        assertThrows(IOException.class, () -> stream.discard(1));
+    }
+
+    @Test
     void readLineReturnsLine() throws IOException {
         var data = "Hello\r\nWorld\n".getBytes(StandardCharsets.US_ASCII);
         var delegate = new ByteArrayInputStream(data);

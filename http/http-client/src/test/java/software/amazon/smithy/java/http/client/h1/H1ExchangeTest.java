@@ -116,4 +116,54 @@ class H1ExchangeTest {
         assertEquals("hello", body);
         exchange.close();
     }
+
+    @Test
+    void exposesCachedContentHeaders() throws IOException {
+        var conn = connection(
+                "HTTP/1.1 200 OK\r\n"
+                        + "Content-Type: text/plain\r\n"
+                        + "Content-Length: 5\r\n"
+                        + "\r\n"
+                        + "hello");
+        var exchange = conn.newExchange(getRequest());
+
+        assertEquals("text/plain", exchange.responseContentType());
+        assertEquals(5, exchange.responseContentLength());
+        exchange.close();
+    }
+
+    @Test
+    void discardsFixedLengthBodyWithoutOpeningResponseStream() throws IOException {
+        var conn = connection(
+                "HTTP/1.1 200 OK\r\n"
+                        + "Content-Length: 5\r\n"
+                        + "\r\n"
+                        + "hello"
+                        + "HTTP/1.1 204 No Content\r\n"
+                        + "Content-Length: 0\r\n"
+                        + "\r\n");
+
+        var first = conn.newExchange(getRequest());
+        assertEquals(200, first.responseStatusCode());
+        first.discardResponseBody();
+
+        var second = conn.newExchange(getRequest());
+        assertEquals(204, second.responseStatusCode());
+        second.close();
+    }
+
+    @Test
+    void writesRawPathAndQueryInRequestLine() throws IOException {
+        var socket = new H1ConnectionTest.FakeSocket("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+        var conn = new H1Connection(new SocketTransport(socket), TEST_ROUTE, READ_TIMEOUT);
+        var request = HttpRequest.create()
+                .setMethod("GET")
+                .setUri(SmithyUri.of("https://example.com/a%2Fb?prefix=x%2Fy"));
+
+        var exchange = conn.newExchange(request);
+        exchange.responseStatusCode();
+
+        assertTrue(socket.outputString().startsWith("GET /a%2Fb?prefix=x%2Fy HTTP/1.1\r\n"));
+        exchange.close();
+    }
 }

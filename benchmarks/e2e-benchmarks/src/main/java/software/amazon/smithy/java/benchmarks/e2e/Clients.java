@@ -19,6 +19,16 @@ import software.amazon.smithy.java.aws.credentials.imds.ImdsCredentialProvider;
 import software.amazon.smithy.java.benchmarks.e2e.dynamodb.client.DynamoDBClient;
 import software.amazon.smithy.java.benchmarks.e2e.s3.client.S3Client;
 import software.amazon.smithy.java.benchmarks.e2e.s3.model.CreateSessionInput;
+import software.amazon.smithy.java.client.core.ClientTransport;
+import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
+import software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport;
+import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
+import software.amazon.smithy.java.client.http.apache.classic.ApacheClassicHttpClientTransport;
+import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
+import software.amazon.smithy.java.client.http.smithy.SmithyHttpClientTransport;
+import software.amazon.smithy.java.http.client.HttpClient;
+import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
+import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 
 /**
  * Constructs the smithy-java-generated DynamoDB and S3 clients used by the benchmark.
@@ -30,11 +40,76 @@ final class Clients {
 
     private Clients() {}
 
+    /**
+     * Apply a {@code -D<prop>=<bytes|auto>} system property to a setter that accepts an int
+     * (with {@code -1} meaning "kernel autotune").
+     */
+    private static void applyBufferProp(String prop, java.util.function.IntConsumer setter) {
+        var value = System.getProperty(prop);
+        if (value == null) {
+            return;
+        }
+        var trimmed = value.trim().toLowerCase();
+        setter.accept("auto".equals(trimmed) ? -1 : Integer.parseInt(trimmed));
+    }
+
+    /**
+     * Returns the alternate transport selected via {@code -De2e.transport=...}, or null for the
+     * default JDK HttpClient. Recognized values: {@code netty}, {@code smithy}.
+     */
+    private static ClientTransport<?, ?> selectTransport() {
+        var name = System.getProperty("e2e.transport", "").trim().toLowerCase();
+        return switch (name) {
+            case "", "jdk" -> null;
+            case "netty" -> new NettyHttpClientTransport();
+            case "apache" -> {
+                var cfg = new ApacheHttpTransportConfig()
+                        .maxConnectionsPerHost(512)
+                        .ioThreads(Runtime.getRuntime().availableProcessors());
+                yield new ApacheHttpClientTransport(cfg);
+            }
+            case "apache-classic" -> new ApacheClassicHttpClientTransport(512, 512);
+            case "crt" -> {
+                var cfg = new software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig()
+                        .maxConnectionsPerHost(512);
+                yield new CrtHttpClientTransport(cfg);
+            }
+            case "smithy" -> {
+                // Smithy HTTP client defaults to ENFORCE_HTTP_2 which fails on S3 (H1-only).
+                // AUTOMATIC also fails: the pool routes HTTPS routes to the H2 manager, which
+                // refuses an ALPN result of "http/1.1". Force ENFORCE_HTTP_1_1 so the pool
+                // routes to the H1 manager from the start.
+                //
+                // The pool defaults to maxConnectionsPerRoute=20 which throttles us hard at
+                // higher concurrency since the benchmark targets a single bucket (= one route).
+                // Bump both caps to match the benchmark's max in-flight count plus headroom.
+                int maxConns = Integer.getInteger("e2e.smithy.maxconns", 512);
+                var poolBuilder = HttpConnectionPool.builder()
+                        .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
+                        .maxTotalConnections(maxConns)
+                        .maxConnectionsPerRoute(maxConns);
+                // -De2e.smithy.recvbuf=<bytes|auto>; -De2e.smithy.sendbuf=<bytes|auto>.
+                // "auto" maps to -1 (kernel autotune).
+                applyBufferProp("e2e.smithy.recvbuf", poolBuilder::socketReceiveBufferSize);
+                applyBufferProp("e2e.smithy.sendbuf", poolBuilder::socketSendBufferSize);
+                var http = HttpClient.builder().connectionPool(poolBuilder.build()).build();
+                yield new SmithyHttpClientTransport(http);
+            }
+            default -> throw new IllegalArgumentException(
+                    "Unknown e2e.transport: '" + name
+                            + "' (expected one of: jdk, netty, smithy, apache, apache-classic, crt)");
+        };
+    }
+
     static DynamoDBClient dynamodb(String region) {
-        return DynamoDBClient.builder()
+        var b = DynamoDBClient.builder()
                 .putConfig(RegionSetting.REGION, region)
-                .addIdentityResolver(IMDS)
-                .build();
+                .addIdentityResolver(IMDS);
+        var transport = selectTransport();
+        if (transport != null) {
+            b.transport(transport);
+        }
+        return b.build();
     }
 
     static S3Client s3(String region) {
@@ -58,11 +133,15 @@ final class Clients {
                     c.getSessionToken(),
                     c.getExpiration());
         };
-        S3Client client = S3Client.builder()
+        var b = S3Client.builder()
                 .putConfig(RegionSetting.REGION, region)
                 .putConfig(S3ExpressContext.CREATE_SESSION_CALLBACK, createSession)
-                .addIdentityResolver(IMDS)
-                .build();
+                .addIdentityResolver(IMDS);
+        var transport = selectTransport();
+        if (transport != null) {
+            b.transport(transport);
+        }
+        S3Client client = b.build();
         clientRef.set(client);
         return client;
     }

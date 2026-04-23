@@ -23,7 +23,8 @@ import javax.net.ssl.SSLSession;
  * (ReadableByteChannel/WritableByteChannel) I/O. The channel API enables
  * zero-copy data paths by operating directly on ByteBuffers.
  */
-public interface Transport extends AutoCloseable {
+public sealed interface Transport extends AutoCloseable
+        permits SocketTransport, SSLEngineBackedTransport {
 
     InputStream inputStream() throws IOException;
 

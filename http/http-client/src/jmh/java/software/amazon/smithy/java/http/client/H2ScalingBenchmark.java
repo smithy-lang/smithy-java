@@ -16,7 +16,9 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
+import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
 import io.netty.handler.codec.http2.Http2DataFrame;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
@@ -40,6 +42,8 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -56,9 +60,16 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
+import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
+import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
+import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
+import software.amazon.smithy.java.http.client.h2.EventLoopH2Transport;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
@@ -90,8 +101,15 @@ public class H2ScalingBenchmark {
 
     private HttpClient smithyClient;
     private java.net.http.HttpClient javaClient;
+    private ExecutorService javaExecutor;
+    private JavaHttpClientTransport javaTransport;
+    private ApacheHttpClientTransport apacheTransport;
     private EventLoopGroup nettyGroup;
     private Channel nettyChannel;
+    private NettyH2Transport nettyTransport;
+    private EventLoopH2Transport eventLoopTransport;
+    private NettyHttpClientTransport productionNettyTransport;
+    private Context transportContext;
 
     @Setup(Level.Trial)
     public void setupIteration() throws Exception {
@@ -118,10 +136,19 @@ public class H2ScalingBenchmark {
                 .build();
 
         // Java HttpClient (HTTP/2 over TLS)
+        javaExecutor = Executors.newVirtualThreadPerTaskExecutor();
         javaClient = java.net.http.HttpClient.newBuilder()
                 .version(java.net.http.HttpClient.Version.HTTP_2)
                 .sslContext(sslContext)
+                .executor(javaExecutor)
                 .build();
+        javaTransport = new JavaHttpClientTransport(javaClient);
+        var apacheConfig = new ApacheHttpTransportConfig();
+        apacheConfig.httpVersion(software.amazon.smithy.java.http.api.HttpVersion.HTTP_2);
+        apacheConfig.maxConnectionsPerHost(connections);
+        apacheConfig.h2StreamsPerConnection(streamsPerConnection);
+        apacheConfig.ioThreads(1);
+        apacheTransport = new ApacheHttpClientTransport(apacheConfig, sslContext);
 
         BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H2_URL);
 
@@ -160,6 +187,21 @@ public class H2ScalingBenchmark {
                     }
                 });
         nettyChannel = b.connect("localhost", 18443).sync().channel();
+
+        // Netty-backed Smithy transport prototype
+        nettyTransport = new NettyH2Transport("localhost", 18443);
+
+        // Event-loop prototype (Phase 1+2: non-blocking TLS + single-thread H2)
+        eventLoopTransport = new EventLoopH2Transport("localhost", 18443);
+
+        // Productionized client-http-netty transport
+        var nettyTransportConfig = new NettyHttpTransportConfig()
+                .maxConnectionsPerHost(connections)
+                .h2StreamsPerConnection(streamsPerConnection)
+                .httpVersionPolicy(software.amazon.smithy.java.client.http.netty.HttpVersionPolicy.ENFORCE_HTTP_2);
+        productionNettyTransport =
+                new NettyHttpClientTransport(nettyTransportConfig);
+        transportContext = Context.create();
     }
 
     @TearDown(Level.Trial)
@@ -180,6 +222,17 @@ public class H2ScalingBenchmark {
             javaClient.close();
             javaClient = null;
         }
+        if (javaExecutor != null) {
+            javaExecutor.close();
+            javaExecutor = null;
+        }
+        if (javaTransport != null) {
+            javaTransport = null;
+        }
+        if (apacheTransport != null) {
+            apacheTransport.close();
+            apacheTransport = null;
+        }
         if (nettyChannel != null) {
             nettyChannel.close().sync();
             nettyChannel = null;
@@ -187,6 +240,18 @@ public class H2ScalingBenchmark {
         if (nettyGroup != null) {
             nettyGroup.shutdownGracefully().sync();
             nettyGroup = null;
+        }
+        if (nettyTransport != null) {
+            nettyTransport.close();
+            nettyTransport = null;
+        }
+        if (eventLoopTransport != null) {
+            eventLoopTransport.close();
+            eventLoopTransport = null;
+        }
+        if (productionNettyTransport != null) {
+            productionNettyTransport.close();
+            productionNettyTransport = null;
         }
     }
 
@@ -265,7 +330,7 @@ public class H2ScalingBenchmark {
                     .path("/get")
                     .scheme("https")
                     .authority("localhost:18443");
-            stream.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, true));
+            stream.writeAndFlush(new DefaultHttp2HeadersFrame(headers, true));
             future.join();
         }, nettyChannel, counter);
 
@@ -298,8 +363,8 @@ public class H2ScalingBenchmark {
                     .path("/post")
                     .scheme("https")
                     .authority("localhost:18443");
-            stream.write(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, false));
-            stream.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2DataFrame(
+            stream.write(new DefaultHttp2HeadersFrame(headers, false));
+            stream.writeAndFlush(new DefaultHttp2DataFrame(
                     Unpooled.wrappedBuffer(BenchmarkSupport.POST_PAYLOAD),
                     true));
             future.join();
@@ -334,8 +399,8 @@ public class H2ScalingBenchmark {
                     .path("/putmb")
                     .scheme("https")
                     .authority("localhost:18443");
-            stream.write(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, false));
-            stream.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2DataFrame(
+            stream.write(new DefaultHttp2HeadersFrame(headers, false));
+            stream.writeAndFlush(new DefaultHttp2DataFrame(
                     Unpooled.wrappedBuffer(BenchmarkSupport.MB_PAYLOAD),
                     true));
             future.join();
@@ -400,6 +465,85 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
+    public void h2SmithyNettyPutMb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
+        var request = HttpRequest.create()
+                .setUri(uri)
+                .setMethod("PUT")
+                .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            var res = nettyTransport.send(req);
+            res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+        }, request, counter);
+
+        counter.logErrors("Smithy-on-Netty H2 PUT 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2SmithyEventLoopPutMb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
+        var request = HttpRequest.create()
+                .setUri(uri)
+                .setMethod("PUT")
+                .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            var res = eventLoopTransport.send(req);
+            res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+        }, request, counter);
+
+        counter.logErrors("Smithy-EventLoop H2 PUT 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2ProductionNettyPutMb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
+        var request = HttpRequest.create()
+                .setUri(uri)
+                .setMethod("PUT")
+                .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            var res = productionNettyTransport.send(transportContext, req);
+            res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+        }, request, counter);
+
+        counter.logErrors("Production-Netty H2 PUT 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2ProductionNettyGetMb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb");
+        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            var res = productionNettyTransport.send(transportContext, req);
+            res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+        }, request, counter);
+
+        counter.logErrors("Production-Netty H2 GET 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2ProductionNettyGet10Mb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/get10mb");
+        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            var res = productionNettyTransport.send(transportContext, req);
+            res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+        }, request, counter);
+
+        counter.logErrors("Production-Netty H2 GET 10MB");
+    }
+
+    @Benchmark
+    @Threads(1)
     public void h2JdkPutMb(Counter counter) throws InterruptedException {
         var request = java.net.http.HttpRequest.newBuilder()
                 .uri(URI.create(BenchmarkSupport.H2_URL + "/putmb"))
@@ -418,6 +562,42 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
+    public void h2JavaWrapperPutMb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
+        var request = HttpRequest.create()
+                .setUri(uri)
+                .setMethod("PUT")
+                .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var response = javaTransport.send(transportContext, req)) {
+                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Java wrapper H2 PUT 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2ApacheAsyncPutMb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
+        var request = HttpRequest.create()
+                .setUri(uri)
+                .setMethod("PUT")
+                .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var response = apacheTransport.send(transportContext, req)) {
+                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Apache-async H2 PUT 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
     public void h2SmithyGetMb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb");
         var request = HttpRequest.create().setUri(uri).setMethod("GET");
@@ -429,6 +609,36 @@ public class H2ScalingBenchmark {
         }, request, counter);
 
         counter.logErrors("Smithy H2 GET 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2JavaWrapperGetMb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb");
+        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var response = javaTransport.send(transportContext, req)) {
+                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Java Wrapper H2 GET 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2ApacheAsyncGetMb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb");
+        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var response = apacheTransport.send(transportContext, req)) {
+                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Apache-async H2 GET 1MB");
     }
 
     @Benchmark
@@ -499,11 +709,41 @@ public class H2ScalingBenchmark {
                     .path("/getmb")
                     .scheme("https")
                     .authority("localhost:18443");
-            stream.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, true));
+            stream.writeAndFlush(new DefaultHttp2HeadersFrame(headers, true));
             future.join();
         }, nettyChannel, counter);
 
         counter.logErrors("Netty H2 GET 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2SmithyGet10Mb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/get10mb");
+        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var res = smithyClient.send(req)) {
+                res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Smithy H2 GET 10MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2JavaWrapperGet10Mb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/get10mb");
+        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var response = javaTransport.send(transportContext, req)) {
+                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Java Wrapper H2 GET 10MB");
     }
 
     @Benchmark
@@ -553,7 +793,7 @@ public class H2ScalingBenchmark {
                     .path("/get10mb")
                     .scheme("https")
                     .authority("localhost:18443");
-            stream.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, true));
+            stream.writeAndFlush(new DefaultHttp2HeadersFrame(headers, true));
             future.join();
         }, nettyChannel, counter);
 

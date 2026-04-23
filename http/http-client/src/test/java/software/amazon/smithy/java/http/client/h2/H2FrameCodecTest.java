@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.channels.Channels;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
@@ -452,13 +453,13 @@ class H2FrameCodecTest {
 
     private ChannelFrameReader wrapIn(byte[] data) {
         return new ChannelFrameReader(
-                java.nio.channels.Channels.newChannel(new ByteArrayInputStream(data)),
+                Channels.newChannel(new ByteArrayInputStream(data)),
                 BUF_SIZE);
     }
 
     private ChannelFrameWriter wrapOut(ByteArrayOutputStream out) {
         return new ChannelFrameWriter(
-                java.nio.channels.Channels.newChannel(out),
+                Channels.newChannel(out),
                 BUF_SIZE);
     }
 

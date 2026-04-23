@@ -41,7 +41,9 @@ import software.amazon.smithy.java.logging.InternalLogger;
  */
 public final class JavaHttpClientTransport implements ClientTransport<HttpRequest, HttpResponse> {
 
-    private static final int SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD = 1024 * 256; // 256 KB
+    private static final String SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD_PROPERTY =
+            "software.amazon.smithy.java.client.http.smallResponseBodyFastPathThreshold";
+    private static final int DEFAULT_SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD = 1024 * 64; // 64 KiB
 
     // Drop content-length
     private static final HeaderWithValueConsumer<java.net.http.HttpRequest.Builder> VALUE_CONSUMER = (b, n, v) -> {
@@ -54,6 +56,7 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
     private final HttpClient client;
     private final Duration defaultRequestTimeout;
     private final ExecutorService ownedExecutor;
+    private final BodyHandler<DataStream> responseBodyHandler;
 
     static {
         setHostProperties();
@@ -80,6 +83,7 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         this.ownedExecutor = Executors.newVirtualThreadPerTaskExecutor();
         this.client = HttpClient.newBuilder().executor(ownedExecutor).build();
         this.defaultRequestTimeout = null;
+        this.responseBodyHandler = new ResponseBodyHandler(smallResponseBodyFastPathThreshold());
         setHostProperties();
     }
 
@@ -91,6 +95,7 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         this.client = client;
         this.ownedExecutor = null;
         this.defaultRequestTimeout = defaultRequestTimeout;
+        this.responseBodyHandler = new ResponseBodyHandler(smallResponseBodyFastPathThreshold());
         setHostProperties();
     }
 
@@ -98,6 +103,7 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         this.client = client;
         this.ownedExecutor = ownedExecutor;
         this.defaultRequestTimeout = defaultRequestTimeout;
+        this.responseBodyHandler = new ResponseBodyHandler(smallResponseBodyFastPathThreshold());
         setHostProperties();
     }
 
@@ -128,6 +134,23 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         }
 
         return false;
+    }
+
+    private static int smallResponseBodyFastPathThreshold() {
+        var value = System.getProperty(SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD_PROPERTY);
+        if (value == null) {
+            return DEFAULT_SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(value));
+        } catch (NumberFormatException e) {
+            LOGGER.warn(
+                    "Invalid {} value '{}'; using default {}",
+                    SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD_PROPERTY,
+                    value,
+                    DEFAULT_SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD);
+            return DEFAULT_SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD;
+        }
     }
 
     @Override
@@ -161,7 +184,7 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
     private HttpResponse sendRequest(java.net.http.HttpRequest request) {
         java.net.http.HttpResponse<DataStream> res = null;
         try {
-            res = client.send(request, ResponseBodyHandler.INSTANCE);
+            res = client.send(request, responseBodyHandler);
             return createSmithyResponse(res);
         } catch (IOException | InterruptedException | RuntimeException e) {
             if (res != null) {
@@ -255,11 +278,14 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
      * Picks a {@link BodySubscriber} implementation based on the advertised response size.
      *
      * <p>Small-body fast path ({@link ZeroCopyBodySubscriber}): when {@code Content-Length} is present and within
-     * {@link #SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD}. Otherwise, falls back to the JDK's built-in
-     * {@code ofInputStream()} body subscriber.
+     * the configured threshold. Otherwise, falls back to the JDK's built-in {@code ofInputStream()} body subscriber.
      */
     private static final class ResponseBodyHandler implements BodyHandler<DataStream> {
-        static final ResponseBodyHandler INSTANCE = new ResponseBodyHandler();
+        private final int smallResponseBodyFastPathThreshold;
+
+        private ResponseBodyHandler(int smallResponseBodyFastPathThreshold) {
+            this.smallResponseBodyFastPathThreshold = smallResponseBodyFastPathThreshold;
+        }
 
         @Override
         public BodySubscriber<DataStream> apply(ResponseInfo responseInfo) {
@@ -268,7 +294,7 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
             if (contentLength == 0) {
                 String contentType = responseInfo.headers().firstValue("content-type").orElse(null);
                 return BodySubscribers.replacing(DataStream.ofBytes(new byte[0], contentType));
-            } else if (contentLength >= 0 && contentLength <= SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD) {
+            } else if (contentLength > 0 && contentLength <= smallResponseBodyFastPathThreshold) {
                 return new ZeroCopyBodySubscriber(responseInfo.headers(), contentLength);
             }
 

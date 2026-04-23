@@ -17,10 +17,13 @@ import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 public final class SmithyHttpTransportConfig extends HttpTransportConfig {
 
     private Integer maxConnections;
+    private Integer maxConnectionsPerRoute;
     private Duration maxIdleTime;
     private Integer h2StreamsPerConnection;
     private Integer h2InitialWindowSize;
     private HttpVersionPolicy httpVersionPolicy;
+    private Integer socketReceiveBufferSize;
+    private Integer socketSendBufferSize;
 
     public Integer maxConnections() {
         return maxConnections;
@@ -28,6 +31,49 @@ public final class SmithyHttpTransportConfig extends HttpTransportConfig {
 
     public SmithyHttpTransportConfig maxConnections(int maxConnections) {
         this.maxConnections = maxConnections;
+        return this;
+    }
+
+    /**
+     * Maximum concurrent connections per route (host+port+proxy). When unset, the route limit
+     * defaults to {@link #maxConnections}. Setting a smaller value reduces high-concurrency
+     * fan-out and tail latency from receive-buffer queueing at the cost of peak per-route
+     * throughput.
+     */
+    public Integer maxConnectionsPerRoute() {
+        return maxConnectionsPerRoute;
+    }
+
+    public SmithyHttpTransportConfig maxConnectionsPerRoute(int maxConnectionsPerRoute) {
+        this.maxConnectionsPerRoute = maxConnectionsPerRoute;
+        return this;
+    }
+
+    /**
+     * SO_RCVBUF for new connection sockets. Larger values help low-concurrency throughput on
+     * high-bandwidth links; smaller values bound per-connection bufferbloat at high concurrency.
+     * 64 KiB is the library default. Pass {@code -1} to defer to the kernel's autotune. See
+     * {@code HttpConnectionPoolBuilder#socketReceiveBufferSize(int)} for full guidance.
+     */
+    public Integer socketReceiveBufferSize() {
+        return socketReceiveBufferSize;
+    }
+
+    public SmithyHttpTransportConfig socketReceiveBufferSize(int bytes) {
+        this.socketReceiveBufferSize = bytes;
+        return this;
+    }
+
+    /**
+     * SO_SNDBUF for new connection sockets. 64 KiB is the library default. Pass {@code -1} to
+     * defer to the kernel's autotune.
+     */
+    public Integer socketSendBufferSize() {
+        return socketSendBufferSize;
+    }
+
+    public SmithyHttpTransportConfig socketSendBufferSize(int bytes) {
+        this.socketSendBufferSize = bytes;
         return this;
     }
 
@@ -75,6 +121,21 @@ public final class SmithyHttpTransportConfig extends HttpTransportConfig {
         var maxConns = config.get("maxConnections");
         if (maxConns != null) {
             this.maxConnections = maxConns.asInteger();
+        }
+
+        var maxConnsPerRoute = config.get("maxConnectionsPerRoute");
+        if (maxConnsPerRoute != null) {
+            this.maxConnectionsPerRoute = maxConnsPerRoute.asInteger();
+        }
+
+        var recvBuf = config.get("socketReceiveBufferSize");
+        if (recvBuf != null) {
+            this.socketReceiveBufferSize = recvBuf.asInteger();
+        }
+
+        var sendBuf = config.get("socketSendBufferSize");
+        if (sendBuf != null) {
+            this.socketSendBufferSize = sendBuf.asInteger();
         }
 
         var idle = config.get("maxIdleTimeMs");
