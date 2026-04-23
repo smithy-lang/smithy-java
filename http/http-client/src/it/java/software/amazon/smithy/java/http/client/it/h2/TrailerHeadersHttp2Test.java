@@ -7,6 +7,7 @@ package software.amazon.smithy.java.http.client.it.h2;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -43,14 +44,19 @@ public class TrailerHeadersHttp2Test extends BaseHttpClientIntegTest {
     @Test
     void readsResponseWithTrailers() throws Exception {
         var request = plainTextRequest(HttpVersion.HTTP_2, "");
-        try (var exchange = client.newExchange(request)) {
-            var body = new String(exchange.responseBody().readAllBytes());
-            assertEquals(RESPONSE_CONTENTS, body);
+        try (var response = client.send(request)) {
+            var body = response.body();
+            var content = new String(body.asInputStream().readAllBytes());
+            assertEquals(RESPONSE_CONTENTS, content);
 
-            var trailers = exchange.responseTrailerHeaders();
-            assertNotNull(trailers, "Should have trailer headers");
-            assertEquals("abc123", trailers.firstValue("x-checksum"));
-            assertEquals("req-456", trailers.firstValue("x-request-id"));
+            if (body instanceof software.amazon.smithy.java.http.api.TrailerSupport ts) {
+                var trailers = ts.trailerHeaders();
+                assertNotNull(trailers, "Should have trailer headers");
+                assertEquals("abc123", trailers.firstValue("x-checksum"));
+                assertEquals("req-456", trailers.firstValue("x-request-id"));
+            } else {
+                fail("Response body should implement TrailerSupport");
+            }
         }
     }
 }

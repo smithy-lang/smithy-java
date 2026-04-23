@@ -18,26 +18,17 @@ import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 /**
  * Blocking, virtual-thread-friendly HTTP client.
  *
- * <p>This client supports both simple ({@link #send(HttpRequest)}) and bidirectional streaming
- * ({@link #newExchange(HttpRequest)}) request/response patterns. Both return streaming responses.
- *
- * <p>The client is intentionally minimal. Behavior can be layered on top of the client via {@link HttpInterceptor}s.
+ * <p>The client is intentionally minimal. Behavior can be layered on top via {@link HttpInterceptor}s.
  */
 public interface HttpClient extends AutoCloseable {
     /**
      * Sends a request and returns a streaming response.
      *
-     * <p>This is a convenience method that:
-     * <ol>
-     *   <li>Creates an {@link HttpExchange}</li>
-     *   <li>Writes the request body (if present)</li>
-     *   <li>Returns an {@link HttpResponse} with a streaming body</li>
-     * </ol>
+     * <p>The response body streams directly from the socket. The caller must close the response body
+     * when done to release the connection back to the pool.
      *
-     * <p>The response body streams directly from the socket. The caller must close the response body stream when
-     * done to release the connection back to the pool.
-     *
-     * <p>Interceptors can modify the request, short-circuit execution, retry on errors, or replace the response.
+     * <p>For HTTP/2, the request body is written concurrently with reading the response (full duplex).
+     * For HTTP/1.1, the request body is fully sent before the response is returned.
      *
      * @param request the HTTP request to send
      * @return the HTTP response with streaming body
@@ -57,66 +48,15 @@ public interface HttpClient extends AutoCloseable {
      */
     HttpResponse send(HttpRequest request, RequestOptions options) throws IOException;
 
-    /**
-     * Create a streaming exchange.
-     *
-     * <p>This is a low-level API that gives full control over request/response streams.
-     * The caller is responsible for:
-     * <ul>
-     *   <li>Writing the request body via {@link HttpExchange#requestBody()} and closing it</li>
-     *   <li>Reading the response body via {@link HttpExchange#responseBody()}</li>
-     *   <li>Closing the exchange when done (or relying on auto-close when both streams close)</li>
-     * </ul>
-     *
-     * <p><b>IMPORTANT:</b> Any body set on the {@link HttpRequest} is NOT automatically written. You must write the
-     * request body manually via {@link HttpExchange#requestBody()}. However, the Content-Length header, if present,
-     * on the request _is_ sent as a header automatically, so you must write the same number of bytes.
-     * Use {@link #send(HttpRequest)} if you want automatic request body handling.
-     *
-     * <p>Interceptors work with {@code exchange()}, but with limitations:
-     * <ul>
-     *   <li>{@code interceptResponse} can see headers/status and replace response, but cannot safely retry</li>
-     *   <li>Use {@code context.isModifiable()} to check if retry is safe</li>
-     * </ul>
-     *
-     * @param request the HTTP request
-     * @return a streaming exchange
-     * @throws IOException if the exchange cannot be created
-     */
-    default HttpExchange newExchange(HttpRequest request) throws IOException {
-        return newExchange(request, RequestOptions.defaults());
-    }
-
-    /**
-     * Create a streaming exchange with options.
-     *
-     * <p><b>IMPORTANT:</b> Any body set on the {@link HttpRequest} is NOT automatically written. You must write the
-     * request body manually via {@link HttpExchange#requestBody()}.
-     *
-     * @param request the HTTP request
-     * @param options options to apply
-     * @return a streaming exchange
-     * @throws IOException if the exchange cannot be created
-     * @see #newExchange(HttpRequest)
-     */
-    HttpExchange newExchange(HttpRequest request, RequestOptions options) throws IOException;
 
     /**
      * Closes the client and its underlying connection pool.
-     *
-     * <p>Active connections are closed immediately. Pending requests may fail with an IOException.
-     *
-     * @throws IOException if an I/O error occurs while closing
      */
     @Override
     void close() throws IOException;
 
     /**
      * Gracefully shuts down the client, waiting for in-flight requests to complete.
-     *
-     * <p>No new requests are accepted after this method is called. Existing requests
-     * are allowed to complete until the timeout expires, after which connections are
-     * forcibly closed.
      *
      * @param timeout maximum time to wait for in-flight requests to complete
      */
