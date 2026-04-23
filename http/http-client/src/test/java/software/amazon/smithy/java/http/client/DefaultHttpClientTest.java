@@ -451,21 +451,6 @@ class DefaultHttpClientTest {
         }
     }
 
-    @Test
-    void newExchangeReturnsExchange() throws IOException {
-        var pool = new TestConnectionPool();
-        try (var client = HttpClient.builder().connectionPool(pool).build()) {
-            var request = HttpRequest.create()
-                    .setMethod("GET")
-                    .setUri(SmithyUri.of("http://example.com/test"));
-
-            var exchange = client.newExchange(request);
-
-            assertNotNull(exchange, "Should return exchange");
-            assertEquals(200, exchange.responseStatusCode(), "Should return status from delegate");
-            exchange.close();
-        }
-    }
 
     @Test
     void proxySelectorsAreUsed() throws IOException {

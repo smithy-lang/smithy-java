@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.client.http.smithy;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.client.core.MessageExchange;
@@ -14,15 +13,11 @@ import software.amazon.smithy.java.client.http.HttpContext;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.client.HttpClient;
-import software.amazon.smithy.java.http.client.HttpExchange;
 import software.amazon.smithy.java.http.client.RequestOptions;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
-import software.amazon.smithy.java.io.datastream.DataStream;
-import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * A client transport using Smithy's native blocking HTTP client with full HTTP/2 bidirectional streaming.
@@ -32,8 +27,6 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * body is fully sent before the response is returned.
  */
 public final class SmithyHttpClientTransport implements ClientTransport<HttpRequest, HttpResponse> {
-
-    private static final InternalLogger LOGGER = InternalLogger.getLogger(SmithyHttpClientTransport.class);
 
     private final HttpClient client;
 
@@ -61,64 +54,13 @@ public final class SmithyHttpClientTransport implements ClientTransport<HttpRequ
     @Override
     public HttpResponse send(Context context, HttpRequest request) {
         try {
-            return doSend(context, request);
+            var options = RequestOptions.builder()
+                    .requestTimeout(context.get(HttpContext.HTTP_REQUEST_TIMEOUT))
+                    .build();
+            return client.send(request, options);
         } catch (Exception e) {
             throw ClientTransport.remapExceptions(e);
         }
-    }
-
-    private HttpResponse doSend(Context context, HttpRequest request) throws Exception {
-        var options = RequestOptions.builder()
-                .requestTimeout(context.get(HttpContext.HTTP_REQUEST_TIMEOUT))
-                .build();
-        HttpExchange exchange = client.newExchange(request, options);
-
-        try {
-            DataStream requestBody = request.body();
-            boolean hasBody = requestBody != null && requestBody.contentLength() != 0;
-            if (!hasBody) {
-                // Close body right away.
-                exchange.requestBody().close();
-            } else if (exchange.supportsBidirectionalStreaming()) {
-                // H2: write body on a virtual thread so response can stream back concurrently (bidi streaming)
-                Thread.startVirtualThread(() -> {
-                    try (OutputStream out = exchange.requestBody()) {
-                        requestBody.writeTo(out);
-                    } catch (IOException e) {
-                        LOGGER.debug("Error writing request body: {}", e.getMessage());
-                    }
-                });
-            } else {
-                // H1: write body inline. It must complete before response is available.
-                try (OutputStream out = exchange.requestBody()) {
-                    requestBody.writeTo(out);
-                }
-            }
-
-            return buildResponse(exchange);
-        } catch (Exception e) {
-            exchange.close();
-            throw e;
-        }
-    }
-
-    private HttpResponse buildResponse(HttpExchange exchange) throws IOException {
-        int statusCode = exchange.responseStatusCode();
-        HttpHeaders headers = exchange.responseHeaders();
-
-        var length = headers.contentLength();
-        long adaptedLength = length == null ? -1 : length;
-        var contentType = headers.contentType();
-
-        // Wrap the response body stream as a DataStream.
-        // The exchange auto-closes when both request and response streams are closed.
-        var body = DataStream.ofInputStream(exchange.responseBody(), contentType, adaptedLength);
-
-        return HttpResponse.create()
-                .setHttpVersion(exchange.request().httpVersion())
-                .setStatusCode(statusCode)
-                .setHeaders(headers)
-                .setBody(body);
     }
 
     @Override
