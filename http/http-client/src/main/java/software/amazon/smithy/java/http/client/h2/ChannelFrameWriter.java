@@ -26,7 +26,8 @@ final class ChannelFrameWriter {
 
     ChannelFrameWriter(WritableByteChannel channel, int bufferSize) {
         this.channel = channel;
-        this.buf = ByteBuffer.allocate(bufferSize);
+        // Direct buffer avoids a heap-to-direct copy when passed to SSLEngine.wrap and socket writes.
+        this.buf = ByteBuffer.allocateDirect(bufferSize);
     }
 
     /**
@@ -94,9 +95,16 @@ final class ChannelFrameWriter {
             write(tmp, 0, len);
             return;
         }
-        // Write directly into buffer's backing array
-        s.getBytes(0, len, buf.array(), buf.arrayOffset() + buf.position());
-        buf.position(buf.position() + len);
+        if (buf.hasArray()) {
+            // Heap buffer: write directly into backing array
+            s.getBytes(0, len, buf.array(), buf.arrayOffset() + buf.position());
+            buf.position(buf.position() + len);
+        } else {
+            // Direct buffer: byte-by-byte put (rare path, only used for GOAWAY debug strings)
+            for (int i = 0; i < len; i++) {
+                buf.put((byte) s.charAt(i));
+            }
+        }
     }
 
     /**
