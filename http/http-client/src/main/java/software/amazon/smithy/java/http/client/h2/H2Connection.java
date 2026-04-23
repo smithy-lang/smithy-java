@@ -337,6 +337,8 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         if (type == FRAME_TYPE_WINDOW_UPDATE) {
             int increment = frameCodec.readAndParseWindowUpdate();
             if (streamId == 0) {
+                stats.connWindowUpdatesReceived.increment();
+                stats.connWindowBytesReceived.add(increment);
                 muxer.releaseConnectionWindow(increment);
             } else {
                 H2Exchange exchange = muxer.getExchange(streamId);
