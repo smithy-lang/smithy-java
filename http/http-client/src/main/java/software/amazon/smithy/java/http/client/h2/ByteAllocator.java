@@ -103,7 +103,7 @@ final class ByteAllocator {
             stats.buffersBorrowed.increment();
             stats.buffersAllocated.increment();
         }
-        return ByteBuffer.allocate(size);
+        return ByteBuffer.allocateDirect(size);
     }
 
     /**
