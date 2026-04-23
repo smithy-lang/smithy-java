@@ -34,6 +34,7 @@ import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
 import io.netty.handler.codec.http2.Http2DataFrame;
+import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
@@ -90,6 +91,10 @@ public final class BenchmarkServer {
     // HTTP/2 TLS settings (slightly more conservative)
     private static final int H2_TLS_MAX_CONCURRENT_STREAMS = 10000;
     private static final int H2_TLS_INITIAL_WINDOW_SIZE = 1024 * 1024;
+    // Additional connection-level receive window credit beyond the RFC default 64KB.
+    // With default 64KB, 10 concurrent 1MB uploads must serialize WINDOW_UPDATE roundtrips.
+    // Bumping by 64MB leaves only per-stream flow control as a throttling factor.
+    private static final int H2_TLS_CONNECTION_WINDOW_INCREMENT = 64 * 1024 * 1024;
 
     private final EventLoopGroup bossGroup;
     private final EventLoopGroup workerGroup;
@@ -312,17 +317,32 @@ public final class BenchmarkServer {
                         .maxConcurrentStreams(H2_TLS_MAX_CONCURRENT_STREAMS)
                         .initialWindowSize(H2_TLS_INITIAL_WINDOW_SIZE)
                         .maxFrameSize(H2_MAX_FRAME_SIZE);
+                var frameCodec = Http2FrameCodecBuilder.forServer()
+                        .initialSettings(settings)
+                        .build();
                 ctx.pipeline()
                         .addLast(
-                                Http2FrameCodecBuilder.forServer()
-                                        .initialSettings(settings)
-                                        .build(),
+                                frameCodec,
                                 new Http2MultiplexHandler(new ChannelInitializer<Channel>() {
                                     @Override
                                     protected void initChannel(Channel ch) {
                                         ch.pipeline().addLast(new Http2StreamHandler());
                                     }
                                 }));
+                // Grow the connection-level receive window so it isn't the bottleneck under
+                // concurrent uploads. RFC default is 64KB, which forces frequent WINDOW_UPDATE
+                // roundtrips when many streams share one connection. We run in the event loop
+                // because flow-controller methods require it.
+                ctx.channel().eventLoop().execute(() -> {
+                    try {
+                        var connection = frameCodec.connection();
+                        connection.local().flowController().incrementWindowSize(
+                                connection.connectionStream(),
+                                H2_TLS_CONNECTION_WINDOW_INCREMENT);
+                    } catch (Http2Exception e) {
+                        ctx.fireExceptionCaught(e);
+                    }
+                });
             } else {
                 ctx.pipeline()
                         .addLast(

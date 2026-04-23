@@ -164,7 +164,10 @@ final class H2Muxer implements AutoCloseable {
         this.headerEncoder = new H2RequestHeaderEncoder(
                 new HpackEncoder(initialTableSize),
                 new ByteBufferOutputStream(512));
-        this.workerThread = Thread.ofVirtual().name(threadName).start(this::workerLoop);
+        // Platform thread (not virtual) because this worker runs a tight I/O loop with
+        // frequent socket writes and is always busy when there's traffic. VTs add
+        // continuation/ForkJoinPool overhead.
+        this.workerThread = Thread.ofPlatform().name(threadName).daemon(true).start(this::workerLoop);
     }
 
     // ==================== LIFECYCLE ====================
@@ -330,6 +333,9 @@ final class H2Muxer implements AutoCloseable {
      * @return bytes acquired (0 if timeout)
      */
     int acquireConnectionWindowUpTo(int maxBytes, long timeoutMs) throws SocketTimeoutException, InterruptedException {
+        if (stats != null) {
+            stats.connWindowAcquires.increment();
+        }
         // Fast path: no waiters and window available
         if (sendWindowWaiters.isEmpty()) {
             int acquired = connectionSendWindow.tryAcquireNonBlocking(maxBytes);
@@ -339,9 +345,14 @@ final class H2Muxer implements AutoCloseable {
         }
 
         // Slow path: queue and wait for fair access
-        long deadlineNs = System.nanoTime() + timeoutMs * 1_000_000L;
+        long waitStart = System.nanoTime();
+        long deadlineNs = waitStart + timeoutMs * 1_000_000L;
         var waiter = new SendWindowWaiter(Thread.currentThread(), maxBytes, deadlineNs);
         sendWindowWaiters.add(waiter);
+        if (stats != null) {
+            stats.connWindowWaits.increment();
+            stats.updateMaxQueued(stats.maxConnWindowWaiters, sendWindowWaiters.size());
+        }
 
         try {
             while (!waiter.done) {
@@ -352,6 +363,9 @@ final class H2Muxer implements AutoCloseable {
                 if (Thread.interrupted()) {
                     throw new InterruptedException();
                 }
+            }
+            if (stats != null) {
+                stats.connWindowWaitNs.add(System.nanoTime() - waitStart);
             }
             return waiter.acquired;
         } finally {
