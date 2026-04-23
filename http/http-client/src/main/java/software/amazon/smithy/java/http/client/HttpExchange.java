@@ -56,18 +56,6 @@ import software.amazon.smithy.java.http.api.HttpVersion;
  */
 public interface HttpExchange extends AutoCloseable {
     /**
-     * Create a new buffered HTTP exchange where the response is already available and request does not need to
-     * be sent.
-     *
-     * @param request Request that was sent or that was intercepted.
-     * @param response Response to return.
-     * @return the buffered HttpExchange.
-     */
-    static HttpExchange newBufferedExchange(HttpRequest request, HttpResponse response) {
-        return new BufferedHttpExchange(request, response);
-    }
-
-    /**
      * Returns the HTTP request associated with this exchange.
      *
      * <p>For exchanges created by {@link HttpClient}, this returns the request after
