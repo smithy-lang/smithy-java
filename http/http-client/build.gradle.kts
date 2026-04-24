@@ -46,6 +46,10 @@ dependencies {
     // Netty for raw HTTP/2 benchmarking
     jmh("io.netty:netty-all:4.2.7.Final")
 
+    // Client-http-netty productionized transport for benchmarking
+    jmh(project(":client:client-http-netty"))
+    jmh(project(":client:client-core"))
+
     // Benchmark server dependencies (Netty runs in separate process)
     jmhServerImplementation("io.netty:netty-all:4.2.7.Final")
     jmhServerImplementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
