@@ -404,6 +404,7 @@ final class NettyConnectionPool implements AutoCloseable {
         pipeline.addLast(Http2FrameCodecBuilder.forClient()
                 .initialSettings(Http2Settings.defaultSettings()
                         .initialWindowSize(config.initialWindowSize())
+                        .maxFrameSize(config.maxFrameSize())
                         .maxConcurrentStreams(config.h2StreamsPerConnection()))
                 .build());
         pipeline.addLast(new Http2MultiplexHandler(new ChannelInitializer<Channel>() {
