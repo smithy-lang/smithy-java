@@ -21,6 +21,7 @@ public final class NettyHttpTransportConfig extends HttpTransportConfig {
     private HttpVersionPolicy httpVersionPolicy = HttpVersionPolicy.AUTOMATIC;
     private int eventLoopThreads = 0; // 0 => Runtime.getRuntime().availableProcessors()
     private int initialWindowSize = 16 * 1024 * 1024;
+    private int maxFrameSize = 64 * 1024; // 64 KB — H2 default is 16 KB, 64 KB is a safe larger default
     private int writeBufferLowWater = 32 * 1024;
     private int writeBufferHighWater = 256 * 1024;
 
@@ -84,6 +85,15 @@ public final class NettyHttpTransportConfig extends HttpTransportConfig {
 
     public NettyHttpTransportConfig initialWindowSize(int v) {
         this.initialWindowSize = v;
+        return this;
+    }
+
+    public int maxFrameSize() {
+        return maxFrameSize;
+    }
+
+    public NettyHttpTransportConfig maxFrameSize(int v) {
+        this.maxFrameSize = v;
         return this;
     }
 

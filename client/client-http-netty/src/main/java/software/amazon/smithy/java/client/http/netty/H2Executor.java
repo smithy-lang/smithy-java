@@ -135,6 +135,8 @@ final class H2Executor {
         private final LinkedBlockingQueue<ByteBuf> bodyQueue;
         private final AtomicReference<Throwable> error;
         private int status;
+        private io.netty.buffer.CompositeByteBuf batch; // accumulated DATA within a read-complete turn
+        private boolean pendingEos;
 
         ResponseHandler(CompletableFuture<HttpResponse> headersFuture,
                 LinkedBlockingQueue<ByteBuf> bodyQueue,
@@ -156,17 +158,33 @@ final class H2Executor {
                         .setBody(DataStream.ofEmpty());
                 headersFuture.complete(response);
                 if (hf.isEndStream()) {
-                    bodyQueue.put(ResponseBodyInputStream.EOS_MARKER);
+                    pendingEos = true;
                 }
             } else if (msg instanceof Http2DataFrame df) {
                 ByteBuf content = df.content();
                 if (content.readableBytes() > 0) {
-                    bodyQueue.put(content.retain());
+                    if (batch == null) {
+                        batch = ctx.alloc().compositeBuffer(16);
+                    }
+                    batch.addComponent(true, content.retain());
                 }
                 if (df.isEndStream()) {
-                    bodyQueue.put(ResponseBodyInputStream.EOS_MARKER);
+                    pendingEos = true;
                 }
             }
+        }
+
+        @Override
+        public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+            if (batch != null) {
+                bodyQueue.put(batch);
+                batch = null;
+            }
+            if (pendingEos) {
+                pendingEos = false;
+                bodyQueue.put(ResponseBodyInputStream.EOS_MARKER);
+            }
+            ctx.fireChannelReadComplete();
         }
 
         @Override
@@ -175,12 +193,20 @@ final class H2Executor {
             if (!headersFuture.isDone()) {
                 headersFuture.completeExceptionally(cause);
             }
+            if (batch != null) {
+                batch.release();
+                batch = null;
+            }
             bodyQueue.offer(ResponseBodyInputStream.EOS_MARKER);
             ctx.close();
         }
 
         @Override
         public void channelInactive(ChannelHandlerContext ctx) {
+            if (batch != null) {
+                bodyQueue.offer(batch);
+                batch = null;
+            }
             bodyQueue.offer(ResponseBodyInputStream.EOS_MARKER);
         }
     }
