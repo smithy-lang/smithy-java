@@ -17,8 +17,8 @@ import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -97,8 +97,8 @@ final class EventLoopH2Transport implements AutoCloseable {
     private int curType;
     private int curFlags;
     private int curStreamId;
-    private int curPayloadRead;           // bytes already copied into curStaged
-    private byte[] curStaged;              // staging buffer for header/push payloads that need full assembly
+    private int curPayloadRead; // bytes already copied into curStaged
+    private byte[] curStaged; // staging buffer for header/push payloads that need full assembly
     private boolean headerParsed;
 
     private static final class Exchange {
@@ -119,9 +119,13 @@ final class EventLoopH2Transport implements AutoCloseable {
 
     EventLoopH2Transport(String host, int port) throws Exception {
         SSLContext sslCtx = SSLContext.getInstance("TLS");
-        sslCtx.init(null, new TrustManager[]{new X509TrustManager() {
-            public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+        sslCtx.init(null, new TrustManager[] {new X509TrustManager() {
+            public X509Certificate[] getAcceptedIssuers() {
+                return new X509Certificate[0];
+            }
+
             public void checkClientTrusted(X509Certificate[] c, String a) {}
+
             public void checkServerTrusted(X509Certificate[] c, String a) {}
         }}, new SecureRandom());
 
@@ -158,10 +162,16 @@ final class EventLoopH2Transport implements AutoCloseable {
     @Override
     public void close() {
         tasks.offer(() -> {
-            try { tls.close(); } catch (IOException ignored) {}
+            try {
+                tls.close();
+            } catch (IOException ignored) {}
         });
         selector.wakeup();
-        try { eventThread.join(1000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        try {
+            eventThread.join(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     // ---- Event loop ----
@@ -170,7 +180,8 @@ final class EventLoopH2Transport implements AutoCloseable {
         try {
             while (!tls.handshakeComplete()) {
                 tls.handshakeStep();
-                if (tls.handshakeComplete()) break;
+                if (tls.handshakeComplete())
+                    break;
                 selector.select(1000);
             }
             // Send preface + initial SETTINGS
@@ -213,8 +224,10 @@ final class EventLoopH2Transport implements AutoCloseable {
                 }
             }
         } catch (Throwable t) {
-            if (!started.isDone()) started.completeExceptionally(t);
-            for (Exchange ex : streams.values()) ex.future.completeExceptionally(t);
+            if (!started.isDone())
+                started.completeExceptionally(t);
+            for (Exchange ex : streams.values())
+                ex.future.completeExceptionally(t);
             streams.clear();
         }
     }
@@ -360,7 +373,8 @@ final class EventLoopH2Transport implements AutoCloseable {
         while (ex.pendingRequestBody.hasRemaining()) {
             int canSend = Math.min(Math.min(ex.sendWindow, sendWindow), remoteMaxFrame);
             if (canSend <= 0) {
-                if (!unsentBodyExchanges.contains(ex)) unsentBodyExchanges.add(ex);
+                if (!unsentBodyExchanges.contains(ex))
+                    unsentBodyExchanges.add(ex);
                 return;
             }
             int chunk = Math.min(canSend, ex.pendingRequestBody.remaining());
@@ -408,7 +422,8 @@ final class EventLoopH2Transport implements AutoCloseable {
                 int take = Math.min(want, readScratch.remaining());
                 readScratch.get(frameHdrBuf, frameHdrBytes, take);
                 frameHdrBytes += take;
-                if (frameHdrBytes < FRAME_HEADER_SIZE) return;
+                if (frameHdrBytes < FRAME_HEADER_SIZE)
+                    return;
 
                 curPayloadLen = ((frameHdrBuf[0] & 0xFF) << 16)
                         | ((frameHdrBuf[1] & 0xFF) << 8)
@@ -502,7 +517,8 @@ final class EventLoopH2Transport implements AutoCloseable {
             case TYPE_HEADERS -> handleHeaders();
             case TYPE_WINDOW_UPDATE -> handleWindowUpdate();
             case TYPE_RST_STREAM -> handleRst();
-            case TYPE_GOAWAY -> { /* ignored */ }
+            case TYPE_GOAWAY -> {
+                /* ignored */ }
             case TYPE_PING -> {
                 if ((curFlags & FLAG_ACK) == 0 && curPayloadLen == 8) {
                     byte[] data = new byte[8];
@@ -510,7 +526,8 @@ final class EventLoopH2Transport implements AutoCloseable {
                     buildPingAck(data);
                 }
             }
-            default -> {}
+            default -> {
+            }
         }
     }
 
@@ -528,7 +545,8 @@ final class EventLoopH2Transport implements AutoCloseable {
             if (id == 0x4) {
                 int delta = value - remoteInitialWindow;
                 remoteInitialWindow = value;
-                for (Exchange ex : streams.values()) ex.sendWindow += delta;
+                for (Exchange ex : streams.values())
+                    ex.sendWindow += delta;
             } else if (id == 0x5) {
                 remoteMaxFrame = value;
             }
@@ -539,7 +557,8 @@ final class EventLoopH2Transport implements AutoCloseable {
 
     private void handleHeaders() throws IOException {
         Exchange ex = streams.get(curStreamId);
-        if (ex == null) return;
+        if (ex == null)
+            return;
         if ((curFlags & FLAG_END_HEADERS) == 0) {
             throw new IOException("CONTINUATION unsupported in prototype");
         }
@@ -573,7 +592,8 @@ final class EventLoopH2Transport implements AutoCloseable {
     }
 
     private void handleWindowUpdate() throws IOException {
-        if (curPayloadLen < 4) return;
+        if (curPayloadLen < 4)
+            return;
         int increment = (((curStaged[0] & 0x7F) << 24)
                 | ((curStaged[1] & 0xFF) << 16)
                 | ((curStaged[2] & 0xFF) << 8)
@@ -592,7 +612,8 @@ final class EventLoopH2Transport implements AutoCloseable {
             Exchange ex = streams.get(curStreamId);
             if (ex != null) {
                 ex.sendWindow += increment;
-                if (!ex.requestEndSent) pumpExchangeData(ex);
+                if (!ex.requestEndSent)
+                    pumpExchangeData(ex);
             }
         }
     }

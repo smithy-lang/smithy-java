@@ -7,7 +7,6 @@ package software.amazon.smithy.java.http.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -450,7 +449,6 @@ class DefaultHttpClientTest {
             assertEquals(200, response.statusCode(), "Should complete within timeout");
         }
     }
-
 
     @Test
     void proxySelectorsAreUsed() throws IOException {

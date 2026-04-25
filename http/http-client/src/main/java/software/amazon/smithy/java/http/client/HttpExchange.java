@@ -12,7 +12,6 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
 
 /**
