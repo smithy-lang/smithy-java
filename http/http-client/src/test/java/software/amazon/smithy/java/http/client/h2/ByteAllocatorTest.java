@@ -79,7 +79,7 @@ class ByteAllocatorTest {
 
     @Test
     void poolRespectsMaxSize() {
-        ByteAllocator pool = new ByteAllocator(2, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(2, 128, 128, 128);
 
         pool.release(ByteBuffer.allocate(128));
         pool.release(ByteBuffer.allocate(128));
@@ -117,7 +117,7 @@ class ByteAllocatorTest {
 
     @Test
     void clearRemovesAllBuffers() {
-        ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(10, 128, 128, 128);
 
         pool.release(ByteBuffer.allocate(128));
         pool.release(ByteBuffer.allocate(128));
@@ -135,7 +135,7 @@ class ByteAllocatorTest {
 
         ByteBuffer smallBuffer = ByteBuffer.allocate(64);
         pool.release(smallBuffer);
-        assertEquals(1, pool.size());
+        assertEquals(0, pool.size());
 
         ByteBuffer buffer = pool.borrow(256);
         assertEquals(0, pool.size());
@@ -153,6 +153,7 @@ class ByteAllocatorTest {
     void constructorValidatesDefaultBufferSize() {
         assertThrows(IllegalArgumentException.class, () -> new ByteAllocator(10, 1024, 1024, 0));
         assertThrows(IllegalArgumentException.class, () -> new ByteAllocator(10, 1024, 1024, -1));
+        assertThrows(IllegalArgumentException.class, () -> new ByteAllocator(10, 1024, 256, 512));
     }
 
     @Test
@@ -171,7 +172,7 @@ class ByteAllocatorTest {
 
     @Test
     void lifoOrderPreserved() {
-        ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
+        ByteAllocator pool = new ByteAllocator(10, 128, 128, 128);
 
         ByteBuffer buffer1 = ByteBuffer.allocate(128);
         ByteBuffer buffer2 = ByteBuffer.allocate(128);
@@ -184,6 +185,18 @@ class ByteAllocatorTest {
         assertSame(buffer3, pool.borrow(128));
         assertSame(buffer2, pool.borrow(128));
         assertSame(buffer1, pool.borrow(128));
+    }
+
+    @Test
+    void largerSizeClassCanSatisfySmallerBorrow() {
+        ByteAllocator pool = new ByteAllocator(10, 1024, 1024, 128);
+        ByteBuffer larger = ByteBuffer.allocateDirect(512);
+
+        pool.release(larger);
+
+        ByteBuffer borrowed = pool.borrow(256);
+        assertTrue(borrowed.capacity() >= 256);
+        assertEquals(0, pool.size());
     }
 
     @Test

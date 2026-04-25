@@ -265,7 +265,13 @@ public final class BenchmarkServer {
             String uri = msg.uri();
             FullHttpResponse response;
 
-            if (uri.startsWith("/post") || uri.startsWith("/putmb")) {
+            if (uri.startsWith("/rpc")) {
+                response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.wrappedBuffer(CONTENT));
+                response.headers()
+                        .set(CONTENT_TYPE, "application/json")
+                        .set(CONNECTION, KEEP_ALIVE)
+                        .setInt(CONTENT_LENGTH, CONTENT.length);
+            } else if (uri.startsWith("/post") || uri.startsWith("/putmb")) {
                 // POST/PUT returns empty 200 OK
                 response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.EMPTY_BUFFER);
                 response.headers()
@@ -378,6 +384,7 @@ public final class BenchmarkServer {
                 .status("200")
                 .set("content-type", "application/octet-stream")
                 .setInt("content-length", MB10_CONTENT.length);
+        private boolean rpcRequest;
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, Http2StreamFrame frame) {
@@ -401,7 +408,14 @@ public final class BenchmarkServer {
                             .setInt("content-length", body.length);
                     ctx.write(new DefaultHttp2HeadersFrame(statsHeaders, false));
                     ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(body), true));
+                } else if ("/rpc".contentEquals(path)) {
+                    rpcRequest = true;
+                    if (headersFrame.isEndStream()) {
+                        ctx.write(new DefaultHttp2HeadersFrame(RESPONSE_HEADERS, false));
+                        ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(CONTENT), true));
+                    }
                 } else if ("/post".contentEquals(path) || "/putmb".contentEquals(path)) {
+                    rpcRequest = false;
                     // POST/PUT with body - wait for data frames
                     if (headersFrame.isEndStream()) {
                         // No body, respond immediately
@@ -426,8 +440,12 @@ public final class BenchmarkServer {
             } else if (frame instanceof Http2DataFrame dataFrame) {
                 // Data consumed - flow control handled automatically by Http2MultiplexHandler
                 if (dataFrame.isEndStream()) {
-                    // POST/PUT complete - send empty response
-                    ctx.writeAndFlush(new DefaultHttp2HeadersFrame(EMPTY_RESPONSE_HEADERS, true));
+                    if (rpcRequest) {
+                        ctx.write(new DefaultHttp2HeadersFrame(RESPONSE_HEADERS, false));
+                        ctx.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(CONTENT), true));
+                    } else {
+                        ctx.writeAndFlush(new DefaultHttp2HeadersFrame(EMPTY_RESPONSE_HEADERS, true));
+                    }
                 }
             }
         }
