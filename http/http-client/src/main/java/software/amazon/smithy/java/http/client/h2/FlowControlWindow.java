@@ -6,13 +6,18 @@
 package software.amazon.smithy.java.http.client.h2;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * HTTP/2 flow control window.
  *
- * <p>Uses ReentrantLock instead of synchronized to avoid virtual thread pinning.
+ * <p>Fast path uses an {@link AtomicLong} CAS loop with no lock — under typical load
+ * (window available, no waiters) acquires and releases are lock-free. The lock is only
+ * acquired on the slow path when a caller has to wait for window.
+ *
+ * <p>Uses ReentrantLock instead of synchronized to avoid virtual thread pinning on the slow path.
  */
 final class FlowControlWindow {
 
@@ -21,73 +26,58 @@ final class FlowControlWindow {
 
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition available = lock.newCondition();
-    private long window;
+    private final AtomicLong window;
 
-    /**
-     * Create a flow control window.
-     *
-     * @param initialWindow the initial window size (e.g., 65535 for HTTP/2 default)
-     */
     FlowControlWindow(int initialWindow) {
-        this.window = initialWindow;
+        this.window = new AtomicLong(initialWindow);
     }
 
     /**
      * Try to acquire up to the requested bytes from the window without blocking.
      *
-     * @param maxBytes maximum number of bytes to acquire
      * @return number of bytes acquired (0 if window is empty)
      */
     int tryAcquireNonBlocking(int maxBytes) {
-        lock.lock();
-        try {
-            if (window > 0) {
-                int acquired = (int) Math.min(window, maxBytes);
-                window -= acquired;
+        while (true) {
+            long current = window.get();
+            if (current <= 0) {
+                return 0;
+            }
+            int acquired = (int) Math.min(current, maxBytes);
+            if (window.compareAndSet(current, current - acquired)) {
                 return acquired;
             }
-            return 0;
-        } finally {
-            lock.unlock();
+            // CAS lost to another acquirer or a release; retry.
         }
     }
 
     /**
-     * Try to acquire up to the requested bytes from the window.
+     * Try to acquire up to the requested bytes, waiting if the window is empty.
      *
-     * <p>This method acquires as many bytes as available (up to the requested amount),
-     * waiting only if the window is completely empty. Uses short polling intervals
-     * to avoid contention on the ScheduledThreadPoolExecutor used for long timed waits.
-     *
-     * @param maxBytes maximum number of bytes to acquire
-     * @param timeoutMs maximum time to wait in milliseconds
      * @return number of bytes acquired (0 if timeout expired)
-     * @throws InterruptedException if interrupted while waiting
      */
     int tryAcquireUpTo(int maxBytes, long timeoutMs) throws InterruptedException {
+        // Fast path: lock-free CAS
+        int acquired = tryAcquireNonBlocking(maxBytes);
+        if (acquired > 0) {
+            return acquired;
+        }
+
+        // Slow path: window empty, take the lock and wait on condition
         lock.lock();
         try {
-            // Fast path: window has capacity
-            if (window > 0) {
-                int acquired = (int) Math.min(window, maxBytes);
-                window -= acquired;
-                return acquired;
-            }
-
-            // Slow path: poll with short intervals to avoid timed-wait contention
             long deadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
-            while (window <= 0) {
+            while (true) {
+                acquired = tryAcquireNonBlocking(maxBytes);
+                if (acquired > 0) {
+                    return acquired;
+                }
                 long remainingNs = deadlineNs - System.nanoTime();
                 if (remainingNs <= 0) {
-                    return 0; // Timeout
+                    return 0;
                 }
-                // Use short poll interval instead of full timeout
                 available.awaitNanos(Math.min(remainingNs, POLL_INTERVAL_NS));
             }
-
-            int acquired = (int) Math.min(window, maxBytes);
-            window -= acquired;
-            return acquired;
         } finally {
             lock.unlock();
         }
@@ -95,14 +85,18 @@ final class FlowControlWindow {
 
     /**
      * Release bytes back to the window.
-     *
-     * @param bytes number of bytes to release
      */
     void release(int bytes) {
-        if (bytes > 0) {
-            lock.lock();
+        if (bytes <= 0) {
+            return;
+        }
+        window.addAndGet(bytes);
+        // Signal condition so any slow-path waiters wake up and re-try the fast path.
+        // Uses tryLock to avoid pinning the writer if a VT is currently holding the lock;
+        // the VT will re-check after awaitNanos returns so a missed signal is caught at the
+        // next POLL_INTERVAL_NS tick.
+        if (lock.tryLock()) {
             try {
-                window += bytes;
                 available.signalAll();
             } finally {
                 lock.unlock();
@@ -112,16 +106,10 @@ final class FlowControlWindow {
 
     /**
      * Get the current available window size.
-     *
-     * @return available bytes in the window (may be negative if window was shrunk)
      */
     int available() {
-        lock.lock();
-        try {
-            return (int) Math.min(window, Integer.MAX_VALUE);
-        } finally {
-            lock.unlock();
-        }
+        long cur = window.get();
+        return (int) Math.max(Integer.MIN_VALUE, Math.min(cur, Integer.MAX_VALUE));
     }
 
     /**
@@ -130,18 +118,16 @@ final class FlowControlWindow {
      * <p>This can increase or decrease the window. If decreasing, the window
      * may become negative (valid in HTTP/2), and writers will block until
      * WINDOW_UPDATE frames restore capacity.
-     *
-     * @param delta change in window size (positive or negative)
      */
     void adjust(int delta) {
-        lock.lock();
-        try {
-            window += delta;
-            if (delta > 0) {
+        window.addAndGet(delta);
+        if (delta > 0) {
+            lock.lock();
+            try {
                 available.signalAll();
+            } finally {
+                lock.unlock();
             }
-        } finally {
-            lock.unlock();
         }
     }
 }

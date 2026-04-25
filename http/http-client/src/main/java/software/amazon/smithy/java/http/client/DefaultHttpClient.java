@@ -187,11 +187,28 @@ final class DefaultHttpClient implements HttpClient {
             this.isH2 = isH2;
         }
 
-        @Override public long contentLength() { return delegate.contentLength(); }
-        @Override public String contentType() { return delegate.contentType(); }
-        @Override public boolean isReplayable() { return false; }
-        @Override public boolean isAvailable() { return !closed; }
-        @Override public InputStream asInputStream() {
+        @Override
+        public long contentLength() {
+            return delegate.contentLength();
+        }
+
+        @Override
+        public String contentType() {
+            return delegate.contentType();
+        }
+
+        @Override
+        public boolean isReplayable() {
+            return false;
+        }
+
+        @Override
+        public boolean isAvailable() {
+            return !closed;
+        }
+
+        @Override
+        public InputStream asInputStream() {
             InputStream inner = delegate.asInputStream();
             wrappedStream = inner;
             return new java.io.FilterInputStream(inner) {
@@ -205,11 +222,21 @@ final class DefaultHttpClient implements HttpClient {
                 }
             };
         }
-        @Override public java.nio.channels.ReadableByteChannel asChannel() {
+
+        @Override
+        public java.nio.channels.ReadableByteChannel asChannel() {
             java.nio.channels.ReadableByteChannel inner = delegate.asChannel();
             return new java.nio.channels.ReadableByteChannel() {
-                @Override public int read(java.nio.ByteBuffer dst) throws IOException { return inner.read(dst); }
-                @Override public boolean isOpen() { return inner.isOpen(); }
+                @Override
+                public int read(java.nio.ByteBuffer dst) throws IOException {
+                    return inner.read(dst);
+                }
+
+                @Override
+                public boolean isOpen() {
+                    return inner.isOpen();
+                }
+
                 @Override
                 public void close() throws IOException {
                     try {
@@ -220,8 +247,16 @@ final class DefaultHttpClient implements HttpClient {
                 }
             };
         }
-        @Override public void writeTo(OutputStream out) throws IOException { delegate.writeTo(out); }
-        @Override public void writeTo(java.nio.channels.WritableByteChannel ch) throws IOException { delegate.writeTo(ch); }
+
+        @Override
+        public void writeTo(OutputStream out) throws IOException {
+            delegate.writeTo(out);
+        }
+
+        @Override
+        public void writeTo(java.nio.channels.WritableByteChannel ch) throws IOException {
+            delegate.writeTo(ch);
+        }
 
         @Override
         public void close() {
@@ -235,7 +270,9 @@ final class DefaultHttpClient implements HttpClient {
             // H1: drain body for connection reuse. H2: skip — exchange.close() sends RST_STREAM.
             if (!isH2) {
                 try {
-                    if (wrappedStream != null) { wrappedStream.transferTo(NULL_OUTPUT_STREAM); }
+                    if (wrappedStream != null) {
+                        wrappedStream.transferTo(NULL_OUTPUT_STREAM);
+                    }
                 } catch (IOException ignored) {
                     errored = true;
                 }

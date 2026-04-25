@@ -8,13 +8,13 @@ package software.amazon.smithy.java.client.http.netty;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.Http2Headers;
+import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-import io.netty.handler.codec.http2.Http2SecurityUtil;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -69,8 +69,10 @@ final class NettyUtils {
             String name = e.getKey().toLowerCase(Locale.ROOT);
             // HTTP/2 forbids Connection, Transfer-Encoding, Upgrade, Keep-Alive, Proxy-Connection
             if (name.equals("connection") || name.equals("transfer-encoding")
-                    || name.equals("upgrade") || name.equals("keep-alive")
-                    || name.equals("proxy-connection") || name.equals("host")) {
+                    || name.equals("upgrade")
+                    || name.equals("keep-alive")
+                    || name.equals("proxy-connection")
+                    || name.equals("host")) {
                 continue;
             }
             for (String v : e.getValue()) {
@@ -114,7 +116,8 @@ final class NettyUtils {
         var out = HttpHeaders.ofModifiable(in.size());
         for (Map.Entry<CharSequence, CharSequence> e : in) {
             String name = e.getKey().toString();
-            if (name.startsWith(":")) continue;
+            if (name.startsWith(":"))
+                continue;
             out.addHeader(name, e.getValue().toString());
         }
         return out;

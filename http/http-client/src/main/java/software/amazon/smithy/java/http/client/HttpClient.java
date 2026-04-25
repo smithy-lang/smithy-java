@@ -48,7 +48,6 @@ public interface HttpClient extends AutoCloseable {
      */
     HttpResponse send(HttpRequest request, RequestOptions options) throws IOException;
 
-
     /**
      * Closes the client and its underlying connection pool.
      */

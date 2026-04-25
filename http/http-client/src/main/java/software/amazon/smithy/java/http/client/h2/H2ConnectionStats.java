@@ -35,10 +35,10 @@ final class H2ConnectionStats {
     final LongAdder dataBytesReleased = new LongAdder();
 
     // --- Send window contention (muxer-writer / VT sender) ---
-    final LongAdder connWindowAcquires = new LongAdder();  // total acquireConnectionWindowUpTo calls
-    final LongAdder connWindowWaits = new LongAdder();     // calls that had to queue (slow path)
-    final LongAdder connWindowWaitNs = new LongAdder();    // total nanos spent parked waiting
-    final AtomicLong maxConnWindowWaiters = new AtomicLong();  // peak waiter queue depth
+    final LongAdder connWindowAcquires = new LongAdder(); // total acquireConnectionWindowUpTo calls
+    final LongAdder connWindowWaits = new LongAdder(); // calls that had to queue (slow path)
+    final LongAdder connWindowWaitNs = new LongAdder(); // total nanos spent parked waiting
+    final AtomicLong maxConnWindowWaiters = new AtomicLong(); // peak waiter queue depth
 
     // --- Buffer pool ---
     final LongAdder buffersBorrowed = new LongAdder();

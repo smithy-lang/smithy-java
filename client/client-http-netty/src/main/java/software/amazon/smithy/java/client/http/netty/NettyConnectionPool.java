@@ -65,7 +65,8 @@ final class NettyConnectionPool implements AutoCloseable {
             boolean shouldOpen = false;
             lock.lock();
             try {
-                if (closed) throw new IOException("Pool closed");
+                if (closed)
+                    throw new IOException("Pool closed");
                 existing = pickReusable(route);
                 if (existing == null) {
                     int count = connectionCounts.getOrDefault(route, 0);
@@ -91,7 +92,8 @@ final class NettyConnectionPool implements AutoCloseable {
                     } finally {
                         lock.unlock();
                     }
-                    if (t instanceof IOException io) throw io;
+                    if (t instanceof IOException io)
+                        throw io;
                     throw new IOException("Failed to open connection", t);
                 }
             }
@@ -119,7 +121,8 @@ final class NettyConnectionPool implements AutoCloseable {
         // active H2 connections are returned immediately via release() back to idle
         // and picked again by any waiter.
         var dq = idle.get(route);
-        if (dq == null) return null;
+        if (dq == null)
+            return null;
         while (!dq.isEmpty()) {
             var c = dq.peekFirst();
             if (!c.isActive()) {
@@ -179,8 +182,7 @@ final class NettyConnectionPool implements AutoCloseable {
         c.markClosed();
         try {
             c.channel.close();
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
         lock.lock();
         try {
             var dq = idle.get(c.route);
@@ -206,7 +208,9 @@ final class NettyConnectionPool implements AutoCloseable {
                     var c = it.next();
                     if (c.lastUsedNanos < cutoff && c.inFlightStreams.get() == 0) {
                         it.remove();
-                        try { c.channel.close(); } catch (Exception ignored) {}
+                        try {
+                            c.channel.close();
+                        } catch (Exception ignored) {}
                         c.markClosed();
                         connectionCounts.merge(c.route, -1, Integer::sum);
                     }
@@ -224,7 +228,9 @@ final class NettyConnectionPool implements AutoCloseable {
             closed = true;
             for (var dq : idle.values()) {
                 for (var c : dq) {
-                    try { c.channel.close(); } catch (Exception ignored) {}
+                    try {
+                        c.channel.close();
+                    } catch (Exception ignored) {}
                     c.markClosed();
                 }
                 dq.clear();
@@ -282,10 +288,12 @@ final class NettyConnectionPool implements AutoCloseable {
                         try {
                             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                                 configureH2Pipeline(ctx);
-                                resolvedModeHolder[0] = new NettyConnection(ctx.channel(), NettyConnection.Mode.H2, route);
+                                resolvedModeHolder[0] =
+                                        new NettyConnection(ctx.channel(), NettyConnection.Mode.H2, route);
                             } else {
                                 configureH1Pipeline(ctx);
-                                resolvedModeHolder[0] = new NettyConnection(ctx.channel(), NettyConnection.Mode.H1, route);
+                                resolvedModeHolder[0] =
+                                        new NettyConnection(ctx.channel(), NettyConnection.Mode.H1, route);
                             }
                             readyLatch.countDown();
                         } catch (Throwable t) {
@@ -359,7 +367,8 @@ final class NettyConnectionPool implements AutoCloseable {
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted connecting", e);
         }
-        if (!cf.isSuccess()) throw new IOException("Connect failed", cf.cause());
+        if (!cf.isSuccess())
+            throw new IOException("Connect failed", cf.cause());
         var conn = new NettyConnection(cf.channel(), NettyConnection.Mode.H1, route);
         conn.channel.closeFuture().addListener(f -> dispose(conn));
         return conn;
@@ -379,7 +388,8 @@ final class NettyConnectionPool implements AutoCloseable {
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted connecting", e);
         }
-        if (!cf.isSuccess()) throw new IOException("Connect failed", cf.cause());
+        if (!cf.isSuccess())
+            throw new IOException("Connect failed", cf.cause());
         var conn = new NettyConnection(cf.channel(), NettyConnection.Mode.H2, route);
         lock.lock();
         try {

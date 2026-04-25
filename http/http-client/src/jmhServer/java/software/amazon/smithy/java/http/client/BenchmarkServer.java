@@ -336,9 +336,11 @@ public final class BenchmarkServer {
                 ctx.channel().eventLoop().execute(() -> {
                     try {
                         var connection = frameCodec.connection();
-                        connection.local().flowController().incrementWindowSize(
-                                connection.connectionStream(),
-                                H2_TLS_CONNECTION_WINDOW_INCREMENT);
+                        connection.local()
+                                .flowController()
+                                .incrementWindowSize(
+                                        connection.connectionStream(),
+                                        H2_TLS_CONNECTION_WINDOW_INCREMENT);
                     } catch (Http2Exception e) {
                         ctx.fireExceptionCaught(e);
                     }

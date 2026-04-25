@@ -176,7 +176,8 @@ public class H2ScalingBenchmark {
                 .maxConnectionsPerHost(connections)
                 .h2StreamsPerConnection(streamsPerConnection)
                 .httpVersionPolicy(software.amazon.smithy.java.client.http.netty.HttpVersionPolicy.ENFORCE_HTTP_2);
-        productionNettyTransport = new software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport(nettyTransportConfig);
+        productionNettyTransport =
+                new software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport(nettyTransportConfig);
         transportContext = software.amazon.smithy.java.context.Context.create();
     }
 
@@ -613,6 +614,21 @@ public class H2ScalingBenchmark {
         }, nettyChannel, counter);
 
         counter.logErrors("Netty H2 GET 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2SmithyGet10Mb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/get10mb");
+        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var res = smithyClient.send(req)) {
+                res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Smithy H2 GET 10MB");
     }
 
     @Benchmark
