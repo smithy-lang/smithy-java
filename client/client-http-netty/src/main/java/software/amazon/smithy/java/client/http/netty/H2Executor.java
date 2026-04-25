@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -34,15 +33,17 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 /**
  * Executes an HTTP/2 request on a multiplexed connection using a fresh stream channel.
  *
- * <p>Streaming: request body is read from the caller's {@link java.io.InputStream} in 64KB chunks
- * and written to the stream channel, respecting {@code channel.isWritable()} backpressure.
- * The response is returned as soon as the HEADERS frame arrives; body bytes stream through a
- * blocking {@link ResponseBodyInputStream}.
+ * <p>The response body is delivered through a {@link ResponseBodyChannel} with a single-slot
+ * inline handoff path: when the caller VT is parked in {@code read}, the event loop copies
+ * DATA-frame bytes directly into the caller's buffer, bypassing a queue and the ByteBuf→byte[]
+ * copy. Falls back to an unbounded deque when the consumer isn't parked; backpressure is
+ * applied by toggling the stream channel's autoRead when the deque depth crosses watermarks.
  */
 final class H2Executor {
 
     private static final int UPLOAD_CHUNK = 64 * 1024;
-    private static final int RESPONSE_QUEUE_CAPACITY = 64;
+    private static final int BODY_HIGH_WATER = 32;
+    private static final int BODY_LOW_WATER = 8;
 
     private H2Executor() {}
 
@@ -56,9 +57,14 @@ final class H2Executor {
         }
 
         var headersFuture = new CompletableFuture<HttpResponse>();
-        var bodyQueue = new LinkedBlockingQueue<ByteBuf>(RESPONSE_QUEUE_CAPACITY);
         var error = new AtomicReference<Throwable>();
-        var handler = new ResponseHandler(headersFuture, bodyQueue, error);
+        var bodyChannel = new ResponseBodyChannel(
+                error,
+                resume -> stream.eventLoop().execute(() -> stream.config().setAutoRead(resume)),
+                stream::close,
+                BODY_HIGH_WATER,
+                BODY_LOW_WATER);
+        var handler = new ResponseHandler(headersFuture, bodyChannel, error);
         stream.pipeline().addLast(handler);
 
         var nettyHeaders = NettyUtils.toH2Headers(request);
@@ -92,16 +98,16 @@ final class H2Executor {
         } catch (ExecutionException e) {
             stream.close();
             Throwable cause = e.getCause();
-            if (cause instanceof IOException io) throw io;
+            if (cause instanceof IOException io)
+                throw io;
             throw new IOException("H2 request failed", cause);
         } catch (TimeoutException e) {
             stream.close();
             throw new IOException("Request timed out waiting for H2 headers", e);
         }
 
-        var bodyStream = new ResponseBodyInputStream(bodyQueue, error, stream::close);
         return headResponse.toModifiable()
-                .setBody(DataStream.ofInputStream(bodyStream))
+                .setBody(DataStream.ofInputStream(bodyChannel))
                 .toUnmodifiable();
     }
 
@@ -110,11 +116,12 @@ final class H2Executor {
         while (true) {
             int n = in.read(buf);
             if (n < 0) {
-                stream.eventLoop().execute(() ->
-                        stream.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.EMPTY_BUFFER, true)));
+                stream.eventLoop()
+                        .execute(() -> stream.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.EMPTY_BUFFER, true)));
                 return;
             }
-            if (n == 0) continue;
+            if (n == 0)
+                continue;
 
             while (!stream.isWritable()) {
                 LockSupport.parkNanos(100_000);
@@ -125,24 +132,25 @@ final class H2Executor {
 
             ByteBuf out = stream.alloc().buffer(n);
             out.writeBytes(buf, 0, n);
-            stream.eventLoop().execute(() ->
-                    stream.writeAndFlush(new DefaultHttp2DataFrame(out, false)));
+            stream.eventLoop().execute(() -> stream.writeAndFlush(new DefaultHttp2DataFrame(out, false)));
         }
     }
 
     private static final class ResponseHandler extends SimpleChannelInboundHandler<Http2StreamFrame> {
         private final CompletableFuture<HttpResponse> headersFuture;
-        private final LinkedBlockingQueue<ByteBuf> bodyQueue;
+        private final ResponseBodyChannel body;
         private final AtomicReference<Throwable> error;
         private int status;
         private io.netty.buffer.CompositeByteBuf batch; // accumulated DATA within a read-complete turn
         private boolean pendingEos;
 
-        ResponseHandler(CompletableFuture<HttpResponse> headersFuture,
-                LinkedBlockingQueue<ByteBuf> bodyQueue,
-                AtomicReference<Throwable> error) {
+        ResponseHandler(
+                CompletableFuture<HttpResponse> headersFuture,
+                ResponseBodyChannel body,
+                AtomicReference<Throwable> error
+        ) {
             this.headersFuture = headersFuture;
-            this.bodyQueue = bodyQueue;
+            this.body = body;
             this.error = error;
         }
 
@@ -150,7 +158,8 @@ final class H2Executor {
         protected void channelRead0(ChannelHandlerContext ctx, Http2StreamFrame msg) throws Exception {
             if (msg instanceof Http2HeadersFrame hf) {
                 var s = hf.headers().status();
-                if (s != null) status = Integer.parseInt(s.toString());
+                if (s != null)
+                    status = Integer.parseInt(s.toString());
                 var response = HttpResponse.create()
                         .setHttpVersion(HttpVersion.HTTP_2)
                         .setStatusCode(status)
@@ -177,12 +186,12 @@ final class H2Executor {
         @Override
         public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
             if (batch != null) {
-                bodyQueue.put(batch);
+                body.publish(batch);
                 batch = null;
             }
             if (pendingEos) {
                 pendingEos = false;
-                bodyQueue.put(ResponseBodyInputStream.EOS_MARKER);
+                body.publishEos();
             }
             ctx.fireChannelReadComplete();
         }
@@ -197,17 +206,17 @@ final class H2Executor {
                 batch.release();
                 batch = null;
             }
-            bodyQueue.offer(ResponseBodyInputStream.EOS_MARKER);
+            body.publishError(cause);
             ctx.close();
         }
 
         @Override
         public void channelInactive(ChannelHandlerContext ctx) {
             if (batch != null) {
-                bodyQueue.offer(batch);
+                body.publish(batch);
                 batch = null;
             }
-            bodyQueue.offer(ResponseBodyInputStream.EOS_MARKER);
+            body.publishEos();
         }
     }
 }

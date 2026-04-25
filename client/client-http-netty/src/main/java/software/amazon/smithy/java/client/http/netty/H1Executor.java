@@ -6,14 +6,11 @@
 package software.amazon.smithy.java.client.http.netty;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpRequest;
-import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -26,7 +23,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,21 +32,31 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
  * Executes an HTTP/1.1 request on a Netty channel. One request per channel at a time
- * (no pipelining). Supports streaming request and response bodies.
+ * (no pipelining). Supports streaming request and response bodies via a single-slot inline
+ * handoff to the caller VT (see {@link ResponseBodyChannel}).
  */
 final class H1Executor {
 
     private static final int UPLOAD_CHUNK = 64 * 1024;
-    private static final int RESPONSE_QUEUE_CAPACITY = 64;
+    private static final int BODY_HIGH_WATER = 32;
+    private static final int BODY_LOW_WATER = 8;
 
     private H1Executor() {}
 
     static software.amazon.smithy.java.http.api.HttpResponse execute(
-            Channel channel, HttpRequest request, long requestTimeoutMs) throws IOException {
+            Channel channel,
+            HttpRequest request,
+            long requestTimeoutMs
+    ) throws IOException {
         var headersFuture = new CompletableFuture<software.amazon.smithy.java.http.api.HttpResponse>();
-        var bodyQueue = new LinkedBlockingQueue<ByteBuf>(RESPONSE_QUEUE_CAPACITY);
         var error = new AtomicReference<Throwable>();
-        ChannelHandler handler = new ResponseHandler(headersFuture, bodyQueue, error);
+        var bodyChannel = new ResponseBodyChannel(
+                error,
+                resume -> channel.eventLoop().execute(() -> channel.config().setAutoRead(resume)),
+                null,
+                BODY_HIGH_WATER,
+                BODY_LOW_WATER);
+        ResponseHandler handler = new ResponseHandler(headersFuture, bodyChannel, error);
         channel.pipeline().addLast("h1-response", handler);
 
         boolean hasBody = request.body() != null && request.body().contentLength() != 0;
@@ -93,25 +99,24 @@ final class H1Executor {
         } catch (ExecutionException e) {
             channel.close();
             Throwable cause = e.getCause();
-            if (cause instanceof IOException io) throw io;
+            if (cause instanceof IOException io)
+                throw io;
             throw new IOException("H1 request failed", cause);
         } catch (TimeoutException e) {
             channel.close();
             throw new IOException("Request timed out waiting for H1 headers", e);
         }
 
-        var bodyStream = new ResponseBodyInputStream(bodyQueue, error, () -> {
-            channel.pipeline().remove(handler);
-        });
         return headResponse.toModifiable()
-                .setBody(DataStream.ofInputStream(bodyStream))
+                .setBody(DataStream.ofInputStream(bodyChannel))
                 .toUnmodifiable();
     }
 
     private static String buildRequestLine(HttpRequest request) {
         var uri = request.uri();
         String path = uri.getPath();
-        if (path == null || path.isEmpty()) path = "/";
+        if (path == null || path.isEmpty())
+            path = "/";
         if (uri.getQuery() != null && !uri.getQuery().isEmpty()) {
             path = path + "?" + uri.getQuery();
         }
@@ -126,7 +131,8 @@ final class H1Executor {
                 channel.eventLoop().execute(() -> channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT));
                 return;
             }
-            if (n == 0) continue;
+            if (n == 0)
+                continue;
 
             while (!channel.isWritable()) {
                 LockSupport.parkNanos(100_000);
@@ -143,14 +149,16 @@ final class H1Executor {
 
     private static final class ResponseHandler extends SimpleChannelInboundHandler<HttpObject> {
         private final CompletableFuture<software.amazon.smithy.java.http.api.HttpResponse> headersFuture;
-        private final LinkedBlockingQueue<ByteBuf> bodyQueue;
+        private final ResponseBodyChannel body;
         private final AtomicReference<Throwable> error;
 
-        ResponseHandler(CompletableFuture<software.amazon.smithy.java.http.api.HttpResponse> headersFuture,
-                LinkedBlockingQueue<ByteBuf> bodyQueue,
-                AtomicReference<Throwable> error) {
+        ResponseHandler(
+                CompletableFuture<software.amazon.smithy.java.http.api.HttpResponse> headersFuture,
+                ResponseBodyChannel body,
+                AtomicReference<Throwable> error
+        ) {
             this.headersFuture = headersFuture;
-            this.bodyQueue = bodyQueue;
+            this.body = body;
             this.error = error;
         }
 
@@ -167,10 +175,10 @@ final class H1Executor {
             if (msg instanceof HttpContent content) {
                 ByteBuf c = content.content();
                 if (c.readableBytes() > 0) {
-                    bodyQueue.put(c.retain());
+                    body.publish(c.retain());
                 }
                 if (msg instanceof LastHttpContent) {
-                    bodyQueue.put(ResponseBodyInputStream.EOS_MARKER);
+                    body.publishEos();
                 }
             }
         }
@@ -181,13 +189,13 @@ final class H1Executor {
             if (!headersFuture.isDone()) {
                 headersFuture.completeExceptionally(cause);
             }
-            bodyQueue.offer(ResponseBodyInputStream.EOS_MARKER);
+            body.publishError(cause);
             ctx.close();
         }
 
         @Override
         public void channelInactive(ChannelHandlerContext ctx) {
-            bodyQueue.offer(ResponseBodyInputStream.EOS_MARKER);
+            body.publishEos();
         }
     }
 }

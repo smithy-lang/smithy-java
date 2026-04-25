@@ -163,7 +163,8 @@ final class NettyH2Transport implements AutoCloseable {
             throw new IOException("Interrupted waiting for response headers", e);
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
-            if (cause instanceof IOException io) throw io;
+            if (cause instanceof IOException io)
+                throw io;
             throw new IOException("Request failed", cause);
         } catch (java.util.concurrent.TimeoutException e) {
             throw new IOException("Request timed out waiting for headers", e);
@@ -184,11 +185,12 @@ final class NettyH2Transport implements AutoCloseable {
             int n = in.read(buf);
             if (n < 0) {
                 // End-of-stream: send empty DATA with endStream=true
-                stream.eventLoop().execute(() ->
-                        stream.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.EMPTY_BUFFER, true)));
+                stream.eventLoop()
+                        .execute(() -> stream.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.EMPTY_BUFFER, true)));
                 return;
             }
-            if (n == 0) continue;
+            if (n == 0)
+                continue;
 
             // Backpressure: park until the channel is writable again.
             while (!stream.isWritable()) {
@@ -201,8 +203,7 @@ final class NettyH2Transport implements AutoCloseable {
             // Allocate a direct pooled buffer from the channel's allocator and copy chunk in.
             ByteBuf out = stream.alloc().buffer(n);
             out.writeBytes(buf, 0, n);
-            stream.eventLoop().execute(() ->
-                    stream.writeAndFlush(new DefaultHttp2DataFrame(out, false)));
+            stream.eventLoop().execute(() -> stream.writeAndFlush(new DefaultHttp2DataFrame(out, false)));
         }
     }
 
@@ -320,7 +321,8 @@ final class NettyH2Transport implements AutoCloseable {
         private boolean ensure() throws IOException {
             while (current == null || !current.isReadable()) {
                 releaseCurrent();
-                if (done) return false;
+                if (done)
+                    return false;
                 try {
                     ByteBuf next = queue.take();
                     if (next == EOS_MARKER) {
@@ -348,13 +350,15 @@ final class NettyH2Transport implements AutoCloseable {
 
         @Override
         public int read() throws IOException {
-            if (!ensure()) return -1;
+            if (!ensure())
+                return -1;
             return current.readByte() & 0xFF;
         }
 
         @Override
         public int read(byte[] b, int off, int len) throws IOException {
-            if (!ensure()) return -1;
+            if (!ensure())
+                return -1;
             int n = Math.min(len, current.readableBytes());
             current.readBytes(b, off, n);
             return n;
@@ -365,7 +369,8 @@ final class NettyH2Transport implements AutoCloseable {
             releaseCurrent();
             while (!done) {
                 ByteBuf next = queue.poll();
-                if (next == null) break;
+                if (next == null)
+                    break;
                 if (next == EOS_MARKER) {
                     done = true;
                 } else {

@@ -59,13 +59,14 @@ final class NonBlockingSSLTransport {
 
         int packetSize = engine.getSession().getPacketBufferSize();
         int appSize = engine.getSession().getApplicationBufferSize();
-        this.netIn = ByteBuffer.allocateDirect(packetSize);   // write mode
-        this.netOut = ByteBuffer.allocateDirect(packetSize);  // write mode
+        this.netIn = ByteBuffer.allocateDirect(packetSize); // write mode
+        this.netOut = ByteBuffer.allocateDirect(packetSize); // write mode
         this.appIn = ByteBuffer.allocate(appSize);
-        this.appIn.flip();                                    // read mode (empty)
+        this.appIn.flip(); // read mode (empty)
     }
 
-    static NonBlockingSSLTransport connect(String host, int port, SSLContext sslCtx, Selector selector) throws IOException {
+    static NonBlockingSSLTransport connect(String host, int port, SSLContext sslCtx, Selector selector)
+            throws IOException {
         SocketChannel ch = SocketChannel.open();
         ch.configureBlocking(false);
         ch.setOption(java.net.StandardSocketOptions.TCP_NODELAY, true);
@@ -82,7 +83,7 @@ final class NonBlockingSSLTransport {
         SSLEngine engine = sslCtx.createSSLEngine(host, port);
         engine.setUseClientMode(true);
         var params = engine.getSSLParameters();
-        params.setApplicationProtocols(new String[]{"h2"});
+        params.setApplicationProtocols(new String[] {"h2"});
         engine.setSSLParameters(params);
         engine.beginHandshake();
         return new NonBlockingSSLTransport(ch, engine, selector);
@@ -309,8 +310,7 @@ final class NonBlockingSSLTransport {
     void close() throws IOException {
         try {
             engine.closeOutbound();
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
         try {
             channel.close();
         } finally {
