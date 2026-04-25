@@ -13,6 +13,7 @@ import java.nio.channels.ReadableByteChannel;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
  * HTTP request/response exchange.
@@ -94,8 +95,21 @@ public interface HttpExchange extends AutoCloseable {
      * @throws IOException if an I/O error occurs
      */
     default void writeRequestBody() throws IOException {
+        writeRequestBody(request().body());
+    }
+
+    /**
+     * Write the given request body to the exchange.
+     *
+     * <p>The default implementation streams through {@link #requestBody()}. Protocol-specific implementations may
+     * override this to use more efficient body transfer paths for certain {@link DataStream} implementations.
+     *
+     * @param body the body to write
+     * @throws IOException if an I/O error occurs
+     */
+    default void writeRequestBody(DataStream body) throws IOException {
         try (OutputStream out = requestBody()) {
-            request().body().writeTo(out);
+            body.writeTo(out);
         }
     }
 
