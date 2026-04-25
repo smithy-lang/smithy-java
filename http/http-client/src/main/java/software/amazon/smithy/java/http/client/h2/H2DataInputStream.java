@@ -21,7 +21,7 @@ import java.util.function.Consumer;
  * <p>Also provides a {@link #channel()} for zero-copy ByteBuffer reads.
  */
 final class H2DataInputStream extends InputStream {
-    private static final int BATCH_SIZE = 32;
+    private static final int BATCH_SIZE = 128;
 
     private final H2Exchange exchange;
     private final Consumer<ByteBuffer> bufferReturner;
@@ -34,7 +34,7 @@ final class H2DataInputStream extends InputStream {
     private boolean eof = false;
     private boolean closed = false;
     private final byte[] singleBuff = new byte[1];
-    private final byte[] transferBuffer = new byte[8192];
+    private final byte[] transferBuffer = new byte[65536];
 
     H2DataInputStream(H2Exchange exchange, Consumer<ByteBuffer> bufferReturner) {
         this.exchange = exchange;

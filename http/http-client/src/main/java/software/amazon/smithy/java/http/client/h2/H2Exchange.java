@@ -98,6 +98,7 @@ public final class H2Exchange implements HttpExchange {
     // Read-side synchronization (state is in packedState)
     private final ReentrantLock dataLock = new ReentrantLock();
     private final java.util.concurrent.locks.Condition dataAvailable = dataLock.newCondition();
+    private volatile boolean readWaiterRegistered;
     private volatile IOException readError;
 
     // Stream-level timeouts (tick-based: 1 tick = TIMEOUT_POLL_INTERVAL_MS)
@@ -356,7 +357,7 @@ public final class H2Exchange implements HttpExchange {
         dataLock.lock();
         try {
             pendingHeadersQueue.add(new PendingHeadersEvent(fields, endStream));
-            dataAvailable.signal();
+            signalReadWaiterLocked();
         } finally {
             dataLock.unlock();
         }
@@ -372,7 +373,7 @@ public final class H2Exchange implements HttpExchange {
         try {
             state.setErrorState();
             this.readError = (error instanceof IOException ioe) ? ioe : new IOException("Connection closed", error);
-            dataAvailable.signal();
+            signalReadWaiterLocked();
         } finally {
             dataLock.unlock();
         }
@@ -389,7 +390,7 @@ public final class H2Exchange implements HttpExchange {
         try {
             state.setErrorState();
             this.readError = new IOException("Stream error", error);
-            dataAvailable.signal();
+            signalReadWaiterLocked();
         } finally {
             dataLock.unlock();
         }
@@ -430,7 +431,7 @@ public final class H2Exchange implements HttpExchange {
 
             // Signal inside the lock to prevent lost-wakeup
             if (endStream || !moreDataBuffered) {
-                dataAvailable.signal();
+                signalReadWaiterLocked();
             }
         } finally {
             dataLock.unlock();
@@ -447,9 +448,15 @@ public final class H2Exchange implements HttpExchange {
     void signalDataAvailable() {
         dataLock.lock();
         try {
-            dataAvailable.signal();
+            signalReadWaiterLocked();
         } finally {
             dataLock.unlock();
+        }
+    }
+
+    private void signalReadWaiterLocked() {
+        if (readWaiterRegistered) {
+            dataAvailable.signal();
         }
     }
 
@@ -473,9 +480,7 @@ public final class H2Exchange implements HttpExchange {
 
         dataLock.lock();
         try {
-            // Wait for data, EOF, or error
             while (dataQueue.isEmpty() && state.getReadState() == RS_READING) {
-                // Check for pending trailers
                 PendingHeadersEvent headerEvent = pendingHeadersQueue.poll();
                 if (headerEvent != null) {
                     handleHeadersEvent(headerEvent.fields(), headerEvent.endStream());
@@ -484,25 +489,21 @@ public final class H2Exchange implements HttpExchange {
                     }
                 }
 
-                // Wait for data to arrive.
-                // Use Condition.await() which atomically releases the lock and waits,
-                // preventing lost-wakeup races.
                 try {
+                    readWaiterRegistered = true;
                     dataAvailable.await();
                 } catch (InterruptedException e) {
                     throw new IOException("Interrupted waiting for data");
+                } finally {
+                    readWaiterRegistered = false;
                 }
             }
 
-            // Check for error
             if (state.getReadState() == RS_ERROR) {
                 throw readError;
             }
 
-            // Check for EOF (no more data and stream is done)
             if (dataQueue.isEmpty() && state.getReadState() == RS_DONE) {
-                // Auto-close stream when user reads to EOF to prevent resource leaks
-                // even if they forget to call close() explicitly
                 if (state.getStreamState() != SS_CLOSED) {
                     state.setStreamStateClosed();
                     if (streamId > 0) {
@@ -510,22 +511,21 @@ public final class H2Exchange implements HttpExchange {
                     }
                 }
                 validateContentLength();
-                return -1; // EOF
+                return -1;
             }
 
-            // Drain up to maxChunks from queue
             int drained = 0;
             while (drained < maxChunks && !dataQueue.isEmpty()) {
                 dest[drained++] = dataQueue.poll();
             }
 
-            // Update timeout once per batch (moved from enqueueData for efficiency)
             if (drained > 0) {
                 onReadActivity();
             }
 
             return drained;
-        } finally {
+        }
+        finally {
             dataLock.unlock();
         }
     }
@@ -803,9 +803,12 @@ public final class H2Exchange implements HttpExchange {
             int rs;
             while (pendingHeadersQueue.isEmpty() && (rs = state.getReadState()) != RS_ERROR && rs != RS_DONE) {
                 try {
+                    readWaiterRegistered = true;
                     dataAvailable.await();
                 } catch (InterruptedException e) {
                     throw new IOException("Interrupted waiting for response");
+                } finally {
+                    readWaiterRegistered = false;
                 }
             }
 
