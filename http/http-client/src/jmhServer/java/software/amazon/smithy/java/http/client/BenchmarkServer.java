@@ -87,6 +87,9 @@ public final class BenchmarkServer {
     private static final int H2_MAX_CONCURRENT_STREAMS = 20000;
     private static final int H2_INITIAL_WINDOW_SIZE = 1024 * 1024 * 2;
     private static final int H2_MAX_FRAME_SIZE = 1024 * 64;
+    // Additional connection-level receive window credit for h2c.
+    // Without this, concurrent uploads can bottleneck on the RFC default 64KB connection window.
+    private static final int H2_CONNECTION_WINDOW_INCREMENT = 64 * 1024 * 1024;
 
     // HTTP/2 TLS settings (slightly more conservative)
     private static final int H2_TLS_MAX_CONCURRENT_STREAMS = 10000;
@@ -219,19 +222,32 @@ public final class BenchmarkServer {
                                 .maxConcurrentStreams(H2_MAX_CONCURRENT_STREAMS)
                                 .initialWindowSize(H2_INITIAL_WINDOW_SIZE)
                                 .maxFrameSize(H2_MAX_FRAME_SIZE);
+                        var frameCodec = Http2FrameCodecBuilder.forServer()
+                                .initialSettings(settings)
+                                .autoAckSettingsFrame(true)
+                                .autoAckPingFrame(true)
+                                .build();
                         ch.pipeline()
                                 .addLast(
-                                        Http2FrameCodecBuilder.forServer()
-                                                .initialSettings(settings)
-                                                .autoAckSettingsFrame(true)
-                                                .autoAckPingFrame(true)
-                                                .build(),
+                                        frameCodec,
                                         new Http2MultiplexHandler(new ChannelInitializer<Channel>() {
                                             @Override
                                             protected void initChannel(Channel ch) {
                                                 ch.pipeline().addLast(new Http2StreamHandler());
                                             }
                                         }));
+                        ch.eventLoop().execute(() -> {
+                            try {
+                                var connection = frameCodec.connection();
+                                connection.local()
+                                        .flowController()
+                                        .incrementWindowSize(
+                                                connection.connectionStream(),
+                                                H2_CONNECTION_WINDOW_INCREMENT);
+                            } catch (Http2Exception e) {
+                                ch.pipeline().fireExceptionCaught(e);
+                            }
+                        });
                     }
                 });
 
