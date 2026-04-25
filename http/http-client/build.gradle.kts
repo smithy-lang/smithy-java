@@ -144,6 +144,7 @@ val stopBenchmarkServer by tasks.registering {
 jmh {
     val includesProp = project.findProperty("jmh.includes")?.toString()
     val jvmArgsProp = project.findProperty("jmh.jvmArgsAppend")?.toString()
+    val profilersProp = project.findProperty("jmh.profilers")?.toString()
     includes = if (includesProp != null) listOf(includesProp) else listOf(".*")
 
     warmupIterations = 3
@@ -153,6 +154,9 @@ jmh {
     resultsFile = project.file("build/reports/jmh/results.csv")
     if (jvmArgsProp != null) {
         jvmArgsAppend = jvmArgsProp.split(Regex("\\s*;\\s*")).filter { it.isNotEmpty() }
+    }
+    if (profilersProp != null) {
+        profilers.addAll(profilersProp.split(Regex("\\s*;\\s*")).filter { it.isNotEmpty() })
     }
     // Use standalone asprof for profiling instead of bundled async profiler
     // profilers.add("async:output=flamegraph")
