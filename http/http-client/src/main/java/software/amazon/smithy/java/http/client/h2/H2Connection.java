@@ -284,7 +284,6 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
                 stats.dataBytesRead.add(dataLength);
 
                 if (endStream) {
-                    exchange.signalDataAvailable();
                     stats.signalsSent.increment();
                     lastDataExchange = null;
                 } else if (moreDataBuffered) {
@@ -301,7 +300,6 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
                     exchange.releaseDiscardedData(payloadLength);
                 }
                 exchange.enqueueData(null, true, false, 0);
-                exchange.signalDataAvailable();
                 lastDataExchange = null;
             } else if (payloadLength > 0) {
                 debitConnectionRecvWindow(payloadLength);
