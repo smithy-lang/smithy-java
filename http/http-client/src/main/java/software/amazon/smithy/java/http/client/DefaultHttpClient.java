@@ -39,7 +39,6 @@ final class DefaultHttpClient implements HttpClient {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(DefaultHttpClient.class);
     private static final OutputStream NULL_OUTPUT_STREAM = OutputStream.nullOutputStream();
-
     private final ConnectionPool connectionPool;
     private final ProxySelector proxySelector;
     private final List<HttpInterceptor> interceptors;
@@ -106,21 +105,19 @@ final class DefaultHttpClient implements HttpClient {
                 exchange.setRequestTrailers(ts.trailerHeaders());
             }
 
-            if (hasBody && exchange.supportsBidirectionalStreaming()) {
+            if (hasBody && exchange.supportsBidirectionalStreaming() && !shouldWriteH2BodyInline(requestBody)) {
                 // H2: write body on background VT for full duplex
                 final DataStream body = requestBody;
                 Thread.startVirtualThread(() -> {
-                    try (OutputStream out = exchange.requestBody()) {
-                        body.writeTo(out);
+                    try {
+                        exchange.writeRequestBody(body);
                     } catch (IOException e) {
                         LOGGER.debug("Error writing request body: {}", e.getMessage());
                     }
                 });
             } else if (hasBody) {
-                // H1: write body inline
-                try (OutputStream out = exchange.requestBody()) {
-                    requestBody.writeTo(out);
-                }
+                // H1, or replayable bounded H2 bodies: write inline
+                exchange.writeRequestBody(requestBody);
             } else {
                 // No body — close request stream to send END_STREAM
                 exchange.requestBody().close();
@@ -167,6 +164,10 @@ final class DefaultHttpClient implements HttpClient {
             }
             throw e;
         }
+    }
+
+    private static boolean shouldWriteH2BodyInline(DataStream body) {
+        return body.isReplayable() && body.hasKnownLength();
     }
 
     /**

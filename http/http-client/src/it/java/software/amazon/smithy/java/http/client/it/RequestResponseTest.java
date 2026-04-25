@@ -9,7 +9,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +24,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
@@ -32,6 +38,7 @@ import software.amazon.smithy.java.http.client.it.server.h1.TextResponseHttp11Cl
 import software.amazon.smithy.java.http.client.it.server.h2.MultiplexingHttp2ClientHandler;
 import software.amazon.smithy.java.http.client.it.server.h2.RequestCapturingHttp2ClientHandler;
 import software.amazon.smithy.java.http.client.it.server.h2.TextResponseHttp2ClientHandler;
+import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
  * Parameterized test for basic request/response across all transport configurations.
@@ -40,6 +47,7 @@ public class RequestResponseTest {
 
     private static final String RESPONSE_CONTENTS = "Test response body";
     private static final String REQUEST_CONTENTS = "Test request body";
+    private static final String LARGE_REQUEST_CONTENTS = REQUEST_CONTENTS.repeat(32 * 1024);
 
     private static TestCertificateGenerator.CertificateBundle certBundle;
     private static SSLContext clientSslContext;
@@ -137,5 +145,62 @@ public class RequestResponseTest {
 
         assertEquals(REQUEST_CONTENTS, capturedBody);
         assertEquals(RESPONSE_CONTENTS, responseBody);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(value = TransportConfig.class, names = {"H2C", "H2_TLS", "H2_ALPN"})
+    void canSendLargeReplayableRequestAndReadResponse(TransportConfig config) throws Exception {
+        setupForConfig(config);
+
+        byte[] body = LARGE_REQUEST_CONTENTS.getBytes(StandardCharsets.UTF_8);
+        var request = HttpRequest.create()
+                .setMethod("POST")
+                .setUri(URI.create(uri(config)))
+                .setHttpVersion(config.httpVersion())
+                .setHeaders(HttpHeaders.of(Map.of(
+                        "content-type",
+                        List.of("text/plain"),
+                        "content-length",
+                        List.of(Integer.toString(body.length)))))
+                .setBody(DataStream.ofByteBuffer(ByteBuffer.wrap(body)));
+        var response = client.send(request);
+        var responseBody = readBody(response);
+
+        h2RequestHandler.streamCompleted().join();
+
+        assertEquals(LARGE_REQUEST_CONTENTS, h2RequestHandler.capturedBody().toString(StandardCharsets.UTF_8));
+        assertEquals(RESPONSE_CONTENTS, responseBody);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(value = TransportConfig.class, names = {"H2C", "H2_TLS", "H2_ALPN"})
+    void canSendReplayableFileRequestAndReadResponse(TransportConfig config) throws Exception {
+        setupForConfig(config);
+
+        byte[] body = LARGE_REQUEST_CONTENTS.getBytes(StandardCharsets.UTF_8);
+        Path tempFile = Files.createTempFile("smithy-http-client-upload", ".txt");
+        try {
+            Files.write(tempFile, body);
+
+            var request = HttpRequest.create()
+                    .setMethod("POST")
+                    .setUri(URI.create(uri(config)))
+                    .setHttpVersion(config.httpVersion())
+                    .setHeaders(HttpHeaders.of(Map.of(
+                            "content-type",
+                            List.of("text/plain"),
+                            "content-length",
+                            List.of(Integer.toString(body.length)))))
+                    .setBody(DataStream.ofFile(tempFile, "text/plain"));
+            var response = client.send(request);
+            var responseBody = readBody(response);
+
+            h2RequestHandler.streamCompleted().join();
+
+            assertEquals(LARGE_REQUEST_CONTENTS, h2RequestHandler.capturedBody().toString(StandardCharsets.UTF_8));
+            assertEquals(RESPONSE_CONTENTS, responseBody);
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
     }
 }
