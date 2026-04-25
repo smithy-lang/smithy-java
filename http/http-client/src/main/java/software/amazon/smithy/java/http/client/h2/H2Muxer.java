@@ -68,6 +68,9 @@ final class H2Muxer implements AutoCloseable {
 
     // The resolution of the tick-based timeout system, used to check for read timeouts.
     static final int TIMEOUT_POLL_INTERVAL_MS = 100;
+    private static final int DEFAULT_POOLED_BUFFER_COUNT = 128;
+    private static final int DEFAULT_POOLED_BUFFER_SIZE = 4 * 1024;
+    private static final int MAX_POOLED_BUFFER_SIZE = 64 * 1024;
 
     // Reusable singleton work items
     private static final H2MuxerWorkItem.CheckDataQueue CHECK_DATA_QUEUE = H2MuxerWorkItem.CheckDataQueue.INSTANCE;
@@ -160,7 +163,11 @@ final class H2Muxer implements AutoCloseable {
         this.frameCodec = frameCodec;
         this.initialWindowSize = initialWindowSize;
         this.connectionSendWindow = new FlowControlWindow(DEFAULT_INITIAL_WINDOW_SIZE);
-        this.allocator = new ByteAllocator(64, initialWindowSize, initialWindowSize, 1024);
+        this.allocator = new ByteAllocator(
+                DEFAULT_POOLED_BUFFER_COUNT,
+                initialWindowSize,
+                Math.min(initialWindowSize, MAX_POOLED_BUFFER_SIZE),
+                Math.min(DEFAULT_POOLED_BUFFER_SIZE, Math.min(initialWindowSize, MAX_POOLED_BUFFER_SIZE)));
         this.headerEncoder = new H2RequestHeaderEncoder(
                 new HpackEncoder(initialTableSize),
                 new ByteBufferOutputStream(512));
