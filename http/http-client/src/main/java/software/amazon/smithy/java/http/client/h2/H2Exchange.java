@@ -38,6 +38,7 @@ import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.DelegatedClosingInputStream;
 import software.amazon.smithy.java.http.client.DelegatedClosingOutputStream;
 import software.amazon.smithy.java.http.client.HttpExchange;
+import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
  * HTTP/2 exchange implementation for a single stream with multiplexing support.
@@ -623,6 +624,26 @@ public final class H2Exchange implements HttpExchange {
     }
 
     @Override
+    public void writeRequestBody(DataStream body) throws IOException {
+        if (body == null || body.contentLength() == 0) {
+            requestBody().close();
+            return;
+        }
+
+        if (canWriteDirectReplayableBody(body)) {
+            try (ReadableByteChannel channel = body.asChannel()) {
+                writeChannelData(channel, body.contentLength(), true);
+            } finally {
+                onRequestStreamClosed();
+                body.close();
+            }
+            return;
+        }
+
+        HttpExchange.super.writeRequestBody(body);
+    }
+
+    @Override
     public synchronized InputStream responseBody() throws IOException {
         // Ensure we have response headers first
         if (!state.isResponseHeadersReceived()) {
@@ -961,9 +982,12 @@ public final class H2Exchange implements HttpExchange {
      * Write data from a ByteBuffer as DATA frames. Zero-copy path.
      */
     void writeData(ByteBuffer data, boolean endStream) throws IOException {
+        writeData(data, endStream, false);
+    }
+
+    private void writeData(ByteBuffer data, boolean endStream, boolean shareBuffers) throws IOException {
         boolean hasTrailers = requestTrailers != null;
         int maxFrameSize = muxer.getRemoteMaxFrameSize();
-        int length = data.remaining();
 
         while (data.hasRemaining()) {
             int remaining = data.remaining();
@@ -1008,29 +1032,154 @@ public final class H2Exchange implements HttpExchange {
                 boolean isLastChunk = (toSend == data.remaining());
                 int flags = (endStream && isLastChunk && !hasTrailers) ? FLAG_END_STREAM : 0;
 
-                // Copy into pooled buffer for async write
-                ByteBuffer buf = muxer.borrowBuffer(toSend);
-                int oldLimit = data.limit();
-                data.limit(data.position() + toSend);
-                buf.put(data);
-                data.limit(oldLimit);
-                buf.flip();
-
-                pendingWrites.add(new PendingWrite().init(buf, flags));
+                if (shareBuffers) {
+                    int oldLimit = data.limit();
+                    data.limit(data.position() + toSend);
+                    pendingWrites.add(new PendingWrite().initDirect(data.slice(), flags));
+                    data.position(data.limit());
+                    data.limit(oldLimit);
+                } else {
+                    ByteBuffer buf = muxer.borrowBuffer(toSend);
+                    int oldLimit = data.limit();
+                    data.limit(data.position() + toSend);
+                    buf.put(data);
+                    data.limit(oldLimit);
+                    buf.flip();
+                    pendingWrites.add(new PendingWrite().init(buf, flags));
+                }
                 batchRemaining -= toSend;
+            }
+
+            // If more data remains, kick the writer now so these frames can drain and
+            // generate WINDOW_UPDATEs before we try to acquire the next batch.
+            if (data.hasRemaining()) {
+                signalPendingWrites();
             }
         }
 
-        // Signal writer thread once after all data is queued
-        if (IN_WORK_QUEUE_HANDLE.compareAndSet(this, false, true)) {
-            muxer.signalDataReady(this);
-        }
+        signalPendingWrites();
 
         if (endStream) {
             if (hasTrailers) {
                 muxer.queueTrailers(streamId, requestTrailers);
             }
             state.markEndStreamSent();
+        }
+    }
+
+    private static boolean canWriteDirectReplayableBody(DataStream body) {
+        return body.isReplayable() && body.hasKnownLength() && body.contentLength() <= Integer.MAX_VALUE;
+    }
+
+    private void signalPendingWrites() {
+        if (IN_WORK_QUEUE_HANDLE.compareAndSet(this, false, true)) {
+            muxer.signalDataReady(this);
+        }
+    }
+
+    private void writeChannelData(ReadableByteChannel channel, long contentLength, boolean endStream)
+            throws IOException {
+        boolean hasTrailers = requestTrailers != null;
+        int maxFrameSize = muxer.getRemoteMaxFrameSize();
+        long remaining = contentLength;
+
+        while (remaining > 0) {
+            int batchSize = (int) Math.min(remaining, (long) maxFrameSize * FLOW_CONTROL_BATCH_FRAMES);
+            int connAcquired = acquireSendWindowBatch(batchSize);
+            int batchRemaining = connAcquired;
+            try {
+                while (batchRemaining > 0 && remaining > 0) {
+                    int toRead = (int) Math.min(Math.min(remaining, maxFrameSize), batchRemaining);
+                    boolean lastChunk = remaining == toRead;
+                    int flags = (endStream && lastChunk && !hasTrailers) ? FLAG_END_STREAM : 0;
+
+                    ByteBuffer buf = muxer.borrowBuffer(toRead);
+                    try {
+                        buf.limit(toRead);
+                        readFully(channel, buf, toRead);
+                        buf.flip();
+                        pendingWrites.add(new PendingWrite().init(buf, flags));
+                    } catch (Throwable t) {
+                        muxer.returnBuffer(buf);
+                        throw t;
+                    }
+
+                    remaining -= toRead;
+                    batchRemaining -= toRead;
+                }
+            } catch (Throwable t) {
+                releaseUnusedSendWindow(batchRemaining);
+                if (t instanceof IOException ioe) {
+                    throw ioe;
+                }
+                throw new IOException("Failed to stream request body", t);
+            }
+
+            if (remaining > 0) {
+                signalPendingWrites();
+            }
+        }
+
+        signalPendingWrites();
+
+        if (endStream) {
+            if (hasTrailers) {
+                muxer.queueTrailers(streamId, requestTrailers);
+            }
+            state.markEndStreamSent();
+        }
+    }
+
+    private int acquireSendWindowBatch(int batchSize) throws IOException {
+        int streamAcquired;
+        try {
+            streamAcquired = sendWindow.tryAcquireUpTo(batchSize, writeTimeoutMs);
+            if (streamAcquired == 0) {
+                throw new SocketTimeoutException(String.format(
+                        "Write timed out after %dms waiting for stream flow control window",
+                        writeTimeoutMs));
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted waiting for stream flow control window", e);
+        }
+
+        try {
+            int connAcquired = muxer.acquireConnectionWindowUpTo(streamAcquired, writeTimeoutMs);
+            if (connAcquired == 0) {
+                sendWindow.release(streamAcquired);
+                throw new SocketTimeoutException(String.format(
+                        "Write timed out after %dms waiting for connection flow control window",
+                        writeTimeoutMs));
+            }
+            if (connAcquired < streamAcquired) {
+                sendWindow.release(streamAcquired - connAcquired);
+            }
+            return connAcquired;
+        } catch (InterruptedException e) {
+            sendWindow.release(streamAcquired);
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted waiting for connection flow control window", e);
+        } catch (SocketTimeoutException e) {
+            sendWindow.release(streamAcquired);
+            throw e;
+        }
+    }
+
+    private void releaseUnusedSendWindow(int bytes) {
+        if (bytes <= 0) {
+            return;
+        }
+        sendWindow.release(bytes);
+        muxer.releaseConnectionWindow(bytes);
+    }
+
+    private static void readFully(ReadableByteChannel channel, ByteBuffer buffer, int bytes) throws IOException {
+        while (buffer.position() < bytes) {
+            int read = channel.read(buffer);
+            if (read < 0) {
+                throw new IOException("Request body ended before expected content-length was fully read");
+            }
         }
     }
 
