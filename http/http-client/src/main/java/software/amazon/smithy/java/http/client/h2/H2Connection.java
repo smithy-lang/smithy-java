@@ -48,6 +48,7 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpExchange;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
+import software.amazon.smithy.java.http.client.connection.MultiplexedHttpConnection;
 import software.amazon.smithy.java.http.client.connection.Route;
 import software.amazon.smithy.java.http.client.connection.Transport;
 import software.amazon.smithy.java.http.hpack.HpackDecoder;
@@ -75,7 +76,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * via the muxer's writer thread, and frame reads are handled by a
  * dedicated reader thread.
  */
-public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCallback {
+public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.ConnectionCallback {
     private enum State {
         CONNECTED,
         SHUTTING_DOWN,
@@ -133,6 +134,7 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
             Route route,
             Duration readTimeout,
             Duration writeTimeout,
+            boolean usePlatformReaderThread,
             int initialWindowSize,
             int maxFrameSize,
             int bufferSize
@@ -169,7 +171,9 @@ public final class H2Connection implements HttpConnection, H2Muxer.ConnectionCal
         }
 
         // Start background reader thread
-        this.readerThread = Thread.ofVirtual().name("h2-reader-" + route.host()).start(this::readerLoop);
+        this.readerThread = (usePlatformReaderThread ? Thread.ofPlatform() : Thread.ofVirtual())
+                .name("h2-reader-" + route.host())
+                .start(this::readerLoop);
     }
 
     /**

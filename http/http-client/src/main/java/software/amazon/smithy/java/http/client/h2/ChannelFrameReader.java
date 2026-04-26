@@ -52,9 +52,17 @@ final class ChannelFrameReader {
      */
     boolean ensure(int n) throws IOException {
         while (buf.remaining() < n) {
-            buf.compact(); // switch to write mode, preserving unread data
-            int read = channel.read(buf);
-            buf.flip(); // back to read mode
+            if (buf.hasRemaining()) {
+                buf.compact(); // switch to write mode, preserving unread data
+            } else {
+                buf.clear(); // no unread data to preserve
+            }
+            int read;
+            try {
+                read = channel.read(buf);
+            } finally {
+                buf.flip(); // always restore read mode, even if the read is interrupted
+            }
             if (read < 0) {
                 return buf.remaining() >= n;
             }

@@ -649,11 +649,12 @@ final class H2Muxer implements AutoCloseable {
 
         try {
             while (running) {
+                boolean wroteFrames = false;
                 // Drain all available work items from the queue
                 H2MuxerWorkItem item;
                 while ((item = workQueue.poll()) != null) {
                     if (item instanceof H2MuxerWorkItem.Shutdown) {
-                        processBatch(batch);
+                        completeBatch(batch, new IOException("Muxer shutting down"));
                         return;
                     }
                     if (!(item instanceof H2MuxerWorkItem.CheckDataQueue)) {
@@ -662,7 +663,7 @@ final class H2Muxer implements AutoCloseable {
                 }
 
                 if (!batch.isEmpty()) {
-                    processBatch(batch);
+                    wroteFrames = processBatch(batch);
                 }
 
                 boolean processedData = false;
@@ -676,10 +677,12 @@ final class H2Muxer implements AutoCloseable {
                 // causing extra wake-ups and flushes
                 dataWorkPending.set(false);
 
-                if (processedData) {
+                if (wroteFrames || processedData) {
                     try {
                         frameCodec.flush();
+                        completeBatch(batch, null);
                     } catch (IOException e) {
+                        completeBatch(batch, e);
                         failWriter(e);
                         return;
                     }
@@ -751,22 +754,24 @@ final class H2Muxer implements AutoCloseable {
         }
     }
 
-    private void processBatch(ArrayList<H2MuxerWorkItem> batch) {
+    private boolean processBatch(ArrayList<H2MuxerWorkItem> batch) throws IOException {
+        if (batch.isEmpty()) {
+            return false;
+        }
+
+        for (H2MuxerWorkItem item : batch) {
+            processItem(item);
+        }
+        return true;
+    }
+
+    private void completeBatch(ArrayList<H2MuxerWorkItem> batch, IOException error) {
         if (batch.isEmpty()) {
             return;
         }
-
         try {
             for (H2MuxerWorkItem item : batch) {
-                processItem(item);
-            }
-            frameCodec.flush();
-            for (H2MuxerWorkItem item : batch) {
-                completeItem(item, null);
-            }
-        } catch (IOException e) {
-            for (H2MuxerWorkItem item : batch) {
-                completeItem(item, e);
+                completeItem(item, error);
             }
         } finally {
             batch.clear();
