@@ -58,9 +58,9 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  *
  * <h2>Data Flow</h2>
  * <p>The reader thread enqueues DATA frame payloads via {@link #enqueueData}. The user
- * thread drains chunks in batches via {@link #drainChunks} (used by H2DataInputStream).
- * Pooled byte[] buffers are returned after consumption. Flow control sends WINDOW_UPDATE
- * after DATA frame bytes are consumed or discarded.
+ * thread reads borrowed chunks through {@link H2DataInputStream}. Pooled buffers are
+ * returned after consumption. Flow control sends WINDOW_UPDATE after DATA frame bytes
+ * are consumed or discarded.
  */
 public final class H2Exchange implements HttpExchange {
 
@@ -91,9 +91,9 @@ public final class H2Exchange implements HttpExchange {
     private final ArrayDeque<PendingHeadersEvent> pendingHeadersQueue = new ArrayDeque<>();
 
     // === Data chunk queue ===
-    // Queue of DataChunks received from reader thread. Each chunk contains one DATA frame payload.
+    // Stream-owned queue of borrowed DATA frame payload buffers.
     // Flow control ensures total queued data never exceeds initial window size.
-    private final ArrayDeque<DataChunk> dataQueue = new ArrayDeque<>();
+    private final H2StreamBody streamBody;
 
     // Read-side synchronization (state is in packedState)
     private final ReentrantLock dataLock = new ReentrantLock();
@@ -120,8 +120,8 @@ public final class H2Exchange implements HttpExchange {
     private long receivedContentLength = 0;
 
     // Request state (endStreamSent is in packedState)
-    private volatile OutputStream requestOut;
     private volatile HttpHeaders requestTrailers;
+    private final H2StreamRequestBody requestBodyState;
 
     // Response body input stream
     private volatile InputStream responseIn;
@@ -168,7 +168,13 @@ public final class H2Exchange implements HttpExchange {
      * @param writeTimeoutMs timeout in milliseconds for waiting on flow control window
      * @param initialWindowSize initial flow control window size for this stream
      */
-    H2Exchange(H2Muxer muxer, HttpRequest request, long readTimeoutMs, long writeTimeoutMs, int initialWindowSize) {
+    H2Exchange(
+            H2Muxer muxer,
+            HttpRequest request,
+            long readTimeoutMs,
+            long writeTimeoutMs,
+            int initialWindowSize
+    ) {
         this.muxer = muxer;
         this.request = request;
         this.streamId = -1; // Will be set later
@@ -181,6 +187,8 @@ public final class H2Exchange implements HttpExchange {
         this.sendWindow = new FlowControlWindow(muxer.getRemoteInitialWindowSize());
         this.initialWindowSize = initialWindowSize;
         this.streamRecvWindow = initialWindowSize;
+        this.streamBody = new H2StreamBody(128, this::discardChunk);
+        this.requestBodyState = new H2StreamRequestBody(this, muxer, this::onRequestStreamClosedUnchecked, state::isEndStreamSent);
     }
 
     /**
@@ -377,6 +385,7 @@ public final class H2Exchange implements HttpExchange {
         } finally {
             dataLock.unlock();
         }
+        streamBody.fail(readError);
     }
 
     /**
@@ -394,6 +403,7 @@ public final class H2Exchange implements HttpExchange {
         } finally {
             dataLock.unlock();
         }
+        streamBody.fail(readError);
     }
 
     /**
@@ -415,26 +425,28 @@ public final class H2Exchange implements HttpExchange {
         try {
             if (data != null && length > 0) {
                 streamRecvWindow -= flowControlBytes;
-                dataQueue.add(new DataChunk(data, endStream, flowControlBytes));
                 H2ConnectionStats s = muxer.getStats();
                 if (s != null) {
                     s.dataBytesQueued.add(length);
                 }
             } else if (data != null) {
                 muxer.returnBuffer(data);
+                data = null;
             }
 
             if (endStream) {
                 state.setEndStreamReceivedFlag();
                 clearReadDeadline();
             }
-
-            // Signal inside the lock to prevent lost-wakeup
-            if (endStream || !moreDataBuffered) {
-                signalReadWaiterLocked();
-            }
         } finally {
             dataLock.unlock();
+        }
+
+        if (data != null && length > 0) {
+            streamBody.offer(new DataChunk(data, endStream, flowControlBytes), this::discardChunk);
+        }
+        if (endStream) {
+            streamBody.complete();
         }
     }
 
@@ -446,12 +458,6 @@ public final class H2Exchange implements HttpExchange {
      * This is lock-free and can be called without holding any locks.
      */
     void signalDataAvailable() {
-        dataLock.lock();
-        try {
-            signalReadWaiterLocked();
-        } finally {
-            dataLock.unlock();
-        }
     }
 
     private void signalReadWaiterLocked() {
@@ -460,74 +466,52 @@ public final class H2Exchange implements HttpExchange {
         }
     }
 
-    /**
-     * Drain multiple data chunks from the queue into a destination deque.
-     *
-     * <p>This method is used by H2DataInputStream for batch dequeuing to reduce
-     * lock contention. Instead of acquiring the lock once per chunk, the consumer
-     * can pull multiple chunks in a single lock acquisition.
-     *
-     * @param dest the destination array to drain chunks into
-     * @param maxChunks maximum number of chunks to drain
-     * @return number of chunks drained, or -1 if EOF
-     * @throws IOException if an error occurs or the stream is in error state
-     */
-    int drainChunks(DataChunk[] dest, int maxChunks) throws IOException {
-        // If we haven't received headers yet, read them first
+    DataChunk awaitNextChunk() throws IOException {
         if (!state.isResponseHeadersReceived()) {
             readResponseHeaders();
         }
 
-        dataLock.lock();
-        try {
-            while (dataQueue.isEmpty() && state.getReadState() == RS_READING) {
-                PendingHeadersEvent headerEvent = pendingHeadersQueue.poll();
-                if (headerEvent != null) {
-                    handleHeadersEvent(headerEvent.fields(), headerEvent.endStream());
-                    if (state.getReadState() == RS_DONE) {
-                        break;
-                    }
-                }
-
-                try {
-                    readWaiterRegistered = true;
-                    dataAvailable.await();
-                } catch (InterruptedException e) {
-                    throw new IOException("Interrupted waiting for data");
-                } finally {
-                    readWaiterRegistered = false;
-                }
-            }
-
+        DataChunk chunk = streamBody.take();
+        if (chunk == null) {
             if (state.getReadState() == RS_ERROR) {
                 throw readError;
             }
-
-            if (dataQueue.isEmpty() && state.getReadState() == RS_DONE) {
-                if (state.getStreamState() != SS_CLOSED) {
-                    state.setStreamStateClosed();
-                    if (streamId > 0) {
-                        muxer.releaseStream(streamId);
-                    }
+            if (state.getStreamState() != SS_CLOSED) {
+                state.setStreamStateClosed();
+                if (streamId > 0) {
+                    muxer.releaseStream(streamId);
                 }
-                validateContentLength();
-                return -1;
             }
-
-            int drained = 0;
-            while (drained < maxChunks && !dataQueue.isEmpty()) {
-                dest[drained++] = dataQueue.poll();
-            }
-
-            if (drained > 0) {
-                onReadActivity();
-            }
-
-            return drained;
+            validateContentLength();
+            return null;
         }
-        finally {
-            dataLock.unlock();
+
+        onReadActivity();
+        return chunk;
+    }
+
+    int awaitChunks(DataChunk[] dest, int maxChunks) throws IOException {
+        if (!state.isResponseHeadersReceived()) {
+            readResponseHeaders();
         }
+
+        int drained = streamBody.takeBulk(dest, maxChunks);
+        if (drained < 0) {
+            if (state.getReadState() == RS_ERROR) {
+                throw readError;
+            }
+            if (state.getStreamState() != SS_CLOSED) {
+                state.setStreamStateClosed();
+                if (streamId > 0) {
+                    muxer.releaseStream(streamId);
+                }
+            }
+            validateContentLength();
+            return -1;
+        }
+
+        onReadActivity();
+        return drained;
     }
 
     /**
@@ -610,37 +594,12 @@ public final class H2Exchange implements HttpExchange {
 
     @Override
     public synchronized OutputStream requestBody() {
-        if (requestOut == null) {
-            // If no request body is expected, then return a no-op stream.
-            H2DataOutputStream rawOut = state.isEndStreamSent()
-                    ? new H2DataOutputStream(this, muxer, 0)
-                    : new H2DataOutputStream(this, muxer, muxer.getRemoteMaxFrameSize());
-            requestOut = new DelegatedClosingOutputStream(rawOut, rw -> {
-                rw.close(); // Send END_STREAM
-                onRequestStreamClosed();
-            });
-        }
-        return requestOut;
+        return requestBodyState.outputStream();
     }
 
     @Override
     public void writeRequestBody(DataStream body) throws IOException {
-        if (body == null || body.contentLength() == 0) {
-            requestBody().close();
-            return;
-        }
-
-        if (canWriteDirectReplayableBody(body)) {
-            try (ReadableByteChannel channel = body.asChannel()) {
-                writeChannelData(channel, body.contentLength(), true);
-            } finally {
-                onRequestStreamClosed();
-                body.close();
-            }
-            return;
-        }
-
-        HttpExchange.super.writeRequestBody(body);
+        requestBodyState.writeRequestBody(body);
     }
 
     @Override
@@ -655,7 +614,8 @@ public final class H2Exchange implements HttpExchange {
             // But only do this if:
             // - content-length is explicitly 0, OR
             // - end stream is received AND no data is queued (truly empty response)
-            boolean isEmpty = expectedContentLength == 0 || (state.isEndStreamReceived() && dataQueue.isEmpty());
+            boolean isEmpty = expectedContentLength == 0
+                    || (state.isEndStreamReceived() && streamBody.isEmpty());
             if (isEmpty) {
                 var nio = InputStream.nullInputStream();
                 responseIn = new DelegatedClosingInputStream(nio, this::onResponseStreamClosed);
@@ -697,6 +657,14 @@ public final class H2Exchange implements HttpExchange {
     private void onRequestStreamClosed() throws IOException {
         if (closedStreamCount.incrementAndGet() == BOTH_STREAMS_CLOSED) {
             close();
+        }
+    }
+
+    private void onRequestStreamClosedUnchecked() {
+        try {
+            onRequestStreamClosed();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed closing request stream", e);
         }
     }
 
@@ -744,11 +712,9 @@ public final class H2Exchange implements HttpExchange {
         }
 
         // Close request output if not already closed
-        if (requestOut != null && !state.isEndStreamSent()) {
-            try {
-                requestOut.close();
-            } catch (IOException ignored) {}
-        }
+        try {
+            requestBodyState.closeIfOpen();
+        } catch (IOException ignored) {}
 
         // If response not fully received and stream was started, queue RST_STREAM
         if (!state.isEndStreamReceived() && streamId > 0 && state.getStreamState() != SS_CLOSED) {
@@ -766,16 +732,7 @@ public final class H2Exchange implements HttpExchange {
 
         // Return all queued buffers to connection pool for reuse
         int discardedCredit = 0;
-        dataLock.lock();
-        try {
-            DataChunk chunk;
-            while ((chunk = dataQueue.poll()) != null) {
-                discardedCredit += chunk.flowControlBytes();
-                muxer.returnBuffer(chunk.data());
-            }
-        } finally {
-            dataLock.unlock();
-        }
+        discardedCredit += streamBody.close();
         releaseDataCredit(discardedCredit);
 
         // Mark stream as closed
@@ -938,6 +895,11 @@ public final class H2Exchange implements HttpExchange {
         H2ResponseHeaderProcessor.validateContentLength(expectedContentLength, receivedContentLength, streamId);
     }
 
+    private int discardChunk(DataChunk chunk) {
+        muxer.returnBuffer(chunk.data());
+        return chunk.flowControlBytes();
+    }
+
     /**
      * Update stream send window from WINDOW_UPDATE frame.
      *
@@ -1070,17 +1032,13 @@ public final class H2Exchange implements HttpExchange {
         }
     }
 
-    private static boolean canWriteDirectReplayableBody(DataStream body) {
-        return body.isReplayable() && body.hasKnownLength() && body.contentLength() <= Integer.MAX_VALUE;
-    }
-
     private void signalPendingWrites() {
         if (IN_WORK_QUEUE_HANDLE.compareAndSet(this, false, true)) {
             muxer.signalDataReady(this);
         }
     }
 
-    private void writeChannelData(ReadableByteChannel channel, long contentLength, boolean endStream)
+    void writeChannelData(ReadableByteChannel channel, long contentLength, boolean endStream)
             throws IOException {
         boolean hasTrailers = requestTrailers != null;
         int maxFrameSize = muxer.getRemoteMaxFrameSize();

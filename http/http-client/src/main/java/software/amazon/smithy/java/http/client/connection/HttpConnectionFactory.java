@@ -19,6 +19,7 @@ import software.amazon.smithy.java.http.client.ProxyConfiguration;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 import software.amazon.smithy.java.http.client.h1.H1Connection;
 import software.amazon.smithy.java.http.client.h1.ProxyTunnel;
+import software.amazon.smithy.java.http.client.h2.ConnectionAgentH2Connection;
 import software.amazon.smithy.java.http.client.h2.H2Connection;
 
 /**
@@ -44,6 +45,9 @@ record HttpConnectionFactory(
         HttpVersionPolicy versionPolicy,
         DnsResolver dnsResolver,
         HttpSocketFactory socketFactory,
+        boolean useConnectionAgentForH2c,
+        boolean useConnectionAgentForH2,
+        boolean usePlatformReaderForH2,
         int h2InitialWindowSize,
         int h2MaxFrameSize,
         int h2BufferSize) {
@@ -90,6 +94,19 @@ record HttpConnectionFactory(
             throw e;
         }
 
+        if (route.isSecure() && useConnectionAgentForH2) {
+            try {
+                SSLEngine engine = createClientEngine(route);
+                return new ConnectionAgentH2Connection(route, socket, engine);
+            } catch (IOException e) {
+                closeQuietly(socket);
+                throw e;
+            } catch (RuntimeException e) {
+                closeQuietly(socket);
+                throw new IOException("TLS connection-agent setup failed for " + route.host(), e);
+            }
+        }
+
         Transport transport;
         if (route.isSecure()) {
             transport = performTlsHandshake(socket, route);
@@ -102,15 +119,7 @@ record HttpConnectionFactory(
 
     private Transport performTlsHandshake(Socket socket, Route route) throws IOException {
         try {
-            SSLEngine engine = sslContext.createSSLEngine(route.host(), route.port());
-            engine.setUseClientMode(true);
-
-            SSLParameters params = sslParameters != null
-                    ? copyParameters(sslParameters)
-                    : engine.getSSLParameters();
-            params.setEndpointIdentificationAlgorithm("HTTPS");
-            params.setApplicationProtocols(versionPolicy.alpnProtocols());
-            engine.setSSLParameters(params);
+            SSLEngine engine = createClientEngine(route);
 
             int originalTimeout = socket.getSoTimeout();
             socket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
@@ -125,6 +134,19 @@ record HttpConnectionFactory(
             closeQuietly(socket);
             throw new IOException("TLS handshake failed for " + route.host(), e);
         }
+    }
+
+    private SSLEngine createClientEngine(Route route) {
+        SSLEngine engine = sslContext.createSSLEngine(route.host(), route.port());
+        engine.setUseClientMode(true);
+
+        SSLParameters params = sslParameters != null
+                ? copyParameters(sslParameters)
+                : engine.getSSLParameters();
+        params.setEndpointIdentificationAlgorithm("HTTPS");
+        params.setApplicationProtocols(versionPolicy.alpnProtocols());
+        engine.setSSLParameters(params);
+        return engine;
     }
 
     private static SSLParameters copyParameters(SSLParameters src) {
@@ -155,11 +177,14 @@ record HttpConnectionFactory(
         }
 
         try {
-            if ("h2".equals(protocol) || "h2c".equals(protocol)) {
+            if ("h2c".equals(protocol) && useConnectionAgentForH2c) {
+                return new ConnectionAgentH2Connection(route);
+            } else if ("h2".equals(protocol) || "h2c".equals(protocol)) {
                 return new H2Connection(transport,
                         route,
                         readTimeout,
                         writeTimeout,
+                        usePlatformReaderForH2,
                         h2InitialWindowSize,
                         h2MaxFrameSize,
                         h2BufferSize);

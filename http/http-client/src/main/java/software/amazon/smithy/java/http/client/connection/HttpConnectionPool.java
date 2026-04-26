@@ -15,7 +15,6 @@ import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
-import software.amazon.smithy.java.http.client.h2.H2Connection;
 
 /**
  * HTTP connection pool optimized for virtual threads.
@@ -169,6 +168,9 @@ public final class HttpConnectionPool implements ConnectionPool {
                 builder.versionPolicy,
                 dnsResolver,
                 builder.socketFactory,
+                builder.useConnectionAgentForH2c,
+                builder.useConnectionAgentForH2,
+                builder.usePlatformReaderForH2,
                 builder.h2InitialWindowSize,
                 builder.h2MaxFrameSize,
                 builder.h2BufferSize);
@@ -262,7 +264,7 @@ public final class HttpConnectionPool implements ConnectionPool {
     }
 
     // Called by H2ConnectionManager when a new connection is needed.
-    private H2Connection onNewH2Connection(Route route) throws IOException {
+    private MultiplexedHttpConnection onNewH2Connection(Route route) throws IOException {
         // Note: cleanupDead was removed from here - it caused lock contention under load.
         // Background cleanup thread handles dead connection removal every 30 seconds.
 
@@ -274,7 +276,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         try {
             conn = connectionFactory.create(route);
             notifyConnected(conn);
-            if (conn instanceof H2Connection h2conn) {
+            if (conn instanceof MultiplexedHttpConnection h2conn) {
                 success = true;
                 return h2conn;
             }
@@ -320,7 +322,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         notifyReturn(connection);
 
         // H2 connections stay active for multiplexing - don't pool them
-        if (connection instanceof H2Connection h2conn) {
+        if (connection instanceof MultiplexedHttpConnection h2conn) {
             if (!connection.isActive() || closed) {
                 h2Manager.unregister(route, h2conn);
                 closeAndReleasePermit(connection, CloseReason.UNEXPECTED_CLOSE);
@@ -340,7 +342,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         Objects.requireNonNull(connection, "connection cannot be null");
         Route route = connection.route();
 
-        if (connection instanceof H2Connection h2conn) {
+        if (connection instanceof MultiplexedHttpConnection h2conn) {
             h2Manager.unregister(route, h2conn);
         } else {
             h1Manager.remove(route, connection);
