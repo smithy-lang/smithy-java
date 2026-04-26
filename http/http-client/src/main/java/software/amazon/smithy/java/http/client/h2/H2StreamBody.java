@@ -6,52 +6,75 @@
 package software.amazon.smithy.java.http.client.h2;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.function.Consumer;
-import java.util.function.ToIntFunction;
 
 /**
  * Per-stream inbound body state backed by borrowed DATA-frame buffers.
  *
- * <p>The connection/reader side offers {@link DataChunk}s directly to this queue.
+ * <p>The connection/reader side offers borrowed DATA-frame buffers directly to this queue.
  * The response consumer side takes them and, when fully consumed, returns the
  * underlying pooled buffer and releases flow-control credit through the supplied
  * releaser.
  */
 final class H2StreamBody {
-    private final DataChunk[] elements;
-    private final ToIntFunction<DataChunk> releaser;
+    interface ChunkReleaser {
+        int release(ByteBuffer buffer, int flowControlBytes);
+    }
+
+    static final class ChunkSlot {
+        ByteBuffer data;
+        int flowControlBytes;
+
+        void set(ByteBuffer data, int flowControlBytes) {
+            this.data = data;
+            this.flowControlBytes = flowControlBytes;
+        }
+
+        void clear() {
+            this.data = null;
+            this.flowControlBytes = 0;
+        }
+    }
+
+    private final ByteBuffer[] buffers;
+    private final int[] flowControlBytes;
+    private final ChunkReleaser releaser;
     private int head;
     private int tail;
     private int size;
     private boolean completed;
     private IOException failure;
 
-    H2StreamBody(int capacity, ToIntFunction<DataChunk> releaser) {
-        this.elements = new DataChunk[capacity];
+    H2StreamBody(int capacity, ChunkReleaser releaser) {
+        this.buffers = new ByteBuffer[capacity];
+        this.flowControlBytes = new int[capacity];
         this.releaser = releaser;
     }
 
-    synchronized void offer(DataChunk chunk, Consumer<DataChunk> onClosed) {
-        while (failure == null && !completed && size == elements.length) {
+    synchronized int offer(ByteBuffer data, int chunkFlowControlBytes, Consumer<ByteBuffer> onClosed) {
+        while (failure == null && !completed && size == buffers.length) {
             try {
                 wait();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                onClosed.accept(chunk);
-                return;
+                onClosed.accept(data);
+                return chunkFlowControlBytes;
             }
         }
         if (failure != null || completed) {
-            onClosed.accept(chunk);
-            return;
+            onClosed.accept(data);
+            return chunkFlowControlBytes;
         }
-        elements[tail] = chunk;
-        tail = (tail + 1) % elements.length;
+        buffers[tail] = data;
+        flowControlBytes[tail] = chunkFlowControlBytes;
+        tail = (tail + 1) % buffers.length;
         size++;
         notifyAll();
+        return 0;
     }
 
-    synchronized DataChunk take() throws IOException {
+    synchronized boolean take(ChunkSlot dest) throws IOException {
         while (size == 0 && failure == null && !completed) {
             try {
                 wait();
@@ -64,17 +87,18 @@ final class H2StreamBody {
             throw failure;
         }
         if (size == 0) {
-            return null;
+            return false;
         }
-        DataChunk chunk = elements[head];
-        elements[head] = null;
-        head = (head + 1) % elements.length;
+        dest.set(buffers[head], flowControlBytes[head]);
+        buffers[head] = null;
+        flowControlBytes[head] = 0;
+        head = (head + 1) % buffers.length;
         size--;
         notifyAll();
-        return chunk;
+        return true;
     }
 
-    synchronized int takeBulk(DataChunk[] dest, int maxChunks) throws IOException {
+    synchronized int takeBulk(ChunkSlot[] dest, int maxChunks) throws IOException {
         while (size == 0 && failure == null && !completed) {
             try {
                 wait();
@@ -92,11 +116,12 @@ final class H2StreamBody {
 
         int drained = 0;
         while (drained < maxChunks && size > 0) {
-            DataChunk chunk = elements[head];
-            elements[head] = null;
-            head = (head + 1) % elements.length;
+            dest[drained].set(buffers[head], flowControlBytes[head]);
+            buffers[head] = null;
+            flowControlBytes[head] = 0;
+            head = (head + 1) % buffers.length;
             size--;
-            dest[drained++] = chunk;
+            drained++;
         }
         notifyAll();
         return drained;
@@ -120,11 +145,13 @@ final class H2StreamBody {
         completed = true;
         int released = 0;
         while (size > 0) {
-            DataChunk chunk = elements[head];
-            elements[head] = null;
-            head = (head + 1) % elements.length;
+            ByteBuffer data = buffers[head];
+            int chunkFlowControlBytes = flowControlBytes[head];
+            buffers[head] = null;
+            flowControlBytes[head] = 0;
+            head = (head + 1) % buffers.length;
             size--;
-            released += releaser.applyAsInt(chunk);
+            released += releaser.release(data, chunkFlowControlBytes);
         }
         notifyAll();
         return released;

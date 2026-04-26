@@ -21,6 +21,8 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  * instead of spreading it across {@link H2Exchange} and {@link H2DataOutputStream}.
  */
 final class H2StreamRequestBody {
+    private static final int DIRECT_REPLAYABLE_UPLOAD_LIMIT = 8 * 1024 * 1024;
+
     private final H2Exchange exchange;
     private final H2Muxer muxer;
     private final Runnable onRequestStreamClosed;
@@ -59,8 +61,14 @@ final class H2StreamRequestBody {
         }
 
         if (body.isReplayable() && body.hasKnownLength() && body.contentLength() <= Integer.MAX_VALUE) {
-            try (ReadableByteChannel channel = body.asChannel()) {
-                exchange.writeChannelData(channel, body.contentLength(), true);
+            try {
+                if (body.contentLength() <= DIRECT_REPLAYABLE_UPLOAD_LIMIT) {
+                    exchange.writeReplayableBody(body.asByteBuffer(), true);
+                } else {
+                    try (ReadableByteChannel channel = body.asChannel()) {
+                        exchange.writeChannelData(channel, body.contentLength(), true);
+                    }
+                }
             } finally {
                 onRequestStreamClosed.run();
                 body.close();
