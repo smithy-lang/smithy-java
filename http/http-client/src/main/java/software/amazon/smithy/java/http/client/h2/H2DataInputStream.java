@@ -25,10 +25,11 @@ final class H2DataInputStream extends InputStream {
 
     private final H2Exchange exchange;
     private final Consumer<ByteBuffer> bufferReturner;
-    private final DataChunk[] localBatch = new DataChunk[BATCH_SIZE];
+    private final H2StreamBody.ChunkSlot[] localBatch = new H2StreamBody.ChunkSlot[BATCH_SIZE];
+    private final H2StreamBody.ChunkSlot currentChunk = new H2StreamBody.ChunkSlot();
 
-    private DataChunk currentChunk;
     private ByteBuffer current;
+    private int currentFlowControlBytes;
     private boolean eof = false;
     private boolean closed = false;
     private final byte[] singleBuff = new byte[1];
@@ -37,6 +38,9 @@ final class H2DataInputStream extends InputStream {
     H2DataInputStream(H2Exchange exchange, Consumer<ByteBuffer> bufferReturner) {
         this.exchange = exchange;
         this.bufferReturner = bufferReturner;
+        for (int i = 0; i < BATCH_SIZE; i++) {
+            localBatch[i] = new H2StreamBody.ChunkSlot();
+        }
     }
 
     /**
@@ -122,24 +126,25 @@ final class H2DataInputStream extends InputStream {
     }
 
     private boolean pullNextChunk() throws IOException {
-        if (currentChunk != null) {
+        if (current != null) {
             releaseCurrentChunk();
         }
 
-        currentChunk = exchange.awaitNextChunk();
-        if (currentChunk == null) {
+        if (!exchange.awaitNextChunk(currentChunk)) {
             eof = true;
             return false;
         }
-        current = currentChunk.data();
+        current = currentChunk.data;
+        currentFlowControlBytes = currentChunk.flowControlBytes;
         return true;
     }
 
     private void releaseCurrentChunk() {
-        exchange.releaseDataCredit(currentChunk.flowControlBytes());
-        bufferReturner.accept(currentChunk.data());
-        currentChunk = null;
+        exchange.releaseDataCredit(currentFlowControlBytes);
+        bufferReturner.accept(currentChunk.data);
+        currentChunk.clear();
         current = null;
+        currentFlowControlBytes = 0;
     }
 
     @Override
@@ -209,9 +214,11 @@ final class H2DataInputStream extends InputStream {
             }
 
             for (int i = 0; i < drained; i++) {
-                currentChunk = localBatch[i];
-                localBatch[i] = null;
-                current = currentChunk.data();
+                H2StreamBody.ChunkSlot chunk = localBatch[i];
+                currentChunk.set(chunk.data, chunk.flowControlBytes);
+                chunk.clear();
+                current = currentChunk.data;
+                currentFlowControlBytes = currentChunk.flowControlBytes;
                 transferred += writeCurrentTo(out);
                 releaseCurrentChunk();
             }
