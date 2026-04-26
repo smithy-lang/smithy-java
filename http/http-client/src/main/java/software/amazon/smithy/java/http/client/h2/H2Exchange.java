@@ -443,7 +443,10 @@ public final class H2Exchange implements HttpExchange {
         }
 
         if (data != null && length > 0) {
-            streamBody.offer(new DataChunk(data, endStream, flowControlBytes), this::discardChunk);
+            int discardedFlowControlBytes = streamBody.offer(data, flowControlBytes, muxer::returnBuffer);
+            if (discardedFlowControlBytes > 0) {
+                releaseDataCredit(discardedFlowControlBytes);
+            }
         }
         if (endStream) {
             streamBody.complete();
@@ -466,13 +469,12 @@ public final class H2Exchange implements HttpExchange {
         }
     }
 
-    DataChunk awaitNextChunk() throws IOException {
+    boolean awaitNextChunk(H2StreamBody.ChunkSlot chunk) throws IOException {
         if (!state.isResponseHeadersReceived()) {
             readResponseHeaders();
         }
 
-        DataChunk chunk = streamBody.take();
-        if (chunk == null) {
+        if (!streamBody.take(chunk)) {
             if (state.getReadState() == RS_ERROR) {
                 throw readError;
             }
@@ -483,14 +485,14 @@ public final class H2Exchange implements HttpExchange {
                 }
             }
             validateContentLength();
-            return null;
+            return false;
         }
 
         onReadActivity();
-        return chunk;
+        return true;
     }
 
-    int awaitChunks(DataChunk[] dest, int maxChunks) throws IOException {
+    int awaitChunks(H2StreamBody.ChunkSlot[] dest, int maxChunks) throws IOException {
         if (!state.isResponseHeadersReceived()) {
             readResponseHeaders();
         }
@@ -895,9 +897,9 @@ public final class H2Exchange implements HttpExchange {
         H2ResponseHeaderProcessor.validateContentLength(expectedContentLength, receivedContentLength, streamId);
     }
 
-    private int discardChunk(DataChunk chunk) {
-        muxer.returnBuffer(chunk.data());
-        return chunk.flowControlBytes();
+    private int discardChunk(ByteBuffer data, int flowControlBytes) {
+        muxer.returnBuffer(data);
+        return flowControlBytes;
     }
 
     /**
@@ -948,6 +950,10 @@ public final class H2Exchange implements HttpExchange {
      */
     void writeData(ByteBuffer data, boolean endStream) throws IOException {
         writeData(data, endStream, false);
+    }
+
+    void writeReplayableBody(ByteBuffer data, boolean endStream) throws IOException {
+        writeData(data, endStream, true);
     }
 
     private void writeData(ByteBuffer data, boolean endStream, boolean shareBuffers) throws IOException {
