@@ -10,7 +10,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
@@ -166,7 +169,12 @@ final class SSLEngineTransport implements AutoCloseable {
         }
         int n;
         if (socketChannel != null) {
-            n = socketChannel.read(netIn);
+            int timeoutMs = socket.getSoTimeout();
+            if (timeoutMs > 0 && socketChannel.isBlocking()) {
+                n = readWithTimeout(timeoutMs);
+            } else {
+                n = socketChannel.read(netIn);
+            }
         } else {
             n = socketIn.read(netIn.array(), netIn.arrayOffset() + netIn.position(), netIn.remaining());
             if (n > 0) {
@@ -178,6 +186,29 @@ final class SSLEngineTransport implements AutoCloseable {
             return false;
         }
         return true;
+    }
+
+    private int readWithTimeout(int timeoutMs) throws IOException {
+        boolean wasBlocking = socketChannel.isBlocking();
+        try (Selector selector = Selector.open()) {
+            socketChannel.configureBlocking(false);
+            socketChannel.register(selector, SelectionKey.OP_READ);
+            while (true) {
+                int ready = selector.select(timeoutMs);
+                if (ready == 0) {
+                    throw new SocketTimeoutException("Read timed out");
+                }
+                selector.selectedKeys().clear();
+                int n = socketChannel.read(netIn);
+                if (n != 0) {
+                    return n;
+                }
+            }
+        } finally {
+            if (wasBlocking) {
+                socketChannel.configureBlocking(true);
+            }
+        }
     }
 
     private void writeNetOut() throws IOException {

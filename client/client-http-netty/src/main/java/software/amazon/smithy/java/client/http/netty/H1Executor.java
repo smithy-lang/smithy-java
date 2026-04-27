@@ -21,6 +21,10 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.ScatteringByteChannel;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +42,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 final class H1Executor {
 
     private static final int UPLOAD_CHUNK = 64 * 1024;
+    private static final int UPLOAD_BATCH_CHUNKS = 4;
     private static final int BODY_HIGH_WATER = 32;
     private static final int BODY_LOW_WATER = 8;
 
@@ -77,11 +82,13 @@ final class H1Executor {
         channel.eventLoop().execute(() -> channel.write(nettyReq));
 
         if (hasBody) {
-            try (InputStream in = request.body().asInputStream()) {
-                streamRequestBody(channel, in);
+            try {
+                streamRequestBody(channel, request.body());
             } catch (IOException e) {
                 channel.close();
                 throw e;
+            } finally {
+                request.body().close();
             }
         } else {
             channel.eventLoop().execute(() -> channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT));
@@ -123,28 +130,101 @@ final class H1Executor {
         return path;
     }
 
-    private static void streamRequestBody(Channel channel, InputStream in) throws IOException {
-        byte[] buf = new byte[UPLOAD_CHUNK];
-        while (true) {
-            int n = in.read(buf);
-            if (n < 0) {
-                channel.eventLoop().execute(() -> channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT));
+    private static void streamRequestBody(Channel channel, DataStream body) throws IOException {
+        List<ByteBuf> batch = new ArrayList<>(UPLOAD_BATCH_CHUNKS);
+        try (ReadableByteChannel channelBody = body.asChannel()) {
+            if (channelBody instanceof ScatteringByteChannel scattering) {
+                streamRequestBody(channel, scattering, batch);
                 return;
             }
-            if (n == 0)
+        }
+
+        try (InputStream in = body.asInputStream()) {
+            byte[] copyBuffer = new byte[UPLOAD_CHUNK];
+            while (true) {
+                int n = in.read(copyBuffer);
+                if (n < 0) {
+                    flushBatch(channel, batch, true);
+                    return;
+                }
+                if (n == 0) {
+                    continue;
+                }
+
+                while (!channel.isWritable()) {
+                    flushBatch(channel, batch, false);
+                    LockSupport.parkNanos(100_000);
+                    if (!channel.isOpen()) {
+                        throw new IOException("Channel closed while waiting for writability");
+                    }
+                }
+
+                ByteBuf out = channel.alloc().buffer(n);
+                out.writeBytes(copyBuffer, 0, n);
+                batch.add(out);
+                if (batch.size() >= UPLOAD_BATCH_CHUNKS) {
+                    flushBatch(channel, batch, false);
+                }
+            }
+        }
+    }
+
+    private static void streamRequestBody(
+            Channel channel,
+            ScatteringByteChannel in,
+            List<ByteBuf> batch
+    ) throws IOException {
+        while (true) {
+            ByteBuf out = channel.alloc().buffer(UPLOAD_CHUNK);
+            int n = out.writeBytes(in, UPLOAD_CHUNK);
+            if (n < 0) {
+                out.release();
+                flushBatch(channel, batch, true);
+                return;
+            }
+            if (n == 0) {
+                out.release();
                 continue;
+            }
 
             while (!channel.isWritable()) {
+                flushBatch(channel, batch, false);
                 LockSupport.parkNanos(100_000);
                 if (!channel.isOpen()) {
                     throw new IOException("Channel closed while waiting for writability");
                 }
             }
 
-            ByteBuf out = channel.alloc().buffer(n);
-            out.writeBytes(buf, 0, n);
-            channel.eventLoop().execute(() -> channel.writeAndFlush(new DefaultHttpContent(out)));
+            if (n < out.capacity()) {
+                out.writerIndex(n);
+                out.capacity(n);
+            }
+            batch.add(out);
+            if (batch.size() >= UPLOAD_BATCH_CHUNKS) {
+                flushBatch(channel, batch, false);
+            }
         }
+    }
+
+    private static void flushBatch(Channel channel, List<ByteBuf> batch, boolean endStream) {
+        if (batch.isEmpty()) {
+            if (endStream) {
+                channel.eventLoop().execute(() -> channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT));
+            }
+            return;
+        }
+
+        ByteBuf[] bufs = batch.toArray(ByteBuf[]::new);
+        batch.clear();
+        channel.eventLoop().execute(() -> {
+            for (ByteBuf buf : bufs) {
+                channel.write(new DefaultHttpContent(buf));
+            }
+            if (endStream) {
+                channel.write(LastHttpContent.EMPTY_LAST_CONTENT);
+            }
+            channel.flush();
+        });
     }
 
     private static final class ResponseHandler extends SimpleChannelInboundHandler<HttpObject> {
