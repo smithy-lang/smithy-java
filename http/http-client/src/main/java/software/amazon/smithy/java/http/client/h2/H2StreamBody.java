@@ -149,9 +149,9 @@ final class H2StreamBody {
             int chunkFlowControlBytes = flowControlBytes[head];
             buffers[head] = null;
             flowControlBytes[head] = 0;
+            released += releaser.release(data, chunkFlowControlBytes);
             head = (head + 1) % buffers.length;
             size--;
-            released += releaser.release(data, chunkFlowControlBytes);
         }
         notifyAll();
         return released;

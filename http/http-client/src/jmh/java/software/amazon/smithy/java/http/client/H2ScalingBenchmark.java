@@ -56,6 +56,7 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -90,6 +91,7 @@ public class H2ScalingBenchmark {
 
     private HttpClient smithyClient;
     private java.net.http.HttpClient javaClient;
+    private JavaHttpClientTransport javaTransport;
     private EventLoopGroup nettyGroup;
     private Channel nettyChannel;
     private NettyH2Transport nettyTransport;
@@ -126,6 +128,7 @@ public class H2ScalingBenchmark {
                 .version(java.net.http.HttpClient.Version.HTTP_2)
                 .sslContext(sslContext)
                 .build();
+        javaTransport = new JavaHttpClientTransport(javaClient);
 
         BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H2_URL);
 
@@ -198,6 +201,9 @@ public class H2ScalingBenchmark {
         if (javaClient != null) {
             javaClient.close();
             javaClient = null;
+        }
+        if (javaTransport != null) {
+            javaTransport = null;
         }
         if (nettyChannel != null) {
             nettyChannel.close().sync();
@@ -528,6 +534,24 @@ public class H2ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
+    public void h2JavaWrapperPutMb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
+        var request = HttpRequest.create()
+                .setUri(uri)
+                .setMethod("PUT")
+                .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var response = javaTransport.send(transportContext, req)) {
+                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Java wrapper H2 PUT 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
     public void h2SmithyGetMb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb");
         var request = HttpRequest.create().setUri(uri).setMethod("GET");
@@ -539,6 +563,21 @@ public class H2ScalingBenchmark {
         }, request, counter);
 
         counter.logErrors("Smithy H2 GET 1MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2JavaWrapperGetMb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb");
+        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var response = javaTransport.send(transportContext, req)) {
+                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Java Wrapper H2 GET 1MB");
     }
 
     @Benchmark
@@ -629,6 +668,21 @@ public class H2ScalingBenchmark {
         }, request, counter);
 
         counter.logErrors("Smithy H2 GET 10MB");
+    }
+
+    @Benchmark
+    @Threads(1)
+    public void h2JavaWrapperGet10Mb(Counter counter) throws InterruptedException {
+        var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/get10mb");
+        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+
+        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+            try (var response = javaTransport.send(transportContext, req)) {
+                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+            }
+        }, request, counter);
+
+        counter.logErrors("Java Wrapper H2 GET 10MB");
     }
 
     @Benchmark

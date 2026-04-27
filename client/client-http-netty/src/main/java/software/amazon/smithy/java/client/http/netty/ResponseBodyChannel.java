@@ -40,7 +40,6 @@ import java.util.function.Consumer;
 final class ResponseBodyChannel extends InputStream {
 
     private static final ByteBuf EOS = Unpooled.EMPTY_BUFFER;
-
     private static final int IDLE = 0;
     private static final int WAITING = 1;
     private static final int HANDED_OFF = 2;

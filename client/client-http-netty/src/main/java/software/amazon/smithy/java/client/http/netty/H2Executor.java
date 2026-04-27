@@ -19,6 +19,10 @@ import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.Http2StreamFrame;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.ScatteringByteChannel;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -42,6 +46,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 final class H2Executor {
 
     private static final int UPLOAD_CHUNK = 64 * 1024;
+    private static final int UPLOAD_BATCH_CHUNKS = 4;
     private static final int BODY_HIGH_WATER = 32;
     private static final int BODY_LOW_WATER = 8;
 
@@ -78,11 +83,13 @@ final class H2Executor {
         });
 
         if (hasBody) {
-            try (InputStream in = request.body().asInputStream()) {
-                streamRequestBody(stream, in);
+            try {
+                streamRequestBody(stream, request.body());
             } catch (IOException e) {
                 stream.close();
                 throw e;
+            } finally {
+                request.body().close();
             }
         }
 
@@ -111,29 +118,98 @@ final class H2Executor {
                 .toUnmodifiable();
     }
 
-    private static void streamRequestBody(Http2StreamChannel stream, InputStream in) throws IOException {
-        byte[] buf = new byte[UPLOAD_CHUNK];
-        while (true) {
-            int n = in.read(buf);
-            if (n < 0) {
-                stream.eventLoop()
-                        .execute(() -> stream.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.EMPTY_BUFFER, true)));
+    private static void streamRequestBody(Http2StreamChannel stream, DataStream body) throws IOException {
+        List<ByteBuf> batch = new ArrayList<>(UPLOAD_BATCH_CHUNKS);
+        try (ReadableByteChannel channel = body.asChannel()) {
+            if (channel instanceof ScatteringByteChannel scattering) {
+                streamRequestBody(stream, scattering, batch);
                 return;
             }
-            if (n == 0)
+        }
+
+        try (InputStream in = body.asInputStream()) {
+            byte[] copyBuffer = new byte[UPLOAD_CHUNK];
+            while (true) {
+                int n = in.read(copyBuffer);
+                if (n < 0) {
+                    flushBatch(stream, batch, true);
+                    return;
+                }
+                if (n == 0) {
+                    continue;
+                }
+
+                while (!stream.isWritable()) {
+                    flushBatch(stream, batch, false);
+                    LockSupport.parkNanos(100_000);
+                    if (!stream.isOpen()) {
+                        throw new IOException("Stream closed while waiting for writability");
+                    }
+                }
+
+                ByteBuf out = stream.alloc().buffer(n);
+                out.writeBytes(copyBuffer, 0, n);
+                batch.add(out);
+                if (batch.size() >= UPLOAD_BATCH_CHUNKS) {
+                    flushBatch(stream, batch, false);
+                }
+            }
+        }
+    }
+
+    private static void streamRequestBody(
+            Http2StreamChannel stream,
+            ScatteringByteChannel in,
+            List<ByteBuf> batch
+    ) throws IOException {
+        while (true) {
+            ByteBuf out = stream.alloc().buffer(UPLOAD_CHUNK);
+            int n = out.writeBytes(in, UPLOAD_CHUNK);
+            if (n < 0) {
+                out.release();
+                flushBatch(stream, batch, true);
+                return;
+            }
+            if (n == 0) {
+                out.release();
                 continue;
+            }
 
             while (!stream.isWritable()) {
+                flushBatch(stream, batch, false);
                 LockSupport.parkNanos(100_000);
                 if (!stream.isOpen()) {
                     throw new IOException("Stream closed while waiting for writability");
                 }
             }
 
-            ByteBuf out = stream.alloc().buffer(n);
-            out.writeBytes(buf, 0, n);
-            stream.eventLoop().execute(() -> stream.writeAndFlush(new DefaultHttp2DataFrame(out, false)));
+            if (n < out.capacity()) {
+                out.writerIndex(n);
+                out.capacity(n);
+            }
+            batch.add(out);
+            if (batch.size() >= UPLOAD_BATCH_CHUNKS) {
+                flushBatch(stream, batch, false);
+            }
         }
+    }
+
+    private static void flushBatch(Http2StreamChannel stream, List<ByteBuf> batch, boolean endStream) {
+        if (batch.isEmpty()) {
+            stream.eventLoop()
+                    .execute(() -> stream.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.EMPTY_BUFFER, endStream)));
+            return;
+        }
+
+        ByteBuf[] bufs = batch.toArray(ByteBuf[]::new);
+        batch.clear();
+        stream.eventLoop().execute(() -> {
+            for (int i = 0; i < bufs.length; i++) {
+                boolean frameEndStream = endStream && i == bufs.length - 1;
+                stream.write(new DefaultHttp2DataFrame(bufs[i], frameEndStream));
+            }
+            stream.flush();
+        });
     }
 
     private static final class ResponseHandler extends SimpleChannelInboundHandler<Http2StreamFrame> {

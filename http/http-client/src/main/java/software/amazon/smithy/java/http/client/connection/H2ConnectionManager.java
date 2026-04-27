@@ -12,7 +12,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
-import software.amazon.smithy.java.http.client.h2.H2Connection;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -34,7 +33,7 @@ final class H2ConnectionManager {
      */
     private static final class RouteState {
         /** Connections for this route. Volatile for lock-free reads. */
-        volatile H2Connection[] conns = new H2Connection[0];
+        volatile MultiplexedHttpConnection[] conns = new MultiplexedHttpConnection[0];
 
         /** Connections currently being created (prevents over-creation). Guarded by lock. */
         int pendingCreations = 0;
@@ -47,7 +46,7 @@ final class H2ConnectionManager {
         final Condition available = lock.newCondition();
     }
 
-    private static final H2Connection[] EMPTY = new H2Connection[0];
+    private static final MultiplexedHttpConnection[] EMPTY = new MultiplexedHttpConnection[0];
 
     // Soft limit as a fraction of streamsPerConnection. When all connections exceed this threshold,
     // we try to create a new connection (if under max).
@@ -62,7 +61,7 @@ final class H2ConnectionManager {
 
     @FunctionalInterface
     interface ConnectionFactory {
-        H2Connection create(Route route) throws IOException;
+        MultiplexedHttpConnection create(Route route) throws IOException;
     }
 
     H2ConnectionManager(
@@ -104,14 +103,14 @@ final class H2ConnectionManager {
      * @return an H2 connection ready for use
      * @throws IOException if acquisition times out or is interrupted
      */
-    H2Connection acquire(Route route, int maxConnectionsForRoute) throws IOException {
+    MultiplexedHttpConnection acquire(Route route, int maxConnectionsForRoute) throws IOException {
         RouteState state = stateFor(route);
         long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(acquireTimeoutMs);
 
         state.lock.lock();
         try {
             while (true) {
-                H2Connection[] snapshot = state.conns;
+                MultiplexedHttpConnection[] snapshot = state.conns;
                 int connCount = snapshot.length;
                 int totalConns = connCount + state.pendingCreations;
 
@@ -175,9 +174,9 @@ final class H2ConnectionManager {
         return createNewH2Connection(route, state);
     }
 
-    private H2Connection createNewH2Connection(Route route, RouteState state) throws IOException {
+    private MultiplexedHttpConnection createNewH2Connection(Route route, RouteState state) throws IOException {
         // Create new connection OUTSIDE the lock to avoid deadlock.
-        H2Connection newConn = null;
+        MultiplexedHttpConnection newConn = null;
         IOException createException = null;
         try {
             newConn = connectionFactory.create(route);
@@ -198,8 +197,8 @@ final class H2ConnectionManager {
             try {
                 state.pendingCreations--;
                 if (newConn != null) {
-                    H2Connection[] cur = state.conns;
-                    H2Connection[] next = new H2Connection[cur.length + 1];
+                    MultiplexedHttpConnection[] cur = state.conns;
+                    MultiplexedHttpConnection[] next = new MultiplexedHttpConnection[cur.length + 1];
                     System.arraycopy(cur, 0, next, 0, cur.length);
                     next[cur.length] = newConn;
                     state.conns = next;
@@ -221,14 +220,14 @@ final class H2ConnectionManager {
     /**
      * Unregister a connection from the route.
      */
-    void unregister(Route route, H2Connection conn) {
+    void unregister(Route route, MultiplexedHttpConnection conn) {
         RouteState state = routes.get(route);
         if (state == null) {
             return;
         }
         state.lock.lock();
         try {
-            H2Connection[] cur = state.conns;
+            MultiplexedHttpConnection[] cur = state.conns;
             int n = cur.length;
             int idx = -1;
             for (int i = 0; i < n; i++) {
@@ -243,7 +242,7 @@ final class H2ConnectionManager {
             } else if (n == 1) {
                 state.conns = EMPTY;
             } else {
-                H2Connection[] next = new H2Connection[n - 1];
+                MultiplexedHttpConnection[] next = new MultiplexedHttpConnection[n - 1];
                 System.arraycopy(cur, 0, next, 0, idx);
                 System.arraycopy(cur, idx + 1, next, idx, n - idx - 1);
                 state.conns = next;
@@ -254,17 +253,17 @@ final class H2ConnectionManager {
         }
     }
 
-    void cleanupDead(Route route, BiConsumer<H2Connection, CloseReason> onRemove) {
+    void cleanupDead(Route route, BiConsumer<MultiplexedHttpConnection, CloseReason> onRemove) {
         RouteState state = routes.get(route);
         if (state == null) {
             return;
         }
 
-        H2Connection[] cur = state.conns;
+        MultiplexedHttpConnection[] cur = state.conns;
 
         // Quick check without lock - if all look healthy, skip
         boolean anyDead = false;
-        for (H2Connection conn : cur) {
+        for (MultiplexedHttpConnection conn : cur) {
             if (conn != null && (!conn.canAcceptMoreStreams() || !conn.isActive())) {
                 anyDead = true;
                 break;
@@ -279,9 +278,9 @@ final class H2ConnectionManager {
         try {
             cur = state.conns; // Re-read under lock
             int n = cur.length;
-            H2Connection[] tmp = new H2Connection[n];
+            MultiplexedHttpConnection[] tmp = new MultiplexedHttpConnection[n];
             int w = 0;
-            for (H2Connection conn : cur) {
+            for (MultiplexedHttpConnection conn : cur) {
                 if (conn == null) {
                     continue;
                 }
@@ -295,7 +294,7 @@ final class H2ConnectionManager {
                 }
             }
             if (w != n) {
-                H2Connection[] next = new H2Connection[w];
+                MultiplexedHttpConnection[] next = new MultiplexedHttpConnection[w];
                 System.arraycopy(tmp, 0, next, 0, w);
                 state.conns = next;
                 // Wake waiters - removed connections free capacity
@@ -306,7 +305,7 @@ final class H2ConnectionManager {
         }
     }
 
-    void cleanupAllDead(BiConsumer<H2Connection, CloseReason> onRemove) {
+    void cleanupAllDead(BiConsumer<MultiplexedHttpConnection, CloseReason> onRemove) {
         for (Route route : routes.keySet()) {
             cleanupDead(route, onRemove);
         }
@@ -318,13 +317,13 @@ final class H2ConnectionManager {
      * @param maxIdleTimeNanos maximum idle time in nanoseconds
      * @param onRemove         callback for removed connections
      */
-    void cleanupIdle(long maxIdleTimeNanos, BiConsumer<H2Connection, CloseReason> onRemove) {
+    void cleanupIdle(long maxIdleTimeNanos, BiConsumer<MultiplexedHttpConnection, CloseReason> onRemove) {
         for (RouteState state : routes.values()) {
-            H2Connection[] cur = state.conns;
+            MultiplexedHttpConnection[] cur = state.conns;
 
             // Quick check without lock - if none look idle, skip
             boolean anyIdle = false;
-            for (H2Connection conn : cur) {
+            for (MultiplexedHttpConnection conn : cur) {
                 if (conn != null && conn.getIdleTimeNanos() > maxIdleTimeNanos) {
                     anyIdle = true;
                     break;
@@ -339,9 +338,9 @@ final class H2ConnectionManager {
             try {
                 cur = state.conns; // Re-read under lock
                 int n = cur.length;
-                H2Connection[] tmp = new H2Connection[n];
+                MultiplexedHttpConnection[] tmp = new MultiplexedHttpConnection[n];
                 int w = 0;
-                for (H2Connection conn : cur) {
+                for (MultiplexedHttpConnection conn : cur) {
                     if (conn == null) {
                         continue;
                     }
@@ -352,7 +351,7 @@ final class H2ConnectionManager {
                     }
                 }
                 if (w != n) {
-                    H2Connection[] next = new H2Connection[w];
+                    MultiplexedHttpConnection[] next = new MultiplexedHttpConnection[w];
                     System.arraycopy(tmp, 0, next, 0, w);
                     state.conns = next;
                     // Wake waiters - removed connections free capacity
@@ -371,10 +370,10 @@ final class H2ConnectionManager {
      * RouteState may continue to operate briefly. For hard shutdown semantics, callers
      * should ensure no new requests are submitted before calling this method.
      */
-    void closeAll(BiConsumer<H2Connection, CloseReason> onClose) {
+    void closeAll(BiConsumer<MultiplexedHttpConnection, CloseReason> onClose) {
         for (RouteState state : routes.values()) {
-            H2Connection[] snapshot = state.conns;
-            for (H2Connection conn : snapshot) {
+            MultiplexedHttpConnection[] snapshot = state.conns;
+            for (MultiplexedHttpConnection conn : snapshot) {
                 if (conn != null) {
                     onClose.accept(conn, CloseReason.POOL_SHUTDOWN);
                 }
@@ -383,7 +382,7 @@ final class H2ConnectionManager {
         routes.clear();
     }
 
-    private void notifyAcquire(H2Connection conn, boolean reused) {
+    private void notifyAcquire(MultiplexedHttpConnection conn, boolean reused) {
         for (ConnectionPoolListener listener : listeners) {
             listener.onAcquire(conn, reused);
         }
