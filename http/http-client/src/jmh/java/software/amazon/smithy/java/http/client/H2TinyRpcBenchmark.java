@@ -7,6 +7,7 @@ package software.amazon.smithy.java.http.client;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.http.HttpClient.Version;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -22,6 +23,7 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -49,6 +51,8 @@ public class H2TinyRpcBenchmark {
     private int streamsPerConnection;
 
     private HttpClient smithyClient;
+    private java.net.http.HttpClient javaClient;
+    private JavaHttpClientTransport javaTransport;
     private software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport productionNettyTransport;
     private software.amazon.smithy.java.context.Context transportContext;
     private HttpRequest smithyRequest;
@@ -67,8 +71,14 @@ public class H2TinyRpcBenchmark {
                         .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
                         .sslContext(sslContext)
                         .dnsResolver(BenchmarkSupport.staticDns())
-                        .build())
+                .build())
                 .build();
+
+        javaClient = java.net.http.HttpClient.newBuilder()
+                .version(Version.HTTP_2)
+                .sslContext(sslContext)
+                .build();
+        javaTransport = new JavaHttpClientTransport(javaClient);
 
         var nettyTransportConfig = new software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig()
                 .maxConnectionsPerHost(connections)
@@ -100,6 +110,11 @@ public class H2TinyRpcBenchmark {
                 smithyClient.close();
                 smithyClient = null;
             }
+            if (javaClient != null) {
+                javaClient.close();
+                javaClient = null;
+            }
+            javaTransport = null;
             if (productionNettyTransport != null) {
                 productionNettyTransport.close();
                 productionNettyTransport = null;
@@ -112,6 +127,16 @@ public class H2TinyRpcBenchmark {
     public void h2SmithyTinyRpc() throws Exception {
         try (var response = smithyClient.send(smithyRequest)) {
             response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+        }
+    }
+
+    @Benchmark
+    @Threads(64)
+    public void h2JavaWrapperTinyRpc() throws Exception {
+        try (var response = javaTransport.send(transportContext, smithyRequest)) {
+            try (InputStream body = response.body().asInputStream()) {
+                body.transferTo(OutputStream.nullOutputStream());
+            }
         }
     }
 

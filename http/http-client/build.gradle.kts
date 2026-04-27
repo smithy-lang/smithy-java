@@ -47,7 +47,9 @@ dependencies {
     jmh("io.netty:netty-all:4.2.7.Final")
 
     // Client-http-netty productionized transport for benchmarking
+    jmh(project(":client:client-http"))
     jmh(project(":client:client-http-netty"))
+    jmh(project(":client:client-http-crt"))
     jmh(project(":client:client-core"))
 
     // Benchmark server dependencies (Netty runs in separate process)
