@@ -113,7 +113,8 @@ final class XmlDeserializer implements ShapeDeserializer {
                 expected = trait.getValue();
             } else if (schema.isMember()) {
                 expected = schema.memberTarget().id().getName();
-            } else if (name != null && (name.equals("ErrorResponse") || name.equals("Error"))) {
+            } else if (name != null
+                    && (name.equals("ErrorResponse") || name.equals("Error") || name.equals("Response"))) {
                 skipToCodeElement(name);
                 return;
             } else {
@@ -157,6 +158,10 @@ final class XmlDeserializer implements ShapeDeserializer {
     private void skipToCodeElement(String name) throws XMLStreamException {
         if (name.equals("ErrorResponse")) {
             reader.nextMemberElement(); // Move to Error element
+        } else if (name.equals("Response")) {
+            // EC2 Query: Response > Errors > Error
+            reader.nextMemberElement(); // Move to Errors element
+            reader.nextMemberElement(); // Move to Error element
         }
         String element;
         while ((element = reader.nextMemberElement()) != null) {
@@ -171,14 +176,26 @@ final class XmlDeserializer implements ShapeDeserializer {
     String parseErrorCodeName() {
         try {
             var element = reader.nextMemberElement();
-            if (element == null || (!element.equals("ErrorResponse") && !element.equals("Error"))) {
+            if (element == null
+                    || (!element.equals("ErrorResponse") && !element.equals("Error")
+                            && !element.equals("Response"))) {
                 throw new SerializationException(
-                        "Expected element <ErrorResponse> or <Error> for XML error response");
+                        "Expected element <ErrorResponse>, <Response>, or <Error> for XML error response");
             }
             if (element.equals("ErrorResponse")) {
                 element = reader.nextMemberElement();
                 if (element == null || !element.equals("Error")) {
                     throw new SerializationException("Expected <Error> element inside <ErrorResponse>");
+                }
+            } else if (element.equals("Response")) {
+                // EC2 Query error format: Response > Errors > Error > Code
+                element = reader.nextMemberElement();
+                if (element == null || !element.equals("Errors")) {
+                    throw new SerializationException("Expected <Errors> element inside <Response>");
+                }
+                element = reader.nextMemberElement();
+                if (element == null || !element.equals("Error")) {
+                    throw new SerializationException("Expected <Error> element inside <Errors>");
                 }
             }
             String childElement;

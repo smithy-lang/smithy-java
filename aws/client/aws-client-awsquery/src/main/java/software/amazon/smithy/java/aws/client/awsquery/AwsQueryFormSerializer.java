@@ -23,6 +23,9 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
+// NOTE: This serializer shares significant structural similarity with Ec2QueryFormSerializer in the
+// aws-client-ec2query module. The duplication is intentional, both protocols are deprecated and
+// self-contained modules are preferred over a shared dependency. If you fix a bug here, check ec2query too.
 final class AwsQueryFormSerializer implements ShapeSerializer {
     private static final byte[] ACTION_PREFIX = "Action=".getBytes(StandardCharsets.UTF_8);
     private static final byte[] VERSION_PREFIX = "&Version=".getBytes(StandardCharsets.UTF_8);

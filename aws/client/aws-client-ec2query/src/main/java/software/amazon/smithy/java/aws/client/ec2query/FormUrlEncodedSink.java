@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.aws.client.awsquery;
+package software.amazon.smithy.java.aws.client.ec2query;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -16,9 +16,9 @@ import java.util.Arrays;
  * application/x-www-form-urlencoded spec which encodes space as '+', but AWS Query protocol expects
  * RFC 3986 encoding.
  *
- * <p><b>Note:</b> This class is intentionally duplicated in the {@code aws-client-ec2query} module.
+ * <p><b>Note:</b> This class is intentionally duplicated in the {@code aws-client-awsquery} module.
  * Both protocols are deprecated and unlikely to change, so duplication is preferred over adding a
- * shared module dependency. If you fix a bug here, check the copy in {@code ec2query} too.
+ * shared module dependency. If you fix a bug here, check the copy in {@code awsquery} too.
  */
 final class FormUrlEncodedSink {
     private static final byte[] HEX = {
