@@ -10,6 +10,7 @@ import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.util.UUID;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -42,6 +43,8 @@ public final class BenchmarkSupport {
     public static final byte[] MB_PAYLOAD = new byte[1024 * 1024];
 
     private BenchmarkSupport() {}
+
+    public record IoStats(long getMbRequests, long getMbBytesSent, long putMbRequests, long putMbBytesReceived) {}
 
     /**
      * Create a DNS resolver that maps localhost to loopback, avoiding DNS overhead.
@@ -82,6 +85,11 @@ public final class BenchmarkSupport {
                 .setMethod("POST"))) {
             res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
         }
+        try (var res = client.send(HttpRequest.create()
+                .setUri(SmithyUri.of(baseUrl + "/reset-io-stats"))
+                .setMethod("POST"))) {
+            res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+        }
         Thread.sleep(100);
     }
 
@@ -93,6 +101,32 @@ public final class BenchmarkSupport {
                 .setUri(SmithyUri.of(baseUrl + "/stats"))
                 .setMethod("GET"))) {
             return new String(res.body().asInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    public static String getServerStats(HttpClient client, String baseUrl, String runId) throws Exception {
+        try (var res = client.send(HttpRequest.create()
+                .setUri(SmithyUri.of(baseUrl + "/stats?runId=" + runId))
+                .setMethod("GET"))) {
+            return new String(res.body().asInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    public static String createRunId(String prefix) {
+        return prefix + "-" + UUID.randomUUID();
+    }
+
+    public static IoStats parseIoStats(String json) {
+        return new IoStats(
+                parseLongField(json, "getMbRequests"),
+                parseLongField(json, "getMbBytesSent"),
+                parseLongField(json, "putMbRequests"),
+                parseLongField(json, "putMbBytesReceived"));
+    }
+
+    public static void assertIoStats(String label, IoStats actual, IoStats expected) {
+        if (!actual.equals(expected)) {
+            throw new IllegalStateException(label + " mismatch. expected=" + expected + ", actual=" + actual);
         }
     }
 
@@ -188,6 +222,16 @@ public final class BenchmarkSupport {
                 firstError.printStackTrace(System.err);
             }
         }
+
+        public void throwIfErrored(String label) {
+            if (firstError == null) {
+                return;
+            }
+            if (firstError instanceof RuntimeException runtimeException) {
+                throw new IllegalStateException(label + " failed with " + errors + " error(s)", runtimeException);
+            }
+            throw new IllegalStateException(label + " failed with " + errors + " error(s)", firstError);
+        }
     }
 
     /**
@@ -231,5 +275,23 @@ public final class BenchmarkSupport {
         } catch (Exception e) {
             return "(stats unavailable: " + e.getMessage() + ")";
         }
+    }
+
+    private static long parseLongField(String json, String fieldName) {
+        String needle = "\"" + fieldName + "\":";
+        int start = json.indexOf(needle);
+        if (start < 0) {
+            throw new IllegalArgumentException("Missing field `" + fieldName + "` in stats: " + json);
+        }
+        start += needle.length();
+        int end = start;
+        while (end < json.length()) {
+            char c = json.charAt(end);
+            if ((c < '0' || c > '9') && c != '-') {
+                break;
+            }
+            end++;
+        }
+        return Long.parseLong(json.substring(start, end));
     }
 }

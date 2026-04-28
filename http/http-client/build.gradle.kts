@@ -37,7 +37,7 @@ dependencies {
     testImplementation(libs.jazzer.api)
 
     // Add Apache HttpClient for benchmarking comparison
-    jmh("org.apache.httpcomponents.client5:httpclient5:5.3.1")
+    jmh("org.apache.httpcomponents.client5:httpclient5:5.5")
 
     // Helidon WebClient for benchmarking comparison
     jmh("io.helidon.webclient:helidon-webclient:4.1.6")
@@ -48,6 +48,7 @@ dependencies {
 
     // Client-http-netty productionized transport for benchmarking
     jmh(project(":client:client-http"))
+    jmh(project(":client:client-http-apache"))
     jmh(project(":client:client-http-netty"))
     jmh(project(":client:client-http-crt"))
     jmh(project(":client:client-core"))
@@ -99,6 +100,10 @@ val startBenchmarkServer by tasks.registering {
         while (!ready && attempts < 50) {
             Thread.sleep(100)
             attempts++
+            if (!process.isAlive) {
+                pidFile.delete()
+                throw GradleException("Benchmark server process exited before becoming ready")
+            }
             try {
                 Socket("localhost", benchmarkH2cPort).close()
                 ready = true
@@ -110,6 +115,11 @@ val startBenchmarkServer by tasks.registering {
         if (!ready) {
             process.destroyForcibly()
             throw GradleException("Benchmark server failed to start (not ready after 5s)")
+        }
+
+        if (!process.isAlive) {
+            pidFile.delete()
+            throw GradleException("Benchmark server exited during startup")
         }
 
         println("Benchmark server started (PID: ${process.pid()})")
@@ -158,7 +168,12 @@ jmh {
         jvmArgsAppend = jvmArgsProp.split(Regex("\\s*;\\s*")).filter { it.isNotEmpty() }
     }
     if (profilersProp != null) {
-        profilers.addAll(profilersProp.split(Regex("\\s*;\\s*")).filter { it.isNotEmpty() })
+        val profilerSpecs = if (profilersProp.contains(";;")) {
+            profilersProp.split(Regex("\\s*;;\\s*")).filter { it.isNotEmpty() }
+        } else {
+            listOf(profilersProp)
+        }
+        profilers.addAll(profilerSpecs)
     }
     // Use standalone asprof for profiling instead of bundled async profiler
     // profilers.add("async:output=flamegraph")
