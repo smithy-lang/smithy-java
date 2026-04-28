@@ -5,23 +5,21 @@
 
 package software.amazon.smithy.java.client.http;
 
+import static java.net.http.HttpRequest.BodyPublisher;
 import static java.net.http.HttpRequest.BodyPublishers;
+import static java.net.http.HttpResponse.BodyHandler;
+import static java.net.http.HttpResponse.BodySubscriber;
+import static java.net.http.HttpResponse.ResponseInfo;
+import static software.amazon.smithy.java.http.api.HttpHeaders.HeaderWithValueConsumer;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.Flow;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.client.core.MessageExchange;
@@ -38,19 +36,62 @@ import software.amazon.smithy.java.logging.InternalLogger;
 /**
  * A client transport that uses Java's built-in {@link HttpClient} to send {@link HttpRequest} and return
  * {@link HttpResponse}.
+ *
+ * <h2>How the pieces fit together</h2>
+ * <p>A request flows through the following (see {@link #createJavaRequest}):
+ * <ol>
+ *   <li>The Smithy {@link DataStream} body is mapped to a {@link java.net.http.HttpRequest.BodyPublisher}
+ *       by one of three strategies, preferring the zero-copy {@link JavaHttpClientReplayableByteBufferPublisher}
+ *       for in-memory replayable bodies.</li>
+ *   <li>Headers, timeout, and HTTP version are applied to the JDK request builder.</li>
+ *   <li>The JDK client dispatches the request; response bytes are delivered to a
+ *       {@link java.net.http.HttpResponse.BodySubscriber} chosen by {@link ResponseBodyHandler}:
+ *       {@link JavaHttpClientSmallBodySubscriber} for small known-length bodies, or
+ *       {@link JavaHttpClientResponseBodySubscriber} + {@link JavaHttpClientStreamingDataStream}
+ *       for streaming bodies.</li>
+ * </ol>
+ *
+ * <h2>Executor lifecycle</h2>
+ * <p>When a caller provides an {@link HttpClient}, its executor (default JDK cached pool or
+ * user-supplied) is owned by the caller. When this transport constructs its own client (no-arg
+ * constructor and {@link Factory}), it attaches a virtual-thread-per-task executor and shuts
+ * that executor down in {@link #close()}; the JDK's {@code client.close()} does NOT shut down
+ * a non-default executor.
+ *
+ * <h2>System properties</h2>
+ * <p>{@link #setDefaultTuningProperties} sets modest improvements to the JDK defaults for
+ * {@code jdk.httpclient.maxframesize}, {@code maxstreams}, and {@code bufsize} at class init.
+ * {@link #setHostProperties} allowlists the {@code Host} header so consumer plugins can
+ * override it.
  */
 public final class JavaHttpClientTransport implements ClientTransport<HttpRequest, HttpResponse> {
 
     private static final URI DUMMY_URI = URI.create("http://localhost");
+
+    // Responses with a known Content-Length at or below this threshold use the small-body
+    // fast path (accumulate into a byte[] before returning). Above this, we switch to the
+    // streaming path. 64 KB is a tradeoff between memory footprint for the aggregated array
+    // and per-request overhead of the streaming producer/consumer machinery; it also matches
+    // the default JDK receive buffer tuning.
     private static final int SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD = 64 * 1024;
+
+    // Applies Smithy headers to the JDK request builder. Content-Length is filtered out because
+    // the JDK client sets it itself based on the selected BodyPublisher's declared length.
+    private static final HeaderWithValueConsumer<java.net.http.HttpRequest.Builder> VALUE_CONSUMER = (b, n, v) -> {
+        if (n != HeaderName.CONTENT_LENGTH.name()) {
+            b.setHeader(n, v);
+        }
+    };
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaHttpClientTransport.class);
     private final HttpClient client;
     private final Duration defaultRequestTimeout;
+    private final ExecutorService ownedExecutor;
 
     static {
         // For some reason, this can't just be done in the constructor to always take effect.
         setHostProperties();
+        setDefaultTuningProperties();
     }
 
     private static void setHostProperties() {
@@ -69,29 +110,74 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         } catch (IllegalArgumentException e) {
             throw new RuntimeException("Unable to add host header. "
                     + "This means that the HttpClient was initialized before we could allowlist it. "
-                    + "You need to explicitly set allow `host` via the system property `jdk.httpclient.allowRestrictedHeaders`",
+                    + "You need to explicitly set allow `host` via the system property "
+                    + "`jdk.httpclient.allowRestrictedHeaders`",
                     e);
         }
     }
 
+    /**
+     * Set JDK HttpClient tuning properties to values more suited for service-to-service traffic.
+     *
+     * <p>These are read once at class init of {@code java.net.http.*}, so we set them here before
+     * the first {@code HttpClient.newBuilder()} call. Callers that want different values can set
+     * the corresponding {@code -Djdk.httpclient.*} property on the JVM command line; this method
+     * only sets a value if the user hasn't already set one.
+     *
+     * <p>The chosen values:
+     * <ul>
+     *   <li>{@code jdk.httpclient.maxframesize=32768}: larger H2 frames amortize per-frame
+     *       overhead on streaming bodies (JDK default is 16 KB).</li>
+     *   <li>{@code jdk.httpclient.maxstreams=256}: allow more concurrent H2 streams per
+     *       connection (JDK default is 100).</li>
+     *   <li>{@code jdk.httpclient.bufsize=32768}: larger internal I/O buffer reduces read
+     *       iterations for medium-to-large bodies (JDK default is 16 KB).</li>
+     * </ul>
+     */
+    private static void setDefaultTuningProperties() {
+        setIfUnset("jdk.httpclient.maxframesize", "32768");
+        setIfUnset("jdk.httpclient.maxstreams", "256");
+        setIfUnset("jdk.httpclient.bufsize", "32768");
+    }
+
+    private static void setIfUnset(String name, String value) {
+        if (System.getProperty(name) == null) {
+            System.setProperty(name, value);
+        }
+    }
+
     public JavaHttpClientTransport() {
-        this(HttpClient.newHttpClient(), null);
+        this.ownedExecutor = Executors.newVirtualThreadPerTaskExecutor();
+        this.client = HttpClient.newBuilder().executor(ownedExecutor).build();
+        this.defaultRequestTimeout = null;
+        setHostProperties();
     }
 
     /**
-     * @param client Java client to use.
+     * @param client Java client to use. The caller is responsible for closing it and any
+     *               executor it was built with.
      */
     public JavaHttpClientTransport(HttpClient client) {
         this(client, null);
     }
 
     /**
-     * @param client Java client to use.
+     * @param client Java client to use. The caller is responsible for closing it and any
+     *               executor it was built with.
      * @param defaultRequestTimeout Default per-request timeout. Used when {@link HttpContext#HTTP_REQUEST_TIMEOUT}
      *                              is not set in the request context. Null means no default.
      */
     public JavaHttpClientTransport(HttpClient client, Duration defaultRequestTimeout) {
         this.client = client;
+        this.ownedExecutor = null;
+        this.defaultRequestTimeout = defaultRequestTimeout;
+        setHostProperties();
+    }
+
+    // Factory-internal constructor: factory owns both client and executor.
+    private JavaHttpClientTransport(HttpClient client, ExecutorService ownedExecutor, Duration defaultRequestTimeout) {
+        this.client = client;
+        this.ownedExecutor = ownedExecutor;
         this.defaultRequestTimeout = defaultRequestTimeout;
         setHostProperties();
     }
@@ -125,19 +211,58 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         return sendRequest(createJavaRequest(context, request));
     }
 
+    /**
+     * Convert a Smithy {@link HttpRequest} into a {@link java.net.http.HttpRequest} for the JDK
+     * {@link HttpClient}.
+     *
+     * <p>The interesting decision here is how to expose the request body to the JDK client.
+     * Three cases are handled, in order of preference:
+     * <ol>
+     *   <li><b>Replayable + in-memory</b>: If the body is already backed by a {@link ByteBuffer}
+     *       and can be replayed (e.g., {@link DataStream#ofBytes(byte[])}), wrap it in a
+     *       {@link JavaHttpClientReplayableByteBufferPublisher}. This is the cheapest path —
+     *       every subscribe hands out a {@code duplicate()} of the shared backing bytes, so
+     *       retries cost nothing and no intermediate buffers are allocated.</li>
+     *   <li><b>Known length, not in-memory</b>: Use the JDK's
+     *       {@link BodyPublishers#fromPublisher(java.util.concurrent.Flow.Publisher, long)}
+     *       overload that takes the content length, so the JDK can set {@code Content-Length}
+     *       and avoid chunked encoding over HTTP/1.1.</li>
+     *   <li><b>Unknown length</b>: Use {@link BodyPublishers#fromPublisher(java.util.concurrent.Flow.Publisher)}
+     *       and let the JDK fall back to chunked transfer encoding.</li>
+     * </ol>
+     *
+     * <p>Version pinning: if the caller explicitly requested HTTP/1.1 but the underlying JDK
+     * client is configured for HTTP/2, we intentionally do NOT call {@code builder.version()}.
+     * Setting the version to HTTP/1.1 here would force the JDK to open a new connection rather
+     * than reuse an existing HTTP/2 connection, which is wasteful when the server advertises
+     * HTTP/2 via ALPN. For any other combination we pass the caller's requested version through.
+     *
+     * <p>Request timeout precedence: context value takes priority over the transport-level
+     * {@link #defaultRequestTimeout}; if neither is set the JDK applies no timeout.
+     *
+     * <p>Headers: Smithy's canonical header names are applied via {@link #VALUE_CONSUMER}. The
+     * JDK rejects some restricted headers by default ({@code Host}, etc.); the static
+     * initializer sets {@code jdk.httpclient.allowRestrictedHeaders=host} to allow our
+     * consumer plugins to override it when necessary.
+     */
     private java.net.http.HttpRequest createJavaRequest(Context context, HttpRequest request) {
         DataStream requestBody = request.body();
-        java.net.http.HttpRequest.BodyPublisher bodyPublisher;
+        BodyPublisher bodyPublisher;
         ByteBuffer replayableRequestBody = toReplayableBodyBuffer(requestBody);
+
         if (replayableRequestBody != null) {
+            // Fast path: zero-copy publishing of an already-in-memory body.
             bodyPublisher = !replayableRequestBody.hasRemaining()
                     ? BodyPublishers.noBody()
-                    : new ReplayableByteBufferPublisher(replayableRequestBody);
+                    : new JavaHttpClientReplayableByteBufferPublisher(replayableRequestBody);
         } else if (requestBody.hasKnownLength()) {
+            // Streaming with Content-Length: JDK can emit a content-length header and skip
+            // chunked encoding over HTTP/1.1.
             bodyPublisher = requestBody.contentLength() == 0
                     ? BodyPublishers.noBody()
                     : BodyPublishers.fromPublisher(requestBody, requestBody.contentLength());
         } else {
+            // Unknown length: JDK will use chunked transfer encoding on HTTP/1.1 or DATA frames on HTTP/2.
             bodyPublisher = BodyPublishers.fromPublisher(requestBody);
         }
 
@@ -146,6 +271,8 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         var httpRequestBuilder = java.net.http.HttpRequest.newBuilder()
                 .method(request.method(), bodyPublisher)
                 .uri(request.uri().toURI());
+        // Skip pinning to HTTP/1.1 when the client is configured for HTTP/2; forcing the
+        // version would prevent reusing an existing H2 connection.
         if (!(requestVersion == HttpVersion.HTTP_1_1 && clientVersion == HttpClient.Version.HTTP_2)) {
             httpRequestBuilder.version(smithyToHttpVersion(requestVersion));
         }
@@ -158,17 +285,19 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
             httpRequestBuilder.timeout(requestTimeout);
         }
 
-        // Any explicitly set headers overwrite existing headers, they do not merge.
-        request.headers().forEachEntry(httpRequestBuilder, (b, name, value) -> {
-            // Skip restricted headers; Header names in HttpHeaders are always canonicalized, so check by reference.
-            if (name != HeaderName.CONTENT_LENGTH.name()) {
-                b.setHeader(name, value);
-            }
-        });
-
+        request.headers().forEachEntry(httpRequestBuilder, VALUE_CONSUMER);
         return httpRequestBuilder.build();
     }
 
+    /**
+     * Return the request body as a {@link ByteBuffer} if it can be published as-is without any copy or
+     * re-materialization; {@code null} otherwise.
+     *
+     * <p>Requires all of: replayable (retries are safe), known length (JDK can set Content-Length), and backed by
+     * a {@link ByteBuffer} (no codec work needed to materialize it). The {@link UnsupportedOperationException}
+     * / {@link IllegalStateException} catches defensively handle DataStream implementations that don't actually
+     * support {@link DataStream#asByteBuffer()} despite reporting {@code hasByteBuffer()}.
+     */
     private static ByteBuffer toReplayableBodyBuffer(DataStream requestBody) {
         if (!requestBody.isReplayable() || !requestBody.hasKnownLength() || !requestBody.hasByteBuffer()) {
             return null;
@@ -236,7 +365,13 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
 
     @Override
     public void close() {
-        client.close();
+        try {
+            client.close();
+        } finally {
+            if (ownedExecutor != null) {
+                ownedExecutor.shutdown();
+            }
+        }
     }
 
     public static final class Factory implements ClientTransportFactory<HttpRequest, HttpResponse> {
@@ -249,17 +384,19 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         public JavaHttpClientTransport createTransport(Document node, Document pluginSettings) {
             setHostProperties();
             // Start with httpConfig from plugin settings as baseline, then apply transport-specific settings on top.
-            var config = new HttpTransportConfig().fromDocument(pluginSettings.asStringMap()
-                    .getOrDefault("httpConfig", Document.EMPTY_MAP));
+            var config = new HttpTransportConfig()
+                    .fromDocument(pluginSettings.asStringMap().getOrDefault("httpConfig", Document.EMPTY_MAP));
             config.fromDocument(node);
-            var builder = HttpClient.newBuilder();
+
+            var executor = Executors.newVirtualThreadPerTaskExecutor();
+            var builder = HttpClient.newBuilder().executor(executor);
             if (config.httpVersion() != null) {
                 builder.version(smithyToHttpVersion(config.httpVersion()));
             }
             if (config.connectTimeout() != null) {
                 builder.connectTimeout(config.connectTimeout());
             }
-            return new JavaHttpClientTransport(builder.build(), config.requestTimeout());
+            return new JavaHttpClientTransport(builder.build(), executor, config.requestTimeout());
         }
 
         @Override
@@ -268,262 +405,27 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         }
     }
 
-    private static final class ResponseBodyHandler implements java.net.http.HttpResponse.BodyHandler<DataStream> {
+    /**
+     * Picks a {@link BodySubscriber} implementation based on the advertised response size.
+     *
+     * <p>Small-body fast path ({@link JavaHttpClientSmallBodySubscriber}): when
+     * {@code Content-Length} is present and within {@link #SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD}
+     * bytes, we pre-size a {@code byte[]} and accumulate the response fully before handing it
+     * back. The result is a replayable {@link DataStream} with known length, avoiding the producer/consumer hand-off
+     * of the streaming path.
+     *
+     * <p>If the fastpath isn't taken, a streaming subscriber is used that reads bytes as they arrive.
+     */
+    private static final class ResponseBodyHandler implements BodyHandler<DataStream> {
         @Override
-        public java.net.http.HttpResponse.BodySubscriber<DataStream> apply(
-                java.net.http.HttpResponse.ResponseInfo responseInfo
-        ) {
+        public BodySubscriber<DataStream> apply(ResponseInfo responseInfo) {
             long contentLength = responseInfo.headers().firstValueAsLong("content-length").orElse(-1L);
+
             if (contentLength >= 0 && contentLength <= SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD) {
-                return new SmallBodySubscriber(responseInfo.headers(), (int) contentLength);
-            }
-            return new ResponseBodySubscriber(responseInfo.headers());
-        }
-    }
-
-    private static final class ReplayableByteBufferPublisher implements java.net.http.HttpRequest.BodyPublisher {
-        private final ByteBuffer body;
-
-        private ReplayableByteBufferPublisher(ByteBuffer body) {
-            this.body = body.asReadOnlyBuffer();
-        }
-
-        @Override
-        public long contentLength() {
-            return body.remaining();
-        }
-
-        @Override
-        public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
-            subscriber.onSubscribe(new Flow.Subscription() {
-                private final AtomicBoolean completed = new AtomicBoolean();
-
-                @Override
-                public void request(long n) {
-                    if (n <= 0 || !completed.compareAndSet(false, true)) {
-                        return;
-                    }
-
-                    subscriber.onNext(body.duplicate());
-                    subscriber.onComplete();
-                }
-
-                @Override
-                public void cancel() {
-                    completed.set(true);
-                }
-            });
-        }
-    }
-
-    private static final class SmallBodySubscriber implements java.net.http.HttpResponse.BodySubscriber<DataStream> {
-        private final String contentType;
-        private final byte[] bytes;
-        private int position;
-        private final CompletableFuture<DataStream> body = new CompletableFuture<>();
-
-        private SmallBodySubscriber(java.net.http.HttpHeaders headers, int contentLength) {
-            this.contentType = headers.firstValue("content-type").orElse(null);
-            this.bytes = new byte[Math.max(contentLength, 0)];
-        }
-
-        @Override
-        public CompletionStage<DataStream> getBody() {
-            return body;
-        }
-
-        @Override
-        public void onSubscribe(Flow.Subscription subscription) {
-            subscription.request(Long.MAX_VALUE);
-        }
-
-        @Override
-        public void onNext(List<ByteBuffer> item) {
-            for (ByteBuffer buffer : item) {
-                int remaining = buffer.remaining();
-                buffer.get(bytes, position, remaining);
-                position += remaining;
-            }
-        }
-
-        @Override
-        public void onError(Throwable throwable) {
-            body.completeExceptionally(throwable);
-        }
-
-        @Override
-        public void onComplete() {
-            byte[] result = position == bytes.length ? bytes : Arrays.copyOf(bytes, position);
-            body.complete(DataStream.ofBytes(result, contentType));
-        }
-    }
-
-    private static final class ResponseBodySubscriber implements java.net.http.HttpResponse.BodySubscriber<DataStream> {
-        private final StreamingDataStream stream;
-        private final CompletionStage<DataStream> body;
-
-        private ResponseBodySubscriber(java.net.http.HttpHeaders headers) {
-            this.stream = new StreamingDataStream(
-                    headers.firstValue("content-type").orElse(null),
-                    headers.firstValueAsLong("content-length").orElse(-1L));
-            this.body = CompletableFuture.completedFuture(stream);
-        }
-
-        @Override
-        public CompletionStage<DataStream> getBody() {
-            return body;
-        }
-
-        @Override
-        public void onSubscribe(Flow.Subscription subscription) {
-            stream.setSubscription(subscription);
-            subscription.request(Long.MAX_VALUE);
-        }
-
-        @Override
-        public void onNext(List<ByteBuffer> item) {
-            for (ByteBuffer buffer : item) {
-                stream.enqueue(buffer);
-            }
-        }
-
-        @Override
-        public void onError(Throwable throwable) {
-            stream.fail(throwable);
-        }
-
-        @Override
-        public void onComplete() {
-            stream.complete();
-        }
-    }
-
-    private static final class StreamingDataStream implements DataStream {
-        private static final Object EOF = new Object();
-
-        private final BlockingQueue<Object> queue = new LinkedBlockingQueue<>();
-        private final String contentType;
-        private final long contentLength;
-        private volatile Flow.Subscription subscription;
-        private volatile boolean consumed;
-        private volatile boolean closed;
-
-        private StreamingDataStream(String contentType, long contentLength) {
-            this.contentType = contentType;
-            this.contentLength = contentLength;
-        }
-
-        @Override
-        public long contentLength() {
-            return contentLength;
-        }
-
-        @Override
-        public String contentType() {
-            return contentType;
-        }
-
-        @Override
-        public boolean isReplayable() {
-            return false;
-        }
-
-        @Override
-        public boolean isAvailable() {
-            return !consumed;
-        }
-
-        @Override
-        public InputStream asInputStream() {
-            if (consumed) {
-                throw new IllegalStateException("Response body is not replayable and has already been consumed");
-            }
-            consumed = true;
-            return new StreamingInputStream(this);
-        }
-
-        @Override
-        public void close() {
-            closed = true;
-            var current = subscription;
-            if (current != null) {
-                current.cancel();
-            }
-            queue.offer(EOF);
-        }
-
-        private void setSubscription(Flow.Subscription subscription) {
-            this.subscription = subscription;
-            if (closed) {
-                subscription.cancel();
-            }
-        }
-
-        private void enqueue(ByteBuffer buffer) {
-            if (closed || !buffer.hasRemaining()) {
-                return;
-            }
-            queue.offer(buffer.asReadOnlyBuffer());
-        }
-
-        private void fail(Throwable throwable) {
-            queue.offer(throwable);
-        }
-
-        private void complete() {
-            queue.offer(EOF);
-        }
-
-        private Object takeNext() throws IOException {
-            try {
-                return queue.take();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException("Interrupted waiting for response body data", e);
-            }
-        }
-    }
-
-    private static final class StreamingInputStream extends InputStream {
-        private final StreamingDataStream stream;
-        private ByteBuffer current;
-
-        private StreamingInputStream(StreamingDataStream stream) {
-            this.stream = stream;
-        }
-
-        @Override
-        public int read() throws IOException {
-            byte[] buffer = new byte[1];
-            int read = read(buffer, 0, 1);
-            return read < 0 ? -1 : buffer[0] & 0xFF;
-        }
-
-        @Override
-        public int read(byte[] b, int off, int len) throws IOException {
-            if (len == 0) {
-                return 0;
+                return new JavaHttpClientSmallBodySubscriber(responseInfo.headers(), (int) contentLength);
             }
 
-            while (current == null || !current.hasRemaining()) {
-                Object next = stream.takeNext();
-                if (next == StreamingDataStream.EOF) {
-                    return -1;
-                }
-                if (next instanceof Throwable throwable) {
-                    throw new IOException("Failed receiving response body", throwable);
-                }
-                current = (ByteBuffer) next;
-            }
-
-            int toRead = Math.min(len, current.remaining());
-            current.get(b, off, toRead);
-            return toRead;
-        }
-
-        @Override
-        public void close() {
-            stream.close();
+            return new JavaHttpClientResponseBodySubscriber(responseInfo.headers());
         }
     }
 }
