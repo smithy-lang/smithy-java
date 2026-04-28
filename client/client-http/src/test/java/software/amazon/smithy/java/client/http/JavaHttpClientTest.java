@@ -12,6 +12,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
 import java.net.Authenticator;
@@ -250,12 +251,98 @@ public class JavaHttpClientTest {
         }
     }
 
-    private static final class CapturingHttpClient extends HttpClient {
+    @Test
+    public void preservesExplicitHttp11RequestVersionOnHttp2Client() {
+        var client = new CapturingHttpClient() {
+            @Override
+            public Version version() {
+                return Version.HTTP_2;
+            }
+        };
+        var transport = new JavaHttpClientTransport(client);
+        var request = software.amazon.smithy.java.http.api.HttpRequest.create()
+                .setUri(URI.create("http://localhost/test"))
+                .setMethod("GET")
+                .setHttpVersion(software.amazon.smithy.java.http.api.HttpVersion.HTTP_1_1)
+                .toUnmodifiable();
+
+        try (var response = transport.send(Context.create(), request)) {
+            assertThat(response.statusCode(), equalTo(200));
+        }
+
+        assertThat(client.capturedVersion().orElseThrow(), equalTo(HttpClient.Version.HTTP_1_1));
+    }
+
+    @Test
+    public void preservesReplayabilityForSmallResponseBodies() throws Exception {
+        var fakeResponse = new HttpResponse<DataStream>() {
+            @Override
+            public int statusCode() {
+                return 200;
+            }
+
+            @Override
+            public HttpHeaders headers() {
+                return HttpHeaders.of(
+                        Map.of(
+                                "content-type",
+                                List.of("text/plain"),
+                                "content-length",
+                                List.of("5")),
+                        (k, v) -> true);
+            }
+
+            @Override
+            public DataStream body() {
+                return DataStream.ofBytes("hello".getBytes());
+            }
+
+            @Override
+            public HttpClient.Version version() {
+                return HttpClient.Version.HTTP_2;
+            }
+
+            @Override
+            public HttpRequest request() {
+                return null;
+            }
+
+            @Override
+            public Optional<HttpResponse<DataStream>> previousResponse() {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<SSLSession> sslSession() {
+                return Optional.empty();
+            }
+
+            @Override
+            public URI uri() {
+                return URI.create("http://localhost/test");
+            }
+        };
+
+        var transport = new JavaHttpClientTransport();
+        var response = transport.createSmithyResponse(fakeResponse);
+
+        assertTrue(response.body().isReplayable());
+        assertThat(response.body().asInputStream().readAllBytes(), equalTo("hello".getBytes()));
+        assertThat(response.body().asInputStream().readAllBytes(), equalTo("hello".getBytes()));
+    }
+
+    private static class CapturingHttpClient extends HttpClient {
         private byte[] capturedBytes = new byte[0];
+        private Optional<HttpClient.Version> capturedVersion = Optional.empty();
+
+        Optional<HttpClient.Version> capturedVersion() {
+            return capturedVersion;
+        }
 
         @Override
         public <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler) {
             capturedBytes = collect(request.bodyPublisher().orElseThrow());
+            capturedVersion = request.version();
             var responseInfo = new HttpResponse.ResponseInfo() {
                 @Override
                 public int statusCode() {

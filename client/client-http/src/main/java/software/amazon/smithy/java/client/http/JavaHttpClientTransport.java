@@ -266,16 +266,10 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
             bodyPublisher = BodyPublishers.fromPublisher(requestBody);
         }
 
-        var requestVersion = request.httpVersion();
-        var clientVersion = client.version();
         var httpRequestBuilder = java.net.http.HttpRequest.newBuilder()
+                .version(smithyToHttpVersion(request.httpVersion()))
                 .method(request.method(), bodyPublisher)
                 .uri(request.uri().toURI());
-        // Skip pinning to HTTP/1.1 when the client is configured for HTTP/2; forcing the
-        // version would prevent reusing an existing H2 connection.
-        if (!(requestVersion == HttpVersion.HTTP_1_1 && clientVersion == HttpClient.Version.HTTP_2)) {
-            httpRequestBuilder.version(smithyToHttpVersion(requestVersion));
-        }
 
         Duration requestTimeout = context.get(HttpContext.HTTP_REQUEST_TIMEOUT);
         if (requestTimeout == null) {
@@ -342,7 +336,7 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         var length = headers.contentLength();
         var adaptedLength = length == null ? -1 : length;
         var contentType = headers.contentType();
-        var body = DataStream.withMetadata(response.body(), contentType, adaptedLength, false);
+        var body = DataStream.withMetadata(response.body(), contentType, adaptedLength, response.body().isReplayable());
 
         return new JavaHttpResponse(javaToSmithyVersion(response.version()), response.statusCode(), headers, body);
     }
