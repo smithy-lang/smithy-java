@@ -11,14 +11,14 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.net.Authenticator;
 import java.net.CookieHandler;
 import java.net.ProxySelector;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.Authenticator;
 import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
@@ -33,19 +33,19 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Flow;
-import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
-import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 public class JavaHttpClientTest {
 
@@ -167,6 +167,8 @@ public class JavaHttpClientTest {
         var transport = new JavaHttpClientTransport();
         var response = transport.createSmithyResponse(fakeResponse);
 
+        assertInstanceOf(JavaHttpResponse.class, response);
+        assertInstanceOf(JavaHttpHeaders.class, response.headers());
         assertFalse(response.headers().map().containsKey(":status"),
                 "Response headers should not contain :status pseudo-header");
         assertThat(response.headers().firstValue("content-type"), equalTo("application/json"));
@@ -179,7 +181,7 @@ public class JavaHttpClientTest {
         var client = new CapturingHttpClient();
         var transport = new JavaHttpClientTransport(client);
         var request = software.amazon.smithy.java.http.api.HttpRequest.create()
-                .setUri(software.amazon.smithy.java.io.uri.SmithyUri.of("http://localhost/test"))
+                .setUri(URI.create("http://localhost/test"))
                 .setMethod("POST")
                 .setBody(new DataStream() {
                     @Override
@@ -204,19 +206,25 @@ public class JavaHttpClientTest {
 
                     @Override
                     public InputStream asInputStream() {
-                        return new ByteArrayInputStream(payload);
+                        throw new AssertionError("asInputStream should not be called");
                     }
 
                     @Override
                     public ByteBuffer asByteBuffer() {
-                        throw new AssertionError("asByteBuffer should not be called");
+                        return ByteBuffer.wrap(payload);
+                    }
+
+                    @Override
+                    public boolean hasByteBuffer() {
+                        return true;
                     }
 
                     @Override
                     public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
-                        HttpRequest.BodyPublishers.ofByteArray(payload).subscribe(subscriber);
+                        throw new AssertionError("subscribe should not be called");
                     }
-                });
+                })
+                .toUnmodifiable();
 
         try (var response = transport.send(Context.create(), request)) {
             assertThat(response.statusCode(), equalTo(200));
@@ -231,11 +239,12 @@ public class JavaHttpClientTest {
         var client = new StreamingResponseHttpClient(payload);
         var transport = new JavaHttpClientTransport(client);
         var request = software.amazon.smithy.java.http.api.HttpRequest.create()
-                .setUri(software.amazon.smithy.java.io.uri.SmithyUri.of("http://localhost/test"))
-                .setMethod("GET");
+                .setUri(URI.create("http://localhost/test"))
+                .setMethod("GET")
+                .toUnmodifiable();
 
         try (var response = transport.send(Context.create(), request);
-             var body = response.body().asInputStream()) {
+                var body = response.body().asInputStream()) {
             assertThat(response.statusCode(), equalTo(200));
             assertThat(body.readAllBytes(), equalTo(payload));
         }
@@ -426,8 +435,10 @@ public class JavaHttpClientTest {
                 public HttpHeaders headers() {
                     return HttpHeaders.of(
                             Map.of(
-                                    "content-length", List.of(Integer.toString(responseBytes.length)),
-                                    "content-type", List.of("text/plain")),
+                                    "content-length",
+                                    List.of(Integer.toString(responseBytes.length)),
+                                    "content-type",
+                                    List.of("text/plain")),
                             (k, v) -> true);
                 }
 

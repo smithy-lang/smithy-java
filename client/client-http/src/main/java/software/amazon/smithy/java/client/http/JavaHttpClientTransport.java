@@ -9,13 +9,10 @@ import static java.net.http.HttpRequest.BodyPublishers;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
@@ -24,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.client.core.MessageExchange;
@@ -31,8 +29,8 @@ import software.amazon.smithy.java.client.core.error.ConnectTimeoutException;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HeaderName;
-import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -41,11 +39,10 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * A client transport that uses Java's built-in {@link HttpClient} to send {@link HttpRequest} and return
  * {@link HttpResponse}.
  */
-public final class JavaHttpClientTransport
-        implements ClientTransport<HttpRequest, software.amazon.smithy.java.http.api.HttpResponse> {
+public final class JavaHttpClientTransport implements ClientTransport<HttpRequest, HttpResponse> {
 
     private static final URI DUMMY_URI = URI.create("http://localhost");
-    private static final int SMALL_BODY_FAST_PATH_THRESHOLD = 64 * 1024;
+    private static final int SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD = 64 * 1024;
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaHttpClientTransport.class);
     private final HttpClient client;
@@ -70,9 +67,9 @@ public final class JavaHttpClientTransport
                     .setHeader("host", "localhost")
                     .build();
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Unable to add host header. " +
-                    "This means that the HttpClient was initialized before we could allowlist it. " +
-                    "You need to explicitly set allow `host` via the system property `jdk.httpclient.allowRestrictedHeaders`",
+            throw new RuntimeException("Unable to add host header. "
+                    + "This means that the HttpClient was initialized before we could allowlist it. "
+                    + "You need to explicitly set allow `host` via the system property `jdk.httpclient.allowRestrictedHeaders`",
                     e);
         }
     }
@@ -103,17 +100,14 @@ public final class JavaHttpClientTransport
         int length = currentValues.length();
         for (int i = 0; i < length; i++) {
             char c = currentValues.charAt(i);
-            // Check if "host" starts at the current position.
             if ((c == 'h' || c == 'H') && i + 3 < length
                     && (currentValues.charAt(i + 1) == 'o')
                     && (currentValues.charAt(i + 2) == 's')
                     && (currentValues.charAt(i + 3) == 't')) {
-                // Ensure "t" is at the end or followed by a comma.
                 if (i + 4 == length || currentValues.charAt(i + 4) == ',') {
                     return true;
                 }
             }
-            // Skip to the next comma or end of string.
             while (i < length && currentValues.charAt(i) != ',') {
                 i++;
             }
@@ -122,23 +116,23 @@ public final class JavaHttpClientTransport
     }
 
     @Override
-    public MessageExchange<HttpRequest, software.amazon.smithy.java.http.api.HttpResponse> messageExchange() {
+    public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
         return HttpMessageExchange.INSTANCE;
     }
 
     @Override
-    public software.amazon.smithy.java.http.api.HttpResponse send(Context context, HttpRequest request) {
+    public HttpResponse send(Context context, HttpRequest request) {
         return sendRequest(createJavaRequest(context, request));
     }
 
     private java.net.http.HttpRequest createJavaRequest(Context context, HttpRequest request) {
         DataStream requestBody = request.body();
         java.net.http.HttpRequest.BodyPublisher bodyPublisher;
-        byte[] smallRequestBody = toSmallReplayableBody(requestBody);
-        if (smallRequestBody != null) {
-            bodyPublisher = smallRequestBody.length == 0
+        ByteBuffer replayableRequestBody = toReplayableBodyBuffer(requestBody);
+        if (replayableRequestBody != null) {
+            bodyPublisher = !replayableRequestBody.hasRemaining()
                     ? BodyPublishers.noBody()
-                    : BodyPublishers.ofByteArray(smallRequestBody);
+                    : new ReplayableByteBufferPublisher(replayableRequestBody);
         } else if (requestBody.hasKnownLength()) {
             bodyPublisher = requestBody.contentLength() == 0
                     ? BodyPublishers.noBody()
@@ -147,15 +141,11 @@ public final class JavaHttpClientTransport
             bodyPublisher = BodyPublishers.fromPublisher(requestBody);
         }
 
+        var requestVersion = request.httpVersion();
+        var clientVersion = client.version();
         var httpRequestBuilder = java.net.http.HttpRequest.newBuilder()
                 .method(request.method(), bodyPublisher)
                 .uri(request.uri().toURI());
-
-        var requestVersion = request.httpVersion();
-        var clientVersion = client.version();
-        // HttpRequest.create() defaults to HTTP/1.1. If the underlying JDK client is configured
-        // for HTTP/2, don't pin each request back to HTTP/1.1 unless the caller explicitly built
-        // the transport around an HTTP/1.1-only client.
         if (!(requestVersion == HttpVersion.HTTP_1_1 && clientVersion == HttpClient.Version.HTTP_2)) {
             httpRequestBuilder.version(smithyToHttpVersion(requestVersion));
         }
@@ -179,42 +169,24 @@ public final class JavaHttpClientTransport
         return httpRequestBuilder.build();
     }
 
-    private static byte[] toSmallReplayableBody(DataStream requestBody) {
-        if (!requestBody.isReplayable() || !requestBody.hasKnownLength()) {
+    private static ByteBuffer toReplayableBodyBuffer(DataStream requestBody) {
+        if (!requestBody.isReplayable() || !requestBody.hasKnownLength() || !requestBody.hasByteBuffer()) {
             return null;
         }
 
-        long contentLength = requestBody.contentLength();
-        if (contentLength < 0 || contentLength > SMALL_BODY_FAST_PATH_THRESHOLD) {
+        try {
+            return requestBody.asByteBuffer().asReadOnlyBuffer();
+        } catch (UnsupportedOperationException | IllegalStateException e) {
             return null;
         }
-
-        ByteBuffer buffer = requestBody.asByteBuffer();
-        if (!buffer.hasRemaining()) {
-            return new byte[0];
-        }
-
-        if (buffer.hasArray()) {
-            int offset = buffer.arrayOffset() + buffer.position();
-            int length = buffer.remaining();
-            if (offset == 0 && length == buffer.array().length) {
-                return buffer.array();
-            }
-            return Arrays.copyOfRange(buffer.array(), offset, offset + length);
-        }
-
-        byte[] bytes = new byte[buffer.remaining()];
-        buffer.get(bytes);
-        return bytes;
     }
 
-    private software.amazon.smithy.java.http.api.HttpResponse sendRequest(java.net.http.HttpRequest request) {
+    private HttpResponse sendRequest(java.net.http.HttpRequest request) {
         java.net.http.HttpResponse<DataStream> res = null;
         try {
             res = client.send(request, new ResponseBodyHandler());
             return createSmithyResponse(res);
         } catch (IOException | InterruptedException | RuntimeException e) {
-            // Close the response body stream if we got a response but failed to process it
             if (res != null) {
                 try {
                     res.body().close();
@@ -234,17 +206,8 @@ public final class JavaHttpClientTransport
     }
 
     // package-private for testing
-    software.amazon.smithy.java.http.api.HttpResponse createSmithyResponse(
-            java.net.http.HttpResponse<? extends DataStream> response
-    ) {
-        var headers = HttpHeaders.ofModifiable();
-        for (var e : response.headers().map().entrySet()) {
-            var name = e.getKey();
-            if (!name.equals(":status")) {
-                headers.addHeader(name, e.getValue());
-            }
-        }
-
+    HttpResponse createSmithyResponse(java.net.http.HttpResponse<? extends DataStream> response) {
+        var headers = new JavaHttpHeaders(response.headers());
         LOGGER.trace("Got response: {}; headers: {}", response, response.headers().map());
 
         var length = headers.contentLength();
@@ -252,12 +215,7 @@ public final class JavaHttpClientTransport
         var contentType = headers.contentType();
         var body = DataStream.withMetadata(response.body(), contentType, adaptedLength, false);
 
-        return software.amazon.smithy.java.http.api.HttpResponse.create()
-                .setHttpVersion(javaToSmithyVersion(response.version()))
-                .setStatusCode(response.statusCode())
-                .setHeaders(headers)
-                .setBody(body)
-                .toUnmodifiable();
+        return new JavaHttpResponse(javaToSmithyVersion(response.version()), response.statusCode(), headers, body);
     }
 
     private static HttpClient.Version smithyToHttpVersion(HttpVersion version) {
@@ -281,8 +239,7 @@ public final class JavaHttpClientTransport
         client.close();
     }
 
-    public static final class Factory
-            implements ClientTransportFactory<HttpRequest, software.amazon.smithy.java.http.api.HttpResponse> {
+    public static final class Factory implements ClientTransportFactory<HttpRequest, HttpResponse> {
         @Override
         public String name() {
             return "http-java";
@@ -306,7 +263,7 @@ public final class JavaHttpClientTransport
         }
 
         @Override
-        public MessageExchange<HttpRequest, software.amazon.smithy.java.http.api.HttpResponse> messageExchange() {
+        public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
             return HttpMessageExchange.INSTANCE;
         }
     }
@@ -317,10 +274,45 @@ public final class JavaHttpClientTransport
                 java.net.http.HttpResponse.ResponseInfo responseInfo
         ) {
             long contentLength = responseInfo.headers().firstValueAsLong("content-length").orElse(-1L);
-            if (contentLength >= 0 && contentLength <= SMALL_BODY_FAST_PATH_THRESHOLD) {
+            if (contentLength >= 0 && contentLength <= SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD) {
                 return new SmallBodySubscriber(responseInfo.headers(), (int) contentLength);
             }
             return new ResponseBodySubscriber(responseInfo.headers());
+        }
+    }
+
+    private static final class ReplayableByteBufferPublisher implements java.net.http.HttpRequest.BodyPublisher {
+        private final ByteBuffer body;
+
+        private ReplayableByteBufferPublisher(ByteBuffer body) {
+            this.body = body.asReadOnlyBuffer();
+        }
+
+        @Override
+        public long contentLength() {
+            return body.remaining();
+        }
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
+            subscriber.onSubscribe(new Flow.Subscription() {
+                private final AtomicBoolean completed = new AtomicBoolean();
+
+                @Override
+                public void request(long n) {
+                    if (n <= 0 || !completed.compareAndSet(false, true)) {
+                        return;
+                    }
+
+                    subscriber.onNext(body.duplicate());
+                    subscriber.onComplete();
+                }
+
+                @Override
+                public void cancel() {
+                    completed.set(true);
+                }
+            });
         }
     }
 
@@ -451,24 +443,6 @@ public final class JavaHttpClientTransport
         }
 
         @Override
-        public void writeTo(OutputStream out) throws IOException {
-            if (consumed) {
-                throw new IllegalStateException("Response body is not replayable and has already been consumed");
-            }
-            consumed = true;
-            drainTo(out, null);
-        }
-
-        @Override
-        public ReadableByteChannel asChannel() {
-            if (consumed) {
-                throw new IllegalStateException("Response body is not replayable and has already been consumed");
-            }
-            consumed = true;
-            return Channels.newChannel(new StreamingInputStream(this));
-        }
-
-        @Override
         public void close() {
             closed = true;
             var current = subscription;
@@ -508,61 +482,21 @@ public final class JavaHttpClientTransport
                 throw new IOException("Interrupted waiting for response body data", e);
             }
         }
-
-        private long drainTo(OutputStream out, ByteBuffer currentBuffer) throws IOException {
-            long written = 0;
-            ByteBuffer buffer = currentBuffer;
-            while (true) {
-                if (buffer == null || !buffer.hasRemaining()) {
-                    Object next = takeNext();
-                    if (next == EOF) {
-                        return written;
-                    }
-                    if (next instanceof Throwable throwable) {
-                        if (throwable instanceof IOException ioe) {
-                            throw ioe;
-                        }
-                        throw new IOException("Response body subscriber failed", throwable);
-                    }
-                    buffer = (ByteBuffer) next;
-                    if (!buffer.hasRemaining()) {
-                        buffer = null;
-                        continue;
-                    }
-                }
-
-                int remaining = buffer.remaining();
-                if (buffer.hasArray()) {
-                    out.write(buffer.array(), buffer.arrayOffset() + buffer.position(), remaining);
-                    buffer.position(buffer.limit());
-                } else {
-                    byte[] tmp = new byte[Math.min(remaining, 16 * 1024)];
-                    while (buffer.hasRemaining()) {
-                        int chunk = Math.min(buffer.remaining(), tmp.length);
-                        buffer.get(tmp, 0, chunk);
-                        out.write(tmp, 0, chunk);
-                    }
-                }
-                written += remaining;
-                buffer = null;
-            }
-        }
     }
 
     private static final class StreamingInputStream extends InputStream {
-        private final StreamingDataStream owner;
+        private final StreamingDataStream stream;
         private ByteBuffer current;
-        private boolean eof;
 
-        private StreamingInputStream(StreamingDataStream owner) {
-            this.owner = owner;
+        private StreamingInputStream(StreamingDataStream stream) {
+            this.stream = stream;
         }
 
         @Override
         public int read() throws IOException {
-            byte[] single = new byte[1];
-            int read = read(single, 0, 1);
-            return read == -1 ? -1 : single[0] & 0xFF;
+            byte[] buffer = new byte[1];
+            int read = read(buffer, 0, 1);
+            return read < 0 ? -1 : buffer[0] & 0xFF;
         }
 
         @Override
@@ -570,66 +504,26 @@ public final class JavaHttpClientTransport
             if (len == 0) {
                 return 0;
             }
-            if (eof) {
-                return -1;
-            }
 
-            int totalRead = 0;
-            while (totalRead == 0) {
-                if (current == null || !current.hasRemaining()) {
-                    current = nextBuffer();
-                    if (eof) {
-                        return totalRead == 0 ? -1 : totalRead;
-                    }
+            while (current == null || !current.hasRemaining()) {
+                Object next = stream.takeNext();
+                if (next == StreamingDataStream.EOF) {
+                    return -1;
                 }
-
-                int toRead = Math.min(len - totalRead, current.remaining());
-                current.get(b, off + totalRead, toRead);
-                totalRead += toRead;
-                if (totalRead == len) {
-                    break;
+                if (next instanceof Throwable throwable) {
+                    throw new IOException("Failed receiving response body", throwable);
                 }
+                current = (ByteBuffer) next;
             }
 
-            return totalRead;
-        }
-
-        @Override
-        public long transferTo(OutputStream out) throws IOException {
-            if (eof) {
-                return 0;
-            }
-            long written = owner.drainTo(out, current);
-            current = null;
-            eof = true;
-            return written;
+            int toRead = Math.min(len, current.remaining());
+            current.get(b, off, toRead);
+            return toRead;
         }
 
         @Override
         public void close() {
-            eof = true;
-            current = null;
-            owner.close();
-        }
-
-        private ByteBuffer nextBuffer() throws IOException {
-            while (true) {
-                Object next = owner.takeNext();
-                if (next == StreamingDataStream.EOF) {
-                    eof = true;
-                    return null;
-                }
-                if (next instanceof Throwable throwable) {
-                    if (throwable instanceof IOException ioe) {
-                        throw ioe;
-                    }
-                    throw new IOException("Response body subscriber failed", throwable);
-                }
-                ByteBuffer buffer = (ByteBuffer) next;
-                if (buffer.hasRemaining()) {
-                    return buffer;
-                }
-            }
+            stream.close();
         }
     }
 }
