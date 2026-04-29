@@ -29,6 +29,7 @@ import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -113,6 +114,7 @@ public class H2TinyRpcBenchmark {
 
         smithyRequest = HttpRequest.create()
                 .setUri(SmithyUri.of(BenchmarkSupport.H2_URL + "/rpc"))
+                .setHttpVersion(HttpVersion.HTTP_2)
                 .setMethod("POST")
                 .setBody(DataStream.ofBytes(BenchmarkSupport.POST_PAYLOAD));
     }

@@ -62,6 +62,7 @@ import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -262,7 +263,7 @@ public class H2ScalingBenchmark {
     @Threads(1)
     public void h2SmithyGet(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/get");
-        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+        var request = HttpRequest.create().setUri(uri).setHttpVersion(HttpVersion.HTTP_2).setMethod("GET");
 
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             try (var res = smithyClient.send(req)) {
@@ -445,6 +446,7 @@ public class H2ScalingBenchmark {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
         var request = HttpRequest.create()
                 .setUri(uri)
+                .setHttpVersion(HttpVersion.HTTP_2)
                 .setMethod("PUT")
                 .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
 
@@ -463,6 +465,7 @@ public class H2ScalingBenchmark {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
         var request = HttpRequest.create()
                 .setUri(uri)
+                .setHttpVersion(HttpVersion.HTTP_2)
                 .setMethod("PUT")
                 .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
 
@@ -480,6 +483,7 @@ public class H2ScalingBenchmark {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
         var request = HttpRequest.create()
                 .setUri(uri)
+                .setHttpVersion(HttpVersion.HTTP_2)
                 .setMethod("PUT")
                 .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
 
@@ -497,6 +501,7 @@ public class H2ScalingBenchmark {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
         var request = HttpRequest.create()
                 .setUri(uri)
+                .setHttpVersion(HttpVersion.HTTP_2)
                 .setMethod("PUT")
                 .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
 
@@ -512,7 +517,7 @@ public class H2ScalingBenchmark {
     @Threads(1)
     public void h2ProductionNettyGetMb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb");
-        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+        var request = HttpRequest.create().setUri(uri).setHttpVersion(HttpVersion.HTTP_2).setMethod("GET");
 
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             var res = productionNettyTransport.send(transportContext, req);
@@ -526,7 +531,7 @@ public class H2ScalingBenchmark {
     @Threads(1)
     public void h2ProductionNettyGet10Mb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/get10mb");
-        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+        var request = HttpRequest.create().setUri(uri).setHttpVersion(HttpVersion.HTTP_2).setMethod("GET");
 
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             var res = productionNettyTransport.send(transportContext, req);
@@ -560,6 +565,7 @@ public class H2ScalingBenchmark {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
         var request = HttpRequest.create()
                 .setUri(uri)
+                .setHttpVersion(HttpVersion.HTTP_2)
                 .setMethod("PUT")
                 .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
 
@@ -578,6 +584,7 @@ public class H2ScalingBenchmark {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb");
         var request = HttpRequest.create()
                 .setUri(uri)
+                .setHttpVersion(HttpVersion.HTTP_2)
                 .setMethod("PUT")
                 .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD));
 
@@ -594,7 +601,7 @@ public class H2ScalingBenchmark {
     @Threads(1)
     public void h2SmithyGetMb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb");
-        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+        var request = HttpRequest.create().setUri(uri).setHttpVersion(HttpVersion.HTTP_2).setMethod("GET");
 
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             try (var res = smithyClient.send(req)) {
@@ -609,7 +616,7 @@ public class H2ScalingBenchmark {
     @Threads(1)
     public void h2JavaWrapperGetMb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb");
-        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+        var request = HttpRequest.create().setUri(uri).setHttpVersion(HttpVersion.HTTP_2).setMethod("GET");
 
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             try (var response = javaTransport.send(transportContext, req)) {
@@ -624,7 +631,7 @@ public class H2ScalingBenchmark {
     @Threads(1)
     public void h2ApacheAsyncGetMb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb");
-        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+        var request = HttpRequest.create().setUri(uri).setHttpVersion(HttpVersion.HTTP_2).setMethod("GET");
 
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             try (var response = apacheTransport.send(transportContext, req)) {
@@ -639,7 +646,7 @@ public class H2ScalingBenchmark {
     @Threads(1)
     public void h2SmithyGetMbChannel(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb");
-        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+        var request = HttpRequest.create().setUri(uri).setHttpVersion(HttpVersion.HTTP_2).setMethod("GET");
         var drainBuf = ByteBuffer.allocate(65536);
 
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
@@ -714,7 +721,7 @@ public class H2ScalingBenchmark {
     @Threads(1)
     public void h2SmithyGet10Mb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/get10mb");
-        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+        var request = HttpRequest.create().setUri(uri).setHttpVersion(HttpVersion.HTTP_2).setMethod("GET");
 
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             try (var res = smithyClient.send(req)) {
@@ -729,7 +736,7 @@ public class H2ScalingBenchmark {
     @Threads(1)
     public void h2JavaWrapperGet10Mb(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/get10mb");
-        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+        var request = HttpRequest.create().setUri(uri).setHttpVersion(HttpVersion.HTTP_2).setMethod("GET");
 
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
             try (var response = javaTransport.send(transportContext, req)) {
@@ -744,7 +751,7 @@ public class H2ScalingBenchmark {
     @Threads(1)
     public void h2SmithyGet10MbChannel(Counter counter) throws InterruptedException {
         var uri = SmithyUri.of(BenchmarkSupport.H2_URL + "/get10mb");
-        var request = HttpRequest.create().setUri(uri).setMethod("GET");
+        var request = HttpRequest.create().setUri(uri).setHttpVersion(HttpVersion.HTTP_2).setMethod("GET");
         var drainBuf = ByteBuffer.allocate(65536);
 
         BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {

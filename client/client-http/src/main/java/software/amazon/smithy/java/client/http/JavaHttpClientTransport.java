@@ -59,8 +59,9 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * a non-default executor.
  *
  * <h2>System properties</h2>
- * <p>{@link #setDefaultTuningProperties} sets modest improvements to the JDK defaults for
- * {@code jdk.httpclient.maxframesize}, {@code maxstreams}, and {@code bufsize} at class init.
+ * <p>{@link #setDefaultTuningProperties} sets modest JVM-global {@code java.net.http} tuning
+ * defaults for {@code jdk.httpclient.maxframesize}, {@code maxstreams}, and
+ * {@code bufsize} at class init when the application has not already set them.
  * {@link #setHostProperties} allowlists the {@code Host} header so consumer plugins can
  * override it.
  */
@@ -126,18 +127,18 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
      *
      * <p>The chosen values:
      * <ul>
-     *   <li>{@code jdk.httpclient.maxframesize=32768}: larger H2 frames amortize per-frame
+     *   <li>{@code jdk.httpclient.maxframesize=65536}: larger H2 frames amortize per-frame
      *       overhead on streaming bodies (JDK default is 16 KB).</li>
-     *   <li>{@code jdk.httpclient.maxstreams=256}: allow more concurrent H2 streams per
+     *   <li>{@code jdk.httpclient.maxstreams=1024}: allow more concurrent H2 streams per
      *       connection (JDK default is 100).</li>
-     *   <li>{@code jdk.httpclient.bufsize=32768}: larger internal I/O buffer reduces read
+     *   <li>{@code jdk.httpclient.bufsize=65536}: larger internal I/O buffer reduces read
      *       iterations for medium-to-large bodies (JDK default is 16 KB).</li>
      * </ul>
      */
     private static void setDefaultTuningProperties() {
-        setIfUnset("jdk.httpclient.maxframesize", "32768");
-        setIfUnset("jdk.httpclient.maxstreams", "256");
-        setIfUnset("jdk.httpclient.bufsize", "32768");
+        setIfUnset("jdk.httpclient.maxframesize", "65536");
+        setIfUnset("jdk.httpclient.maxstreams", "1024");
+        setIfUnset("jdk.httpclient.bufsize", "65536");
     }
 
     private static void setIfUnset(String name, String value) {
@@ -231,11 +232,10 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
      *       and let the JDK fall back to chunked transfer encoding.</li>
      * </ol>
      *
-     * <p>Version pinning: if the caller explicitly requested HTTP/1.1 but the underlying JDK
-     * client is configured for HTTP/2, we intentionally do NOT call {@code builder.version()}.
-     * Setting the version to HTTP/1.1 here would force the JDK to open a new connection rather
-     * than reuse an existing HTTP/2 connection, which is wasteful when the server advertises
-     * HTTP/2 via ALPN. For any other combination we pass the caller's requested version through.
+     * <p>Version pinning: we always pass the caller's requested HTTP version through to
+     * {@code builder.version(...)}, including explicit HTTP/1.1 on an HTTP/2-capable client.
+     * This preserves request-level version semantics and lets callers intentionally force HTTP/1.1
+     * when needed.
      *
      * <p>Request timeout precedence: context value takes priority over the transport-level
      * {@link #defaultRequestTimeout}; if neither is set the JDK applies no timeout.

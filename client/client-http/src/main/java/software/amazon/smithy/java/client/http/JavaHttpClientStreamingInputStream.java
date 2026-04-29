@@ -35,8 +35,16 @@ import java.util.Objects;
  */
 final class JavaHttpClientStreamingInputStream extends InputStream {
 
-    /** Size of the reusable scratch buffer used by {@link #transferTo(OutputStream)} when chunks are not array-backed. */
-    private static final int TRANSFER_SCRATCH_SIZE = 16 * 1024;
+    /**
+     * Size of the reusable scratch buffer used by {@link #transferTo(OutputStream)} when chunks
+     * are not array-backed.
+     *
+     * <p>Benchmark-only sweeps can override this with
+     * {@code -Dsmithy.java.client.http.jdk.transferScratchSize=<bytes>} to test whether larger
+     * response-drain granularity reduces JDK HttpClient scheduler churn on large streaming bodies.
+     */
+    private static final int TRANSFER_SCRATCH_SIZE =
+            Math.max(1024, Integer.getInteger("smithy.java.client.http.jdk.transferScratchSize", 16 * 1024));
 
     private final JavaHttpClientStreamingDataStream stream;
 

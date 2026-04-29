@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -31,6 +32,7 @@ import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -70,6 +72,8 @@ public class H2MixedGetPutBenchmark {
     private software.amazon.smithy.java.context.Context transportContext;
     private MixedRequests mixedRequests;
     private String runId;
+    private String javaExecutorKind;
+    private int javaExecutorThreads;
 
     @Setup(Level.Trial)
     public void setup() throws Exception {
@@ -116,7 +120,11 @@ public class H2MixedGetPutBenchmark {
                         .build())
                 .build();
 
-        javaExecutor = Executors.newVirtualThreadPerTaskExecutor();
+        javaExecutorKind = System.getProperty("smithy.java.jmh.javaExecutor", "vt");
+        javaExecutorThreads = Integer.getInteger(
+                "smithy.java.jmh.javaExecutorThreads",
+                Math.max(1, Runtime.getRuntime().availableProcessors()));
+        javaExecutor = createJavaExecutor(javaExecutorKind, javaExecutorThreads);
         javaClient = java.net.http.HttpClient.newBuilder()
                 .version(java.net.http.HttpClient.Version.HTTP_2)
                 .sslContext(sslContext)
@@ -145,6 +153,7 @@ public class H2MixedGetPutBenchmark {
                 new RequestPlan(
                         HttpRequest.create()
                                 .setUri(SmithyUri.of(BenchmarkSupport.H2_URL + "/getmb?runId=" + runId))
+                                .setHttpVersion(HttpVersion.HTTP_2)
                                 .setMethod("GET"),
                         true,
                         0,
@@ -152,6 +161,7 @@ public class H2MixedGetPutBenchmark {
                 new RequestPlan(
                         HttpRequest.create()
                                 .setUri(SmithyUri.of(BenchmarkSupport.H2_URL + "/putmb?runId=" + runId))
+                                .setHttpVersion(HttpVersion.HTTP_2)
                                 .setMethod("PUT")
                                 .setBody(DataStream.ofBytes(BenchmarkSupport.MB_PAYLOAD)),
                         false,
@@ -171,6 +181,13 @@ public class H2MixedGetPutBenchmark {
                 System.out.println("H2 mixed GET+PUT stats [c=" + concurrency + ", conn=" + connections
                         + ", streams=" + streamsPerConnection + "]: " + stats);
                 System.out.println("H2 client stats: " + BenchmarkSupport.getH2ConnectionStats(smithyClient));
+                System.out.println("JDK mixed config: executor=" + javaExecutorKind
+                        + ", executorThreads=" + javaExecutorThreads
+                        + ", transferScratchSize="
+                        + Integer.getInteger("smithy.java.client.http.jdk.transferScratchSize", 16 * 1024)
+                        + ", jdk.httpclient.maxframesize=" + System.getProperty("jdk.httpclient.maxframesize")
+                        + ", jdk.httpclient.bufsize=" + System.getProperty("jdk.httpclient.bufsize")
+                        + ", jdk.httpclient.maxstreams=" + System.getProperty("jdk.httpclient.maxstreams"));
             }
             if (smithyPlatformReaderClient != null) {
                 System.out.println("H2 platform-reader client stats: "
@@ -213,6 +230,15 @@ public class H2MixedGetPutBenchmark {
                 productionNettyTransport = null;
             }
         }
+    }
+
+    private static ExecutorService createJavaExecutor(String kind, int threads) {
+        return switch (kind) {
+            case "vt" -> Executors.newVirtualThreadPerTaskExecutor();
+            case "fixed" -> Executors.newFixedThreadPool(threads);
+            case "fjp" -> new ForkJoinPool(threads);
+            default -> throw new IllegalArgumentException("Unsupported smithy.java.jmh.javaExecutor: " + kind);
+        };
     }
 
     @AuxCounters(AuxCounters.Type.EVENTS)
