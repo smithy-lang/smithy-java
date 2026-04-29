@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.aws.client.ec2query;
+package software.amazon.smithy.java.aws.client.awsquery;
 
 import static java.net.URLDecoder.decode;
 import static org.junit.jupiter.api.Assertions.assertEquals;

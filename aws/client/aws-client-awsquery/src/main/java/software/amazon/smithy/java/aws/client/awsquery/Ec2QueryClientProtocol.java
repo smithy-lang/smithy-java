@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.aws.client.ec2query;
+package software.amazon.smithy.java.aws.client.awsquery;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -33,23 +33,25 @@ import software.amazon.smithy.java.xml.XmlCodec;
 import software.amazon.smithy.java.xml.XmlUtil;
 import software.amazon.smithy.model.shapes.ShapeId;
 
+/**
+ * Implements the {@code aws.protocols#ec2Query} protocol.
+ */
 public final class Ec2QueryClientProtocol extends HttpClientProtocol {
 
     private static final String CONTENT_TYPE = "application/x-www-form-urlencoded";
 
-    private final ShapeId service;
     private final String version;
     private final HttpErrorDeserializer errorDeserializer;
     private final XmlCodec codec = XmlCodec.builder().build();
 
     public Ec2QueryClientProtocol(ShapeId service, String version) {
         super(Ec2QueryTrait.ID);
-        this.service = Objects.requireNonNull(service, "service is required");
+        Objects.requireNonNull(service, "service is required");
         this.version = Objects.requireNonNull(version, "version is required");
         this.errorDeserializer = HttpErrorDeserializer.builder()
                 .codec(codec)
                 .serviceId(service)
-                .errorPayloadParser(EC2_ERROR_PAYLOAD_PARSER)
+                .errorPayloadParser(new Ec2ErrorPayloadParser())
                 .knownErrorFactory(new XmlKnownErrorFactory())
                 .build();
     }
@@ -67,7 +69,10 @@ public final class Ec2QueryClientProtocol extends HttpClientProtocol {
             SmithyUri endpoint
     ) {
         String operationName = operation.schema().id().getName();
-        Ec2QueryFormSerializer serializer = new Ec2QueryFormSerializer(operationName, version);
+        QueryFormSerializer serializer = new QueryFormSerializer(
+                QueryFormSerializer.QueryVariant.EC2_QUERY,
+                operationName,
+                version);
 
         if (!operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
             input.serializeMembers(serializer);
@@ -111,70 +116,36 @@ public final class Ec2QueryClientProtocol extends HttpClientProtocol {
     }
 
     /**
-     * EC2 Query error format:
-     * {@snippet lang = XML :
-     * <Response>
-     *     <Errors>
-     *         <Error>
-     *             <Code>ErrorShapeName</Code>
-     *             <Message>...</Message>
-     *         </Error>
-     *     </Errors>
-     *     <RequestID>...</RequestID>
-     * </Response>
-     * }
-     * Error code is just the shape name (no awsQueryError trait).
+     * EC2 Query error format: {@code Response > Errors > Error > Code}.
+     * No awsQueryError trait — error code is just the shape name.
      */
-    private static final HttpErrorDeserializer.ErrorPayloadParser EC2_ERROR_PAYLOAD_PARSER =
-            new HttpErrorDeserializer.ErrorPayloadParser() {
-                @Override
-                public CallException parsePayload(
-                        Context context,
-                        Codec codec,
-                        HttpErrorDeserializer.KnownErrorFactory knownErrorFactory,
-                        ShapeId serviceId,
-                        TypeRegistry typeRegistry,
-                        ApiOperation<?, ?> operation,
-                        HttpResponse response,
-                        ByteBuffer buffer
-                ) {
-                    var deserializer = codec.createDeserializer(buffer);
-                    String code = XmlUtil.parseErrorCodeName(deserializer);
-
-                    // EC2 Query has no awsQueryError trait - resolve by shape ID directly
-                    var id = ShapeId.fromOptionalNamespace(serviceId.getNamespace(), code);
-                    ShapeBuilder<ModeledException> builder = typeRegistry.createBuilder(
-                            id,
-                            ModeledException.class);
-
-                    if (builder != null) {
-                        return knownErrorFactory.createError(context, codec, response, builder);
-                    }
-                    return null;
-                }
-
-                @Override
-                public ShapeId extractErrorType(
-                        Document document,
-                        String namespace
-                ) {
-                    return null;
-                }
-            };
-
-    private static final class XmlKnownErrorFactory implements HttpErrorDeserializer.KnownErrorFactory {
+    private static final class Ec2ErrorPayloadParser implements HttpErrorDeserializer.ErrorPayloadParser {
         @Override
-        public ModeledException createError(
+        public CallException parsePayload(
                 Context context,
                 Codec codec,
+                HttpErrorDeserializer.KnownErrorFactory knownErrorFactory,
+                ShapeId serviceId,
+                TypeRegistry typeRegistry,
+                ApiOperation<?, ?> operation,
                 HttpResponse response,
-                ShapeBuilder<ModeledException> builder
+                ByteBuffer buffer
         ) {
-            ByteBuffer bytes = DataStream.ofPublisher(
-                    response.body(),
-                    response.contentType(),
-                    response.contentLength(-1)).asByteBuffer();
-            return codec.deserializeShape(bytes, builder);
+            var deserializer = codec.createDeserializer(buffer);
+            String code = XmlUtil.parseErrorCodeName(deserializer);
+
+            var id = ShapeId.fromOptionalNamespace(serviceId.getNamespace(), code);
+            ShapeBuilder<ModeledException> builder = typeRegistry.createBuilder(id, ModeledException.class);
+
+            if (builder != null) {
+                return knownErrorFactory.createError(context, codec, response, builder);
+            }
+            return null;
+        }
+
+        @Override
+        public ShapeId extractErrorType(Document document, String namespace) {
+            return null;
         }
     }
 

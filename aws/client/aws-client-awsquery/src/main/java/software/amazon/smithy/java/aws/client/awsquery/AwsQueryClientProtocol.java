@@ -69,7 +69,10 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
             SmithyUri endpoint
     ) {
         String operationName = operation.schema().id().getName();
-        AwsQueryFormSerializer serializer = new AwsQueryFormSerializer(operationName, version);
+        QueryFormSerializer serializer = new QueryFormSerializer(
+                QueryFormSerializer.QueryVariant.AWS_QUERY,
+                operationName,
+                version);
 
         if (!operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
             input.serializeMembers(serializer);
@@ -157,22 +160,6 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
                     return null;
                 }
             };
-
-    private static final class XmlKnownErrorFactory implements HttpErrorDeserializer.KnownErrorFactory {
-        @Override
-        public ModeledException createError(
-                Context context,
-                Codec codec,
-                HttpResponse response,
-                ShapeBuilder<ModeledException> builder
-        ) {
-            ByteBuffer bytes = DataStream.ofPublisher(
-                    response.body(),
-                    response.contentType(),
-                    response.contentLength(-1)).asByteBuffer();
-            return codec.deserializeShape(bytes, builder);
-        }
-    }
 
     public static final class Factory implements ClientProtocolFactory<AwsQueryTrait> {
 

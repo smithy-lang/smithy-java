@@ -1,1 +1,2 @@
 software.amazon.smithy.java.aws.client.awsquery.AwsQueryClientProtocol$Factory
+software.amazon.smithy.java.aws.client.awsquery.Ec2QueryClientProtocol$Factory
