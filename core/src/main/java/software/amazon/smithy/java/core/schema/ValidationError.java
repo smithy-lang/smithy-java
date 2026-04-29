@@ -137,4 +137,6 @@ public interface ValidationError {
             return "Conflicting list item found at position " + position;
         }
     }
+
+    record CustomValidationFailure(String path, Schema schema, String message) implements ValidationError { }
 }

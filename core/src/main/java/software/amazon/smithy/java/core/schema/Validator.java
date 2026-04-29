@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ServiceLoader;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.serde.ListSerializer;
 import software.amazon.smithy.java.core.serde.MapSerializer;
@@ -105,6 +106,28 @@ public final class Validator {
         public Builder maxAllowedErrors(int maxAllowedErrors) {
             this.maxAllowedErrors = maxAllowedErrors;
             return this;
+        }
+    }
+
+    static class CustomValidationRuleProvider implements SchemaExtensionProvider<List<CustomValidationRule>> {
+        private static final SchemaExtensionKey<List<CustomValidationRule>> CUSTOM_VALIDATION_RULE_EXTENSION_KEY = new SchemaExtensionKey<>();
+        private static final List<CustomValidationRule> CUSTOM_VALIDATION_RULE_LIST = new ArrayList<>();
+
+        static {
+            // loading all custom validation rules at once at startup
+            var loader = ServiceLoader.load(CustomValidationRule.class, CustomValidationRule.class.getClassLoader());
+            loader.forEach(rule -> CUSTOM_VALIDATION_RULE_LIST.add(rule));
+        }
+
+        @Override
+        public SchemaExtensionKey<List<CustomValidationRule>> key() {
+            return CUSTOM_VALIDATION_RULE_EXTENSION_KEY;
+        }
+
+        @Override
+        public List<CustomValidationRule> provide(Schema schema) {
+            return CUSTOM_VALIDATION_RULE_LIST
+                .stream().filter(rule -> rule.appliesTo(schema)).toList();
         }
     }
 
@@ -224,6 +247,7 @@ public final class Validator {
                 case UNION -> ValidatorOfUnion.validate(this, schema, struct);
                 default -> checkType(schema, ShapeType.STRUCTURE); // this is guaranteed to fail type checking.
             }
+            executeCustomValidation(schema, struct);
             currentSchema = previousSchema;
             elementCount = previousCount;
         }
@@ -260,6 +284,7 @@ public final class Validator {
 
                 checkListLength(schema, count);
             }
+          executeCustomValidation(schema, state);
         }
 
         private void checkListLength(Schema schema, int count) {
@@ -297,6 +322,7 @@ public final class Validator {
                 elementCount = previousCount;
                 checkMapLength(schema, count);
             }
+          executeCustomValidation(schema, state);
         }
 
         private void checkMapLength(Schema schema, int count) {
@@ -328,18 +354,21 @@ public final class Validator {
         @Override
         public void writeBoolean(Schema schema, boolean value) {
             checkType(schema, ShapeType.BOOLEAN);
+            executeCustomValidation(schema, value);
         }
 
         @Override
         public void writeByte(Schema schema, byte value) {
             checkType(schema, ShapeType.BYTE);
             validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
+            executeCustomValidation(schema, value);
         }
 
         @Override
         public void writeShort(Schema schema, short value) {
             checkType(schema, ShapeType.SHORT);
             validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
+            executeCustomValidation(schema, value);
         }
 
         @Override
@@ -354,24 +383,28 @@ public final class Validator {
                 }
                 default -> checkType(schema, ShapeType.INTEGER); // it's invalid.
             }
+            executeCustomValidation(schema, value);
         }
 
         @Override
         public void writeLong(Schema schema, long value) {
             checkType(schema, ShapeType.LONG);
             validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
+            executeCustomValidation(schema, value);
         }
 
         @Override
         public void writeFloat(Schema schema, float value) {
             checkType(schema, ShapeType.FLOAT);
             validateRange(schema, value, schema.minDoubleConstraint, schema.maxDoubleConstraint);
+            executeCustomValidation(schema, value);
         }
 
         @Override
         public void writeDouble(Schema schema, double value) {
             checkType(schema, ShapeType.DOUBLE);
             validateRange(schema, value, schema.minDoubleConstraint, schema.maxDoubleConstraint);
+            executeCustomValidation(schema, value);
         }
 
         @Override
@@ -383,6 +416,7 @@ public final class Validator {
                     schema.maxRangeConstraint.toBigInteger()) > 0) {
                 emitRangeError(schema, value);
             }
+            executeCustomValidation(schema, value);
         }
 
         @Override
@@ -393,6 +427,7 @@ public final class Validator {
             } else if (schema.maxRangeConstraint != null && value.compareTo(schema.maxRangeConstraint) > 0) {
                 emitRangeError(schema, value);
             }
+            executeCustomValidation(schema, value);
         }
 
         @Override
@@ -429,6 +464,7 @@ public final class Validator {
                 }
                 default -> checkType(schema, ShapeType.STRING); // it's invalid, and calling this adds an error.
             }
+            executeCustomValidation(schema, value);
         }
 
         @Override
@@ -438,16 +474,19 @@ public final class Validator {
             if (length < schema.minLengthConstraint || length > schema.maxLengthConstraint) {
                 addError(new ValidationError.LengthValidationFailure(createPath(), length, schema));
             }
+            executeCustomValidation(schema, value);
         }
 
         @Override
         public void writeTimestamp(Schema schema, Instant value) {
             checkType(schema, ShapeType.TIMESTAMP);
+            executeCustomValidation(schema, value);
         }
 
         @Override
         public void writeDocument(Schema schema, Document document) {
             checkType(schema, ShapeType.DOCUMENT);
+            executeCustomValidation(schema, document);
         }
 
         @Override
@@ -487,6 +526,15 @@ public final class Validator {
                 // is emitted from something manually and not from an actual modeled shape.
                 throw new ValidationShortCircuitException();
             }
+        }
+
+        private void executeCustomValidation(Schema schema, Object value) {
+            var customValidationRules = schema.getExtension(CustomValidationRuleProvider.CUSTOM_VALIDATION_RULE_EXTENSION_KEY);
+            if (customValidationRules == null) return;
+            customValidationRules.forEach(rule -> {
+                var validationErrors = rule.validate(schema, value, createPath());
+                validationErrors.forEach(error -> addError(error));
+            });
         }
     }
 }
