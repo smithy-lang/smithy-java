@@ -15,10 +15,6 @@ import java.util.Arrays;
  * unencoded, while all other characters are percent-encoded as UTF-8 bytes. This differs from the
  * application/x-www-form-urlencoded spec which encodes space as '+', but AWS Query protocol expects
  * RFC 3986 encoding.
- *
- * <p><b>Note:</b> This class is intentionally duplicated in the {@code aws-client-ec2query} module.
- * Both protocols are deprecated and unlikely to change, so duplication is preferred over adding a
- * shared module dependency. If you fix a bug here, check the copy in {@code ec2query} too.
  */
 final class FormUrlEncodedSink {
     private static final byte[] HEX = {
