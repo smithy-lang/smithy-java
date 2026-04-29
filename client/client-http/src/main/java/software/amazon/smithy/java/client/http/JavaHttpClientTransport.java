@@ -5,15 +5,22 @@
 
 package software.amazon.smithy.java.client.http;
 
+import static java.net.http.HttpRequest.BodyPublisher;
 import static java.net.http.HttpRequest.BodyPublishers;
-import static java.net.http.HttpResponse.BodyHandlers;
+import static java.net.http.HttpResponse.BodyHandler;
+import static java.net.http.HttpResponse.BodySubscriber;
+import static java.net.http.HttpResponse.BodySubscribers;
+import static java.net.http.HttpResponse.ResponseInfo;
+import static software.amazon.smithy.java.http.api.HttpHeaders.HeaderWithValueConsumer;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
+import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.client.core.MessageExchange;
@@ -21,33 +28,43 @@ import software.amazon.smithy.java.client.core.error.ConnectTimeoutException;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HeaderName;
-import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
-import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
- * A client transport that uses Java's built-in {@link HttpClient} to send {@link HttpRequest} and return
- * {@link HttpResponse}.
+ * Smithy HTTP transport backed by Java's built-in {@link HttpClient}.
+ *
+ * <p>Uses a direct {@link ByteBuffer} request-body fast path for replayable in-memory bodies,
+ * a small-body response subscriber for known small responses, and a streaming bridge for larger
+ * response bodies. When this transport builds its own {@link HttpClient}, it also owns and
+ * closes the attached virtual-thread executor.
  */
 public final class JavaHttpClientTransport implements ClientTransport<HttpRequest, HttpResponse> {
 
     private static final URI DUMMY_URI = URI.create("http://localhost");
 
+    private static final int SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD = 64 * 1024;
+
+    private static final HeaderWithValueConsumer<java.net.http.HttpRequest.Builder> VALUE_CONSUMER = (b, n, v) -> {
+        if (n != HeaderName.CONTENT_LENGTH.name()) {
+            b.setHeader(n, v);
+        }
+    };
+
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaHttpClientTransport.class);
     private final HttpClient client;
     private final Duration defaultRequestTimeout;
+    private final ExecutorService ownedExecutor;
 
     static {
-        // For some reason, this can't just be done in the constructor to always take effect.
         setHostProperties();
+        setDefaultTuningProperties();
     }
 
     private static void setHostProperties() {
-        // Allow clients to set Host header. This has to be done using a system property and can't be done per/client.
         var currentValues = System.getProperty("jdk.httpclient.allowRestrictedHeaders");
         if (currentValues == null || currentValues.isEmpty()) {
             System.setProperty("jdk.httpclient.allowRestrictedHeaders", "host");
@@ -60,31 +77,51 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
                     .setHeader("host", "localhost")
                     .build();
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Unable to add host header. " +
-                    "This means that the HttpClient was initialized before we could allowlist it. " +
-                    "You need to explicitly set allow `host` via the system property `jdk.httpclient.allowRestrictedHeaders`",
+            throw new RuntimeException("Unable to add host header. "
+                    + "This means that the HttpClient was initialized before we could allowlist it. "
+                    + "You need to explicitly set allow `host` via the system property "
+                    + "`jdk.httpclient.allowRestrictedHeaders`",
                     e);
         }
     }
 
-    public JavaHttpClientTransport() {
-        this(HttpClient.newHttpClient(), null);
+    /**
+     * Set JVM-global JDK HttpClient tuning defaults when the application has not already set
+     * them.
+     */
+    private static void setDefaultTuningProperties() {
+        setIfUnset("jdk.httpclient.maxframesize", "65536");
+        setIfUnset("jdk.httpclient.maxstreams", "1024");
+        setIfUnset("jdk.httpclient.bufsize", "65536");
     }
 
-    /**
-     * @param client Java client to use.
-     */
+    private static void setIfUnset(String name, String value) {
+        if (System.getProperty(name) == null) {
+            System.setProperty(name, value);
+        }
+    }
+
+    public JavaHttpClientTransport() {
+        this.ownedExecutor = Executors.newVirtualThreadPerTaskExecutor();
+        this.client = HttpClient.newBuilder().executor(ownedExecutor).build();
+        this.defaultRequestTimeout = null;
+        setHostProperties();
+    }
+
     public JavaHttpClientTransport(HttpClient client) {
         this(client, null);
     }
 
-    /**
-     * @param client Java client to use.
-     * @param defaultRequestTimeout Default per-request timeout. Used when {@link HttpContext#HTTP_REQUEST_TIMEOUT}
-     *                              is not set in the request context. Null means no default.
-     */
     public JavaHttpClientTransport(HttpClient client, Duration defaultRequestTimeout) {
         this.client = client;
+        this.ownedExecutor = null;
+        this.defaultRequestTimeout = defaultRequestTimeout;
+        setHostProperties();
+    }
+
+    private JavaHttpClientTransport(HttpClient client, ExecutorService ownedExecutor, Duration defaultRequestTimeout) {
+        this.client = client;
+        this.ownedExecutor = ownedExecutor;
         this.defaultRequestTimeout = defaultRequestTimeout;
         setHostProperties();
     }
@@ -93,17 +130,14 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         int length = currentValues.length();
         for (int i = 0; i < length; i++) {
             char c = currentValues.charAt(i);
-            // Check if "host" starts at the current position.
             if ((c == 'h' || c == 'H') && i + 3 < length
                     && (currentValues.charAt(i + 1) == 'o')
                     && (currentValues.charAt(i + 2) == 's')
                     && (currentValues.charAt(i + 3) == 't')) {
-                // Ensure "t" is at the end or followed by a comma.
                 if (i + 4 == length || currentValues.charAt(i + 4) == ',') {
                     return true;
                 }
             }
-            // Skip to the next comma or end of string.
             while (i < length && currentValues.charAt(i) != ',') {
                 i++;
             }
@@ -121,16 +155,31 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         return sendRequest(createJavaRequest(context, request));
     }
 
+    /**
+     * Convert a Smithy {@link HttpRequest} into a JDK {@link java.net.http.HttpRequest}.
+     *
+     * <p>Known-empty bodies use {@link BodyPublishers#noBody()}, replayable in-memory
+     * {@link ByteBuffer} bodies use {@link JavaHttpClientReplayableByteBufferPublisher}, and
+     * everything else falls back to {@link DataStream#bodyPublisher()}.
+     *
+     * <p>Request timeout precedence: context value takes priority over the transport-level
+     * {@link #defaultRequestTimeout}; if neither is set the JDK applies no timeout.
+     */
     private java.net.http.HttpRequest createJavaRequest(Context context, HttpRequest request) {
-        java.net.http.HttpRequest.BodyPublisher bodyPublisher;
-        if (request.body().hasKnownLength()) {
-            if (request.body().contentLength() == 0) {
-                bodyPublisher = BodyPublishers.noBody();
-            } else {
-                bodyPublisher = BodyPublishers.ofByteArray(ByteBufferUtils.getBytes(request.body().asByteBuffer()));
-            }
+        DataStream requestBody = request.body();
+        BodyPublisher bodyPublisher;
+        ByteBuffer replayableRequestBody = toReplayableBodyBuffer(requestBody);
+
+        if (replayableRequestBody != null) {
+            bodyPublisher = !replayableRequestBody.hasRemaining()
+                    ? BodyPublishers.noBody()
+                    : new JavaHttpClientReplayableByteBufferPublisher(replayableRequestBody);
+        } else if (requestBody.hasKnownLength()) {
+            bodyPublisher = requestBody.contentLength() == 0
+                    ? BodyPublishers.noBody()
+                    : BodyPublishers.fromPublisher(requestBody, requestBody.contentLength());
         } else {
-            bodyPublisher = BodyPublishers.ofInputStream(() -> request.body().asInputStream());
+            bodyPublisher = BodyPublishers.fromPublisher(requestBody);
         }
 
         var httpRequestBuilder = java.net.http.HttpRequest.newBuilder()
@@ -146,28 +195,36 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
             httpRequestBuilder.timeout(requestTimeout);
         }
 
-        // Any explicitly set headers overwrite existing headers, they do not merge.
-        request.headers().forEachEntry(httpRequestBuilder, (b, name, value) -> {
-            // Skip restricted headers; Header names in HttpHeaders are always canonicalized, so check by reference.
-            if (name != HeaderName.CONTENT_LENGTH.name()) {
-                b.setHeader(name, value);
-            }
-        });
-
+        request.headers().forEachEntry(httpRequestBuilder, VALUE_CONSUMER);
         return httpRequestBuilder.build();
     }
 
-    private HttpResponse sendRequest(java.net.http.HttpRequest request) {
-        java.net.http.HttpResponse<InputStream> res = null;
+    /**
+     * Return the body as a {@link ByteBuffer} when it can be published directly; otherwise
+     * return {@code null}.
+     */
+    private static ByteBuffer toReplayableBodyBuffer(DataStream requestBody) {
+        if (!requestBody.isReplayable() || !requestBody.hasKnownLength() || !requestBody.hasByteBuffer()) {
+            return null;
+        }
+
         try {
-            res = client.send(request, BodyHandlers.ofInputStream());
+            return requestBody.asByteBuffer().asReadOnlyBuffer();
+        } catch (UnsupportedOperationException | IllegalStateException e) {
+            return null;
+        }
+    }
+
+    private HttpResponse sendRequest(java.net.http.HttpRequest request) {
+        java.net.http.HttpResponse<DataStream> res = null;
+        try {
+            res = client.send(request, new ResponseBodyHandler());
             return createSmithyResponse(res);
         } catch (IOException | InterruptedException | RuntimeException e) {
-            // Close the response body stream if we got a response but failed to process it
             if (res != null) {
                 try {
                     res.body().close();
-                } catch (IOException closeException) {
+                } catch (RuntimeException closeException) {
                     LOGGER.trace("Failed to close response body after error", closeException);
                 }
             }
@@ -183,28 +240,16 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
     }
 
     // package-private for testing
-    HttpResponse createSmithyResponse(java.net.http.HttpResponse<InputStream> response) {
-        var headers = HttpHeaders.ofModifiable();
-        for (var e : response.headers().map().entrySet()) {
-            var name = e.getKey();
-            if (!name.equals(":status")) {
-                headers.addHeader(name, e.getValue());
-            }
-        }
-
+    HttpResponse createSmithyResponse(java.net.http.HttpResponse<? extends DataStream> response) {
+        var headers = new JavaHttpHeaders(response.headers());
         LOGGER.trace("Got response: {}; headers: {}", response, response.headers().map());
 
         var length = headers.contentLength();
         var adaptedLength = length == null ? -1 : length;
         var contentType = headers.contentType();
-        var body = DataStream.ofInputStream(response.body(), contentType, adaptedLength);
+        var body = DataStream.withMetadata(response.body(), contentType, adaptedLength, response.body().isReplayable());
 
-        return HttpResponse.create()
-                .setHttpVersion(javaToSmithyVersion(response.version()))
-                .setStatusCode(response.statusCode())
-                .setHeaders(headers)
-                .setBody(body)
-                .toUnmodifiable();
+        return new JavaHttpResponse(javaToSmithyVersion(response.version()), response.statusCode(), headers, body);
     }
 
     private static HttpClient.Version smithyToHttpVersion(HttpVersion version) {
@@ -225,7 +270,13 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
 
     @Override
     public void close() {
-        client.close();
+        try {
+            client.close();
+        } finally {
+            if (ownedExecutor != null) {
+                ownedExecutor.shutdown();
+            }
+        }
     }
 
     public static final class Factory implements ClientTransportFactory<HttpRequest, HttpResponse> {
@@ -238,22 +289,53 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         public JavaHttpClientTransport createTransport(Document node, Document pluginSettings) {
             setHostProperties();
             // Start with httpConfig from plugin settings as baseline, then apply transport-specific settings on top.
-            var config = new HttpTransportConfig().fromDocument(pluginSettings.asStringMap()
-                    .getOrDefault("httpConfig", Document.EMPTY_MAP));
+            var config = new HttpTransportConfig()
+                    .fromDocument(pluginSettings.asStringMap().getOrDefault("httpConfig", Document.EMPTY_MAP));
             config.fromDocument(node);
-            var builder = HttpClient.newBuilder();
+
+            var executor = Executors.newVirtualThreadPerTaskExecutor();
+            var builder = HttpClient.newBuilder().executor(executor);
             if (config.httpVersion() != null) {
                 builder.version(smithyToHttpVersion(config.httpVersion()));
             }
             if (config.connectTimeout() != null) {
                 builder.connectTimeout(config.connectTimeout());
             }
-            return new JavaHttpClientTransport(builder.build(), config.requestTimeout());
+            return new JavaHttpClientTransport(builder.build(), executor, config.requestTimeout());
         }
 
         @Override
         public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
             return HttpMessageExchange.INSTANCE;
+        }
+    }
+
+    /**
+     * Picks a {@link BodySubscriber} implementation based on the advertised response size.
+     *
+     * <p>Small-body fast path ({@link JavaHttpClientSmallBodySubscriber}): when
+     * {@code Content-Length} is present and within {@link #SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD}
+     * bytes, we pre-size a {@code byte[]} and accumulate the response fully before handing it
+     * back. The result is a replayable {@link DataStream} with known length, avoiding the producer/consumer hand-off
+     * of the streaming path.
+     *
+     * <p>If the fast path is not taken, the transport falls back to the JDK's built-in
+     * {@code ofInputStream()} body subscriber and wraps the returned stream as a Smithy
+     * {@link DataStream}.
+     */
+    private static final class ResponseBodyHandler implements BodyHandler<DataStream> {
+        @Override
+        public BodySubscriber<DataStream> apply(ResponseInfo responseInfo) {
+            long contentLength = responseInfo.headers().firstValueAsLong("content-length").orElse(-1L);
+
+            if (contentLength >= 0 && contentLength <= SMALL_RESPONSE_BODY_FAST_PATH_THRESHOLD) {
+                return new JavaHttpClientSmallBodySubscriber(responseInfo.headers(), (int) contentLength);
+            }
+
+            String contentType = responseInfo.headers().firstValue("content-type").orElse(null);
+            return BodySubscribers.mapping(
+                    BodySubscribers.ofInputStream(),
+                    inputStream -> DataStream.ofInputStream(inputStream, contentType, contentLength));
         }
     }
 }

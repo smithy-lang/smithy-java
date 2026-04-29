@@ -31,6 +31,11 @@ final class WrappedDataStream implements DataStream {
     }
 
     @Override
+    public boolean hasByteBuffer() {
+        return delegate.hasByteBuffer();
+    }
+
+    @Override
     public InputStream asInputStream() {
         return delegate.asInputStream();
     }

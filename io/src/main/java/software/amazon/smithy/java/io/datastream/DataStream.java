@@ -117,6 +117,19 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
         }
     }
 
+    /**
+     * Indicates whether this stream already has a stable in-memory {@link ByteBuffer} representation.
+     *
+     * <p>When this returns {@code true}, calling {@link #asByteBuffer()} must not require materializing or reading
+     * the underlying stream contents. This is stronger than merely supporting {@code asByteBuffer()}, since the
+     * default implementation always materializes the stream into memory.
+     *
+     * @return true if {@link #asByteBuffer()} is backed by an already-available in-memory buffer.
+     */
+    default boolean hasByteBuffer() {
+        return false;
+    }
+
     @Override
     default void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
         HttpRequest.BodyPublishers.ofInputStream(this::asInputStream).subscribe(subscriber);

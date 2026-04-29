@@ -186,9 +186,6 @@ public final class BenchmarkSupport {
             if (firstError == null) {
                 return;
             }
-            if (firstError instanceof RuntimeException runtimeException) {
-                throw new IllegalStateException(label + " failed with " + errors + " error(s)", runtimeException);
-            }
             throw new IllegalStateException(label + " failed with " + errors + " error(s)", firstError);
         }
     }

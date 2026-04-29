@@ -23,6 +23,11 @@ final class EmptyDataStream implements DataStream {
     }
 
     @Override
+    public boolean hasByteBuffer() {
+        return true;
+    }
+
+    @Override
     public InputStream asInputStream() {
         return InputStream.nullInputStream();
     }

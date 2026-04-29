@@ -1,14 +1,14 @@
 import java.net.Socket
 
 plugins {
-    id("smithy-java.module-conventions")
+    java
     id("me.champeau.jmh") version "0.7.3"
 }
 
-description = "JDK transport benchmarks and benchmark server"
-
-extra["displayName"] = "Smithy :: Java :: HTTP :: Client Benchmarks"
-extra["moduleName"] = "software.amazon.smithy.java.http.client"
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
 
 sourceSets {
     create("jmhServer") {

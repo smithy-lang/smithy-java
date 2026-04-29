@@ -44,6 +44,11 @@ final class ByteBufferDataStream implements DataStream {
     }
 
     @Override
+    public boolean hasByteBuffer() {
+        return true;
+    }
+
+    @Override
     public InputStream asInputStream() {
         // Use duplicate() to avoid mutating the original buffer's position,
         // allowing the DataStream to be replayed (isReplayable() returns true)
