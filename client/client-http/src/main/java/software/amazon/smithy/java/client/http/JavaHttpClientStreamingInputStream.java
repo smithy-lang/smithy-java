@@ -47,6 +47,7 @@ final class JavaHttpClientStreamingInputStream extends InputStream {
             Math.max(1024, Integer.getInteger("smithy.java.client.http.jdk.transferScratchSize", 16 * 1024));
 
     private final JavaHttpClientStreamingDataStream stream;
+    private final byte[] singleByte = new byte[1];
 
     /** Number of bytes returned to the caller so far. Used by {@link #readAllBytes()} when content-length is known. */
     private long bytesRead;
@@ -57,9 +58,8 @@ final class JavaHttpClientStreamingInputStream extends InputStream {
 
     @Override
     public int read() throws IOException {
-        byte[] one = new byte[1];
-        int n = read(one, 0, 1);
-        return n < 0 ? -1 : one[0] & 0xFF;
+        int n = read(singleByte, 0, 1);
+        return n < 0 ? -1 : singleByte[0] & 0xFF;
     }
 
     @Override
