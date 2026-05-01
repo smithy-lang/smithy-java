@@ -138,5 +138,5 @@ public interface ValidationError {
         }
     }
 
-    record CustomValidationFailure(String path, Schema schema, String message) implements ValidationError { }
+    record CustomValidationFailure(String path, Schema schema, String message) implements ValidationError {}
 }

@@ -109,9 +109,12 @@ public final class Validator {
         }
     }
 
-    static class CustomValidationRuleProvider implements SchemaExtensionProvider<List<CustomValidationRule>> {
-        private static final SchemaExtensionKey<List<CustomValidationRule>> CUSTOM_VALIDATION_RULE_EXTENSION_KEY = new SchemaExtensionKey<>();
+    public static class CustomValidationRuleProvider implements SchemaExtensionProvider<List<CustomValidationRule>> {
+        private static final SchemaExtensionKey<List<CustomValidationRule>> CUSTOM_VALIDATION_RULE_EXTENSION_KEY =
+            new SchemaExtensionKey<>();
         private static final List<CustomValidationRule> CUSTOM_VALIDATION_RULE_LIST = new ArrayList<>();
+
+        public CustomValidationRuleProvider() {}
 
         static {
             // loading all custom validation rules at once at startup
@@ -127,7 +130,9 @@ public final class Validator {
         @Override
         public List<CustomValidationRule> provide(Schema schema) {
             return CUSTOM_VALIDATION_RULE_LIST
-                .stream().filter(rule -> rule.appliesTo(schema)).toList();
+                    .stream()
+                    .filter(rule -> rule.appliesTo(schema))
+                    .toList();
         }
     }
 
@@ -284,7 +289,7 @@ public final class Validator {
 
                 checkListLength(schema, count);
             }
-          executeCustomValidation(schema, state);
+            executeCustomValidation(schema, state);
         }
 
         private void checkListLength(Schema schema, int count) {
@@ -322,7 +327,7 @@ public final class Validator {
                 elementCount = previousCount;
                 checkMapLength(schema, count);
             }
-          executeCustomValidation(schema, state);
+            executeCustomValidation(schema, state);
         }
 
         private void checkMapLength(Schema schema, int count) {
