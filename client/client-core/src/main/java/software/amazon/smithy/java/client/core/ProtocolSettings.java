@@ -84,6 +84,9 @@ public final class ProtocolSettings {
          * @return the builder
          */
         public Builder serviceSchema(Schema serviceSchema) {
+            if (service == null && serviceSchema != null) {
+                service = serviceSchema.id();
+            }
             this.serviceSchema = serviceSchema;
             return this;
         }
