@@ -21,6 +21,8 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -45,9 +47,18 @@ public final class RestXmlClientProtocol extends HttpBindingClientProtocol<AwsEv
      *                relative shape IDs.
      */
     public RestXmlClientProtocol(ShapeId service) {
+        this(service, null);
+    }
+
+    /**
+     * @param service The service being called.
+     * @param serviceSchema The service schema, used to extract service-level traits like xmlNamespace.
+     */
+    public RestXmlClientProtocol(ShapeId service, Schema serviceSchema) {
         super(RestXmlTrait.ID);
 
-        this.codec = XmlCodec.builder().build();
+        var xmlNamespace = serviceSchema != null ? serviceSchema.getTrait(TraitKey.XML_NAMESPACE_TRAIT) : null;
+        this.codec = XmlCodec.builder().defaultNamespace(xmlNamespace).build();
         this.errorDeserializer = HttpErrorDeserializer.builder()
                 .codec(codec)
                 .serviceId(service)
@@ -129,7 +140,7 @@ public final class RestXmlClientProtocol extends HttpBindingClientProtocol<AwsEv
 
         @Override
         public ClientProtocol<?, ?> createProtocol(ProtocolSettings settings, RestXmlTrait trait) {
-            return new RestXmlClientProtocol(settings.service());
+            return new RestXmlClientProtocol(settings.service(), settings.serviceSchema());
         }
     }
 }

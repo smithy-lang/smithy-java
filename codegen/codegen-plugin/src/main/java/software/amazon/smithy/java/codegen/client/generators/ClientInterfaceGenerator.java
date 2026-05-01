@@ -447,6 +447,7 @@ public final class ClientInterfaceGenerator
                     private static final ${protocolSettings:T} protocolSettings = ${protocolSettings:T}.builder()
                             .service(${shapeId:T}.from(${service:S}))
                             .serviceVersion(${serviceVersion:S})
+                            .serviceSchema(${serviceApi:T}.instance().schema())
                             .build();
                     private static final ${trait:T} protocolTrait = ${initializer:C};
                     """;

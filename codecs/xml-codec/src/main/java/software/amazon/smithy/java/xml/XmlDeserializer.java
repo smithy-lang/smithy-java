@@ -614,7 +614,14 @@ final class XmlDeserializer implements ShapeDeserializer {
             for (var entry : decoder.attributes.entrySet()) {
                 String attributeName = entry.getKey();
                 Schema attributeSchema = entry.getValue();
-                String attributeValue = reader.getAttributeValue(null, attributeName);
+                // For namespace-prefixed attributes (e.g., "xsi:someName"), use the local part
+                // for lookup since namespace-aware XML parsers store them by local name.
+                String lookupName = attributeName;
+                int colonIdx = attributeName.indexOf(':');
+                if (colonIdx >= 0) {
+                    lookupName = attributeName.substring(colonIdx + 1);
+                }
+                String attributeValue = reader.getAttributeValue(null, lookupName);
                 if (attributeValue != null) {
                     try {
                         consumer.accept(state, attributeSchema, new AttributeDeserializer(reader, attributeValue));

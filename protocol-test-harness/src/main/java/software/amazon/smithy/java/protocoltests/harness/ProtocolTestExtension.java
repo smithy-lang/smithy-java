@@ -27,6 +27,7 @@ import software.amazon.smithy.java.codegen.JavaSymbolProvider;
 import software.amazon.smithy.java.codegen.ServerSymbolProperties;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -37,6 +38,7 @@ import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.model.transform.ModelTransformer;
 import software.amazon.smithy.protocoltests.traits.HttpMalformedRequestTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpMalformedRequestTestsTrait;
@@ -243,9 +245,13 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
             if (protocolFactory == null) {
                 continue;
             }
+            var serviceSchema = Schema.createService(
+                    service.getId(),
+                    service.getAllTraits().values().toArray(new Trait[0]));
             var protocolSettings = ProtocolSettings.builder()
                     .service(service.getId())
                     .serviceVersion(service.getVersion())
+                    .serviceSchema(serviceSchema)
                     .build();
             var instance = protocolFactory.createProtocol(protocolSettings, protocolTraitEntry.getValue());
             protocols.put(protocolTraitEntry.getKey(), instance);

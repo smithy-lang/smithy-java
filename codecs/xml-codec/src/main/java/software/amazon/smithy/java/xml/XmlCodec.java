@@ -16,6 +16,7 @@ import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.io.ByteBufferUtils;
+import software.amazon.smithy.model.traits.XmlNamespaceTrait;
 
 /**
  * Serialize and deserialize XML documents.
@@ -29,6 +30,7 @@ public final class XmlCodec implements Codec {
     private final XmlInfo xmlInfo = new XmlInfo();
     private final XMLEventFactory eventFactory = XMLEventFactory.newInstance();
     private final List<String> wrapperElements;
+    private final XmlNamespaceTrait defaultNamespace;
 
     private XmlCodec(Builder builder) {
         xmlInputFactory = XMLInputFactory.newInstance();
@@ -38,6 +40,7 @@ public final class XmlCodec implements Codec {
         xmlInputFactory.setProperty(XMLInputFactory.IS_COALESCING, false);
         xmlOutputFactory = XMLOutputFactory.newInstance();
         this.wrapperElements = builder.wrapperElements;
+        this.defaultNamespace = builder.defaultNamespace;
     }
 
     /**
@@ -52,7 +55,7 @@ public final class XmlCodec implements Codec {
     @Override
     public ShapeSerializer createSerializer(OutputStream sink) {
         try {
-            return new XmlSerializer(xmlOutputFactory.createXMLStreamWriter(sink), xmlInfo);
+            return new XmlSerializer(xmlOutputFactory.createXMLStreamWriter(sink), xmlInfo, defaultNamespace);
         } catch (XMLStreamException e) {
             throw new RuntimeException(e);
         }
@@ -77,6 +80,7 @@ public final class XmlCodec implements Codec {
      */
     public static final class Builder {
         private List<String> wrapperElements = List.of();
+        private XmlNamespaceTrait defaultNamespace;
 
         private Builder() {}
 
@@ -96,6 +100,17 @@ public final class XmlCodec implements Codec {
          */
         public Builder wrapperElements(List<String> wrapperElements) {
             this.wrapperElements = wrapperElements;
+            return this;
+        }
+
+        /**
+         * Sets a default XML namespace to apply to top-level elements during serialization.
+         *
+         * @param defaultNamespace the default namespace trait
+         * @return the builder
+         */
+        public Builder defaultNamespace(XmlNamespaceTrait defaultNamespace) {
+            this.defaultNamespace = defaultNamespace;
             return this;
         }
 

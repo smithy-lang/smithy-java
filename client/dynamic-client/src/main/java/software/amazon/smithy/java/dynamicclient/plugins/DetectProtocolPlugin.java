@@ -17,6 +17,8 @@ import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
 import software.amazon.smithy.java.dynamicclient.settings.ModelSetting;
 import software.amazon.smithy.java.dynamicclient.settings.ServiceIdSetting;
+import software.amazon.smithy.java.dynamicschemas.SchemaConverter;
+import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.Trait;
@@ -74,8 +76,8 @@ public final class DetectProtocolPlugin implements ClientPlugin {
 
         var transport = config.transport();
         ClientProtocol<?, ?> protocol = transport != null
-                ? findProtocolMatchingTransport(service, protocols, transport)
-                : findProtocol(service, protocols);
+                ? findProtocolMatchingTransport(model, service, protocols, transport)
+                : findProtocol(model, service, protocols);
 
         if (protocol != null) {
             config.protocol(protocol);
@@ -89,32 +91,39 @@ public final class DetectProtocolPlugin implements ClientPlugin {
                         + " (transport set?=" + (transport == null ? "no" : transport.getClass().getName()) + ")");
     }
 
-    private static ClientProtocol<?, ?> findProtocol(ShapeId service, Map<ShapeId, Trait> protocols) {
+    private static ClientProtocol<?, ?> findProtocol(Model model, ShapeId service, Map<ShapeId, Trait> protocols) {
         for (var protocolImpl : PROTOCOL_FACTORIES) {
             if (protocols.containsKey(protocolImpl.id())) {
-                return createProtocol(service, protocols, protocolImpl);
+                return createProtocol(model, service, protocols, protocolImpl);
             }
         }
         return null;
     }
 
     private static ClientProtocol<?, ?> createProtocol(
+            Model model,
             ShapeId service,
             Map<ShapeId, Trait> protocols,
             ClientProtocolFactory<Trait> protocolImpl
     ) {
-        var settings = ProtocolSettings.builder().service(service).build();
+        var converter = new SchemaConverter(model);
+        var serviceSchema = converter.getSchema(model.expectShape(service));
+        var settings = ProtocolSettings.builder()
+                .service(service)
+                .serviceSchema(serviceSchema)
+                .build();
         return protocolImpl.createProtocol(settings, protocols.get(protocolImpl.id()));
     }
 
     private static ClientProtocol<?, ?> findProtocolMatchingTransport(
+            Model model,
             ShapeId service,
             Map<ShapeId, Trait> protocols,
             ClientTransport<?, ?> transport
     ) {
         for (var protocolImpl : PROTOCOL_FACTORIES) {
             if (protocols.containsKey(protocolImpl.id())) {
-                var protocol = createProtocol(service, protocols, protocolImpl);
+                var protocol = createProtocol(model, service, protocols, protocolImpl);
                 // Only return the protocol if it has the same message exchange as the transport.
                 if (protocol.messageExchange().equals(transport.messageExchange())) {
                     return protocol;
