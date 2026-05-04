@@ -21,10 +21,18 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.auth.api.SignResult;
+import software.amazon.smithy.java.auth.api.Signer;
+import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
+import software.amazon.smithy.java.auth.api.identity.IdentityResult;
+import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 class HttpMcpProxyTest {
@@ -64,6 +72,110 @@ class HttpMcpProxyTest {
         assertThrows(IllegalArgumentException.class, () -> HttpMcpProxy.builder().build());
 
         assertThrows(IllegalArgumentException.class, () -> HttpMcpProxy.builder().endpoint("").build());
+    }
+
+    @Test
+    void testBuilderRejectsSignerAndAuthSchemeTogether() {
+        assertThrows(IllegalArgumentException.class,
+                () -> HttpMcpProxy.builder()
+                        .endpoint(serverUrl)
+                        .signer((request, identity, context) -> new SignResult<>(request))
+                        .authScheme(new TestAuthScheme())
+                        .identityResolver(TestIdentityResolver.INSTANCE)
+                        .build());
+    }
+
+    @Test
+    void testBuilderRejectsAuthSchemeWithoutIdentityResolver() {
+        assertThrows(IllegalArgumentException.class,
+                () -> HttpMcpProxy.builder()
+                        .endpoint(serverUrl)
+                        .authScheme(new TestAuthScheme())
+                        .build());
+    }
+
+    @Test
+    void testBuilderRejectsIdentityResolverWithoutAuthScheme() {
+        assertThrows(IllegalArgumentException.class,
+                () -> HttpMcpProxy.builder()
+                        .endpoint(serverUrl)
+                        .identityResolver(TestIdentityResolver.INSTANCE)
+                        .build());
+    }
+
+    @Test
+    void testAuthSchemeSignsRequest() throws IOException {
+        String[] capturedHeader = {null};
+
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            capturedHeader[0] = exchange.getRequestHeaders().getFirst("X-Test-Signed");
+            String response = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"signed\"}";
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.getBytes(StandardCharsets.UTF_8).length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(response.getBytes(StandardCharsets.UTF_8));
+            }
+            exchange.close();
+        });
+
+        HttpMcpProxy authProxy = HttpMcpProxy.builder()
+                .endpoint(serverUrl)
+                .authScheme(new TestAuthScheme())
+                .identityResolver(TestIdentityResolver.INSTANCE)
+                .build();
+
+        JsonRpcRequest request = JsonRpcRequest.builder()
+                .method("test/method")
+                .id(Document.of(1))
+                .jsonrpc("2.0")
+                .build();
+
+        JsonRpcResponse response = authProxy.rpc(request).join();
+
+        assertNotNull(response);
+        assertEquals("signed", response.getResult().asString());
+        assertEquals("test-token", capturedHeader[0]);
+        authProxy.shutdown().join();
+    }
+
+    @Test
+    void testAuthSchemeReceivesSignerContext() throws IOException {
+        String[] capturedRegion = {null};
+
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            capturedRegion[0] = exchange.getRequestHeaders().getFirst("X-Region");
+            String response = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"ok\"}";
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.getBytes(StandardCharsets.UTF_8).length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(response.getBytes(StandardCharsets.UTF_8));
+            }
+            exchange.close();
+        });
+
+        Context signerCtx = Context.create();
+        signerCtx.put(TestAuthScheme.REGION_KEY, "us-west-2");
+
+        HttpMcpProxy authProxy = HttpMcpProxy.builder()
+                .endpoint(serverUrl)
+                .authScheme(new TestAuthScheme())
+                .identityResolver(TestIdentityResolver.INSTANCE)
+                .signerContext(signerCtx)
+                .build();
+
+        JsonRpcRequest request = JsonRpcRequest.builder()
+                .method("test/method")
+                .id(Document.of(1))
+                .jsonrpc("2.0")
+                .build();
+
+        JsonRpcResponse response = authProxy.rpc(request).join();
+
+        assertNotNull(response);
+        assertEquals("us-west-2", capturedRegion[0]);
+        authProxy.shutdown().join();
     }
 
     @Test
@@ -553,6 +665,66 @@ class HttpMcpProxyTest {
             } finally {
                 exchange.close();
             }
+        }
+    }
+
+    private record TestIdentity(String token) implements Identity {}
+
+    private static final class TestIdentityResolver implements IdentityResolver<TestIdentity> {
+        static final TestIdentityResolver INSTANCE = new TestIdentityResolver();
+
+        @Override
+        public IdentityResult<TestIdentity> resolveIdentity(Context requestProperties) {
+            return IdentityResult.of(new TestIdentity("test-token"));
+        }
+
+        @Override
+        public Class<TestIdentity> identityType() {
+            return TestIdentity.class;
+        }
+    }
+
+    private static final class TestAuthScheme implements AuthScheme<HttpRequest, TestIdentity> {
+        static final Context.Key<String> REGION_KEY = Context.key("test-region");
+
+        @Override
+        public ShapeId schemeId() {
+            return ShapeId.from("smithy.test#testAuth");
+        }
+
+        @Override
+        public Class<HttpRequest> requestClass() {
+            return HttpRequest.class;
+        }
+
+        @Override
+        public Class<TestIdentity> identityClass() {
+            return TestIdentity.class;
+        }
+
+        @Override
+        public Context getSignerProperties(Context context) {
+            var ctx = Context.create();
+            var region = context.get(REGION_KEY);
+            if (region != null) {
+                ctx.put(REGION_KEY, region);
+            }
+            return ctx;
+        }
+
+        @Override
+        public Signer<HttpRequest, TestIdentity> signer() {
+            return (request, identity, properties) -> {
+                var r = request.toModifiable();
+                var h = r.headers().toModifiable();
+                h.setHeader("X-Test-Signed", identity.token());
+                var region = properties.get(REGION_KEY);
+                if (region != null) {
+                    h.setHeader("X-Region", region);
+                }
+                r.setHeaders(h);
+                return new SignResult<>(r);
+            };
         }
     }
 }
