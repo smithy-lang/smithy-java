@@ -73,3 +73,7 @@ repositories {
     mavenLocal()
     mavenCentral()
 }
+
+java.sourceSets["main"].java {
+    srcDirs("model", "src/main/smithy")
+}

@@ -57,7 +57,7 @@ public final class CollectionStruct implements SerializableStruct {
     }
 
     /**
-     * Non-sparse list: List<String>
+     * Non-sparse list: List&lt;String&gt;
      */
     public List<String> getNonSparseList() {
         if (nonSparseList == null) {
@@ -71,7 +71,7 @@ public final class CollectionStruct implements SerializableStruct {
     }
 
     /**
-     * Sparse list: List<@Nullable String>
+     * Sparse list: List&lt;{@literal @}Nullable String&gt;
      */
     public List<@Nullable String> getSparseList() {
         return sparseList;
@@ -82,7 +82,7 @@ public final class CollectionStruct implements SerializableStruct {
     }
 
     /**
-     * Non-sparse map: Map<String, String>
+     * Non-sparse map: Map&lt;String, String&gt;
      */
     public Map<String, String> getNonSparseMap() {
         if (nonSparseMap == null) {
@@ -96,7 +96,7 @@ public final class CollectionStruct implements SerializableStruct {
     }
 
     /**
-     * Sparse map: Map<String, @Nullable String>
+     * Sparse map: Map&lt;String, {@literal @}Nullable String&gt;
      */
     public Map<String, @Nullable String> getSparseMap() {
         return sparseMap;
@@ -107,7 +107,7 @@ public final class CollectionStruct implements SerializableStruct {
     }
 
     /**
-     * Non-sparse list of sparse map: List<Map<String, @Nullable String>>
+     * Non-sparse list of sparse map: List&lt;Map&lt;String, {@literal @}Nullable String&gt;&gt;
      */
     public List<Map<String, @Nullable String>> getNonSparseListOfSparseMap() {
         if (nonSparseListOfSparseMap == null) {
@@ -121,7 +121,7 @@ public final class CollectionStruct implements SerializableStruct {
     }
 
     /**
-     * Sparse list of sparse map: List<@Nullable Map<String, @Nullable String>>
+     * Sparse list of sparse map: List&lt;{@literal @}Nullable Map&lt;String, {@literal @}Nullable String&gt;&gt;
      */
     public List<@Nullable Map<String, @Nullable String>> getSparseListOfSparseMap() {
         return sparseListOfSparseMap;
@@ -132,7 +132,7 @@ public final class CollectionStruct implements SerializableStruct {
     }
 
     /**
-     * Sparse map of non-sparse list: Map<String, @Nullable List<String>>
+     * Sparse map of non-sparse list: Map&lt;String, {@literal @}Nullable List&lt;String&gt;&gt;
      */
     public Map<String, @Nullable List<String>> getSparseMapOfNonSparseList() {
         if (sparseMapOfNonSparseList == null) {
@@ -146,7 +146,7 @@ public final class CollectionStruct implements SerializableStruct {
     }
 
     /**
-     * Non-sparse list of non-sparse map: List<Map<String, String>>
+     * Non-sparse list of non-sparse map: List&lt;Map&lt;String, String&gt;&gt;
      */
     public List<Map<String, String>> getNonSparseListOfNonSparseMap() {
         return nonSparseListOfNonSparseMap;
@@ -283,7 +283,7 @@ public final class CollectionStruct implements SerializableStruct {
         }
 
         /**
-         * Non-sparse list: List<String>
+         * Non-sparse list: List&lt;String&gt;
          *
          * @return this builder.
          */
@@ -293,7 +293,7 @@ public final class CollectionStruct implements SerializableStruct {
         }
 
         /**
-         * Sparse list: List<@Nullable String>
+         * Sparse list: List&lt;{@literal @}Nullable String&gt;
          *
          * <p><strong>Required</strong>
          * @return this builder.
@@ -305,7 +305,7 @@ public final class CollectionStruct implements SerializableStruct {
         }
 
         /**
-         * Non-sparse map: Map<String, String>
+         * Non-sparse map: Map&lt;String, String&gt;
          *
          * @return this builder.
          */
@@ -315,7 +315,7 @@ public final class CollectionStruct implements SerializableStruct {
         }
 
         /**
-         * Sparse map: Map<String, @Nullable String>
+         * Sparse map: Map&lt;String, {@literal @}Nullable String&gt;
          *
          * <p><strong>Required</strong>
          * @return this builder.
@@ -327,7 +327,7 @@ public final class CollectionStruct implements SerializableStruct {
         }
 
         /**
-         * Non-sparse list of sparse map: List<Map<String, @Nullable String>>
+         * Non-sparse list of sparse map: List&lt;Map&lt;String, {@literal @}Nullable String&gt;&gt;
          *
          * @return this builder.
          */
@@ -337,7 +337,7 @@ public final class CollectionStruct implements SerializableStruct {
         }
 
         /**
-         * Sparse list of sparse map: List<@Nullable Map<String, @Nullable String>>
+         * Sparse list of sparse map: List&lt;{@literal @}Nullable Map&lt;String, {@literal @}Nullable String&gt;&gt;
          *
          * <p><strong>Required</strong>
          * @return this builder.
@@ -349,7 +349,7 @@ public final class CollectionStruct implements SerializableStruct {
         }
 
         /**
-         * Sparse map of non-sparse list: Map<String, @Nullable List<String>>
+         * Sparse map of non-sparse list: Map&lt;String, {@literal @}Nullable List&lt;String&gt;&gt;
          *
          * @return this builder.
          */
@@ -359,7 +359,7 @@ public final class CollectionStruct implements SerializableStruct {
         }
 
         /**
-         * Non-sparse list of non-sparse map: List<Map<String, String>>
+         * Non-sparse list of non-sparse map: List&lt;Map&lt;String, String&gt;&gt;
          *
          * <p><strong>Required</strong>
          * @return this builder.

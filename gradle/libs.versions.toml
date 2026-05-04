@@ -23,6 +23,8 @@ jazzer = "0.30.0"
 json-schema-validator = "3.0.0"
 opentelemetry = "1.61.0"
 jspecify = "1.0.0"
+commonmark = "0.28.0"
+jsoup = "1.22.2"
 aws-api-models = "1.0.221"
 
 [libraries]
@@ -76,6 +78,8 @@ jazzer-junit = { module = "com.code-intelligence:jazzer-junit", version.ref = "j
 jazzer-api = { module = "com.code-intelligence:jazzer-api", version.ref = "jazzer" }
 json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "json-schema-validator"}
 jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
+commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 aws-api-models-bom = { module = "software.amazon.api.models:all", version.ref = "aws-api-models" }
 
 # plugin artifacts for buildsrc plugins
