@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.core;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,7 +18,6 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
 /**
@@ -38,6 +38,7 @@ public class VersionCheckBench {
     private static final String VERSION = Version.VERSION;
 
     @Setup
+    @SuppressFBWarnings(value = "LG_LOST_LOGGER_DUE_TO_WEAK_REFERENCE", justification = "Intentional for benchmark")
     public void setup() {
         Logger.getLogger(VersionCheck.class.getName()).setLevel(Level.OFF);
     }

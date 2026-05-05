@@ -18,9 +18,12 @@ dependencies {
 }
 
 jmh {
-    includes.addAll(providers.gradleProperty("jmh.includes")
-        .map { listOf(it) }
-        .orElse(emptyList()))
+    includes.addAll(
+        providers
+            .gradleProperty("jmh.includes")
+            .map { listOf(it) }
+            .orElse(emptyList()),
+    )
 }
 
 // Run all tests with a different locale to ensure we are not doing anything locale specific.
