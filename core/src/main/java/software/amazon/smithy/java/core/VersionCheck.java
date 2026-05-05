@@ -43,9 +43,9 @@ public final class VersionCheck {
     public static void check(String codegenVersion) {
         if (Boolean.getBoolean(SKIP_PROPERTY)) {
             LOGGER.warn("Smithy Java version compatibility check is disabled via '{}'. "
-                + "This is not recommended and should only be used as a temporary workaround. "
-                + "Running with mismatched module versions may cause unexpected runtime errors.",
-                SKIP_PROPERTY);
+                    + "This is not recommended and should only be used as a temporary workaround. "
+                    + "Running with mismatched module versions may cause unexpected runtime errors.",
+                    SKIP_PROPERTY);
             return;
         }
 
@@ -106,8 +106,10 @@ public final class VersionCheck {
                 sb.append("    - ").append(error).append("\n");
             }
             sb.append("  Fix: Align all smithy-java dependencies to the same version. ")
-                .append("If using Gradle, consider importing the BOM: ")
-                .append("platform('software.amazon.smithy.java:bom:").append(codegenVersion).append("')");
+                    .append("If using Gradle, consider importing the BOM: ")
+                    .append("platform('software.amazon.smithy.java:bom:")
+                    .append(codegenVersion)
+                    .append("')");
             throw new IncompatibleVersionException(sb.toString());
         }
     }
