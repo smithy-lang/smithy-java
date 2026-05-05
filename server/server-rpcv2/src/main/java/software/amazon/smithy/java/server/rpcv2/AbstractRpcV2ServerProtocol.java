@@ -19,6 +19,7 @@ import software.amazon.smithy.java.server.core.Job;
 import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.ServiceProtocolResolutionRequest;
 import software.amazon.smithy.java.server.core.ServiceProtocolResolutionResult;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Shared base for RPC v2 server protocol implementations.
@@ -28,6 +29,7 @@ import software.amazon.smithy.java.server.core.ServiceProtocolResolutionResult;
  * parsing, operation resolution, input deserialization, and output serialization
  * are handled here.
  */
+@SmithyInternalApi
 public abstract class AbstractRpcV2ServerProtocol extends ServerProtocol {
 
     private static final String SMITHY_PROTOCOL_PREFIX = "rpc-v2-";

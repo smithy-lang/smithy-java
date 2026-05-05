@@ -11,7 +11,9 @@ import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.ServerProtocolProvider;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.protocol.traits.Rpcv2JsonTrait;
+import software.amazon.smithy.utils.SmithyUnstableApi;
 
+@SmithyUnstableApi
 public final class RpcV2JsonProtocolProvider implements ServerProtocolProvider {
     @Override
     public ServerProtocol provideProtocolHandler(List<Service> candidateServices) {

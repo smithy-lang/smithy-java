@@ -14,6 +14,7 @@ import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.protocol.traits.Rpcv2JsonTrait;
+import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
  * Client protocol implementation for {@code smithy.protocols#rpcv2Json}.
@@ -21,6 +22,7 @@ import software.amazon.smithy.protocol.traits.Rpcv2JsonTrait;
  * <p>BigDecimal and BigInteger values are serialized as JSON strings to preserve
  * arbitrary precision.
  */
+@SmithyUnstableApi
 public final class RpcV2JsonProtocol extends AbstractRpcV2ClientProtocol {
     private static final String PAYLOAD_MEDIA_TYPE = "application/json";
 

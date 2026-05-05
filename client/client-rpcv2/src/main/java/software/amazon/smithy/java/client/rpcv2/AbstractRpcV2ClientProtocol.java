@@ -31,6 +31,7 @@ import software.amazon.smithy.java.io.ByteBufferOutputStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Shared base for RPC v2 client protocol implementations.
@@ -39,6 +40,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * format (CBOR vs JSON). All request construction, response deserialization, error
  * extraction, and event-streaming plumbing is handled here.
  */
+@SmithyInternalApi
 public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
 
     private final ShapeId service;
@@ -127,7 +129,7 @@ public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
                     .addHeader(HeaderName.ACCEPT, payloadMediaType)
                     .setBody(getBody(input));
         }
-        return builder.toUnmodifiable();
+        return builder;
     }
 
     @Override
