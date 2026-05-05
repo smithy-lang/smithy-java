@@ -38,11 +38,6 @@ afterEvaluate {
                 srcDir("$clientPath/resources")
             }
         }
-        test {
-            java {
-                srcDir("$clientPath/test-java")
-            }
-        }
         create("it") {
             compileClasspath += main.get().output + configurations["testRuntimeClasspath"] + configurations["testCompileClasspath"]
             runtimeClasspath += output + compileClasspath + test.get().runtimeClasspath + test.get().output
@@ -55,14 +50,8 @@ tasks {
     compileJava {
         dependsOn(smithyBuild)
     }
-    compileTestJava {
-        dependsOn(smithyBuild)
-    }
     processResources {
         dependsOn(smithyBuild)
-    }
-    test {
-        useJUnitPlatform()
     }
     val integ by registering(Test::class) {
         useJUnitPlatform()

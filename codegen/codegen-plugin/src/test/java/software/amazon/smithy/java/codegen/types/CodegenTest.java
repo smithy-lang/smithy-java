@@ -49,7 +49,7 @@ public class CodegenTest {
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
         assertThat(manifest.getFiles())
-                .hasSize(9)
+                .hasSize(8)
                 .containsExactlyInAnyOrder(
                         Path.of("/java/test/smithy/codegen/types/test/model/EnumShape.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/IntEnumShape.java"),
@@ -58,8 +58,7 @@ public class CodegenTest {
                         Path.of("/java/test/smithy/codegen/types/test/model/StructureShape.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/UnionShape.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
-                        Path.of("/resources/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"),
-                        Path.of("/test-java/test/smithy/codegen/types/test/SmithyVersionCompatibilityTest.java"));
+                        Path.of("/resources/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"));
     }
 
     @Test
@@ -70,14 +69,13 @@ public class CodegenTest {
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
         assertThat(manifest.getFiles())
-                .hasSize(6)
+                .hasSize(5)
                 .containsExactlyInAnyOrder(
                         Path.of("/java/test/smithy/codegen/types/test/model/Schemas.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/SharedSerde.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/StructureShape.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
-                        Path.of("/resources/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"),
-                        Path.of("/test-java/test/smithy/codegen/types/test/SmithyVersionCompatibilityTest.java"));
+                        Path.of("/resources/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"));
     }
 
     @Test
@@ -88,17 +86,16 @@ public class CodegenTest {
                 .build();
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
-        assertEquals(7, manifest.getFiles().size());
+        assertEquals(6, manifest.getFiles().size());
         assertThat(manifest.getFiles())
-                .hasSize(7)
+                .hasSize(6)
                 .containsExactlyInAnyOrder(
                         Path.of("/java/test/smithy/codegen/types/test/model/Schemas.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/SharedSerde.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/StructureShape.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/UnionShape.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
-                        Path.of("/resources/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"),
-                        Path.of("/test-java/test/smithy/codegen/types/test/SmithyVersionCompatibilityTest.java"));
+                        Path.of("/resources/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"));
     }
 
 }
