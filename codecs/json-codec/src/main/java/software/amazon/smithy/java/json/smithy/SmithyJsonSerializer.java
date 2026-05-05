@@ -281,6 +281,12 @@ final class SmithyJsonSerializer implements ShapeSerializer {
 
     @Override
     public void writeBigInteger(Schema schema, BigInteger value) {
+        if (settings.useStringForArbitraryPrecision()) {
+            String s = value.toString();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(s));
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, s);
+            return;
+        }
         if (value.bitLength() < 64) {
             ensureCapacity(20);
             pos = JsonWriteUtils.writeLong(buf, pos, value.longValue());
@@ -309,8 +315,14 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             }
         }
         String s = value.toString();
-        ensureCapacity(s.length());
-        pos = JsonWriteUtils.writeAsciiString(buf, pos, s);
+        // Preempt the quotes wrapping, as a BigDecimal write will almost
+        // always have at least 1 additional character after it.
+        ensureCapacity(s.length() + 2);
+        if (settings.useStringForArbitraryPrecision()) {
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, s);
+        } else {
+            pos = JsonWriteUtils.writeAsciiString(buf, pos, s);
+        }
     }
 
     @Override

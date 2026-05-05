@@ -9,9 +9,8 @@ extra["displayName"] = "Smithy :: Java :: Client :: RPCv2 CBOR"
 extra["moduleName"] = "software.amazon.smithy.java.client.rpcv2cbor"
 
 dependencies {
-    api(project(":client:client-http"))
+    api(project(":client:client-rpcv2"))
     api(project(":codecs:cbor-codec"))
-    api(project(":aws:aws-event-streams"))
     api(libs.smithy.aws.traits)
 
     implementation(libs.smithy.protocol.traits)

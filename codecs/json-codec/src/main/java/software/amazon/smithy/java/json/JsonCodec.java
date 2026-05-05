@@ -192,6 +192,20 @@ public final class JsonCodec implements Codec {
         }
 
         /**
+         * Whether to serialize BigDecimal and BigInteger values as JSON strings to preserve arbitrary precision.
+         *
+         * <p>When enabled, these values are written as quoted strings and deserialization accepts both string
+         * and number tokens. Disabled by default.
+         *
+         * @param useStringForArbitraryPrecision true to use string encoding for arbitrary precision numbers
+         * @return the builder
+         */
+        public Builder useStringForArbitraryPrecision(boolean useStringForArbitraryPrecision) {
+            settingsBuilder.useStringForArbitraryPrecision(useStringForArbitraryPrecision);
+            return this;
+        }
+
+        /**
          * Uses a custom JSON serde provider.
          *
          * @param provider the JSON serde provider to use.

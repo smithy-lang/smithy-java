@@ -45,6 +45,7 @@ public final class JsonSettings {
     private final JsonSerdeProvider provider;
     private final boolean serializeTypeInDocuments;
     private final boolean prettyPrint;
+    private final boolean useStringForArbitraryPrecision;
 
     private JsonSettings(Builder builder) {
         this.timestampResolver = builder.useTimestampFormat
@@ -58,6 +59,7 @@ public final class JsonSettings {
         this.provider = builder.provider;
         this.serializeTypeInDocuments = builder.serializeTypeInDocuments;
         this.prettyPrint = builder.prettyPrint;
+        this.useStringForArbitraryPrecision = builder.useStringForArbitraryPrecision;
     }
 
     /**
@@ -124,6 +126,18 @@ public final class JsonSettings {
         return prettyPrint;
     }
 
+    /**
+     * Whether BigDecimal and BigInteger values are serialized as JSON strings to preserve arbitrary precision.
+     *
+     * <p>When enabled, serialization writes these values as quoted strings (e.g., {@code "1.5"} instead of
+     * {@code 1.5}), and deserialization accepts both string and number tokens.
+     *
+     * @return true if arbitrary precision numbers use string encoding
+     */
+    public boolean useStringForArbitraryPrecision() {
+        return useStringForArbitraryPrecision;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -135,6 +149,7 @@ public final class JsonSettings {
         return forbidUnknownUnionMembers == that.forbidUnknownUnionMembers
                 && serializeTypeInDocuments == that.serializeTypeInDocuments
                 && prettyPrint == that.prettyPrint
+                && useStringForArbitraryPrecision == that.useStringForArbitraryPrecision
                 && timestampResolver.getClass() == that.timestampResolver.getClass()
                 && fieldMapper.getClass() == that.fieldMapper.getClass()
                 && Objects.equals(defaultNamespace, that.defaultNamespace);
@@ -145,6 +160,7 @@ public final class JsonSettings {
         int h = Boolean.hashCode(forbidUnknownUnionMembers);
         h = 31 * h + Boolean.hashCode(serializeTypeInDocuments);
         h = 31 * h + Boolean.hashCode(prettyPrint);
+        h = 31 * h + Boolean.hashCode(useStringForArbitraryPrecision);
         h = 31 * h + timestampResolver.getClass().hashCode();
         h = 31 * h + fieldMapper.getClass().hashCode();
         h = 31 * h + Objects.hashCode(defaultNamespace);
@@ -167,6 +183,7 @@ public final class JsonSettings {
         }
         builder.serializeTypeInDocuments(serializeTypeInDocuments);
         builder.prettyPrint(prettyPrint);
+        builder.useStringForArbitraryPrecision(useStringForArbitraryPrecision);
     }
 
     /**
@@ -192,6 +209,7 @@ public final class JsonSettings {
         private JsonSerdeProvider provider = PROVIDER;
         private boolean serializeTypeInDocuments = true;
         private boolean prettyPrint = false;
+        private boolean useStringForArbitraryPrecision = false;
 
         private Builder() {}
 
@@ -289,6 +307,20 @@ public final class JsonSettings {
          */
         public Builder prettyPrint(boolean prettyPrint) {
             this.prettyPrint = prettyPrint;
+            return this;
+        }
+
+        /**
+         * Whether to serialize BigDecimal and BigInteger values as JSON strings to preserve arbitrary precision.
+         *
+         * <p>When enabled, these values are written as quoted strings and deserialization accepts both string
+         * and number tokens. Disabled by default.
+         *
+         * @param useStringForArbitraryPrecision true to use string encoding for arbitrary precision numbers
+         * @return the builder
+         */
+        public Builder useStringForArbitraryPrecision(boolean useStringForArbitraryPrecision) {
+            this.useStringForArbitraryPrecision = useStringForArbitraryPrecision;
             return this;
         }
 
