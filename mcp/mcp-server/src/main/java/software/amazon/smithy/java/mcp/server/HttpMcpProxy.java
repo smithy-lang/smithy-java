@@ -10,7 +10,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.auth.api.Signer;
+import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.client.core.ClientTransport;
+import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.http.HttpContext;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.context.Context;
@@ -42,6 +45,9 @@ public final class HttpMcpProxy extends McpServerProxy {
     private final URI endpoint;
     private final String name;
     private final Signer<HttpRequest, ?> signer;
+    private final AuthScheme<HttpRequest, ?> authScheme;
+    private final IdentityResolver<?> identityResolver;
+    private final Context signerContext;
     private final Duration timeout;
     private volatile String sessionId;
 
@@ -50,6 +56,9 @@ public final class HttpMcpProxy extends McpServerProxy {
         this.endpoint = URI.create(builder.endpoint);
         this.name = builder.name != null ? builder.name : sanitizeName(endpoint.getHost());
         this.signer = builder.signer;
+        this.authScheme = builder.authScheme;
+        this.identityResolver = builder.identityResolver;
+        this.signerContext = builder.signerContext != null ? builder.signerContext : Context.create();
         this.timeout = builder.timeout != null ? builder.timeout : Duration.ofMinutes(5);
     }
 
@@ -64,6 +73,9 @@ public final class HttpMcpProxy extends McpServerProxy {
         private String endpoint;
         private String name;
         private Signer<HttpRequest, ?> signer;
+        private AuthScheme<HttpRequest, ?> authScheme;
+        private IdentityResolver<?> identityResolver;
+        private Context signerContext;
         private ClientTransport<HttpRequest, HttpResponse> transport;
         private Duration timeout;
 
@@ -82,6 +94,21 @@ public final class HttpMcpProxy extends McpServerProxy {
             return this;
         }
 
+        public Builder authScheme(AuthScheme<HttpRequest, ?> authScheme) {
+            this.authScheme = authScheme;
+            return this;
+        }
+
+        public Builder identityResolver(IdentityResolver<?> identityResolver) {
+            this.identityResolver = identityResolver;
+            return this;
+        }
+
+        public Builder signerContext(Context signerContext) {
+            this.signerContext = signerContext;
+            return this;
+        }
+
         public Builder transport(ClientTransport<HttpRequest, HttpResponse> transport) {
             this.transport = transport;
             return this;
@@ -95,6 +122,18 @@ public final class HttpMcpProxy extends McpServerProxy {
         public HttpMcpProxy build() {
             if (endpoint == null || endpoint.isEmpty()) {
                 throw new IllegalArgumentException("Endpoint must be provided");
+            }
+            if (signer != null && authScheme != null) {
+                throw new IllegalArgumentException(
+                        "Cannot set both signer and authScheme; use one or the other");
+            }
+            if (authScheme != null && identityResolver == null) {
+                throw new IllegalArgumentException(
+                        "identityResolver must be provided when authScheme is set");
+            }
+            if (identityResolver != null && authScheme == null) {
+                throw new IllegalArgumentException(
+                        "authScheme must be provided when identityResolver is set");
             }
             return new HttpMcpProxy(this);
         }
@@ -137,7 +176,9 @@ public final class HttpMcpProxy extends McpServerProxy {
             Context context = Context.create();
             context.put(HttpContext.HTTP_REQUEST_TIMEOUT, timeout);
 
-            if (signer != null) {
+            if (authScheme != null) {
+                httpRequest = signWithAuthScheme(httpRequest);
+            } else if (signer != null) {
                 httpRequest = signer.sign(httpRequest, null, context).signedRequest();
             }
 
@@ -175,6 +216,20 @@ public final class HttpMcpProxy extends McpServerProxy {
                     .build());
         } catch (Exception e) {
             return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <I extends Identity> HttpRequest signWithAuthScheme(HttpRequest request) {
+        AuthScheme<HttpRequest, I> scheme = (AuthScheme<HttpRequest, I>) authScheme;
+        IdentityResolver<I> resolver = (IdentityResolver<I>) identityResolver;
+
+        Context signerProperties = scheme.getSignerProperties(signerContext);
+        Context identityProperties = scheme.getIdentityProperties(signerContext);
+        I identity = resolver.resolveIdentity(identityProperties).unwrap();
+
+        try (var schemeSigner = scheme.signer()) {
+            return schemeSigner.sign(request, identity, signerProperties).signedRequest();
         }
     }
 
