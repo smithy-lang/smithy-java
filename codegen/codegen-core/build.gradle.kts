@@ -13,6 +13,8 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":logging"))
     implementation(libs.jspecify)
+    implementation(libs.commonmark)
+    implementation(libs.jsoup)
 }
 
 // Internal source set for the types-only SmithyBuildPlugin.

@@ -154,6 +154,12 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     @Override
     public BigInteger readBigInteger(Schema schema) {
         try {
+            if (settings.useStringForArbitraryPrecision()) {
+                if (parser.currentToken() != JsonToken.VALUE_STRING) {
+                    throw new SerializationException("Expected string, found: " + describeToken());
+                }
+                return new BigInteger(parser.getText());
+            }
             return parser.getBigIntegerValue();
         } catch (Exception e) {
             throw new SerializationException(e);
@@ -163,6 +169,12 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     @Override
     public BigDecimal readBigDecimal(Schema schema) {
         try {
+            if (settings.useStringForArbitraryPrecision()) {
+                if (parser.currentToken() != JsonToken.VALUE_STRING) {
+                    throw new SerializationException("Expected string, found: " + describeToken());
+                }
+                return new BigDecimal(parser.getText());
+            }
             return parser.getDecimalValue();
         } catch (Exception e) {
             throw new SerializationException(e);

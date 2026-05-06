@@ -129,17 +129,25 @@ public class RestXmlProtocolTests {
                 return false;
             }
 
-            // Compare child nodes
+            // Compare child nodes (order-independent)
             NodeList children1 = node1.getChildNodes();
             NodeList children2 = node2.getChildNodes();
             if (children1.getLength() != children2.getLength()) {
                 return false;
             }
 
+            boolean[] matched = new boolean[children2.getLength()];
             for (int i = 0; i < children1.getLength(); i++) {
                 Node child1 = children1.item(i);
-                Node child2 = children2.item(i);
-                if (!compareNodes(child1, child2)) {
+                boolean found = false;
+                for (int j = 0; j < children2.getLength(); j++) {
+                    if (!matched[j] && compareNodes(child1, children2.item(j))) {
+                        matched[j] = true;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
                     return false;
                 }
             }

@@ -158,6 +158,22 @@ public class JsonDeserializerTest extends ProviderTestBase {
     }
 
     @PerProvider
+    public void deserializesBigIntegerFromStringWhenConfigured(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useStringForArbitraryPrecision(true).build()) {
+            var de = codec.createDeserializer("\"1\"".getBytes(StandardCharsets.UTF_8));
+            assertThat(de.readBigInteger(PreludeSchemas.BIG_INTEGER), is(BigInteger.ONE));
+        }
+    }
+
+    @PerProvider
+    public void deserializesBigIntegerOnlyFromStringWhenConfigured(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useStringForArbitraryPrecision(true).build()) {
+            var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
+            Assertions.assertThrows(SerializationException.class, () -> de.readBigInteger(PreludeSchemas.BIG_INTEGER));
+        }
+    }
+
+    @PerProvider
     public void deserializesBigDecimal(JsonSerdeProvider provider) {
         try (var codec = codec(provider)) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
@@ -169,6 +185,22 @@ public class JsonDeserializerTest extends ProviderTestBase {
     public void deserializesBigDecimalOnlyFromRawNumbersByDefault(JsonSerdeProvider provider) {
         try (var codec = codec(provider)) {
             var de = codec.createDeserializer("\"1\"".getBytes(StandardCharsets.UTF_8));
+            Assertions.assertThrows(SerializationException.class, () -> de.readBigDecimal(PreludeSchemas.BIG_DECIMAL));
+        }
+    }
+
+    @PerProvider
+    public void deserializesBigDecimalFromStringWhenConfigured(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useStringForArbitraryPrecision(true).build()) {
+            var de = codec.createDeserializer("\"1\"".getBytes(StandardCharsets.UTF_8));
+            assertThat(de.readBigDecimal(PreludeSchemas.BIG_DECIMAL), is(BigDecimal.ONE));
+        }
+    }
+
+    @PerProvider
+    public void deserializesBigDecimalOnlyFromStringWhenConfigured(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useStringForArbitraryPrecision(true).build()) {
+            var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             Assertions.assertThrows(SerializationException.class, () -> de.readBigDecimal(PreludeSchemas.BIG_DECIMAL));
         }
     }

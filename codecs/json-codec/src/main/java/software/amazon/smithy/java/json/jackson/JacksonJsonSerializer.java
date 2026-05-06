@@ -174,7 +174,11 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     @Override
     public void writeBigInteger(Schema schema, BigInteger value) {
         try {
-            generator.writeNumber(value);
+            if (settings.useStringForArbitraryPrecision()) {
+                generator.writeString(value.toString());
+            } else {
+                generator.writeNumber(value);
+            }
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -183,7 +187,11 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     @Override
     public void writeBigDecimal(Schema schema, BigDecimal value) {
         try {
-            generator.writeNumber(value);
+            if (settings.useStringForArbitraryPrecision()) {
+                generator.writeString(value.toString());
+            } else {
+                generator.writeNumber(value);
+            }
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -294,7 +302,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
         public void writeBigInteger(Schema schema, BigInteger value) {
             try {
                 writeFieldName(schema);
-                generator.writeNumber(value);
+                JacksonJsonSerializer.this.writeBigInteger(schema, value);
             } catch (Exception e) {
                 throw new SerializationException(e);
             }
@@ -304,7 +312,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
         public void writeBigDecimal(Schema schema, BigDecimal value) {
             try {
                 writeFieldName(schema);
-                generator.writeNumber(value);
+                JacksonJsonSerializer.this.writeBigDecimal(schema, value);
             } catch (Exception e) {
                 throw new SerializationException(e);
             }

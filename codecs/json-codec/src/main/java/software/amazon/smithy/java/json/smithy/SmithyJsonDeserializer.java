@@ -171,6 +171,18 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public BigInteger readBigInteger(Schema schema) {
         skipWhitespace();
+        if (settings.useStringForArbitraryPrecision()) {
+            if (pos >= end || buf[pos] != '"') {
+                throw new SerializationException(
+                        "Expected string for BigInteger, found: " + JsonReadUtils.describePos(buf, pos, end));
+            }
+            String s = readStringValue();
+            try {
+                return new BigInteger(s);
+            } catch (NumberFormatException e) {
+                throw new SerializationException("Invalid BigInteger value: " + s, e);
+            }
+        }
         if (pos >= end || (buf[pos] != '-' && (buf[pos] < '0' || buf[pos] > '9'))) {
             throw new SerializationException(
                     "Expected number for BigInteger, found: " + JsonReadUtils.describePos(buf, pos, end));
@@ -188,6 +200,18 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public BigDecimal readBigDecimal(Schema schema) {
         skipWhitespace();
+        if (settings.useStringForArbitraryPrecision()) {
+            if (pos >= end || buf[pos] != '"') {
+                throw new SerializationException(
+                        "Expected string for BigDecimal, found: " + JsonReadUtils.describePos(buf, pos, end));
+            }
+            String s = readStringValue();
+            try {
+                return new BigDecimal(s);
+            } catch (NumberFormatException e) {
+                throw new SerializationException("Invalid BigDecimal value: " + s, e);
+            }
+        }
         if (pos >= end || (buf[pos] != '-' && (buf[pos] < '0' || buf[pos] > '9'))) {
             throw new SerializationException(
                     "Expected number for BigDecimal, found: " + JsonReadUtils.describePos(buf, pos, end));

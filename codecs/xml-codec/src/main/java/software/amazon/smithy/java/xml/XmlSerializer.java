@@ -24,6 +24,7 @@ import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
+import software.amazon.smithy.model.traits.XmlNamespaceTrait;
 
 final class XmlSerializer extends InterceptingSerializer {
 
@@ -31,15 +32,17 @@ final class XmlSerializer extends InterceptingSerializer {
 
     private final XmlInfo xmlInfo;
     private final XMLStreamWriter writer;
+    private final XmlNamespaceTrait defaultNamespace;
     private final NonFlattenedMemberSerializer nonFlattenedMemberSerializer = new NonFlattenedMemberSerializer();
     private final ValueSerializer valueSerializer = new ValueSerializer();
     private final StructMemberSerializer structMemberSerializer = new StructMemberSerializer();
     private final StructAttributeSerializer structAttributeSerializer = new StructAttributeSerializer();
     private final AttributeSerializer attributeSerializer = new AttributeSerializer();
 
-    XmlSerializer(XMLStreamWriter writer, XmlInfo xmlInfo) {
+    XmlSerializer(XMLStreamWriter writer, XmlInfo xmlInfo, XmlNamespaceTrait defaultNamespace) {
         this.writer = writer;
         this.xmlInfo = xmlInfo;
+        this.defaultNamespace = defaultNamespace;
     }
 
     // Handles writing top-level shapes that are not members. The element uses xmlName or the shape name.
@@ -61,6 +64,9 @@ final class XmlSerializer extends InterceptingSerializer {
 
             // Add a namespace if present, and peek-through to the target shape for a namespace when it's a member.
             var ns = schema.getTrait(TraitKey.XML_NAMESPACE_TRAIT);
+            if (ns == null) {
+                ns = defaultNamespace;
+            }
             if (ns != null) {
                 writer.writeNamespace(ns.getPrefix().orElse(null), ns.getUri());
             }

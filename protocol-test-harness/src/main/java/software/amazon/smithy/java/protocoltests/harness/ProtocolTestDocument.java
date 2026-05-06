@@ -147,8 +147,8 @@ final class ProtocolTestDocument implements Document {
             return null;
         }
         return node.asNumberNode()
-                .map(NumberNode::getValue)
-                .map(n -> BigInteger.valueOf(n.longValue()))
+                .flatMap(NumberNode::asBigDecimal)
+                .map(BigDecimal::toBigIntegerExact)
                 .orElseGet(Document.super::asBigInteger);
     }
 
