@@ -50,6 +50,14 @@ afterEvaluate {
             attributes(mapOf("Automatic-Module-Name" to moduleName))
         }
     }
+
+    // Generate a version marker resource for this module.
+    val generateVersionProvider = tasks.register<GenerateVersionProviderTask>("generateVersionProvider") {
+        this.moduleName = moduleName
+        this.moduleVersion = smithyJavaVersion
+    }
+    sourceSets["main"].resources.srcDir(generateVersionProvider.map { it.outputDir.resolve("resources") })
+    tasks.named("processResources") { dependsOn(generateVersionProvider) }
 }
 
 // Always run javadoc after build.
