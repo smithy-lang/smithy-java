@@ -225,7 +225,7 @@ public final class Validator {
                 case UNION -> ValidatorOfUnion.validate(this, schema, struct);
                 default -> checkType(schema, ShapeType.STRUCTURE); // this is guaranteed to fail type checking.
             }
-            executeCustomValidation(schema, struct);
+            applyCustomConstraints(schema, struct);
             currentSchema = previousSchema;
             elementCount = previousCount;
         }
@@ -262,7 +262,7 @@ public final class Validator {
 
                 checkListLength(schema, count);
             }
-            executeCustomValidation(schema, state);
+            applyCustomConstraints(schema, state);
         }
 
         private void checkListLength(Schema schema, int count) {
@@ -300,7 +300,7 @@ public final class Validator {
                 elementCount = previousCount;
                 checkMapLength(schema, count);
             }
-            executeCustomValidation(schema, state);
+            applyCustomConstraints(schema, state);
         }
 
         private void checkMapLength(Schema schema, int count) {
@@ -332,21 +332,21 @@ public final class Validator {
         @Override
         public void writeBoolean(Schema schema, boolean value) {
             checkType(schema, ShapeType.BOOLEAN);
-            executeCustomValidation(schema, value);
+            applyCustomConstraints(schema, value);
         }
 
         @Override
         public void writeByte(Schema schema, byte value) {
             checkType(schema, ShapeType.BYTE);
             validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
-            executeCustomValidation(schema, value);
+            applyCustomConstraints(schema, value);
         }
 
         @Override
         public void writeShort(Schema schema, short value) {
             checkType(schema, ShapeType.SHORT);
             validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
-            executeCustomValidation(schema, value);
+            applyCustomConstraints(schema, value);
         }
 
         @Override
@@ -361,28 +361,28 @@ public final class Validator {
                 }
                 default -> checkType(schema, ShapeType.INTEGER); // it's invalid.
             }
-            executeCustomValidation(schema, value);
+            applyCustomConstraints(schema, value);
         }
 
         @Override
         public void writeLong(Schema schema, long value) {
             checkType(schema, ShapeType.LONG);
             validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
-            executeCustomValidation(schema, value);
+            applyCustomConstraints(schema, value);
         }
 
         @Override
         public void writeFloat(Schema schema, float value) {
             checkType(schema, ShapeType.FLOAT);
             validateRange(schema, value, schema.minDoubleConstraint, schema.maxDoubleConstraint);
-            executeCustomValidation(schema, value);
+            applyCustomConstraints(schema, value);
         }
 
         @Override
         public void writeDouble(Schema schema, double value) {
             checkType(schema, ShapeType.DOUBLE);
             validateRange(schema, value, schema.minDoubleConstraint, schema.maxDoubleConstraint);
-            executeCustomValidation(schema, value);
+            applyCustomConstraints(schema, value);
         }
 
         @Override
@@ -394,7 +394,7 @@ public final class Validator {
                     schema.maxRangeConstraint.toBigInteger()) > 0) {
                 emitRangeError(schema, value);
             }
-            executeCustomValidation(schema, value);
+            applyCustomConstraints(schema, value);
         }
 
         @Override
@@ -405,7 +405,7 @@ public final class Validator {
             } else if (schema.maxRangeConstraint != null && value.compareTo(schema.maxRangeConstraint) > 0) {
                 emitRangeError(schema, value);
             }
-            executeCustomValidation(schema, value);
+            applyCustomConstraints(schema, value);
         }
 
         @Override
@@ -442,7 +442,7 @@ public final class Validator {
                 }
                 default -> checkType(schema, ShapeType.STRING); // it's invalid, and calling this adds an error.
             }
-            executeCustomValidation(schema, value);
+            applyCustomConstraints(schema, value);
         }
 
         @Override
@@ -452,19 +452,19 @@ public final class Validator {
             if (length < schema.minLengthConstraint || length > schema.maxLengthConstraint) {
                 addError(new ValidationError.LengthValidationFailure(createPath(), length, schema));
             }
-            executeCustomValidation(schema, value);
+            applyCustomConstraints(schema, value);
         }
 
         @Override
         public void writeTimestamp(Schema schema, Instant value) {
             checkType(schema, ShapeType.TIMESTAMP);
-            executeCustomValidation(schema, value);
+            applyCustomConstraints(schema, value);
         }
 
         @Override
         public void writeDocument(Schema schema, Document document) {
             checkType(schema, ShapeType.DOCUMENT);
-            executeCustomValidation(schema, document);
+            applyCustomConstraints(schema, document);
         }
 
         @Override
@@ -506,15 +506,15 @@ public final class Validator {
             }
         }
 
-        private void executeCustomValidation(Schema schema, Object value) {
-            if (!CustomValidationRuleProvider.HAS_CUSTOM_RULE) {
+        private void applyCustomConstraints(Schema schema, Object value) {
+            if (!CustomConstraintProvider.HAS_CUSTOM_CONSTRAINTS) {
                 return;
             }
-            var customValidationRules = schema.getExtension(CustomValidationRuleProvider.CUSTOM_VALIDATION_RULE_EXTENSION_KEY);
-            if (customValidationRules == null) {
+            var customConstraints = schema.getExtension(CustomConstraintProvider.CUSTOM_CONSTRAINT_EXTENSION_KEY);
+            if (customConstraints == null) {
                 return;
             }
-            for (var rule: customValidationRules) {
+            for (var rule: customConstraints) {
                 var validationErrors = rule.validate(schema, value, createPath());
                 for (var error: validationErrors) {
                     addError(error);
@@ -524,34 +524,34 @@ public final class Validator {
     }
 
     /**
-     * Registers a new schema extension for a list of {@link CustomValidationRule}
+     * Registers a new schema extension for a list of {@link CustomConstraint}
      */
-    public static class CustomValidationRuleProvider implements SchemaExtensionProvider<List<CustomValidationRule>> {
-        private static final SchemaExtensionKey<List<CustomValidationRule>> CUSTOM_VALIDATION_RULE_EXTENSION_KEY =
+    public static class CustomConstraintProvider implements SchemaExtensionProvider<List<CustomConstraint>> {
+        private static final SchemaExtensionKey<List<CustomConstraint>> CUSTOM_CONSTRAINT_EXTENSION_KEY =
             new SchemaExtensionKey<>();
-        private static final List<CustomValidationRule> CUSTOM_VALIDATION_RULE_LIST = new ArrayList<>();
-        private static final boolean HAS_CUSTOM_RULE;
+        private static final List<CustomConstraint> CUSTOM_CONSTRAINT_LIST = new ArrayList<>();
+        private static final boolean HAS_CUSTOM_CONSTRAINTS;
 
-        public CustomValidationRuleProvider() {}
+        public CustomConstraintProvider() {}
 
         static {
-            // loading all custom validation rules at once at startup
-            var loader = ServiceLoader.load(CustomValidationRule.class, CustomValidationRule.class.getClassLoader());
+            // loading all custom constraints at once at startup
+            var loader = ServiceLoader.load(CustomConstraint.class, CustomConstraint.class.getClassLoader());
             for (var customRule: loader) {
-                CUSTOM_VALIDATION_RULE_LIST.add(customRule);
+                CUSTOM_CONSTRAINT_LIST.add(customRule);
             }
-            HAS_CUSTOM_RULE = !CUSTOM_VALIDATION_RULE_LIST.isEmpty();
+            HAS_CUSTOM_CONSTRAINTS = !CUSTOM_CONSTRAINT_LIST.isEmpty();
         }
 
         @Override
-        public SchemaExtensionKey<List<CustomValidationRule>> key() {
-            return CUSTOM_VALIDATION_RULE_EXTENSION_KEY;
+        public SchemaExtensionKey<List<CustomConstraint>> key() {
+            return CUSTOM_CONSTRAINT_EXTENSION_KEY;
         }
 
         @Override
-        public List<CustomValidationRule> provide(Schema schema) {
-            var rulesForThisSchema = new ArrayList<CustomValidationRule>();
-            for (var rule: CUSTOM_VALIDATION_RULE_LIST) {
+        public List<CustomConstraint> provide(Schema schema) {
+            var rulesForThisSchema = new ArrayList<CustomConstraint>();
+            for (var rule: CUSTOM_CONSTRAINT_LIST) {
                 if (rule.appliesTo(schema)) {
                     rulesForThisSchema.add(rule);
                 }

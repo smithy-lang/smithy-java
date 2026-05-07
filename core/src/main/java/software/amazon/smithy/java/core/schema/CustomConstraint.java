@@ -8,16 +8,16 @@ package software.amazon.smithy.java.core.schema;
 import java.util.List;
 
 /**
- * A custom validation rule that extends Smithy's validation framework.
+ * A custom constraint that extends Validation API.
  *
  * <p>Implementations are discovered via {@link java.util.ServiceLoader} and must be registered in
- * {@code META-INF/services/software.amazon.smithy.java.core.schema.CustomValidationRule}.
+ * {@code META-INF/services/software.amazon.smithy.java.core.schema.CustomConstraint}.
  *
  * @see Validator
- * @see Validator.CustomValidationRuleProvider
+ * @see Validator.CustomConstraintProvider
  * @see ValidationError.CustomValidationFailure
  */
-public interface CustomValidationRule {
+public interface CustomConstraint {
     /**
      * Determines whether this rule applies to the given schema.
      *
