@@ -31,6 +31,18 @@ public interface IdentityResolver<IdentityT extends Identity> {
     Class<IdentityT> identityType();
 
     /**
+     * Invalidate any cached identity, forcing the next call to {@link #resolveIdentity(Context)} to fetch fresh
+     * credentials from the underlying source.
+     *
+     * <p>This is typically called by retry logic or interceptors when a service returns an authentication error
+     * (e.g., {@code ExpiredTokenException}), indicating that the currently cached identity is no longer valid.
+     *
+     * <p>The default implementation is a no-op. Caching resolvers (such as {@link CachingIdentityResolver}) override
+     * this to clear their cache.
+     */
+    default void invalidate() {}
+
+    /**
      * Combines multiple identity resolvers with the same identity type into a single resolver.
      *
      * @param resolvers Resolvers to combine.
