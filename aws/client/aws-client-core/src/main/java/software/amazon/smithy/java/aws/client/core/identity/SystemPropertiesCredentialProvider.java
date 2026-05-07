@@ -1,0 +1,33 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.aws.client.core.identity;
+
+import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
+import software.amazon.smithy.java.aws.credentials.chain.AwsCredentialProvider;
+import software.amazon.smithy.java.aws.credentials.chain.BuiltinProvider;
+import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
+import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
+
+/**
+ * Registers {@link SystemPropertiesIdentityResolver} in the credential chain's
+ * {@link BuiltinProvider#JAVA_SYSTEM_PROPERTIES} slot.
+ */
+public final class SystemPropertiesCredentialProvider implements AwsCredentialProvider {
+    @Override
+    public String name() {
+        return "JavaSystemProperties";
+    }
+
+    @Override
+    public OrderingConstraint ordering() {
+        return new OrderingConstraint.Builtin(BuiltinProvider.JAVA_SYSTEM_PROPERTIES);
+    }
+
+    @Override
+    public AwsCredentialsResolver create(ProviderContext context) {
+        return SystemPropertiesIdentityResolver.INSTANCE;
+    }
+}
