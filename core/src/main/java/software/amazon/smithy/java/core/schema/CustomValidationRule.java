@@ -1,10 +1,38 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.core.schema;
 
 import java.util.List;
 
+/**
+ * A custom validation rule that extends Smithy's validation framework.
+ *
+ * <p>Implementations are discovered via {@link java.util.ServiceLoader} and must be registered in
+ * {@code META-INF/services/software.amazon.smithy.java.core.schema.CustomValidationRule}.
+ *
+ * @see Validator
+ * @see Validator.CustomValidationRuleProvider
+ * @see ValidationError.CustomValidationFailure
+ */
 public interface CustomValidationRule {
-    // takes in the schema and checks if the rules applies to it (using schema.getTrait and checking the trait this rule is being defined for is there)
+    /**
+     * Determines whether this rule applies to the given schema.
+     *
+     * @param schema the schema to check
+     * @return {@code true} if this rule should validate values of this schema
+     */
     boolean appliesTo(Schema schema);
 
+    /**
+     * Validates the given value against this custom rule.
+     *
+     * @param schema the schema of the value being validated
+     * @param value the value to validate
+     * @param path the path to the value (e.g., "/user/address/zipCode")
+     * @return a list of validation errors, or an empty list if validation passes
+     */
     List<ValidationError> validate(Schema schema, Object value, String path);
 }
