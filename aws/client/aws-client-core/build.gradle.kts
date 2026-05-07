@@ -11,6 +11,7 @@ dependencies {
     api(project(":client:client-core"))
     api(project(":aws:aws-auth-api"))
     api(project(":auth-api"))
+    implementation(project(":aws:aws-credential-chain"))
 }
 
 tasks {

@@ -13,8 +13,10 @@ import software.amazon.smithy.java.context.Context;
 /**
  * {@link AwsCredentialsResolver} implementation that loads credentials from environment variables.
  *
- * <p>This resolvers expects the following environment variables to be present in order to resolve an
- * {@link AwsCredentialsIdentity}:
+ * <p>This resolver reads environment variables once on first access and caches the result. Use
+ * {@link #invalidate()} to force re-reading (e.g., in tests).
+ *
+ * <p>Expected environment variables:
  * <dl>
  *     <dt>{@code AWS_ACCESS_KEY_ID}</dt>
  *     <dd>Sets the AWS Access Key for the identity</dd>
@@ -22,6 +24,8 @@ import software.amazon.smithy.java.context.Context;
  *     <dd>Sets the AWS Secret Key for the identity</dd>
  *     <dt>{@code AWS_SESSION_TOKEN}</dt>
  *     <dd>(optional) Security token provided by the AWS Security Token Service (STS) for temporary credentials</dd>
+ *     <dt>{@code AWS_ACCOUNT_ID}</dt>
+ *     <dd>(optional) AWS account ID</dd>
  * </dl>
  */
 public final class EnvironmentVariableIdentityResolver implements AwsCredentialsResolver {
@@ -30,19 +34,40 @@ public final class EnvironmentVariableIdentityResolver implements AwsCredentials
     private static final String ACCESS_KEY_PROPERTY = "AWS_ACCESS_KEY_ID";
     private static final String SECRET_KEY_PROPERTY = "AWS_SECRET_ACCESS_KEY";
     private static final String SESSION_TOKEN_PROPERTY = "AWS_SESSION_TOKEN";
-    private static final String ERROR_MESSAGE = "Could not resolve an AWS identity using the AWS_ACCESS_KEY_ID and "
-            + "AWS_SECRET_ACCESS_KEY environment variables";
+    private static final String ACCOUNT_ID_PROPERTY = "AWS_ACCOUNT_ID";
+    private static final IdentityResult<AwsCredentialsIdentity> NOT_FOUND = IdentityResult.ofError(
+            EnvironmentVariableIdentityResolver.class,
+            "Could not resolve an AWS identity using the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment "
+                    + "variables");
+
+    private volatile IdentityResult<AwsCredentialsIdentity> cached;
 
     @Override
     public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context requestProperties) {
-        String accessKey = System.getenv(ACCESS_KEY_PROPERTY);
-        String secretKey = System.getenv(SECRET_KEY_PROPERTY);
-        String sessionToken = System.getenv(SESSION_TOKEN_PROPERTY);
-
-        if (accessKey == null || secretKey == null) {
-            return IdentityResult.ofError(getClass(), ERROR_MESSAGE);
+        IdentityResult<AwsCredentialsIdentity> result = cached;
+        if (result != null) {
+            return result;
         }
 
-        return IdentityResult.of(AwsCredentialsIdentity.create(accessKey, secretKey, sessionToken));
+        result = resolve();
+        cached = result;
+        return result;
+    }
+
+    @Override
+    public void invalidate() {
+        cached = null;
+    }
+
+    private static IdentityResult<AwsCredentialsIdentity> resolve() {
+        String accessKey = System.getenv(ACCESS_KEY_PROPERTY);
+        String secretKey = System.getenv(SECRET_KEY_PROPERTY);
+        if (accessKey == null || secretKey == null) {
+            return NOT_FOUND;
+        }
+
+        String sessionToken = System.getenv(SESSION_TOKEN_PROPERTY);
+        String accountId = System.getenv(ACCOUNT_ID_PROPERTY);
+        return IdentityResult.of(AwsCredentialsIdentity.create(accessKey, secretKey, sessionToken, null, accountId));
     }
 }
