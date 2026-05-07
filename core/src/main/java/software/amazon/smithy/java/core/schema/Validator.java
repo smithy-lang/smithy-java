@@ -109,33 +109,6 @@ public final class Validator {
         }
     }
 
-    public static class CustomValidationRuleProvider implements SchemaExtensionProvider<List<CustomValidationRule>> {
-        private static final SchemaExtensionKey<List<CustomValidationRule>> CUSTOM_VALIDATION_RULE_EXTENSION_KEY =
-            new SchemaExtensionKey<>();
-        private static final List<CustomValidationRule> CUSTOM_VALIDATION_RULE_LIST = new ArrayList<>();
-
-        public CustomValidationRuleProvider() {}
-
-        static {
-            // loading all custom validation rules at once at startup
-            var loader = ServiceLoader.load(CustomValidationRule.class, CustomValidationRule.class.getClassLoader());
-            loader.forEach(rule -> CUSTOM_VALIDATION_RULE_LIST.add(rule));
-        }
-
-        @Override
-        public SchemaExtensionKey<List<CustomValidationRule>> key() {
-            return CUSTOM_VALIDATION_RULE_EXTENSION_KEY;
-        }
-
-        @Override
-        public List<CustomValidationRule> provide(Schema schema) {
-            return CUSTOM_VALIDATION_RULE_LIST
-                    .stream()
-                    .filter(rule -> rule.appliesTo(schema))
-                    .toList();
-        }
-    }
-
     /**
      * An error that short circuits further validation.
      */
@@ -534,12 +507,56 @@ public final class Validator {
         }
 
         private void executeCustomValidation(Schema schema, Object value) {
+            if (!CustomValidationRuleProvider.HAS_CUSTOM_RULE) {
+                return;
+            }
             var customValidationRules = schema.getExtension(CustomValidationRuleProvider.CUSTOM_VALIDATION_RULE_EXTENSION_KEY);
-            if (customValidationRules == null) return;
-            customValidationRules.forEach(rule -> {
+            if (customValidationRules == null) {
+                return;
+            }
+            for (var rule: customValidationRules) {
                 var validationErrors = rule.validate(schema, value, createPath());
-                validationErrors.forEach(error -> addError(error));
-            });
+                for (var error: validationErrors) {
+                    addError(error);
+                }
+            }
+        }
+    }
+
+    /**
+     * Registers a new schema extension for a list of {@link CustomValidationRule}
+     */
+    public static class CustomValidationRuleProvider implements SchemaExtensionProvider<List<CustomValidationRule>> {
+        private static final SchemaExtensionKey<List<CustomValidationRule>> CUSTOM_VALIDATION_RULE_EXTENSION_KEY =
+            new SchemaExtensionKey<>();
+        private static final List<CustomValidationRule> CUSTOM_VALIDATION_RULE_LIST = new ArrayList<>();
+        private static final boolean HAS_CUSTOM_RULE;
+
+        public CustomValidationRuleProvider() {}
+
+        static {
+            // loading all custom validation rules at once at startup
+            var loader = ServiceLoader.load(CustomValidationRule.class, CustomValidationRule.class.getClassLoader());
+            for (var customRule: loader) {
+                CUSTOM_VALIDATION_RULE_LIST.add(customRule);
+            }
+            HAS_CUSTOM_RULE = !CUSTOM_VALIDATION_RULE_LIST.isEmpty();
+        }
+
+        @Override
+        public SchemaExtensionKey<List<CustomValidationRule>> key() {
+            return CUSTOM_VALIDATION_RULE_EXTENSION_KEY;
+        }
+
+        @Override
+        public List<CustomValidationRule> provide(Schema schema) {
+            var rulesForThisSchema = new ArrayList<CustomValidationRule>();
+            for (var rule: CUSTOM_VALIDATION_RULE_LIST) {
+                if (rule.appliesTo(schema)) {
+                    rulesForThisSchema.add(rule);
+                }
+            }
+            return rulesForThisSchema;
         }
     }
 }
