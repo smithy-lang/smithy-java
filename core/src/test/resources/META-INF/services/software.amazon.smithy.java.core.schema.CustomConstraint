@@ -1,0 +1,2 @@
+software.amazon.smithy.java.core.schema.TestCustomConstraints$AlwaysFailsConstraint
+software.amazon.smithy.java.core.schema.TestCustomConstraints$StringOnlyConstraint

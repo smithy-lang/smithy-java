@@ -1281,6 +1281,33 @@ public class ValidatorTest {
                 Arguments.of(65, 65, 0, 65));
     }
 
+    @Test
+    public void customConstraintsWork() {
+        var validator = Validator.builder().build();
+        var schema = Schema.createInteger(ShapeId.from("smithy.CustomTest#TestInt"));
+
+        var errors = validator.validate(encoder -> encoder.writeInteger(schema, 42));
+
+        assertThat(errors, hasSize(1));
+        var error = errors.get(0);
+        assertThat(error.path(), equalTo("/"));
+        assertThat(error.message(), equalTo("Custom constraint failed"));
+    }
+
+    @Test
+    public void customConstraintsAreSelective() {
+        var validator = Validator.builder().build();
+        var stringSchema = Schema.createString(ShapeId.from("smithy.CustomTest#SelectiveString"));
+
+        var errors = validator.validate(encoder -> encoder.writeString(stringSchema, "test"));
+
+        assertThat(errors, hasSize(2));
+        assertTrue(errors.stream()
+            .anyMatch(e -> e.message().equals("String-only constraint violated")));
+        assertTrue(errors.stream()
+            .anyMatch(e -> e.message().equals("Custom constraint failed")));
+    }
+
     static Schema createBigRequiredSchema(int totalMembers, int requiredCount, int defaultedCount) {
         var builder = Schema.structureBuilder(ShapeId.from("smithy.example#Foo"));
         for (var i = 0; i < totalMembers; i++) {
