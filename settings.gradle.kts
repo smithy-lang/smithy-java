@@ -89,6 +89,7 @@ include(":aws:server:aws-server-restjson")
 include(":aws:aws-auth-api")
 include(":aws:aws-config")
 include(":aws:aws-credential-chain")
+include(":aws:aws-credentials-imds")
 
 // AWS service bundling code
 include(":aws:aws-service-bundle")
