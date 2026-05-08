@@ -6,7 +6,9 @@
 package software.amazon.smithy.java.aws.config;
 
 import java.util.List;
-import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
+import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
+import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.credentials.chain.AwsCredentialProvider;
 import software.amazon.smithy.java.aws.credentials.chain.BuiltinProvider;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
@@ -33,7 +35,9 @@ public final class ProfileCredentialProvider implements AwsCredentialProvider {
     }
 
     @Override
-    public AwsCredentialsResolver create(ProviderContext context) {
-        return AwsProfileCredentialsResolver.builder().build();
+    public IdentityResolver<AwsCredentialsIdentity> create(ProviderContext context) {
+        return CachingIdentityResolver.builder(AwsProfileCredentialsResolver.builder().build())
+                .executor(context.executor())
+                .build();
     }
 }

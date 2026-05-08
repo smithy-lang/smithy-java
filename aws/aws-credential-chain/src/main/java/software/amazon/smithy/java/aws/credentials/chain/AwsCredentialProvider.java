@@ -6,7 +6,8 @@
 package software.amazon.smithy.java.aws.credentials.chain;
 
 import java.util.List;
-import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
+import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 
 /**
  * SPI for registering a credential provider into the AWS default credential chain.
@@ -37,5 +38,5 @@ public interface AwsCredentialProvider {
      * @param context shared resources provided by the chain.
      * @return the resolver.
      */
-    AwsCredentialsResolver create(ProviderContext context);
+    IdentityResolver<AwsCredentialsIdentity> create(ProviderContext context);
 }

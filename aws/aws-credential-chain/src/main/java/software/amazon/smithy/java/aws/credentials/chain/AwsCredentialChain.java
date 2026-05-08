@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
@@ -242,5 +243,5 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
         return resolved != null ? resolved.name() : target;
     }
 
-    private record NamedResolver(String name, AwsCredentialsResolver resolver) {}
+    private record NamedResolver(String name, IdentityResolver<AwsCredentialsIdentity> resolver) {}
 }
