@@ -99,7 +99,7 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
             t.setDaemon(true);
             return t;
         });
-        ProviderContext ctx = new ProviderContext(executor);
+        ProviderContext ctx = new ProviderContext(executor, Context.create());
 
         // Build the ordered list: builtin slots first (in enum order), then insert relatives.
         List<NamedResolver> ordered = new ArrayList<>();

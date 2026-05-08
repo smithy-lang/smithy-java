@@ -36,7 +36,10 @@ public final class ProfileCredentialProvider implements AwsCredentialProvider {
 
     @Override
     public IdentityResolver<AwsCredentialsIdentity> create(ProviderContext context) {
-        return CachingIdentityResolver.builder(AwsProfileCredentialsResolver.builder().build())
+        AwsProfileCredentialsResolver resolver = AwsProfileCredentialsResolver.builder().build();
+        // Share the loaded profile file with other providers via context.
+        context.properties().put(AwsProfileFile.CONTEXT_KEY, resolver.profileFile());
+        return CachingIdentityResolver.<AwsCredentialsIdentity>builder(resolver)
                 .executor(context.executor())
                 .build();
     }

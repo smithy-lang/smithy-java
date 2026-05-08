@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -65,6 +66,9 @@ public final class AwsProfileFile {
 
     /** Environment variable overriding the credentials file path. */
     public static final String AWS_SHARED_CREDENTIALS_FILE_ENV = "AWS_SHARED_CREDENTIALS_FILE";
+
+    /** Context key for sharing a loaded profile file across providers in the chain. */
+    public static final Context.Key<AwsProfileFile> CONTEXT_KEY = Context.key("awsProfileFile");
 
     private final Path configFile;
     private final Path credentialsFile;
