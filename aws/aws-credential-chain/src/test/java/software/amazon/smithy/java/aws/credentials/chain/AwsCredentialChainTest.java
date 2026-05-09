@@ -88,7 +88,7 @@ class AwsCredentialChainTest {
                         new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
                         errorResolver("profile")),
                 registration("custom",
-                        new OrderingConstraint.After("env"),
+                        new OrderingConstraint.After(BuiltinProvider.ENVIRONMENT),
                         errorResolver("custom"))));
 
         assertEquals(List.of("env", "custom", "profile"), chain.providerNames());
@@ -104,22 +104,22 @@ class AwsCredentialChainTest {
                         new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
                         errorResolver("profile")),
                 registration("custom",
-                        new OrderingConstraint.Before("profile"),
+                        new OrderingConstraint.Before(BuiltinProvider.SHARED_CONFIG),
                         errorResolver("custom"))));
 
         assertEquals(List.of("env", "custom", "profile"), chain.providerNames());
     }
 
     @Test
-    void relativeWithUnknownReferenceThrows() {
-        assertThrows(IllegalStateException.class,
-                () -> AwsCredentialChain.assemble(List.of(
-                        registration("env",
-                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
-                                errorResolver("env")),
-                        registration("custom",
-                                new OrderingConstraint.After("nonexistent"),
-                                errorResolver("custom")))));
+    void relativeToUnclaimedSlotAppendsAtEnd() {
+        var chain = AwsCredentialChain.assemble(List.of(
+                registration("env",
+                        new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                        errorResolver("env")),
+                registration("custom",
+                        new OrderingConstraint.After(BuiltinProvider.EC2_INSTANCE_METADATA),
+                        errorResolver("custom"))));
+        assertEquals(List.of("env", "custom"), chain.providerNames());
     }
 
     @Test

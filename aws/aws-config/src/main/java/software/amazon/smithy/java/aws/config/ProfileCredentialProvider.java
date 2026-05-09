@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.aws.config;
 
-import java.util.List;
 import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
@@ -22,11 +21,6 @@ public final class ProfileCredentialProvider implements AwsCredentialProvider {
     @Override
     public String name() {
         return "SharedConfig";
-    }
-
-    @Override
-    public List<String> aliases() {
-        return List.of("SharedCredentials");
     }
 
     @Override
