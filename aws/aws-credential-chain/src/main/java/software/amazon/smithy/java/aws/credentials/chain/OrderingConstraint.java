@@ -7,6 +7,17 @@ package software.amazon.smithy.java.aws.credentials.chain;
 
 /**
  * Describes where an {@link AwsCredentialProvider} sits in the credential chain.
+ *
+ * <p>Three forms:
+ * <ul>
+ *   <li>{@link Builtin} — claims a builtin slot. At most one provider may claim each slot;
+ *       a conflict at assembly time is a fatal error.</li>
+ *   <li>{@link Before} — positions the provider immediately before a builtin slot.</li>
+ *   <li>{@link After} — positions the provider immediately after a builtin slot.</li>
+ * </ul>
+ *
+ * <p>{@link Before} and {@link After} reference {@link BuiltinProvider} enum values only, not
+ * arbitrary provider names. This eliminates the possibility of cycles in ordering constraints.
  */
 public sealed interface OrderingConstraint {
     /**
@@ -23,27 +34,27 @@ public sealed interface OrderingConstraint {
     }
 
     /**
-     * Positions a provider immediately before the named provider.
+     * Positions a provider immediately before the given builtin slot.
      *
-     * @param provider the name of the provider this one must come before.
+     * @param slot the builtin slot this provider must come before.
      */
-    record Before(String provider) implements OrderingConstraint {
+    record Before(BuiltinProvider slot) implements OrderingConstraint {
         public Before {
-            if (provider == null || provider.isEmpty()) {
-                throw new IllegalArgumentException("provider must not be null or empty");
+            if (slot == null) {
+                throw new IllegalArgumentException("slot must not be null");
             }
         }
     }
 
     /**
-     * Positions a provider immediately after the named provider.
+     * Positions a provider immediately after the given builtin slot.
      *
-     * @param provider the name of the provider this one must come after.
+     * @param slot the builtin slot this provider must come after.
      */
-    record After(String provider) implements OrderingConstraint {
+    record After(BuiltinProvider slot) implements OrderingConstraint {
         public After {
-            if (provider == null || provider.isEmpty()) {
-                throw new IllegalArgumentException("provider must not be null or empty");
+            if (slot == null) {
+                throw new IllegalArgumentException("slot must not be null");
             }
         }
     }

@@ -7,14 +7,16 @@ package software.amazon.smithy.java.aws.credentials.chain;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
@@ -66,19 +68,16 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
     }
 
     static AwsCredentialChain assemble(List<AwsCredentialProvider> registrations) {
-        // Index by name and aliases.
-        Map<String, AwsCredentialProvider> byName = new HashMap<>();
+        // Check for duplicate names.
+        Set<String> seenNames = new HashSet<>();
         for (AwsCredentialProvider r : registrations) {
-            if (byName.put(r.name(), r) != null) {
+            if (!seenNames.add(r.name())) {
                 throw new IllegalStateException("Duplicate credential provider registration name: '" + r.name() + "'");
-            }
-            for (String alias : r.aliases()) {
-                byName.put(alias, r);
             }
         }
 
         // Separate builtins from relatives.
-        Map<BuiltinProvider, AwsCredentialProvider> builtins = new LinkedHashMap<>();
+        Map<BuiltinProvider, AwsCredentialProvider> builtins = new EnumMap<>(BuiltinProvider.class);
         List<AwsCredentialProvider> relatives = new ArrayList<>();
 
         for (AwsCredentialProvider r : registrations) {
@@ -101,54 +100,56 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
         });
         ProviderContext ctx = new ProviderContext(executor, Context.create());
 
-        // Build the ordered list: builtin slots first (in enum order), then insert relatives.
-        List<NamedResolver> ordered = new ArrayList<>();
-        List<String> orderedNames = new ArrayList<>();
+        // Precompute insert positions: for each slot, how many claimed slots come before it
+        // and up to and including it. This avoids re-scanning the enum on every relative insert.
+        EnumMap<BuiltinProvider, Integer> insertAfter = new EnumMap<>(BuiltinProvider.class);
+        EnumMap<BuiltinProvider, Integer> insertBefore = new EnumMap<>(BuiltinProvider.class);
+        int count = 0;
+        for (BuiltinProvider slot : BuiltinProvider.values()) {
+            insertBefore.put(slot, count);
+            if (builtins.containsKey(slot)) {
+                count++;
+            }
+            insertAfter.put(slot, count);
+        }
 
+        // Build the ordered list: builtin slots in enum order.
+        List<NamedResolver> ordered = new ArrayList<>();
         for (BuiltinProvider slot : BuiltinProvider.values()) {
             AwsCredentialProvider r = builtins.get(slot);
             if (r != null) {
                 ordered.add(new NamedResolver(r.name(), r.create(ctx)));
-                orderedNames.add(r.name());
             }
         }
 
-        // Insert relative providers.
+        // Insert relative providers using precomputed positions.
         for (AwsCredentialProvider r : relatives) {
-            String target;
             int insertAt;
-            if (r.ordering() instanceof OrderingConstraint.After(String provider)) {
-                target = resolveName(provider, byName);
-                int idx = orderedNames.indexOf(target);
-                if (idx < 0) {
-                    throw new IllegalStateException("Credential provider '" + r.name() + "' references unknown "
-                            + "provider '" + provider + "' in its 'after' constraint.");
-                }
-                insertAt = idx + 1;
-            } else if (r.ordering() instanceof OrderingConstraint.Before(String provider)) {
-                target = resolveName(provider, byName);
-                int idx = orderedNames.indexOf(target);
-                if (idx < 0) {
-                    throw new IllegalStateException("Credential provider '" + r.name() + "' references unknown "
-                            + "provider '" + provider + "' in its 'before' constraint.");
-                }
-                insertAt = idx;
+            if (r.ordering() instanceof OrderingConstraint.After(BuiltinProvider slot)) {
+                insertAt = insertAfter.get(slot);
+            } else if (r.ordering() instanceof OrderingConstraint.Before(BuiltinProvider slot)) {
+                insertAt = insertBefore.get(slot);
             } else {
                 insertAt = ordered.size();
             }
-
+            if (insertAt > ordered.size()) {
+                insertAt = ordered.size();
+            }
             ordered.add(insertAt, new NamedResolver(r.name(), r.create(ctx)));
-            orderedNames.add(insertAt, r.name());
         }
 
-        LOGGER.debug("Assembled credential chain: {}", orderedNames);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Assembled credential chain: {}",
+                    ordered.stream().map(NamedResolver::name).collect(Collectors.joining(", ")));
+        }
+
         warnDetectedButUnclaimed(builtins);
         return new AwsCredentialChain(Collections.unmodifiableList(ordered), executor);
     }
 
     private static void warnDetectedButUnclaimed(Map<BuiltinProvider, AwsCredentialProvider> builtins) {
         for (BuiltinProvider slot : BuiltinProvider.values()) {
-            if (!builtins.containsKey(slot) && slot.moduleSuggestion() != null && slot.isDetected()) {
+            if (slot.moduleSuggestion() != null && !builtins.containsKey(slot) && slot.isDetected()) {
                 LOGGER.warn("{} credentials detected but no provider is registered for the '{}' slot. "
                         + "Add '{}' to your dependencies.",
                         slot.name(),
@@ -236,11 +237,6 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
     @Override
     public void close() {
         executor.shutdownNow();
-    }
-
-    private static String resolveName(String target, Map<String, AwsCredentialProvider> byName) {
-        AwsCredentialProvider resolved = byName.get(target);
-        return resolved != null ? resolved.name() : target;
     }
 
     private record NamedResolver(String name, IdentityResolver<AwsCredentialsIdentity> resolver) {}
