@@ -5,14 +5,13 @@
 
 package software.amazon.smithy.java.json.codegen;
 
-import software.amazon.smithy.java.codegen.rt.BytecodeCodecProfile;
+import software.amazon.smithy.java.codegen.rt.CodecProfile;
 import software.amazon.smithy.java.codegen.rt.plan.StructCodePlan;
 
 /**
  * ClassFile API-based bytecode codec profile for JSON serialization.
- * Alternative to {@link JsonCodecProfile} which generates Java source for Janino compilation.
  */
-public final class ClassFileJsonCodecProfile implements BytecodeCodecProfile {
+public final class ClassFileJsonCodecProfile implements CodecProfile {
 
     @Override
     public String name() {

@@ -35,7 +35,18 @@ public final class JsonSettings {
         if (selected == null) {
             throw new IllegalStateException("At least one JSON provider should be registered.");
         }
-        PROVIDER = selected;
+        PROVIDER = maybeWrapWithCodegen(selected);
+    }
+
+    private static JsonSerdeProvider maybeWrapWithCodegen(JsonSerdeProvider provider) {
+        try {
+            var codegen = ServiceLoader.load(SpecializedJsonSerde.class,
+                    SpecializedJsonSerde.class.getClassLoader()).findFirst().orElse(null);
+            if (codegen != null) {
+                return new CodegenJsonSerdeProvider(provider, codegen);
+            }
+        } catch (Exception ignored) {}
+        return provider;
     }
 
     private final TimestampResolver timestampResolver;
@@ -122,6 +133,10 @@ public final class JsonSettings {
      *
      * @return true if pretty printing is enabled
      */
+    public boolean useJsonName() {
+        return fieldMapper instanceof JsonFieldMapper.UseJsonNameTrait;
+    }
+
     public boolean prettyPrint() {
         return prettyPrint;
     }
