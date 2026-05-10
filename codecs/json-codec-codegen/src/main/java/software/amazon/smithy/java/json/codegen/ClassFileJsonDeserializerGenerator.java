@@ -281,38 +281,53 @@ final class ClassFileJsonDeserializerGenerator {
                     code.goto_(loopEnd);
                     code.labelBinding(notCloseBrace);
 
-                    // Handle comma between fields
-                    Label afterComma = code.newLabel();
+                    // Handle comma + opening quote (fast-path for minified: ,"fieldName")
+                    Label commaSlowPath = code.newLabel();
                     code.iload(SLOT_FIRST);
-                    code.ifne(afterComma);
-                    // Expect comma
-                    Label commaOk = code.newLabel();
+                    code.ifne(commaSlowPath);
+                    // Not first: expect comma followed by quote
                     code.iload(SLOT_POS);
+                    code.iconst_1();
+                    code.iadd();
                     code.iload(SLOT_END);
-                    code.if_icmpge(afterComma); // lenient
+                    code.if_icmpge(commaSlowPath);
                     code.aload(SLOT_BUF);
                     code.iload(SLOT_POS);
                     code.baload();
                     code.bipush(',');
-                    code.if_icmpne(afterComma); // lenient
+                    code.if_icmpne(commaSlowPath);
+                    code.aload(SLOT_BUF);
+                    code.iload(SLOT_POS);
+                    code.iconst_1();
+                    code.iadd();
+                    code.baload();
+                    code.bipush('"');
+                    Label commaQuoteFast = code.newLabel();
+                    code.if_icmpeq(commaQuoteFast);
+                    // Comma present but next isn't quote - might be whitespace
                     code.iinc(SLOT_POS, 1);
                     emitSkipWhitespace(code);
-                    code.labelBinding(afterComma);
+                    code.iinc(SLOT_POS, 1); // skip quote
+                    Label afterCommaQuote = code.newLabel();
+                    code.goto_(afterCommaQuote);
+                    code.labelBinding(commaQuoteFast);
+                    code.iinc(SLOT_POS, 2); // skip comma + quote
+                    code.goto_(afterCommaQuote);
+
+                    code.labelBinding(commaSlowPath);
                     code.iconst_0();
                     code.istore(SLOT_FIRST);
-
-                    // Expect opening quote for field name
-                    Label quoteOk = code.newLabel();
+                    // First field: just expect opening quote
                     code.iload(SLOT_POS);
                     code.iload(SLOT_END);
-                    code.if_icmpge(quoteOk); // will fail later
+                    code.if_icmpge(afterCommaQuote);
                     code.aload(SLOT_BUF);
                     code.iload(SLOT_POS);
                     code.baload();
                     code.bipush('"');
-                    code.if_icmpne(quoteOk); // will fail later
-                    code.labelBinding(quoteOk);
+                    code.if_icmpne(afterCommaQuote);
                     code.iinc(SLOT_POS, 1); // skip opening quote
+                    code.labelBinding(afterCommaQuote);
 
                     // matched = -1
                     code.iconst_m1();
@@ -333,10 +348,35 @@ final class ClassFileJsonDeserializerGenerator {
                     emitHashDispatch(code, thisClass, fields, fieldNameBytesList);
                     code.labelBinding(afterHash);
 
-                    // Skip colon
+                    // Skip colon (with fast-path for minified JSON: no whitespace around ':')
+                    Label colonSlowPath = code.newLabel();
+                    Label afterColon = code.newLabel();
+                    code.iload(SLOT_POS);
+                    code.iload(SLOT_END);
+                    code.if_icmpge(colonSlowPath);
+                    code.aload(SLOT_BUF);
+                    code.iload(SLOT_POS);
+                    code.baload();
+                    code.bipush(':');
+                    code.if_icmpne(colonSlowPath);
+                    code.iinc(SLOT_POS, 1);
+                    // Check if next byte is not whitespace (common case)
+                    code.iload(SLOT_POS);
+                    code.iload(SLOT_END);
+                    code.if_icmpge(afterColon);
+                    code.aload(SLOT_BUF);
+                    code.iload(SLOT_POS);
+                    code.baload();
+                    code.bipush(' ');
+                    code.if_icmpgt(afterColon);
+                    // Rare: whitespace after colon
+                    emitSkipWhitespace(code);
+                    code.goto_(afterColon);
+                    code.labelBinding(colonSlowPath);
                     emitSkipWhitespace(code);
                     code.iinc(SLOT_POS, 1); // skip ':'
                     emitSkipWhitespace(code);
+                    code.labelBinding(afterColon);
 
                     // Check for null
                     Label notNull = code.newLabel();
