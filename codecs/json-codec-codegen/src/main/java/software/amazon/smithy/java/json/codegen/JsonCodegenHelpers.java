@@ -218,16 +218,16 @@ public final class JsonCodegenHelpers {
 
     /**
      * Fast-path quoted string write that takes buf/pos directly, avoiding ctx field round-trips.
-     * Returns new pos on success. If the buffer needs to grow or the string needs escaping,
-     * falls back to ctx-based slow path and returns a negative value: {@code -(newPos) - 1}.
-     * Caller must reload buf from ctx.buf when the return value is negative.
+     * Returns new pos on success (always positive). If the buffer needs to grow or the string
+     * needs escaping, falls back to ctx-based slow path and returns {@code Integer.MIN_VALUE}.
+     * Caller must reload buf and pos from ctx when the return is {@code Integer.MIN_VALUE}.
      */
     public static int writeQuotedStringFast(byte[] buf, int pos, String value, WriterContext ctx) {
         int len = value.length();
         if (pos + len + 2 > buf.length) {
             ctx.pos = pos;
             writeQuotedStringFused(ctx, value);
-            return -(ctx.pos) - 1;
+            return Integer.MIN_VALUE;
         }
         int startPos = pos;
         buf[pos++] = '"';
@@ -237,7 +237,7 @@ public final class JsonCodegenHelpers {
                 ctx.pos = startPos;
                 ctx.ensureCapacity(len * 6 + 2);
                 ctx.pos = JsonWriteUtils.writeQuotedString(ctx.buf, ctx.pos, value);
-                return -(ctx.pos) - 1;
+                return Integer.MIN_VALUE;
             }
             buf[pos++] = (byte) c;
         }

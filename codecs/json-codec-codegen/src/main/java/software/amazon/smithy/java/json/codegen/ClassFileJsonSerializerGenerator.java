@@ -746,25 +746,15 @@ final class ClassFileJsonSerializerGenerator {
     ) {
         switch (field.category()) {
             case STRING -> {
-                emitSyncBufPosToCtx(code);
-                code.aload(2); // ctx
                 code.aload(valSlot);
                 code.checkcast(CD_String);
-                code.invokestatic(CD_JsonCodegenHelpers,
-                        "writeQuotedStringFused",
-                        MethodTypeDesc.of(CD_void, CD_WriterContext, CD_String));
-                emitSyncFromCtx(code);
+                emitWriteStringFastCall(code);
             }
             case ENUM_STRING -> {
-                emitSyncBufPosToCtx(code);
-                code.aload(2);
                 code.aload(valSlot);
                 code.checkcast(CD_SmithyEnum);
                 code.invokeinterface(CD_SmithyEnum, "getValue", MethodTypeDesc.of(CD_String));
-                code.invokestatic(CD_JsonCodegenHelpers,
-                        "writeQuotedStringFused",
-                        MethodTypeDesc.of(CD_void, CD_WriterContext, CD_String));
-                emitSyncFromCtx(code);
+                emitWriteStringFastCall(code);
             }
             case BLOB -> emitWriteBlobFromLocal(code, thisClass, valSlot);
             case BIG_INTEGER -> emitWriteBigIntegerFromLocal(code, thisClass, valSlot);
@@ -908,14 +898,47 @@ final class ClassFileJsonSerializerGenerator {
 
     // ---- String ----
 
+    /**
+     * Emits a writeQuotedStringFast call. Stack before: string value is ready.
+     * Expects string value on the top of stack. Handles reload from ctx on slow path.
+     */
+    private void emitWriteStringFastCall(CodeBuilder code) {
+        // Stack: ..., String value
+        // Need: buf, pos, value, ctx -> writeQuotedStringFast -> int
+        int strSlot = allocTempSlot();
+        code.astore(strSlot);
+        code.aload(SLOT_BUF);
+        code.iload(SLOT_POS);
+        code.aload(strSlot);
+        code.aload(2); // ctx
+        code.invokestatic(CD_JsonCodegenHelpers,
+                "writeQuotedStringFast",
+                MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_String, CD_WriterContext));
+
+        // Check result: MIN_VALUE means slow path was taken
+        int resultSlot = allocTempSlot();
+        code.istore(resultSlot);
+        Label reloadLabel = code.newLabel();
+        Label afterLabel = code.newLabel();
+        code.iload(resultSlot);
+        code.ldc(Integer.MIN_VALUE);
+        code.if_icmpeq(reloadLabel);
+        // Fast path: result is new pos
+        code.iload(resultSlot);
+        code.istore(SLOT_POS);
+        code.goto_(afterLabel);
+        // Slow path: reload buf and pos from ctx
+        code.labelBinding(reloadLabel);
+        emitSyncFromCtx(code);
+        code.labelBinding(afterLabel);
+    }
+
     private void emitWriteString(
             CodeBuilder code,
             ClassDesc ownerClass,
             FieldPlan field,
             int ownerSlot
     ) {
-        emitSyncBufPosToCtx(code);
-        code.aload(2); // ctx
         code.aload(ownerSlot);
         if (field.category() == FieldCategory.ENUM_STRING) {
             Class<?> enumJavaClass = field.schema().memberTarget().shapeClass();
@@ -933,10 +956,7 @@ final class ClassFileJsonSerializerGenerator {
                     field.getterName(),
                     MethodTypeDesc.of(CD_String));
         }
-        code.invokestatic(CD_JsonCodegenHelpers,
-                "writeQuotedStringFused",
-                MethodTypeDesc.of(CD_void, CD_WriterContext, CD_String));
-        emitSyncFromCtx(code);
+        emitWriteStringFastCall(code);
     }
 
     // ---- Blob ----
@@ -1570,31 +1590,21 @@ final class ClassFileJsonSerializerGenerator {
             case STRING -> {
                 emitEnsure(code, thisClass, 1);
                 emitWriteCommaIfNotFirst(code, idxSlot);
-                emitSyncBufPosToCtx(code);
-                code.aload(2);
                 code.aload(listSlot);
                 code.iload(idxSlot);
                 code.invokeinterface(CD_List, "get", MethodTypeDesc.of(CD_Object, CD_int));
                 code.checkcast(CD_String);
-                code.invokestatic(CD_JsonCodegenHelpers,
-                        "writeQuotedStringFused",
-                        MethodTypeDesc.of(CD_void, CD_WriterContext, CD_String));
-                emitSyncFromCtx(code);
+                emitWriteStringFastCall(code);
             }
             case ENUM_STRING -> {
                 emitEnsure(code, thisClass, 1);
                 emitWriteCommaIfNotFirst(code, idxSlot);
-                emitSyncBufPosToCtx(code);
-                code.aload(2);
                 code.aload(listSlot);
                 code.iload(idxSlot);
                 code.invokeinterface(CD_List, "get", MethodTypeDesc.of(CD_Object, CD_int));
                 code.checkcast(CD_SmithyEnum);
                 code.invokeinterface(CD_SmithyEnum, "getValue", MethodTypeDesc.of(CD_String));
-                code.invokestatic(CD_JsonCodegenHelpers,
-                        "writeQuotedStringFused",
-                        MethodTypeDesc.of(CD_void, CD_WriterContext, CD_String));
-                emitSyncFromCtx(code);
+                emitWriteStringFastCall(code);
             }
             default -> {
                 Label skipComma = code.newLabel();
@@ -1705,13 +1715,8 @@ final class ClassFileJsonSerializerGenerator {
         code.istore(firstSlot);
 
         // Write key as quoted string
-        emitSyncBufPosToCtx(code);
-        code.aload(2);
         code.aload(keySlot);
-        code.invokestatic(CD_JsonCodegenHelpers,
-                "writeQuotedStringFused",
-                MethodTypeDesc.of(CD_void, CD_WriterContext, CD_String));
-        emitSyncFromCtx(code);
+        emitWriteStringFastCall(code);
 
         // Write colon
         emitEnsure(code, thisClass, 1);
@@ -1825,25 +1830,15 @@ final class ClassFileJsonSerializerGenerator {
                 code.istore(SLOT_POS);
             }
             case STRING -> {
-                emitSyncBufPosToCtx(code);
-                code.aload(2); // ctx
                 code.aload(valSlot);
                 code.checkcast(CD_String);
-                code.invokestatic(CD_JsonCodegenHelpers,
-                        "writeQuotedStringFused",
-                        MethodTypeDesc.of(CD_void, CD_WriterContext, CD_String));
-                emitSyncFromCtx(code);
+                emitWriteStringFastCall(code);
             }
             case ENUM_STRING -> {
-                emitSyncBufPosToCtx(code);
-                code.aload(2);
                 code.aload(valSlot);
                 code.checkcast(CD_SmithyEnum);
                 code.invokeinterface(CD_SmithyEnum, "getValue", MethodTypeDesc.of(CD_String));
-                code.invokestatic(CD_JsonCodegenHelpers,
-                        "writeQuotedStringFused",
-                        MethodTypeDesc.of(CD_void, CD_WriterContext, CD_String));
-                emitSyncFromCtx(code);
+                emitWriteStringFastCall(code);
             }
             default -> {
                 // Complex: delegate to nested struct handler
