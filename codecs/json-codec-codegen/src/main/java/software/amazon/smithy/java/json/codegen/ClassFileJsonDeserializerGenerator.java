@@ -86,6 +86,12 @@ final class ClassFileJsonDeserializerGenerator {
     private static final int SLOT_MATCHED = 10;
     private static final int SLOT_FIRST_TEMP = 11;
 
+    // Slot layout for extracted deserializeField$ method:
+    // 0=this, 1=matched, 2=_pad, 3=ctx, 4=builder, 5=buf, 6=pos, 7=end
+    // CTX/BUILDER/BUF/POS/END match the main method so emit helpers work unchanged.
+    private static final int DF_SLOT_MATCHED = 1;
+    private static final int DF_SLOT_FIRST_TEMP = 8;
+
     private int nextTempSlot;
     private final Map<String, Integer> nestedDeCacheIndices = new LinkedHashMap<>();
     private int nextCacheIndex;
@@ -126,6 +132,7 @@ final class ClassFileJsonDeserializerGenerator {
 
             emitClassInit(cb, thisClass, fieldNameBytesList);
             emitConstructor(cb, thisClass);
+            emitDeserializeFieldMethod(cb, thisClass, plan);
             emitDeserializeMethod(cb, thisClass, shapeClass, plan, fieldNameBytesList);
         });
 
@@ -338,8 +345,22 @@ final class ClassFileJsonDeserializerGenerator {
                     code.goto_(loopStart);
                     code.labelBinding(notNull);
 
-                    // Dispatch on matched field
-                    emitFieldDispatch(code, thisClass, builderClass, fields, plan);
+                    // Dispatch on matched field (extracted to separate method for JIT)
+                    code.aload(0); // this
+                    code.iload(SLOT_MATCHED);
+                    code.iconst_0(); // pad
+                    code.aload(SLOT_CTX);
+                    code.aload(SLOT_BUILDER);
+                    code.aload(SLOT_BUF);
+                    code.iload(SLOT_POS);
+                    code.iload(SLOT_END);
+                    code.invokevirtual(thisClass,
+                            "deserializeField$",
+                            MethodTypeDesc.of(CD_int,
+                                    CD_int, CD_int,
+                                    CD_JsonReaderContext, builderClass,
+                                    CD_byte_array, CD_int, CD_int));
+                    code.istore(SLOT_POS);
 
                     code.goto_(loopStart);
                     code.labelBinding(loopEnd);
@@ -361,6 +382,66 @@ final class ClassFileJsonDeserializerGenerator {
                             MethodTypeDesc.of(CD_SerializableShape));
                     code.checkcast(CD_SerializableStruct);
                     code.areturn();
+                });
+    }
+
+    private void emitDeserializeFieldMethod(
+            java.lang.classfile.ClassBuilder cb,
+            ClassDesc thisClass,
+            StructCodePlan plan
+    ) {
+        ClassDesc builderClass = ClassDesc.of(plan.shapeClass().getName() + "$Builder");
+        List<FieldPlan> fields = plan.fields();
+
+        Class<?> actualBuilderClass;
+        try {
+            actualBuilderClass = Class.forName(plan.shapeClass().getName() + "$Builder");
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+
+        // Signature: int deserializeField$(int matched, int _pad, ctx, builder, buf, pos, end)
+        // Slot layout: 0=this, 1=matched, 2=_pad, 3=ctx, 4=builder, 5=buf, 6=pos, 7=end
+        // CTX/BUILDER/BUF/POS/END match the main method slots so emit helpers work unchanged.
+        cb.withMethodBody("deserializeField$",
+                MethodTypeDesc.of(CD_int,
+                        CD_int, CD_int,
+                        CD_JsonReaderContext, builderClass,
+                        CD_byte_array, CD_int, CD_int),
+                ClassFile.ACC_PRIVATE,
+                code -> {
+                    nextTempSlot = DF_SLOT_FIRST_TEMP;
+
+                    Label defaultLabel = code.newLabel();
+                    var cases = new ArrayList<java.lang.classfile.instruction.SwitchCase>();
+                    Label[] fieldLabels = new Label[fields.size()];
+                    for (int i = 0; i < fields.size(); i++) {
+                        fieldLabels[i] = code.newLabel();
+                        cases.add(java.lang.classfile.instruction.SwitchCase.of(i, fieldLabels[i]));
+                    }
+
+                    code.iload(DF_SLOT_MATCHED);
+                    code.tableswitch(defaultLabel, cases);
+
+                    for (int i = 0; i < fields.size(); i++) {
+                        code.labelBinding(fieldLabels[i]);
+                        emitFieldDeserialization(code, thisClass, builderClass,
+                                fields.get(i), plan, actualBuilderClass);
+                        code.iload(SLOT_POS);
+                        code.ireturn();
+                    }
+
+                    code.labelBinding(defaultLabel);
+                    // Skip unknown field value
+                    code.aload(SLOT_BUF);
+                    code.iload(SLOT_POS);
+                    code.iload(SLOT_END);
+                    code.aload(SLOT_CTX);
+                    code.invokestatic(CD_JsonReadUtils,
+                            "skipValue",
+                            MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int,
+                                    CD_JsonParseState));
+                    code.ireturn();
                 });
     }
 
@@ -631,50 +712,7 @@ final class ClassFileJsonDeserializerGenerator {
         code.if_icmpne(notNullLabel);
     }
 
-    private void emitFieldDispatch(
-            CodeBuilder code,
-            ClassDesc thisClass,
-            ClassDesc builderClass,
-            List<FieldPlan> fields,
-            StructCodePlan plan
-    ) {
-        Class<?> actualBuilderClass;
-        try {
-            actualBuilderClass = Class.forName(plan.shapeClass().getName() + "$Builder");
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-        Label defaultLabel = code.newLabel();
-        var cases = new ArrayList<java.lang.classfile.instruction.SwitchCase>();
-        Label[] fieldLabels = new Label[fields.size()];
-        for (int i = 0; i < fields.size(); i++) {
-            fieldLabels[i] = code.newLabel();
-            cases.add(java.lang.classfile.instruction.SwitchCase.of(i, fieldLabels[i]));
-        }
 
-        Label afterSwitch = code.newLabel();
-        code.iload(SLOT_MATCHED);
-        code.tableswitch(defaultLabel, cases);
-
-        for (int i = 0; i < fields.size(); i++) {
-            code.labelBinding(fieldLabels[i]);
-            emitFieldDeserialization(code, thisClass, builderClass, fields.get(i), plan, actualBuilderClass);
-            code.goto_(afterSwitch);
-        }
-
-        code.labelBinding(defaultLabel);
-        // Skip unknown field value
-        code.aload(SLOT_BUF);
-        code.iload(SLOT_POS);
-        code.iload(SLOT_END);
-        code.aload(SLOT_CTX);
-        code.invokestatic(CD_JsonReadUtils,
-                "skipValue",
-                MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int, CD_JsonParseState));
-        code.istore(SLOT_POS);
-
-        code.labelBinding(afterSwitch);
-    }
 
     private void emitFieldDeserialization(
             CodeBuilder code,
