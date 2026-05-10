@@ -492,10 +492,8 @@ final class ClassFileJsonDeserializerGenerator {
         // switch(expectedNext) { case 0: try DN_0 ... }
         Label defaultLabel = code.newLabel();
         Label[] caseLabels = new Label[fields.size()];
-        int[] caseValues = new int[fields.size()];
         for (int i = 0; i < fields.size(); i++) {
             caseLabels[i] = code.newLabel();
-            caseValues[i] = i;
         }
 
         code.iload(SLOT_EXPECTED_NEXT);
@@ -509,14 +507,30 @@ final class ClassFileJsonDeserializerGenerator {
         for (int i = 0; i < fields.size(); i++) {
             code.labelBinding(caseLabels[i]);
 
-            // int result = JsonReadUtils.matchFieldName(buf, pos, end, DN_i)
+            byte[] nameBytes = fieldNameBytesList.get(i);
+            int nameLen = nameBytes.length;
+
             code.aload(SLOT_BUF);
             code.iload(SLOT_POS);
             code.iload(SLOT_END);
-            code.getstatic(thisClass, "DN_" + i, CD_byte_array);
-            code.invokestatic(CD_JsonReadUtils,
-                    "matchFieldName",
-                    MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int, CD_byte_array));
+            if (nameLen == 4) {
+                code.ldc(computeLeInt(nameBytes));
+                code.invokestatic(CD_JsonReadUtils,
+                        "matchFieldName4",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int, CD_int));
+            } else if (nameLen >= 5 && nameLen <= 8) {
+                code.ldc(computeLeMaskedLong(nameBytes));
+                code.ldc(computeMask(nameLen));
+                code.ldc(nameLen);
+                code.invokestatic(CD_JsonReadUtils,
+                        "matchFieldNameMasked",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int, CD_long, CD_long, CD_int));
+            } else {
+                code.getstatic(thisClass, "DN_" + i, CD_byte_array);
+                code.invokestatic(CD_JsonReadUtils,
+                        "matchFieldName",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int, CD_byte_array));
+            }
             code.istore(matchResultSlot);
             code.iload(matchResultSlot);
             code.iconst_m1();
@@ -538,6 +552,30 @@ final class ClassFileJsonDeserializerGenerator {
 
         code.labelBinding(defaultLabel);
         // Fall through: matched stays -1
+    }
+
+    private static int computeLeInt(byte[] bytes) {
+        int result = 0;
+        for (int i = 0; i < 4 && i < bytes.length; i++) {
+            result |= (bytes[i] & 0xFF) << (i * 8);
+        }
+        return result;
+    }
+
+    private static long computeLeMaskedLong(byte[] bytes) {
+        long result = 0;
+        for (int i = 0; i < 8 && i < bytes.length; i++) {
+            result |= (long) (bytes[i] & 0xFF) << (i * 8);
+        }
+        return result;
+    }
+
+    private static long computeMask(int nameLen) {
+        long mask = 0;
+        for (int i = 0; i < nameLen && i < 8; i++) {
+            mask |= 0xFFL << (i * 8);
+        }
+        return mask;
     }
 
     private void emitHashDispatch(

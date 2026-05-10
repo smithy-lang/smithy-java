@@ -242,22 +242,20 @@ final class ClassFileJsonSerializerGenerator {
 
                     List<FieldPlan> serOrder = plan.serializationOrder();
 
-                    // Compute upfront capacity
-                    int fixedCapacity = 2; // { and }
+                    // Compute upfront capacity covering all field names + fixed-size values + braces
+                    int totalCapacity = 2; // { and }
                     int fixedFieldEnd = 0;
                     for (int i = 0; i < serOrder.size(); i++) {
                         FieldPlan f = serOrder.get(i);
+                        totalCapacity += fieldNameBytesList.get(i).length;
                         if (f.required() && f.category().isFixedSize()) {
-                            byte[] nameBytes = fieldNameBytesList.get(i);
-                            fixedCapacity += nameBytes.length + f.fixedSizeUpperBound();
+                            totalCapacity += f.fixedSizeUpperBound();
                             fixedFieldEnd = i + 1;
                         }
                     }
 
-                    boolean hasVariableFields = fixedFieldEnd < serOrder.size();
-
-                    // ctx.ensure(pos, fixedCapacity)
-                    emitEnsure(code, thisClass, fixedCapacity);
+                    // Single upfront ensure covers all field names + fixed values + braces
+                    emitEnsure(code, thisClass, totalCapacity);
 
                     // buf[pos++] = '{'
                     emitWriteByte(code, '{');
@@ -269,7 +267,7 @@ final class ClassFileJsonSerializerGenerator {
                         emitWriteFixedValue(code, shapeClass, f);
                     }
 
-                    // Remaining fields
+                    // Remaining fields (name capacity already ensured upfront)
                     for (int i = fixedFieldEnd; i < serOrder.size(); i++) {
                         FieldPlan field = serOrder.get(i);
                         if (field.nullable()) {
@@ -281,7 +279,7 @@ final class ClassFileJsonSerializerGenerator {
                                     fieldNameBytesList.get(i).length,
                                     plan);
                         } else {
-                            emitRequiredVariableField(code,
+                            emitRequiredVariableFieldNoNameEnsure(code,
                                     thisClass,
                                     shapeClass,
                                     field,
@@ -291,10 +289,7 @@ final class ClassFileJsonSerializerGenerator {
                         }
                     }
 
-                    // Closing brace
-                    if (hasVariableFields) {
-                        emitEnsure(code, thisClass, 1);
-                    }
+                    // Closing brace (capacity already ensured upfront)
                     emitWriteByte(code, '}');
 
                     // Sync back to ctx
@@ -573,6 +568,22 @@ final class ClassFileJsonSerializerGenerator {
     ) {
         // Ensure capacity for field name
         emitEnsure(code, thisClass, nameLength);
+        emitFieldNameCopy(code, thisClass, fieldIndex, nameLength);
+
+        // Write value with its own capacity management
+        emitWriteValueWithCapacity(code, thisClass, shapeClass, field, SLOT_TYPED, plan);
+    }
+
+    private void emitRequiredVariableFieldNoNameEnsure(
+            CodeBuilder code,
+            ClassDesc thisClass,
+            ClassDesc shapeClass,
+            FieldPlan field,
+            int fieldIndex,
+            int nameLength,
+            StructCodePlan plan
+    ) {
+        // Name capacity already ensured upfront, just copy
         emitFieldNameCopy(code, thisClass, fieldIndex, nameLength);
 
         // Write value with its own capacity management
@@ -1815,7 +1826,7 @@ final class ClassFileJsonSerializerGenerator {
             }
             case STRING -> {
                 emitSyncBufPosToCtx(code);
-                code.aload(2);
+                code.aload(2); // ctx
                 code.aload(valSlot);
                 code.checkcast(CD_String);
                 code.invokestatic(CD_JsonCodegenHelpers,
