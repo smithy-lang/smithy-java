@@ -25,9 +25,13 @@ public final class JsonReadUtils {
 
     private JsonReadUtils() {}
 
-    // VarHandle for reading 8 bytes at a time from byte arrays (SWAR technique)
+    // VarHandles for reading 4/8 bytes at a time from byte arrays (SWAR technique)
     private static final VarHandle LONG_HANDLE =
             MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
+    private static final VarHandle INT_HANDLE =
+            MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
+
+    private static final int NULL_INT_LE = 'n' | ('u' << 8) | ('l' << 16) | ('l' << 24);
 
     // Hex digit lookup table: -1 means invalid hex digit
     private static final int[] HEX_VALUES = new int[128];
@@ -445,6 +449,49 @@ public final class JsonReadUtils {
             }
         }
         return pos + len + 1;
+    }
+
+    /**
+     * Matches a 4-byte field name using a single int comparison.
+     * Returns pos + 5 (past closing quote) on match, or -1.
+     */
+    public static int matchFieldName4(byte[] buf, int pos, int end, int expectedInt) {
+        if (pos + 5 > end || buf[pos + 4] != '"') {
+            return -1;
+        }
+        return (int) INT_HANDLE.get(buf, pos) == expectedInt ? pos + 5 : -1;
+    }
+
+    /**
+     * Matches a field name of {@code nameLen} bytes (1-8) using a masked long comparison.
+     * The mask has 0xFF for each used byte position and 0x00 for unused positions.
+     * Returns pos + nameLen + 1 (past closing quote) on match, or -1.
+     */
+    public static int matchFieldNameMasked(byte[] buf, int pos, int end, long expected, long mask, int nameLen) {
+        if (pos + nameLen + 1 > end || buf[pos + nameLen] != '"') {
+            return -1;
+        }
+        // Ensure 8-byte VarHandle read is within buffer bounds
+        if (pos + 8 > buf.length) {
+            return matchFieldName(buf, pos, end, expected, nameLen);
+        }
+        return ((long) LONG_HANDLE.get(buf, pos) & mask) == expected ? pos + nameLen + 1 : -1;
+    }
+
+    private static int matchFieldName(byte[] buf, int pos, int end, long expected, int nameLen) {
+        for (int i = 0; i < nameLen; i++) {
+            if ((buf[pos + i] & 0xFF) != ((int) (expected >>> (i * 8)) & 0xFF)) {
+                return -1;
+            }
+        }
+        return pos + nameLen + 1;
+    }
+
+    /**
+     * Checks if the bytes at buf[pos..pos+4) are the JSON null literal "null".
+     */
+    public static boolean isNullLiteral(byte[] buf, int pos, int end) {
+        return pos + 4 <= end && (int) INT_HANDLE.get(buf, pos) == NULL_INT_LE;
     }
 
     // Month lookup: index by first two bytes of 3-letter month abbreviation
