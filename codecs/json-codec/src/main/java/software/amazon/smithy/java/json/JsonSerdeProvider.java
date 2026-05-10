@@ -8,6 +8,7 @@ package software.amazon.smithy.java.json;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
@@ -38,4 +39,29 @@ public interface JsonSerdeProvider {
         return baos.toByteBuffer();
     }
 
+    default <T extends SerializableShape> T deserializeShape(
+            byte[] source,
+            ShapeBuilder<T> builder,
+            JsonSettings settings
+    ) {
+        var deserializer = newDeserializer(source, settings);
+        try {
+            return builder.deserialize(deserializer).errorCorrection().build();
+        } finally {
+            deserializer.close();
+        }
+    }
+
+    default <T extends SerializableShape> T deserializeShape(
+            ByteBuffer source,
+            ShapeBuilder<T> builder,
+            JsonSettings settings
+    ) {
+        var deserializer = newDeserializer(source, settings);
+        try {
+            return builder.deserialize(deserializer).errorCorrection().build();
+        } finally {
+            deserializer.close();
+        }
+    }
 }

@@ -33,24 +33,17 @@ import software.amazon.smithy.java.json.codegen.test.model.SimpleStruct;
 public class ClassFileJsonCodegenTest {
 
     private static SpecializedCodecRegistry registry;
-    private static SpecializedCodecRegistry janinoRegistry;
     private static JsonCodec jsonCodec;
 
     @BeforeAll
     static void setup() {
         registry = new SpecializedCodecRegistry(new ClassFileJsonCodecProfile());
-        janinoRegistry = new SpecializedCodecRegistry(new JsonCodecProfile());
         jsonCodec = JsonCodec.builder().useTimestampFormat(true).build();
 
         registry.warmup(SimpleStruct.$SCHEMA, SimpleStruct.class);
         registry.warmup(ListStruct.$SCHEMA, ListStruct.class);
         registry.warmup(MapStruct.$SCHEMA, MapStruct.class);
         registry.warmup(FullStruct.$SCHEMA, FullStruct.class);
-
-        janinoRegistry.warmup(SimpleStruct.$SCHEMA, SimpleStruct.class);
-        janinoRegistry.warmup(ListStruct.$SCHEMA, ListStruct.class);
-        janinoRegistry.warmup(MapStruct.$SCHEMA, MapStruct.class);
-        janinoRegistry.warmup(FullStruct.$SCHEMA, FullStruct.class);
     }
 
     // ---- Serialization Tests ----
@@ -211,51 +204,6 @@ public class ClassFileJsonCodegenTest {
 
         assertEquals(original.getNames(), deserialized.getNames());
         assertEquals(original.getCounts(), deserialized.getCounts());
-    }
-
-    // ---- Cross-path Tests (ClassFile serialize, Janino deserialize and vice versa) ----
-
-    @Test
-    void testCrossPathSerializeClassFileDeserializeJanino() {
-        SimpleStruct obj = SimpleStruct.builder()
-                .name("Cross")
-                .age(42)
-                .build();
-
-        byte[] classFileBytes = serializeToBytes(obj);
-        JsonReaderContext ctx = new JsonReaderContext(classFileBytes, 0, classFileBytes.length, janinoRegistry);
-        SimpleStruct result = (SimpleStruct) janinoRegistry
-                .getDeserializer(SimpleStruct.$SCHEMA, SimpleStruct.class)
-                .deserialize(ctx, SimpleStruct.builder());
-
-        assertEquals("Cross", result.getName());
-        assertEquals(42, result.getAge());
-    }
-
-    @Test
-    void testCrossPathSerializeJaninoDeserializeClassFile() {
-        SimpleStruct obj = SimpleStruct.builder()
-                .name("Cross2")
-                .age(55)
-                .build();
-
-        WriterContext wCtx = WriterContext.acquire(janinoRegistry);
-        byte[] janinoBytes;
-        try {
-            janinoRegistry.getSerializer(SimpleStruct.$SCHEMA, SimpleStruct.class)
-                    .serialize(obj, wCtx);
-            janinoBytes = wCtx.toByteArray();
-        } finally {
-            WriterContext.release(wCtx);
-        }
-
-        JsonReaderContext rCtx = new JsonReaderContext(janinoBytes, 0, janinoBytes.length, registry);
-        SimpleStruct result = (SimpleStruct) registry
-                .getDeserializer(SimpleStruct.$SCHEMA, SimpleStruct.class)
-                .deserialize(rCtx, SimpleStruct.builder());
-
-        assertEquals("Cross2", result.getName());
-        assertEquals(55, result.getAge());
     }
 
     // ---- Dispatch Codec Comparison Tests ----

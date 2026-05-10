@@ -7,6 +7,8 @@ package software.amazon.smithy.java.codegen.rt;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.lang.invoke.MethodHandles;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -15,6 +17,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import software.amazon.smithy.java.codegen.rt.plan.StructCodePlan;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
  * Thread-safe cache and factory for runtime-generated specialized serializers/deserializers.
@@ -28,26 +31,15 @@ public final class SpecializedCodecRegistry {
     private static final Logger LOG = Logger.getLogger(SpecializedCodecRegistry.class.getName());
 
     private final CodecProfile profile;
-    private final BytecodeCodecProfile bytecodeProfile;
     private final ConcurrentHashMap<Class<?>, GeneratedStructSerializer> serializers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Class<?>, GeneratedStructDeserializer> deserializers =
             new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Class<?>, Future<?>> pending = new ConcurrentHashMap<>();
+    private final Set<Class<?>> failed = ConcurrentHashMap.newKeySet();
     private final ExecutorService executor;
 
     public SpecializedCodecRegistry(CodecProfile profile) {
         this.profile = profile;
-        this.bytecodeProfile = null;
-        this.executor = Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "smithy-codec-codegen");
-            t.setDaemon(true);
-            return t;
-        });
-    }
-
-    public SpecializedCodecRegistry(BytecodeCodecProfile bytecodeProfile) {
-        this.profile = null;
-        this.bytecodeProfile = bytecodeProfile;
         this.executor = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "smithy-codec-bytecode");
             t.setDaemon(true);
@@ -58,6 +50,9 @@ public final class SpecializedCodecRegistry {
     public GeneratedStructSerializer getSerializer(Schema schema, Class<?> shapeClass) {
         GeneratedStructSerializer ser = serializers.get(shapeClass);
         if (ser == null) {
+            if (failed.contains(shapeClass)) {
+                return null;
+            }
             triggerAsync(schema, shapeClass);
         }
         return ser;
@@ -66,6 +61,9 @@ public final class SpecializedCodecRegistry {
     public GeneratedStructDeserializer getDeserializer(Schema schema, Class<?> shapeClass) {
         GeneratedStructDeserializer de = deserializers.get(shapeClass);
         if (de == null) {
+            if (failed.contains(shapeClass)) {
+                return null;
+            }
             triggerAsync(schema, shapeClass);
         }
         return de;
@@ -79,20 +77,40 @@ public final class SpecializedCodecRegistry {
     }
 
     public void warmupTransitive(Schema schema, Class<?> shapeClass) {
+        warmupTransitive(schema, shapeClass, new HashSet<>());
+    }
+
+    private void warmupTransitive(Schema schema, Class<?> shapeClass, Set<Class<?>> visited) {
+        if (!visited.add(shapeClass)) {
+            return;
+        }
         warmup(schema, shapeClass);
         for (Schema member : schema.members()) {
             Schema target = member.memberTarget();
-            if (target.type() == software.amazon.smithy.model.shapes.ShapeType.STRUCTURE
-                    || target.type() == software.amazon.smithy.model.shapes.ShapeType.UNION) {
+            if (target.type() == ShapeType.STRUCTURE || target.type() == ShapeType.UNION) {
                 Class<?> targetClass = target.shapeClass();
                 if (targetClass != null) {
-                    warmup(target, targetClass);
+                    warmupTransitive(target, targetClass, visited);
+                }
+            }
+            if (target.type() == ShapeType.LIST || target.type() == ShapeType.MAP) {
+                for (Schema nested : target.members()) {
+                    Schema nestedTarget = nested.memberTarget();
+                    if (nestedTarget.type() == ShapeType.STRUCTURE || nestedTarget.type() == ShapeType.UNION) {
+                        Class<?> nestedClass = nestedTarget.shapeClass();
+                        if (nestedClass != null) {
+                            warmupTransitive(nestedTarget, nestedClass, visited);
+                        }
+                    }
                 }
             }
         }
     }
 
     private void triggerAsync(Schema schema, Class<?> shapeClass) {
+        if (failed.contains(shapeClass)) {
+            return;
+        }
         pending.computeIfAbsent(shapeClass, k -> executor.submit(() -> {
             try {
                 generate(schema, shapeClass);
@@ -113,70 +131,36 @@ public final class SpecializedCodecRegistry {
         String pkg = shapeClass.getPackageName();
 
         try {
-            if (bytecodeProfile != null) {
-                generateBytecode(plan, pkg, shapeClass);
-            } else {
-                generateJanino(plan, pkg, shapeClass);
+            MethodHandles.Lookup baseLookup = MethodHandles.privateLookupIn(
+                    shapeClass,
+                    MethodHandles.lookup());
+
+            if (!serializers.containsKey(shapeClass)) {
+                String serClassName = shapeClass.getSimpleName() + "$" + profile.name() + "Ser";
+                CodecProfile.GenerationResult serResult =
+                        profile.generateSerializerBytecode(plan, serClassName, pkg);
+                Class<?> serClass = loadHiddenClass(baseLookup, serResult);
+                serializers.put(shapeClass,
+                        (GeneratedStructSerializer) serClass.getDeclaredConstructor().newInstance());
+            }
+
+            if (!deserializers.containsKey(shapeClass)) {
+                String deClassName = shapeClass.getSimpleName() + "$" + profile.name() + "De";
+                CodecProfile.GenerationResult deResult =
+                        profile.generateDeserializerBytecode(plan, deClassName, pkg);
+                Class<?> deClass = loadHiddenClass(baseLookup, deResult);
+                deserializers.put(shapeClass,
+                        (GeneratedStructDeserializer) deClass.getDeclaredConstructor().newInstance());
             }
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Code generation failed for " + shapeClass.getName(), e);
-            throw new RuntimeException("Code generation failed for " + shapeClass.getName(), e);
-        }
-    }
-
-    private void generateJanino(StructCodePlan plan, String pkg, Class<?> shapeClass) throws Exception {
-        if (!serializers.containsKey(shapeClass)) {
-            String serClassName = shapeClass.getSimpleName() + "$" + profile.name() + "Ser";
-            String serFqcn = pkg + "." + serClassName;
-            String serSource = profile.generateSerializerSource(plan, serClassName, pkg);
-            Class<?> serClass = JaninoCompiler.compile(serFqcn,
-                    serSource,
-                    shapeClass.getClassLoader(),
-                    shapeClass);
-            serializers.put(shapeClass,
-                    (GeneratedStructSerializer) serClass.getDeclaredConstructor().newInstance());
-        }
-
-        if (!deserializers.containsKey(shapeClass)) {
-            String deClassName = shapeClass.getSimpleName() + "$" + profile.name() + "De";
-            String deFqcn = pkg + "." + deClassName;
-            String deSource = profile.generateDeserializerSource(plan, deClassName, pkg);
-            Class<?> deClass = JaninoCompiler.compile(deFqcn,
-                    deSource,
-                    shapeClass.getClassLoader(),
-                    shapeClass);
-            deserializers.put(shapeClass,
-                    (GeneratedStructDeserializer) deClass.getDeclaredConstructor().newInstance());
-        }
-    }
-
-    private void generateBytecode(StructCodePlan plan, String pkg, Class<?> shapeClass) throws Exception {
-        MethodHandles.Lookup baseLookup = MethodHandles.privateLookupIn(
-                shapeClass,
-                MethodHandles.lookup());
-
-        if (!serializers.containsKey(shapeClass)) {
-            String serClassName = shapeClass.getSimpleName() + "$" + bytecodeProfile.name() + "Ser";
-            BytecodeCodecProfile.GenerationResult serResult =
-                    bytecodeProfile.generateSerializerBytecode(plan, serClassName, pkg);
-            Class<?> serClass = loadHiddenClass(baseLookup, serResult);
-            serializers.put(shapeClass,
-                    (GeneratedStructSerializer) serClass.getDeclaredConstructor().newInstance());
-        }
-
-        if (!deserializers.containsKey(shapeClass)) {
-            String deClassName = shapeClass.getSimpleName() + "$" + bytecodeProfile.name() + "De";
-            BytecodeCodecProfile.GenerationResult deResult =
-                    bytecodeProfile.generateDeserializerBytecode(plan, deClassName, pkg);
-            Class<?> deClass = loadHiddenClass(baseLookup, deResult);
-            deserializers.put(shapeClass,
-                    (GeneratedStructDeserializer) deClass.getDeclaredConstructor().newInstance());
+            failed.add(shapeClass);
         }
     }
 
     private static Class<?> loadHiddenClass(
             MethodHandles.Lookup baseLookup,
-            BytecodeCodecProfile.GenerationResult result
+            CodecProfile.GenerationResult result
     ) throws IllegalAccessException {
         MethodHandles.Lookup hiddenLookup;
         if (result.classData() != null) {

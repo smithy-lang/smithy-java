@@ -22,7 +22,7 @@ dependencies {
     implementation(project(":core"))
     jmhImplementation(project(":codecs:json-codec", configuration = "shadow"))
     jmhImplementation(project(":codecs:cbor-codec"))
-    jmhImplementation(project(":codecs:codec-codegen", configuration = "shadow"))
+    jmhImplementation(project(":codecs:codec-codegen"))
     jmhImplementation(project(":codecs:json-codec-codegen"))
     // Jackson classes needed for the reverseJsonFieldOrder helper in JsonBench
     jmhImplementation(libs.jackson.core)
@@ -53,6 +53,16 @@ jmh {
     iterations = 5
     fork = 1
     jvmArgs.addAll("-Xms1g", "-Xmx1g")
+    jvmArgs.addAll(
+        providers
+            .gradleProperty("jmh.jitlog")
+            .map { listOf(
+                "-XX:+UnlockDiagnosticVMOptions",
+                "-XX:+LogCompilation",
+                "-XX:LogFile=build/jmh-jitlog/hotspot.log"
+            ) }
+            .orElse(emptyList()),
+    )
     includes.addAll(
         providers
             .gradleProperty("jmh.includes")

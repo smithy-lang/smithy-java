@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.json;
 
 import java.nio.ByteBuffer;
+import java.util.ServiceLoader;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -23,7 +24,7 @@ import software.amazon.smithy.java.benchmarks.codec.model.SimpleStruct;
 import software.amazon.smithy.java.codegen.rt.SpecializedCodecRegistry;
 import software.amazon.smithy.java.codegen.rt.WriterContext;
 import software.amazon.smithy.java.core.serde.Codec;
-import software.amazon.smithy.java.json.codegen.JsonCodecProfile;
+import software.amazon.smithy.java.json.codegen.ClassFileJsonCodecProfile;
 import software.amazon.smithy.java.json.codegen.JsonReaderContext;
 
 @BenchmarkMode(Mode.AverageTime)
@@ -42,8 +43,15 @@ public class JsonCodegenBench {
 
     @Setup(Level.Trial)
     public void setup() {
-        registry = new SpecializedCodecRegistry(new JsonCodecProfile());
-        dispatchCodec = JsonCodec.builder().build();
+        registry = new SpecializedCodecRegistry(new ClassFileJsonCodecProfile());
+        // Use the raw provider without codegen wrapping to get a true dispatch-only codec
+        JsonSerdeProvider rawProvider = ServiceLoader.load(JsonSerdeProvider.class)
+                .stream()
+                .map(ServiceLoader.Provider::get)
+                .filter(p -> !(p instanceof CodegenJsonSerdeProvider))
+                .findFirst()
+                .orElseThrow();
+        dispatchCodec = JsonCodec.builder().overrideSerdeProvider(rawProvider).build();
 
         simpleStruct = BenchData.buildSimpleStruct();
         complexStruct = BenchData.buildComplexStruct();

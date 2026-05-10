@@ -55,22 +55,12 @@ public final class JsonCodec implements Codec {
 
     @Override
     public <T extends SerializableShape> T deserializeShape(byte[] source, ShapeBuilder<T> builder) {
-        var deserializer = createDeserializer(source);
-        try {
-            return builder.deserialize(deserializer).errorCorrection().build();
-        } finally {
-            deserializer.close();
-        }
+        return settings.provider().deserializeShape(source, builder, settings);
     }
 
     @Override
     public <T extends SerializableShape> T deserializeShape(ByteBuffer source, ShapeBuilder<T> builder) {
-        var deserializer = createDeserializer(source);
-        try {
-            return builder.deserialize(deserializer).errorCorrection().build();
-        } finally {
-            deserializer.close();
-        }
+        return settings.provider().deserializeShape(source, builder, settings);
     }
 
     @Override

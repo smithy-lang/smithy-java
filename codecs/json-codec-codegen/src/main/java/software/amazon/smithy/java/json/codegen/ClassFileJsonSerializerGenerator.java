@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import software.amazon.smithy.java.codegen.rt.BytecodeCodecProfile.GenerationResult;
+import software.amazon.smithy.java.codegen.rt.CodecProfile.GenerationResult;
 import software.amazon.smithy.java.codegen.rt.GeneratedStructSerializer;
 import software.amazon.smithy.java.codegen.rt.plan.FieldCategory;
 import software.amazon.smithy.java.codegen.rt.plan.FieldPlan;
@@ -385,9 +385,7 @@ final class ClassFileJsonSerializerGenerator {
     // ---- Bytecode emit helpers ----
 
     private void emitEnsure(CodeBuilder code, ClassDesc thisClass, int needed) {
-        // buf = ctx.ensure(pos, needed)
-        // Note: ensure() sets ctx.pos = pos (unchanged) and may grow buf.
-        // We only need the returned buf; pos stays in our local slot.
+        // buf = ctx.ensure(pos, needed) — may grow buf; pos stays in local slot
         code.aload(2); // ctx
         code.iload(SLOT_POS);
         code.ldc(needed);
@@ -443,7 +441,8 @@ final class ClassFileJsonSerializerGenerator {
     }
 
     private void emitSyncBufPosToCtx(CodeBuilder code) {
-        emitSyncToCtx(code);
+        // ctx.buf is always in sync (ensure() updates this.buf directly), only pos needs syncing
+        emitSyncPosToCtx(code);
     }
 
     private int allocTempSlot() {
@@ -592,7 +591,6 @@ final class ClassFileJsonSerializerGenerator {
         Label skipLabel = code.newLabel();
         int valSlot = allocTempSlot();
 
-        ClassDesc returnType = getGetterReturnType(field);
         boolean isPrimitive = field.category().isPrimitive() && !field.required();
 
         // Get value and store in temp
@@ -999,9 +997,6 @@ final class ClassFileJsonSerializerGenerator {
                 "ensure",
                 MethodTypeDesc.of(CD_byte_array, CD_int, CD_int));
         code.astore(SLOT_BUF);
-        code.aload(2);
-        code.getfield(CD_WriterContext, "pos", CD_int);
-        code.istore(SLOT_POS);
 
         // pos = JsonWriteUtils.writeBase64String(buf, pos, data, off, len)
         code.aload(SLOT_BUF);
@@ -1071,9 +1066,6 @@ final class ClassFileJsonSerializerGenerator {
                 "ensure",
                 MethodTypeDesc.of(CD_byte_array, CD_int, CD_int));
         code.astore(SLOT_BUF);
-        code.aload(2);
-        code.getfield(CD_WriterContext, "pos", CD_int);
-        code.istore(SLOT_POS);
 
         code.aload(SLOT_BUF);
         code.iload(SLOT_POS);
@@ -1192,9 +1184,6 @@ final class ClassFileJsonSerializerGenerator {
                 "ensure",
                 MethodTypeDesc.of(CD_byte_array, CD_int, CD_int));
         code.astore(SLOT_BUF);
-        code.aload(2);
-        code.getfield(CD_WriterContext, "pos", CD_int);
-        code.istore(SLOT_POS);
         code.aload(SLOT_BUF);
         code.iload(SLOT_POS);
         code.aload(strSlot);
@@ -1523,13 +1512,7 @@ final class ClassFileJsonSerializerGenerator {
     ) {
         switch (category) {
             case BOOLEAN -> {
-                emitSyncPosToCtx(code);
-                code.aload(2);
-                code.bipush(6);
-                code.invokevirtual(CD_WriterContext,
-                        "ensureCapacity",
-                        MethodTypeDesc.of(CD_void, CD_int));
-                emitSyncFromCtx(code);
+                emitEnsure(code, thisClass, 6);
                 emitWriteCommaIfNotFirst(code, idxSlot);
                 code.aload(SLOT_BUF);
                 code.iload(SLOT_POS);
@@ -1544,13 +1527,7 @@ final class ClassFileJsonSerializerGenerator {
                 code.istore(SLOT_POS);
             }
             case BYTE, SHORT, INTEGER -> {
-                emitSyncPosToCtx(code);
-                code.aload(2);
-                code.bipush(12);
-                code.invokevirtual(CD_WriterContext,
-                        "ensureCapacity",
-                        MethodTypeDesc.of(CD_void, CD_int));
-                emitSyncFromCtx(code);
+                emitEnsure(code, thisClass, 12);
                 emitWriteCommaIfNotFirst(code, idxSlot);
                 code.aload(SLOT_BUF);
                 code.iload(SLOT_POS);
@@ -1565,13 +1542,7 @@ final class ClassFileJsonSerializerGenerator {
                 code.istore(SLOT_POS);
             }
             case LONG -> {
-                emitSyncPosToCtx(code);
-                code.aload(2);
-                code.bipush(21);
-                code.invokevirtual(CD_WriterContext,
-                        "ensureCapacity",
-                        MethodTypeDesc.of(CD_void, CD_int));
-                emitSyncFromCtx(code);
+                emitEnsure(code, thisClass, 21);
                 emitWriteCommaIfNotFirst(code, idxSlot);
                 code.aload(SLOT_BUF);
                 code.iload(SLOT_POS);
@@ -2032,13 +2003,6 @@ final class ClassFileJsonSerializerGenerator {
             case DOCUMENT -> ClassDesc.of("software.amazon.smithy.java.core.serde.document.Document");
             default -> CD_Object;
         };
-    }
-
-    private static ClassDesc getGetterReturnType(FieldPlan field) {
-        if (field.category().isPrimitive() && !field.required()) {
-            return boxedClassDesc(field);
-        }
-        return boxedClassDesc(field);
     }
 
     private static FieldCategory resolveElementCategory(FieldPlan field) {

@@ -19,7 +19,7 @@ extra["displayName"] = "Smithy :: Java :: JSON Codec Codegen"
 extra["moduleName"] = "software.amazon.smithy.java.json.codegen"
 
 dependencies {
-    api(project(":codecs:codec-codegen", configuration = "shadow"))
+    api(project(":codecs:codec-codegen"))
     api(project(":codecs:json-codec", configuration = "shadow"))
     smithyBuild(project(":codegen:codegen-plugin"))
 }

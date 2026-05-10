@@ -47,12 +47,11 @@ public final class WriterContext {
     }
 
     /**
-     * Sets pos, ensures capacity, and returns buf. Reduces the 3-line pattern
-     * {@code ctx.pos = pos; ctx.ensureCapacity(N); buf = ctx.buf; pos = ctx.pos;}
-     * to {@code buf = ctx.ensure(pos, N); pos = ctx.pos;}.
+     * Ensures capacity for {@code needed} bytes starting at {@code pos} and returns
+     * the (possibly reallocated) buffer. Does NOT write pos back to ctx — callers keep
+     * pos in a local register and sync explicitly before helper calls.
      */
     public byte[] ensure(int pos, int needed) {
-        this.pos = pos;
         if (pos + needed > buf.length) {
             buf = Arrays.copyOf(buf, Math.max(buf.length * 2, pos + needed));
         }

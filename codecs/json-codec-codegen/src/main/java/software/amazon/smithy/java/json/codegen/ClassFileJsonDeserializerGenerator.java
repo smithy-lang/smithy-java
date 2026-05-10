@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import software.amazon.smithy.java.codegen.rt.BytecodeCodecProfile.GenerationResult;
+import software.amazon.smithy.java.codegen.rt.CodecProfile.GenerationResult;
 import software.amazon.smithy.java.codegen.rt.GeneratedStructDeserializer;
 import software.amazon.smithy.java.codegen.rt.plan.FieldCategory;
 import software.amazon.smithy.java.codegen.rt.plan.FieldPlan;
@@ -388,9 +388,13 @@ final class ClassFileJsonDeserializerGenerator {
         code.new_(CD_SerializationException);
         code.dup();
         code.ldc(msg);
+        code.iload(SLOT_POS);
         code.invokestatic(ClassDesc.of("java.lang.String"),
                 "valueOf",
-                MethodTypeDesc.of(CD_String, CD_Object));
+                MethodTypeDesc.of(CD_String, CD_int));
+        code.invokevirtual(CD_String,
+                "concat",
+                MethodTypeDesc.of(CD_String, CD_String));
         code.invokespecial(CD_SerializationException,
                 ConstantDescs.INIT_NAME,
                 MethodTypeDesc.of(CD_void, CD_String));
@@ -414,12 +418,11 @@ final class ClassFileJsonDeserializerGenerator {
         }
 
         code.iload(SLOT_EXPECTED_NEXT);
-        // Use lookupswitch for speculative match
         var cases = new java.util.ArrayList<java.lang.classfile.instruction.SwitchCase>();
         for (int i = 0; i < fields.size(); i++) {
             cases.add(java.lang.classfile.instruction.SwitchCase.of(i, caseLabels[i]));
         }
-        code.lookupswitch(defaultLabel, cases);
+        code.tableswitch(defaultLabel, cases);
 
         int matchResultSlot = nextTempSlot++;
         for (int i = 0; i < fields.size(); i++) {
@@ -585,6 +588,7 @@ final class ClassFileJsonDeserializerGenerator {
                 code.istore(SLOT_MATCHED);
                 code.ldc(fi + 1);
                 code.istore(SLOT_EXPECTED_NEXT);
+                code.goto_(switchDefault);
                 code.labelBinding(noMatch);
             }
             code.goto_(switchDefault);
@@ -650,7 +654,7 @@ final class ClassFileJsonDeserializerGenerator {
 
         Label afterSwitch = code.newLabel();
         code.iload(SLOT_MATCHED);
-        code.lookupswitch(defaultLabel, cases);
+        code.tableswitch(defaultLabel, cases);
 
         for (int i = 0; i < fields.size(); i++) {
             code.labelBinding(fieldLabels[i]);
