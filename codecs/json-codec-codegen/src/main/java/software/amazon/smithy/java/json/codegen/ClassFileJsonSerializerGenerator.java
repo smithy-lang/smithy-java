@@ -616,12 +616,12 @@ final class ClassFileJsonSerializerGenerator {
         code.ifnull(skipLabel);
 
         if (field.category().isFixedSize()) {
-            int totalCapacity = nameLength + field.fixedSizeUpperBound();
-            emitEnsure(code, thisClass, totalCapacity);
+            // Fixed-size value needs ensure for the value bytes (name already covered upfront)
+            emitEnsure(code, thisClass, field.fixedSizeUpperBound());
             emitFieldNameCopy(code, thisClass, fieldIndex, nameLength);
             emitWriteFixedValueFromBoxedLocal(code, field, valSlot);
         } else {
-            emitEnsure(code, thisClass, nameLength);
+            // Name capacity already ensured upfront
             emitFieldNameCopy(code, thisClass, fieldIndex, nameLength);
             emitWriteValueWithCapacityFromLocal(code, thisClass, shapeClass, field, valSlot, plan);
         }
