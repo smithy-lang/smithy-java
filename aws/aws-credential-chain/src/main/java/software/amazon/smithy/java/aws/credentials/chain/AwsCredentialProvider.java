@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.aws.credentials.chain;
 
+import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 
@@ -31,4 +32,14 @@ public interface AwsCredentialProvider {
      * @return the resolver.
      */
     IdentityResolver<AwsCredentialsIdentity> create(ProviderContext context);
+
+    /**
+     * The business metric feature ID emitted when this provider successfully resolves credentials.
+     * Appended to the User-Agent header per the credential chain precedence SEP.
+     *
+     * @return the feature ID, or {@code null} if none.
+     */
+    default Set<CredentialFeatureId> featureIds() {
+        return Set.of();
+    }
 }

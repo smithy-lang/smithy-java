@@ -10,6 +10,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
@@ -19,6 +20,7 @@ import software.amazon.smithy.java.aws.config.AwsProfile;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
 import software.amazon.smithy.java.aws.credentials.chain.AwsCredentialProvider;
 import software.amazon.smithy.java.aws.credentials.chain.BuiltinProvider;
+import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
 import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
 import software.amazon.smithy.java.context.Context;
@@ -34,6 +36,8 @@ import software.amazon.smithy.java.logging.InternalLogger;
  */
 public final class ImdsCredentialProvider implements AwsCredentialProvider {
 
+    private static final Set<CredentialFeatureId> FEATURE_IDS = Set.of(new CredentialFeatureId("0"));
+
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ImdsCredentialProvider.class);
     private static final URI DEFAULT_ENDPOINT = URI.create("http://169.254.169.254");
     private static final JsonCodec CODEC = JsonCodec.builder().build();
@@ -41,6 +45,11 @@ public final class ImdsCredentialProvider implements AwsCredentialProvider {
     @Override
     public String name() {
         return "Ec2InstanceMetadata";
+    }
+
+    @Override
+    public Set<CredentialFeatureId> featureIds() {
+        return FEATURE_IDS;
     }
 
     @Override

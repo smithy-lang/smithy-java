@@ -13,6 +13,7 @@ dependencies {
     api(project(":aws:aws-auth-api"))
     api(project(":auth-api"))
     implementation(project(":logging"))
+    implementation(project(":client:client-core"))
     implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(project(":aws:aws-credential-chain"))
     testImplementation("tools.jackson.core:jackson-databind:3.1.2")

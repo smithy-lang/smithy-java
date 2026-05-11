@@ -12,9 +12,11 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -39,6 +41,15 @@ public final class CredentialProcessHandler implements AwsConfigCredentialSource
     private static final int MAX_OUTPUT_BYTES = 64000;
 
     public CredentialProcessHandler() {}
+
+    private static final Set<CredentialFeatureId> FEATURE_IDS = Set.of(
+            new CredentialFeatureId("v"),
+            new CredentialFeatureId("w"));
+
+    @Override
+    public Set<CredentialFeatureId> featureIds() {
+        return FEATURE_IDS;
+    }
 
     @Override
     public IdentityResult<AwsCredentialsIdentity> tryResolve(
