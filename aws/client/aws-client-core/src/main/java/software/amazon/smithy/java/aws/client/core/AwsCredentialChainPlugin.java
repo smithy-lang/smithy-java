@@ -38,7 +38,9 @@ public final class AwsCredentialChainPlugin implements ClientPlugin {
     @Override
     public void configureClient(ClientConfig.Builder config) {
         if (needsAwsCredentials(config) && !hasAwsCredentialsResolver(config)) {
-            config.addIdentityResolver(AwsCredentialChain.create());
+            var chain = AwsCredentialChain.create();
+            config.addIdentityResolver(chain);
+            config.addInterceptor(new InvalidateOnAuthFailureInterceptor(chain));
         }
     }
 
