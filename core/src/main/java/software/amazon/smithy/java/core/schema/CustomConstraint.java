@@ -5,7 +5,10 @@
 
 package software.amazon.smithy.java.core.schema;
 
+import java.util.EnumSet;
 import java.util.List;
+import java.util.function.Supplier;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
  * A custom constraint that extends Validation API.
@@ -14,25 +17,25 @@ import java.util.List;
  * {@code META-INF/services/software.amazon.smithy.java.core.schema.CustomConstraint}.
  *
  * @see Validator
- * @see Validator.CustomConstraintProvider
  * @see ValidationError.CustomValidationFailure
  */
 public interface CustomConstraint {
     /**
-     * Determines whether this rule applies to the given schema.
+     * Returns the set of shape types this constraint applies to.
      *
-     * @param schema the schema to check
-     * @return {@code true} if this rule should validate values of this schema
+     * <p>Return an empty set to match all shape types (wildcard).
+     *
+     * @return the set of shape types this constraint validates, or an empty set for all types
      */
-    boolean appliesTo(Schema schema);
+    EnumSet<ShapeType> appliesTo();
 
     /**
      * Validates the given value against this custom rule.
      *
      * @param schema the schema of the value being validated
      * @param value the value to validate
-     * @param path the path to the value (e.g., "/user/address/zipCode")
+     * @param pathSupplier a supplier that lazily computes the path to the value (e.g., "/user/address/zipCode")
      * @return a list of validation errors, or an empty list if validation passes
      */
-    List<ValidationError> validate(Schema schema, Object value, String path);
+    List<ValidationError> validate(Schema schema, Object value, Supplier<String> pathSupplier);
 }

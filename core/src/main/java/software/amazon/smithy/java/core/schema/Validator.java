@@ -121,6 +121,34 @@ public final class Validator {
     static final class ShapeValidator implements ShapeSerializer, MapSerializer {
 
         private static final int STARTING_PATH_SIZE = 4;
+        // Lazy initialization of custom constraints per shape type
+        @SuppressWarnings("unchecked")
+        private static final List<CustomConstraint>[] CUSTOM_CONSTRAINTS_BY_TYPE = new List[ShapeType.values().length];
+        private static final List<CustomConstraint> WILDCARD_CONSTRAINTS = new ArrayList<>();
+        private static final boolean HAS_CUSTOM_CONSTRAINTS;
+
+        static {
+            // Load all custom constraints at startup and organize by type
+            var loader = ServiceLoader.load(CustomConstraint.class, CustomConstraint.class.getClassLoader());
+            for (var constraint : loader) {
+                var types = constraint.appliesTo();
+                if (types.isEmpty()) {
+                    // Wildcard constraint that applies to all types
+                    WILDCARD_CONSTRAINTS.add(constraint);
+                } else {
+                    for (var type : types) {
+                        int ordinal = type.ordinal();
+                        if (CUSTOM_CONSTRAINTS_BY_TYPE[ordinal] == null) {
+                            CUSTOM_CONSTRAINTS_BY_TYPE[ordinal] = new ArrayList<>();
+                        }
+                        CUSTOM_CONSTRAINTS_BY_TYPE[ordinal].add(constraint);
+                    }
+                }
+            }
+            HAS_CUSTOM_CONSTRAINTS = !WILDCARD_CONSTRAINTS.isEmpty()
+                    || java.util.Arrays.stream(CUSTOM_CONSTRAINTS_BY_TYPE).anyMatch(java.util.Objects::nonNull);
+        }
+
         private final int maxAllowedErrors;
         private final int maxDepth;
         private final ListSerializer listValidator;
@@ -507,56 +535,32 @@ public final class Validator {
         }
 
         private void applyCustomConstraints(Schema schema, Object value) {
-            if (!CustomConstraintProvider.HAS_CUSTOM_CONSTRAINTS) {
+            if (!HAS_CUSTOM_CONSTRAINTS) {
                 return;
             }
-            var customConstraints = schema.getExtension(CustomConstraintProvider.CUSTOM_CONSTRAINT_EXTENSION_KEY);
-            if (customConstraints == null) {
-                return;
-            }
-            for (var rule: customConstraints) {
-                var validationErrors = rule.validate(schema, value, createPath());
-                for (var error: validationErrors) {
-                    addError(error);
+
+            // Get constraints for this specific type
+            var typeConstraints = CUSTOM_CONSTRAINTS_BY_TYPE[schema.type().ordinal()];
+
+            // Apply type-specific constraints
+            if (typeConstraints != null) {
+                for (var constraint : typeConstraints) {
+                    var validationErrors = constraint.validate(schema, value, this::createPath);
+                    for (var error : validationErrors) {
+                        addError(error);
+                    }
                 }
             }
-        }
-    }
 
-    /**
-     * Registers a new schema extension for a list of {@link CustomConstraint}
-     */
-    public static class CustomConstraintProvider implements SchemaExtensionProvider<List<CustomConstraint>> {
-        private static final SchemaExtensionKey<List<CustomConstraint>> CUSTOM_CONSTRAINT_EXTENSION_KEY =
-            new SchemaExtensionKey<>();
-        private static final List<CustomConstraint> CUSTOM_CONSTRAINT_LIST = new ArrayList<>();
-        private static final boolean HAS_CUSTOM_CONSTRAINTS;
-
-        public CustomConstraintProvider() {}
-
-        static {
-            // loading all custom constraints at once at startup
-            var loader = ServiceLoader.load(CustomConstraint.class, CustomConstraint.class.getClassLoader());
-            for (var customRule: loader) {
-                CUSTOM_CONSTRAINT_LIST.add(customRule);
-            }
-            HAS_CUSTOM_CONSTRAINTS = !CUSTOM_CONSTRAINT_LIST.isEmpty();
-        }
-
-        @Override
-        public SchemaExtensionKey<List<CustomConstraint>> key() {
-            return CUSTOM_CONSTRAINT_EXTENSION_KEY;
-        }
-
-        @Override
-        public List<CustomConstraint> provide(Schema schema) {
-            var rulesForThisSchema = new ArrayList<CustomConstraint>();
-            for (var rule: CUSTOM_CONSTRAINT_LIST) {
-                if (rule.appliesTo(schema)) {
-                    rulesForThisSchema.add(rule);
+            // Apply wildcard constraints
+            if (!WILDCARD_CONSTRAINTS.isEmpty()) {
+                for (var constraint : WILDCARD_CONSTRAINTS) {
+                    var validationErrors = constraint.validate(schema, value, this::createPath);
+                    for (var error : validationErrors) {
+                        addError(error);
+                    }
                 }
             }
-            return rulesForThisSchema;
         }
     }
 }

@@ -1304,9 +1304,9 @@ public class ValidatorTest {
 
         assertThat(errors, hasSize(2));
         assertTrue(errors.stream()
-            .anyMatch(e -> e.message().equals("String-only constraint violated")));
+                .anyMatch(e -> e.message().equals("String-only constraint violated")));
         assertTrue(errors.stream()
-            .anyMatch(e -> e.message().equals("Custom constraint failed")));
+                .anyMatch(e -> e.message().equals("Custom constraint failed")));
     }
 
     @Nested
@@ -1326,12 +1326,15 @@ public class ValidatorTest {
             });
 
             assertThat(errors, hasSize(3));
-            assertTrue(errors.stream().anyMatch(e -> e.path().equals("/")
-                    && e.message().equals("Custom constraint failed")));
-            assertTrue(errors.stream().anyMatch(e -> e.path().equals("/")
-                    && e.message().equals("Struct-only constraint violated")));
-            assertTrue(errors.stream().anyMatch(e -> e.path().equals("/value")
-                    && e.message().equals("Custom constraint failed")));
+            assertTrue(errors.stream()
+                    .anyMatch(e -> e.path().equals("/")
+                            && e.message().equals("Custom constraint failed")));
+            assertTrue(errors.stream()
+                    .anyMatch(e -> e.path().equals("/")
+                            && e.message().equals("Struct-only constraint violated")));
+            assertTrue(errors.stream()
+                    .anyMatch(e -> e.path().equals("/value")
+                            && e.message().equals("Custom constraint failed")));
         }
 
         @Test
@@ -1349,14 +1352,18 @@ public class ValidatorTest {
             });
 
             assertThat(errors, hasSize(4));
-            assertTrue(errors.stream().anyMatch(e -> e.path().equals("/")
-                    && e.message().equals("Custom constraint failed")));
-            assertTrue(errors.stream().anyMatch(e -> e.path().equals("/")
-                    && e.message().equals("Union-only constraint violated")));
-            assertTrue(errors.stream().anyMatch(e -> e.path().equals("/stringValue")
-                    && e.message().equals("Custom constraint failed")));
-            assertTrue(errors.stream().anyMatch(e -> e.path().equals("/stringValue")
-                    && e.message().equals("String-only constraint violated")));
+            assertTrue(errors.stream()
+                    .anyMatch(e -> e.path().equals("/")
+                            && e.message().equals("Custom constraint failed")));
+            assertTrue(errors.stream()
+                    .anyMatch(e -> e.path().equals("/")
+                            && e.message().equals("Union-only constraint violated")));
+            assertTrue(errors.stream()
+                    .anyMatch(e -> e.path().equals("/stringValue")
+                            && e.message().equals("Custom constraint failed")));
+            assertTrue(errors.stream()
+                    .anyMatch(e -> e.path().equals("/stringValue")
+                            && e.message().equals("String-only constraint violated")));
         }
 
         @Test
@@ -1374,10 +1381,12 @@ public class ValidatorTest {
             });
 
             assertThat(errors, hasSize(2));
-            assertTrue(errors.stream().anyMatch(e -> e.path().equals("/")
-                    && e.message().equals("Custom constraint failed")));
-            assertTrue(errors.stream().anyMatch(e -> e.path().equals("/")
-                    && e.message().equals("List-only constraint violated")));
+            assertTrue(errors.stream()
+                    .anyMatch(e -> e.path().equals("/")
+                            && e.message().equals("Custom constraint failed")));
+            assertTrue(errors.stream()
+                    .anyMatch(e -> e.path().equals("/")
+                            && e.message().equals("List-only constraint violated")));
         }
     }
 
