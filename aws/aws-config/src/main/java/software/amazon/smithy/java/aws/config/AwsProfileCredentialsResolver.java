@@ -15,6 +15,7 @@ import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
 import software.amazon.smithy.java.aws.config.AwsConfigCredentialSourceHandler.ResolutionContext;
+import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.context.Context;
 
 /**
@@ -216,6 +217,12 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
         for (AwsConfigCredentialSourceHandler handler : handlers) {
             IdentityResult<AwsCredentialsIdentity> attempt = handler.tryResolve(source, ctx);
             if (attempt != null) {
+                if (!handler.featureIds().isEmpty()) {
+                    var ids = ctx.requestProperties().get(CallContext.FEATURE_IDS);
+                    if (ids != null) {
+                        ids.addAll(handler.featureIds());
+                    }
+                }
                 return attempt;
             }
         }

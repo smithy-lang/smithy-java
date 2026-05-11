@@ -10,5 +10,6 @@ extra["moduleName"] = "software.amazon.smithy.java.aws.credentials.chain"
 dependencies {
     api(project(":aws:aws-auth-api"))
     api(project(":auth-api"))
+    implementation(project(":client:client-core"))
     implementation(project(":logging"))
 }
