@@ -5,8 +5,10 @@
 
 package software.amazon.smithy.java.aws.config;
 
+import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 
 /**
  * Handles {@link AwsConfigCredentialSource.StaticKeys}.
@@ -14,6 +16,13 @@ import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 public final class StaticKeysHandler implements AwsConfigCredentialSourceHandler {
 
     public StaticKeysHandler() {}
+
+    private static final Set<CredentialFeatureId> FEATURE_IDS = Set.of(new CredentialFeatureId("n"));
+
+    @Override
+    public Set<CredentialFeatureId> featureIds() {
+        return FEATURE_IDS;
+    }
 
     @Override
     public IdentityResult<

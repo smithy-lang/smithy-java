@@ -21,6 +21,7 @@ import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
+import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 
@@ -118,7 +119,7 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
         for (BuiltinProvider slot : BuiltinProvider.values()) {
             AwsCredentialProvider r = builtins.get(slot);
             if (r != null) {
-                ordered.add(new NamedResolver(r.name(), r.create(ctx)));
+                ordered.add(new NamedResolver(r.name(), r.featureIds(), r.create(ctx)));
             }
         }
 
@@ -135,7 +136,7 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
             if (insertAt > ordered.size()) {
                 insertAt = ordered.size();
             }
-            ordered.add(insertAt, new NamedResolver(r.name(), r.create(ctx)));
+            ordered.add(insertAt, new NamedResolver(r.name(), r.featureIds(), r.create(ctx)));
         }
 
         if (LOGGER.isDebugEnabled()) {
@@ -169,9 +170,16 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
 
         // More cheaply build up a list of failures, and defer string-ing them into a StringBuilder.
         List<Object> errors = new ArrayList<>();
+
         for (NamedResolver nr : resolvers) {
             IdentityResult<AwsCredentialsIdentity> result = nr.resolver.resolveIdentity(requestProperties);
             if (result.identity() != null) {
+                if (!nr.featureIds.isEmpty()) {
+                    var ids = requestProperties.get(CallContext.FEATURE_IDS);
+                    if (ids != null) {
+                        ids.addAll(nr.featureIds);
+                    }
+                }
                 return result;
             }
             errors.add(nr.name);
@@ -239,5 +247,8 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
         executor.shutdownNow();
     }
 
-    private record NamedResolver(String name, IdentityResolver<AwsCredentialsIdentity> resolver) {}
+    private record NamedResolver(
+            String name,
+            Set<CredentialFeatureId> featureIds,
+            IdentityResolver<AwsCredentialsIdentity> resolver) {}
 }

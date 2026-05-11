@@ -5,8 +5,10 @@
 
 package software.amazon.smithy.java.aws.config;
 
+import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.context.Context;
 
 /**
@@ -51,4 +53,14 @@ public interface AwsConfigCredentialSourceHandler {
      * @param requestProperties Context properties associated with the request.
      */
     record ResolutionContext(AwsProfileFile profileFile, String profileName, Context requestProperties) {}
+
+    /**
+     * The business metric feature ID emitted when this handler successfully resolves credentials.
+     * Appended to the User-Agent header per the credential chain precedence SEP.
+     *
+     * @return the feature ID, or {@code null} if none.
+     */
+    default Set<CredentialFeatureId> featureIds() {
+        return Set.of();
+    }
 }
