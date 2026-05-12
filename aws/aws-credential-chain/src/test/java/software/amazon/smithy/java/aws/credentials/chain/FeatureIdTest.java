@@ -27,7 +27,7 @@ class FeatureIdTest {
         var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         provider("env",
-                                BuiltinProvider.ENVIRONMENT,
+                                StandardProvider.ENVIRONMENT,
                                 Set.of(new CredentialFeatureId("g")),
                                 staticResolver("AK", "SK"))),
                 null);
@@ -47,11 +47,11 @@ class FeatureIdTest {
         var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         provider("env",
-                                BuiltinProvider.ENVIRONMENT,
+                                StandardProvider.ENVIRONMENT,
                                 Set.of(new CredentialFeatureId("g")),
                                 errorResolver("no creds")),
                         provider("profile",
-                                BuiltinProvider.SHARED_CONFIG,
+                                StandardProvider.SHARED_CONFIG,
                                 Set.of(new CredentialFeatureId("n")),
                                 staticResolver("AK", "SK"))),
                 null);
@@ -71,7 +71,7 @@ class FeatureIdTest {
         var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         provider("proc",
-                                BuiltinProvider.SHARED_CONFIG,
+                                StandardProvider.SHARED_CONFIG,
                                 Set.of(new CredentialFeatureId("v"), new CredentialFeatureId("w")),
                                 staticResolver("AK", "SK"))),
                 null);
@@ -96,7 +96,7 @@ class FeatureIdTest {
         var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         provider("env",
-                                BuiltinProvider.ENVIRONMENT,
+                                StandardProvider.ENVIRONMENT,
                                 Set.of(new CredentialFeatureId("g")),
                                 staticResolver("AK", "SK"))),
                 null);
@@ -109,7 +109,7 @@ class FeatureIdTest {
 
     private static ChainIdentityProvider provider(
             String name,
-            BuiltinProvider slot,
+            StandardProvider slot,
             Set<CredentialFeatureId> featureIds,
             IdentityResolver<AwsCredentialsIdentity> resolver
     ) {
@@ -126,7 +126,7 @@ class FeatureIdTest {
 
             @Override
             public OrderingConstraint ordering() {
-                return new OrderingConstraint.Builtin(slot);
+                return new OrderingConstraint.Standard(slot);
             }
 
             @Override

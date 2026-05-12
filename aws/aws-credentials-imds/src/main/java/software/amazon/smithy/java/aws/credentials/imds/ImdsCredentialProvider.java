@@ -19,11 +19,11 @@ import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
 import software.amazon.smithy.java.aws.config.AwsProfile;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
-import software.amazon.smithy.java.aws.credentials.chain.BuiltinProvider;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
 import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
+import software.amazon.smithy.java.aws.credentials.chain.StandardProvider;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonCodec;
@@ -32,7 +32,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
 /**
  * Credential provider that fetches credentials from the EC2 Instance Metadata Service (IMDS).
  *
- * <p>Registers in the {@link BuiltinProvider#EC2_INSTANCE_METADATA} chain slot. Uses IMDSv2 exclusively
+ * <p>Registers in the {@link StandardProvider#EC2_INSTANCE_METADATA} chain slot. Uses IMDSv2 exclusively
  * (no v1 fallback). Credentials are cached with static stability enabled per the AWS Static Stability SEP.
  */
 public final class ImdsCredentialProvider implements ChainIdentityProvider {
@@ -55,7 +55,7 @@ public final class ImdsCredentialProvider implements ChainIdentityProvider {
 
     @Override
     public OrderingConstraint ordering() {
-        return new OrderingConstraint.Builtin(BuiltinProvider.EC2_INSTANCE_METADATA);
+        return new OrderingConstraint.Standard(StandardProvider.EC2_INSTANCE_METADATA);
     }
 
     @Override

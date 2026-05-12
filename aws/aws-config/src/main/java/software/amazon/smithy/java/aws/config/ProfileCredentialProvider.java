@@ -9,14 +9,14 @@ import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
-import software.amazon.smithy.java.aws.credentials.chain.BuiltinProvider;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
 import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
+import software.amazon.smithy.java.aws.credentials.chain.StandardProvider;
 
 /**
  * Registers {@link ProfileIdentityResolver} in the credential chain's
- * {@link BuiltinProvider#SHARED_CONFIG} slot.
+ * {@link StandardProvider#SHARED_CONFIG} slot.
  */
 public final class ProfileCredentialProvider implements ChainIdentityProvider {
     @Override
@@ -26,7 +26,7 @@ public final class ProfileCredentialProvider implements ChainIdentityProvider {
 
     @Override
     public OrderingConstraint ordering() {
-        return new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG);
+        return new OrderingConstraint.Standard(StandardProvider.SHARED_CONFIG);
     }
 
     @Override
