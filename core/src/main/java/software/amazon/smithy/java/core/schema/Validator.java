@@ -10,6 +10,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.function.BiConsumer;
@@ -124,8 +125,14 @@ public final class Validator {
         // Lazy initialization of custom constraints per shape type
         @SuppressWarnings("unchecked")
         private static final List<CustomConstraint>[] CUSTOM_CONSTRAINTS_BY_TYPE = new List[ShapeType.values().length];
-        private static final List<CustomConstraint> WILDCARD_CONSTRAINTS = new ArrayList<>();
         private static final boolean HAS_CUSTOM_CONSTRAINTS;
+
+        private static void addConstraint(CustomConstraint constraint, int index) {
+            if (CUSTOM_CONSTRAINTS_BY_TYPE[index] == null) {
+                CUSTOM_CONSTRAINTS_BY_TYPE[index] = new ArrayList<>();
+            }
+            CUSTOM_CONSTRAINTS_BY_TYPE[index].add(constraint);
+        }
 
         static {
             // Load all custom constraints at startup and organize by type
@@ -133,20 +140,16 @@ public final class Validator {
             for (var constraint : loader) {
                 var types = constraint.appliesTo();
                 if (types.isEmpty()) {
-                    // Wildcard constraint that applies to all types
-                    WILDCARD_CONSTRAINTS.add(constraint);
+                    for (var i = 0; i < CUSTOM_CONSTRAINTS_BY_TYPE.length; i++) {
+                        addConstraint(constraint, i);
+                    }
                 } else {
                     for (var type : types) {
-                        int ordinal = type.ordinal();
-                        if (CUSTOM_CONSTRAINTS_BY_TYPE[ordinal] == null) {
-                            CUSTOM_CONSTRAINTS_BY_TYPE[ordinal] = new ArrayList<>();
-                        }
-                        CUSTOM_CONSTRAINTS_BY_TYPE[ordinal].add(constraint);
+                        addConstraint(constraint, type.ordinal());
                     }
                 }
             }
-            HAS_CUSTOM_CONSTRAINTS = !WILDCARD_CONSTRAINTS.isEmpty()
-                    || java.util.Arrays.stream(CUSTOM_CONSTRAINTS_BY_TYPE).anyMatch(java.util.Objects::nonNull);
+            HAS_CUSTOM_CONSTRAINTS = Arrays.stream(CUSTOM_CONSTRAINTS_BY_TYPE).anyMatch(java.util.Objects::nonNull);
         }
 
         private final int maxAllowedErrors;
@@ -541,20 +544,8 @@ public final class Validator {
 
             // Get constraints for this specific type
             var typeConstraints = CUSTOM_CONSTRAINTS_BY_TYPE[schema.type().ordinal()];
-
-            // Apply type-specific constraints
             if (typeConstraints != null) {
                 for (var constraint : typeConstraints) {
-                    var validationErrors = constraint.validate(schema, value, this::createPath);
-                    for (var error : validationErrors) {
-                        addError(error);
-                    }
-                }
-            }
-
-            // Apply wildcard constraints
-            if (!WILDCARD_CONSTRAINTS.isEmpty()) {
-                for (var constraint : WILDCARD_CONSTRAINTS) {
                     var validationErrors = constraint.validate(schema, value, this::createPath);
                     for (var error : validationErrors) {
                         addError(error);

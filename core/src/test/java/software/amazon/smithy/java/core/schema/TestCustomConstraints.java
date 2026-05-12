@@ -27,7 +27,7 @@ public final class TestCustomConstraints {
             if (!schema.id().getNamespace().contains("CustomTest")) {
                 return List.of();
             }
-            return List.of(new ValidationError.CustomValidationFailure(
+            return List.of(new CustomValidationFailure(
                     pathSupplier.get(),
                     schema,
                     "Custom constraint failed"));
@@ -46,7 +46,7 @@ public final class TestCustomConstraints {
             if (!schema.id().getNamespace().contains("CustomTest")) {
                 return List.of();
             }
-            return List.of(new ValidationError.CustomValidationFailure(
+            return List.of(new CustomValidationFailure(
                     pathSupplier.get(),
                     schema,
                     "String-only constraint violated"));
@@ -65,7 +65,7 @@ public final class TestCustomConstraints {
             if (!schema.id().getNamespace().contains("CustomTest")) {
                 return List.of();
             }
-            return List.of(new ValidationError.CustomValidationFailure(
+            return List.of(new CustomValidationFailure(
                     pathSupplier.get(),
                     schema,
                     "List-only constraint violated"));
@@ -85,7 +85,7 @@ public final class TestCustomConstraints {
             if (!schema.id().getNamespace().contains("CustomTest")) {
                 return List.of();
             }
-            return List.of(new ValidationError.CustomValidationFailure(
+            return List.of(new CustomValidationFailure(
                     pathSupplier.get(),
                     schema,
                     "Struct-only constraint violated"));
@@ -105,10 +105,12 @@ public final class TestCustomConstraints {
             if (!schema.id().getNamespace().contains("CustomTest")) {
                 return List.of();
             }
-            return List.of(new ValidationError.CustomValidationFailure(
+            return List.of(new CustomValidationFailure(
                     pathSupplier.get(),
                     schema,
                     "Union-only constraint violated"));
         }
     }
+
+    record CustomValidationFailure(String path, Schema schema, String message) implements ValidationError {}
 }

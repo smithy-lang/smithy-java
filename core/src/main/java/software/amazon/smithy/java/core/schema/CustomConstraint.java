@@ -17,13 +17,13 @@ import software.amazon.smithy.model.shapes.ShapeType;
  * {@code META-INF/services/software.amazon.smithy.java.core.schema.CustomConstraint}.
  *
  * @see Validator
- * @see ValidationError.CustomValidationFailure
+ * @see ValidationError
  */
 public interface CustomConstraint {
     /**
      * Returns the set of shape types this constraint applies to.
      *
-     * <p>Return an empty set to match all shape types (wildcard).
+     * <p>Return an empty set to match all shape types
      *
      * @return the set of shape types this constraint validates, or an empty set for all types
      */
