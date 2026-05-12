@@ -127,7 +127,7 @@ public final class Validator {
         private static final List<CustomConstraint>[] CUSTOM_CONSTRAINTS_BY_TYPE = new List[ShapeType.values().length];
         private static final boolean HAS_CUSTOM_CONSTRAINTS;
 
-        private static void addConstraint(CustomConstraint constraint, int index) {
+        private static void addConstraint(int index, CustomConstraint constraint) {
             if (CUSTOM_CONSTRAINTS_BY_TYPE[index] == null) {
                 CUSTOM_CONSTRAINTS_BY_TYPE[index] = new ArrayList<>();
             }
@@ -140,12 +140,13 @@ public final class Validator {
             for (var constraint : loader) {
                 var types = constraint.appliesTo();
                 if (types.isEmpty()) {
+                    // Add the constraint to all types if the enum set is empty
                     for (var i = 0; i < CUSTOM_CONSTRAINTS_BY_TYPE.length; i++) {
-                        addConstraint(constraint, i);
+                        addConstraint(i, constraint);
                     }
                 } else {
                     for (var type : types) {
-                        addConstraint(constraint, type.ordinal());
+                        addConstraint(type.ordinal(), constraint);
                     }
                 }
             }
