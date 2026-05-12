@@ -9,7 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Builtin credential provider slots in the AWS default credential chain.
+ * Standard credential provider slots in the AWS default credential chain.
  *
  * <p>These are ordered from highest to lowest priority. If no implementation is registered for a slot, that slot is
  * skipped in the chain.
@@ -18,7 +18,7 @@ import java.nio.file.Path;
  * (via {@link #isDetected()}), and what dependency to suggest if the implementation is missing
  * (via {@link #moduleSuggestion()}).
  */
-public enum BuiltinProvider {
+public enum StandardProvider {
     /** Credentials explicitly provided in code. */
     CODE(null) {
         @Override
@@ -84,7 +84,7 @@ public enum BuiltinProvider {
 
     private final String moduleSuggestion;
 
-    BuiltinProvider(String moduleSuggestion) {
+    StandardProvider(String moduleSuggestion) {
         this.moduleSuggestion = moduleSuggestion;
     }
 

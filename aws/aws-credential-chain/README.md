@@ -49,7 +49,7 @@ called with the requested identity type. Providers that don't support the type
 return `null` and are skipped. The chain tries remaining providers in order
 until one succeeds.
 
-## Builtin slots (in priority order)
+## Standard slots (in priority order)
 
 1. `CODE` — programmatic
 2. `JAVA_SYSTEM_PROPERTIES` — `aws.accessKeyId`
@@ -61,10 +61,10 @@ until one succeeds.
 
 ## Ordering
 
-Providers position themselves relative to builtin slots using
+Providers position themselves relative to standard slots using
 `OrderingConstraint`:
 
-- `Builtin(slot)` — claims a builtin slot (one provider per slot)
+- `Standard(slot)` — claims a standard slot (one provider per slot)
 - `Before(slot)` — inserts before the given slot's position
 - `After(slot)` — inserts after the given slot's position
 
@@ -83,7 +83,7 @@ public class MyProvider implements ChainIdentityProvider {
 
     @Override
     public OrderingConstraint ordering() {
-        return new OrderingConstraint.After(BuiltinProvider.SHARED_CONFIG);
+        return new OrderingConstraint.After(StandardProvider.SHARED_CONFIG);
     }
 
     @Override
