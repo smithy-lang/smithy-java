@@ -697,8 +697,8 @@ public class ClassFileJsonCodegenTest {
         String pkg = shapeClass.getPackageName();
         String name = shapeClass.getSimpleName();
 
-        var serResult = profile.generateSerializerBytecode(plan, name + "$Ser", pkg);
-        var deResult = profile.generateDeserializerBytecode(plan, name + "$De", pkg);
+        var serResult = profile.generateSerializerBytecode(plan, name + "$Ser", pkg, java.util.Map.of());
+        var deResult = profile.generateDeserializerBytecode(plan, name + "$De", pkg, java.util.Map.of());
 
         var dumpDir = java.nio.file.Path.of("build/codegen-dump");
         java.nio.file.Files.createDirectories(dumpDir);

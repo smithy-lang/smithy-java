@@ -5,7 +5,10 @@
 
 package software.amazon.smithy.java.json.codegen;
 
+import java.util.Map;
 import software.amazon.smithy.java.codegen.rt.CodecProfile;
+import software.amazon.smithy.java.codegen.rt.GeneratedStructDeserializer;
+import software.amazon.smithy.java.codegen.rt.GeneratedStructSerializer;
 import software.amazon.smithy.java.codegen.rt.plan.StructCodePlan;
 
 /**
@@ -22,17 +25,21 @@ public final class ClassFileJsonCodecProfile implements CodecProfile {
     public GenerationResult generateSerializerBytecode(
             StructCodePlan plan,
             String className,
-            String packageName
+            String packageName,
+            Map<String, GeneratedStructSerializer> resolvedSerializers
     ) {
-        return new ClassFileJsonSerializerGenerator().generate(plan, className, packageName);
+        return new ClassFileJsonSerializerGenerator()
+                .generate(plan, className, packageName, resolvedSerializers);
     }
 
     @Override
     public GenerationResult generateDeserializerBytecode(
             StructCodePlan plan,
             String className,
-            String packageName
+            String packageName,
+            Map<String, GeneratedStructDeserializer> resolvedDeserializers
     ) {
-        return new ClassFileJsonDeserializerGenerator().generate(plan, className, packageName);
+        return new ClassFileJsonDeserializerGenerator()
+                .generate(plan, className, packageName, resolvedDeserializers);
     }
 }

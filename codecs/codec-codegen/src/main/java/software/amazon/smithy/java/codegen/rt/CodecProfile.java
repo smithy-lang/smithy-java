@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.rt;
 
+import java.util.Map;
 import software.amazon.smithy.java.codegen.rt.plan.StructCodePlan;
 
 /**
@@ -13,9 +14,19 @@ import software.amazon.smithy.java.codegen.rt.plan.StructCodePlan;
 public interface CodecProfile {
     String name();
 
-    GenerationResult generateSerializerBytecode(StructCodePlan plan, String className, String packageName);
+    GenerationResult generateSerializerBytecode(
+            StructCodePlan plan,
+            String className,
+            String packageName,
+            Map<String, GeneratedStructSerializer> resolvedSerializers
+    );
 
-    GenerationResult generateDeserializerBytecode(StructCodePlan plan, String className, String packageName);
+    GenerationResult generateDeserializerBytecode(
+            StructCodePlan plan,
+            String className,
+            String packageName,
+            Map<String, GeneratedStructDeserializer> resolvedDeserializers
+    );
 
     record GenerationResult(byte[] bytecode, Object classData) {}
 }

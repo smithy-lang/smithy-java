@@ -7,6 +7,7 @@ package software.amazon.smithy.java.codegen.rt;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.lang.invoke.MethodHandles;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -18,7 +19,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import software.amazon.smithy.java.codegen.rt.plan.StructCodePlan;
 import software.amazon.smithy.java.core.schema.Schema;
-import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
  * Thread-safe cache and factory for runtime-generated specialized serializers/deserializers.
@@ -74,38 +74,11 @@ public final class SpecializedCodecRegistry {
         if (serializers.containsKey(shapeClass) && deserializers.containsKey(shapeClass)) {
             return;
         }
-        generate(schema, shapeClass);
+        generate(schema, shapeClass, new HashSet<>());
     }
 
     public void warmupTransitive(Schema schema, Class<?> shapeClass) {
-        warmupTransitive(schema, shapeClass, new HashSet<>());
-    }
-
-    private void warmupTransitive(Schema schema, Class<?> shapeClass, Set<Class<?>> visited) {
-        if (!visited.add(shapeClass)) {
-            return;
-        }
         warmup(schema, shapeClass);
-        for (Schema member : schema.members()) {
-            Schema target = member.memberTarget();
-            if (target.type() == ShapeType.STRUCTURE || target.type() == ShapeType.UNION) {
-                Class<?> targetClass = target.shapeClass();
-                if (targetClass != null) {
-                    warmupTransitive(target, targetClass, visited);
-                }
-            }
-            if (target.type() == ShapeType.LIST || target.type() == ShapeType.MAP) {
-                for (Schema nested : target.members()) {
-                    Schema nestedTarget = nested.memberTarget();
-                    if (nestedTarget.type() == ShapeType.STRUCTURE || nestedTarget.type() == ShapeType.UNION) {
-                        Class<?> nestedClass = nestedTarget.shapeClass();
-                        if (nestedClass != null) {
-                            warmupTransitive(nestedTarget, nestedClass, visited);
-                        }
-                    }
-                }
-            }
-        }
     }
 
     private void triggerAsync(Schema schema, Class<?> shapeClass) {
@@ -114,7 +87,7 @@ public final class SpecializedCodecRegistry {
         }
         pending.computeIfAbsent(shapeClass, k -> executor.submit(() -> {
             try {
-                generate(schema, shapeClass);
+                generate(schema, shapeClass, new HashSet<>());
             } catch (Exception e) {
                 LOG.log(Level.WARNING, "Async codegen failed for " + shapeClass.getName(), e);
             }
@@ -123,12 +96,30 @@ public final class SpecializedCodecRegistry {
 
     @SuppressFBWarnings(value = "AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
             justification = "Method is synchronized — containsKey + put sequence is safe")
-    private synchronized void generate(Schema schema, Class<?> shapeClass) {
+    private synchronized void generate(Schema schema, Class<?> shapeClass, Set<Class<?>> inProgress) {
         if (serializers.containsKey(shapeClass) && deserializers.containsKey(shapeClass)) {
+            return;
+        }
+        if (!inProgress.add(shapeClass)) {
             return;
         }
 
         StructCodePlan plan = StructCodePlan.analyze(schema, shapeClass);
+
+        Map<String, GeneratedStructSerializer> resolvedSer = new HashMap<>();
+        Map<String, GeneratedStructDeserializer> resolvedDe = new HashMap<>();
+        for (Class<?> nested : plan.nestedStructClasses()) {
+            generate(CodegenHelpers.schemaFor(nested), nested, inProgress);
+            GeneratedStructSerializer ser = serializers.get(nested);
+            if (ser != null) {
+                resolvedSer.put(nested.getName(), ser);
+            }
+            GeneratedStructDeserializer de = deserializers.get(nested);
+            if (de != null) {
+                resolvedDe.put(nested.getName(), de);
+            }
+        }
+
         String pkg = shapeClass.getPackageName();
 
         try {
@@ -139,7 +130,7 @@ public final class SpecializedCodecRegistry {
             if (!serializers.containsKey(shapeClass)) {
                 String serClassName = shapeClass.getSimpleName() + "$" + profile.name() + "Ser";
                 CodecProfile.GenerationResult serResult =
-                        profile.generateSerializerBytecode(plan, serClassName, pkg);
+                        profile.generateSerializerBytecode(plan, serClassName, pkg, resolvedSer);
                 Class<?> serClass = loadHiddenClass(baseLookup, serResult);
                 serializers.put(shapeClass,
                         (GeneratedStructSerializer) serClass.getDeclaredConstructor().newInstance());
@@ -148,7 +139,7 @@ public final class SpecializedCodecRegistry {
             if (!deserializers.containsKey(shapeClass)) {
                 String deClassName = shapeClass.getSimpleName() + "$" + profile.name() + "De";
                 CodecProfile.GenerationResult deResult =
-                        profile.generateDeserializerBytecode(plan, deClassName, pkg);
+                        profile.generateDeserializerBytecode(plan, deClassName, pkg, resolvedDe);
                 Class<?> deClass = loadHiddenClass(baseLookup, deResult);
                 deserializers.put(shapeClass,
                         (GeneratedStructDeserializer) deClass.getDeclaredConstructor().newInstance());

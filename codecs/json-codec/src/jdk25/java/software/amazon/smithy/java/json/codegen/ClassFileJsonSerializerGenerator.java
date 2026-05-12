@@ -8,6 +8,7 @@ package software.amazon.smithy.java.json.codegen;
 import java.lang.classfile.ClassFile;
 import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.Label;
+import java.lang.classfile.Opcode;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
@@ -80,19 +81,28 @@ final class ClassFileJsonSerializerGenerator {
     private static final int SLOT_FIRST_TEMP = 7;
 
     private int nextTempSlot;
-    private final Map<String, Integer> nestedSerCacheFieldIndices = new LinkedHashMap<>();
-    private int nextCacheIndex;
+    private final Map<String, Integer> resolvedSerFieldIndices = new LinkedHashMap<>();
+    private final Map<String, Integer> unresolvedSerCacheFieldIndices = new LinkedHashMap<>();
+    private int nextResolvedIndex;
+    private int nextUnresolvedIndex;
 
     private Set<Integer> jsonNameFieldIndices;
     private List<byte[]> jsonFieldNameBytesListRef;
 
-    GenerationResult generate(StructCodePlan plan, String className, String packageName) {
+    GenerationResult generate(
+            StructCodePlan plan,
+            String className,
+            String packageName,
+            Map<String, GeneratedStructSerializer> resolvedSerializers
+    ) {
         nextTempSlot = SLOT_FIRST_TEMP;
-        nestedSerCacheFieldIndices.clear();
-        nextCacheIndex = 0;
+        resolvedSerFieldIndices.clear();
+        unresolvedSerCacheFieldIndices.clear();
+        nextResolvedIndex = 0;
+        nextUnresolvedIndex = 0;
         jsonNameFieldIndices = new LinkedHashSet<>();
 
-        collectNestedStructTypes(plan);
+        collectNestedStructTypes(plan, resolvedSerializers);
 
         ClassDesc thisClass = ClassDesc.of(packageName + "." + className);
         ClassDesc shapeClass = ClassDesc.of(plan.shapeClass().getName());
@@ -110,10 +120,14 @@ final class ClassFileJsonSerializerGenerator {
             }
         }
 
-        // Class data: memberName bytes followed by jsonName bytes (for fields that differ)
-        List<byte[]> classData = new ArrayList<>(fieldNameBytesList);
+        // Class data: field name bytes, jsonName bytes, then resolved serializer instances
+        List<Object> classData = new ArrayList<>(fieldNameBytesList);
         for (int idx : jsonNameFieldIndices) {
             classData.add(jsonFieldNameBytesList.get(idx));
+        }
+        int resolvedSerClassDataOffset = classData.size();
+        for (var entry : resolvedSerFieldIndices.entrySet()) {
+            classData.add(resolvedSerializers.get(entry.getKey()));
         }
 
         byte[] bytecode = ClassFile.of().build(thisClass, cb -> {
@@ -131,14 +145,23 @@ final class ClassFileJsonSerializerGenerator {
                         ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
             }
 
-            ClassDesc serArrayDesc = CD_GeneratedStructSerializer.arrayType();
-            for (var entry : nestedSerCacheFieldIndices.entrySet()) {
+            for (var entry : resolvedSerFieldIndices.entrySet()) {
                 cb.withField("_SER_" + entry.getValue(),
+                        CD_GeneratedStructSerializer,
+                        ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
+            }
+            ClassDesc serArrayDesc = CD_GeneratedStructSerializer.arrayType();
+            for (var entry : unresolvedSerCacheFieldIndices.entrySet()) {
+                cb.withField("_SERC_" + entry.getValue(),
                         serArrayDesc,
                         ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
             }
 
-            emitClassInit(cb, thisClass, fieldNameBytesList, jsonFieldNameBytesList);
+            emitClassInit(cb,
+                    thisClass,
+                    fieldNameBytesList,
+                    jsonFieldNameBytesList,
+                    resolvedSerClassDataOffset);
             emitConstructor(cb, thisClass);
 
             if (plan.isUnion()) {
@@ -190,7 +213,8 @@ final class ClassFileJsonSerializerGenerator {
             java.lang.classfile.ClassBuilder cb,
             ClassDesc thisClass,
             List<byte[]> fieldNameBytesList,
-            List<byte[]> jsonFieldNameBytesList
+            List<byte[]> jsonFieldNameBytesList,
+            int resolvedSerClassDataOffset
     ) {
         ClassDesc CD_MethodHandles = ClassDesc.of("java.lang.invoke.MethodHandles");
         ClassDesc CD_List_cls = ClassDesc.of("java.util.List");
@@ -225,7 +249,6 @@ final class ClassFileJsonSerializerGenerator {
                         code.putstatic(thisClass, "FN_" + i, CD_byte_array);
                     }
 
-                    // Load jsonName field name bytes (only for fields where jsonName differs)
                     int classDataIdx = fieldNameBytesList.size();
                     for (int idx : jsonNameFieldIndices) {
                         code.aload(listSlot);
@@ -237,10 +260,23 @@ final class ClassFileJsonSerializerGenerator {
                         code.putstatic(thisClass, "FN_J_" + idx, CD_byte_array);
                     }
 
-                    for (var entry : nestedSerCacheFieldIndices.entrySet()) {
+                    int serIdx = resolvedSerClassDataOffset;
+                    for (var entry : resolvedSerFieldIndices.entrySet()) {
+                        code.aload(listSlot);
+                        code.ldc(serIdx++);
+                        code.invokeinterface(CD_List_cls,
+                                "get",
+                                MethodTypeDesc.of(CD_Object, CD_int));
+                        code.checkcast(CD_GeneratedStructSerializer);
+                        code.putstatic(thisClass,
+                                "_SER_" + entry.getValue(),
+                                CD_GeneratedStructSerializer);
+                    }
+
+                    for (var entry : unresolvedSerCacheFieldIndices.entrySet()) {
                         code.iconst_1();
                         code.anewarray(CD_GeneratedStructSerializer);
-                        code.putstatic(thisClass, "_SER_" + entry.getValue(), serArrayDesc);
+                        code.putstatic(thisClass, "_SERC_" + entry.getValue(), serArrayDesc);
                     }
 
                     code.return_();
@@ -2126,13 +2162,54 @@ final class ClassFileJsonSerializerGenerator {
             Class<?> targetClass
     ) {
         // Stack: ..., Object value, WriterContext ctx
-        Integer cacheIdx = targetClass != null ? nestedSerCacheFieldIndices.get(targetClass.getName()) : null;
-        ClassDesc serArrayDesc = CD_GeneratedStructSerializer.arrayType();
+        String name = targetClass != null ? targetClass.getName() : null;
+        Integer resolvedIdx = name != null ? resolvedSerFieldIndices.get(name) : null;
+        Integer unresolvedIdx = name != null ? unresolvedSerCacheFieldIndices.get(name) : null;
 
-        if (cacheIdx != null) {
-            // JsonCodegenHelpers.serializeNestedStructDirect(value, ctx, cache, class)
-            code.getstatic(thisClass, "_SER_" + cacheIdx, serArrayDesc);
-            code.ldc(ClassDesc.of(targetClass.getName()));
+        if (resolvedIdx != null) {
+            // Stack: ..., Object value, WriterContext ctx
+            int ctxSlot = nextTempSlot++;
+            int valSlot = nextTempSlot++;
+            code.astore(ctxSlot);
+            code.astore(valSlot);
+
+            code.aload(valSlot);
+            code.ifThenElse(Opcode.IFNONNULL,
+                    tb -> {
+                        tb.getstatic(thisClass,
+                                "_SER_" + resolvedIdx,
+                                CD_GeneratedStructSerializer);
+                        tb.aload(valSlot);
+                        tb.checkcast(CD_SerializableStruct);
+                        tb.aload(ctxSlot);
+                        tb.invokeinterface(CD_GeneratedStructSerializer,
+                                "serialize",
+                                MethodTypeDesc.of(CD_void,
+                                        CD_SerializableStruct,
+                                        CD_WriterContext));
+                    },
+                    fb -> {
+                        fb.aload(ctxSlot);
+                        fb.ldc(4);
+                        fb.invokevirtual(CD_WriterContext,
+                                "ensureCapacity",
+                                MethodTypeDesc.of(CD_void, CD_int));
+                        fb.aload(ctxSlot);
+                        fb.getfield(CD_WriterContext, "buf", CD_byte_array);
+                        fb.aload(ctxSlot);
+                        fb.getfield(CD_WriterContext, "pos", CD_int);
+                        fb.invokestatic(CD_JsonCodegenHelpers,
+                                "writeNull",
+                                MethodTypeDesc.of(CD_int, CD_byte_array, CD_int));
+                        fb.aload(ctxSlot);
+                        fb.swap();
+                        fb.putfield(CD_WriterContext, "pos", CD_int);
+                    });
+            nextTempSlot -= 2;
+        } else if (unresolvedIdx != null) {
+            ClassDesc serArrayDesc = CD_GeneratedStructSerializer.arrayType();
+            code.getstatic(thisClass, "_SERC_" + unresolvedIdx, serArrayDesc);
+            code.ldc(ClassDesc.of(name));
             code.invokestatic(CD_JsonCodegenHelpers,
                     "serializeNestedStructDirect",
                     MethodTypeDesc.of(CD_void,
@@ -2141,7 +2218,6 @@ final class ClassFileJsonSerializerGenerator {
                             serArrayDesc,
                             ClassDesc.of("java.lang.Class")));
         } else {
-            // JsonCodegenHelpers.serializeNestedStruct(value, ctx)
             code.invokestatic(CD_JsonCodegenHelpers,
                     "serializeNestedStruct",
                     MethodTypeDesc.of(CD_void, CD_Object, CD_WriterContext));
@@ -2171,31 +2247,40 @@ final class ClassFileJsonSerializerGenerator {
 
     // ---- Nested struct type collection ----
 
-    private void collectNestedStructTypes(StructCodePlan plan) {
+    private void collectNestedStructTypes(
+            StructCodePlan plan,
+            Map<String, GeneratedStructSerializer> resolvedSerializers
+    ) {
         for (FieldPlan field : plan.fields()) {
+            Class<?> clazz = null;
             switch (field.category()) {
-                case STRUCT, UNION -> registerNestedSerCache(field.schema().memberTarget().shapeClass());
+                case STRUCT, UNION -> clazz = field.schema().memberTarget().shapeClass();
                 case LIST -> {
                     Class<?> elemClass = field.elementClass();
                     if (elemClass != null && !isSimpleType(elemClass)) {
-                        registerNestedSerCache(elemClass);
+                        clazz = elemClass;
                     }
                 }
                 case MAP -> {
                     Class<?> valClass = field.mapValueClass();
                     if (valClass != null && !isSimpleType(valClass)) {
-                        registerNestedSerCache(valClass);
+                        clazz = valClass;
                     }
                 }
                 default -> {
                 }
             }
-        }
-    }
-
-    private void registerNestedSerCache(Class<?> clazz) {
-        if (clazz != null) {
-            nestedSerCacheFieldIndices.computeIfAbsent(clazz.getName(), k -> nextCacheIndex++);
+            if (clazz != null) {
+                String name = clazz.getName();
+                if (!resolvedSerFieldIndices.containsKey(name)
+                        && !unresolvedSerCacheFieldIndices.containsKey(name)) {
+                    if (resolvedSerializers.containsKey(name)) {
+                        resolvedSerFieldIndices.put(name, nextResolvedIndex++);
+                    } else {
+                        unresolvedSerCacheFieldIndices.put(name, nextUnresolvedIndex++);
+                    }
+                }
+            }
         }
     }
 

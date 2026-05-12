@@ -10,8 +10,11 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SmithyEnum;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -190,5 +193,29 @@ public final class StructCodePlan {
 
     public boolean isUnion() {
         return isUnion;
+    }
+
+    public List<Class<?>> nestedStructClasses() {
+        Set<Class<?>> seen = new LinkedHashSet<>();
+        for (FieldPlan field : fields) {
+            Class<?> clazz = null;
+            switch (field.category()) {
+                case STRUCT, UNION -> clazz = field.schema().memberTarget().shapeClass();
+                case LIST -> clazz = field.elementClass();
+                case MAP -> clazz = field.mapValueClass();
+                default -> {
+                }
+            }
+            if (clazz != null && isStructLike(clazz)) {
+                seen.add(clazz);
+            }
+        }
+        return new ArrayList<>(seen);
+    }
+
+    private static boolean isStructLike(Class<?> clazz) {
+        return !clazz.isPrimitive()
+                && !clazz.getName().startsWith("java.")
+                && !SmithyEnum.class.isAssignableFrom(clazz);
     }
 }
