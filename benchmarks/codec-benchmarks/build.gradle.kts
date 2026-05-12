@@ -48,8 +48,11 @@ tasks.named("processJmhResources") {
 }
 
 jmh {
-    warmupIterations = 3
-    iterations = 5
+    val fast = providers.gradleProperty("jmh.fast").isPresent
+    warmupIterations = if (fast) 2 else 3
+    iterations = if (fast) 3 else 5
+    warmup = if (fast) "3s" else "10s"
+    timeOnIteration = if (fast) "3s" else "10s"
     fork = 1
     jvmArgs.addAll("-Xms1g", "-Xmx1g")
     jvmArgs.addAll(
@@ -69,5 +72,7 @@ jmh {
             .map { listOf(it) }
             .orElse(emptyList()),
     )
-    profilers.add("async:output=jfr;dir=${layout.buildDirectory.get()}/jmh-profiler")
+    if (!fast) {
+        profilers.add("async:output=jfr;dir=${layout.buildDirectory.get()}/jmh-profiler")
+    }
 }

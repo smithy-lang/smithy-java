@@ -27,14 +27,8 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import software.amazon.smithy.java.benchmarks.codec.BenchData;
 import software.amazon.smithy.java.benchmarks.codec.model.ComplexStruct;
-import software.amazon.smithy.java.benchmarks.codec.model.InnerStruct;
-import software.amazon.smithy.java.benchmarks.codec.model.NestedStruct;
 import software.amazon.smithy.java.benchmarks.codec.model.SimpleStruct;
-import software.amazon.smithy.java.codegen.rt.SpecializedCodecRegistry;
 import software.amazon.smithy.java.core.serde.Codec;
-import software.amazon.smithy.java.json.codegen.ClassFileJsonCodecProfile;
-import software.amazon.smithy.java.json.codegen.JsonReaderContext;
-import software.amazon.smithy.java.json.smithy.JsonWriterContext;
 import tools.jackson.core.ObjectReadContext;
 import tools.jackson.core.ObjectWriteContext;
 import tools.jackson.core.json.JsonFactory;
@@ -44,7 +38,7 @@ import tools.jackson.core.json.JsonFactory;
 @State(Scope.Benchmark)
 public class JsonCodegenBench {
 
-    private SpecializedCodecRegistry registry;
+    private Codec codegenCodec;
     private Codec dispatchCodec;
 
     private SimpleStruct simpleStruct;
@@ -57,8 +51,11 @@ public class JsonCodegenBench {
 
     @Setup(Level.Trial)
     public void setup() {
-        registry = new SpecializedCodecRegistry(new ClassFileJsonCodecProfile());
-        // Use the raw provider without codegen wrapping to get a true dispatch-only codec
+        // Default codec picks up CodegenJsonSerdeProvider via ServiceLoader, which wraps
+        // the dispatch provider and tries codegen first — this is the real production path.
+        codegenCodec = JsonCodec.builder().build();
+
+        // Dispatch-only codec: explicitly select the raw provider without codegen wrapping.
         JsonSerdeProvider rawProvider = ServiceLoader.load(JsonSerdeProvider.class)
                 .stream()
                 .map(ServiceLoader.Provider::get)
@@ -70,13 +67,17 @@ public class JsonCodegenBench {
         simpleStruct = BenchData.buildSimpleStruct();
         complexStruct = BenchData.buildComplexStruct();
 
-        // Warmup codegen for all shapes
-        registry.warmup(SimpleStruct.$SCHEMA, SimpleStruct.class);
-        registry.warmup(ComplexStruct.$SCHEMA, ComplexStruct.class);
-        registry.warmup(NestedStruct.$SCHEMA, NestedStruct.class);
-        registry.warmup(InnerStruct.$SCHEMA, InnerStruct.class);
+        // Warmup codegen: first call triggers async generation, spin until the fast path is active.
+        // The codegen path returns a result from ClassFileSpecializedJsonSerde once ready;
+        // until then it falls back to dispatch. We spin to ensure JMH measurement hits codegen.
+        for (int i = 0; i < 200; i++) {
+            codegenCodec.serialize(simpleStruct);
+            codegenCodec.serialize(complexStruct);
+            codegenCodec.deserializeShape(codegenCodec.serialize(simpleStruct), SimpleStruct.builder());
+            codegenCodec.deserializeShape(codegenCodec.serialize(complexStruct), ComplexStruct.builder());
+        }
 
-        // Pre-serialize for deserialization benchmarks
+        // Pre-serialize for deserialization benchmarks (use dispatch to get clean bytes)
         ByteBuffer buf = dispatchCodec.serialize(simpleStruct);
         simpleBytes = new byte[buf.remaining()];
         buf.get(simpleBytes);
@@ -103,14 +104,7 @@ public class JsonCodegenBench {
 
     @Benchmark
     public ByteBuffer serializeSimpleCodegen() {
-        JsonWriterContext ctx = JsonWriterContext.acquire(registry);
-        try {
-            registry.getSerializer(SimpleStruct.$SCHEMA, SimpleStruct.class)
-                    .serialize(simpleStruct, ctx);
-            return ctx.toByteBuffer();
-        } finally {
-            JsonWriterContext.release(ctx);
-        }
+        return codegenCodec.serialize(simpleStruct);
     }
 
     @Benchmark
@@ -120,31 +114,19 @@ public class JsonCodegenBench {
 
     @Benchmark
     public SimpleStruct deserializeSimpleCodegen() {
-        JsonReaderContext ctx = new JsonReaderContext(simpleBytes, 0, simpleBytes.length, registry);
-        return (SimpleStruct) registry
-                .getDeserializer(SimpleStruct.$SCHEMA, SimpleStruct.class)
-                .deserialize(ctx, SimpleStruct.builder());
+        return codegenCodec.deserializeShape(simpleBytes, SimpleStruct.builder());
     }
 
     @Benchmark
     public SimpleStruct deserializeSimpleDispatch() {
-        return dispatchCodec.deserializeShape(
-                ByteBuffer.wrap(simpleBytes),
-                SimpleStruct.builder());
+        return dispatchCodec.deserializeShape(simpleBytes, SimpleStruct.builder());
     }
 
     // ---- Complex struct benchmarks ----
 
     @Benchmark
     public ByteBuffer serializeComplexCodegen() {
-        JsonWriterContext ctx = JsonWriterContext.acquire(registry);
-        try {
-            registry.getSerializer(ComplexStruct.$SCHEMA, ComplexStruct.class)
-                    .serialize(complexStruct, ctx);
-            return ctx.toByteBuffer();
-        } finally {
-            JsonWriterContext.release(ctx);
-        }
+        return codegenCodec.serialize(complexStruct);
     }
 
     @Benchmark
@@ -154,59 +136,36 @@ public class JsonCodegenBench {
 
     @Benchmark
     public ComplexStruct deserializeComplexCodegen() {
-        JsonReaderContext ctx = new JsonReaderContext(complexBytes, 0, complexBytes.length, registry);
-        return (ComplexStruct) registry
-                .getDeserializer(ComplexStruct.$SCHEMA, ComplexStruct.class)
-                .deserialize(ctx, ComplexStruct.builder());
+        return codegenCodec.deserializeShape(complexBytes, ComplexStruct.builder());
     }
 
     @Benchmark
     public ComplexStruct deserializeComplexDispatch() {
-        return dispatchCodec.deserializeShape(
-                ByteBuffer.wrap(complexBytes),
-                ComplexStruct.builder());
+        return dispatchCodec.deserializeShape(complexBytes, ComplexStruct.builder());
     }
 
     // ---- Missing fields benchmarks (in-order but with gaps — realistic scenario) ----
 
     @Benchmark
     public ComplexStruct deserializeSparseCodegen() {
-        JsonReaderContext ctx = new JsonReaderContext(
-                complexBytesSparse,
-                0,
-                complexBytesSparse.length,
-                registry);
-        return (ComplexStruct) registry
-                .getDeserializer(ComplexStruct.$SCHEMA, ComplexStruct.class)
-                .deserialize(ctx, ComplexStruct.builder());
+        return codegenCodec.deserializeShape(complexBytesSparse, ComplexStruct.builder());
     }
 
     @Benchmark
     public ComplexStruct deserializeSparseDispatch() {
-        return dispatchCodec.deserializeShape(
-                ByteBuffer.wrap(complexBytesSparse),
-                ComplexStruct.builder());
+        return dispatchCodec.deserializeShape(complexBytesSparse, ComplexStruct.builder());
     }
 
     // ---- Reversed field order benchmarks (tests hash dispatch fallback) ----
 
     @Benchmark
     public ComplexStruct deserializeReversedCodegen() {
-        JsonReaderContext ctx = new JsonReaderContext(
-                complexBytesReversed,
-                0,
-                complexBytesReversed.length,
-                registry);
-        return (ComplexStruct) registry
-                .getDeserializer(ComplexStruct.$SCHEMA, ComplexStruct.class)
-                .deserialize(ctx, ComplexStruct.builder());
+        return codegenCodec.deserializeShape(complexBytesReversed, ComplexStruct.builder());
     }
 
     @Benchmark
     public ComplexStruct deserializeReversedDispatch() {
-        return dispatchCodec.deserializeShape(
-                ByteBuffer.wrap(complexBytesReversed),
-                ComplexStruct.builder());
+        return dispatchCodec.deserializeShape(complexBytesReversed, ComplexStruct.builder());
     }
 
     private static byte[] dropJsonFields(byte[] json, Set<String> fieldsToDrop) {
