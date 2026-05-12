@@ -35,7 +35,7 @@ public final class ClassFileSpecializedJsonSerde implements SpecializedJsonSerde
             return null;
         }
         JsonWriterContext ctx = JsonWriterContext.acquire(registry);
-        ctx.useJsonName = settings.useJsonName();
+        ctx.jsonSettings = settings;
         try {
             ser.serialize(struct, ctx);
             return ByteBuffer.wrap(ctx.toByteArray());
@@ -63,7 +63,6 @@ public final class ClassFileSpecializedJsonSerde implements SpecializedJsonSerde
             return null;
         }
         JsonReaderContext ctx = JsonReaderContext.acquire(buf, offset, end, registry);
-        ctx.useJsonName = settings.useJsonName();
         ctx.jsonSettings = settings;
         try {
             return (T) de.deserialize(ctx, builder);

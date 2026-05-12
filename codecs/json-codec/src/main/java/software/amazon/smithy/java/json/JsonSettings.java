@@ -140,6 +140,10 @@ public final class JsonSettings {
         return fieldMapper instanceof JsonFieldMapper.UseJsonNameTrait;
     }
 
+    public boolean useTimestampFormat() {
+        return timestampResolver instanceof TimestampResolver.UseTimestampFormatTrait;
+    }
+
     public boolean prettyPrint() {
         return prettyPrint;
     }

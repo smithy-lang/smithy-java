@@ -55,7 +55,7 @@ final class CodegenJsonSerdeProvider implements JsonSerdeProvider {
 
     @Override
     public ShapeSerializer newSerializer(OutputStream sink, JsonSettings settings) {
-        return delegate.newSerializer(sink, settings);
+        return new CodegenShapeSerializer(sink, delegate, codegen, settings);
     }
 
     @Override

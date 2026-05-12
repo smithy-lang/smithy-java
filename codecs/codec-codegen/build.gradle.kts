@@ -9,4 +9,5 @@ extra["moduleName"] = "software.amazon.smithy.java.codegen.rt"
 
 dependencies {
     api(project(":core"))
+    implementation(project(":logging"))
 }
