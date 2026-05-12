@@ -17,8 +17,8 @@ public final class TestCustomConstraints {
     public static class AlwaysFailsConstraint implements CustomConstraint {
         @Override
         public EnumSet<ShapeType> appliesTo() {
-            // Empty set means wildcard - applies to all types
-            return EnumSet.noneOf(ShapeType.class);
+            // Applies to all types
+            return EnumSet.allOf(ShapeType.class);
         }
 
         @Override

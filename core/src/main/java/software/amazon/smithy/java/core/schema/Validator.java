@@ -10,10 +10,10 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 import software.amazon.smithy.java.core.serde.ListSerializer;
 import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.SerializationException;
@@ -127,30 +127,22 @@ public final class Validator {
         private static final List<CustomConstraint>[] CUSTOM_CONSTRAINTS_BY_TYPE = new List[ShapeType.values().length];
         private static final boolean HAS_CUSTOM_CONSTRAINTS;
 
-        private static void addConstraint(int index, CustomConstraint constraint) {
-            if (CUSTOM_CONSTRAINTS_BY_TYPE[index] == null) {
-                CUSTOM_CONSTRAINTS_BY_TYPE[index] = new ArrayList<>();
-            }
-            CUSTOM_CONSTRAINTS_BY_TYPE[index].add(constraint);
-        }
-
         static {
             // Load all custom constraints at startup and organize by type
             var loader = ServiceLoader.load(CustomConstraint.class, CustomConstraint.class.getClassLoader());
+            var anyConstraintsFound = false;
             for (var constraint : loader) {
                 var types = constraint.appliesTo();
-                if (types.isEmpty()) {
-                    // Add the constraint to all types if the enum set is empty
-                    for (var i = 0; i < CUSTOM_CONSTRAINTS_BY_TYPE.length; i++) {
-                        addConstraint(i, constraint);
+                for (var type : types) {
+                    var index = type.ordinal();
+                    if (CUSTOM_CONSTRAINTS_BY_TYPE[index] == null) {
+                        CUSTOM_CONSTRAINTS_BY_TYPE[index] = new ArrayList<>();
                     }
-                } else {
-                    for (var type : types) {
-                        addConstraint(type.ordinal(), constraint);
-                    }
+                    CUSTOM_CONSTRAINTS_BY_TYPE[index].add(constraint);
+                    anyConstraintsFound = true;
                 }
             }
-            HAS_CUSTOM_CONSTRAINTS = Arrays.stream(CUSTOM_CONSTRAINTS_BY_TYPE).anyMatch(java.util.Objects::nonNull);
+            HAS_CUSTOM_CONSTRAINTS = anyConstraintsFound;
         }
 
         private final int maxAllowedErrors;
@@ -546,8 +538,9 @@ public final class Validator {
             // Get constraints for this specific type
             var typeConstraints = CUSTOM_CONSTRAINTS_BY_TYPE[schema.type().ordinal()];
             if (typeConstraints != null) {
+                Supplier<String> pathSupplier = this::createPath;
                 for (var constraint : typeConstraints) {
-                    var validationErrors = constraint.validate(schema, value, this::createPath);
+                    var validationErrors = constraint.validate(schema, value, pathSupplier);
                     for (var error : validationErrors) {
                         addError(error);
                     }
