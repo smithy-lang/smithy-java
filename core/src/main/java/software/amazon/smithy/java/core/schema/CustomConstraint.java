@@ -23,8 +23,6 @@ public interface CustomConstraint {
     /**
      * Returns the set of shape types this constraint applies to.
      *
-     * <p>Return an empty set to match all shape types
-     *
      * @return the set of shape types this constraint validates, or an empty set for all types
      */
     EnumSet<ShapeType> appliesTo();
