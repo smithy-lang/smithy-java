@@ -102,12 +102,12 @@ public class JsonCodegenBench {
     // ---- Simple struct benchmarks ----
 
     @Benchmark
-    public byte[] serializeSimpleCodegen() {
+    public ByteBuffer serializeSimpleCodegen() {
         JsonWriterContext ctx = JsonWriterContext.acquire(registry);
         try {
             registry.getSerializer(SimpleStruct.$SCHEMA, SimpleStruct.class)
                     .serialize(simpleStruct, ctx);
-            return ctx.toByteArray();
+            return ctx.toByteBuffer();
         } finally {
             JsonWriterContext.release(ctx);
         }
@@ -136,12 +136,12 @@ public class JsonCodegenBench {
     // ---- Complex struct benchmarks ----
 
     @Benchmark
-    public byte[] serializeComplexCodegen() {
+    public ByteBuffer serializeComplexCodegen() {
         JsonWriterContext ctx = JsonWriterContext.acquire(registry);
         try {
             registry.getSerializer(ComplexStruct.$SCHEMA, ComplexStruct.class)
                     .serialize(complexStruct, ctx);
-            return ctx.toByteArray();
+            return ctx.toByteBuffer();
         } finally {
             JsonWriterContext.release(ctx);
         }
