@@ -55,32 +55,6 @@ public final class JsonCodegenHelpers {
         }
     }
 
-    public static void serializeNestedStructDirect(
-            Object obj,
-            WriterContext ctx,
-            GeneratedStructSerializer[] cached,
-            Class<?> structClass
-    ) {
-        if (obj == null) {
-            ctx.ensureCapacity(4);
-            ctx.pos = writeNull(ctx.buf, ctx.pos);
-            return;
-        }
-        SerializableStruct struct = (SerializableStruct) obj;
-        GeneratedStructSerializer ser = cached[0];
-        if (ser == null) {
-            ser = ctx.registry.getSerializer(struct.schema(), structClass);
-            if (ser != null) {
-                cached[0] = ser;
-            }
-        }
-        if (ser != null) {
-            ser.serialize(struct, ctx);
-        } else {
-            serializeViaDispatch((SerializableShape) obj, ctx);
-        }
-    }
-
     public static Object deserializeNestedStruct(JsonReaderContext ctx, Class<?> structClass) {
         Schema schema = CodegenHelpers.schemaFor(structClass);
         GeneratedStructDeserializer de = ctx.registry.getDeserializer(schema, structClass);
@@ -89,27 +63,6 @@ public final class JsonCodegenHelpers {
             return de.deserialize(ctx, builder);
         }
         return deserializeViaDispatch(ctx, schema);
-    }
-
-    public static Object deserializeNestedStructDirect(
-            JsonReaderContext ctx,
-            Object[] cached,
-            Class<?> structClass
-    ) {
-        GeneratedStructDeserializer de = (GeneratedStructDeserializer) cached[0];
-        Schema schema = (Schema) cached[1];
-        if (de == null) {
-            schema = CodegenHelpers.schemaFor(structClass);
-            de = ctx.registry.getDeserializer(schema, structClass);
-            if (de != null) {
-                cached[0] = de;
-                cached[1] = schema;
-            } else {
-                return deserializeViaDispatch(ctx, schema);
-            }
-        }
-        ShapeBuilder<?> builder = schema.shapeBuilder();
-        return de.deserialize(ctx, builder);
     }
 
     private static final JsonCodec DISPATCH_CODEC = JsonCodec.builder().build();

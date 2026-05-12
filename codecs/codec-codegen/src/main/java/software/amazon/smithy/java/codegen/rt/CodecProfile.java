@@ -18,14 +18,14 @@ public interface CodecProfile {
             StructCodePlan plan,
             String className,
             String packageName,
-            Map<String, GeneratedStructSerializer> resolvedSerializers
+            Map<String, GeneratedStructSerializer[]> serializerHolders
     );
 
     GenerationResult generateDeserializerBytecode(
             StructCodePlan plan,
             String className,
             String packageName,
-            Map<String, GeneratedStructDeserializer> resolvedDeserializers
+            Map<String, GeneratedStructDeserializer[]> deserializerHolders
     );
 
     record GenerationResult(byte[] bytecode, Object classData) {}

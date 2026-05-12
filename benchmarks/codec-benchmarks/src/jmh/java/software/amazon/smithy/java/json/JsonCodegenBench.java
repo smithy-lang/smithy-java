@@ -65,7 +65,10 @@ public class JsonCodegenBench {
                 .filter(p -> !(p instanceof CodegenJsonSerdeProvider))
                 .findFirst()
                 .orElseThrow();
-        dispatchCodec = JsonCodec.builder().overrideSerdeProvider(rawProvider).build();
+        dispatchCodec = JsonCodec.builder()
+                .overrideSerdeProvider(rawProvider)
+                .useTimestampFormat(true)
+                .build();
 
         simpleStruct = BenchData.buildSimpleStruct();
         complexStruct = BenchData.buildComplexStruct();
