@@ -21,17 +21,17 @@ import software.amazon.smithy.java.context.Context;
 
 class AwsCredentialChainTest {
     @Test
-    void builtinProvidersAreOrderedByEnumOrder() {
+    void standardProvidersAreOrderedByEnumOrder() {
         var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         registration("imds",
-                                new OrderingConstraint.Builtin(BuiltinProvider.EC2_INSTANCE_METADATA),
+                                new OrderingConstraint.Standard(StandardProvider.EC2_INSTANCE_METADATA),
                                 errorResolver("imds")),
                         registration("env",
-                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
                                 errorResolver("env")),
                         registration("profile",
-                                new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
+                                new OrderingConstraint.Standard(StandardProvider.SHARED_CONFIG),
                                 errorResolver("profile"))),
                 null);
 
@@ -43,10 +43,10 @@ class AwsCredentialChainTest {
         var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         registration("env",
-                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
                                 errorResolver("env")),
                         registration("profile",
-                                new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
+                                new OrderingConstraint.Standard(StandardProvider.SHARED_CONFIG),
                                 staticResolver("AK", "SK"))),
                 null);
         IdentityResult<AwsCredentialsIdentity> result = chain.resolveIdentity(Context.empty());
@@ -60,10 +60,10 @@ class AwsCredentialChainTest {
         var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         registration("env",
-                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
                                 errorResolver("no env")),
                         registration("profile",
-                                new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
+                                new OrderingConstraint.Standard(StandardProvider.SHARED_CONFIG),
                                 errorResolver("no profile"))),
                 null);
         IdentityResult<AwsCredentialsIdentity> result = chain.resolveIdentity(Context.empty());
@@ -79,10 +79,10 @@ class AwsCredentialChainTest {
                 () -> CredentialChain.assemble(AwsCredentialsIdentity.class,
                         List.of(
                                 registration("a",
-                                        new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                        new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
                                         errorResolver("a")),
                                 registration("b",
-                                        new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                        new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
                                         errorResolver("b"))),
                         null));
     }
@@ -92,13 +92,13 @@ class AwsCredentialChainTest {
         var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         registration("env",
-                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
                                 errorResolver("env")),
                         registration("profile",
-                                new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
+                                new OrderingConstraint.Standard(StandardProvider.SHARED_CONFIG),
                                 errorResolver("profile")),
                         registration("custom",
-                                new OrderingConstraint.After(BuiltinProvider.ENVIRONMENT),
+                                new OrderingConstraint.After(StandardProvider.ENVIRONMENT),
                                 errorResolver("custom"))),
                 null);
 
@@ -110,13 +110,13 @@ class AwsCredentialChainTest {
         var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         registration("env",
-                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
                                 errorResolver("env")),
                         registration("profile",
-                                new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
+                                new OrderingConstraint.Standard(StandardProvider.SHARED_CONFIG),
                                 errorResolver("profile")),
                         registration("custom",
-                                new OrderingConstraint.Before(BuiltinProvider.SHARED_CONFIG),
+                                new OrderingConstraint.Before(StandardProvider.SHARED_CONFIG),
                                 errorResolver("custom"))),
                 null);
 
@@ -128,10 +128,10 @@ class AwsCredentialChainTest {
         var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         registration("env",
-                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
                                 errorResolver("env")),
                         registration("custom",
-                                new OrderingConstraint.After(BuiltinProvider.EC2_INSTANCE_METADATA),
+                                new OrderingConstraint.After(StandardProvider.EC2_INSTANCE_METADATA),
                                 errorResolver("custom"))),
                 null);
 
@@ -144,10 +144,10 @@ class AwsCredentialChainTest {
                 () -> CredentialChain.assemble(AwsCredentialsIdentity.class,
                         List.of(
                                 registration("env",
-                                        new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                        new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
                                         errorResolver("env")),
                                 registration("env",
-                                        new OrderingConstraint.Builtin(BuiltinProvider.JAVA_SYSTEM_PROPERTIES),
+                                        new OrderingConstraint.Standard(StandardProvider.JAVA_SYSTEM_PROPERTIES),
                                         errorResolver("env2"))),
                         null));
     }

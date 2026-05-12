@@ -28,7 +28,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * A credential provider chain.
  *
  * <p>Discovers {@link ChainIdentityProvider} implementations via {@link ServiceLoader}, assembles them into an
- * ordered chain based on {@link BuiltinProvider} slots and relative ordering constraints, and resolves
+ * ordered chain based on {@link StandardProvider} slots and relative ordering constraints, and resolves
  * credentials by trying each provider in order.
  *
  * <p>Usage:
@@ -69,7 +69,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
      *
      * @param identityType Identity type to resolve.
      * @return the assembled chain.
-     * @throws IllegalStateException if two providers claim the same builtin slot.
+     * @throws IllegalStateException if two providers claim the same standard slot.
      */
     public static <I extends Identity> CredentialChain<I> create(Class<I> identityType) {
         return create(identityType, Executors.newSingleThreadScheduledExecutor(r2 -> {
@@ -85,7 +85,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
      * @param identityType Identity type to resolve.
      * @param ex Executor used for background resolution.
      * @return the assembled chain.
-     * @throws IllegalStateException if two providers claim the same builtin slot.
+     * @throws IllegalStateException if two providers claim the same standard slot.
      */
     public static <I extends Identity> CredentialChain<I> create(Class<I> identityType, ScheduledExecutorService ex) {
         List<ChainIdentityProvider> registrations = new ArrayList<>();
@@ -108,13 +108,13 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
             }
         }
 
-        // Separate builtins from relatives.
-        Map<BuiltinProvider, ChainIdentityProvider> builtins = new EnumMap<>(BuiltinProvider.class);
+        // Separate standards from relatives.
+        Map<StandardProvider, ChainIdentityProvider> standards = new EnumMap<>(StandardProvider.class);
         List<ChainIdentityProvider> relatives = new ArrayList<>();
 
         for (ChainIdentityProvider r : registrations) {
-            if (r.ordering() instanceof OrderingConstraint.Builtin(BuiltinProvider slot)) {
-                ChainIdentityProvider existing = builtins.put(slot, r);
+            if (r.ordering() instanceof OrderingConstraint.Standard(StandardProvider slot)) {
+                ChainIdentityProvider existing = standards.put(slot, r);
                 if (existing != null) {
                     throw new IllegalStateException("Two credential providers claim the same slot '"
                             + slot + "': '" + existing.name() + "' and '" + r.name() + "'");
@@ -129,21 +129,21 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
 
         // Precompute insert positions: for each slot, how many claimed slots come before it
         // and up to and including it. This avoids re-scanning the enum on every relative insert.
-        EnumMap<BuiltinProvider, Integer> insertAfter = new EnumMap<>(BuiltinProvider.class);
-        EnumMap<BuiltinProvider, Integer> insertBefore = new EnumMap<>(BuiltinProvider.class);
+        EnumMap<StandardProvider, Integer> insertAfter = new EnumMap<>(StandardProvider.class);
+        EnumMap<StandardProvider, Integer> insertBefore = new EnumMap<>(StandardProvider.class);
         int count = 0;
-        for (BuiltinProvider slot : BuiltinProvider.values()) {
+        for (StandardProvider slot : StandardProvider.values()) {
             insertBefore.put(slot, count);
-            if (builtins.containsKey(slot)) {
+            if (standards.containsKey(slot)) {
                 count++;
             }
             insertAfter.put(slot, count);
         }
 
-        // Build the ordered list: builtin slots in enum order.
+        // Build the ordered list: standard slots in enum order.
         List<NamedResolver<I>> ordered = new ArrayList<>();
-        for (BuiltinProvider slot : BuiltinProvider.values()) {
-            ChainIdentityProvider r = builtins.get(slot);
+        for (StandardProvider slot : StandardProvider.values()) {
+            ChainIdentityProvider r = standards.get(slot);
             if (r != null) {
                 IdentityResolver<I> resolver = r.create(identityType, ctx);
                 if (resolver != null) {
@@ -155,9 +155,9 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
         // Insert relative providers using precomputed positions.
         for (ChainIdentityProvider r : relatives) {
             int insertAt;
-            if (r.ordering() instanceof OrderingConstraint.After(BuiltinProvider slot)) {
+            if (r.ordering() instanceof OrderingConstraint.After(StandardProvider slot)) {
                 insertAt = insertAfter.get(slot);
-            } else if (r.ordering() instanceof OrderingConstraint.Before(BuiltinProvider slot)) {
+            } else if (r.ordering() instanceof OrderingConstraint.Before(StandardProvider slot)) {
                 insertAt = insertBefore.get(slot);
             } else {
                 insertAt = ordered.size();
@@ -176,13 +176,13 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
                     ordered.stream().map(NamedResolver::name).collect(Collectors.joining(", ")));
         }
 
-        warnDetectedButUnclaimed(builtins);
+        warnDetectedButUnclaimed(standards);
         return new CredentialChain<>(identityType, Collections.unmodifiableList(ordered), executor);
     }
 
-    private static void warnDetectedButUnclaimed(Map<BuiltinProvider, ?> builtins) {
-        for (BuiltinProvider slot : BuiltinProvider.values()) {
-            if (slot.moduleSuggestion() != null && !builtins.containsKey(slot) && slot.isDetected()) {
+    private static void warnDetectedButUnclaimed(Map<StandardProvider, ?> standards) {
+        for (StandardProvider slot : StandardProvider.values()) {
+            if (slot.moduleSuggestion() != null && !standards.containsKey(slot) && slot.isDetected()) {
                 LOGGER.warn("{} credentials detected but no provider is registered for the '{}' slot. "
                         + "Add '{}' to your dependencies.",
                         slot.name(),
@@ -233,7 +233,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
 
     private String detectedButMissingHints() {
         StringBuilder hints = new StringBuilder();
-        for (BuiltinProvider slot : BuiltinProvider.values()) {
+        for (StandardProvider slot : StandardProvider.values()) {
             if (slot.moduleSuggestion() != null && slot.isDetected()) {
                 if (!isClaimed(slot)) {
                     hints.append(" Detected ")
@@ -247,7 +247,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
         return hints.toString();
     }
 
-    private boolean isClaimed(BuiltinProvider slot) {
+    private boolean isClaimed(StandardProvider slot) {
         for (var nr : resolvers) {
             if (nr.name.equals(slot.name().toLowerCase(Locale.ROOT))) {
                 return true;

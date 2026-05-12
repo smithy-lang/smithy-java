@@ -9,11 +9,11 @@ import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
-import software.amazon.smithy.java.aws.credentials.chain.BuiltinProvider;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
 import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
+import software.amazon.smithy.java.aws.credentials.chain.StandardProvider;
 
 public final class SystemPropertiesCredentialProvider implements ChainIdentityProvider {
 
@@ -31,7 +31,7 @@ public final class SystemPropertiesCredentialProvider implements ChainIdentityPr
 
     @Override
     public OrderingConstraint ordering() {
-        return new OrderingConstraint.Builtin(BuiltinProvider.JAVA_SYSTEM_PROPERTIES);
+        return new OrderingConstraint.Standard(StandardProvider.JAVA_SYSTEM_PROPERTIES);
     }
 
     @Override
