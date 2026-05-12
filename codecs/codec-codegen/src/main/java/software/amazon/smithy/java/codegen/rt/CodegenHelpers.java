@@ -7,7 +7,6 @@ package software.amazon.smithy.java.codegen.rt;
 
 import java.lang.invoke.MethodHandles;
 import software.amazon.smithy.java.core.schema.Schema;
-import software.amazon.smithy.java.core.schema.SerializableStruct;
 
 /**
  * Format-independent runtime helpers for generated serializer code.
@@ -31,30 +30,5 @@ public final class CodegenHelpers {
 
     public static Schema schemaFor(Class<?> shapeClass) {
         return SCHEMA_CACHE.get(shapeClass);
-    }
-
-    public static boolean trySerializeNested(SerializableStruct struct, WriterContext ctx) {
-        GeneratedStructSerializer ser = ctx.registry.getSerializer(struct.schema(), struct.getClass());
-        if (ser != null) {
-            ser.serialize(struct, ctx);
-            return true;
-        }
-        return false;
-    }
-
-    public static GeneratedStructSerializer lookupCachedSerializer(
-            SerializableStruct struct,
-            WriterContext ctx,
-            GeneratedStructSerializer[] cached,
-            Class<?> structClass
-    ) {
-        GeneratedStructSerializer ser = cached[0];
-        if (ser == null) {
-            ser = ctx.registry.getSerializer(struct.schema(), structClass);
-            if (ser != null) {
-                cached[0] = ser;
-            }
-        }
-        return ser;
     }
 }

@@ -96,10 +96,9 @@ final class ClassFileJsonDeserializerGenerator {
     private static final int DF_SLOT_FIRST_TEMP = 8;
 
     private int nextTempSlot;
-    private final Map<String, Integer> resolvedDeFieldIndices = new LinkedHashMap<>();
-    private final Map<String, Integer> unresolvedDeCacheIndices = new LinkedHashMap<>();
-    private int nextResolvedIndex;
-    private int nextUnresolvedIndex;
+    private final Map<String, Integer> nestedDeFieldIndices = new LinkedHashMap<>();
+    private final Map<String, Class<?>> nestedDeClasses = new LinkedHashMap<>();
+    private int nextDeIndex;
 
     private Set<Integer> jsonNameFieldIndices;
 
@@ -107,16 +106,15 @@ final class ClassFileJsonDeserializerGenerator {
             StructCodePlan plan,
             String className,
             String packageName,
-            Map<String, GeneratedStructDeserializer> resolvedDeserializers
+            Map<String, GeneratedStructDeserializer[]> deserializerHolders
     ) {
         nextTempSlot = SLOT_FIRST_TEMP;
-        resolvedDeFieldIndices.clear();
-        unresolvedDeCacheIndices.clear();
-        nextResolvedIndex = 0;
-        nextUnresolvedIndex = 0;
+        nestedDeFieldIndices.clear();
+        nestedDeClasses.clear();
+        nextDeIndex = 0;
         jsonNameFieldIndices = new LinkedHashSet<>();
 
-        collectNestedStructTypes(plan, resolvedDeserializers);
+        collectNestedStructTypes(plan, deserializerHolders);
 
         ClassDesc thisClass = ClassDesc.of(packageName + "." + className);
         ClassDesc shapeClass = ClassDesc.of(plan.shapeClass().getName());
@@ -134,14 +132,14 @@ final class ClassFileJsonDeserializerGenerator {
             }
         }
 
-        // Class data: field name bytes, jsonName bytes, then resolved deserializer instances
+        // Class data: field name bytes, jsonName bytes, then deserializer holder arrays
         List<Object> classData = new ArrayList<>(fieldNameBytesList);
         for (int idx : jsonNameFieldIndices) {
             classData.add(jsonFieldNameBytesList.get(idx));
         }
-        int resolvedDeClassDataOffset = classData.size();
-        for (var entry : resolvedDeFieldIndices.entrySet()) {
-            classData.add(resolvedDeserializers.get(entry.getKey()));
+        int deHoldersClassDataOffset = classData.size();
+        for (var entry : nestedDeFieldIndices.entrySet()) {
+            classData.add(deserializerHolders.get(entry.getKey()));
         }
 
         byte[] bytecode = ClassFile.of().build(thisClass, cb -> {
@@ -159,19 +157,14 @@ final class ClassFileJsonDeserializerGenerator {
                         ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
             }
 
-            for (var entry : resolvedDeFieldIndices.entrySet()) {
+            ClassDesc deArrayDesc = CD_GeneratedStructDeserializer.arrayType();
+            for (var entry : nestedDeFieldIndices.entrySet()) {
                 cb.withField("_DE_" + entry.getValue(),
-                        CD_GeneratedStructDeserializer,
-                        ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
-            }
-            ClassDesc objArrayDesc = CD_Object.arrayType();
-            for (var entry : unresolvedDeCacheIndices.entrySet()) {
-                cb.withField("_DEC_" + entry.getValue(),
-                        objArrayDesc,
+                        deArrayDesc,
                         ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
             }
 
-            emitClassInit(cb, thisClass, fieldNameBytesList, resolvedDeClassDataOffset);
+            emitClassInit(cb, thisClass, fieldNameBytesList, deHoldersClassDataOffset);
             emitConstructor(cb, thisClass);
             emitDeserializeFieldMethod(cb, thisClass, plan);
             emitDeserializeMethod(cb,
@@ -189,11 +182,11 @@ final class ClassFileJsonDeserializerGenerator {
             java.lang.classfile.ClassBuilder cb,
             ClassDesc thisClass,
             List<byte[]> fieldNameBytesList,
-            int resolvedDeClassDataOffset
+            int deHoldersClassDataOffset
     ) {
         ClassDesc CD_MethodHandles = ClassDesc.of("java.lang.invoke.MethodHandles");
         ClassDesc CD_List_cls = ClassDesc.of("java.util.List");
-        ClassDesc objArrayDesc = CD_Object.arrayType();
+        ClassDesc deArrayDesc = CD_GeneratedStructDeserializer.arrayType();
 
         cb.withMethodBody(ConstantDescs.CLASS_INIT_NAME,
                 MethodTypeDesc.of(CD_void),
@@ -235,23 +228,15 @@ final class ClassFileJsonDeserializerGenerator {
                         code.putstatic(thisClass, "DN_J_" + idx, CD_byte_array);
                     }
 
-                    int deIdx = resolvedDeClassDataOffset;
-                    for (var entry : resolvedDeFieldIndices.entrySet()) {
+                    int deIdx = deHoldersClassDataOffset;
+                    for (var entry : nestedDeFieldIndices.entrySet()) {
                         code.aload(listSlot);
                         code.ldc(deIdx++);
                         code.invokeinterface(CD_List_cls,
                                 "get",
                                 MethodTypeDesc.of(CD_Object, CD_int));
-                        code.checkcast(CD_GeneratedStructDeserializer);
-                        code.putstatic(thisClass,
-                                "_DE_" + entry.getValue(),
-                                CD_GeneratedStructDeserializer);
-                    }
-
-                    for (var entry : unresolvedDeCacheIndices.entrySet()) {
-                        code.iconst_2();
-                        code.anewarray(CD_Object);
-                        code.putstatic(thisClass, "_DEC_" + entry.getValue(), objArrayDesc);
+                        code.checkcast(deArrayDesc);
+                        code.putstatic(thisClass, "_DE_" + entry.getValue(), deArrayDesc);
                     }
 
                     code.return_();
@@ -1902,13 +1887,15 @@ final class ClassFileJsonDeserializerGenerator {
 
     private void emitDeserializeNestedCall(CodeBuilder code, ClassDesc thisClass, Class<?> targetClass) {
         String name = targetClass != null ? targetClass.getName() : null;
-        Integer resolvedIdx = name != null ? resolvedDeFieldIndices.get(name) : null;
-        Integer unresolvedIdx = name != null ? unresolvedDeCacheIndices.get(name) : null;
+        Integer idx = name != null ? nestedDeFieldIndices.get(name) : null;
 
-        if (resolvedIdx != null) {
+        if (idx != null) {
+            ClassDesc deArrayDesc = CD_GeneratedStructDeserializer.arrayType();
             ClassDesc targetClassDesc = ClassDesc.of(name);
             ClassDesc CD_ShapeBuilder = ClassDesc.of("software.amazon.smithy.java.core.schema.ShapeBuilder");
-            code.getstatic(thisClass, "_DE_" + resolvedIdx, CD_GeneratedStructDeserializer);
+            code.getstatic(thisClass, "_DE_" + idx, deArrayDesc);
+            code.iconst_0();
+            code.aaload();
             code.aload(SLOT_CTX);
             boolean isIface = targetClass.isInterface();
             code.invoke(
@@ -1923,17 +1910,6 @@ final class ClassFileJsonDeserializerGenerator {
                             ClassDesc.of("software.amazon.smithy.java.core.schema.SerializableStruct"),
                             CD_Object,
                             CD_ShapeBuilder));
-        } else if (unresolvedIdx != null) {
-            ClassDesc objArrayDesc = CD_Object.arrayType();
-            code.aload(SLOT_CTX);
-            code.getstatic(thisClass, "_DEC_" + unresolvedIdx, objArrayDesc);
-            code.ldc(ClassDesc.of(name));
-            code.invokestatic(CD_JsonCodegenHelpers,
-                    "deserializeNestedStructDirect",
-                    MethodTypeDesc.of(CD_Object,
-                            CD_JsonReaderContext,
-                            objArrayDesc,
-                            ClassDesc.of("java.lang.Class")));
         } else {
             code.aload(SLOT_CTX);
             code.ldc(ClassDesc.of(targetClass.getName()));
@@ -1949,7 +1925,7 @@ final class ClassFileJsonDeserializerGenerator {
 
     private void collectNestedStructTypes(
             StructCodePlan plan,
-            Map<String, GeneratedStructDeserializer> resolvedDeserializers
+            Map<String, GeneratedStructDeserializer[]> deserializerHolders
     ) {
         for (FieldPlan field : plan.fields()) {
             Class<?> clazz = null;
@@ -1972,12 +1948,9 @@ final class ClassFileJsonDeserializerGenerator {
             }
             if (clazz != null) {
                 String n = clazz.getName();
-                if (!resolvedDeFieldIndices.containsKey(n) && !unresolvedDeCacheIndices.containsKey(n)) {
-                    if (resolvedDeserializers.containsKey(n)) {
-                        resolvedDeFieldIndices.put(n, nextResolvedIndex++);
-                    } else {
-                        unresolvedDeCacheIndices.put(n, nextUnresolvedIndex++);
-                    }
+                if (deserializerHolders.containsKey(n)) {
+                    nestedDeFieldIndices.computeIfAbsent(n, k -> nextDeIndex++);
+                    nestedDeClasses.putIfAbsent(n, clazz);
                 }
             }
         }

@@ -26,10 +26,10 @@ public final class ClassFileJsonCodecProfile implements CodecProfile {
             StructCodePlan plan,
             String className,
             String packageName,
-            Map<String, GeneratedStructSerializer> resolvedSerializers
+            Map<String, GeneratedStructSerializer[]> serializerHolders
     ) {
         return new ClassFileJsonSerializerGenerator()
-                .generate(plan, className, packageName, resolvedSerializers);
+                .generate(plan, className, packageName, serializerHolders);
     }
 
     @Override
@@ -37,9 +37,9 @@ public final class ClassFileJsonCodecProfile implements CodecProfile {
             StructCodePlan plan,
             String className,
             String packageName,
-            Map<String, GeneratedStructDeserializer> resolvedDeserializers
+            Map<String, GeneratedStructDeserializer[]> deserializerHolders
     ) {
         return new ClassFileJsonDeserializerGenerator()
-                .generate(plan, className, packageName, resolvedDeserializers);
+                .generate(plan, className, packageName, deserializerHolders);
     }
 }

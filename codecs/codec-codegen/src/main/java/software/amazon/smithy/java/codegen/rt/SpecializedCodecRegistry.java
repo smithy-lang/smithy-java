@@ -35,6 +35,8 @@ public final class SpecializedCodecRegistry {
     private final Map<Class<?>, GeneratedStructSerializer> serializers = new ConcurrentHashMap<>();
     private final Map<Class<?>, GeneratedStructDeserializer> deserializers =
             new ConcurrentHashMap<>();
+    private final Map<String, GeneratedStructSerializer[]> serHolders = new ConcurrentHashMap<>();
+    private final Map<String, GeneratedStructDeserializer[]> deHolders = new ConcurrentHashMap<>();
     private final Map<Class<?>, Future<?>> pending = new ConcurrentHashMap<>();
     private final Set<Class<?>> failed = ConcurrentHashMap.newKeySet();
     private final ExecutorService executor;
@@ -104,20 +106,21 @@ public final class SpecializedCodecRegistry {
             return;
         }
 
+        String name = shapeClass.getName();
+        serHolders.computeIfAbsent(name, k -> new GeneratedStructSerializer[1]);
+        deHolders.computeIfAbsent(name, k -> new GeneratedStructDeserializer[1]);
+
         StructCodePlan plan = StructCodePlan.analyze(schema, shapeClass);
 
-        Map<String, GeneratedStructSerializer> resolvedSer = new HashMap<>();
-        Map<String, GeneratedStructDeserializer> resolvedDe = new HashMap<>();
+        Map<String, GeneratedStructSerializer[]> nestedSerHolders = new HashMap<>();
+        Map<String, GeneratedStructDeserializer[]> nestedDeHolders = new HashMap<>();
         for (Class<?> nested : plan.nestedStructClasses()) {
+            String nestedName = nested.getName();
+            serHolders.computeIfAbsent(nestedName, k -> new GeneratedStructSerializer[1]);
+            deHolders.computeIfAbsent(nestedName, k -> new GeneratedStructDeserializer[1]);
             generate(CodegenHelpers.schemaFor(nested), nested, inProgress);
-            GeneratedStructSerializer ser = serializers.get(nested);
-            if (ser != null) {
-                resolvedSer.put(nested.getName(), ser);
-            }
-            GeneratedStructDeserializer de = deserializers.get(nested);
-            if (de != null) {
-                resolvedDe.put(nested.getName(), de);
-            }
+            nestedSerHolders.put(nestedName, serHolders.get(nestedName));
+            nestedDeHolders.put(nestedName, deHolders.get(nestedName));
         }
 
         String pkg = shapeClass.getPackageName();
@@ -130,19 +133,23 @@ public final class SpecializedCodecRegistry {
             if (!serializers.containsKey(shapeClass)) {
                 String serClassName = shapeClass.getSimpleName() + "$" + profile.name() + "Ser";
                 CodecProfile.GenerationResult serResult =
-                        profile.generateSerializerBytecode(plan, serClassName, pkg, resolvedSer);
+                        profile.generateSerializerBytecode(plan, serClassName, pkg, nestedSerHolders);
                 Class<?> serClass = loadHiddenClass(baseLookup, serResult);
-                serializers.put(shapeClass,
-                        (GeneratedStructSerializer) serClass.getDeclaredConstructor().newInstance());
+                GeneratedStructSerializer ser =
+                        (GeneratedStructSerializer) serClass.getDeclaredConstructor().newInstance();
+                serializers.put(shapeClass, ser);
+                serHolders.get(name)[0] = ser;
             }
 
             if (!deserializers.containsKey(shapeClass)) {
                 String deClassName = shapeClass.getSimpleName() + "$" + profile.name() + "De";
                 CodecProfile.GenerationResult deResult =
-                        profile.generateDeserializerBytecode(plan, deClassName, pkg, resolvedDe);
+                        profile.generateDeserializerBytecode(plan, deClassName, pkg, nestedDeHolders);
                 Class<?> deClass = loadHiddenClass(baseLookup, deResult);
-                deserializers.put(shapeClass,
-                        (GeneratedStructDeserializer) deClass.getDeclaredConstructor().newInstance());
+                GeneratedStructDeserializer de =
+                        (GeneratedStructDeserializer) deClass.getDeclaredConstructor().newInstance();
+                deserializers.put(shapeClass, de);
+                deHolders.get(name)[0] = de;
             }
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Code generation failed for " + shapeClass.getName(), e);
