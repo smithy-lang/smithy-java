@@ -475,31 +475,38 @@ public final class JsonWriteUtils {
         return Schubfach.writeFloat(buf, pos, value, ftd);
     }
 
-    private static final ThreadLocal<Schubfach.DoubleToDecimal> REUSABLE_DTD =
-            ThreadLocal.withInitial(Schubfach::createDoubleToDecimal);
-    private static final ThreadLocal<Schubfach.FloatToDecimal> REUSABLE_FTD =
-            ThreadLocal.withInitial(Schubfach::createFloatToDecimal);
-
-    /**
-     * Writes a double using a thread-local reusable Schubfach instance, avoiding per-call allocation.
-     */
-    public static int writeDoubleReusable(byte[] buf, int pos, double value) {
-        long longValue = (long) value;
-        if (value == (double) longValue) {
-            return writeLong(buf, pos, longValue);
+    public static int writeDoubleNanCheck(byte[] buf, int pos, double value, JsonWriterContext ctx) {
+        if (Double.isFinite(value)) {
+            long longValue = (long) value;
+            if (value == (double) longValue) {
+                return writeLong(buf, pos, longValue);
+            }
+            return Schubfach.writeDouble(buf, pos, value, ctx.dtd);
+        } else if (Double.isNaN(value)) {
+            System.arraycopy(NAN_BYTES, 0, buf, pos, NAN_BYTES.length);
+            return pos + NAN_BYTES.length;
+        } else {
+            byte[] bytes = value > 0 ? INF_BYTES : NEG_INF_BYTES;
+            System.arraycopy(bytes, 0, buf, pos, bytes.length);
+            return pos + bytes.length;
         }
-        return Schubfach.writeDouble(buf, pos, value, REUSABLE_DTD.get());
     }
 
-    /**
-     * Writes a float using a thread-local reusable Schubfach instance, avoiding per-call allocation.
-     */
-    public static int writeFloatReusable(byte[] buf, int pos, float value) {
-        int intValue = (int) value;
-        if (value == (float) intValue) {
-            return writeInt(buf, pos, intValue);
+    public static int writeFloatNanCheck(byte[] buf, int pos, float value, JsonWriterContext ctx) {
+        if (Float.isFinite(value)) {
+            int intValue = (int) value;
+            if (value == (float) intValue) {
+                return writeInt(buf, pos, intValue);
+            }
+            return Schubfach.writeFloat(buf, pos, value, ctx.ftd);
+        } else if (Float.isNaN(value)) {
+            System.arraycopy(NAN_BYTES, 0, buf, pos, NAN_BYTES.length);
+            return pos + NAN_BYTES.length;
+        } else {
+            byte[] bytes = value > 0 ? INF_BYTES : NEG_INF_BYTES;
+            System.arraycopy(bytes, 0, buf, pos, bytes.length);
+            return pos + bytes.length;
         }
-        return Schubfach.writeFloat(buf, pos, value, REUSABLE_FTD.get());
     }
 
     /**
@@ -745,7 +752,9 @@ public final class JsonWriteUtils {
             unscaled = -unscaled;
         }
 
-        if (scale < POWERS_OF_10.length) {
+        if (scale == 0) {
+            pos = writePositiveLong(buf, pos, unscaled);
+        } else if (scale < POWERS_OF_10.length) {
             long divisor = POWERS_OF_10[scale];
             long intPart = unscaled / divisor;
             long fracPart = unscaled - intPart * divisor;

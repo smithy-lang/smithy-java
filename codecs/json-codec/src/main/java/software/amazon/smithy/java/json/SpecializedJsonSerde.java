@@ -11,12 +11,6 @@ import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 
-/**
- * SPI for specialized (codegen) JSON serialization/deserialization.
- *
- * <p>When an implementation is on the classpath, it is automatically discovered via ServiceLoader
- * and used to wrap the underlying {@link JsonSerdeProvider} with a fast-path decorator.
- */
 public interface SpecializedJsonSerde {
     ByteBuffer trySerialize(SerializableStruct struct, JsonSettings settings);
 

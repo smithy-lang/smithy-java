@@ -9,13 +9,13 @@ import java.nio.ByteBuffer;
 import software.amazon.smithy.java.codegen.rt.GeneratedStructDeserializer;
 import software.amazon.smithy.java.codegen.rt.GeneratedStructSerializer;
 import software.amazon.smithy.java.codegen.rt.SpecializedCodecRegistry;
-import software.amazon.smithy.java.codegen.rt.WriterContext;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.json.SpecializedJsonSerde;
+import software.amazon.smithy.java.json.smithy.JsonWriterContext;
 
 public final class ClassFileSpecializedJsonSerde implements SpecializedJsonSerde {
 
@@ -27,19 +27,20 @@ public final class ClassFileSpecializedJsonSerde implements SpecializedJsonSerde
 
     @Override
     public ByteBuffer trySerialize(SerializableStruct struct, JsonSettings settings) {
-        if (settings.prettyPrint() || settings.useJsonName()) {
+        if (settings.prettyPrint()) {
             return null;
         }
         GeneratedStructSerializer ser = registry.getSerializer(struct.schema(), struct.getClass());
         if (ser == null) {
             return null;
         }
-        WriterContext ctx = WriterContext.acquire(registry);
+        JsonWriterContext ctx = JsonWriterContext.acquire(registry);
+        ctx.useJsonName = settings.useJsonName();
         try {
             ser.serialize(struct, ctx);
             return ByteBuffer.wrap(ctx.toByteArray());
         } finally {
-            WriterContext.release(ctx);
+            JsonWriterContext.release(ctx);
         }
     }
 
@@ -52,15 +53,18 @@ public final class ClassFileSpecializedJsonSerde implements SpecializedJsonSerde
             ShapeBuilder<T> builder,
             JsonSettings settings
     ) {
-        if (settings.useJsonName()) {
+        Schema schema = builder.schema();
+        Class<?> shapeClass = schema.shapeClass();
+        if (shapeClass == null) {
             return null;
         }
-        Schema schema = builder.schema();
-        GeneratedStructDeserializer de = registry.getDeserializer(schema, schema.shapeClass());
+        GeneratedStructDeserializer de = registry.getDeserializer(schema, shapeClass);
         if (de == null) {
             return null;
         }
         JsonReaderContext ctx = JsonReaderContext.acquire(buf, offset, end, registry);
+        ctx.useJsonName = settings.useJsonName();
+        ctx.jsonSettings = settings;
         try {
             return (T) de.deserialize(ctx, builder);
         } finally {

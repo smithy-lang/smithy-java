@@ -5,9 +5,11 @@
 
 package software.amazon.smithy.java.codegen.rt;
 
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+
 /**
  * Interface implemented by runtime-generated specialized serializers.
  */
 public interface GeneratedStructSerializer {
-    void serialize(Object obj, WriterContext ctx);
+    void serialize(SerializableStruct obj, WriterContext ctx);
 }

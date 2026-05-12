@@ -13,6 +13,7 @@ import software.amazon.smithy.java.core.schema.Schema;
 public record FieldPlan(
         Schema schema,
         String memberName,
+        String jsonName,
         String getterName,
         int memberIndex,
         FieldCategory category,
@@ -24,5 +25,12 @@ public record FieldPlan(
         Class<?> mapValueClass) {
     public int fixedSizeUpperBound() {
         return category.fixedSizeUpperBound();
+    }
+
+    public String wireName(boolean useJsonName) {
+        if (useJsonName && jsonName != null) {
+            return jsonName;
+        }
+        return memberName;
     }
 }

@@ -39,13 +39,16 @@ public final class JsonSettings {
     }
 
     private static JsonSerdeProvider maybeWrapWithCodegen(JsonSerdeProvider provider) {
+        if (Runtime.version().feature() < 25) {
+            return provider;
+        }
         try {
-            var codegen = ServiceLoader.load(SpecializedJsonSerde.class,
-                    SpecializedJsonSerde.class.getClassLoader()).findFirst().orElse(null);
-            if (codegen != null) {
-                return new CodegenJsonSerdeProvider(provider, codegen);
-            }
-        } catch (Exception ignored) {}
+            var codegen = (SpecializedJsonSerde) Class.forName(
+                    "software.amazon.smithy.java.json.codegen.ClassFileSpecializedJsonSerde")
+                    .getDeclaredConstructor()
+                    .newInstance();
+            return new CodegenJsonSerdeProvider(provider, codegen);
+        } catch (Exception | LinkageError ignored) {}
         return provider;
     }
 

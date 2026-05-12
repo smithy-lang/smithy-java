@@ -33,25 +33,23 @@ public final class CodegenHelpers {
         return SCHEMA_CACHE.get(shapeClass);
     }
 
-    public static boolean trySerializeNested(Object obj, WriterContext ctx) {
-        if (obj instanceof SerializableStruct struct) {
-            GeneratedStructSerializer ser = ctx.registry.getSerializer(struct.schema(), obj.getClass());
-            if (ser != null) {
-                ser.serialize(obj, ctx);
-                return true;
-            }
+    public static boolean trySerializeNested(SerializableStruct struct, WriterContext ctx) {
+        GeneratedStructSerializer ser = ctx.registry.getSerializer(struct.schema(), struct.getClass());
+        if (ser != null) {
+            ser.serialize(struct, ctx);
+            return true;
         }
         return false;
     }
 
     public static GeneratedStructSerializer lookupCachedSerializer(
-            Object obj,
+            SerializableStruct struct,
             WriterContext ctx,
             GeneratedStructSerializer[] cached,
             Class<?> structClass
     ) {
         GeneratedStructSerializer ser = cached[0];
-        if (ser == null && obj instanceof SerializableStruct struct) {
+        if (ser == null) {
             ser = ctx.registry.getSerializer(struct.schema(), structClass);
             if (ser != null) {
                 cached[0] = ser;
