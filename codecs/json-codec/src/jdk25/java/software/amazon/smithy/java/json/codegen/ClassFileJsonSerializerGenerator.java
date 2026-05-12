@@ -1529,6 +1529,13 @@ final class ClassFileJsonSerializerGenerator {
             StructCodePlan plan
     ) {
         FieldCategory elemCategory = resolveElementCategory(field);
+        int sizeSlot = allocTempSlot();
+
+        // Cache list.size() before the loop to avoid repeated interface dispatch
+        // through Collections.unmodifiableList wrapper
+        code.aload(listSlot);
+        code.invokeinterface(CD_List, "size", MethodTypeDesc.of(CD_int));
+        code.istore(sizeSlot);
 
         if (elemCategory.isFixedSize() && !field.sparse()) {
             // Batch capacity: [ + ] + N * (element bound + comma)
@@ -1537,8 +1544,7 @@ final class ClassFileJsonSerializerGenerator {
             code.aload(2); // ctx
             code.iload(SLOT_POS);
             code.iconst_2();
-            code.aload(listSlot);
-            code.invokeinterface(CD_List, "size", MethodTypeDesc.of(CD_int));
+            code.iload(sizeSlot);
             code.ldc(elemBound + 1);
             code.imul();
             code.iadd(); // needed = 2 + size * (elemBound + 1)
@@ -1557,8 +1563,7 @@ final class ClassFileJsonSerializerGenerator {
             code.istore(idxSlot);
             code.labelBinding(loopStart);
             code.iload(idxSlot);
-            code.aload(listSlot);
-            code.invokeinterface(CD_List, "size", MethodTypeDesc.of(CD_int));
+            code.iload(sizeSlot);
             code.if_icmpge(loopEnd);
 
             // if (i > 0) buf[pos++] = ','
@@ -1592,8 +1597,7 @@ final class ClassFileJsonSerializerGenerator {
             code.istore(idxSlot);
             code.labelBinding(loopStart);
             code.iload(idxSlot);
-            code.aload(listSlot);
-            code.invokeinterface(CD_List, "size", MethodTypeDesc.of(CD_int));
+            code.iload(sizeSlot);
             code.if_icmpge(loopEnd);
 
             int savedTempSlot2 = nextTempSlot;
