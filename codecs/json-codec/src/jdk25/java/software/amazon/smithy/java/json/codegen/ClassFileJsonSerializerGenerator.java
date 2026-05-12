@@ -786,10 +786,13 @@ final class ClassFileJsonSerializerGenerator {
         code.aload(valSlot);
         code.ifnull(skipLabel);
 
-        // Ensure capacity for field name (may have been lost after prior variable-size writes)
+        // Ensure capacity for field name + value in one call when possible
         int ensureLen = nameLength;
         if (jsonNameFieldIndices.contains(fieldIndex)) {
             ensureLen = Math.max(ensureLen, jsonFieldNameBytesListRef.get(fieldIndex).length);
+        }
+        if (field.category().isFixedSize()) {
+            ensureLen += field.fixedSizeUpperBound();
         }
         emitEnsure(code, thisClass, ensureLen);
 
@@ -806,7 +809,6 @@ final class ClassFileJsonSerializerGenerator {
         code.istore(SLOT_NEEDS_COMMA);
 
         if (field.category().isFixedSize()) {
-            emitEnsure(code, thisClass, field.fixedSizeUpperBound());
             emitWriteFixedValueFromBoxedLocal(code, field, valSlot);
         } else {
             emitWriteValueWithCapacityFromLocal(code, thisClass, shapeClass, field, valSlot, plan);
