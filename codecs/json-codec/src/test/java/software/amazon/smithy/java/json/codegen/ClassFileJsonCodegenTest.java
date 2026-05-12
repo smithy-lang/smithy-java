@@ -43,11 +43,15 @@ public class ClassFileJsonCodegenTest {
 
     private static SpecializedCodecRegistry registry;
     private static JsonCodec jsonCodec;
+    private static software.amazon.smithy.java.json.JsonSettings codegenSettings;
 
     @BeforeAll
     static void setup() {
         registry = new SpecializedCodecRegistry(new ClassFileJsonCodecProfile());
         jsonCodec = JsonCodec.builder().useTimestampFormat(true).build();
+        codegenSettings = software.amazon.smithy.java.json.JsonSettings.builder()
+                .useTimestampFormat(true)
+                .build();
 
         registry.warmup(SimpleStruct.$SCHEMA, SimpleStruct.class);
         registry.warmup(ComplexStruct.$SCHEMA, ComplexStruct.class);
@@ -279,7 +283,7 @@ public class ClassFileJsonCodegenTest {
                 .build();
 
         JsonWriterContext ctx = JsonWriterContext.acquire(registry);
-        ctx.useJsonName = true;
+        ctx.jsonSettings = software.amazon.smithy.java.json.JsonSettings.builder().useJsonName(true).build();
         try {
             registry.getSerializer(JsonNameStruct.$SCHEMA, JsonNameStruct.class).serialize(obj, ctx);
             String json = new String(ctx.toByteArray(), StandardCharsets.UTF_8);
@@ -309,7 +313,7 @@ public class ClassFileJsonCodegenTest {
         String json = "{\"ID\":\"test-id\",\"DisplayName\":\"Bob\",\"normalField\":\"n\"}";
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         JsonReaderContext ctx = new JsonReaderContext(bytes, 0, bytes.length, registry);
-        ctx.useJsonName = true;
+        ctx.jsonSettings = software.amazon.smithy.java.json.JsonSettings.builder().useJsonName(true).build();
         JsonNameStruct obj = (JsonNameStruct) registry
                 .getDeserializer(JsonNameStruct.$SCHEMA, JsonNameStruct.class)
                 .deserialize(ctx, JsonNameStruct.builder());
@@ -328,7 +332,7 @@ public class ClassFileJsonCodegenTest {
                 .build();
 
         JsonWriterContext wctx = JsonWriterContext.acquire(registry);
-        wctx.useJsonName = true;
+        wctx.jsonSettings = software.amazon.smithy.java.json.JsonSettings.builder().useJsonName(true).build();
         byte[] bytes;
         try {
             registry.getSerializer(JsonNameStruct.$SCHEMA, JsonNameStruct.class).serialize(original, wctx);
@@ -338,7 +342,7 @@ public class ClassFileJsonCodegenTest {
         }
 
         JsonReaderContext rctx = new JsonReaderContext(bytes, 0, bytes.length, registry);
-        rctx.useJsonName = true;
+        rctx.jsonSettings = software.amazon.smithy.java.json.JsonSettings.builder().useJsonName(true).build();
         JsonNameStruct deserialized = (JsonNameStruct) registry
                 .getDeserializer(JsonNameStruct.$SCHEMA, JsonNameStruct.class)
                 .deserialize(rctx, JsonNameStruct.builder());
@@ -651,6 +655,7 @@ public class ClassFileJsonCodegenTest {
 
     private byte[] serializeToBytes(SerializableStruct obj) {
         JsonWriterContext ctx = JsonWriterContext.acquire(registry);
+        ctx.jsonSettings = codegenSettings;
         try {
             registry.getSerializer(obj.schema(), obj.getClass()).serialize(obj, ctx);
             return ctx.toByteArray();
@@ -683,6 +688,7 @@ public class ClassFileJsonCodegenTest {
             Class<T> shapeClass
     ) {
         JsonReaderContext ctx = new JsonReaderContext(bytes, 0, bytes.length, registry);
+        ctx.jsonSettings = codegenSettings;
         return (T) registry.getDeserializer(
                 ((software.amazon.smithy.java.core.schema.ShapeBuilder<?>) builder).schema(),
                 shapeClass).deserialize(ctx, (software.amazon.smithy.java.core.schema.ShapeBuilder<?>) builder);

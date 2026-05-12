@@ -22,6 +22,7 @@ import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.SerializationException;
+import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonDocuments;
@@ -271,6 +272,64 @@ public final class JsonCodegenHelpers {
 
         state.parsedEndPos = pos;
         return Instant.ofEpochSecond(seconds, nano);
+    }
+
+    public static int writeTimestamp(
+            byte[] buf,
+            int pos,
+            Instant value,
+            Schema memberSchema,
+            JsonSettings settings
+    ) {
+        var format = settings.timestampResolver().resolve(memberSchema);
+        if (format == TimestampFormatter.Prelude.EPOCH_SECONDS) {
+            return JsonWriteUtils.writeEpochSeconds(buf, pos, value.getEpochSecond(), value.getNano());
+        }
+        if (format == TimestampFormatter.Prelude.DATE_TIME) {
+            return JsonWriteUtils.writeIso8601Timestamp(buf, pos, value);
+        }
+        if (format == TimestampFormatter.Prelude.HTTP_DATE) {
+            return JsonWriteUtils.writeHttpDate(buf, pos, value);
+        }
+        return JsonWriteUtils.writeEpochSeconds(buf, pos, value.getEpochSecond(), value.getNano());
+    }
+
+    public static Instant readTimestamp(
+            byte[] buf,
+            int pos,
+            int end,
+            Schema memberSchema,
+            JsonSettings settings,
+            JsonParseState state
+    ) {
+        pos = JsonReadUtils.skipWhitespace(buf, pos, end);
+        state.parsedEndPos = pos;
+        var format = settings.timestampResolver().resolve(memberSchema);
+        if (format == TimestampFormatter.Prelude.EPOCH_SECONDS
+                && pos < end
+                && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
+            return parseEpochSeconds(buf, pos, end, state);
+        }
+        if (pos < end && buf[pos] == '"') {
+            if (format == TimestampFormatter.Prelude.DATE_TIME) {
+                Instant result = JsonReadUtils.parseIso8601(buf, pos, end, state);
+                if (result != null) {
+                    return result;
+                }
+            } else if (format == TimestampFormatter.Prelude.HTTP_DATE) {
+                Instant result = JsonReadUtils.parseHttpDate(buf, pos, end, state);
+                if (result != null) {
+                    return result;
+                }
+            }
+            JsonReadUtils.parseString(buf, pos, end, state);
+            return format.readFromString(state.parsedString, true);
+        }
+        if (pos < end && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
+            JsonReadUtils.parseDouble(buf, pos, end, state);
+            return format.readFromNumber(state.parsedDouble);
+        }
+        throw new SerializationException("Expected a timestamp at position " + pos);
     }
 
     public static int writeNull(byte[] buf, int pos) {

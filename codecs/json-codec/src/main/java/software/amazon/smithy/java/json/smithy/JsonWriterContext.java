@@ -15,6 +15,10 @@ import software.amazon.smithy.java.codegen.rt.WriterContext;
  */
 public final class JsonWriterContext extends WriterContext {
 
+    private static final software.amazon.smithy.java.json.JsonSettings DEFAULT_SETTINGS =
+            software.amazon.smithy.java.json.JsonSettings.builder().build();
+
+    public software.amazon.smithy.java.json.JsonSettings jsonSettings = DEFAULT_SETTINGS;
     public final Schubfach.DoubleToDecimal dtd = Schubfach.createDoubleToDecimal();
     public final Schubfach.FloatToDecimal ftd = Schubfach.createFloatToDecimal();
 
@@ -37,7 +41,6 @@ public final class JsonWriterContext extends WriterContext {
         JsonWriterContext ctx = POOL.getAndSet(idx, null);
         if (ctx != null) {
             ctx.pos = 0;
-            ctx.useJsonName = false;
             ctx.registry = registry;
             return ctx;
         }

@@ -23,9 +23,9 @@ public final class JsonReaderContext extends JsonParseState {
     public byte[] buf;
     public int pos;
     public int end;
-    public boolean useJsonName;
     public SpecializedCodecRegistry registry;
-    public software.amazon.smithy.java.json.JsonSettings jsonSettings;
+    public software.amazon.smithy.java.json.JsonSettings jsonSettings =
+            software.amazon.smithy.java.json.JsonSettings.builder().build();
 
     private static final int POOL_SIZE;
     private static final AtomicReferenceArray<JsonReaderContext> POOL;

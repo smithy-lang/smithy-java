@@ -56,6 +56,8 @@ final class ClassFileJsonDeserializerGenerator {
             "software.amazon.smithy.java.json.smithy.JsonReadUtils");
     private static final ClassDesc CD_JsonParseState = ClassDesc.of(
             "software.amazon.smithy.java.json.smithy.JsonParseState");
+    private static final ClassDesc CD_JsonSettings = ClassDesc.of(
+            "software.amazon.smithy.java.json.JsonSettings");
     private static final ClassDesc CD_JsonCodegenHelpers = ClassDesc.of(
             "software.amazon.smithy.java.json.codegen.JsonCodegenHelpers");
     private static final ClassDesc CD_SerializationException = ClassDesc.of(
@@ -101,6 +103,7 @@ final class ClassFileJsonDeserializerGenerator {
     private int nextDeIndex;
 
     private Set<Integer> jsonNameFieldIndices;
+    private ClassDesc shapeClassDesc;
 
     GenerationResult generate(
             StructCodePlan plan,
@@ -118,6 +121,7 @@ final class ClassFileJsonDeserializerGenerator {
 
         ClassDesc thisClass = ClassDesc.of(packageName + "." + className);
         ClassDesc shapeClass = ClassDesc.of(plan.shapeClass().getName());
+        this.shapeClassDesc = shapeClass;
 
         List<FieldPlan> fields = plan.fields();
         List<byte[]> fieldNameBytesList = new ArrayList<>();
@@ -630,11 +634,13 @@ final class ClassFileJsonDeserializerGenerator {
             code.labelBinding(caseLabels[i]);
 
             if (jsonNameFieldIndices.contains(i)) {
-                // Field has a different jsonName — branch on ctx.useJsonName
                 Label useMember = code.newLabel();
                 Label afterMatch = code.newLabel();
                 code.aload(SLOT_CTX);
-                code.getfield(CD_JsonReaderContext, "useJsonName", CD_boolean);
+                code.getfield(CD_JsonReaderContext, "jsonSettings", CD_JsonSettings);
+                code.invokevirtual(CD_JsonSettings,
+                        "useJsonName",
+                        MethodTypeDesc.of(CD_boolean));
                 code.ifeq(useMember);
                 // jsonName path
                 emitMatchFieldName(code,
@@ -1274,57 +1280,36 @@ final class ClassFileJsonDeserializerGenerator {
             ClassDesc setterReturn
     ) {
         String setter = field.memberName();
-        String format = field.timestampFormat();
-        if (format == null || "EPOCH_SECONDS".equals(format)) {
-            code.aload(SLOT_BUF);
-            code.iload(SLOT_POS);
-            code.iload(SLOT_END);
-            code.aload(SLOT_CTX);
-            code.invokestatic(CD_JsonCodegenHelpers,
-                    "parseEpochSeconds",
-                    MethodTypeDesc.of(CD_Instant, CD_byte_array, CD_int, CD_int, CD_JsonParseState));
-            int tsSlot = nextTempSlot++;
-            code.astore(tsSlot);
-            emitUpdatePosFromParsedEndPos(code);
-            code.aload(SLOT_BUILDER);
-            code.aload(tsSlot);
-            code.invokevirtual(builderClass,
-                    setter,
-                    MethodTypeDesc.of(setterReturn, CD_Instant));
-            code.pop();
-        } else if ("HTTP_DATE".equals(format)) {
-            // HTTP-date: use direct byte-level parser
-            code.aload(SLOT_BUF);
-            code.iload(SLOT_POS);
-            code.iload(SLOT_END);
-            code.aload(SLOT_CTX);
-            code.invokestatic(CD_JsonReadUtils,
-                    "parseHttpDate",
-                    MethodTypeDesc.of(CD_Instant, CD_byte_array, CD_int, CD_int, CD_JsonParseState));
-            int tsSlot = nextTempSlot++;
-            code.astore(tsSlot);
-            emitUpdatePosFromParsedEndPos(code);
-            code.aload(SLOT_BUILDER);
-            code.aload(tsSlot);
-            code.invokevirtual(builderClass,
-                    setter,
-                    MethodTypeDesc.of(setterReturn, CD_Instant));
-            code.pop();
-        } else {
-            // date-time: parse as quoted string, then Instant.parse
-            emitParseString(code);
-            emitUpdatePosFromParsedEndPos(code);
-            code.aload(SLOT_BUILDER);
-            code.aload(SLOT_CTX);
-            code.getfield(CD_JsonReaderContext, "parsedString", CD_String);
-            code.invokestatic(CD_Instant,
-                    "parse",
-                    MethodTypeDesc.of(CD_Instant, ClassDesc.of("java.lang.CharSequence")));
-            code.invokevirtual(builderClass,
-                    setter,
-                    MethodTypeDesc.of(setterReturn, CD_Instant));
-            code.pop();
-        }
+        ClassDesc CD_Schema = ClassDesc.of("software.amazon.smithy.java.core.schema.Schema");
+        code.aload(SLOT_BUF);
+        code.iload(SLOT_POS);
+        code.iload(SLOT_END);
+        code.getstatic(shapeClassDesc, "$SCHEMA", CD_Schema);
+        code.ldc(field.memberName());
+        code.invokevirtual(CD_Schema,
+                "member",
+                MethodTypeDesc.of(CD_Schema, CD_String));
+        code.aload(SLOT_CTX);
+        code.getfield(CD_JsonReaderContext, "jsonSettings", CD_JsonSettings);
+        code.aload(SLOT_CTX);
+        code.invokestatic(CD_JsonCodegenHelpers,
+                "readTimestamp",
+                MethodTypeDesc.of(CD_Instant,
+                        CD_byte_array,
+                        CD_int,
+                        CD_int,
+                        CD_Schema,
+                        CD_JsonSettings,
+                        CD_JsonParseState));
+        int tsSlot = nextTempSlot++;
+        code.astore(tsSlot);
+        emitUpdatePosFromParsedEndPos(code);
+        code.aload(SLOT_BUILDER);
+        code.aload(tsSlot);
+        code.invokevirtual(builderClass,
+                setter,
+                MethodTypeDesc.of(setterReturn, CD_Instant));
+        code.pop();
     }
 
     private void emitListDeserialization(
@@ -1644,13 +1629,27 @@ final class ClassFileJsonDeserializerGenerator {
                 code.pop();
             }
             case TIMESTAMP -> {
+                ClassDesc CD_Schema = ClassDesc.of("software.amazon.smithy.java.core.schema.Schema");
                 code.aload(SLOT_BUF);
                 code.iload(SLOT_POS);
                 code.iload(SLOT_END);
+                code.getstatic(shapeClassDesc, "$SCHEMA", CD_Schema);
+                code.ldc(field.memberName());
+                code.invokevirtual(CD_Schema,
+                        "member",
+                        MethodTypeDesc.of(CD_Schema, CD_String));
+                code.aload(SLOT_CTX);
+                code.getfield(CD_JsonReaderContext, "jsonSettings", CD_JsonSettings);
                 code.aload(SLOT_CTX);
                 code.invokestatic(CD_JsonCodegenHelpers,
-                        "parseEpochSeconds",
-                        MethodTypeDesc.of(CD_Instant, CD_byte_array, CD_int, CD_int, CD_JsonParseState));
+                        "readTimestamp",
+                        MethodTypeDesc.of(CD_Instant,
+                                CD_byte_array,
+                                CD_int,
+                                CD_int,
+                                CD_Schema,
+                                CD_JsonSettings,
+                                CD_JsonParseState));
                 int tsSlot = nextTempSlot++;
                 code.astore(tsSlot);
                 emitUpdatePosFromParsedEndPos(code);

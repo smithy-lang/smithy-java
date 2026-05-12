@@ -27,7 +27,6 @@ import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.ModifiableHttpRequest;
-import software.amazon.smithy.java.io.ByteBufferOutputStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -166,11 +165,7 @@ public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
     }
 
     private DataStream getBody(SerializableStruct input) {
-        var sink = new ByteBufferOutputStream();
-        try (var serializer = codec().createSerializer(sink)) {
-            input.serialize(serializer);
-        }
-        return DataStream.ofByteBuffer(sink.toByteBuffer(), payloadMediaType);
+        return DataStream.ofByteBuffer(codec().serialize(input), payloadMediaType);
     }
 
     private EventEncoderFactory<AwsEventFrame> getEventEncoderFactory(ApiOperation<?, ?> operation) {

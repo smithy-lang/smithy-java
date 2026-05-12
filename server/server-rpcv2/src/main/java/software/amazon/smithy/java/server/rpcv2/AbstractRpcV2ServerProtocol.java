@@ -12,7 +12,6 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.framework.model.MalformedRequestException;
 import software.amazon.smithy.java.framework.model.UnknownOperationException;
-import software.amazon.smithy.java.io.ByteBufferOutputStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.Job;
@@ -119,11 +118,7 @@ public abstract class AbstractRpcV2ServerProtocol extends ServerProtocol {
 
     @Override
     protected CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output, boolean isError) {
-        var sink = new ByteBufferOutputStream();
-        try (var serializer = codec().createSerializer(sink)) {
-            output.serialize(serializer);
-        }
-        job.response().setSerializedValue(DataStream.ofByteBuffer(sink.toByteBuffer(), payloadMediaType));
+        job.response().setSerializedValue(DataStream.ofByteBuffer(codec().serialize(output), payloadMediaType));
         var httpJob = job.asHttpJob();
         final int statusCode;
         if (isError) {

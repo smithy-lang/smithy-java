@@ -56,6 +56,8 @@ final class ClassFileJsonSerializerGenerator {
             "software.amazon.smithy.java.json.smithy.JsonWriterContext");
     private static final ClassDesc CD_JsonCodegenHelpers = ClassDesc.of(
             "software.amazon.smithy.java.json.codegen.JsonCodegenHelpers");
+    private static final ClassDesc CD_JsonSettings = ClassDesc.of(
+            "software.amazon.smithy.java.json.JsonSettings");
     private static final ClassDesc CD_BigInteger = ClassDesc.of("java.math.BigInteger");
     private static final ClassDesc CD_BigDecimal = ClassDesc.of("java.math.BigDecimal");
     private static final ClassDesc CD_Instant = ClassDesc.of("java.time.Instant");
@@ -86,6 +88,7 @@ final class ClassFileJsonSerializerGenerator {
 
     private Set<Integer> jsonNameFieldIndices;
     private List<byte[]> jsonFieldNameBytesListRef;
+    private ClassDesc shapeClassDesc;
 
     GenerationResult generate(
             StructCodePlan plan,
@@ -102,6 +105,7 @@ final class ClassFileJsonSerializerGenerator {
 
         ClassDesc thisClass = ClassDesc.of(packageName + "." + className);
         ClassDesc shapeClass = ClassDesc.of(plan.shapeClass().getName());
+        this.shapeClassDesc = shapeClass;
 
         List<byte[]> fieldNameBytesList = prepareFieldNameBytes(plan, false);
         List<byte[]> jsonFieldNameBytesList = prepareFieldNameBytes(plan, true);
@@ -477,8 +481,10 @@ final class ClassFileJsonSerializerGenerator {
             // Branch: use FN_J_i when ctx.useJsonName, otherwise FN_i
             Label useMember = code.newLabel();
             Label afterCopy = code.newLabel();
-            code.aload(2); // ctx
-            code.getfield(CD_WriterContext, "useJsonName", CD_boolean);
+            code.aload(2);
+            code.checkcast(CD_JsonWriterContext);
+            code.getfield(CD_JsonWriterContext, "jsonSettings", CD_JsonSettings);
+            code.invokevirtual(CD_JsonSettings, "useJsonName", MethodTypeDesc.of(CD_boolean));
             code.ifeq(useMember);
 
             // jsonName path
@@ -510,7 +516,9 @@ final class ClassFileJsonSerializerGenerator {
             Label useMember = code.newLabel();
             Label afterCopy = code.newLabel();
             code.aload(2);
-            code.getfield(CD_WriterContext, "useJsonName", CD_boolean);
+            code.checkcast(CD_JsonWriterContext);
+            code.getfield(CD_JsonWriterContext, "jsonSettings", CD_JsonSettings);
+            code.invokevirtual(CD_JsonSettings, "useJsonName", MethodTypeDesc.of(CD_boolean));
             code.ifeq(useMember);
             emitRangedFieldNameCopy(code, thisClass, "FN_J_" + fieldIndex, jsonNameLength);
             code.goto_(afterCopy);
@@ -1449,38 +1457,28 @@ final class ClassFileJsonSerializerGenerator {
             FieldPlan field,
             int tsSlot
     ) {
-        String format = field.timestampFormat();
-        if (format == null || "EPOCH_SECONDS".equals(format)) {
-            emitEnsure(code, thisClass, 24);
-            code.aload(SLOT_BUF);
-            code.iload(SLOT_POS);
-            code.aload(tsSlot);
-            code.invokevirtual(CD_Instant, "getEpochSecond", MethodTypeDesc.of(CD_long));
-            code.aload(tsSlot);
-            code.invokevirtual(CD_Instant, "getNano", MethodTypeDesc.of(CD_int));
-            code.invokestatic(CD_JsonWriteUtils,
-                    "writeEpochSeconds",
-                    MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_long, CD_int));
-            code.istore(SLOT_POS);
-        } else if ("HTTP_DATE".equals(format)) {
-            emitEnsure(code, thisClass, 40);
-            code.aload(SLOT_BUF);
-            code.iload(SLOT_POS);
-            code.aload(tsSlot);
-            code.invokestatic(CD_JsonWriteUtils,
-                    "writeHttpDate",
-                    MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_Instant));
-            code.istore(SLOT_POS);
-        } else {
-            emitEnsure(code, thisClass, 40);
-            code.aload(SLOT_BUF);
-            code.iload(SLOT_POS);
-            code.aload(tsSlot);
-            code.invokestatic(CD_JsonWriteUtils,
-                    "writeIso8601Timestamp",
-                    MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_Instant));
-            code.istore(SLOT_POS);
-        }
+        ClassDesc CD_Schema = ClassDesc.of("software.amazon.smithy.java.core.schema.Schema");
+        emitEnsure(code, thisClass, 42);
+        code.aload(SLOT_BUF);
+        code.iload(SLOT_POS);
+        code.aload(tsSlot);
+        code.getstatic(shapeClassDesc, "$SCHEMA", CD_Schema);
+        code.ldc(field.memberName());
+        code.invokevirtual(CD_Schema,
+                "member",
+                MethodTypeDesc.of(CD_Schema, CD_String));
+        code.aload(2);
+        code.checkcast(CD_JsonWriterContext);
+        code.getfield(CD_JsonWriterContext, "jsonSettings", CD_JsonSettings);
+        code.invokestatic(CD_JsonCodegenHelpers,
+                "writeTimestamp",
+                MethodTypeDesc.of(CD_int,
+                        CD_byte_array,
+                        CD_int,
+                        CD_Instant,
+                        CD_Schema,
+                        CD_JsonSettings));
+        code.istore(SLOT_POS);
     }
 
     // ---- List ----
