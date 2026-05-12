@@ -72,7 +72,5 @@ jmh {
             .map { listOf(it) }
             .orElse(emptyList()),
     )
-    if (!fast) {
-        profilers.add("async:output=jfr;dir=${layout.buildDirectory.get()}/jmh-profiler")
-    }
+    profilers.add("async:output=jfr;dir=${layout.buildDirectory.get()}/jmh-profiler")
 }

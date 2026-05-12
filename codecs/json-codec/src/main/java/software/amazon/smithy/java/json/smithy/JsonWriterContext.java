@@ -22,19 +22,14 @@ public final class JsonWriterContext extends WriterContext {
     public final Schubfach.DoubleToDecimal dtd = Schubfach.createDoubleToDecimal();
     public final Schubfach.FloatToDecimal ftd = Schubfach.createFloatToDecimal();
 
-    private static final int DEFAULT_BUF_SIZE = 512;
-    private static final int MAX_POOLED_CAPACITY = DEFAULT_BUF_SIZE * 64;
-    private static final int POOL_SLOTS;
-    private static final int POOL_MASK;
+    private static final int MAX_POOLED_CAPACITY = 64 * 1024;
+    private static final int POOL_SIZE;
     private static final AtomicReferenceArray<JsonWriterContext> POOL;
-    private static final int MAX_PROBE = 3;
 
     static {
         int procs = Runtime.getRuntime().availableProcessors();
-        int raw = procs * 4;
-        POOL_SLOTS = Integer.highestOneBit(raw - 1) << 1;
-        POOL_MASK = POOL_SLOTS - 1;
-        POOL = new AtomicReferenceArray<>(POOL_SLOTS);
+        POOL_SIZE = Integer.highestOneBit(procs * 4 - 1) << 1;
+        POOL = new AtomicReferenceArray<>(POOL_SIZE);
     }
 
     public JsonWriterContext(SpecializedCodecRegistry registry) {
@@ -42,40 +37,20 @@ public final class JsonWriterContext extends WriterContext {
     }
 
     public static JsonWriterContext acquire(SpecializedCodecRegistry registry) {
-        if (!Thread.currentThread().isVirtual()) {
-            int base = poolProbe();
-            for (int i = 0; i < MAX_PROBE; i++) {
-                int idx = (base + i) & POOL_MASK;
-                JsonWriterContext ctx = POOL.getPlain(idx);
-                if (ctx != null && POOL.compareAndExchangeAcquire(idx, ctx, null) == ctx) {
-                    ctx.pos = 0;
-                    ctx.registry = registry;
-                    return ctx;
-                }
-            }
+        int idx = (int) (Thread.currentThread().threadId() & (POOL_SIZE - 1));
+        JsonWriterContext ctx = POOL.getAndSet(idx, null);
+        if (ctx != null) {
+            ctx.pos = 0;
+            ctx.registry = registry;
+            return ctx;
         }
         return new JsonWriterContext(registry);
     }
 
     public static void release(JsonWriterContext ctx) {
-        if (Thread.currentThread().isVirtual()) {
-            return;
+        if (ctx.buf.length <= MAX_POOLED_CAPACITY) {
+            int idx = (int) (Thread.currentThread().threadId() & (POOL_SIZE - 1));
+            POOL.lazySet(idx, ctx);
         }
-        if (ctx.buf.length > MAX_POOLED_CAPACITY) {
-            ctx.buf = new byte[DEFAULT_BUF_SIZE];
-        }
-        int base = poolProbe();
-        for (int i = 0; i < MAX_PROBE; i++) {
-            int idx = (base + i) & POOL_MASK;
-            if (POOL.getPlain(idx) == null
-                    && POOL.compareAndExchangeRelease(idx, null, ctx) == null) {
-                return;
-            }
-        }
-    }
-
-    private static int poolProbe() {
-        long id = Thread.currentThread().threadId();
-        return (int) (id ^ (id >>> 16)) & POOL_MASK;
     }
 }
