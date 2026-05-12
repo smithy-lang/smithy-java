@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.aws.credentials.chain;
 
 /**
- * Describes where an {@link AwsCredentialProvider} sits in the credential chain.
+ * Describes where a {@link ChainIdentityProvider} sits in the credential chain.
  *
  * <p>Three forms:
  * <ul>

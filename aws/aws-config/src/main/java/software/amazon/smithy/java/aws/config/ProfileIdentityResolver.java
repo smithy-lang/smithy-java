@@ -11,22 +11,20 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.ServiceLoader;
+import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
-import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
-import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
 import software.amazon.smithy.java.aws.config.AwsConfigCredentialSourceHandler.ResolutionContext;
 import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.context.Context;
 
 /**
- * An {@link AwsCredentialsResolver} that reads credentials from a profile in the AWS shared
- * configuration / credentials files by dispatching to a chain of
- * {@link AwsConfigCredentialSourceHandler}s.
+ * An {@link IdentityResolver} that reads credentials from a profile in the AWS shared configuration / credentials
+ * files by dispatching to a chain of {@link AwsConfigCredentialSourceHandler}s.
  *
  * <h2>Architecture</h2>
  *
- * <p>Responsibilities are split so that the data model and credential-acquisition policy stay
- * independent:
+ * <p>Responsibilities are split so that the data model and credential-acquisition policy stay independent:
  *
  * <ul>
  *   <li>{@link AwsProfileFile} / {@link AwsProfile} own the loaded profile data. A profile exposes
@@ -63,7 +61,7 @@ import software.amazon.smithy.java.context.Context;
  * {@link AwsProfileFile#refresh()}). Concurrent callers of {@link #resolveIdentity(Context)}
  * observe the new state atomically after refresh completes.
  */
-public final class AwsProfileCredentialsResolver implements AwsCredentialsResolver {
+public final class ProfileIdentityResolver<I extends Identity> implements IdentityResolver<I> {
 
     /** Environment variable used to select the default profile name. */
     public static final String AWS_PROFILE_ENV = "AWS_PROFILE";
@@ -74,16 +72,18 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
     /** Profile name used when nothing else is configured. */
     public static final String DEFAULT_PROFILE_NAME = "default";
 
+    private final Class<I> identityType;
     private final String profileName;
-    private final List<AwsConfigCredentialSourceHandler> handlers;
+    private final List<AwsConfigCredentialSourceHandler<I>> handlers;
     private final boolean ignoreUnhandledSources;
     private final AwsProfileFile profileFile;
     private final String sourceDescription;
-    private final IdentityResult<AwsCredentialsIdentity> profileNotFoundError;
+    private final IdentityResult<I> profileNotFoundError;
 
-    private AwsProfileCredentialsResolver(Builder b) {
+    private ProfileIdentityResolver(Builder<I> b) {
+        this.identityType = b.identityType;
         this.profileName = b.profileName != null ? b.profileName : resolveDefaultProfileName();
-        this.handlers = b.handlers.isEmpty() ? discoverHandlers() : List.copyOf(b.handlers);
+        this.handlers = b.handlers.isEmpty() ? discoverHandlers(b.identityType) : List.copyOf(b.handlers);
         this.ignoreUnhandledSources = b.ignoreUnhandledSources;
 
         if (b.profileFile != null) {
@@ -106,10 +106,16 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
                 "AWS profile '" + profileName + "' was not found in " + sourceDescription);
     }
 
-    private static List<AwsConfigCredentialSourceHandler> discoverHandlers() {
-        List<AwsConfigCredentialSourceHandler> found = new ArrayList<>();
-        for (AwsConfigCredentialSourceHandler h : ServiceLoader.load(AwsConfigCredentialSourceHandler.class)) {
-            found.add(h);
+    private static <I extends Identity> List<AwsConfigCredentialSourceHandler<I>> discoverHandlers(
+            Class<I> identityType
+    ) {
+        List<AwsConfigCredentialSourceHandler<I>> found = new ArrayList<>();
+        for (AwsConfigCredentialSourceHandler<?> h : ServiceLoader.load(AwsConfigCredentialSourceHandler.class)) {
+            if (h.identityType() == identityType) {
+                @SuppressWarnings("unchecked")
+                var typed = (AwsConfigCredentialSourceHandler<I>) h;
+                found.add(typed);
+            }
         }
         return Collections.unmodifiableList(found);
     }
@@ -137,8 +143,8 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
     /**
      * @return a new builder.
      */
-    public static Builder builder() {
-        return new Builder();
+    public static <I extends Identity> Builder<I> builder(Class<I> identityType) {
+        return new Builder<>(identityType);
     }
 
     /**
@@ -159,7 +165,7 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
     /**
      * @return an unmodifiable, ordered view of this resolver's registered handlers.
      */
-    public List<AwsConfigCredentialSourceHandler> handlers() {
+    public List<AwsConfigCredentialSourceHandler<I>> handlers() {
         return handlers;
     }
 
@@ -177,7 +183,12 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
     }
 
     @Override
-    public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context requestProperties) {
+    public Class<I> identityType() {
+        return identityType;
+    }
+
+    @Override
+    public IdentityResult<I> resolveIdentity(Context requestProperties) {
         // Access each time since it can be refreshed.
         AwsProfile profile = profileFile.profile(profileName);
         if (profile == null) {
@@ -194,7 +205,7 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
 
         ResolutionContext ctx = new ResolutionContext(profileFile, profileName, requestProperties);
         for (AwsConfigCredentialSource source : sources) {
-            IdentityResult<AwsCredentialsIdentity> result = tryHandlers(source, ctx);
+            IdentityResult<I> result = tryHandlers(source, ctx);
             if (result != null) {
                 return result;
             } else if (!ignoreUnhandledSources) {
@@ -202,7 +213,7 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
             }
         }
 
-        String typeName = sources.get(0).getClass().getSimpleName();
+        String typeName = sources.getFirst().getClass().getSimpleName();
         return IdentityResult.ofError(
                 getClass(),
                 "AWS profile '" + profileName + "' requires a credential source of type '" + typeName + "', "
@@ -210,12 +221,12 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
                         + "(for example, an STS or SSO-backed handler from another module).");
     }
 
-    private IdentityResult<AwsCredentialsIdentity> tryHandlers(
+    private IdentityResult<I> tryHandlers(
             AwsConfigCredentialSource source,
             ResolutionContext ctx
     ) {
-        for (AwsConfigCredentialSourceHandler handler : handlers) {
-            IdentityResult<AwsCredentialsIdentity> attempt = handler.tryResolve(source, ctx);
+        for (var handler : handlers) {
+            IdentityResult<I> attempt = handler.tryResolve(source, ctx);
             if (attempt != null) {
                 if (!handler.featureIds().isEmpty()) {
                     var ids = ctx.requestProperties().get(CallContext.FEATURE_IDS);
@@ -243,35 +254,35 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
         return DEFAULT_PROFILE_NAME;
     }
 
-    /**
-     * Builder for {@link AwsProfileCredentialsResolver}.
-     */
-    public static final class Builder {
+    public static final class Builder<I extends Identity> {
+        private final Class<I> identityType;
         private String profileName;
         private AwsProfileFile profileFile;
         private Path configFile;
         private boolean configFileSet;
         private Path credentialsFile;
         private boolean credentialsFileSet;
-        private final List<AwsConfigCredentialSourceHandler> handlers = new ArrayList<>();
+        private final List<AwsConfigCredentialSourceHandler<I>> handlers = new ArrayList<>();
         private boolean ignoreUnhandledSources;
 
-        private Builder() {}
+        private Builder(Class<I> identityType) {
+            this.identityType = identityType;
+        }
 
         /**
          * Set the profile name to look up. If not set, the default resolution order applies
          * ({@code AWS_PROFILE}, {@code AWS_DEFAULT_PROFILE}, {@code "default"}).
          */
-        public Builder profileName(String profileName) {
+        public Builder<I> profileName(String profileName) {
             this.profileName = profileName;
             return this;
         }
 
         /**
-         * Use a pre-loaded {@link AwsProfileFile}. Mutually exclusive with {@link #configFile(Path)}
+         * Use a preloaded {@link AwsProfileFile}. Mutually exclusive with {@link #configFile(Path)}
          * and {@link #credentialsFile(Path)}.
          */
-        public Builder profileFile(AwsProfileFile profileFile) {
+        public Builder<I> profileFile(AwsProfileFile profileFile) {
             this.profileFile = Objects.requireNonNull(profileFile, "profileFile");
             this.configFile = null;
             this.configFileSet = false;
@@ -284,7 +295,7 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
          * Override the config file path. Mutually exclusive with {@link #profileFile(AwsProfileFile)}.
          * Pass {@code null} to explicitly disable reading a config file.
          */
-        public Builder configFile(Path configFile) {
+        public Builder<I> configFile(Path configFile) {
             this.profileFile = null;
             this.configFile = configFile;
             this.configFileSet = true;
@@ -295,7 +306,7 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
          * Override the credentials file path. Mutually exclusive with {@link #profileFile(AwsProfileFile)}.
          * Pass {@code null} to explicitly disable reading a credentials file.
          */
-        public Builder credentialsFile(Path credentialsFile) {
+        public Builder<I> credentialsFile(Path credentialsFile) {
             this.profileFile = null;
             this.credentialsFile = credentialsFile;
             this.credentialsFileSet = true;
@@ -307,10 +318,10 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
          * first handler that returns non-null for a given source wins.
          *
          * <p>If no handlers are registered before {@link #build()}, the resolver discovers
-         * handlers via {@link java.util.ServiceLoader}. Calling this method replaces ServiceLoader discovery
+         * handlers via {@link ServiceLoader}. Calling this method replaces ServiceLoader discovery
          * entirely; only explicitly added handlers will be used.
          */
-        public Builder addHandler(AwsConfigCredentialSourceHandler handler) {
+        public Builder<I> addHandler(AwsConfigCredentialSourceHandler<I> handler) {
             this.handlers.add(Objects.requireNonNull(handler, "handler"));
             return this;
         }
@@ -321,7 +332,7 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
          * matching the AWS SDK shared-configuration specification's requirement that the highest-priority source
          * MUST be used.
          */
-        public Builder ignoreUnhandledSources(boolean ignoreUnhandledSources) {
+        public Builder<I> ignoreUnhandledSources(boolean ignoreUnhandledSources) {
             this.ignoreUnhandledSources = ignoreUnhandledSources;
             return this;
         }
@@ -329,8 +340,8 @@ public final class AwsProfileCredentialsResolver implements AwsCredentialsResolv
         /**
          * Build the resolver.
          */
-        public AwsProfileCredentialsResolver build() {
-            return new AwsProfileCredentialsResolver(this);
+        public ProfileIdentityResolver<I> build() {
+            return new ProfileIdentityResolver<>(this);
         }
     }
 }

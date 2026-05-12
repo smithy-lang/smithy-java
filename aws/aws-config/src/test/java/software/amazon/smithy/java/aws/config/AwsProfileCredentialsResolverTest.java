@@ -73,7 +73,7 @@ class AwsProfileCredentialsResolverTest {
                 source_profile = base
                 """, StandardCharsets.UTF_8);
 
-        AwsProfileCredentialsResolver resolver = AwsProfileCredentialsResolver.builder()
+        var resolver = ProfileIdentityResolver.builder(AwsCredentialsIdentity.class)
                 .configFile(config)
                 .credentialsFile(null)
                 .profileName("role-profile")
@@ -84,7 +84,7 @@ class AwsProfileCredentialsResolverTest {
         assertNotNull(result.error());
         assertTrue(result.error().contains("AssumeRole"));
         assertTrue(result.error().contains("no handler"));
-        assertEquals(AwsProfileCredentialsResolver.class, result.resolver());
+        assertEquals(ProfileIdentityResolver.class, result.resolver());
     }
 
     @Test
@@ -97,16 +97,28 @@ class AwsProfileCredentialsResolverTest {
                 source_profile = base
                 """, StandardCharsets.UTF_8);
 
-        AwsConfigCredentialSourceHandler stubAssumeRoleHandler = (source, ctx) -> {
-            if (!(source instanceof AwsConfigCredentialSource.AssumeRole r)) {
-                return null;
-            }
-            return IdentityResult.of(AwsCredentialsIdentity.create(
-                    "assumed-" + r.roleArn(),
-                    "assumed-secret"));
-        };
+        AwsConfigCredentialSourceHandler<AwsCredentialsIdentity> stubAssumeRoleHandler =
+                new AwsConfigCredentialSourceHandler<>() {
+                    @Override
+                    public Class<AwsCredentialsIdentity> identityType() {
+                        return AwsCredentialsIdentity.class;
+                    }
 
-        AwsProfileCredentialsResolver resolver = AwsProfileCredentialsResolver.builder()
+                    @Override
+                    public IdentityResult<AwsCredentialsIdentity> tryResolve(
+                            AwsConfigCredentialSource source,
+                            ResolutionContext ctx
+                    ) {
+                        if (!(source instanceof AwsConfigCredentialSource.AssumeRole r)) {
+                            return null;
+                        }
+                        return IdentityResult.of(AwsCredentialsIdentity.create(
+                                "assumed-" + r.roleArn(),
+                                "assumed-secret"));
+                    }
+                };
+
+        var resolver = ProfileIdentityResolver.builder(AwsCredentialsIdentity.class)
                 .configFile(config)
                 .credentialsFile(null)
                 .profileName("role-profile")
@@ -132,7 +144,7 @@ class AwsProfileCredentialsResolverTest {
                 aws_secret_access_key = FALLBACK_SK
                 """, StandardCharsets.UTF_8);
 
-        AwsProfileCredentialsResolver resolver = AwsProfileCredentialsResolver.builder()
+        var resolver = ProfileIdentityResolver.builder(AwsCredentialsIdentity.class)
                 .configFile(config)
                 .credentialsFile(null)
                 .profileName("mixed")
@@ -156,7 +168,7 @@ class AwsProfileCredentialsResolverTest {
                 aws_secret_access_key = FALLBACK_SK
                 """, StandardCharsets.UTF_8);
 
-        AwsProfileCredentialsResolver resolver = AwsProfileCredentialsResolver.builder()
+        var resolver = ProfileIdentityResolver.builder(AwsCredentialsIdentity.class)
                 .configFile(config)
                 .credentialsFile(null)
                 .profileName("mixed")
@@ -176,7 +188,7 @@ class AwsProfileCredentialsResolverTest {
                 region = us-east-1
                 """, StandardCharsets.UTF_8);
 
-        AwsProfileCredentialsResolver resolver = AwsProfileCredentialsResolver.builder()
+        var resolver = ProfileIdentityResolver.builder(AwsCredentialsIdentity.class)
                 .configFile(config)
                 .credentialsFile(null)
                 .profileName("default")
@@ -210,7 +222,7 @@ class AwsProfileCredentialsResolverTest {
                 aws_secret_access_key = S1
                 """);
 
-        AwsProfileCredentialsResolver resolver = buildResolver(creds, "default");
+        var resolver = buildResolver(creds, "default");
         assertEquals("V1", resolver.resolveIdentity(Context.empty()).unwrap().accessKeyId());
 
         Files.writeString(creds, """
@@ -237,7 +249,7 @@ class AwsProfileCredentialsResolverTest {
                 .credentialsFile(creds)
                 .build();
 
-        AwsProfileCredentialsResolver resolver = AwsProfileCredentialsResolver.builder()
+        var resolver = ProfileIdentityResolver.builder(AwsCredentialsIdentity.class)
                 .profileFile(file)
                 .profileName("prod")
                 .build();
@@ -245,8 +257,8 @@ class AwsProfileCredentialsResolverTest {
         assertEquals("PK", resolver.resolveIdentity(Context.empty()).unwrap().accessKeyId());
     }
 
-    private static AwsProfileCredentialsResolver buildResolver(Path credentials, String profile) {
-        return AwsProfileCredentialsResolver.builder()
+    private static ProfileIdentityResolver<AwsCredentialsIdentity> buildResolver(Path credentials, String profile) {
+        return ProfileIdentityResolver.builder(AwsCredentialsIdentity.class)
                 .configFile(null)
                 .credentialsFile(credentials)
                 .profileName(profile)

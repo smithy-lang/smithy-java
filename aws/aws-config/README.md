@@ -28,7 +28,7 @@ AwsProfile profile = file.profile("default");
 String region = profile.property("region");
 
 // Resolve credentials from a profile directly
-AwsProfileCredentialsResolver resolver = AwsProfileCredentialsResolver.builder()
+var resolver = ProfileIdentityResolver.builder(AwsCredentialsIdentity.class)
     .profileName("dev")
     .build();
 

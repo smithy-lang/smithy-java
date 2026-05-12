@@ -12,6 +12,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
@@ -23,11 +24,13 @@ class FeatureIdTest {
 
     @Test
     void successfulProviderEmitsFeatureId() {
-        var chain = AwsCredentialChain.assemble(List.of(
-                provider("env",
-                        BuiltinProvider.ENVIRONMENT,
-                        Set.of(new CredentialFeatureId("g")),
-                        staticResolver("AK", "SK"))));
+        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+                List.of(
+                        provider("env",
+                                BuiltinProvider.ENVIRONMENT,
+                                Set.of(new CredentialFeatureId("g")),
+                                staticResolver("AK", "SK"))),
+                null);
 
         Context ctx = Context.create();
         ctx.put(CallContext.FEATURE_IDS, new HashSet<>());
@@ -41,15 +44,17 @@ class FeatureIdTest {
 
     @Test
     void failedProviderDoesNotEmitFeatureId() {
-        var chain = AwsCredentialChain.assemble(List.of(
-                provider("env",
-                        BuiltinProvider.ENVIRONMENT,
-                        Set.of(new CredentialFeatureId("g")),
-                        errorResolver("no creds")),
-                provider("profile",
-                        BuiltinProvider.SHARED_CONFIG,
-                        Set.of(new CredentialFeatureId("n")),
-                        staticResolver("AK", "SK"))));
+        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+                List.of(
+                        provider("env",
+                                BuiltinProvider.ENVIRONMENT,
+                                Set.of(new CredentialFeatureId("g")),
+                                errorResolver("no creds")),
+                        provider("profile",
+                                BuiltinProvider.SHARED_CONFIG,
+                                Set.of(new CredentialFeatureId("n")),
+                                staticResolver("AK", "SK"))),
+                null);
 
         Context ctx = Context.create();
         ctx.put(CallContext.FEATURE_IDS, new HashSet<>());
@@ -63,11 +68,13 @@ class FeatureIdTest {
 
     @Test
     void multipleFeatureIdsEmitted() {
-        var chain = AwsCredentialChain.assemble(List.of(
-                provider("proc",
-                        BuiltinProvider.SHARED_CONFIG,
-                        Set.of(new CredentialFeatureId("v"), new CredentialFeatureId("w")),
-                        staticResolver("AK", "SK"))));
+        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+                List.of(
+                        provider("proc",
+                                BuiltinProvider.SHARED_CONFIG,
+                                Set.of(new CredentialFeatureId("v"), new CredentialFeatureId("w")),
+                                staticResolver("AK", "SK"))),
+                null);
 
         Context ctx = Context.create();
         ctx.put(CallContext.FEATURE_IDS, new HashSet<>());
@@ -86,11 +93,13 @@ class FeatureIdTest {
 
     @Test
     void noFeatureIdsWhenContextKeyNotSet() {
-        var chain = AwsCredentialChain.assemble(List.of(
-                provider("env",
-                        BuiltinProvider.ENVIRONMENT,
-                        Set.of(new CredentialFeatureId("g")),
-                        staticResolver("AK", "SK"))));
+        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+                List.of(
+                        provider("env",
+                                BuiltinProvider.ENVIRONMENT,
+                                Set.of(new CredentialFeatureId("g")),
+                                staticResolver("AK", "SK"))),
+                null);
 
         // No FEATURE_IDS in context — should not throw.
         Context ctx = Context.create();
@@ -98,13 +107,13 @@ class FeatureIdTest {
         assertEquals("AK", result.identity().accessKeyId());
     }
 
-    private static AwsCredentialProvider provider(
+    private static ChainIdentityProvider provider(
             String name,
             BuiltinProvider slot,
             Set<CredentialFeatureId> featureIds,
             IdentityResolver<AwsCredentialsIdentity> resolver
     ) {
-        return new AwsCredentialProvider() {
+        return new ChainIdentityProvider() {
             @Override
             public String name() {
                 return name;
@@ -121,8 +130,9 @@ class FeatureIdTest {
             }
 
             @Override
-            public IdentityResolver<AwsCredentialsIdentity> create(ProviderContext context) {
-                return resolver;
+            @SuppressWarnings("unchecked")
+            public <I extends Identity> IdentityResolver<I> create(Class<I> identityType, ProviderContext context) {
+                return (IdentityResolver<I>) resolver;
             }
         };
     }

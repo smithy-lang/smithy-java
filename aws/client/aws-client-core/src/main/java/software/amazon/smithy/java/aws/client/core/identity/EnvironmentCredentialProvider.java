@@ -6,19 +6,16 @@
 package software.amazon.smithy.java.aws.client.core.identity;
 
 import java.util.Set;
+import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
-import software.amazon.smithy.java.aws.credentials.chain.AwsCredentialProvider;
 import software.amazon.smithy.java.aws.credentials.chain.BuiltinProvider;
+import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
 import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
 
-/**
- * Registers {@link EnvironmentVariableIdentityResolver} in the credential chain's
- * {@link BuiltinProvider#ENVIRONMENT} slot.
- */
-public final class EnvironmentCredentialProvider implements AwsCredentialProvider {
+public final class EnvironmentCredentialProvider implements ChainIdentityProvider {
 
     private static final Set<CredentialFeatureId> FEATURE_IDS = Set.of(new CredentialFeatureId("g"));
 
@@ -38,7 +35,11 @@ public final class EnvironmentCredentialProvider implements AwsCredentialProvide
     }
 
     @Override
-    public IdentityResolver<AwsCredentialsIdentity> create(ProviderContext context) {
-        return EnvironmentVariableIdentityResolver.INSTANCE;
+    @SuppressWarnings("unchecked")
+    public <I extends Identity> IdentityResolver<I> create(Class<I> identityType, ProviderContext context) {
+        if (identityType == AwsCredentialsIdentity.class) {
+            return (IdentityResolver<I>) EnvironmentVariableIdentityResolver.INSTANCE;
+        }
+        return null;
     }
 }
