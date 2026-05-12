@@ -5,8 +5,17 @@
 
 package software.amazon.smithy.java.json;
 
+import static tools.jackson.core.JsonToken.PROPERTY_NAME;
+
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -22,10 +31,13 @@ import software.amazon.smithy.java.benchmarks.codec.model.InnerStruct;
 import software.amazon.smithy.java.benchmarks.codec.model.NestedStruct;
 import software.amazon.smithy.java.benchmarks.codec.model.SimpleStruct;
 import software.amazon.smithy.java.codegen.rt.SpecializedCodecRegistry;
-import software.amazon.smithy.java.codegen.rt.WriterContext;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.json.codegen.ClassFileJsonCodecProfile;
 import software.amazon.smithy.java.json.codegen.JsonReaderContext;
+import software.amazon.smithy.java.json.smithy.JsonWriterContext;
+import tools.jackson.core.ObjectReadContext;
+import tools.jackson.core.ObjectWriteContext;
+import tools.jackson.core.json.JsonFactory;
 
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -40,6 +52,8 @@ public class JsonCodegenBench {
 
     private ComplexStruct complexStruct;
     private byte[] complexBytes;
+    private byte[] complexBytesReversed;
+    private byte[] complexBytesSparse;
 
     @Setup(Level.Trial)
     public void setup() {
@@ -70,19 +84,32 @@ public class JsonCodegenBench {
         ByteBuffer cbuf = dispatchCodec.serialize(complexStruct);
         complexBytes = new byte[cbuf.remaining()];
         cbuf.get(complexBytes);
+
+        complexBytesReversed = reverseJsonFieldOrder(complexBytes);
+        complexBytesSparse = dropJsonFields(complexBytes,
+                Set.of(
+                        "optionalString",
+                        "optionalInt",
+                        "optionalNested",
+                        "sparseStrings",
+                        "sparseMap",
+                        "bigIntValue",
+                        "bigDecValue",
+                        "freeformData",
+                        "choice"));
     }
 
     // ---- Simple struct benchmarks ----
 
     @Benchmark
     public byte[] serializeSimpleCodegen() {
-        WriterContext ctx = WriterContext.acquire(registry);
+        JsonWriterContext ctx = JsonWriterContext.acquire(registry);
         try {
             registry.getSerializer(SimpleStruct.$SCHEMA, SimpleStruct.class)
                     .serialize(simpleStruct, ctx);
             return ctx.toByteArray();
         } finally {
-            WriterContext.release(ctx);
+            JsonWriterContext.release(ctx);
         }
     }
 
@@ -110,13 +137,13 @@ public class JsonCodegenBench {
 
     @Benchmark
     public byte[] serializeComplexCodegen() {
-        WriterContext ctx = WriterContext.acquire(registry);
+        JsonWriterContext ctx = JsonWriterContext.acquire(registry);
         try {
             registry.getSerializer(ComplexStruct.$SCHEMA, ComplexStruct.class)
                     .serialize(complexStruct, ctx);
             return ctx.toByteArray();
         } finally {
-            WriterContext.release(ctx);
+            JsonWriterContext.release(ctx);
         }
     }
 
@@ -138,5 +165,112 @@ public class JsonCodegenBench {
         return dispatchCodec.deserializeShape(
                 ByteBuffer.wrap(complexBytes),
                 ComplexStruct.builder());
+    }
+
+    // ---- Missing fields benchmarks (in-order but with gaps — realistic scenario) ----
+
+    @Benchmark
+    public ComplexStruct deserializeSparseCodegen() {
+        JsonReaderContext ctx = new JsonReaderContext(
+                complexBytesSparse,
+                0,
+                complexBytesSparse.length,
+                registry);
+        return (ComplexStruct) registry
+                .getDeserializer(ComplexStruct.$SCHEMA, ComplexStruct.class)
+                .deserialize(ctx, ComplexStruct.builder());
+    }
+
+    @Benchmark
+    public ComplexStruct deserializeSparseDispatch() {
+        return dispatchCodec.deserializeShape(
+                ByteBuffer.wrap(complexBytesSparse),
+                ComplexStruct.builder());
+    }
+
+    // ---- Reversed field order benchmarks (tests hash dispatch fallback) ----
+
+    @Benchmark
+    public ComplexStruct deserializeReversedCodegen() {
+        JsonReaderContext ctx = new JsonReaderContext(
+                complexBytesReversed,
+                0,
+                complexBytesReversed.length,
+                registry);
+        return (ComplexStruct) registry
+                .getDeserializer(ComplexStruct.$SCHEMA, ComplexStruct.class)
+                .deserialize(ctx, ComplexStruct.builder());
+    }
+
+    @Benchmark
+    public ComplexStruct deserializeReversedDispatch() {
+        return dispatchCodec.deserializeShape(
+                ByteBuffer.wrap(complexBytesReversed),
+                ComplexStruct.builder());
+    }
+
+    private static byte[] dropJsonFields(byte[] json, Set<String> fieldsToDrop) {
+        var factory = JsonFactory.builder().build();
+        List<Map.Entry<String, byte[]>> fields = new ArrayList<>();
+        try (var parser = factory.createParser(ObjectReadContext.empty(), json)) {
+            parser.nextToken();
+            while (parser.nextToken() == PROPERTY_NAME) {
+                String name = parser.currentName();
+                parser.nextToken();
+                if (fieldsToDrop.contains(name)) {
+                    parser.skipChildren();
+                    continue;
+                }
+                var baos = new ByteArrayOutputStream();
+                try (var gen = factory.createGenerator(ObjectWriteContext.empty(), baos)) {
+                    gen.copyCurrentStructure(parser);
+                }
+                fields.add(new AbstractMap.SimpleEntry<>(name, baos.toByteArray()));
+            }
+        }
+        var out = new ByteArrayOutputStream();
+        try (var gen = factory.createGenerator(ObjectWriteContext.empty(), out)) {
+            gen.writeStartObject();
+            for (var field : fields) {
+                gen.writeName(field.getKey());
+                try (var p = factory.createParser(ObjectReadContext.empty(), field.getValue())) {
+                    p.nextToken();
+                    gen.copyCurrentStructure(p);
+                }
+            }
+            gen.writeEndObject();
+        }
+        return out.toByteArray();
+    }
+
+    private static byte[] reverseJsonFieldOrder(byte[] json) {
+        var factory = JsonFactory.builder().build();
+        List<Map.Entry<String, byte[]>> fields = new ArrayList<>();
+        try (var parser = factory.createParser(ObjectReadContext.empty(), json)) {
+            parser.nextToken();
+            while (parser.nextToken() == PROPERTY_NAME) {
+                String name = parser.currentName();
+                parser.nextToken();
+                var baos = new ByteArrayOutputStream();
+                try (var gen = factory.createGenerator(ObjectWriteContext.empty(), baos)) {
+                    gen.copyCurrentStructure(parser);
+                }
+                fields.add(new AbstractMap.SimpleEntry<>(name, baos.toByteArray()));
+            }
+        }
+        Collections.reverse(fields);
+        var out = new ByteArrayOutputStream();
+        try (var gen = factory.createGenerator(ObjectWriteContext.empty(), out)) {
+            gen.writeStartObject();
+            for (var field : fields) {
+                gen.writeName(field.getKey());
+                try (var p = factory.createParser(ObjectReadContext.empty(), field.getValue())) {
+                    p.nextToken();
+                    gen.copyCurrentStructure(p);
+                }
+            }
+            gen.writeEndObject();
+        }
+        return out.toByteArray();
     }
 }

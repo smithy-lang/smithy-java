@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.json.codegen;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import software.amazon.smithy.java.codegen.rt.SpecializedCodecRegistry;
 import software.amazon.smithy.java.json.smithy.JsonParseState;
@@ -18,14 +17,15 @@ import software.amazon.smithy.java.json.smithy.JsonParseState;
  * <p>Fields are public for direct access from generated code.
  * Instances are pooled via striped pooling to avoid allocation.
  */
-@SuppressFBWarnings(value = {"PA_PUBLIC_PRIMITIVE_ATTRIBUTE", "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"},
-        justification = "Public fields intentional for JIT optimization in generated code")
+@SuppressWarnings("checkstyle:VisibilityModifier")
 public final class JsonReaderContext extends JsonParseState {
 
     public byte[] buf;
     public int pos;
     public int end;
+    public boolean useJsonName;
     public SpecializedCodecRegistry registry;
+    public software.amazon.smithy.java.json.JsonSettings jsonSettings;
 
     private static final int POOL_SIZE;
     private static final AtomicReferenceArray<JsonReaderContext> POOL;

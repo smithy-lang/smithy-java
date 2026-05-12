@@ -199,6 +199,45 @@ structure JsonNameStruct {
 structure RecursiveStruct {
     value: String
     child: RecursiveStruct
+    children: RecursiveStructList
+}
+
+list RecursiveStructList {
+    member: RecursiveStruct
+}
+
+intEnum Priority {
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
+}
+
+structure EnumStruct {
+    @required
+    color: Color
+
+    priority: Priority
+
+    colors: ColorList
+}
+
+structure UnionHolder {
+    @required
+    name: String
+
+    choice: BenchUnion
+}
+
+structure DocumentHolder {
+    @required
+    name: String
+
+    freeform: Document
+}
+
+structure SparseStruct {
+    sparseStrings: SparseStringList
+    sparseMap: SparseStringMap
 }
 
 /// Structure for blob testing

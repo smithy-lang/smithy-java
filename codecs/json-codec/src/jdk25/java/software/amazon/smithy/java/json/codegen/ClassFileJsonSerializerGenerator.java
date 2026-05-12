@@ -13,8 +13,10 @@ import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import software.amazon.smithy.java.codegen.rt.CodecProfile.GenerationResult;
 import software.amazon.smithy.java.codegen.rt.GeneratedStructSerializer;
 import software.amazon.smithy.java.codegen.rt.plan.FieldCategory;
@@ -49,6 +51,8 @@ final class ClassFileJsonSerializerGenerator {
             "software.amazon.smithy.java.codegen.rt.GeneratedStructSerializer");
     private static final ClassDesc CD_JsonWriteUtils = ClassDesc.of(
             "software.amazon.smithy.java.json.smithy.JsonWriteUtils");
+    private static final ClassDesc CD_JsonWriterContext = ClassDesc.of(
+            "software.amazon.smithy.java.json.smithy.JsonWriterContext");
     private static final ClassDesc CD_JsonCodegenHelpers = ClassDesc.of(
             "software.amazon.smithy.java.json.codegen.JsonCodegenHelpers");
     private static final ClassDesc CD_BigInteger = ClassDesc.of("java.math.BigInteger");
@@ -64,43 +68,69 @@ final class ClassFileJsonSerializerGenerator {
     private static final ClassDesc CD_SmithyEnum = ClassDesc.of(
             "software.amazon.smithy.java.core.schema.SmithyEnum");
     private static final ClassDesc CD_System = ClassDesc.of("java.lang.System");
+    private static final ClassDesc CD_SerializableStruct = ClassDesc.of(
+            "software.amazon.smithy.java.core.schema.SerializableStruct");
 
     // Slot assignments for serialize method
     // 0=this, 1=Object obj, 2=WriterContext ctx
     private static final int SLOT_TYPED = 3;
     private static final int SLOT_BUF = 4;
     private static final int SLOT_POS = 5;
-    private static final int SLOT_FIRST_TEMP = 6;
+    private static final int SLOT_NEEDS_COMMA = 6;
+    private static final int SLOT_FIRST_TEMP = 7;
 
     private int nextTempSlot;
     private final Map<String, Integer> nestedSerCacheFieldIndices = new LinkedHashMap<>();
     private int nextCacheIndex;
 
+    private Set<Integer> jsonNameFieldIndices;
+    private List<byte[]> jsonFieldNameBytesListRef;
+
     GenerationResult generate(StructCodePlan plan, String className, String packageName) {
         nextTempSlot = SLOT_FIRST_TEMP;
         nestedSerCacheFieldIndices.clear();
         nextCacheIndex = 0;
+        jsonNameFieldIndices = new LinkedHashSet<>();
 
         collectNestedStructTypes(plan);
 
         ClassDesc thisClass = ClassDesc.of(packageName + "." + className);
         ClassDesc shapeClass = ClassDesc.of(plan.shapeClass().getName());
 
-        // Prepare field name bytes as class data
-        List<byte[]> fieldNameBytesList = prepareFieldNameBytes(plan);
+        List<byte[]> fieldNameBytesList = prepareFieldNameBytes(plan, false);
+        List<byte[]> jsonFieldNameBytesList = prepareFieldNameBytes(plan, true);
+        this.jsonFieldNameBytesListRef = jsonFieldNameBytesList;
+
+        // Track which serialization-order indices have a different jsonName
+        List<FieldPlan> serOrder = plan.isUnion() ? plan.fields() : plan.serializationOrder();
+        for (int i = 0; i < serOrder.size(); i++) {
+            FieldPlan f = serOrder.get(i);
+            if (f.jsonName() != null && !f.jsonName().equals(f.memberName())) {
+                jsonNameFieldIndices.add(i);
+            }
+        }
+
+        // Class data: memberName bytes followed by jsonName bytes (for fields that differ)
+        List<byte[]> classData = new ArrayList<>(fieldNameBytesList);
+        for (int idx : jsonNameFieldIndices) {
+            classData.add(jsonFieldNameBytesList.get(idx));
+        }
 
         byte[] bytecode = ClassFile.of().build(thisClass, cb -> {
             cb.withFlags(ClassFile.ACC_PUBLIC | ClassFile.ACC_FINAL);
             cb.withInterfaceSymbols(CD_GeneratedStructSerializer);
 
-            // Static fields for field name bytes (loaded from class data in clinit)
             for (int i = 0; i < fieldNameBytesList.size(); i++) {
                 cb.withField("FN_" + i,
                         CD_byte_array,
                         ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
             }
+            for (int idx : jsonNameFieldIndices) {
+                cb.withField("FN_J_" + idx,
+                        CD_byte_array,
+                        ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
+            }
 
-            // Static fields for nested serializer caches
             ClassDesc serArrayDesc = CD_GeneratedStructSerializer.arrayType();
             for (var entry : nestedSerCacheFieldIndices.entrySet()) {
                 cb.withField("_SER_" + entry.getValue(),
@@ -108,35 +138,41 @@ final class ClassFileJsonSerializerGenerator {
                         ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
             }
 
-            // Class initializer to load field name bytes from class data
-            emitClassInit(cb, thisClass, fieldNameBytesList);
-
-            // Default constructor
+            emitClassInit(cb, thisClass, fieldNameBytesList, jsonFieldNameBytesList);
             emitConstructor(cb, thisClass);
 
-            // serialize method
             if (plan.isUnion()) {
-                emitUnionSerializeMethod(cb, thisClass, shapeClass, plan, fieldNameBytesList);
+                emitUnionSerializeMethod(cb,
+                        thisClass,
+                        shapeClass,
+                        plan,
+                        fieldNameBytesList,
+                        jsonFieldNameBytesList);
             } else {
-                emitSerializeMethod(cb, thisClass, shapeClass, plan, fieldNameBytesList);
+                emitSerializeMethod(cb,
+                        thisClass,
+                        shapeClass,
+                        plan,
+                        fieldNameBytesList,
+                        jsonFieldNameBytesList);
             }
         });
 
-        // Class data: list of byte arrays for field names
-        return new GenerationResult(bytecode, fieldNameBytesList);
+        return new GenerationResult(bytecode, classData);
     }
 
-    private List<byte[]> prepareFieldNameBytes(StructCodePlan plan) {
+    private List<byte[]> prepareFieldNameBytes(StructCodePlan plan, boolean useJsonName) {
         List<byte[]> result = new ArrayList<>();
         if (plan.isUnion()) {
             for (FieldPlan field : plan.fields()) {
-                result.add(JsonWriteUtils.precomputeFieldNameBytes(field.memberName()));
+                result.add(JsonWriteUtils.precomputeFieldNameBytes(field.wireName(useJsonName)));
             }
         } else {
             List<FieldPlan> serOrder = plan.serializationOrder();
             boolean first = true;
             for (FieldPlan field : serOrder) {
-                byte[] nameBytes = JsonWriteUtils.precomputeFieldNameBytes(field.memberName());
+                byte[] nameBytes = JsonWriteUtils.precomputeFieldNameBytes(
+                        field.wireName(useJsonName));
                 if (!first) {
                     byte[] withComma = new byte[nameBytes.length + 1];
                     withComma[0] = ',';
@@ -153,7 +189,8 @@ final class ClassFileJsonSerializerGenerator {
     private void emitClassInit(
             java.lang.classfile.ClassBuilder cb,
             ClassDesc thisClass,
-            List<byte[]> fieldNameBytesList
+            List<byte[]> fieldNameBytesList,
+            List<byte[]> jsonFieldNameBytesList
     ) {
         ClassDesc CD_MethodHandles = ClassDesc.of("java.lang.invoke.MethodHandles");
         ClassDesc CD_List_cls = ClassDesc.of("java.util.List");
@@ -163,7 +200,6 @@ final class ClassFileJsonSerializerGenerator {
                 MethodTypeDesc.of(CD_void),
                 ClassFile.ACC_STATIC,
                 code -> {
-                    // Load class data: MethodHandles.classData(MethodHandles.lookup(), "", List.class)
                     code.invokestatic(CD_MethodHandles,
                             "lookup",
                             MethodTypeDesc.of(ClassDesc.of("java.lang.invoke.MethodHandles$Lookup")));
@@ -179,7 +215,6 @@ final class ClassFileJsonSerializerGenerator {
                     int listSlot = 0;
                     code.astore(listSlot);
 
-                    // Extract each byte[] from list into static fields
                     for (int i = 0; i < fieldNameBytesList.size(); i++) {
                         code.aload(listSlot);
                         code.ldc(i);
@@ -190,7 +225,18 @@ final class ClassFileJsonSerializerGenerator {
                         code.putstatic(thisClass, "FN_" + i, CD_byte_array);
                     }
 
-                    // Init nested serializer cache arrays
+                    // Load jsonName field name bytes (only for fields where jsonName differs)
+                    int classDataIdx = fieldNameBytesList.size();
+                    for (int idx : jsonNameFieldIndices) {
+                        code.aload(listSlot);
+                        code.ldc(classDataIdx++);
+                        code.invokeinterface(CD_List_cls,
+                                "get",
+                                MethodTypeDesc.of(CD_Object, CD_int));
+                        code.checkcast(CD_byte_array);
+                        code.putstatic(thisClass, "FN_J_" + idx, CD_byte_array);
+                    }
+
                     for (var entry : nestedSerCacheFieldIndices.entrySet()) {
                         code.iconst_1();
                         code.anewarray(CD_GeneratedStructSerializer);
@@ -219,10 +265,11 @@ final class ClassFileJsonSerializerGenerator {
             ClassDesc thisClass,
             ClassDesc shapeClass,
             StructCodePlan plan,
-            List<byte[]> fieldNameBytesList
+            List<byte[]> fieldNameBytesList,
+            List<byte[]> jsonFieldNameBytesList
     ) {
         cb.withMethodBody("serialize",
-                MethodTypeDesc.of(CD_void, CD_Object, CD_WriterContext),
+                MethodTypeDesc.of(CD_void, CD_SerializableStruct, CD_WriterContext),
                 ClassFile.ACC_PUBLIC,
                 code -> {
                     nextTempSlot = SLOT_FIRST_TEMP;
@@ -242,32 +289,37 @@ final class ClassFileJsonSerializerGenerator {
 
                     List<FieldPlan> serOrder = plan.serializationOrder();
 
-                    // Compute upfront capacity covering all field names + fixed-size values + braces
                     int totalCapacity = 2; // { and }
                     int fixedFieldEnd = 0;
                     for (int i = 0; i < serOrder.size(); i++) {
                         FieldPlan f = serOrder.get(i);
-                        totalCapacity += fieldNameBytesList.get(i).length;
+                        int nameLen = Math.max(
+                                fieldNameBytesList.get(i).length,
+                                jsonFieldNameBytesList.get(i).length);
+                        totalCapacity += nameLen;
                         if (f.required() && f.category().isFixedSize()) {
                             totalCapacity += f.fixedSizeUpperBound();
                             fixedFieldEnd = i + 1;
                         }
                     }
 
-                    // Single upfront ensure covers all field names + fixed values + braces
                     emitEnsure(code, thisClass, totalCapacity);
 
                     // buf[pos++] = '{'
                     emitWriteByte(code, '{');
 
-                    // Required fixed-size fields
+                    // needsComma tracks whether a field has been written (for optional field comma logic)
+                    code.ldc(fixedFieldEnd > 0 ? 1 : 0);
+                    code.istore(SLOT_NEEDS_COMMA);
+
+                    // Required fixed-size fields (always present; comma baked into field name bytes)
                     for (int i = 0; i < fixedFieldEnd; i++) {
                         FieldPlan f = serOrder.get(i);
                         emitFieldNameCopy(code, thisClass, i, fieldNameBytesList.get(i).length);
                         emitWriteFixedValue(code, shapeClass, f);
                     }
 
-                    // Remaining fields (name capacity already ensured upfront)
+                    // Remaining fields
                     for (int i = fixedFieldEnd; i < serOrder.size(); i++) {
                         FieldPlan field = serOrder.get(i);
                         if (field.nullable()) {
@@ -279,17 +331,19 @@ final class ClassFileJsonSerializerGenerator {
                                     fieldNameBytesList.get(i).length,
                                     plan);
                         } else {
-                            emitRequiredVariableFieldNoNameEnsure(code,
+                            emitRequiredVariableField(code,
                                     thisClass,
                                     shapeClass,
                                     field,
                                     i,
                                     fieldNameBytesList.get(i).length,
                                     plan);
+                            code.iconst_1();
+                            code.istore(SLOT_NEEDS_COMMA);
                         }
                     }
 
-                    // Closing brace (capacity already ensured upfront)
+                    // Closing brace
                     emitWriteByte(code, '}');
 
                     // Sync back to ctx
@@ -303,10 +357,11 @@ final class ClassFileJsonSerializerGenerator {
             ClassDesc thisClass,
             ClassDesc shapeClass,
             StructCodePlan plan,
-            List<byte[]> fieldNameBytesList
+            List<byte[]> fieldNameBytesList,
+            List<byte[]> jsonFieldNameBytesList
     ) {
         cb.withMethodBody("serialize",
-                MethodTypeDesc.of(CD_void, CD_Object, CD_WriterContext),
+                MethodTypeDesc.of(CD_void, CD_SerializableStruct, CD_WriterContext),
                 ClassFile.ACC_PUBLIC,
                 code -> {
                     nextTempSlot = SLOT_FIRST_TEMP;
@@ -399,9 +454,88 @@ final class ClassFileJsonSerializerGenerator {
     }
 
     private void emitFieldNameCopy(CodeBuilder code, ClassDesc thisClass, int fieldIndex, int length) {
-        // System.arraycopy(FN_i, 0, buf, pos, FN_i.length); pos += length;
-        code.getstatic(thisClass, "FN_" + fieldIndex, CD_byte_array);
-        code.iconst_0();
+        if (jsonNameFieldIndices.contains(fieldIndex)) {
+            int jsonNameLength = jsonFieldNameBytesListRef.get(fieldIndex).length;
+            // Branch: use FN_J_i when ctx.useJsonName, otherwise FN_i
+            Label useMember = code.newLabel();
+            Label afterCopy = code.newLabel();
+            code.aload(2); // ctx
+            code.getfield(CD_WriterContext, "useJsonName", CD_boolean);
+            code.ifeq(useMember);
+
+            // jsonName path
+            emitRawFieldNameCopy(code, thisClass, "FN_J_" + fieldIndex, jsonNameLength);
+            code.goto_(afterCopy);
+
+            // memberName path
+            code.labelBinding(useMember);
+            emitRawFieldNameCopy(code, thisClass, "FN_" + fieldIndex, length);
+
+            code.labelBinding(afterCopy);
+        } else {
+            emitRawFieldNameCopy(code, thisClass, "FN_" + fieldIndex, length);
+        }
+    }
+
+    private void emitOptionalFieldNameCopy(
+            CodeBuilder code,
+            ClassDesc thisClass,
+            int fieldIndex,
+            int nameLength
+    ) {
+        // The precomputed bytes for fieldIndex > 0 have a comma prefix: ",\"name\":"
+        // If needsComma == true, copy all bytes (offset 0, length nameLength).
+        // If needsComma == false, skip the comma (offset 1, length nameLength - 1).
+        if (jsonNameFieldIndices.contains(fieldIndex)) {
+            // Has jsonName variant — need to handle both FN_ and FN_J_ with comma logic
+            int jsonNameLength = jsonFieldNameBytesListRef.get(fieldIndex).length;
+            Label useMember = code.newLabel();
+            Label afterCopy = code.newLabel();
+            code.aload(2);
+            code.getfield(CD_WriterContext, "useJsonName", CD_boolean);
+            code.ifeq(useMember);
+            emitRangedFieldNameCopy(code, thisClass, "FN_J_" + fieldIndex, jsonNameLength);
+            code.goto_(afterCopy);
+            code.labelBinding(useMember);
+            emitRangedFieldNameCopy(code, thisClass, "FN_" + fieldIndex, nameLength);
+            code.labelBinding(afterCopy);
+        } else {
+            emitRangedFieldNameCopy(code, thisClass, "FN_" + fieldIndex, nameLength);
+        }
+    }
+
+    private void emitRangedFieldNameCopy(
+            CodeBuilder code,
+            ClassDesc thisClass,
+            String staticField,
+            int fullLength
+    ) {
+        Label withComma = code.newLabel();
+        Label afterCopy = code.newLabel();
+        code.iload(SLOT_NEEDS_COMMA);
+        code.ifne(withComma);
+        // No comma: copy from offset 1, length-1
+        emitRawFieldNameCopy(code, thisClass, staticField, 1, fullLength - 1);
+        code.goto_(afterCopy);
+        code.labelBinding(withComma);
+        // With comma: copy from offset 0, full length
+        emitRawFieldNameCopy(code, thisClass, staticField, 0, fullLength);
+        code.labelBinding(afterCopy);
+    }
+
+    private void emitRawFieldNameCopy(CodeBuilder code, ClassDesc thisClass, String fieldName, int length) {
+        emitRawFieldNameCopy(code, thisClass, fieldName, 0, length);
+    }
+
+    private void emitRawFieldNameCopy(
+            CodeBuilder code,
+            ClassDesc thisClass,
+            String fieldName,
+            int srcOffset,
+            int length
+    ) {
+        code.getstatic(thisClass, fieldName, CD_byte_array);
+        code.ldc(srcOffset);
         code.aload(SLOT_BUF);
         code.iload(SLOT_POS);
         code.ldc(length);
@@ -516,9 +650,11 @@ final class ClassFileJsonSerializerGenerator {
                 code.invokevirtual(shapeClass,
                         field.getterName(),
                         MethodTypeDesc.of(CD_float));
+                code.aload(2);
+                code.checkcast(CD_JsonWriterContext);
                 code.invokestatic(CD_JsonWriteUtils,
-                        "writeFloatReusable",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_float));
+                        "writeFloatNanCheck",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_float, CD_JsonWriterContext));
                 code.istore(SLOT_POS);
             }
             case DOUBLE -> {
@@ -528,9 +664,11 @@ final class ClassFileJsonSerializerGenerator {
                 code.invokevirtual(shapeClass,
                         field.getterName(),
                         MethodTypeDesc.of(CD_double));
+                code.aload(2);
+                code.checkcast(CD_JsonWriterContext);
                 code.invokestatic(CD_JsonWriteUtils,
-                        "writeDoubleReusable",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_double));
+                        "writeDoubleNanCheck",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_double, CD_JsonWriterContext));
                 code.istore(SLOT_POS);
             }
             case INT_ENUM -> {
@@ -602,7 +740,14 @@ final class ClassFileJsonSerializerGenerator {
         Label skipLabel = code.newLabel();
         int valSlot = allocTempSlot();
 
-        boolean isPrimitive = field.category().isPrimitive() && !field.required();
+        // For optional collections, use hasX() to check if set (getters return empty for null fields)
+        if (!field.required()
+                && (field.category() == FieldCategory.LIST || field.category() == FieldCategory.MAP)) {
+            String hasMethod = "has" + capitalize(field.memberName());
+            code.aload(SLOT_TYPED);
+            code.invokevirtual(shapeClass, hasMethod, MethodTypeDesc.of(CD_boolean));
+            code.ifeq(skipLabel);
+        }
 
         // Get value and store in temp
         code.aload(SLOT_TYPED);
@@ -615,14 +760,29 @@ final class ClassFileJsonSerializerGenerator {
         code.aload(valSlot);
         code.ifnull(skipLabel);
 
-        if (field.category().isFixedSize()) {
-            // Fixed-size value needs ensure for the value bytes (name already covered upfront)
-            emitEnsure(code, thisClass, field.fixedSizeUpperBound());
+        // Ensure capacity for field name (may have been lost after prior variable-size writes)
+        int ensureLen = nameLength;
+        if (jsonNameFieldIndices.contains(fieldIndex)) {
+            ensureLen = Math.max(ensureLen, jsonFieldNameBytesListRef.get(fieldIndex).length);
+        }
+        emitEnsure(code, thisClass, ensureLen);
+
+        // Field name copy with conditional comma handling:
+        // fieldIndex > 0 means the precomputed bytes have a comma prefix.
+        // If needsComma is false (no prior field written), skip the comma byte.
+        if (fieldIndex > 0) {
+            emitOptionalFieldNameCopy(code, thisClass, fieldIndex, nameLength);
+        } else {
             emitFieldNameCopy(code, thisClass, fieldIndex, nameLength);
+        }
+        // Mark that a field has been written
+        code.iconst_1();
+        code.istore(SLOT_NEEDS_COMMA);
+
+        if (field.category().isFixedSize()) {
+            emitEnsure(code, thisClass, field.fixedSizeUpperBound());
             emitWriteFixedValueFromBoxedLocal(code, field, valSlot);
         } else {
-            // Name capacity already ensured upfront
-            emitFieldNameCopy(code, thisClass, fieldIndex, nameLength);
             emitWriteValueWithCapacityFromLocal(code, thisClass, shapeClass, field, valSlot, plan);
         }
 
@@ -670,9 +830,11 @@ final class ClassFileJsonSerializerGenerator {
                 code.aload(valSlot);
                 code.checkcast(CD_Number);
                 code.invokevirtual(CD_Number, "floatValue", MethodTypeDesc.of(CD_float));
+                code.aload(2);
+                code.checkcast(CD_JsonWriterContext);
                 code.invokestatic(CD_JsonWriteUtils,
-                        "writeFloatReusable",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_float));
+                        "writeFloatNanCheck",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_float, CD_JsonWriterContext));
                 code.istore(SLOT_POS);
             }
             case DOUBLE -> {
@@ -681,9 +843,11 @@ final class ClassFileJsonSerializerGenerator {
                 code.aload(valSlot);
                 code.checkcast(CD_Number);
                 code.invokevirtual(CD_Number, "doubleValue", MethodTypeDesc.of(CD_double));
+                code.aload(2);
+                code.checkcast(CD_JsonWriterContext);
                 code.invokestatic(CD_JsonWriteUtils,
-                        "writeDoubleReusable",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_double));
+                        "writeDoubleNanCheck",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_double, CD_JsonWriterContext));
                 code.istore(SLOT_POS);
             }
             case INT_ENUM -> {
@@ -856,9 +1020,11 @@ final class ClassFileJsonSerializerGenerator {
                 code.invokevirtual(ownerClass,
                         field.getterName(),
                         MethodTypeDesc.of(CD_float));
+                code.aload(2);
+                code.checkcast(CD_JsonWriterContext);
                 code.invokestatic(CD_JsonWriteUtils,
-                        "writeFloatReusable",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_float));
+                        "writeFloatNanCheck",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_float, CD_JsonWriterContext));
                 code.istore(SLOT_POS);
             }
             case DOUBLE -> {
@@ -868,9 +1034,11 @@ final class ClassFileJsonSerializerGenerator {
                 code.invokevirtual(ownerClass,
                         field.getterName(),
                         MethodTypeDesc.of(CD_double));
+                code.aload(2);
+                code.checkcast(CD_JsonWriterContext);
                 code.invokestatic(CD_JsonWriteUtils,
-                        "writeDoubleReusable",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_double));
+                        "writeDoubleNanCheck",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_double, CD_JsonWriterContext));
                 code.istore(SLOT_POS);
             }
             case INT_ENUM -> {
@@ -1510,9 +1678,11 @@ final class ClassFileJsonSerializerGenerator {
                 code.aload(elemSlot);
                 code.checkcast(CD_Number);
                 code.invokevirtual(CD_Number, "floatValue", MethodTypeDesc.of(CD_float));
+                code.aload(2);
+                code.checkcast(CD_JsonWriterContext);
                 code.invokestatic(CD_JsonWriteUtils,
-                        "writeFloatReusable",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_float));
+                        "writeFloatNanCheck",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_float, CD_JsonWriterContext));
                 code.istore(SLOT_POS);
             }
             case DOUBLE -> {
@@ -1521,9 +1691,11 @@ final class ClassFileJsonSerializerGenerator {
                 code.aload(elemSlot);
                 code.checkcast(CD_Number);
                 code.invokevirtual(CD_Number, "doubleValue", MethodTypeDesc.of(CD_double));
+                code.aload(2);
+                code.checkcast(CD_JsonWriterContext);
                 code.invokestatic(CD_JsonWriteUtils,
-                        "writeDoubleReusable",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_double));
+                        "writeDoubleNanCheck",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_double, CD_JsonWriterContext));
                 code.istore(SLOT_POS);
             }
             case INT_ENUM -> throw new UnsupportedOperationException(
@@ -1605,6 +1777,63 @@ final class ClassFileJsonSerializerGenerator {
                 code.checkcast(CD_SmithyEnum);
                 code.invokeinterface(CD_SmithyEnum, "getValue", MethodTypeDesc.of(CD_String));
                 emitWriteStringFastCall(code);
+            }
+            case BIG_INTEGER -> {
+                emitEnsure(code, thisClass, 57);
+                emitWriteCommaIfNotFirst(code, idxSlot);
+                code.aload(SLOT_BUF);
+                code.iload(SLOT_POS);
+                code.aload(listSlot);
+                code.iload(idxSlot);
+                code.invokeinterface(CD_List, "get", MethodTypeDesc.of(CD_Object, CD_int));
+                code.checkcast(CD_BigInteger);
+                code.invokestatic(CD_JsonWriteUtils,
+                        "writeBigInteger",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_BigInteger));
+                code.istore(SLOT_POS);
+            }
+            case BIG_DECIMAL -> {
+                int elemSlot = allocTempSlot();
+                Label skipComma = code.newLabel();
+                code.iload(idxSlot);
+                code.ifeq(skipComma);
+                emitEnsure(code, thisClass, 1);
+                emitWriteByte(code, ',');
+                code.labelBinding(skipComma);
+                code.aload(listSlot);
+                code.iload(idxSlot);
+                code.invokeinterface(CD_List, "get", MethodTypeDesc.of(CD_Object, CD_int));
+                code.astore(elemSlot);
+                emitWriteBigDecimalFromLocal(code, thisClass, elemSlot);
+            }
+            case BLOB -> {
+                int elemSlot = allocTempSlot();
+                Label skipComma = code.newLabel();
+                code.iload(idxSlot);
+                code.ifeq(skipComma);
+                emitEnsure(code, thisClass, 1);
+                emitWriteByte(code, ',');
+                code.labelBinding(skipComma);
+                code.aload(listSlot);
+                code.iload(idxSlot);
+                code.invokeinterface(CD_List, "get", MethodTypeDesc.of(CD_Object, CD_int));
+                code.astore(elemSlot);
+                emitWriteBlobFromLocal(code, thisClass, elemSlot);
+            }
+            case TIMESTAMP -> {
+                int elemSlot = allocTempSlot();
+                Label skipComma = code.newLabel();
+                code.iload(idxSlot);
+                code.ifeq(skipComma);
+                emitEnsure(code, thisClass, 1);
+                emitWriteByte(code, ',');
+                code.labelBinding(skipComma);
+                code.aload(listSlot);
+                code.iload(idxSlot);
+                code.invokeinterface(CD_List, "get", MethodTypeDesc.of(CD_Object, CD_int));
+                code.checkcast(CD_Instant);
+                code.astore(elemSlot);
+                emitWriteTimestampFromSlot(code, thisClass, field, elemSlot);
             }
             default -> {
                 Label skipComma = code.newLabel();
@@ -1812,9 +2041,11 @@ final class ClassFileJsonSerializerGenerator {
                 code.aload(valSlot);
                 code.checkcast(CD_Number);
                 code.invokevirtual(CD_Number, "floatValue", MethodTypeDesc.of(CD_float));
+                code.aload(2);
+                code.checkcast(CD_JsonWriterContext);
                 code.invokestatic(CD_JsonWriteUtils,
-                        "writeFloatReusable",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_float));
+                        "writeFloatNanCheck",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_float, CD_JsonWriterContext));
                 code.istore(SLOT_POS);
             }
             case DOUBLE -> {
@@ -1824,9 +2055,11 @@ final class ClassFileJsonSerializerGenerator {
                 code.aload(valSlot);
                 code.checkcast(CD_Number);
                 code.invokevirtual(CD_Number, "doubleValue", MethodTypeDesc.of(CD_double));
+                code.aload(2);
+                code.checkcast(CD_JsonWriterContext);
                 code.invokestatic(CD_JsonWriteUtils,
-                        "writeDoubleReusable",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_double));
+                        "writeDoubleNanCheck",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_double, CD_JsonWriterContext));
                 code.istore(SLOT_POS);
             }
             case STRING -> {
@@ -2046,6 +2279,16 @@ final class ClassFileJsonSerializerGenerator {
             return FieldCategory.BYTE;
         if (SmithyEnum.class.isAssignableFrom(clazz))
             return FieldCategory.ENUM_STRING;
+        if (clazz == java.math.BigInteger.class)
+            return FieldCategory.BIG_INTEGER;
+        if (clazz == java.math.BigDecimal.class)
+            return FieldCategory.BIG_DECIMAL;
+        if (clazz == java.nio.ByteBuffer.class)
+            return FieldCategory.BLOB;
+        if (clazz == java.time.Instant.class)
+            return FieldCategory.TIMESTAMP;
+        if (software.amazon.smithy.java.core.serde.document.Document.class.isAssignableFrom(clazz))
+            return FieldCategory.DOCUMENT;
         return FieldCategory.STRUCT;
     }
 

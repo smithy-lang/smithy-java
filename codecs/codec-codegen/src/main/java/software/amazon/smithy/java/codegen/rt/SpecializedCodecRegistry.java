@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.rt;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.lang.invoke.MethodHandles;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -31,10 +32,10 @@ public final class SpecializedCodecRegistry {
     private static final Logger LOG = Logger.getLogger(SpecializedCodecRegistry.class.getName());
 
     private final CodecProfile profile;
-    private final ConcurrentHashMap<Class<?>, GeneratedStructSerializer> serializers = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Class<?>, GeneratedStructDeserializer> deserializers =
+    private final Map<Class<?>, GeneratedStructSerializer> serializers = new ConcurrentHashMap<>();
+    private final Map<Class<?>, GeneratedStructDeserializer> deserializers =
             new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Class<?>, Future<?>> pending = new ConcurrentHashMap<>();
+    private final Map<Class<?>, Future<?>> pending = new ConcurrentHashMap<>();
     private final Set<Class<?>> failed = ConcurrentHashMap.newKeySet();
     private final ExecutorService executor;
 

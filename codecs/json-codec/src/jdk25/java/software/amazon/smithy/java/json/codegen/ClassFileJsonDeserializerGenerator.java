@@ -14,8 +14,10 @@ import java.lang.constant.MethodTypeDesc;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import software.amazon.smithy.java.codegen.rt.CodecProfile.GenerationResult;
 import software.amazon.smithy.java.codegen.rt.GeneratedStructDeserializer;
 import software.amazon.smithy.java.codegen.rt.plan.FieldCategory;
@@ -96,33 +98,53 @@ final class ClassFileJsonDeserializerGenerator {
     private final Map<String, Integer> nestedDeCacheIndices = new LinkedHashMap<>();
     private int nextCacheIndex;
 
+    private Set<Integer> jsonNameFieldIndices;
+
     GenerationResult generate(StructCodePlan plan, String className, String packageName) {
         nextTempSlot = SLOT_FIRST_TEMP;
         nestedDeCacheIndices.clear();
         nextCacheIndex = 0;
+        jsonNameFieldIndices = new LinkedHashSet<>();
 
         collectNestedStructTypes(plan);
 
         ClassDesc thisClass = ClassDesc.of(packageName + "." + className);
         ClassDesc shapeClass = ClassDesc.of(plan.shapeClass().getName());
 
+        List<FieldPlan> fields = plan.fields();
         List<byte[]> fieldNameBytesList = new ArrayList<>();
-        for (FieldPlan f : plan.fields()) {
+        List<byte[]> jsonFieldNameBytesList = new ArrayList<>();
+        for (int i = 0; i < fields.size(); i++) {
+            FieldPlan f = fields.get(i);
             fieldNameBytesList.add(f.memberName().getBytes(StandardCharsets.UTF_8));
+            String jn = f.wireName(true);
+            jsonFieldNameBytesList.add(jn.getBytes(StandardCharsets.UTF_8));
+            if (f.jsonName() != null && !f.jsonName().equals(f.memberName())) {
+                jsonNameFieldIndices.add(i);
+            }
+        }
+
+        // Class data: memberName bytes, then jsonName bytes for fields that differ
+        List<byte[]> classData = new ArrayList<>(fieldNameBytesList);
+        for (int idx : jsonNameFieldIndices) {
+            classData.add(jsonFieldNameBytesList.get(idx));
         }
 
         byte[] bytecode = ClassFile.of().build(thisClass, cb -> {
             cb.withFlags(ClassFile.ACC_PUBLIC | ClassFile.ACC_FINAL);
             cb.withInterfaceSymbols(CD_GeneratedStructDeserializer);
 
-            // Static fields for field name bytes
             for (int i = 0; i < fieldNameBytesList.size(); i++) {
                 cb.withField("DN_" + i,
                         CD_byte_array,
                         ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
             }
+            for (int idx : jsonNameFieldIndices) {
+                cb.withField("DN_J_" + idx,
+                        CD_byte_array,
+                        ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
+            }
 
-            // Nested deserializer cache fields
             ClassDesc objArrayDesc = CD_Object.arrayType();
             for (var entry : nestedDeCacheIndices.entrySet()) {
                 cb.withField("_DE_" + entry.getValue(),
@@ -133,10 +155,15 @@ final class ClassFileJsonDeserializerGenerator {
             emitClassInit(cb, thisClass, fieldNameBytesList);
             emitConstructor(cb, thisClass);
             emitDeserializeFieldMethod(cb, thisClass, plan);
-            emitDeserializeMethod(cb, thisClass, shapeClass, plan, fieldNameBytesList);
+            emitDeserializeMethod(cb,
+                    thisClass,
+                    shapeClass,
+                    plan,
+                    fieldNameBytesList,
+                    jsonFieldNameBytesList);
         });
 
-        return new GenerationResult(bytecode, fieldNameBytesList);
+        return new GenerationResult(bytecode, classData);
     }
 
     private void emitClassInit(
@@ -177,6 +204,18 @@ final class ClassFileJsonDeserializerGenerator {
                         code.putstatic(thisClass, "DN_" + i, CD_byte_array);
                     }
 
+                    // Load jsonName field name bytes (for fields where jsonName differs)
+                    int classDataIdx = fieldNameBytesList.size();
+                    for (int idx : jsonNameFieldIndices) {
+                        code.aload(listSlot);
+                        code.ldc(classDataIdx++);
+                        code.invokeinterface(CD_List_cls,
+                                "get",
+                                MethodTypeDesc.of(CD_Object, CD_int));
+                        code.checkcast(CD_byte_array);
+                        code.putstatic(thisClass, "DN_J_" + idx, CD_byte_array);
+                    }
+
                     for (var entry : nestedDeCacheIndices.entrySet()) {
                         code.iconst_2();
                         code.anewarray(CD_Object);
@@ -205,7 +244,8 @@ final class ClassFileJsonDeserializerGenerator {
             ClassDesc thisClass,
             ClassDesc shapeClass,
             StructCodePlan plan,
-            List<byte[]> fieldNameBytesList
+            List<byte[]> fieldNameBytesList,
+            List<byte[]> jsonFieldNameBytesList
     ) {
         ClassDesc builderClass = ClassDesc.of(plan.shapeClass().getName() + "$Builder");
 
@@ -337,7 +377,12 @@ final class ClassFileJsonDeserializerGenerator {
 
                     // Speculative matching via switch on expectedNext
                     Label afterSpeculative = code.newLabel();
-                    emitSpeculativeMatch(code, thisClass, fields, fieldNameBytesList, afterSpeculative);
+                    emitSpeculativeMatch(code,
+                            thisClass,
+                            fields,
+                            fieldNameBytesList,
+                            jsonFieldNameBytesList,
+                            afterSpeculative);
                     code.labelBinding(afterSpeculative);
 
                     // Slow path: FNV-1a hash
@@ -345,7 +390,11 @@ final class ClassFileJsonDeserializerGenerator {
                     code.iload(SLOT_MATCHED);
                     code.iconst_m1();
                     code.if_icmpne(afterHash);
-                    emitHashDispatch(code, thisClass, fields, fieldNameBytesList);
+                    emitHashDispatch(code,
+                            thisClass,
+                            fields,
+                            fieldNameBytesList,
+                            jsonFieldNameBytesList);
                     code.labelBinding(afterHash);
 
                     // Skip colon (with fast-path for minified JSON: no whitespace around ':')
@@ -397,9 +446,13 @@ final class ClassFileJsonDeserializerGenerator {
                     code.invokevirtual(thisClass,
                             "deserializeField$",
                             MethodTypeDesc.of(CD_int,
-                                    CD_int, CD_int,
-                                    CD_JsonReaderContext, builderClass,
-                                    CD_byte_array, CD_int, CD_int));
+                                    CD_int,
+                                    CD_int,
+                                    CD_JsonReaderContext,
+                                    builderClass,
+                                    CD_byte_array,
+                                    CD_int,
+                                    CD_int));
                     code.istore(SLOT_POS);
 
                     code.goto_(loopStart);
@@ -445,9 +498,13 @@ final class ClassFileJsonDeserializerGenerator {
         // CTX/BUILDER/BUF/POS/END match the main method slots so emit helpers work unchanged.
         cb.withMethodBody("deserializeField$",
                 MethodTypeDesc.of(CD_int,
-                        CD_int, CD_int,
-                        CD_JsonReaderContext, builderClass,
-                        CD_byte_array, CD_int, CD_int),
+                        CD_int,
+                        CD_int,
+                        CD_JsonReaderContext,
+                        builderClass,
+                        CD_byte_array,
+                        CD_int,
+                        CD_int),
                 ClassFile.ACC_PRIVATE,
                 code -> {
                     nextTempSlot = DF_SLOT_FIRST_TEMP;
@@ -465,8 +522,12 @@ final class ClassFileJsonDeserializerGenerator {
 
                     for (int i = 0; i < fields.size(); i++) {
                         code.labelBinding(fieldLabels[i]);
-                        emitFieldDeserialization(code, thisClass, builderClass,
-                                fields.get(i), plan, actualBuilderClass);
+                        emitFieldDeserialization(code,
+                                thisClass,
+                                builderClass,
+                                fields.get(i),
+                                plan,
+                                actualBuilderClass);
                         code.iload(SLOT_POS);
                         code.ireturn();
                     }
@@ -479,7 +540,10 @@ final class ClassFileJsonDeserializerGenerator {
                     code.aload(SLOT_CTX);
                     code.invokestatic(CD_JsonReadUtils,
                             "skipValue",
-                            MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int,
+                            MethodTypeDesc.of(CD_int,
+                                    CD_byte_array,
+                                    CD_int,
+                                    CD_int,
                                     CD_JsonParseState));
                     code.ireturn();
                 });
@@ -527,6 +591,7 @@ final class ClassFileJsonDeserializerGenerator {
             ClassDesc thisClass,
             List<FieldPlan> fields,
             List<byte[]> fieldNameBytesList,
+            List<byte[]> jsonFieldNameBytesList,
             Label afterSpeculative
     ) {
         // switch(expectedNext) { case 0: try DN_0 ... }
@@ -547,31 +612,35 @@ final class ClassFileJsonDeserializerGenerator {
         for (int i = 0; i < fields.size(); i++) {
             code.labelBinding(caseLabels[i]);
 
-            byte[] nameBytes = fieldNameBytesList.get(i);
-            int nameLen = nameBytes.length;
-
-            code.aload(SLOT_BUF);
-            code.iload(SLOT_POS);
-            code.iload(SLOT_END);
-            if (nameLen == 4) {
-                code.ldc(computeLeInt(nameBytes));
-                code.invokestatic(CD_JsonReadUtils,
-                        "matchFieldName4",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int, CD_int));
-            } else if (nameLen >= 5 && nameLen <= 8) {
-                code.ldc(computeLeMaskedLong(nameBytes));
-                code.ldc(computeMask(nameLen));
-                code.ldc(nameLen);
-                code.invokestatic(CD_JsonReadUtils,
-                        "matchFieldNameMasked",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int, CD_long, CD_long, CD_int));
+            if (jsonNameFieldIndices.contains(i)) {
+                // Field has a different jsonName — branch on ctx.useJsonName
+                Label useMember = code.newLabel();
+                Label afterMatch = code.newLabel();
+                code.aload(SLOT_CTX);
+                code.getfield(CD_JsonReaderContext, "useJsonName", CD_boolean);
+                code.ifeq(useMember);
+                // jsonName path
+                emitMatchFieldName(code,
+                        thisClass,
+                        "DN_J_" + i,
+                        jsonFieldNameBytesList.get(i),
+                        matchResultSlot);
+                code.goto_(afterMatch);
+                // memberName path
+                code.labelBinding(useMember);
+                emitMatchFieldName(code,
+                        thisClass,
+                        "DN_" + i,
+                        fieldNameBytesList.get(i),
+                        matchResultSlot);
+                code.labelBinding(afterMatch);
             } else {
-                code.getstatic(thisClass, "DN_" + i, CD_byte_array);
-                code.invokestatic(CD_JsonReadUtils,
-                        "matchFieldName",
-                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int, CD_byte_array));
+                emitMatchFieldName(code,
+                        thisClass,
+                        "DN_" + i,
+                        fieldNameBytesList.get(i),
+                        matchResultSlot);
             }
-            code.istore(matchResultSlot);
             code.iload(matchResultSlot);
             code.iconst_m1();
             Label noMatch = code.newLabel();
@@ -592,6 +661,38 @@ final class ClassFileJsonDeserializerGenerator {
 
         code.labelBinding(defaultLabel);
         // Fall through: matched stays -1
+    }
+
+    private void emitMatchFieldName(
+            CodeBuilder code,
+            ClassDesc thisClass,
+            String staticFieldName,
+            byte[] nameBytes,
+            int resultSlot
+    ) {
+        int nameLen = nameBytes.length;
+        code.aload(SLOT_BUF);
+        code.iload(SLOT_POS);
+        code.iload(SLOT_END);
+        if (nameLen == 4) {
+            code.ldc(computeLeInt(nameBytes));
+            code.invokestatic(CD_JsonReadUtils,
+                    "matchFieldName4",
+                    MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int, CD_int));
+        } else if (nameLen >= 5 && nameLen <= 8) {
+            code.ldc(computeLeMaskedLong(nameBytes));
+            code.ldc(computeMask(nameLen));
+            code.ldc(nameLen);
+            code.invokestatic(CD_JsonReadUtils,
+                    "matchFieldNameMasked",
+                    MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int, CD_long, CD_long, CD_int));
+        } else {
+            code.getstatic(thisClass, staticFieldName, CD_byte_array);
+            code.invokestatic(CD_JsonReadUtils,
+                    "matchFieldName",
+                    MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int, CD_byte_array));
+        }
+        code.istore(resultSlot);
     }
 
     private static int computeLeInt(byte[] bytes) {
@@ -622,7 +723,8 @@ final class ClassFileJsonDeserializerGenerator {
             CodeBuilder code,
             ClassDesc thisClass,
             List<FieldPlan> fields,
-            List<byte[]> fieldNameBytesList
+            List<byte[]> fieldNameBytesList,
+            List<byte[]> jsonFieldNameBytesList
     ) {
         int nameStartSlot = nextTempSlot++;
         int nameEndSlot = nextTempSlot++;
@@ -695,18 +797,31 @@ final class ClassFileJsonDeserializerGenerator {
         code.goto_(hashLoop);
         code.labelBinding(hashEnd);
 
-        // Build hash -> field indices map
-        Map<Integer, List<Integer>> hashToFields = new LinkedHashMap<>();
+        // Build hash -> (field index, static field name) map
+        // Includes both memberName and jsonName hashes for fields with jsonName
+        record HashEntry(int fieldIndex, String staticFieldName) {}
+        Map<Integer, List<HashEntry>> hashToEntries = new LinkedHashMap<>();
         for (int i = 0; i < fields.size(); i++) {
             int hash = computeFnv1a(fieldNameBytesList.get(i));
-            hashToFields.computeIfAbsent(hash, k -> new ArrayList<>()).add(i);
+            hashToEntries.computeIfAbsent(hash, k -> new ArrayList<>())
+                    .add(new HashEntry(i, "DN_" + i));
+            if (jsonNameFieldIndices.contains(i)) {
+                int jsonHash = computeFnv1a(jsonFieldNameBytesList.get(i));
+                if (jsonHash != hash) {
+                    hashToEntries.computeIfAbsent(jsonHash, k -> new ArrayList<>())
+                            .add(new HashEntry(i, "DN_J_" + i));
+                } else {
+                    // Same hash — add jsonName entry to existing bucket
+                    hashToEntries.get(hash).add(new HashEntry(i, "DN_J_" + i));
+                }
+            }
         }
 
         // switch(hash) { ... }
         Label switchDefault = code.newLabel();
         var cases = new ArrayList<java.lang.classfile.instruction.SwitchCase>();
         Map<Integer, Label> hashLabels = new LinkedHashMap<>();
-        for (int hash : hashToFields.keySet()) {
+        for (int hash : hashToEntries.keySet()) {
             Label l = code.newLabel();
             hashLabels.put(hash, l);
             cases.add(java.lang.classfile.instruction.SwitchCase.of(hash, l));
@@ -715,22 +830,21 @@ final class ClassFileJsonDeserializerGenerator {
         code.iload(hashSlot);
         code.lookupswitch(switchDefault, cases);
 
-        for (var entry : hashToFields.entrySet()) {
+        for (var entry : hashToEntries.entrySet()) {
             code.labelBinding(hashLabels.get(entry.getKey()));
-            for (int fi : entry.getValue()) {
-                // if (nameLen == DN_fi.length && Arrays.equals(...))
+            for (var he : entry.getValue()) {
                 Label noMatch = code.newLabel();
                 code.iload(nameLenSlot);
-                code.getstatic(thisClass, "DN_" + fi, CD_byte_array);
+                code.getstatic(thisClass, he.staticFieldName(), CD_byte_array);
                 code.arraylength();
                 code.if_icmpne(noMatch);
 
                 code.aload(SLOT_BUF);
                 code.iload(nameStartSlot);
                 code.iload(nameEndSlot);
-                code.getstatic(thisClass, "DN_" + fi, CD_byte_array);
+                code.getstatic(thisClass, he.staticFieldName(), CD_byte_array);
                 code.iconst_0();
-                code.getstatic(thisClass, "DN_" + fi, CD_byte_array);
+                code.getstatic(thisClass, he.staticFieldName(), CD_byte_array);
                 code.arraylength();
                 code.invokestatic(CD_Arrays,
                         "equals",
@@ -743,9 +857,9 @@ final class ClassFileJsonDeserializerGenerator {
                                 CD_int));
                 code.ifeq(noMatch);
 
-                code.ldc(fi);
+                code.ldc(he.fieldIndex());
                 code.istore(SLOT_MATCHED);
-                code.ldc(fi + 1);
+                code.ldc(he.fieldIndex() + 1);
                 code.istore(SLOT_EXPECTED_NEXT);
                 code.goto_(switchDefault);
                 code.labelBinding(noMatch);
@@ -790,8 +904,6 @@ final class ClassFileJsonDeserializerGenerator {
         code.if_icmpne(notNullLabel);
     }
 
-
-
     private void emitFieldDeserialization(
             CodeBuilder code,
             ClassDesc thisClass,
@@ -802,6 +914,7 @@ final class ClassFileJsonDeserializerGenerator {
     ) {
         String setter = field.memberName();
         ClassDesc setterParam = resolveSetterParamType(actualBuilderClass, setter);
+        ClassDesc setterReturn = resolveSetterReturnType(actualBuilderClass, setter);
         switch (field.category()) {
             case BOOLEAN -> {
                 int bSlot = nextTempSlot++;
@@ -831,7 +944,7 @@ final class ClassFileJsonDeserializerGenerator {
                 emitBoxIfNeeded(code, FieldCategory.BOOLEAN, setterParam);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, setterParam));
+                        MethodTypeDesc.of(setterReturn, setterParam));
                 code.pop();
             }
             case BYTE -> {
@@ -844,7 +957,7 @@ final class ClassFileJsonDeserializerGenerator {
                 emitBoxIfNeeded(code, FieldCategory.BYTE, setterParam);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, setterParam));
+                        MethodTypeDesc.of(setterReturn, setterParam));
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);
             }
@@ -858,7 +971,7 @@ final class ClassFileJsonDeserializerGenerator {
                 emitBoxIfNeeded(code, FieldCategory.SHORT, setterParam);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, setterParam));
+                        MethodTypeDesc.of(setterReturn, setterParam));
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);
             }
@@ -871,7 +984,7 @@ final class ClassFileJsonDeserializerGenerator {
                 emitBoxIfNeeded(code, FieldCategory.INTEGER, setterParam);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, setterParam));
+                        MethodTypeDesc.of(setterReturn, setterParam));
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);
             }
@@ -883,7 +996,7 @@ final class ClassFileJsonDeserializerGenerator {
                 emitBoxIfNeeded(code, FieldCategory.LONG, setterParam);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, setterParam));
+                        MethodTypeDesc.of(setterReturn, setterParam));
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);
             }
@@ -896,7 +1009,7 @@ final class ClassFileJsonDeserializerGenerator {
                 emitBoxIfNeeded(code, FieldCategory.FLOAT, setterParam);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, setterParam));
+                        MethodTypeDesc.of(setterReturn, setterParam));
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);
             }
@@ -908,7 +1021,7 @@ final class ClassFileJsonDeserializerGenerator {
                 emitBoxIfNeeded(code, FieldCategory.DOUBLE, setterParam);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, setterParam));
+                        MethodTypeDesc.of(setterReturn, setterParam));
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);
             }
@@ -919,7 +1032,7 @@ final class ClassFileJsonDeserializerGenerator {
                 code.getfield(CD_JsonReaderContext, "parsedString", CD_String);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, setterParam));
+                        MethodTypeDesc.of(setterReturn, setterParam));
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);
             }
@@ -940,7 +1053,7 @@ final class ClassFileJsonDeserializerGenerator {
                         MethodTypeDesc.of(CD_ByteBuffer, CD_byte_array));
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, CD_ByteBuffer));
+                        MethodTypeDesc.of(setterReturn, CD_ByteBuffer));
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);
             }
@@ -975,7 +1088,7 @@ final class ClassFileJsonDeserializerGenerator {
                         MethodTypeDesc.of(CD_void, CD_String));
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, CD_BigInteger));
+                        MethodTypeDesc.of(setterReturn, CD_BigInteger));
                 code.pop();
             }
             case BIG_DECIMAL -> {
@@ -1009,12 +1122,12 @@ final class ClassFileJsonDeserializerGenerator {
                         MethodTypeDesc.of(CD_void, CD_String));
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, CD_BigDecimal));
+                        MethodTypeDesc.of(setterReturn, CD_BigDecimal));
                 code.pop();
             }
-            case TIMESTAMP -> emitTimestampDeserialization(code, thisClass, builderClass, field);
-            case LIST -> emitListDeserialization(code, thisClass, builderClass, field, plan);
-            case MAP -> emitMapDeserialization(code, thisClass, builderClass, field, plan);
+            case TIMESTAMP -> emitTimestampDeserialization(code, thisClass, builderClass, field, setterReturn);
+            case LIST -> emitListDeserialization(code, thisClass, builderClass, field, plan, setterReturn);
+            case MAP -> emitMapDeserialization(code, thisClass, builderClass, field, plan, setterReturn);
             case ENUM_STRING -> {
                 emitParseString(code);
                 Class<?> enumJavaClass = field.schema().memberTarget().shapeClass();
@@ -1029,7 +1142,7 @@ final class ClassFileJsonDeserializerGenerator {
                         isIface);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, setterParam));
+                        MethodTypeDesc.of(setterReturn, setterParam));
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);
             }
@@ -1048,7 +1161,7 @@ final class ClassFileJsonDeserializerGenerator {
                         isIface);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, setterParam));
+                        MethodTypeDesc.of(setterReturn, setterParam));
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);
             }
@@ -1063,7 +1176,7 @@ final class ClassFileJsonDeserializerGenerator {
                 code.checkcast(targetDesc);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, targetDesc));
+                        MethodTypeDesc.of(setterReturn, targetDesc));
                 code.pop();
                 code.aload(SLOT_CTX);
                 code.getfield(CD_JsonReaderContext, "pos", CD_int);
@@ -1081,7 +1194,7 @@ final class ClassFileJsonDeserializerGenerator {
                 code.checkcast(CD_Document);
                 code.invokevirtual(builderClass,
                         setter,
-                        MethodTypeDesc.of(builderClass, CD_Document));
+                        MethodTypeDesc.of(setterReturn, CD_Document));
                 code.pop();
                 code.aload(SLOT_CTX);
                 code.getfield(CD_JsonReaderContext, "pos", CD_int);
@@ -1115,8 +1228,8 @@ final class ClassFileJsonDeserializerGenerator {
         code.iload(SLOT_POS);
         code.iload(SLOT_END);
         code.aload(SLOT_CTX);
-        code.invokestatic(CD_JsonReadUtils,
-                "parseDouble",
+        code.invokestatic(CD_JsonCodegenHelpers,
+                "parseFloat",
                 MethodTypeDesc.of(CD_void, CD_byte_array, CD_int, CD_int, CD_JsonParseState));
     }
 
@@ -1140,7 +1253,8 @@ final class ClassFileJsonDeserializerGenerator {
             CodeBuilder code,
             ClassDesc thisClass,
             ClassDesc builderClass,
-            FieldPlan field
+            FieldPlan field,
+            ClassDesc setterReturn
     ) {
         String setter = field.memberName();
         String format = field.timestampFormat();
@@ -1159,53 +1273,28 @@ final class ClassFileJsonDeserializerGenerator {
             code.aload(tsSlot);
             code.invokevirtual(builderClass,
                     setter,
-                    MethodTypeDesc.of(builderClass, CD_Instant));
+                    MethodTypeDesc.of(setterReturn, CD_Instant));
             code.pop();
-        } else {
-            // For HTTP_DATE and date-time: check if numeric first, fallback to string parse
-            Label isString = code.newLabel();
-            Label afterTs = code.newLabel();
-
-            code.iload(SLOT_POS);
-            code.iload(SLOT_END);
-            code.if_icmpge(isString);
-            code.aload(SLOT_BUF);
-            code.iload(SLOT_POS);
-            code.baload();
-            int bSlot = nextTempSlot++;
-            code.istore(bSlot);
-            code.iload(bSlot);
-            code.bipush('-');
-            code.if_icmpeq(isString); // negative number
-            code.iload(bSlot);
-            code.bipush('0');
-            Label checkDigitEnd = code.newLabel();
-            code.if_icmplt(isString);
-            code.iload(bSlot);
-            code.bipush('9');
-            code.if_icmpgt(isString);
-
-            // Numeric: parse as epoch seconds
+        } else if ("HTTP_DATE".equals(format)) {
+            // HTTP-date: use direct byte-level parser
             code.aload(SLOT_BUF);
             code.iload(SLOT_POS);
             code.iload(SLOT_END);
             code.aload(SLOT_CTX);
-            code.invokestatic(CD_JsonCodegenHelpers,
-                    "parseEpochSeconds",
+            code.invokestatic(CD_JsonReadUtils,
+                    "parseHttpDate",
                     MethodTypeDesc.of(CD_Instant, CD_byte_array, CD_int, CD_int, CD_JsonParseState));
-            int ts2Slot = nextTempSlot++;
-            code.astore(ts2Slot);
+            int tsSlot = nextTempSlot++;
+            code.astore(tsSlot);
             emitUpdatePosFromParsedEndPos(code);
             code.aload(SLOT_BUILDER);
-            code.aload(ts2Slot);
+            code.aload(tsSlot);
             code.invokevirtual(builderClass,
                     setter,
-                    MethodTypeDesc.of(builderClass, CD_Instant));
+                    MethodTypeDesc.of(setterReturn, CD_Instant));
             code.pop();
-            code.goto_(afterTs);
-
-            code.labelBinding(isString);
-            // String: parse as string, then Instant.parse
+        } else {
+            // date-time: parse as quoted string, then Instant.parse
             emitParseString(code);
             emitUpdatePosFromParsedEndPos(code);
             code.aload(SLOT_BUILDER);
@@ -1216,10 +1305,8 @@ final class ClassFileJsonDeserializerGenerator {
                     MethodTypeDesc.of(CD_Instant, ClassDesc.of("java.lang.CharSequence")));
             code.invokevirtual(builderClass,
                     setter,
-                    MethodTypeDesc.of(builderClass, CD_Instant));
+                    MethodTypeDesc.of(setterReturn, CD_Instant));
             code.pop();
-
-            code.labelBinding(afterTs);
         }
     }
 
@@ -1228,7 +1315,8 @@ final class ClassFileJsonDeserializerGenerator {
             ClassDesc thisClass,
             ClassDesc builderClass,
             FieldPlan field,
-            StructCodePlan plan
+            StructCodePlan plan,
+            ClassDesc setterReturn
     ) {
         String setter = field.memberName();
         FieldCategory elemCategory = resolveElementCategory(field);
@@ -1310,7 +1398,7 @@ final class ClassFileJsonDeserializerGenerator {
         code.aload(listSlot);
         code.invokevirtual(builderClass,
                 setter,
-                MethodTypeDesc.of(builderClass, CD_List));
+                MethodTypeDesc.of(setterReturn, CD_List));
         code.pop();
     }
 
@@ -1455,6 +1543,120 @@ final class ClassFileJsonDeserializerGenerator {
                 code.pop();
                 emitUpdatePosFromParsedEndPos(code);
             }
+            case BIG_INTEGER -> {
+                int startSlot = nextTempSlot++;
+                code.iload(SLOT_POS);
+                code.istore(startSlot);
+                code.aload(SLOT_BUF);
+                code.iload(SLOT_POS);
+                code.iload(SLOT_END);
+                code.invokestatic(CD_JsonReadUtils,
+                        "findNumberEnd",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int));
+                code.istore(SLOT_POS);
+                code.aload(listSlot);
+                code.new_(CD_BigInteger);
+                code.dup();
+                code.new_(CD_String);
+                code.dup();
+                code.aload(SLOT_BUF);
+                code.iload(startSlot);
+                code.iload(SLOT_POS);
+                code.iload(startSlot);
+                code.isub();
+                ClassDesc CD_Charset_cls = ClassDesc.of("java.nio.charset.Charset");
+                code.getstatic(ClassDesc.of("java.nio.charset.StandardCharsets"), "US_ASCII", CD_Charset_cls);
+                code.invokespecial(CD_String,
+                        ConstantDescs.INIT_NAME,
+                        MethodTypeDesc.of(CD_void, CD_byte_array, CD_int, CD_int, CD_Charset_cls));
+                code.invokespecial(CD_BigInteger,
+                        ConstantDescs.INIT_NAME,
+                        MethodTypeDesc.of(CD_void, CD_String));
+                code.invokevirtual(CD_ArrayList, "add", MethodTypeDesc.of(CD_boolean, CD_Object));
+                code.pop();
+            }
+            case BIG_DECIMAL -> {
+                int startSlot = nextTempSlot++;
+                code.iload(SLOT_POS);
+                code.istore(startSlot);
+                code.aload(SLOT_BUF);
+                code.iload(SLOT_POS);
+                code.iload(SLOT_END);
+                code.invokestatic(CD_JsonReadUtils,
+                        "findNumberEnd",
+                        MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int));
+                code.istore(SLOT_POS);
+                code.aload(listSlot);
+                code.new_(CD_BigDecimal);
+                code.dup();
+                code.new_(CD_String);
+                code.dup();
+                code.aload(SLOT_BUF);
+                code.iload(startSlot);
+                code.iload(SLOT_POS);
+                code.iload(startSlot);
+                code.isub();
+                ClassDesc CD_Charset_cls2 = ClassDesc.of("java.nio.charset.Charset");
+                code.getstatic(ClassDesc.of("java.nio.charset.StandardCharsets"), "US_ASCII", CD_Charset_cls2);
+                code.invokespecial(CD_String,
+                        ConstantDescs.INIT_NAME,
+                        MethodTypeDesc.of(CD_void, CD_byte_array, CD_int, CD_int, CD_Charset_cls2));
+                code.invokespecial(CD_BigDecimal,
+                        ConstantDescs.INIT_NAME,
+                        MethodTypeDesc.of(CD_void, CD_String));
+                code.invokevirtual(CD_ArrayList, "add", MethodTypeDesc.of(CD_boolean, CD_Object));
+                code.pop();
+            }
+            case BLOB -> {
+                code.aload(SLOT_BUF);
+                code.iload(SLOT_POS);
+                code.iload(SLOT_END);
+                code.aload(SLOT_CTX);
+                code.invokestatic(CD_JsonReadUtils,
+                        "decodeBase64String",
+                        MethodTypeDesc.of(CD_byte_array, CD_byte_array, CD_int, CD_int, CD_JsonParseState));
+                int decodedSlot = nextTempSlot++;
+                code.astore(decodedSlot);
+                emitUpdatePosFromParsedEndPos(code);
+                code.aload(listSlot);
+                code.aload(decodedSlot);
+                code.invokestatic(CD_ByteBuffer,
+                        "wrap",
+                        MethodTypeDesc.of(CD_ByteBuffer, CD_byte_array));
+                code.invokevirtual(CD_ArrayList, "add", MethodTypeDesc.of(CD_boolean, CD_Object));
+                code.pop();
+            }
+            case TIMESTAMP -> {
+                code.aload(SLOT_BUF);
+                code.iload(SLOT_POS);
+                code.iload(SLOT_END);
+                code.aload(SLOT_CTX);
+                code.invokestatic(CD_JsonCodegenHelpers,
+                        "parseEpochSeconds",
+                        MethodTypeDesc.of(CD_Instant, CD_byte_array, CD_int, CD_int, CD_JsonParseState));
+                int tsSlot = nextTempSlot++;
+                code.astore(tsSlot);
+                emitUpdatePosFromParsedEndPos(code);
+                code.aload(listSlot);
+                code.aload(tsSlot);
+                code.invokevirtual(CD_ArrayList, "add", MethodTypeDesc.of(CD_boolean, CD_Object));
+                code.pop();
+            }
+            case DOCUMENT -> {
+                code.aload(SLOT_CTX);
+                code.iload(SLOT_POS);
+                code.putfield(CD_JsonReaderContext, "pos", CD_int);
+                code.aload(listSlot);
+                code.aload(SLOT_CTX);
+                code.invokestatic(CD_JsonCodegenHelpers,
+                        "deserializeDocument",
+                        MethodTypeDesc.of(CD_Object, CD_JsonReaderContext));
+                code.invokevirtual(CD_ArrayList, "add", MethodTypeDesc.of(CD_boolean, CD_Object));
+                code.pop();
+                code.aload(SLOT_CTX);
+                code.getfield(CD_JsonReaderContext, "pos", CD_int);
+                code.istore(SLOT_POS);
+            }
             default -> {
                 // Complex: nested struct
                 code.aload(SLOT_CTX);
@@ -1476,7 +1678,8 @@ final class ClassFileJsonDeserializerGenerator {
             ClassDesc thisClass,
             ClassDesc builderClass,
             FieldPlan field,
-            StructCodePlan plan
+            StructCodePlan plan,
+            ClassDesc setterReturn
     ) {
         String setter = field.memberName();
         FieldCategory valCategory = resolveMapValueCategory(field);
@@ -1571,7 +1774,7 @@ final class ClassFileJsonDeserializerGenerator {
         code.aload(mapSlot);
         code.invokevirtual(builderClass,
                 setter,
-                MethodTypeDesc.of(builderClass, CD_Map));
+                MethodTypeDesc.of(setterReturn, CD_Map));
         code.pop();
     }
 
@@ -1771,6 +1974,16 @@ final class ClassFileJsonDeserializerGenerator {
             return FieldCategory.BYTE;
         if (SmithyEnum.class.isAssignableFrom(clazz))
             return FieldCategory.ENUM_STRING;
+        if (clazz == java.math.BigInteger.class)
+            return FieldCategory.BIG_INTEGER;
+        if (clazz == java.math.BigDecimal.class)
+            return FieldCategory.BIG_DECIMAL;
+        if (clazz == java.nio.ByteBuffer.class)
+            return FieldCategory.BLOB;
+        if (clazz == java.time.Instant.class)
+            return FieldCategory.TIMESTAMP;
+        if (software.amazon.smithy.java.core.serde.document.Document.class.isAssignableFrom(clazz))
+            return FieldCategory.DOCUMENT;
         return FieldCategory.STRUCT;
     }
 
@@ -1781,6 +1994,15 @@ final class ClassFileJsonDeserializerGenerator {
             }
         }
         return CD_Object;
+    }
+
+    private static ClassDesc resolveSetterReturnType(Class<?> builderClass, String setterName) {
+        for (java.lang.reflect.Method m : builderClass.getMethods()) {
+            if (m.getName().equals(setterName) && m.getParameterCount() == 1) {
+                return ClassDesc.ofDescriptor(m.getReturnType().descriptorString());
+            }
+        }
+        return ClassDesc.of(builderClass.getName());
     }
 
     private static boolean needsBoxing(ClassDesc setterParam) {

@@ -52,6 +52,8 @@ public final class StructCodePlan {
         for (Schema member : schema.members()) {
             Schema target = member.memberTarget();
             String memberName = member.memberName();
+            var jsonNameTrait = member.getTrait(TraitKey.JSON_NAME_TRAIT);
+            String jsonName = jsonNameTrait != null ? jsonNameTrait.getValue() : null;
             String getterName = resolveGetter(shapeClass, memberName, target.type(), isUnion);
             FieldCategory category = classify(target);
             boolean required = member.hasTrait(TraitKey.REQUIRED_TRAIT);
@@ -89,6 +91,7 @@ public final class StructCodePlan {
             fields.add(new FieldPlan(
                     member,
                     memberName,
+                    jsonName,
                     getterName,
                     member.memberIndex(),
                     category,
