@@ -12,14 +12,15 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
+import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
 import software.amazon.smithy.java.aws.config.AwsProfile;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
-import software.amazon.smithy.java.aws.credentials.chain.AwsCredentialProvider;
 import software.amazon.smithy.java.aws.credentials.chain.BuiltinProvider;
+import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
 import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
@@ -34,7 +35,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * <p>Registers in the {@link BuiltinProvider#EC2_INSTANCE_METADATA} chain slot. Uses IMDSv2 exclusively
  * (no v1 fallback). Credentials are cached with static stability enabled per the AWS Static Stability SEP.
  */
-public final class ImdsCredentialProvider implements AwsCredentialProvider {
+public final class ImdsCredentialProvider implements ChainIdentityProvider {
 
     private static final Set<CredentialFeatureId> FEATURE_IDS = Set.of(new CredentialFeatureId("0"));
 
@@ -58,10 +59,15 @@ public final class ImdsCredentialProvider implements AwsCredentialProvider {
     }
 
     @Override
-    public IdentityResolver<AwsCredentialsIdentity> create(ProviderContext context) {
+    @SuppressWarnings("unchecked")
+    public <I extends Identity> IdentityResolver<I> create(Class<I> identityType, ProviderContext context) {
+        if (identityType != AwsCredentialsIdentity.class) {
+            return null;
+        }
+
         AwsProfileFile profileFile = context.properties().get(AwsProfileFile.CONTEXT_KEY);
         if (isDisabled(profileFile)) {
-            return new DisabledResolver();
+            return (IdentityResolver<I>) new DisabledResolver();
         }
 
         URI endpoint = resolveEndpoint();
@@ -69,9 +75,9 @@ public final class ImdsCredentialProvider implements AwsCredentialProvider {
         ImdsClient client = new ImdsClient(endpoint);
         AwsCredentialsResolver delegate = ctx -> fetchAndParse(client, profileName);
 
-        return CachingIdentityResolver.builder(delegate)
+        return (IdentityResolver<I>) CachingIdentityResolver.builder(delegate)
                 .executor(context.executor())
-                .allowExpiredCredentials(true) // Static stability
+                .allowExpiredCredentials(true)
                 .build();
     }
 

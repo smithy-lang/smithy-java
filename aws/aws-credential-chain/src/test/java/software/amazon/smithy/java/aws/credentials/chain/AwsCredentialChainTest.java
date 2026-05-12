@@ -13,37 +13,42 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
-import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
 import software.amazon.smithy.java.context.Context;
 
 class AwsCredentialChainTest {
     @Test
     void builtinProvidersAreOrderedByEnumOrder() {
-        var chain = AwsCredentialChain.assemble(List.of(
-                registration("imds",
-                        new OrderingConstraint.Builtin(BuiltinProvider.EC2_INSTANCE_METADATA),
-                        errorResolver("imds")),
-                registration("env",
-                        new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
-                        errorResolver("env")),
-                registration("profile",
-                        new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
-                        errorResolver("profile"))));
+        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+                List.of(
+                        registration("imds",
+                                new OrderingConstraint.Builtin(BuiltinProvider.EC2_INSTANCE_METADATA),
+                                errorResolver("imds")),
+                        registration("env",
+                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                errorResolver("env")),
+                        registration("profile",
+                                new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
+                                errorResolver("profile"))),
+                null);
 
         assertEquals(List.of("env", "profile", "imds"), chain.providerNames());
     }
 
     @Test
     void firstSuccessfulProviderWins() {
-        var chain = AwsCredentialChain.assemble(List.of(
-                registration("env",
-                        new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
-                        errorResolver("env")),
-                registration("profile",
-                        new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
-                        staticResolver("AK", "SK"))));
+        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+                List.of(
+                        registration("env",
+                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                errorResolver("env")),
+                        registration("profile",
+                                new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
+                                staticResolver("AK", "SK"))),
+                null);
         IdentityResult<AwsCredentialsIdentity> result = chain.resolveIdentity(Context.empty());
 
         assertNotNull(result.identity());
@@ -52,13 +57,15 @@ class AwsCredentialChainTest {
 
     @Test
     void allFailReturnsAggregatedError() {
-        var chain = AwsCredentialChain.assemble(List.of(
-                registration("env",
-                        new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
-                        errorResolver("no env")),
-                registration("profile",
-                        new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
-                        errorResolver("no profile"))));
+        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+                List.of(
+                        registration("env",
+                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                errorResolver("no env")),
+                        registration("profile",
+                                new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
+                                errorResolver("no profile"))),
+                null);
         IdentityResult<AwsCredentialsIdentity> result = chain.resolveIdentity(Context.empty());
 
         assertNull(result.identity());
@@ -69,86 +76,97 @@ class AwsCredentialChainTest {
     @Test
     void duplicateSlotThrows() {
         assertThrows(IllegalStateException.class,
-                () -> AwsCredentialChain.assemble(List.of(
-                        registration("a",
-                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
-                                errorResolver("a")),
-                        registration("b",
-                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
-                                errorResolver("b")))));
+                () -> CredentialChain.assemble(AwsCredentialsIdentity.class,
+                        List.of(
+                                registration("a",
+                                        new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                        errorResolver("a")),
+                                registration("b",
+                                        new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                        errorResolver("b"))),
+                        null));
     }
 
     @Test
     void relativeAfterInsertsCorrectly() {
-        var chain = AwsCredentialChain.assemble(List.of(
-                registration("env",
-                        new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
-                        errorResolver("env")),
-                registration("profile",
-                        new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
-                        errorResolver("profile")),
-                registration("custom",
-                        new OrderingConstraint.After(BuiltinProvider.ENVIRONMENT),
-                        errorResolver("custom"))));
+        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+                List.of(
+                        registration("env",
+                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                errorResolver("env")),
+                        registration("profile",
+                                new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
+                                errorResolver("profile")),
+                        registration("custom",
+                                new OrderingConstraint.After(BuiltinProvider.ENVIRONMENT),
+                                errorResolver("custom"))),
+                null);
 
         assertEquals(List.of("env", "custom", "profile"), chain.providerNames());
     }
 
     @Test
     void relativeBeforeInsertsCorrectly() {
-        var chain = AwsCredentialChain.assemble(List.of(
-                registration("env",
-                        new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
-                        errorResolver("env")),
-                registration("profile",
-                        new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
-                        errorResolver("profile")),
-                registration("custom",
-                        new OrderingConstraint.Before(BuiltinProvider.SHARED_CONFIG),
-                        errorResolver("custom"))));
+        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+                List.of(
+                        registration("env",
+                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                errorResolver("env")),
+                        registration("profile",
+                                new OrderingConstraint.Builtin(BuiltinProvider.SHARED_CONFIG),
+                                errorResolver("profile")),
+                        registration("custom",
+                                new OrderingConstraint.Before(BuiltinProvider.SHARED_CONFIG),
+                                errorResolver("custom"))),
+                null);
 
         assertEquals(List.of("env", "custom", "profile"), chain.providerNames());
     }
 
     @Test
     void relativeToUnclaimedSlotAppendsAtEnd() {
-        var chain = AwsCredentialChain.assemble(List.of(
-                registration("env",
-                        new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
-                        errorResolver("env")),
-                registration("custom",
-                        new OrderingConstraint.After(BuiltinProvider.EC2_INSTANCE_METADATA),
-                        errorResolver("custom"))));
+        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+                List.of(
+                        registration("env",
+                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                errorResolver("env")),
+                        registration("custom",
+                                new OrderingConstraint.After(BuiltinProvider.EC2_INSTANCE_METADATA),
+                                errorResolver("custom"))),
+                null);
+
         assertEquals(List.of("env", "custom"), chain.providerNames());
     }
 
     @Test
     void duplicateNameThrows() {
         assertThrows(IllegalStateException.class,
-                () -> AwsCredentialChain.assemble(List.of(
-                        registration("env",
-                                new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
-                                errorResolver("env")),
-                        registration("env",
-                                new OrderingConstraint.Builtin(BuiltinProvider.JAVA_SYSTEM_PROPERTIES),
-                                errorResolver("env2")))));
+                () -> CredentialChain.assemble(AwsCredentialsIdentity.class,
+                        List.of(
+                                registration("env",
+                                        new OrderingConstraint.Builtin(BuiltinProvider.ENVIRONMENT),
+                                        errorResolver("env")),
+                                registration("env",
+                                        new OrderingConstraint.Builtin(BuiltinProvider.JAVA_SYSTEM_PROPERTIES),
+                                        errorResolver("env2"))),
+                        null));
     }
 
     @Test
     void emptyChainReturnsDescriptiveError() {
-        var chain = AwsCredentialChain.assemble(List.of());
+        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class, List.of(), null);
         IdentityResult<AwsCredentialsIdentity> result = chain.resolveIdentity(Context.empty());
 
         assertNull(result.identity());
         assertTrue(result.error().contains("No credential providers were discovered"));
     }
 
-    private static AwsCredentialProvider registration(
+    private static ChainIdentityProvider registration(
             String name,
             OrderingConstraint ordering,
-            AwsCredentialsResolver resolver
+            IdentityResolver<AwsCredentialsIdentity> resolver
     ) {
-        return new AwsCredentialProvider() {
+        return new ChainIdentityProvider() {
             @Override
             public String name() {
                 return name;
@@ -160,17 +178,40 @@ class AwsCredentialChainTest {
             }
 
             @Override
-            public AwsCredentialsResolver create(ProviderContext context) {
-                return resolver;
+            @SuppressWarnings("unchecked")
+            public <I extends Identity> IdentityResolver<I> create(Class<I> identityType, ProviderContext context) {
+                return (IdentityResolver<I>) resolver;
             }
         };
     }
 
-    private static AwsCredentialsResolver errorResolver(String msg) {
-        return ctx -> IdentityResult.ofError(AwsCredentialChainTest.class, msg);
+    private static IdentityResolver<AwsCredentialsIdentity> errorResolver(String msg) {
+        IdentityResult<AwsCredentialsIdentity> result = IdentityResult.ofError(AwsCredentialChainTest.class, msg);
+        return new IdentityResolver<>() {
+            @Override
+            public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context ctx) {
+                return result;
+            }
+
+            @Override
+            public Class<AwsCredentialsIdentity> identityType() {
+                return AwsCredentialsIdentity.class;
+            }
+        };
     }
 
-    private static AwsCredentialsResolver staticResolver(String ak, String sk) {
-        return ctx -> IdentityResult.of(AwsCredentialsIdentity.create(ak, sk));
+    private static IdentityResolver<AwsCredentialsIdentity> staticResolver(String ak, String sk) {
+        IdentityResult<AwsCredentialsIdentity> result = IdentityResult.of(AwsCredentialsIdentity.create(ak, sk));
+        return new IdentityResolver<>() {
+            @Override
+            public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context ctx) {
+                return result;
+            }
+
+            @Override
+            public Class<AwsCredentialsIdentity> identityType() {
+                return AwsCredentialsIdentity.class;
+            }
+        };
     }
 }

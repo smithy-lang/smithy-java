@@ -33,7 +33,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * <p>A non-zero exit code is treated as an error. The process's stderr is captured for the error message but is never
  * logged above debug level to prevent leaking secrets.
  */
-public final class CredentialProcessHandler implements AwsConfigCredentialSourceHandler {
+public final class CredentialProcessHandler implements AwsConfigCredentialSourceHandler<AwsCredentialsIdentity> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(CredentialProcessHandler.class);
     private static final JsonCodec CODEC = JsonCodec.builder().build();
@@ -47,6 +47,10 @@ public final class CredentialProcessHandler implements AwsConfigCredentialSource
             new CredentialFeatureId("w"));
 
     @Override
+    public Class<AwsCredentialsIdentity> identityType() {
+        return AwsCredentialsIdentity.class;
+    }
+
     public Set<CredentialFeatureId> featureIds() {
         return FEATURE_IDS;
     }

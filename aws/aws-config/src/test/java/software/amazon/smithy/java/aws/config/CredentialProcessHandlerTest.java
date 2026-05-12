@@ -124,7 +124,7 @@ class CredentialProcessHandlerTest {
                 credential_process = %s
                 """.formatted(script.toString()), StandardCharsets.UTF_8);
 
-        AwsProfileCredentialsResolver resolver = AwsProfileCredentialsResolver.builder()
+        var resolver = ProfileIdentityResolver.builder(AwsCredentialsIdentity.class)
                 .configFile(config)
                 .credentialsFile(null)
                 .profileName("proc")

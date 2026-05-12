@@ -1,7 +1,8 @@
-# AWS Credential Chain
+# Credential Chain
 
-Assembles an ordered AWS credential provider chain from SPI-discovered
-providers. Provides the infrastructure for modular credential resolution.
+Assembles an ordered identity provider chain from SPI-discovered providers.
+Supports any identity type (AWS credentials, bearer tokens, etc.) through a
+single generic chain.
 
 ## Dependency
 
@@ -17,7 +18,7 @@ dependencies {
 
 Services modeled with `@aws.auth#sigv4` or `@aws.auth#sigv4a` automatically get
 `AwsCredentialChainPlugin` added as a default plugin during code generation.
-No manual wiring is needed: just add the provider modules you need to your
+No manual wiring needed - just add the provider modules you need to your
 runtime dependencies.
 
 ### Manual
@@ -35,15 +36,18 @@ adds an interceptor that invalidates cached credentials on auth failures
 ## Standalone usage
 
 ```java
-try (AwsCredentialChain chain = AwsCredentialChain.create()) {
+try (var chain = CredentialChain.create(AwsCredentialsIdentity.class)) {
     IdentityResult<AwsCredentialsIdentity> result = chain.resolveIdentity(context);
 }
 ```
 
 ## How it works
 
-The chain discovers `AwsCredentialProvider` implementations via ServiceLoader, 
-orders them by builtin enum slots, and tries each in order until one succeeds.
+The chain discovers `ChainIdentityProvider` implementations via ServiceLoader.
+Each provider's `create(Class<I> identityType, ProviderContext context)` is
+called with the requested identity type. Providers that don't support the type
+return `null` and are skipped. The chain tries remaining providers in order
+until one succeeds.
 
 ## Builtin slots (in priority order)
 
@@ -60,19 +64,18 @@ orders them by builtin enum slots, and tries each in order until one succeeds.
 Providers position themselves relative to builtin slots using
 `OrderingConstraint`:
 
-- `Builtin(slot)` — claims a builtin slot (one provider per slot). Only one
-  provider can claim a builtin. Not all builtins have to be claimed.
+- `Builtin(slot)` — claims a builtin slot (one provider per slot)
 - `Before(slot)` — inserts before the given slot's position
 - `After(slot)` — inserts after the given slot's position
 
 Before/After reference enum values only, so cycles are impossible. If the
-referenced slot has no registered provider, the custom provider is placed
-where that slot would be in enum order.
+referenced slot has no registered provider, the custom provider is placed where
+that slot would be in enum order.
 
 ## Adding a custom provider
 
 ```java
-public class MyProvider implements AwsCredentialProvider {
+public class MyProvider implements ChainIdentityProvider {
     @Override
     public String name() {
         return "MyCustomProvider";
@@ -84,10 +87,13 @@ public class MyProvider implements AwsCredentialProvider {
     }
 
     @Override
-    public IdentityResolver<AwsCredentialsIdentity> create(ProviderContext ctx) {
-        return new MyResolver();
+    public <I extends Identity> IdentityResolver<I> create(Class<I> identityType, ProviderContext ctx) {
+        if (identityType == AwsCredentialsIdentity.class) {
+            return (IdentityResolver<I>) new MyResolver();
+        }
+        return null;
     }
 }
 ```
 
-Register in `META-INF/services/software.amazon.smithy.java.aws.credentials.chain.AwsCredentialProvider`.
+Register in `META-INF/services/software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider`.
