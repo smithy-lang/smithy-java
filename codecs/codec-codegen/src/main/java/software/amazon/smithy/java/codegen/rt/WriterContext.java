@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.rt;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 /**
@@ -50,5 +51,9 @@ public class WriterContext {
 
     public byte[] toByteArray() {
         return Arrays.copyOf(buf, pos);
+    }
+
+    public ByteBuffer toByteBuffer() {
+        return ByteBuffer.wrap(buf, 0, pos);
     }
 }
