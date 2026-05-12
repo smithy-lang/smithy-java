@@ -17,39 +17,49 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
+import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
-import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
-import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
 import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
- * The AWS default credential provider chain.
+ * A credential provider chain.
  *
- * <p>Discovers {@link AwsCredentialProvider} implementations via {@link ServiceLoader}, assembles them into an
+ * <p>Discovers {@link ChainIdentityProvider} implementations via {@link ServiceLoader}, assembles them into an
  * ordered chain based on {@link BuiltinProvider} slots and relative ordering constraints, and resolves
  * credentials by trying each provider in order.
  *
  * <p>Usage:
  * <pre>{@code
- * AwsCredentialsResolver chain = AwsCredentialChain.create();
- * IdentityResult<AwsCredentialsIdentity> result = chain.resolveIdentity(Context.empty());
+ * var chain = CredentialChain.create();
+ * var result = chain.resolveIdentity(Context.empty());
  * }</pre>
  *
  * <p>The chain is assembled once at creation time. Providers that are not on the classpath simply don't
  * participate: their slots are skipped. If no provider in the chain can resolve credentials, the chain returns an
  * error result describing which providers were tried.
  */
-public final class AwsCredentialChain implements AwsCredentialsResolver, AutoCloseable {
+public final class CredentialChain<I extends Identity> implements IdentityResolver<I>, AutoCloseable {
 
-    private static final InternalLogger LOGGER = InternalLogger.getLogger(AwsCredentialChain.class);
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(CredentialChain.class);
 
-    private final List<NamedResolver> resolvers;
+    private final Class<I> identityType;
+    private final List<NamedResolver<I>> resolvers;
     private final ScheduledExecutorService executor;
 
-    private AwsCredentialChain(List<NamedResolver> resolvers, ScheduledExecutorService executor) {
+    private record NamedResolver<I extends Identity>(
+            String name,
+            Set<CredentialFeatureId> featureIds,
+            IdentityResolver<I> resolver) {}
+
+    private CredentialChain(
+            Class<I> identityType,
+            List<NamedResolver<I>> resolvers,
+            ScheduledExecutorService executor
+    ) {
+        this.identityType = identityType;
         this.resolvers = resolvers;
         this.executor = executor;
     }
@@ -57,33 +67,54 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
     /**
      * Create a credential chain by discovering providers via ServiceLoader.
      *
+     * @param identityType Identity type to resolve.
      * @return the assembled chain.
      * @throws IllegalStateException if two providers claim the same builtin slot.
      */
-    public static AwsCredentialChain create() {
-        List<AwsCredentialProvider> registrations = new ArrayList<>();
-        for (AwsCredentialProvider r : ServiceLoader.load(AwsCredentialProvider.class)) {
-            registrations.add(r);
-        }
-        return assemble(registrations);
+    public static <I extends Identity> CredentialChain<I> create(Class<I> identityType) {
+        return create(identityType, Executors.newSingleThreadScheduledExecutor(r2 -> {
+            Thread t = new Thread(r2, "aws-credential-chain-refresh");
+            t.setDaemon(true);
+            return t;
+        }));
     }
 
-    static AwsCredentialChain assemble(List<AwsCredentialProvider> registrations) {
+    /**
+     * Create a credential chain by discovering providers via ServiceLoader.
+     *
+     * @param identityType Identity type to resolve.
+     * @param ex Executor used for background resolution.
+     * @return the assembled chain.
+     * @throws IllegalStateException if two providers claim the same builtin slot.
+     */
+    public static <I extends Identity> CredentialChain<I> create(Class<I> identityType, ScheduledExecutorService ex) {
+        List<ChainIdentityProvider> registrations = new ArrayList<>();
+        for (ChainIdentityProvider r : ServiceLoader.load(ChainIdentityProvider.class)) {
+            registrations.add(r);
+        }
+        return assemble(identityType, registrations, ex);
+    }
+
+    static <I extends Identity> CredentialChain<I> assemble(
+            Class<I> identityType,
+            List<ChainIdentityProvider> registrations,
+            ScheduledExecutorService executor
+    ) {
         // Check for duplicate names.
         Set<String> seenNames = new HashSet<>();
-        for (AwsCredentialProvider r : registrations) {
+        for (ChainIdentityProvider r : registrations) {
             if (!seenNames.add(r.name())) {
                 throw new IllegalStateException("Duplicate credential provider registration name: '" + r.name() + "'");
             }
         }
 
         // Separate builtins from relatives.
-        Map<BuiltinProvider, AwsCredentialProvider> builtins = new EnumMap<>(BuiltinProvider.class);
-        List<AwsCredentialProvider> relatives = new ArrayList<>();
+        Map<BuiltinProvider, ChainIdentityProvider> builtins = new EnumMap<>(BuiltinProvider.class);
+        List<ChainIdentityProvider> relatives = new ArrayList<>();
 
-        for (AwsCredentialProvider r : registrations) {
+        for (ChainIdentityProvider r : registrations) {
             if (r.ordering() instanceof OrderingConstraint.Builtin(BuiltinProvider slot)) {
-                AwsCredentialProvider existing = builtins.put(slot, r);
+                ChainIdentityProvider existing = builtins.put(slot, r);
                 if (existing != null) {
                     throw new IllegalStateException("Two credential providers claim the same slot '"
                             + slot + "': '" + existing.name() + "' and '" + r.name() + "'");
@@ -94,11 +125,6 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
         }
 
         // Use a single executor for each provider (used for caching).
-        ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(r2 -> {
-            Thread t = new Thread(r2, "aws-credential-chain-refresh");
-            t.setDaemon(true);
-            return t;
-        });
         ProviderContext ctx = new ProviderContext(executor, Context.create());
 
         // Precompute insert positions: for each slot, how many claimed slots come before it
@@ -115,16 +141,19 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
         }
 
         // Build the ordered list: builtin slots in enum order.
-        List<NamedResolver> ordered = new ArrayList<>();
+        List<NamedResolver<I>> ordered = new ArrayList<>();
         for (BuiltinProvider slot : BuiltinProvider.values()) {
-            AwsCredentialProvider r = builtins.get(slot);
+            ChainIdentityProvider r = builtins.get(slot);
             if (r != null) {
-                ordered.add(new NamedResolver(r.name(), r.featureIds(), r.create(ctx)));
+                IdentityResolver<I> resolver = r.create(identityType, ctx);
+                if (resolver != null) {
+                    ordered.add(new NamedResolver<>(r.name(), r.featureIds(), resolver));
+                }
             }
         }
 
         // Insert relative providers using precomputed positions.
-        for (AwsCredentialProvider r : relatives) {
+        for (ChainIdentityProvider r : relatives) {
             int insertAt;
             if (r.ordering() instanceof OrderingConstraint.After(BuiltinProvider slot)) {
                 insertAt = insertAfter.get(slot);
@@ -136,7 +165,10 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
             if (insertAt > ordered.size()) {
                 insertAt = ordered.size();
             }
-            ordered.add(insertAt, new NamedResolver(r.name(), r.featureIds(), r.create(ctx)));
+            IdentityResolver<I> relResolver = r.create(identityType, ctx);
+            if (relResolver != null) {
+                ordered.add(insertAt, new NamedResolver<>(r.name(), r.featureIds(), relResolver));
+            }
         }
 
         if (LOGGER.isDebugEnabled()) {
@@ -145,10 +177,10 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
         }
 
         warnDetectedButUnclaimed(builtins);
-        return new AwsCredentialChain(Collections.unmodifiableList(ordered), executor);
+        return new CredentialChain<>(identityType, Collections.unmodifiableList(ordered), executor);
     }
 
-    private static void warnDetectedButUnclaimed(Map<BuiltinProvider, AwsCredentialProvider> builtins) {
+    private static void warnDetectedButUnclaimed(Map<BuiltinProvider, ?> builtins) {
         for (BuiltinProvider slot : BuiltinProvider.values()) {
             if (slot.moduleSuggestion() != null && !builtins.containsKey(slot) && slot.isDetected()) {
                 LOGGER.warn("{} credentials detected but no provider is registered for the '{}' slot. "
@@ -161,7 +193,7 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
     }
 
     @Override
-    public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context requestProperties) {
+    public IdentityResult<I> resolveIdentity(Context requestProperties) {
         if (resolvers.isEmpty()) {
             return IdentityResult.ofError(getClass(),
                     "No credential providers were discovered. Ensure at least one "
@@ -171,8 +203,8 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
         // More cheaply build up a list of failures, and defer string-ing them into a StringBuilder.
         List<Object> errors = new ArrayList<>();
 
-        for (NamedResolver nr : resolvers) {
-            IdentityResult<AwsCredentialsIdentity> result = nr.resolver.resolveIdentity(requestProperties);
+        for (var nr : resolvers) {
+            var result = nr.resolver.resolveIdentity(requestProperties);
             if (result.identity() != null) {
                 if (!nr.featureIds.isEmpty()) {
                     var ids = requestProperties.get(CallContext.FEATURE_IDS);
@@ -216,7 +248,7 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
     }
 
     private boolean isClaimed(BuiltinProvider slot) {
-        for (NamedResolver nr : resolvers) {
+        for (var nr : resolvers) {
             if (nr.name.equals(slot.name().toLowerCase(Locale.ROOT))) {
                 return true;
             }
@@ -229,15 +261,20 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
      */
     public List<String> providerNames() {
         List<String> names = new ArrayList<>(resolvers.size());
-        for (NamedResolver nr : resolvers) {
+        for (var nr : resolvers) {
             names.add(nr.name);
         }
         return names;
     }
 
     @Override
+    public Class<I> identityType() {
+        return identityType;
+    }
+
+    @Override
     public void invalidate() {
-        for (NamedResolver nr : resolvers) {
+        for (var nr : resolvers) {
             nr.resolver.invalidate();
         }
     }
@@ -246,9 +283,4 @@ public final class AwsCredentialChain implements AwsCredentialsResolver, AutoClo
     public void close() {
         executor.shutdownNow();
     }
-
-    private record NamedResolver(
-            String name,
-            Set<CredentialFeatureId> featureIds,
-            IdentityResolver<AwsCredentialsIdentity> resolver) {}
 }

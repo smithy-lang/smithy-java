@@ -13,13 +13,17 @@ import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 /**
  * Handles {@link AwsConfigCredentialSource.StaticKeys}.
  */
-public final class StaticKeysHandler implements AwsConfigCredentialSourceHandler {
+public final class StaticKeysHandler implements AwsConfigCredentialSourceHandler<AwsCredentialsIdentity> {
 
     public StaticKeysHandler() {}
 
     private static final Set<CredentialFeatureId> FEATURE_IDS = Set.of(new CredentialFeatureId("n"));
 
     @Override
+    public Class<AwsCredentialsIdentity> identityType() {
+        return AwsCredentialsIdentity.class;
+    }
+
     public Set<CredentialFeatureId> featureIds() {
         return FEATURE_IDS;
     }

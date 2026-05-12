@@ -9,6 +9,8 @@ import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 
 /**
  * An {@link IdentityResolver} that resolves a {@link AwsCredentialsIdentity} for authentication.
+ *
+ * <p>Note: this is a convenience only. Do not rely on this for limiting subtypes.
  */
 public interface AwsCredentialsResolver extends IdentityResolver<AwsCredentialsIdentity> {
     @Override
