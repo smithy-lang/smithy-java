@@ -100,6 +100,34 @@ public final class AwsProfileFile {
     }
 
     /**
+     * Loads the config/credentials files, returning {@code null} if neither exists or parsing fails.
+     */
+    public static AwsProfileFile loadSilently() {
+        try {
+            return load();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Returns the active profile based on {@code AWS_PROFILE} env var, {@code aws.profile} system property,
+     * or {@code "default"}.
+     *
+     * @return the active profile, or {@code null} if not found.
+     */
+    public AwsProfile activeProfile() {
+        String name = System.getProperty("aws.profile");
+        if (name == null) {
+            name = System.getenv("AWS_PROFILE");
+        }
+        if (name == null) {
+            name = "default";
+        }
+        return profile(name);
+    }
+
+    /**
      * @return a new builder.
      */
     public static Builder builder() {

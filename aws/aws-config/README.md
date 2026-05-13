@@ -1,6 +1,6 @@
 # AWS Config
 
-Parses AWS shared configuration files (`~/.aws/config` and `~/.aws/credentials`) and resolves credentials from profiles.
+Provides credential resolution from AWS shared configuration files (`~/.aws/config` and `~/.aws/credentials`). Ships handlers for static keys, session keys, and credential_process.
 
 ## Dependency
 
@@ -12,17 +12,13 @@ dependencies {
 
 ## Usage
 
-Config file-based credential resolution is wired up automatically when
-`AwsCredentialChainPlugin` is installed on a client. This module registers
-itself in the `SHARED_CONFIG` chain slot via ServiceLoader, so no additional
-code is needed beyond adding the dependency.
+Config file-based credential resolution is wired up automatically when `AwsCredentialChainPlugin` is installed on a client. This module registers its `ChainIdentityProvider` implementations via ServiceLoader, so no additional code is needed beyond adding the dependency.
 
 ## Programmatic config file support
 
 You can load and query config files directly:
 
 ```java
-// Load and query the config file
 AwsProfileFile file = AwsProfileFile.load();
 AwsProfile profile = file.profile("default");
 String region = profile.property("region");
@@ -31,13 +27,12 @@ String region = profile.property("region");
 var resolver = ProfileIdentityResolver.builder(AwsCredentialsIdentity.class)
     .profileName("dev")
     .build();
-
 IdentityResult<AwsCredentialsIdentity> result = resolver.resolveIdentity(Context.empty());
 ```
 
 ## Supported credential sources
 
-Profiles can define credentials in multiple ways. This module handles:
+This module handles the following profile credential sources via `ChainIdentityProvider.resolve()`:
 
 - **Static keys** — `aws_access_key_id` + `aws_secret_access_key`
 - **Session keys** — static keys + `aws_session_token`
@@ -45,12 +40,8 @@ Profiles can define credentials in multiple ways. This module handles:
 
 ## Modular credential sources
 
-Additional sources like IMDS, AssumeRole, SSO, WebIdentity, and Login are
-detected and typed but require separate handler modules (`aws-credentials-sts`,
-`aws-credentials-sso`, etc.) to resolve. When possible, this module detects
-if you intended to use one of these providers but are missing the dependency.
+Additional sources (AssumeRole, SSO, WebIdentity, Login) are detected and typed by the chain module but require separate provider modules (`aws-credentials-sts`, `aws-credentials-sso`, etc.) to resolve. When a source is detected but no provider claims it, an actionable error names the missing dependency.
 
 ## Extensibility
 
-Implement `AwsConfigCredentialSourceHandler` and register via
-`META-INF/services` to handle additional source types.
+Implement `ChainIdentityProvider.resolve()` in a new module and register via `META-INF/services/software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider` to handle additional config-file source types.

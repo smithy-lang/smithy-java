@@ -7,7 +7,6 @@ package software.amazon.smithy.java.aws.credentials.chain;
 
 import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
-import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 
 /**
  * SPI for registering an identity provider into a credential/token chain.
@@ -38,13 +37,20 @@ public interface ChainIdentityProvider {
     /**
      * Create the identity resolver for the requested identity type.
      *
-     * <p>Called once during chain assembly. If this provider does not support the requested identity
-     * type, it MUST return {@code null} and the chain will skip it.
+     * <p>Called once during chain assembly in slot order. Return:
+     * <ul>
+     *   <li>{@link CreateResult#pass()} — this provider does not participate</li>
+     *   <li>{@link CreateResult.PossibleMatch} — resolver added, assembly continues</li>
+     *   <li>{@link CreateResult.UnconditionalMatch} — resolver added, assembly stops</li>
+     * </ul>
+     *
+     * <p>Providers that need AWS config file data should read it from
+     * {@link ProviderContext#profile()}, populated by the {@code SHARED_CONFIG} provider.
      *
      * @param identityType the identity class the chain is resolving.
      * @param context      shared resources provided by the chain.
      * @param <I>          the identity type.
-     * @return the resolver, or {@code null} if this provider does not support the requested type.
+     * @return the create result.
      */
-    <I extends Identity> IdentityResolver<I> create(Class<I> identityType, ProviderContext context);
+    <I extends Identity> CreateResult<I> create(Class<I> identityType, ProviderContext context);
 }

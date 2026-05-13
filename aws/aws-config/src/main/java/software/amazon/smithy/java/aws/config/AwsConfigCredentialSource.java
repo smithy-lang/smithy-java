@@ -17,7 +17,6 @@ import java.util.Objects;
  * list; most profiles produce exactly one source.
  */
 public sealed interface AwsConfigCredentialSource {
-
     /**
      * Long-term credentials from {@code aws_access_key_id} + {@code aws_secret_access_key}. Used
      * when no higher-priority source applies.

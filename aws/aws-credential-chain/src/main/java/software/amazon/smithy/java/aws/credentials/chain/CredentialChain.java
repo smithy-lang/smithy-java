@@ -125,7 +125,8 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
         }
 
         // Use a single executor for each provider (used for caching).
-        ProviderContext ctx = new ProviderContext(executor, Context.create());
+        // Parse config files and resolve active profile before calling providers.
+        ProviderContext ctx = new ProviderContext(executor);
 
         // Precompute insert positions: for each slot, how many claimed slots come before it
         // and up to and including it. This avoids re-scanning the enum on every relative insert.
@@ -142,32 +143,55 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
 
         // Build the ordered list: standard slots in enum order.
         List<NamedResolver<I>> ordered = new ArrayList<>();
+        boolean done = false;
         for (StandardProvider slot : StandardProvider.values()) {
+            if (done) {
+                break;
+            }
             ChainIdentityProvider r = standards.get(slot);
             if (r != null) {
-                IdentityResolver<I> resolver = r.create(identityType, ctx);
-                if (resolver != null) {
-                    ordered.add(new NamedResolver<>(r.name(), r.featureIds(), resolver));
+                CreateResult<I> result = r.create(identityType, ctx);
+                switch (result) {
+                    case CreateResult.UnconditionalMatch<I>(var resolver) -> {
+                        ordered.add(new NamedResolver<>(r.name(), r.featureIds(), resolver));
+                        done = true;
+                    }
+                    case CreateResult.PossibleMatch<I>(var resolver) ->
+                        ordered.add(new NamedResolver<>(r.name(), r.featureIds(), resolver));
+                    case CreateResult.Pass<I> ignored -> {
+                    }
                 }
             }
         }
 
-        // Insert relative providers using precomputed positions.
-        for (ChainIdentityProvider r : relatives) {
-            int insertAt;
-            if (r.ordering() instanceof OrderingConstraint.After(StandardProvider slot)) {
-                insertAt = insertAfter.get(slot);
-            } else if (r.ordering() instanceof OrderingConstraint.Before(StandardProvider slot)) {
-                insertAt = insertBefore.get(slot);
-            } else {
-                insertAt = ordered.size();
-            }
-            if (insertAt > ordered.size()) {
-                insertAt = ordered.size();
-            }
-            IdentityResolver<I> relResolver = r.create(identityType, ctx);
-            if (relResolver != null) {
-                ordered.add(insertAt, new NamedResolver<>(r.name(), r.featureIds(), relResolver));
+        // Insert relative providers using precomputed positions (only if assembly wasn't short-circuited).
+        if (!done) {
+            for (ChainIdentityProvider r : relatives) {
+                int insertAt;
+                if (r.ordering() instanceof OrderingConstraint.After(StandardProvider slot)) {
+                    insertAt = insertAfter.get(slot);
+                } else if (r.ordering() instanceof OrderingConstraint.Before(StandardProvider slot)) {
+                    insertAt = insertBefore.get(slot);
+                } else {
+                    insertAt = ordered.size();
+                }
+                if (insertAt > ordered.size()) {
+                    insertAt = ordered.size();
+                }
+                CreateResult<I> result = r.create(identityType, ctx);
+                switch (result) {
+                    case CreateResult.UnconditionalMatch<I>(var resolver) -> {
+                        ordered.add(insertAt, new NamedResolver<>(r.name(), r.featureIds(), resolver));
+                        done = true;
+                    }
+                    case CreateResult.PossibleMatch<I>(var resolver) ->
+                        ordered.add(insertAt, new NamedResolver<>(r.name(), r.featureIds(), resolver));
+                    case CreateResult.Pass<I> ignored -> {
+                    }
+                }
+                if (done) {
+                    break;
+                }
             }
         }
 

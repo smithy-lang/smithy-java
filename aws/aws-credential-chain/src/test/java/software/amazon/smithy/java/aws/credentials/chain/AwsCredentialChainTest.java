@@ -179,8 +179,8 @@ class AwsCredentialChainTest {
 
             @Override
             @SuppressWarnings("unchecked")
-            public <I extends Identity> IdentityResolver<I> create(Class<I> identityType, ProviderContext context) {
-                return (IdentityResolver<I>) resolver;
+            public <I extends Identity> CreateResult<I> create(Class<I> identityType, ProviderContext context) {
+                return (CreateResult<I>) new CreateResult.PossibleMatch<>(resolver);
             }
         };
     }
