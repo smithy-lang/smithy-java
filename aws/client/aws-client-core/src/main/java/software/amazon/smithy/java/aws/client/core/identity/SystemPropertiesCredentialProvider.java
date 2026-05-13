@@ -7,9 +7,9 @@ package software.amazon.smithy.java.aws.client.core.identity;
 
 import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
-import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
+import software.amazon.smithy.java.aws.credentials.chain.CreateResult;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
 import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
@@ -36,10 +36,10 @@ public final class SystemPropertiesCredentialProvider implements ChainIdentityPr
 
     @Override
     @SuppressWarnings("unchecked")
-    public <I extends Identity> IdentityResolver<I> create(Class<I> identityType, ProviderContext context) {
+    public <I extends Identity> CreateResult<I> create(Class<I> identityType, ProviderContext context) {
         if (identityType == AwsCredentialsIdentity.class) {
-            return (IdentityResolver<I>) SystemPropertiesIdentityResolver.INSTANCE;
+            return (CreateResult<I>) new CreateResult.UnconditionalMatch<>(SystemPropertiesIdentityResolver.INSTANCE);
         }
-        return null;
+        return CreateResult.pass();
     }
 }

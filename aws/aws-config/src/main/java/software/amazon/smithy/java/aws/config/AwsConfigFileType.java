@@ -8,7 +8,7 @@ package software.amazon.smithy.java.aws.config;
 /**
  * Identifies which of the two AWS shared configuration files is being parsed.
  */
-public enum AwsConfigFileType {
+enum AwsConfigFileType {
     /** The configuration file (e.g., {@code ~/.aws/config}). */
     CONFIGURATION,
 
