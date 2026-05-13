@@ -63,6 +63,7 @@ jmh {
                     "-XX:+UnlockDiagnosticVMOptions",
                     "-XX:+LogCompilation",
                     "-XX:LogFile=build/jmh-jitlog/hotspot.log",
+                    "-XX:+PrintInlining",
                 )
             }.orElse(emptyList()),
     )
@@ -72,5 +73,6 @@ jmh {
             .map { listOf(it) }
             .orElse(emptyList()),
     )
-    profilers.add("async:output=jfr;dir=${layout.buildDirectory.get()}/jmh-profiler")
+    val profEvent = providers.gradleProperty("jmh.profEvent").orElse("cpu").get()
+    profilers.add("async:libPath=/local/home/adwsingh/async-profiler-4.4-linux-arm64/lib/libasyncProfiler.so;event=$profEvent;output=jfr;dir=${layout.buildDirectory.get()}/jmh-profiler")
 }

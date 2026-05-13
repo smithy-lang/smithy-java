@@ -79,6 +79,8 @@ final class ClassFileJsonDeserializerGenerator {
     private static final ClassDesc CD_System = ClassDesc.of("java.lang.System");
     private static final ClassDesc CD_ErrorCorrection = ClassDesc.of(
             "software.amazon.smithy.java.core.schema.ShapeBuilder");
+    private static final ClassDesc CD_Schema = ClassDesc.of(
+            "software.amazon.smithy.java.core.schema.Schema");
 
     // Slot assignments: 0=this, 1=Object ctxObj, 2=ShapeBuilder builderObj
     private static final int SLOT_CTX = 3;
@@ -106,6 +108,8 @@ final class ClassFileJsonDeserializerGenerator {
 
     private Set<Integer> jsonNameFieldIndices;
     private ClassDesc shapeClassDesc;
+    private final Map<String, Integer> timestampSchemaIndices = new LinkedHashMap<>();
+    private int nextTsSchemaIndex;
 
     GenerationResult generate(
             StructCodePlan plan,
@@ -118,6 +122,8 @@ final class ClassFileJsonDeserializerGenerator {
         nestedDeClasses.clear();
         nextDeIndex = 0;
         jsonNameFieldIndices = new LinkedHashSet<>();
+        timestampSchemaIndices.clear();
+        nextTsSchemaIndex = 0;
 
         collectNestedStructTypes(plan, deserializerHolders);
 
@@ -138,7 +144,9 @@ final class ClassFileJsonDeserializerGenerator {
             }
         }
 
-        // Class data: field name bytes, jsonName bytes, then deserializer holder arrays
+        collectTimestampFields(plan);
+
+        // Class data: field name bytes, jsonName bytes, deserializer holder arrays, timestamp schemas
         List<Object> classData = new ArrayList<>(fieldNameBytesList);
         for (int idx : jsonNameFieldIndices) {
             classData.add(jsonFieldNameBytesList.get(idx));
@@ -146,6 +154,10 @@ final class ClassFileJsonDeserializerGenerator {
         int deHoldersClassDataOffset = classData.size();
         for (var entry : nestedDeFieldIndices.entrySet()) {
             classData.add(deserializerHolders.get(entry.getKey()));
+        }
+        int tsSchemaClassDataOffset = classData.size();
+        for (var entry : timestampSchemaIndices.entrySet()) {
+            classData.add(findMemberSchema(plan, entry.getKey()));
         }
 
         byte[] bytecode = ClassFile.of().build(thisClass, cb -> {
@@ -170,7 +182,14 @@ final class ClassFileJsonDeserializerGenerator {
                         ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
             }
 
-            emitClassInit(cb, thisClass, fieldNameBytesList, deHoldersClassDataOffset);
+            for (var entry : timestampSchemaIndices.entrySet()) {
+                cb.withField("_TS_" + entry.getValue(),
+                        CD_Schema,
+                        ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
+            }
+
+            emitClassInit(cb, thisClass, fieldNameBytesList, deHoldersClassDataOffset,
+                    tsSchemaClassDataOffset);
             emitConstructor(cb, thisClass);
             emitDeserializeFieldMethod(cb, thisClass, plan);
             emitDeserializeMethod(cb,
@@ -188,7 +207,8 @@ final class ClassFileJsonDeserializerGenerator {
             java.lang.classfile.ClassBuilder cb,
             ClassDesc thisClass,
             List<byte[]> fieldNameBytesList,
-            int deHoldersClassDataOffset
+            int deHoldersClassDataOffset,
+            int tsSchemaClassDataOffset
     ) {
         ClassDesc CD_MethodHandles = ClassDesc.of("java.lang.invoke.MethodHandles");
         ClassDesc CD_List_cls = ClassDesc.of("java.util.List");
@@ -243,6 +263,17 @@ final class ClassFileJsonDeserializerGenerator {
                                 MethodTypeDesc.of(CD_Object, CD_int));
                         code.checkcast(deArrayDesc);
                         code.putstatic(thisClass, "_DE_" + entry.getValue(), deArrayDesc);
+                    }
+
+                    int tsIdx = tsSchemaClassDataOffset;
+                    for (var entry : timestampSchemaIndices.entrySet()) {
+                        code.aload(listSlot);
+                        code.ldc(tsIdx++);
+                        code.invokeinterface(CD_List_cls,
+                                "get",
+                                MethodTypeDesc.of(CD_Object, CD_int));
+                        code.checkcast(CD_Schema);
+                        code.putstatic(thisClass, "_TS_" + entry.getValue(), CD_Schema);
                     }
 
                     code.return_();
@@ -649,6 +680,36 @@ final class ClassFileJsonDeserializerGenerator {
                                     CD_JsonParseState));
                     code.ireturn();
                 });
+    }
+
+    private void collectTimestampFields(StructCodePlan plan) {
+        for (FieldPlan f : plan.fields()) {
+            boolean needsSchema = false;
+            if (f.category() == FieldCategory.TIMESTAMP) {
+                needsSchema = true;
+            } else if (f.category() == FieldCategory.LIST
+                    && f.elementClass() == java.time.Instant.class) {
+                needsSchema = true;
+            } else if (f.category() == FieldCategory.MAP
+                    && f.mapValueClass() == java.time.Instant.class) {
+                needsSchema = true;
+            }
+            if (needsSchema) {
+                String key = f.memberName();
+                if (!timestampSchemaIndices.containsKey(key)) {
+                    timestampSchemaIndices.put(key, nextTsSchemaIndex++);
+                }
+            }
+        }
+    }
+
+    private static Object findMemberSchema(StructCodePlan plan, String memberName) {
+        for (var member : plan.schema().members()) {
+            if (member.memberName().equals(memberName)) {
+                return member;
+            }
+        }
+        throw new IllegalArgumentException("No member named " + memberName);
     }
 
     private void emitSkipWhitespace(CodeBuilder code) {
@@ -1374,15 +1435,11 @@ final class ClassFileJsonDeserializerGenerator {
             ClassDesc setterReturn
     ) {
         String setter = field.memberName();
-        ClassDesc CD_Schema = ClassDesc.of("software.amazon.smithy.java.core.schema.Schema");
+        Integer tsIdx = timestampSchemaIndices.get(field.memberName());
         code.aload(SLOT_BUF);
         code.iload(SLOT_POS);
         code.iload(SLOT_END);
-        code.getstatic(shapeClassDesc, "$SCHEMA", CD_Schema);
-        code.ldc(field.memberName());
-        code.invokevirtual(CD_Schema,
-                "member",
-                MethodTypeDesc.of(CD_Schema, CD_String));
+        code.getstatic(thisClass, "_TS_" + tsIdx, CD_Schema);
         code.aload(SLOT_CTX);
         code.getfield(CD_JsonReaderContext, "jsonSettings", CD_JsonSettings);
         code.aload(SLOT_CTX);
@@ -1725,13 +1782,10 @@ final class ClassFileJsonDeserializerGenerator {
             case TIMESTAMP -> {
                 ClassDesc CD_Schema = ClassDesc.of("software.amazon.smithy.java.core.schema.Schema");
                 code.aload(SLOT_BUF);
+                Integer tsIdx = timestampSchemaIndices.get(field.memberName());
                 code.iload(SLOT_POS);
                 code.iload(SLOT_END);
-                code.getstatic(shapeClassDesc, "$SCHEMA", CD_Schema);
-                code.ldc(field.memberName());
-                code.invokevirtual(CD_Schema,
-                        "member",
-                        MethodTypeDesc.of(CD_Schema, CD_String));
+                code.getstatic(thisClass, "_TS_" + tsIdx, CD_Schema);
                 code.aload(SLOT_CTX);
                 code.getfield(CD_JsonReaderContext, "jsonSettings", CD_JsonSettings);
                 code.aload(SLOT_CTX);
