@@ -709,6 +709,15 @@ final class ClassFileJsonDeserializerGenerator {
             code.invokestatic(CD_JsonReadUtils,
                     "matchFieldNameMasked",
                     MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int, CD_long, CD_long, CD_int));
+        } else if (nameLen >= 9 && nameLen <= 16) {
+            code.ldc(computeLeMaskedLong(nameBytes, 0));
+            code.ldc(computeLeMaskedLong(nameBytes, 8));
+            code.ldc(computeMask(nameLen - 8));
+            code.ldc(nameLen);
+            code.invokestatic(CD_JsonReadUtils,
+                    "matchFieldName2Long",
+                    MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int,
+                            CD_long, CD_long, CD_long, CD_int));
         } else {
             code.getstatic(thisClass, staticFieldName, CD_byte_array);
             code.invokestatic(CD_JsonReadUtils,
@@ -727,9 +736,13 @@ final class ClassFileJsonDeserializerGenerator {
     }
 
     private static long computeLeMaskedLong(byte[] bytes) {
+        return computeLeMaskedLong(bytes, 0);
+    }
+
+    private static long computeLeMaskedLong(byte[] bytes, int offset) {
         long result = 0;
-        for (int i = 0; i < 8 && i < bytes.length; i++) {
-            result |= (long) (bytes[i] & 0xFF) << (i * 8);
+        for (int i = 0; i < 8 && offset + i < bytes.length; i++) {
+            result |= (long) (bytes[offset + i] & 0xFF) << (i * 8);
         }
         return result;
     }

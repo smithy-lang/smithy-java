@@ -78,10 +78,18 @@ public final class JsonReadUtils {
             throw new SerializationException("Leading zeros not allowed in JSON numbers");
         }
 
-        // Accumulate as negative to handle Long.MIN_VALUE correctly
-        // (Long.MIN_VALUE has no positive counterpart)
         long value = -(first - '0');
         pos++;
+
+        int safeEnd = Math.min(end, pos + 17);
+        while (pos < safeEnd) {
+            byte b = buf[pos];
+            if (b < '0' || b > '9') {
+                break;
+            }
+            value = value * 10 - (b - '0');
+            pos++;
+        }
 
         while (pos < end) {
             byte b = buf[pos];
@@ -91,7 +99,6 @@ public final class JsonReadUtils {
             long prev = value;
             value = value * 10 - (b - '0');
             if (value > prev) {
-                // Overflowed past Long.MIN_VALUE
                 throw new SerializationException("Number overflow");
             }
             pos++;
@@ -196,34 +203,38 @@ public final class JsonReadUtils {
         }
         pos++; // skip opening quote
 
-        // Fast path: SWAR scan 8 bytes at a time for closing quote, backslash, or control chars.
         int start = pos;
+        boolean ascii = true;
 
         while (pos + 8 <= end) {
             long word = (long) LONG_HANDLE.get(buf, pos);
             if (hasSpecialStringByte(word)) {
-                break; // found something, fall through to scalar loop
+                break;
+            }
+            if ((word & 0x8080808080808080L) != 0) {
+                ascii = false;
             }
             pos += 8;
         }
 
-        // Scalar loop for remaining bytes and to find the exact special byte
         while (pos < end) {
             byte b = buf[pos];
             if (b == '"') {
-                // No escapes found — fast path
-                deser.parsedString = new String(buf, start, pos - start, StandardCharsets.UTF_8);
+                deser.parsedString = new String(buf, start, pos - start,
+                        ascii ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8);
                 deser.parsedEndPos = pos + 1;
                 return;
             }
             if (b == '\\') {
-                // Has escapes — slow path
                 parseStringWithEscapes(buf, start, pos, end, deser);
                 return;
             }
             if ((b & 0xFF) < 0x20) {
                 throw new SerializationException(
                         "Unescaped control character 0x" + Integer.toHexString(b & 0xFF) + " in string");
+            }
+            if (b < 0) {
+                ascii = false;
             }
             pos++;
         }
@@ -471,11 +482,30 @@ public final class JsonReadUtils {
         if (pos + nameLen + 1 > end || buf[pos + nameLen] != '"') {
             return -1;
         }
-        // Ensure 8-byte VarHandle read is within buffer bounds
         if (pos + 8 > buf.length) {
             return matchFieldName(buf, pos, end, expected, nameLen);
         }
         return ((long) LONG_HANDLE.get(buf, pos) & mask) == expected ? pos + nameLen + 1 : -1;
+    }
+
+    /**
+     * Matches a field name of 9-16 bytes using two long comparisons (SWAR).
+     * Returns pos + nameLen + 1 (past closing quote) on match, or -1.
+     */
+    public static int matchFieldName2Long(
+            byte[] buf, int pos, int end,
+            long expected0, long expected1, long mask1, int nameLen
+    ) {
+        if (pos + nameLen + 1 > end || buf[pos + nameLen] != '"') {
+            return -1;
+        }
+        if (pos + 16 > buf.length) {
+            return -1;
+        }
+        if ((long) LONG_HANDLE.get(buf, pos) != expected0) {
+            return -1;
+        }
+        return ((long) LONG_HANDLE.get(buf, pos + 8) & mask1) == expected1 ? pos + nameLen + 1 : -1;
     }
 
     private static int matchFieldName(byte[] buf, int pos, int end, long expected, int nameLen) {
@@ -877,6 +907,19 @@ public final class JsonReadUtils {
         long value = -(first - '0');
         pos++;
 
+        // Fast path: consume up to 17 more digits without overflow checks.
+        // 18 total digits can't overflow a long (max is 19 digits for Long.MIN_VALUE).
+        int safeEnd = Math.min(end, pos + 17);
+        while (pos < safeEnd) {
+            byte b = buf[pos];
+            if (b < '0' || b > '9') {
+                break;
+            }
+            value = value * 10 - (b - '0');
+            pos++;
+        }
+
+        // Slow path: 19th digit and beyond needs overflow checking
         while (pos < end) {
             byte b = buf[pos];
             if (b < '0' || b > '9') {
@@ -964,11 +1007,15 @@ public final class JsonReadUtils {
         pos++;
 
         int start = pos;
+        boolean ascii = true;
 
         while (pos + 8 <= end) {
             long word = (long) LONG_HANDLE.get(buf, pos);
             if (hasSpecialStringByte(word)) {
                 break;
+            }
+            if ((word & 0x8080808080808080L) != 0) {
+                ascii = false;
             }
             pos += 8;
         }
@@ -976,7 +1023,8 @@ public final class JsonReadUtils {
         while (pos < end) {
             byte b = buf[pos];
             if (b == '"') {
-                state.parsedString = new String(buf, start, pos - start, StandardCharsets.UTF_8);
+                state.parsedString = new String(buf, start, pos - start,
+                        ascii ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8);
                 state.parsedEndPos = pos + 1;
                 return;
             }
@@ -987,6 +1035,9 @@ public final class JsonReadUtils {
             if ((b & 0xFF) < 0x20) {
                 throw new SerializationException(
                         "Unescaped control character 0x" + Integer.toHexString(b & 0xFF) + " in string");
+            }
+            if (b < 0) {
+                ascii = false;
             }
             pos++;
         }
