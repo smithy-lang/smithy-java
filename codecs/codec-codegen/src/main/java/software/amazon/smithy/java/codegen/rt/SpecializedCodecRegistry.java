@@ -38,6 +38,12 @@ public final class SpecializedCodecRegistry {
 
     private final CodecProfile profile;
     private final ConcurrentHashMap<Class<?>, Entry> entries = new ConcurrentHashMap<>();
+    private final ClassValue<Entry> entryCache = new ClassValue<>() {
+        @Override
+        protected Entry computeValue(Class<?> type) {
+            return entries.computeIfAbsent(type, k -> new Entry());
+        }
+    };
     private final ExecutorService executor;
 
     public SpecializedCodecRegistry(CodecProfile profile) {
@@ -50,38 +56,34 @@ public final class SpecializedCodecRegistry {
     }
 
     public GeneratedStructSerializer getSerializer(Schema schema, Class<?> shapeClass) {
-        Entry entry = entries.get(shapeClass);
-        if (entry != null) {
-            if (entry.failed) {
-                return null;
-            }
-            GeneratedStructSerializer ser = entry.serHolder[0];
-            if (ser != null) {
-                return ser;
-            }
+        Entry entry = entryCache.get(shapeClass);
+        if (entry.failed) {
+            return null;
+        }
+        GeneratedStructSerializer ser = entry.serHolder[0];
+        if (ser != null) {
+            return ser;
         }
         triggerAsync(schema, shapeClass);
         return null;
     }
 
     public GeneratedStructDeserializer getDeserializer(Schema schema, Class<?> shapeClass) {
-        Entry entry = entries.get(shapeClass);
-        if (entry != null) {
-            if (entry.failed) {
-                return null;
-            }
-            GeneratedStructDeserializer de = entry.deHolder[0];
-            if (de != null) {
-                return de;
-            }
+        Entry entry = entryCache.get(shapeClass);
+        if (entry.failed) {
+            return null;
+        }
+        GeneratedStructDeserializer de = entry.deHolder[0];
+        if (de != null) {
+            return de;
         }
         triggerAsync(schema, shapeClass);
         return null;
     }
 
     public void warmup(Schema schema, Class<?> shapeClass) {
-        Entry entry = entries.get(shapeClass);
-        if (entry != null && entry.serHolder[0] != null && entry.deHolder[0] != null) {
+        Entry entry = entryCache.get(shapeClass);
+        if (entry.serHolder[0] != null && entry.deHolder[0] != null) {
             return;
         }
         generate(schema, shapeClass, new HashSet<>());
@@ -161,7 +163,7 @@ public final class SpecializedCodecRegistry {
     }
 
     private Entry getOrCreateEntry(Class<?> shapeClass) {
-        return entries.computeIfAbsent(shapeClass, k -> new Entry());
+        return entryCache.get(shapeClass);
     }
 
     private static Class<?> loadHiddenClass(

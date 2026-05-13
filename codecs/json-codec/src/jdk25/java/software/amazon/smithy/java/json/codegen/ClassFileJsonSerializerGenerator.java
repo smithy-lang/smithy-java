@@ -73,6 +73,8 @@ final class ClassFileJsonSerializerGenerator {
     private static final ClassDesc CD_System = ClassDesc.of("java.lang.System");
     private static final ClassDesc CD_SerializableStruct = ClassDesc.of(
             "software.amazon.smithy.java.core.schema.SerializableStruct");
+    private static final ClassDesc CD_Schema = ClassDesc.of(
+            "software.amazon.smithy.java.core.schema.Schema");
 
     // Slot assignments for serialize method
     // 0=this, 1=Object obj, 2=WriterContext ctx
@@ -94,6 +96,8 @@ final class ClassFileJsonSerializerGenerator {
     private Set<Integer> jsonNameFieldIndices;
     private List<byte[]> jsonFieldNameBytesListRef;
     private ClassDesc shapeClassDesc;
+    private final Map<String, Integer> timestampSchemaIndices = new LinkedHashMap<>();
+    private int nextTsSchemaIndex;
 
     GenerationResult generate(
             StructCodePlan plan,
@@ -105,6 +109,8 @@ final class ClassFileJsonSerializerGenerator {
         nestedSerFieldIndices.clear();
         nextSerIndex = 0;
         jsonNameFieldIndices = new LinkedHashSet<>();
+        timestampSchemaIndices.clear();
+        nextTsSchemaIndex = 0;
 
         collectNestedStructTypes(plan, serializerHolders);
 
@@ -124,7 +130,9 @@ final class ClassFileJsonSerializerGenerator {
             }
         }
 
-        // Class data: field name bytes, jsonName bytes, then serializer holder arrays
+        collectTimestampFields(plan);
+
+        // Class data: field name bytes, jsonName bytes, serializer holder arrays, timestamp schemas
         List<Object> classData = new ArrayList<>(fieldNameBytesList);
         for (int idx : jsonNameFieldIndices) {
             classData.add(jsonFieldNameBytesList.get(idx));
@@ -132,6 +140,10 @@ final class ClassFileJsonSerializerGenerator {
         int serHoldersClassDataOffset = classData.size();
         for (var entry : nestedSerFieldIndices.entrySet()) {
             classData.add(serializerHolders.get(entry.getKey()));
+        }
+        int tsSchemaClassDataOffset = classData.size();
+        for (var entry : timestampSchemaIndices.entrySet()) {
+            classData.add(findMemberSchema(plan, entry.getKey()));
         }
 
         byte[] bytecode = ClassFile.of().build(thisClass, cb -> {
@@ -156,11 +168,18 @@ final class ClassFileJsonSerializerGenerator {
                         ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
             }
 
+            for (var entry : timestampSchemaIndices.entrySet()) {
+                cb.withField("_TS_" + entry.getValue(),
+                        CD_Schema,
+                        ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
+            }
+
             emitClassInit(cb,
                     thisClass,
                     fieldNameBytesList,
                     jsonFieldNameBytesList,
-                    serHoldersClassDataOffset);
+                    serHoldersClassDataOffset,
+                    tsSchemaClassDataOffset);
             emitConstructor(cb, thisClass);
 
             if (plan.isUnion()) {
@@ -219,7 +238,8 @@ final class ClassFileJsonSerializerGenerator {
             ClassDesc thisClass,
             List<byte[]> fieldNameBytesList,
             List<byte[]> jsonFieldNameBytesList,
-            int serHoldersClassDataOffset
+            int serHoldersClassDataOffset,
+            int tsSchemaClassDataOffset
     ) {
         ClassDesc CD_MethodHandles = ClassDesc.of("java.lang.invoke.MethodHandles");
         ClassDesc CD_List_cls = ClassDesc.of("java.util.List");
@@ -274,6 +294,17 @@ final class ClassFileJsonSerializerGenerator {
                                 MethodTypeDesc.of(CD_Object, CD_int));
                         code.checkcast(serArrayDesc);
                         code.putstatic(thisClass, "_SER_" + entry.getValue(), serArrayDesc);
+                    }
+
+                    int tsIdx = tsSchemaClassDataOffset;
+                    for (var entry : timestampSchemaIndices.entrySet()) {
+                        code.aload(listSlot);
+                        code.ldc(tsIdx++);
+                        code.invokeinterface(CD_List_cls,
+                                "get",
+                                MethodTypeDesc.of(CD_Object, CD_int));
+                        code.checkcast(CD_Schema);
+                        code.putstatic(thisClass, "_TS_" + entry.getValue(), CD_Schema);
                     }
 
                     code.return_();
@@ -386,7 +417,9 @@ final class ClassFileJsonSerializerGenerator {
                         code.putfield(CD_WriterContext, "needsComma", CD_int);
 
                         int chunkIdx = 0;
-                        for (int start = fixedFieldEnd; start < serOrder.size();
+                        for (
+                                int start = fixedFieldEnd;
+                                start < serOrder.size();
                                 start += CHUNK_SIZE) {
                             code.aload(0); // this
                             code.aload(SLOT_TYPED);
@@ -405,6 +438,7 @@ final class ClassFileJsonSerializerGenerator {
                     }
 
                     // Closing brace
+                    emitEnsure(code, thisClass, 1);
                     emitWriteByte(code, '}');
 
                     // Sync back to ctx
@@ -707,6 +741,37 @@ final class ClassFileJsonSerializerGenerator {
                 "arraycopy",
                 MethodTypeDesc.of(CD_void, CD_Object, CD_int, CD_Object, CD_int, CD_int));
         code.iinc(SLOT_POS, length);
+    }
+
+    private void collectTimestampFields(StructCodePlan plan) {
+        List<FieldPlan> fields = plan.isUnion() ? plan.fields() : plan.serializationOrder();
+        for (FieldPlan f : fields) {
+            boolean needsSchema = false;
+            if (f.category() == FieldCategory.TIMESTAMP) {
+                needsSchema = true;
+            } else if (f.category() == FieldCategory.LIST
+                    && f.elementClass() == java.time.Instant.class) {
+                needsSchema = true;
+            } else if (f.category() == FieldCategory.MAP
+                    && f.mapValueClass() == java.time.Instant.class) {
+                needsSchema = true;
+            }
+            if (needsSchema) {
+                String key = f.memberName();
+                if (!timestampSchemaIndices.containsKey(key)) {
+                    timestampSchemaIndices.put(key, nextTsSchemaIndex++);
+                }
+            }
+        }
+    }
+
+    private static Object findMemberSchema(StructCodePlan plan, String memberName) {
+        for (var member : plan.schema().members()) {
+            if (member.memberName().equals(memberName)) {
+                return member;
+            }
+        }
+        throw new IllegalArgumentException("No member named " + memberName);
     }
 
     private void emitSyncToCtx(CodeBuilder code) {
@@ -1601,16 +1666,12 @@ final class ClassFileJsonSerializerGenerator {
             FieldPlan field,
             int tsSlot
     ) {
-        ClassDesc CD_Schema = ClassDesc.of("software.amazon.smithy.java.core.schema.Schema");
+        Integer tsIdx = timestampSchemaIndices.get(field.memberName());
         emitEnsure(code, thisClass, 42);
         code.aload(SLOT_BUF);
         code.iload(SLOT_POS);
         code.aload(tsSlot);
-        code.getstatic(shapeClassDesc, "$SCHEMA", CD_Schema);
-        code.ldc(field.memberName());
-        code.invokevirtual(CD_Schema,
-                "member",
-                MethodTypeDesc.of(CD_Schema, CD_String));
+        code.getstatic(thisClass, "_TS_" + tsIdx, CD_Schema);
         code.aload(2);
         code.checkcast(CD_JsonWriterContext);
         code.getfield(CD_JsonWriterContext, "jsonSettings", CD_JsonSettings);
