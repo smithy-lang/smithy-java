@@ -763,14 +763,28 @@ public final class JsonWriteUtils {
             pos = writePositiveLong(buf, pos, intPart);
             buf[pos++] = '.';
 
-            // Write fractional part with leading zeros
-            // e.g., scale=5 and fracPart=99 -> "00099"
-            for (int i = scale - 1; i >= 0; i--) {
-                long p10 = POWERS_OF_10[i];
-                int d = (int) (fracPart / p10);
-                buf[pos++] = (byte) ('0' + d);
-                fracPart -= d * p10;
+            // Write fractional digits right-to-left using digit pairs, then
+            // fill any remaining leading-zero positions.
+            int fracEnd = pos + scale;
+            int p = fracEnd;
+            while (fracPart >= 100) {
+                long q = fracPart / 100;
+                int r = (int) (fracPart - q * 100) * 2;
+                fracPart = q;
+                buf[--p] = DIGIT_PAIRS[r + 1];
+                buf[--p] = DIGIT_PAIRS[r];
             }
+            if (fracPart >= 10) {
+                int r = (int) fracPart * 2;
+                buf[--p] = DIGIT_PAIRS[r + 1];
+                buf[--p] = DIGIT_PAIRS[r];
+            } else if (fracPart > 0) {
+                buf[--p] = (byte) ('0' + fracPart);
+            }
+            while (p > pos) {
+                buf[--p] = '0';
+            }
+            pos = fracEnd;
         } else {
             // Scale too large for our table — shouldn't happen for practical values
             pos = writePositiveLong(buf, pos, unscaled);

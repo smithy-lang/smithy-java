@@ -457,7 +457,15 @@ final class ClassFileJsonSerializerGenerator {
     // ---- Bytecode emit helpers ----
 
     private void emitEnsure(CodeBuilder code, ClassDesc thisClass, int needed) {
-        // buf = ctx.ensure(pos, needed) — may grow buf; pos stays in local slot
+        // Inline the fast path: if (pos + needed > buf.length) buf = ctx.ensure(pos, needed)
+        Label ok = code.newLabel();
+        code.iload(SLOT_POS);
+        code.ldc(needed);
+        code.iadd();
+        code.aload(SLOT_BUF);
+        code.arraylength();
+        code.if_icmple(ok);
+        // Slow path: grow buffer
         code.aload(2); // ctx
         code.iload(SLOT_POS);
         code.ldc(needed);
@@ -465,6 +473,7 @@ final class ClassFileJsonSerializerGenerator {
                 "ensure",
                 MethodTypeDesc.of(CD_byte_array, CD_int, CD_int));
         code.astore(SLOT_BUF);
+        code.labelBinding(ok);
     }
 
     private void emitWriteByte(CodeBuilder code, char b) {
