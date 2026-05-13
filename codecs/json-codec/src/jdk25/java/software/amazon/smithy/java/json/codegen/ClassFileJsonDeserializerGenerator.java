@@ -97,6 +97,8 @@ final class ClassFileJsonDeserializerGenerator {
     private static final int DF_SLOT_MATCHED = 1;
     private static final int DF_SLOT_FIRST_TEMP = 8;
 
+    private static final int DE_CHUNK_SIZE = 7;
+
     private int nextTempSlot;
     private final Map<String, Integer> nestedDeFieldIndices = new LinkedHashMap<>();
     private final Map<String, Class<?>> nestedDeClasses = new LinkedHashMap<>();
@@ -514,18 +516,97 @@ final class ClassFileJsonDeserializerGenerator {
             throw new RuntimeException(e);
         }
 
-        // Signature: int deserializeField$(int matched, int _pad, ctx, builder, buf, pos, end)
-        // Slot layout: 0=this, 1=matched, 2=_pad, 3=ctx, 4=builder, 5=buf, 6=pos, 7=end
-        // CTX/BUILDER/BUF/POS/END match the main method slots so emit helpers work unchanged.
-        cb.withMethodBody("deserializeField$",
-                MethodTypeDesc.of(CD_int,
-                        CD_int,
-                        CD_int,
-                        CD_JsonReaderContext,
-                        builderClass,
-                        CD_byte_array,
-                        CD_int,
-                        CD_int),
+        MethodTypeDesc fieldMethodDesc = MethodTypeDesc.of(CD_int,
+                CD_int,
+                CD_int,
+                CD_JsonReaderContext,
+                builderClass,
+                CD_byte_array,
+                CD_int,
+                CD_int);
+
+        if (fields.size() <= DE_CHUNK_SIZE) {
+            // Small struct: single method with all fields inline
+            emitDeserializeFieldMethodBody(cb, thisClass, builderClass, fields,
+                    plan, actualBuilderClass, "deserializeField$", fieldMethodDesc, 0);
+        } else {
+            // Large struct: thin dispatcher + chunk methods
+            int numChunks = (fields.size() + DE_CHUNK_SIZE - 1) / DE_CHUNK_SIZE;
+            for (int chunk = 0; chunk < numChunks; chunk++) {
+                int start = chunk * DE_CHUNK_SIZE;
+                int end = Math.min(start + DE_CHUNK_SIZE, fields.size());
+                List<FieldPlan> chunkFields = fields.subList(start, end);
+                emitDeserializeFieldMethodBody(cb, thisClass, builderClass, chunkFields,
+                        plan, actualBuilderClass, "deserializeField$" + chunk,
+                        fieldMethodDesc, start);
+            }
+
+            // Thin dispatcher: route matched index to the correct chunk method
+            cb.withMethodBody("deserializeField$",
+                    fieldMethodDesc,
+                    ClassFile.ACC_PRIVATE,
+                    code -> {
+                        Label defaultLabel = code.newLabel();
+                        Label[] chunkLabels = new Label[numChunks];
+                        for (int c = 0; c < numChunks; c++) {
+                            chunkLabels[c] = code.newLabel();
+                        }
+
+                        // Map field index to chunk: matched / DE_CHUNK_SIZE
+                        // Use if-else chain (cheaper than division for small numChunks)
+                        for (int c = numChunks - 1; c >= 1; c--) {
+                            code.iload(DF_SLOT_MATCHED);
+                            code.ldc(c * DE_CHUNK_SIZE);
+                            code.if_icmpge(chunkLabels[c]);
+                        }
+                        code.goto_(chunkLabels[0]);
+
+                        for (int c = 0; c < numChunks; c++) {
+                            code.labelBinding(chunkLabels[c]);
+                            code.aload(0); // this
+                            code.iload(1); // matched
+                            code.iload(2); // _pad
+                            code.aload(3); // ctx
+                            code.aload(4); // builder
+                            code.aload(5); // buf
+                            code.iload(6); // pos
+                            code.iload(7); // end
+                            code.invokevirtual(thisClass,
+                                    "deserializeField$" + c,
+                                    fieldMethodDesc);
+                            code.ireturn();
+                        }
+
+                        code.labelBinding(defaultLabel);
+                        code.aload(SLOT_BUF);
+                        code.iload(SLOT_POS);
+                        code.iload(SLOT_END);
+                        code.aload(SLOT_CTX);
+                        code.invokestatic(CD_JsonReadUtils,
+                                "skipValue",
+                                MethodTypeDesc.of(CD_int,
+                                        CD_byte_array,
+                                        CD_int,
+                                        CD_int,
+                                        CD_JsonParseState));
+                        code.ireturn();
+                    });
+        }
+    }
+
+    private void emitDeserializeFieldMethodBody(
+            java.lang.classfile.ClassBuilder cb,
+            ClassDesc thisClass,
+            ClassDesc builderClass,
+            List<FieldPlan> fields,
+            StructCodePlan plan,
+            Class<?> actualBuilderClass,
+            String methodName,
+            MethodTypeDesc methodDesc,
+            int fieldOffset
+    ) {
+        cb.withMethodBody(methodName,
+                methodDesc,
                 ClassFile.ACC_PRIVATE,
                 code -> {
                     nextTempSlot = DF_SLOT_FIRST_TEMP;
@@ -535,7 +616,8 @@ final class ClassFileJsonDeserializerGenerator {
                     Label[] fieldLabels = new Label[fields.size()];
                     for (int i = 0; i < fields.size(); i++) {
                         fieldLabels[i] = code.newLabel();
-                        cases.add(java.lang.classfile.instruction.SwitchCase.of(i, fieldLabels[i]));
+                        cases.add(java.lang.classfile.instruction.SwitchCase.of(
+                                fieldOffset + i, fieldLabels[i]));
                     }
 
                     code.iload(DF_SLOT_MATCHED);
@@ -554,7 +636,6 @@ final class ClassFileJsonDeserializerGenerator {
                     }
 
                     code.labelBinding(defaultLabel);
-                    // Skip unknown field value
                     code.aload(SLOT_BUF);
                     code.iload(SLOT_POS);
                     code.iload(SLOT_END);
