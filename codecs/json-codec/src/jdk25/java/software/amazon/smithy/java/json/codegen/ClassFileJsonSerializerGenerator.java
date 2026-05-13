@@ -82,6 +82,11 @@ final class ClassFileJsonSerializerGenerator {
     private static final int SLOT_NEEDS_COMMA = 6;
     private static final int SLOT_FIRST_TEMP = 7;
 
+    // Max variable fields per chunk method to keep bytecode under C2's DesiredMethodLimit.
+    // Each variable field generates ~150-250 bytes of bytecode; 7 fields ≈ ~1500 bytes
+    // which leaves room for C2 to inline helpers like writeQuotedStringFast (151 bytes).
+    private static final int CHUNK_SIZE = 7;
+
     private int nextTempSlot;
     private final Map<String, Integer> nestedSerFieldIndices = new LinkedHashMap<>();
     private int nextSerIndex;
@@ -167,6 +172,12 @@ final class ClassFileJsonSerializerGenerator {
                         jsonFieldNameBytesList);
             } else {
                 emitSerializeMethod(cb,
+                        thisClass,
+                        shapeClass,
+                        plan,
+                        fieldNameBytesList,
+                        jsonFieldNameBytesList);
+                emitSerializeChunkMethods(cb,
                         thisClass,
                         shapeClass,
                         plan,
@@ -341,28 +352,56 @@ final class ClassFileJsonSerializerGenerator {
                         emitWriteFixedValue(code, shapeClass, f);
                     }
 
-                    // Remaining fields
-                    for (int i = fixedFieldEnd; i < serOrder.size(); i++) {
-                        FieldPlan field = serOrder.get(i);
-                        if (field.nullable()) {
-                            emitOptionalField(code,
-                                    thisClass,
-                                    shapeClass,
-                                    field,
-                                    i,
-                                    fieldNameBytesList.get(i).length,
-                                    plan);
-                        } else {
-                            emitRequiredVariableField(code,
-                                    thisClass,
-                                    shapeClass,
-                                    field,
-                                    i,
-                                    fieldNameBytesList.get(i).length,
-                                    plan);
-                            code.iconst_1();
-                            code.istore(SLOT_NEEDS_COMMA);
+                    // Variable fields: emit inline if few, split into chunk methods if many
+                    int varFieldCount = serOrder.size() - fixedFieldEnd;
+                    if (varFieldCount <= CHUNK_SIZE) {
+                        // Small struct: emit all variable fields inline
+                        for (int i = fixedFieldEnd; i < serOrder.size(); i++) {
+                            FieldPlan field = serOrder.get(i);
+                            if (field.nullable()) {
+                                emitOptionalField(code,
+                                        thisClass,
+                                        shapeClass,
+                                        field,
+                                        i,
+                                        fieldNameBytesList.get(i).length,
+                                        plan);
+                            } else {
+                                emitRequiredVariableField(code,
+                                        thisClass,
+                                        shapeClass,
+                                        field,
+                                        i,
+                                        fieldNameBytesList.get(i).length,
+                                        plan);
+                                code.iconst_1();
+                                code.istore(SLOT_NEEDS_COMMA);
+                            }
                         }
+                    } else {
+                        // Large struct: sync state to ctx, call chunk methods
+                        emitSyncToCtx(code);
+                        code.aload(2);
+                        code.iload(SLOT_NEEDS_COMMA);
+                        code.putfield(CD_WriterContext, "needsComma", CD_int);
+
+                        int chunkIdx = 0;
+                        for (int start = fixedFieldEnd; start < serOrder.size();
+                                start += CHUNK_SIZE) {
+                            code.aload(0); // this
+                            code.aload(SLOT_TYPED);
+                            code.aload(2); // ctx
+                            code.invokevirtual(thisClass,
+                                    "serializeVars$" + chunkIdx,
+                                    MethodTypeDesc.of(CD_void, shapeClass, CD_WriterContext));
+                            chunkIdx++;
+                        }
+
+                        // Reload buf, pos, needsComma from ctx
+                        emitSyncFromCtx(code);
+                        code.aload(2);
+                        code.getfield(CD_WriterContext, "needsComma", CD_int);
+                        code.istore(SLOT_NEEDS_COMMA);
                     }
 
                     // Closing brace
@@ -452,6 +491,96 @@ final class ClassFileJsonSerializerGenerator {
                     emitSyncToCtx(code);
                     code.return_();
                 });
+    }
+
+    private void emitSerializeChunkMethods(
+            java.lang.classfile.ClassBuilder cb,
+            ClassDesc thisClass,
+            ClassDesc shapeClass,
+            StructCodePlan plan,
+            List<byte[]> fieldNameBytesList,
+            List<byte[]> jsonFieldNameBytesList
+    ) {
+        List<FieldPlan> serOrder = plan.serializationOrder();
+        int fixedFieldEnd = 0;
+        for (int i = 0; i < serOrder.size(); i++) {
+            FieldPlan f = serOrder.get(i);
+            if (f.required() && f.category().isFixedSize()) {
+                fixedFieldEnd = i + 1;
+            }
+        }
+
+        int varFieldCount = serOrder.size() - fixedFieldEnd;
+        if (varFieldCount <= CHUNK_SIZE) {
+            return;
+        }
+
+        int chunkIdx = 0;
+        for (int start = fixedFieldEnd; start < serOrder.size(); start += CHUNK_SIZE) {
+            int end = Math.min(start + CHUNK_SIZE, serOrder.size());
+            int capturedChunkIdx = chunkIdx;
+            int capturedStart = start;
+            int capturedEnd = end;
+
+            // Signature: void serializeVars$N(ShapeClass typed, WriterContext ctx)
+            // Slot layout: 0=this, 1=typed, 2=ctx, 3=buf, 4=pos, 5=needsComma, 6+=temps
+            // SLOT_TYPED=3 in the main method, but here typed is slot 1 and ctx is slot 2.
+            // We need to match slot assignments: load into the standard slots.
+            cb.withMethodBody("serializeVars$" + capturedChunkIdx,
+                    MethodTypeDesc.of(CD_void, shapeClass, CD_WriterContext),
+                    ClassFile.ACC_PRIVATE,
+                    code -> {
+                        nextTempSlot = SLOT_FIRST_TEMP;
+
+                        // Set up standard slot layout from parameters
+                        // 0=this, 1=shapeClass typed, 2=WriterContext ctx
+                        // Load typed into SLOT_TYPED (3) - but it's already at slot 1
+                        // We need SLOT_TYPED=3, SLOT_BUF=4, SLOT_POS=5, SLOT_NEEDS_COMMA=6
+                        // Load from parameters and ctx fields
+                        code.aload(1); // typed param
+                        code.astore(SLOT_TYPED);
+                        code.aload(2); // ctx
+                        code.getfield(CD_WriterContext, "buf", CD_byte_array);
+                        code.astore(SLOT_BUF);
+                        code.aload(2);
+                        code.getfield(CD_WriterContext, "pos", CD_int);
+                        code.istore(SLOT_POS);
+                        code.aload(2);
+                        code.getfield(CD_WriterContext, "needsComma", CD_int);
+                        code.istore(SLOT_NEEDS_COMMA);
+
+                        for (int i = capturedStart; i < capturedEnd; i++) {
+                            FieldPlan field = serOrder.get(i);
+                            if (field.nullable()) {
+                                emitOptionalField(code,
+                                        thisClass,
+                                        shapeClass,
+                                        field,
+                                        i,
+                                        fieldNameBytesList.get(i).length,
+                                        plan);
+                            } else {
+                                emitRequiredVariableField(code,
+                                        thisClass,
+                                        shapeClass,
+                                        field,
+                                        i,
+                                        fieldNameBytesList.get(i).length,
+                                        plan);
+                                code.iconst_1();
+                                code.istore(SLOT_NEEDS_COMMA);
+                            }
+                        }
+
+                        // Write state back to ctx
+                        emitSyncToCtx(code);
+                        code.aload(2);
+                        code.iload(SLOT_NEEDS_COMMA);
+                        code.putfield(CD_WriterContext, "needsComma", CD_int);
+                        code.return_();
+                    });
+            chunkIdx++;
+        }
     }
 
     // ---- Bytecode emit helpers ----

@@ -23,6 +23,7 @@ public class WriterContext {
 
     public byte[] buf;
     public int pos;
+    public int needsComma;
     public SpecializedCodecRegistry registry;
 
     public WriterContext(SpecializedCodecRegistry registry) {
