@@ -11,7 +11,6 @@ dependencies {
     api(project(":aws:aws-auth-api"))
     api(project(":auth-api"))
     implementation(project(":aws:aws-credential-chain"))
-    implementation(project(":aws:aws-config"))
     implementation(project(":logging"))
     implementation(project(":codecs:json-codec"))
 

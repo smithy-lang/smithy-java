@@ -13,13 +13,13 @@ import java.time.format.DateTimeParseException;
 import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.Identity;
-import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
 import software.amazon.smithy.java.aws.config.AwsProfile;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
+import software.amazon.smithy.java.aws.credentials.chain.CreateResult;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
 import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
@@ -60,14 +60,14 @@ public final class ImdsCredentialProvider implements ChainIdentityProvider {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <I extends Identity> IdentityResolver<I> create(Class<I> identityType, ProviderContext context) {
+    public <I extends Identity> CreateResult<I> create(Class<I> identityType, ProviderContext context) {
         if (identityType != AwsCredentialsIdentity.class) {
-            return null;
+            return CreateResult.pass();
         }
 
-        AwsProfileFile profileFile = context.properties().get(AwsProfileFile.CONTEXT_KEY);
+        AwsProfileFile profileFile = context.profileFile();
         if (isDisabled(profileFile)) {
-            return (IdentityResolver<I>) new DisabledResolver();
+            return CreateResult.pass();
         }
 
         URI endpoint = resolveEndpoint();
@@ -75,10 +75,10 @@ public final class ImdsCredentialProvider implements ChainIdentityProvider {
         ImdsClient client = new ImdsClient(endpoint);
         AwsCredentialsResolver delegate = ctx -> fetchAndParse(client, profileName);
 
-        return (IdentityResolver<I>) CachingIdentityResolver.builder(delegate)
+        return (CreateResult<I>) new CreateResult.PossibleMatch<>(CachingIdentityResolver.builder(delegate)
                 .executor(context.executor())
                 .allowExpiredCredentials(true)
-                .build();
+                .build());
     }
 
     private static IdentityResult<AwsCredentialsIdentity> fetchAndParse(ImdsClient client, String profileName) {

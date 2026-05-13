@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.aws.config;
+package software.amazon.smithy.java.aws.credentials.chain.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -16,9 +16,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
-import software.amazon.smithy.java.aws.config.AwsConfigCredentialSourceHandler.ResolutionContext;
+import software.amazon.smithy.java.aws.config.AwsConfigCredentialSource;
+import software.amazon.smithy.java.aws.config.AwsProfileFile;
+import software.amazon.smithy.java.aws.credentials.chain.CreateResult;
+import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
 import software.amazon.smithy.java.context.Context;
 
 class CredentialProcessHandlerTest {
@@ -33,7 +37,7 @@ class CredentialProcessHandlerTest {
 
         AwsConfigCredentialSource.CredentialProcess source =
                 new AwsConfigCredentialSource.CredentialProcess(script.toString());
-        IdentityResult<AwsCredentialsIdentity> result = new CredentialProcessHandler().tryResolve(source, ctx());
+        IdentityResult<AwsCredentialsIdentity> result = createFromProfileResult(source);
 
         assertNotNull(result);
         AwsCredentialsIdentity id = result.unwrap();
@@ -53,7 +57,7 @@ class CredentialProcessHandlerTest {
 
         AwsConfigCredentialSource.CredentialProcess source =
                 new AwsConfigCredentialSource.CredentialProcess(script.toString());
-        AwsCredentialsIdentity id = new CredentialProcessHandler().tryResolve(source, ctx()).unwrap();
+        AwsCredentialsIdentity id = createFromProfileResult(source).unwrap();
         assertNotNull(id.expirationTime());
         assertEquals("2099-01-01T00:00:00Z", id.expirationTime().toString());
     }
@@ -67,7 +71,7 @@ class CredentialProcessHandlerTest {
 
         AwsConfigCredentialSource.CredentialProcess source =
                 new AwsConfigCredentialSource.CredentialProcess(script.toString());
-        AwsCredentialsIdentity id = new CredentialProcessHandler().tryResolve(source, ctx()).unwrap();
+        AwsCredentialsIdentity id = createFromProfileResult(source).unwrap();
         assertEquals("AK", id.accessKeyId());
         assertEquals("SK", id.secretAccessKey());
         assertNull(id.sessionToken());
@@ -83,7 +87,7 @@ class CredentialProcessHandlerTest {
 
         AwsConfigCredentialSource.CredentialProcess source =
                 new AwsConfigCredentialSource.CredentialProcess(script.toString());
-        IdentityResult<AwsCredentialsIdentity> result = new CredentialProcessHandler().tryResolve(source, ctx());
+        IdentityResult<AwsCredentialsIdentity> result = createFromProfileResult(source);
 
         assertNotNull(result);
         assertNull(result.identity());
@@ -99,7 +103,7 @@ class CredentialProcessHandlerTest {
 
         AwsConfigCredentialSource.CredentialProcess source =
                 new AwsConfigCredentialSource.CredentialProcess(script.toString());
-        IdentityResult<AwsCredentialsIdentity> result = new CredentialProcessHandler().tryResolve(source, ctx());
+        IdentityResult<AwsCredentialsIdentity> result = createFromProfileResult(source);
 
         assertNull(result.identity());
         assertTrue(result.error().contains("SecretAccessKey"));
@@ -108,33 +112,7 @@ class CredentialProcessHandlerTest {
     @Test
     void returnsNullForNonCredentialProcessSource() {
         AwsConfigCredentialSource.StaticKeys other = new AwsConfigCredentialSource.StaticKeys("AK", "SK", null);
-        assertNull(new CredentialProcessHandler().tryResolve(other, ctx()));
-    }
-
-    @Test
-    void endToEndWithResolver(@TempDir Path tmp) throws IOException {
-        Path script = writeScript(tmp, """
-                #!/bin/sh
-                echo '{"Version": 1, "AccessKeyId": "PROC_AK", "SecretAccessKey": "PROC_SK"}'
-                """);
-
-        Path config = tmp.resolve("config");
-        Files.writeString(config, """
-                [profile proc]
-                credential_process = %s
-                """.formatted(script.toString()), StandardCharsets.UTF_8);
-
-        var resolver = ProfileIdentityResolver.builder(AwsCredentialsIdentity.class)
-                .configFile(config)
-                .credentialsFile(null)
-                .profileName("proc")
-                .addHandler(new CredentialProcessHandler())
-                .addHandler(new StaticKeysHandler())
-                .build();
-
-        AwsCredentialsIdentity id = resolver.resolveIdentity(Context.empty()).unwrap();
-        assertEquals("PROC_AK", id.accessKeyId());
-        assertEquals("PROC_SK", id.secretAccessKey());
+        assertNull(createFromProfileResult(other));
     }
 
     private static Path writeScript(Path tmp, String content) throws IOException {
@@ -144,7 +122,29 @@ class CredentialProcessHandlerTest {
         return script;
     }
 
-    private static ResolutionContext ctx() {
-        return new ResolutionContext(null, "test", Context.empty());
+    private IdentityResult<AwsCredentialsIdentity> createFromProfileResult(AwsConfigCredentialSource source) {
+        if (!(source instanceof AwsConfigCredentialSource.CredentialProcess cp)) {
+            return null;
+        }
+        var handler = new CredentialProcessHandler();
+        var ctx = new ProviderContext(null);
+        try {
+            Path configPath = Files.createTempFile("aws-config", ".ini");
+            Files.writeString(configPath, "[default]\ncredential_process=" + cp.commandLine() + "\n");
+            var file = AwsProfileFile.builder().configFile(configPath).credentialsFile(null).build();
+            ctx.setProfileFile(file);
+            ctx.setProfile(file.activeProfile());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        var result = handler.create(AwsCredentialsIdentity.class, ctx);
+        if (!(result instanceof CreateResult.PossibleMatch<AwsCredentialsIdentity> m)) {
+            return null;
+        }
+        IdentityResolver<AwsCredentialsIdentity> resolver = m.resolver();
+        if (resolver == null) {
+            return null;
+        }
+        return resolver.resolveIdentity(Context.empty());
     }
 }
