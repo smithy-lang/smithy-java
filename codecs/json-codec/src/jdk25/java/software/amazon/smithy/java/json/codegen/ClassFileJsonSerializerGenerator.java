@@ -1377,26 +1377,30 @@ final class ClassFileJsonSerializerGenerator {
     private void emitWriteBigDecimalFromSlot(CodeBuilder code, ClassDesc thisClass, int bdSlot) {
         Label elseLabel = code.newLabel();
         Label endLabel = code.newLabel();
+        int scaleSlot = allocTempSlot();
+        int unscaledSlot = allocTempSlot();
 
-        // if (bd.scale() >= 0 && bd.unscaledValue().bitLength() < 64)
+        // Cache scale() and unscaledValue() to avoid calling them twice
         code.aload(bdSlot);
         code.invokevirtual(CD_BigDecimal, "scale", MethodTypeDesc.of(CD_int));
+        code.istore(scaleSlot);
+        code.iload(scaleSlot);
         code.iflt(elseLabel);
         code.aload(bdSlot);
         code.invokevirtual(CD_BigDecimal, "unscaledValue", MethodTypeDesc.of(CD_BigInteger));
+        code.astore(unscaledSlot);
+        code.aload(unscaledSlot);
         code.invokevirtual(CD_BigInteger, "bitLength", MethodTypeDesc.of(CD_int));
         code.bipush(64);
         code.if_icmpge(elseLabel);
 
-        // Fast path
+        // Fast path: reuse cached values
         emitEnsure(code, thisClass, 22);
         code.aload(SLOT_BUF);
         code.iload(SLOT_POS);
-        code.aload(bdSlot);
-        code.invokevirtual(CD_BigDecimal, "unscaledValue", MethodTypeDesc.of(CD_BigInteger));
+        code.aload(unscaledSlot);
         code.invokevirtual(CD_BigInteger, "longValue", MethodTypeDesc.of(CD_long));
-        code.aload(bdSlot);
-        code.invokevirtual(CD_BigDecimal, "scale", MethodTypeDesc.of(CD_int));
+        code.iload(scaleSlot);
         code.invokestatic(CD_JsonWriteUtils,
                 "writeBigDecimalFromLong",
                 MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_long, CD_int));
