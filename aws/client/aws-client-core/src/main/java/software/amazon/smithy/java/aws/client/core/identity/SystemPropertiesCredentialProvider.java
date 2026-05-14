@@ -34,7 +34,7 @@ public final class SystemPropertiesCredentialProvider implements ChainIdentityPr
     }
 
     @Override
-    public void create(Class<? extends Identity> identityType, ChainSetup setup) {
+    public void setup(Class<? extends Identity> identityType, ChainSetup setup) {
         if (identityType == AwsCredentialsIdentity.class) {
             setup.addTerminalResolver(SystemPropertiesIdentityResolver.INSTANCE);
         }

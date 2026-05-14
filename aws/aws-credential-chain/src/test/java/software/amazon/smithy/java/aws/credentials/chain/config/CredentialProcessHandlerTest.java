@@ -126,7 +126,7 @@ class CredentialProcessHandlerTest {
             return null;
         }
         var handler = new CredentialProcessHandler();
-        var setup = new ChainSetup(null);
+        var setup = ChainSetup.builder().build();
         try {
             Path configPath = Files.createTempFile("aws-config", ".ini");
             Files.writeString(configPath, "[default]\ncredential_process=" + cp.commandLine() + "\n");
@@ -137,7 +137,7 @@ class CredentialProcessHandlerTest {
             throw new RuntimeException(e);
         }
         setup.setCurrentProvider(handler);
-        handler.create(AwsCredentialsIdentity.class, setup);
+        handler.setup(AwsCredentialsIdentity.class, setup);
         var resolvers = setup.resolvers();
         if (resolvers.isEmpty()) {
             return null;

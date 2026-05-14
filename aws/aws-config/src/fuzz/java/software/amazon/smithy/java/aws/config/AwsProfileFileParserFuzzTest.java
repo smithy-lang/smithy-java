@@ -9,7 +9,7 @@ import com.code_intelligence.jazzer.junit.FuzzTest;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Fuzz test for the AWS config file parser. Ensures no input can cause unexpected exceptions,
+ * Fuzz test for the AWS config file parser. Helps detect when an input causes unexpected exceptions,
  * OOM, or infinite loops. The only acceptable exception is {@link ConfigFileParseException}.
  */
 class AwsProfileFileParserFuzzTest {

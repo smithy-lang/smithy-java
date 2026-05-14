@@ -12,7 +12,7 @@ import software.amazon.smithy.java.auth.api.identity.Identity;
  * SPI for registering an identity provider into a credential/token chain.
  *
  * <p>Implementations are discovered via the language's plugin mechanism (e.g., {@code ServiceLoader}
- * in Java) and sorted by {@link #ordering()} before {@link #create} is called. A provider
+ * in Java) and sorted by {@link #ordering()} before {@link #setup} is called. A provider
  * registers its resolver by calling {@link ChainSetup#addResolver} or
  * {@link ChainSetup#addTerminalResolver} from within {@code create()}.
  */
@@ -47,5 +47,5 @@ public interface ChainIdentityProvider {
      * @param identityType the identity class the chain is resolving.
      * @param setup        the chain setup context.
      */
-    void create(Class<? extends Identity> identityType, ChainSetup setup);
+    void setup(Class<? extends Identity> identityType, ChainSetup setup);
 }

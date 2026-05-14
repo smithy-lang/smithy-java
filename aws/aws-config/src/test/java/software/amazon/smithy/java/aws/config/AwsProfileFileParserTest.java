@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -237,7 +238,7 @@ class AwsProfileFileParserTest {
     }
 
     private static Map<String, String> mapValues(Map<String, RawProperty> props) {
-        Map<String, String> out = new java.util.LinkedHashMap<>();
+        Map<String, String> out = new LinkedHashMap<>();
         for (var e : props.entrySet()) {
             out.put(e.getKey(), e.getValue().value);
         }
