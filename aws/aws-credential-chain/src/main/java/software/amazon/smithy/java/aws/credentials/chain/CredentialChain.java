@@ -30,10 +30,10 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * credentials by trying each provider in order.
  *
  * <p>Usage:
- * <pre>{@code
+ * {@snippet lang="java" :
  * var chain = CredentialChain.create();
  * var result = chain.resolveIdentity(Context.empty());
- * }</pre>
+ * }
  *
  * <p>The chain is assembled once at creation time. Providers that are not on the classpath simply don't
  * participate: their slots are skipped. If no provider in the chain can resolve credentials, the chain returns an
@@ -105,17 +105,17 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
         List<ChainIdentityProvider> sorted = sortByOrdering(registrations);
 
         // Call create() on each provider in sorted order.
-        ChainSetup setup = new ChainSetup(executor);
+        ChainSetup setup = ChainSetup.builder().executor(executor).build();
 
         for (ChainIdentityProvider provider : sorted) {
             setup.setCurrentProvider(provider);
-            provider.create(identityType, setup);
+            provider.setup(identityType, setup);
             if (setup.isTerminal()) {
                 break;
             }
         }
 
-        List<ChainSetup.NamedResolver> ordered = setup.resolvers();
+        var ordered = setup.resolvers();
 
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Assembled credential chain: {}",
@@ -207,6 +207,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public IdentityResult<I> resolveIdentity(Context requestProperties) {
         if (resolvers.isEmpty()) {
             return IdentityResult.ofError(getClass(),
@@ -218,8 +219,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
         List<Object> errors = new ArrayList<>();
 
         for (var nr : resolvers) {
-            @SuppressWarnings("unchecked")
-            var result = (IdentityResult<I>) nr.resolver().resolveIdentity(requestProperties);
+            var result = nr.resolver().resolveIdentity(requestProperties);
             if (result.identity() != null) {
                 if (!nr.featureIds().isEmpty()) {
                     var ids = requestProperties.get(CallContext.FEATURE_IDS);
@@ -227,7 +227,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
                         ids.addAll(nr.featureIds());
                     }
                 }
-                return result;
+                return (IdentityResult<I>) result;
             }
             errors.add(nr.name());
             errors.add(result.error());
@@ -236,7 +236,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
         StringBuilder missing = new StringBuilder();
         for (var i = 0; i < errors.size(); i += 2) {
             if (i > 0) {
-                errors.add("; ");
+                missing.append("; ");
             }
             missing.append(errors.get(i)).append(": ").append(errors.get(i + 1));
         }

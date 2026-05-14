@@ -58,11 +58,11 @@ public enum StandardProvider {
 
     /**
      * Parses AWS shared config/credentials files and stores the result on the
-     * {@link ProviderContext} for downstream providers.
+     * {@link ChainSetup} for downstream providers.
      *
      * <p>This provider does not itself resolve credentials — it returns {@code null} from
      * {@code create()}. Its purpose is to make the parsed profile available via
-     * {@link ProviderContext#profile()} for all subsequent profile-based slots.
+     * {@link ChainSetup#profile()} for all subsequent profile-based slots.
      */
     SHARED_CONFIG(null) {
         @Override
@@ -76,11 +76,6 @@ public enum StandardProvider {
         }
     },
 
-    /**
-     * Profile-based web identity token ({@code web_identity_token_file} + {@code role_arn}).
-     *
-     * <p>Requires the STS module. Reads the active profile from {@link ProviderContext#profile()}.
-     */
     /**
      * Profile-based static keys ({@code aws_access_key_id} + {@code aws_secret_access_key}).
      *

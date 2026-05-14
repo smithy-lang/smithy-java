@@ -44,6 +44,8 @@ public final class CredentialProcessHandler implements ChainIdentityProvider {
     private static final JsonCodec CODEC = JsonCodec.builder().build();
     private static final long TIMEOUT_SECONDS = 60;
     private static final int MAX_OUTPUT_BYTES = 64000;
+    private static final boolean IS_WINDOWS =
+            System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows");
     private static final Set<CredentialFeatureId> FEATURE_IDS = Set.of(
             new CredentialFeatureId("v"),
             new CredentialFeatureId("w"));
@@ -64,7 +66,7 @@ public final class CredentialProcessHandler implements ChainIdentityProvider {
     }
 
     @Override
-    public void create(Class<? extends Identity> identityType, ChainSetup setup) {
+    public void setup(Class<? extends Identity> identityType, ChainSetup setup) {
         if (identityType != AwsCredentialsIdentity.class) {
             return;
         }
@@ -126,7 +128,7 @@ public final class CredentialProcessHandler implements ChainIdentityProvider {
     }
 
     private static List<String> buildCommand(String commandLine) {
-        if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows")) {
+        if (IS_WINDOWS) {
             return List.of("cmd.exe", "/C", commandLine);
         }
         return List.of("sh", "-c", commandLine);

@@ -175,8 +175,7 @@ class AwsCredentialChainTest {
                 return ordering;
             }
 
-            @SuppressWarnings("unchecked")
-            public void create(Class<? extends Identity> identityType, ChainSetup setup) {
+            public void setup(Class<? extends Identity> identityType, ChainSetup setup) {
                 setup.addResolver(resolver);
             }
         };

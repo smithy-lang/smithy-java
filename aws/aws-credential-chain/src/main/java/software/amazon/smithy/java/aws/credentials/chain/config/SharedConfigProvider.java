@@ -30,7 +30,7 @@ public final class SharedConfigProvider implements ChainIdentityProvider {
     }
 
     @Override
-    public void create(Class<? extends Identity> identityType, ChainSetup setup) {
+    public void setup(Class<? extends Identity> identityType, ChainSetup setup) {
         AwsProfileFile profileFile = AwsProfileFile.loadSilently();
         if (profileFile != null) {
             setup.setProfileFile(profileFile);

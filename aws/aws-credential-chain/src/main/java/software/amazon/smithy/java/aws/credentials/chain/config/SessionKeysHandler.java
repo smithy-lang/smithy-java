@@ -48,7 +48,7 @@ public final class SessionKeysHandler implements ChainIdentityProvider {
     }
 
     @Override
-    public void create(Class<? extends Identity> identityType, ChainSetup setup) {
+    public void setup(Class<? extends Identity> identityType, ChainSetup setup) {
         if (identityType != AwsCredentialsIdentity.class) {
             return;
         }
