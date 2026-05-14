@@ -46,6 +46,8 @@ import software.amazon.smithy.protocoltests.traits.HttpMessageTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestsTrait;
 import software.amazon.smithy.protocoltests.traits.HttpResponseTestsTrait;
+import software.amazon.smithy.protocoltests.traits.eventstream.EventStreamTestCase;
+import software.amazon.smithy.protocoltests.traits.eventstream.EventStreamTestsTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
@@ -301,6 +303,10 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                 .map(ap -> ap.equals(testType.appliesTo))
                 .orElse(true);
 
+        Predicate<EventStreamTestCase> eventStreamTestTypeFiler = tc -> tc.getAppliesTo()
+                .map(ap -> ap.equals(testType.appliesTo))
+                .orElse(true);
+
         var symbolProvider = new JavaSymbolProvider(
                 serviceModel,
                 service,
@@ -315,6 +321,7 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                 List<HttpRequestTestCase> requestTestsCases = new ArrayList<>();
                 List<HttpResponseProtocolTestCase> responseTestsCases = new ArrayList<>();
                 List<HttpMalformedRequestTestCase> malformedRequestTestCases = new ArrayList<>();
+                List<EventStreamTestCase> eventStreamTestCases = new ArrayList<>();
                 operation.getTrait(HttpRequestTestsTrait.class)
                         .map(HttpRequestTestsTrait::getTestCases)
                         .map(l -> l.stream().filter(testTypeFiler).toList())
@@ -347,6 +354,11 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                 operation.getTrait(HttpMalformedRequestTestsTrait.class)
                         .map(HttpMalformedRequestTestsTrait::getTestCases)
                         .ifPresent(malformedRequestTestCases::addAll);
+
+                operation.getTrait(EventStreamTestsTrait.class)
+                        .map(EventStreamTestsTrait::getTestCases)
+                        .map(l -> l.stream().filter(eventStreamTestTypeFiler).toList())
+                        .ifPresent(eventStreamTestCases::addAll);
                 result.add(
                         new HttpTestOperation(
                                 operationId.toShapeId(),
@@ -354,7 +366,8 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                                 apiOperation,
                                 requestTestsCases,
                                 responseTestsCases,
-                                malformedRequestTestCases));
+                                malformedRequestTestCases,
+                                eventStreamTestCases));
             }
         }
 

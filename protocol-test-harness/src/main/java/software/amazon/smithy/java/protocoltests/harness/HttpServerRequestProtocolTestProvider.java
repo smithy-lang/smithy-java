@@ -55,7 +55,7 @@ public class HttpServerRequestProtocolTestProvider extends
             boolean shouldSkip = testFilter.skipOperation(testOperation.id());
             for (var testCase : testOperation.requestTestCases()) {
                 if (shouldSkip || testFilter.skipTestCase(testCase)) {
-                    invocationContexts.add(new IgnoredTestCase(testCase));
+                    invocationContexts.add(new IgnoredTestCase(testCase.getId()));
                     continue;
                 }
                 var createUri = createUri(testData.endpoint(), testCase.getUri(), testCase.getQueryParams());

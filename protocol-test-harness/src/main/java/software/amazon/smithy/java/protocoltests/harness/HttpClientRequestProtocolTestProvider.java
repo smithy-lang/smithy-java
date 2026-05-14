@@ -62,7 +62,7 @@ final class HttpClientRequestProtocolTestProvider extends
                                 .stream()
                                 .map(testCase -> {
                                     if (filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)) {
-                                        return new IgnoredTestCase(testCase);
+                                        return new IgnoredTestCase(testCase.getId());
                                     }
                                     var testProtocol = store.getProtocol(testCase.getProtocol());
                                     var testResolver = testCase.getAuthScheme().isEmpty()

@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.protocoltests.harness.EventStreamClientTests;
 import software.amazon.smithy.java.protocoltests.harness.HttpClientRequestTests;
 import software.amazon.smithy.java.protocoltests.harness.HttpClientResponseTests;
 import software.amazon.smithy.java.protocoltests.harness.ProtocolTest;
@@ -26,6 +27,40 @@ import software.amazon.smithy.model.node.Node;
         skipOperations = {
                 // We dont ignore defaults on input shapes
                 "aws.protocoltests.restjson#OperationWithDefaults",
+        },
+        skipTests = {
+                // Need to add exception type to header
+                "ClientErrorInput",
+                "DuplexClientErrorInput",
+                // Currently we are using JSON codec for plain text payload, need to correct it.
+                "StringPayloadOutput",
+                "DuplexStringPayloadOutput",
+                // eventstream:1.0.1 made ByteValue.encodeValue() and
+                // ShortValue.encodeValue() no-ops, producing malformed frames.
+                "ByteHeaderInput",
+                "DuplexByteHeaderInput",
+                "ShortHeaderInput",
+                "DuplexShortHeaderInput",
+                // Blob test params use inconsistent encoding conventions —
+                // headers use base64, payloads use raw strings.
+                "BlobPayloadInput",
+                "DuplexBlobPayloadInput",
+                "BlobPayloadOutput",
+                "DuplexBlobPayloadOutput",
+                "BlobHeaderInput",
+                "DuplexBlobHeaderInput",
+                "BlobHeaderOutput",
+                "DuplexBlobHeaderOutput",
+                "MultipleHeaderInput",
+                "DuplexMultipleHeaderInput",
+                "MultipleHeaderOutput",
+                "DuplexMultipleHeaderOutput",
+                // Decoder returns modeled error events instead of throwing
+                "ClientErrorOutput",
+                "DuplexClientErrorOutput",
+                // Client doesn't validate missing @required initial response members
+                "MissingRequiredInitialResponseOutput",
+                "DuplexMissingRequiredInitialResponseOutput"
         })
 public class RestJson1ProtocolTests {
     private static final String EMPTY_BODY = "";
@@ -55,6 +90,11 @@ public class RestJson1ProtocolTests {
 
     @HttpClientResponseTests
     public void responseTest(Runnable test) {
+        test.run();
+    }
+
+    @EventStreamClientTests
+    public void eventStreamClientTest(Runnable test) {
         test.run();
     }
 }

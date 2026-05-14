@@ -64,7 +64,7 @@ final class HttpClientResponseProtocolTestProvider extends
                                 .map(protocolTestCase -> {
                                     var testCase = protocolTestCase.responseTestCase();
                                     if (filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)) {
-                                        return new IgnoredTestCase(testCase);
+                                        return new IgnoredTestCase(testCase.getId());
                                     }
                                     boolean isErrorTestCase = protocolTestCase.isErrorTest();
                                     // Get specific values to use for this test case's context

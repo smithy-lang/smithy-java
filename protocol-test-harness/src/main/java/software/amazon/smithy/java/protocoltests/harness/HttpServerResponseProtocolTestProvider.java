@@ -55,7 +55,7 @@ public class HttpServerResponseProtocolTestProvider extends
             for (var protocolTestCase : testOperation.responseTestCases()) {
                 var testCase = protocolTestCase.responseTestCase();
                 if (shouldSkip || filter.skipTestCase(testCase)) {
-                    invocationContexts.add(new IgnoredTestCase(testCase));
+                    invocationContexts.add(new IgnoredTestCase(testCase.getId()));
                     continue;
                 }
                 Map<String, List<String>> headers = new HashMap<>();

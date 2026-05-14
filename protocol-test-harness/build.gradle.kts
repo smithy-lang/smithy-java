@@ -19,6 +19,7 @@ dependencies {
     implementation(project(":client:client-http"))
     implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(libs.assertj.core)
+    implementation(project(":aws:aws-event-streams"))
 
     api(platform(libs.junit.bom))
     api(libs.junit.jupiter.api)

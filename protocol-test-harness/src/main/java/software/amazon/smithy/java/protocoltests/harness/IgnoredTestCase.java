@@ -10,13 +10,12 @@ import org.junit.jupiter.api.extension.ConditionEvaluationResult;
 import org.junit.jupiter.api.extension.ExecutionCondition;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
-import software.amazon.smithy.protocoltests.traits.HttpMessageTestCase;
 
-record IgnoredTestCase(HttpMessageTestCase testCase) implements TestTemplateInvocationContext {
+record IgnoredTestCase(String testId) implements TestTemplateInvocationContext {
 
     @Override
     public String getDisplayName(int invocationIndex) {
-        return testCase.getId();
+        return testId;
     }
 
     @Override

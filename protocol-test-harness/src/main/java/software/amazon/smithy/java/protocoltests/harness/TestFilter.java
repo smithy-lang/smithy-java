@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.protocoltests.traits.HttpMessageTestCase;
+import software.amazon.smithy.protocoltests.traits.eventstream.EventStreamTestCase;
 
 /**
  * Test filter class that implements filtering of protocol tests. This filter is configured by the {@link ProtocolTestFilter} annotation.
@@ -27,6 +28,11 @@ sealed interface TestFilter {
      * Filters test cases
      */
     boolean skipTestCase(HttpMessageTestCase testCase);
+
+    /**
+     * Filters event stream test cases.
+     */
+    boolean skipTestCase(EventStreamTestCase testCase);
 
     default TestFilter combine(TestFilter other) {
         return new CombinedTestFilter(this, other);
@@ -75,6 +81,12 @@ sealed interface TestFilter {
             return skippedTests.contains(testCase.getId())
                     || (!tests.isEmpty() && !tests.contains(testCase.getId()));
         }
+
+        @Override
+        public boolean skipTestCase(EventStreamTestCase testCase) {
+            return skippedTests.contains(testCase.getId())
+                    || (!tests.isEmpty() && !tests.contains(testCase.getId()));
+        }
     }
 
     final class EmptyFilter implements TestFilter {
@@ -86,6 +98,11 @@ sealed interface TestFilter {
 
         @Override
         public boolean skipTestCase(HttpMessageTestCase testCase) {
+            return false;
+        }
+
+        @Override
+        public boolean skipTestCase(EventStreamTestCase testCase) {
             return false;
         }
     }
@@ -107,6 +124,11 @@ sealed interface TestFilter {
 
         @Override
         public boolean skipTestCase(HttpMessageTestCase testCase) {
+            return first.skipTestCase(testCase) || second.skipTestCase(testCase);
+        }
+
+        @Override
+        public boolean skipTestCase(EventStreamTestCase testCase) {
             return first.skipTestCase(testCase) || second.skipTestCase(testCase);
         }
     }
