@@ -21,8 +21,7 @@ import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.config.AwsConfigCredentialSource;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
-import software.amazon.smithy.java.aws.credentials.chain.CreateResult;
-import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
+import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.context.Context;
 
 class CredentialProcessHandlerTest {
@@ -127,24 +126,24 @@ class CredentialProcessHandlerTest {
             return null;
         }
         var handler = new CredentialProcessHandler();
-        var ctx = new ProviderContext(null);
+        var setup = new ChainSetup(null);
         try {
             Path configPath = Files.createTempFile("aws-config", ".ini");
             Files.writeString(configPath, "[default]\ncredential_process=" + cp.commandLine() + "\n");
             var file = AwsProfileFile.builder().configFile(configPath).credentialsFile(null).build();
-            ctx.setProfileFile(file);
-            ctx.setProfile(file.activeProfile());
+            setup.setProfileFile(file);
+            setup.setProfile(file.activeProfile());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        var result = handler.create(AwsCredentialsIdentity.class, ctx);
-        if (!(result instanceof CreateResult.PossibleMatch<AwsCredentialsIdentity> m)) {
+        setup.setCurrentProvider(handler);
+        handler.create(AwsCredentialsIdentity.class, setup);
+        var resolvers = setup.resolvers();
+        if (resolvers.isEmpty()) {
             return null;
         }
-        IdentityResolver<AwsCredentialsIdentity> resolver = m.resolver();
-        if (resolver == null) {
-            return null;
-        }
-        return resolver.resolveIdentity(Context.empty());
+        @SuppressWarnings("unchecked")
+        var r = (IdentityResolver<AwsCredentialsIdentity>) resolvers.getFirst().resolver();
+        return r.resolveIdentity(Context.empty());
     }
 }

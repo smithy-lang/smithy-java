@@ -9,10 +9,9 @@ import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
-import software.amazon.smithy.java.aws.credentials.chain.CreateResult;
+import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
-import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
 import software.amazon.smithy.java.aws.credentials.chain.StandardProvider;
 
 public final class SystemPropertiesCredentialProvider implements ChainIdentityProvider {
@@ -25,21 +24,19 @@ public final class SystemPropertiesCredentialProvider implements ChainIdentityPr
     }
 
     @Override
-    public Set<CredentialFeatureId> featureIds() {
-        return FEATURE_IDS;
-    }
-
-    @Override
     public OrderingConstraint ordering() {
         return new OrderingConstraint.Standard(StandardProvider.JAVA_SYSTEM_PROPERTIES);
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public <I extends Identity> CreateResult<I> create(Class<I> identityType, ProviderContext context) {
+    public Set<CredentialFeatureId> featureIds() {
+        return FEATURE_IDS;
+    }
+
+    @Override
+    public void create(Class<? extends Identity> identityType, ChainSetup setup) {
         if (identityType == AwsCredentialsIdentity.class) {
-            return (CreateResult<I>) new CreateResult.UnconditionalMatch<>(SystemPropertiesIdentityResolver.INSTANCE);
+            setup.addTerminalResolver(SystemPropertiesIdentityResolver.INSTANCE);
         }
-        return CreateResult.pass();
     }
 }

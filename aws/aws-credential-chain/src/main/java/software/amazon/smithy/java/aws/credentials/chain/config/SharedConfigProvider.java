@@ -8,17 +8,17 @@ package software.amazon.smithy.java.aws.credentials.chain.config;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
-import software.amazon.smithy.java.aws.credentials.chain.CreateResult;
+import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
-import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
 import software.amazon.smithy.java.aws.credentials.chain.StandardProvider;
 
 /**
- * Claims the {@link StandardProvider#SHARED_CONFIG} slot. Parses the AWS config/credentials
- * files and stores the result on the {@link ProviderContext} for downstream providers.
- * Returns {@code null} — it does not itself resolve credentials.
+ * Claims the {@link software.amazon.smithy.java.aws.credentials.chain.StandardProvider#SHARED_CONFIG}
+ * slot. Parses the AWS config/credentials files and stores the result on the {@link ChainSetup}
+ * for downstream providers. Does not register any resolver.
  */
 public final class SharedConfigProvider implements ChainIdentityProvider {
+
     @Override
     public String name() {
         return "SharedConfig";
@@ -30,17 +30,16 @@ public final class SharedConfigProvider implements ChainIdentityProvider {
     }
 
     @Override
-    public <I extends Identity> CreateResult<I> create(Class<I> identityType, ProviderContext context) {
+    public void create(Class<? extends Identity> identityType, ChainSetup setup) {
         AwsProfileFile profileFile = AwsProfileFile.loadSilently();
         if (profileFile != null) {
-            context.setProfileFile(profileFile);
-            String name = context.profileNameOverride();
+            setup.setProfileFile(profileFile);
+            String name = setup.profileNameOverride();
             if (name == null) {
-                context.setProfile(profileFile.activeProfile());
+                setup.setProfile(profileFile.activeProfile());
             } else {
-                context.setProfile(profileFile.profile(name));
+                setup.setProfile(profileFile.profile(name));
             }
         }
-        return CreateResult.pass();
     }
 }
