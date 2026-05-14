@@ -21,10 +21,9 @@ import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.config.AwsConfigCredentialSource;
 import software.amazon.smithy.java.aws.config.AwsProfile;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
-import software.amazon.smithy.java.aws.credentials.chain.CreateResult;
+import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
-import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
 import software.amazon.smithy.java.aws.credentials.chain.StandardProvider;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -48,10 +47,6 @@ public final class CredentialProcessHandler implements ChainIdentityProvider {
     private static final Set<CredentialFeatureId> FEATURE_IDS = Set.of(
             new CredentialFeatureId("v"),
             new CredentialFeatureId("w"));
-    private static final IdentityResult<AwsCredentialsIdentity> NO_PROFILE =
-            IdentityResult.ofError(CredentialProcessHandler.class, "No active profile");
-    private static final IdentityResult<AwsCredentialsIdentity> NOT_FOUND =
-            IdentityResult.ofError(CredentialProcessHandler.class, "No credential_process in profile");
 
     @Override
     public String name() {
@@ -69,24 +64,20 @@ public final class CredentialProcessHandler implements ChainIdentityProvider {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public <I extends Identity> CreateResult<I> create(Class<I> identityType, ProviderContext context) {
+    public void create(Class<? extends Identity> identityType, ChainSetup setup) {
         if (identityType != AwsCredentialsIdentity.class) {
-            return CreateResult.pass();
+            return;
         }
-
-        AwsProfile profile = context.profile();
+        AwsProfile profile = setup.profile();
         if (profile == null) {
-            return CreateResult.pass();
+            return;
         }
-
         for (AwsConfigCredentialSource source : profile.credentialSources()) {
             if (source instanceof AwsConfigCredentialSource.CredentialProcess(String commandLine)) {
-                return (CreateResult<I>) new CreateResult.PossibleMatch<>(new Resolver(commandLine));
+                setup.addResolver(new Resolver(commandLine));
+                return;
             }
         }
-
-        return CreateResult.pass();
     }
 
     private record Resolver(String commandLine) implements IdentityResolver<AwsCredentialsIdentity> {
@@ -156,14 +147,12 @@ public final class CredentialProcessHandler implements ChainIdentityProvider {
             return IdentityResult.ofError(CredentialProcessHandler.class,
                     "credential_process output has unsupported Version: " + versionNode.asInteger());
         }
-
         String accessKeyId = stringMember(doc, "AccessKeyId");
         String secretAccessKey = stringMember(doc, "SecretAccessKey");
         if (accessKeyId == null || secretAccessKey == null) {
             return IdentityResult.ofError(CredentialProcessHandler.class,
                     "credential_process output missing required AccessKeyId or SecretAccessKey");
         }
-
         String sessionToken = stringMember(doc, "SessionToken");
         String accountId = stringMember(doc, "AccountId");
         String expirationStr = stringMember(doc, "Expiration");
@@ -175,7 +164,6 @@ public final class CredentialProcessHandler implements ChainIdentityProvider {
                 LOGGER.warn("credential_process returned unparseable Expiration: {}", expirationStr);
             }
         }
-
         return IdentityResult.of(AwsCredentialsIdentity.create(
                 accessKeyId,
                 secretAccessKey,

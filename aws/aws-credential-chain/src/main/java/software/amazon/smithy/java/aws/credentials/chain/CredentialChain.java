@@ -7,11 +7,9 @@ package software.amazon.smithy.java.aws.credentials.chain;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.Executors;
@@ -46,17 +44,12 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
     private static final InternalLogger LOGGER = InternalLogger.getLogger(CredentialChain.class);
 
     private final Class<I> identityType;
-    private final List<NamedResolver<I>> resolvers;
+    private final List<ChainSetup.NamedResolver> resolvers;
     private final ScheduledExecutorService executor;
-
-    private record NamedResolver<I extends Identity>(
-            String name,
-            Set<CredentialFeatureId> featureIds,
-            IdentityResolver<I> resolver) {}
 
     private CredentialChain(
             Class<I> identityType,
-            List<NamedResolver<I>> resolvers,
+            List<ChainSetup.NamedResolver> resolvers,
             ScheduledExecutorService executor
     ) {
         this.identityType = identityType;
@@ -108,105 +101,102 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
             }
         }
 
-        // Separate standards from relatives.
-        Map<StandardProvider, ChainIdentityProvider> standards = new EnumMap<>(StandardProvider.class);
-        List<ChainIdentityProvider> relatives = new ArrayList<>();
+        // Sort providers by ordering constraint (enum order for Standard, relative for Before/After).
+        List<ChainIdentityProvider> sorted = sortByOrdering(registrations);
 
-        for (ChainIdentityProvider r : registrations) {
-            if (r.ordering() instanceof OrderingConstraint.Standard(StandardProvider slot)) {
-                ChainIdentityProvider existing = standards.put(slot, r);
-                if (existing != null) {
-                    throw new IllegalStateException("Two credential providers claim the same slot '"
-                            + slot + "': '" + existing.name() + "' and '" + r.name() + "'");
-                }
-            } else {
-                relatives.add(r);
-            }
-        }
+        // Call create() on each provider in sorted order.
+        ChainSetup setup = new ChainSetup(executor);
 
-        // Use a single executor for each provider (used for caching).
-        // Parse config files and resolve active profile before calling providers.
-        ProviderContext ctx = new ProviderContext(executor);
-
-        // Precompute insert positions: for each slot, how many claimed slots come before it
-        // and up to and including it. This avoids re-scanning the enum on every relative insert.
-        EnumMap<StandardProvider, Integer> insertAfter = new EnumMap<>(StandardProvider.class);
-        EnumMap<StandardProvider, Integer> insertBefore = new EnumMap<>(StandardProvider.class);
-        int count = 0;
-        for (StandardProvider slot : StandardProvider.values()) {
-            insertBefore.put(slot, count);
-            if (standards.containsKey(slot)) {
-                count++;
-            }
-            insertAfter.put(slot, count);
-        }
-
-        // Build the ordered list: standard slots in enum order.
-        List<NamedResolver<I>> ordered = new ArrayList<>();
-        boolean done = false;
-        for (StandardProvider slot : StandardProvider.values()) {
-            if (done) {
+        for (ChainIdentityProvider provider : sorted) {
+            setup.setCurrentProvider(provider);
+            provider.create(identityType, setup);
+            if (setup.isTerminal()) {
                 break;
             }
-            ChainIdentityProvider r = standards.get(slot);
-            if (r != null) {
-                CreateResult<I> result = r.create(identityType, ctx);
-                switch (result) {
-                    case CreateResult.UnconditionalMatch<I>(var resolver) -> {
-                        ordered.add(new NamedResolver<>(r.name(), r.featureIds(), resolver));
-                        done = true;
-                    }
-                    case CreateResult.PossibleMatch<I>(var resolver) ->
-                        ordered.add(new NamedResolver<>(r.name(), r.featureIds(), resolver));
-                    case CreateResult.Pass<I> ignored -> {
-                    }
-                }
-            }
         }
 
-        // Insert relative providers using precomputed positions (only if assembly wasn't short-circuited).
-        if (!done) {
-            for (ChainIdentityProvider r : relatives) {
-                int insertAt;
-                if (r.ordering() instanceof OrderingConstraint.After(StandardProvider slot)) {
-                    insertAt = insertAfter.get(slot);
-                } else if (r.ordering() instanceof OrderingConstraint.Before(StandardProvider slot)) {
-                    insertAt = insertBefore.get(slot);
-                } else {
-                    insertAt = ordered.size();
-                }
-                if (insertAt > ordered.size()) {
-                    insertAt = ordered.size();
-                }
-                CreateResult<I> result = r.create(identityType, ctx);
-                switch (result) {
-                    case CreateResult.UnconditionalMatch<I>(var resolver) -> {
-                        ordered.add(insertAt, new NamedResolver<>(r.name(), r.featureIds(), resolver));
-                        done = true;
-                    }
-                    case CreateResult.PossibleMatch<I>(var resolver) ->
-                        ordered.add(insertAt, new NamedResolver<>(r.name(), r.featureIds(), resolver));
-                    case CreateResult.Pass<I> ignored -> {
-                    }
-                }
-                if (done) {
-                    break;
-                }
-            }
-        }
+        List<ChainSetup.NamedResolver> ordered = setup.resolvers();
 
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Assembled credential chain: {}",
-                    ordered.stream().map(NamedResolver::name).collect(Collectors.joining(", ")));
+                    ordered.stream().map(ChainSetup.NamedResolver::name).collect(Collectors.joining(", ")));
         }
 
-        warnDetectedButUnclaimed(standards);
+        // Warn about detected-but-unclaimed slots.
+        Set<StandardProvider> claimed = new HashSet<>();
+        for (var nr : ordered) {
+            for (ChainIdentityProvider p : sorted) {
+                if (p.name().equals(nr.name())
+                        && p.ordering() instanceof OrderingConstraint.Standard(StandardProvider s)) {
+                    claimed.add(s);
+                }
+            }
+        }
+        warnDetectedButUnclaimed(claimed);
         return new CredentialChain<>(identityType, Collections.unmodifiableList(ordered), executor);
     }
 
-    private static void warnDetectedButUnclaimed(Map<StandardProvider, ?> standards) {
+    private static List<ChainIdentityProvider> sortByOrdering(List<ChainIdentityProvider> providers) {
+        // Separate into standard-slot providers and relative providers.
+        List<ChainIdentityProvider> standards = new ArrayList<>();
+        List<ChainIdentityProvider> befores = new ArrayList<>();
+        List<ChainIdentityProvider> afters = new ArrayList<>();
+        Set<StandardProvider> seenSlots = new HashSet<>();
+
+        for (ChainIdentityProvider p : providers) {
+            switch (p.ordering()) {
+                case OrderingConstraint.Standard(StandardProvider slot) -> {
+                    if (!seenSlots.add(slot)) {
+                        throw new IllegalStateException("Two providers claim the same standard slot '"
+                                + slot + "': check provider '" + p.name() + "'");
+                    }
+                    standards.add(p);
+                }
+                case OrderingConstraint.Before b -> befores.add(p);
+                case OrderingConstraint.After a -> afters.add(p);
+            }
+        }
+
+        // Sort standards by enum ordinal.
+        standards.sort((a, b) -> {
+            var slotA = ((OrderingConstraint.Standard) a.ordering()).slot();
+            var slotB = ((OrderingConstraint.Standard) b.ordering()).slot();
+            return slotA.compareTo(slotB);
+        });
+
+        // Build final list: insert Before/After relative to their referenced slot's position.
+        List<ChainIdentityProvider> result = new ArrayList<>(standards);
+        for (ChainIdentityProvider p : befores) {
+            var slot = ((OrderingConstraint.Before) p.ordering()).slot();
+            int idx = indexOfSlot(result, slot);
+            result.add(idx, p);
+        }
+        for (ChainIdentityProvider p : afters) {
+            var slot = ((OrderingConstraint.After) p.ordering()).slot();
+            int idx = indexOfSlot(result, slot);
+            int insertAt = Math.min(idx + 1, result.size());
+            result.add(insertAt, p);
+        }
+        return result;
+    }
+
+    private static int indexOfSlot(List<ChainIdentityProvider> list, StandardProvider slot) {
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).ordering() instanceof OrderingConstraint.Standard(StandardProvider s) && s == slot) {
+                return i;
+            }
+            // If slot not found, find where it would be by enum order.
+            if (list.get(i).ordering() instanceof OrderingConstraint.Standard(StandardProvider s)
+                    && s.ordinal() > slot.ordinal()) {
+                return i;
+            }
+        }
+        return list.size();
+    }
+
+    private static void warnDetectedButUnclaimed(Set<StandardProvider> claimed) {
         for (StandardProvider slot : StandardProvider.values()) {
-            if (slot.moduleSuggestion() != null && !standards.containsKey(slot) && slot.isDetected()) {
+            if (slot.moduleSuggestion() != null && !claimed.contains(slot) && slot.isDetected()) {
                 LOGGER.warn("{} credentials detected but no provider is registered for the '{}' slot. "
                         + "Add '{}' to your dependencies.",
                         slot.name(),
@@ -228,17 +218,18 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
         List<Object> errors = new ArrayList<>();
 
         for (var nr : resolvers) {
-            var result = nr.resolver.resolveIdentity(requestProperties);
+            @SuppressWarnings("unchecked")
+            var result = (IdentityResult<I>) nr.resolver().resolveIdentity(requestProperties);
             if (result.identity() != null) {
-                if (!nr.featureIds.isEmpty()) {
+                if (!nr.featureIds().isEmpty()) {
                     var ids = requestProperties.get(CallContext.FEATURE_IDS);
                     if (ids != null) {
-                        ids.addAll(nr.featureIds);
+                        ids.addAll(nr.featureIds());
                     }
                 }
                 return result;
             }
-            errors.add(nr.name);
+            errors.add(nr.name());
             errors.add(result.error());
         }
 
@@ -273,7 +264,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
 
     private boolean isClaimed(StandardProvider slot) {
         for (var nr : resolvers) {
-            if (nr.name.equals(slot.name().toLowerCase(Locale.ROOT))) {
+            if (nr.name().equals(slot.name().toLowerCase(Locale.ROOT))) {
                 return true;
             }
         }
@@ -286,7 +277,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
     public List<String> providerNames() {
         List<String> names = new ArrayList<>(resolvers.size());
         for (var nr : resolvers) {
-            names.add(nr.name);
+            names.add(nr.name());
         }
         return names;
     }
@@ -299,7 +290,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
     @Override
     public void invalidate() {
         for (var nr : resolvers) {
-            nr.resolver.invalidate();
+            nr.resolver().invalidate();
         }
     }
 

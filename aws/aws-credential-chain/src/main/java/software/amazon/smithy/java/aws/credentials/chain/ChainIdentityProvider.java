@@ -11,8 +11,10 @@ import software.amazon.smithy.java.auth.api.identity.Identity;
 /**
  * SPI for registering an identity provider into a credential/token chain.
  *
- * <p>A single provider can support multiple identity types by checking the requested type in
- * {@link #create(Class, ProviderContext)} and returning {@code null} for unsupported types.
+ * <p>Implementations are discovered via the language's plugin mechanism (e.g., {@code ServiceLoader}
+ * in Java) and sorted by {@link #ordering()} before {@link #create} is called. A provider
+ * registers its resolver by calling {@link ChainSetup#addResolver} or
+ * {@link ChainSetup#addTerminalResolver} from within {@code create()}.
  */
 public interface ChainIdentityProvider {
     /**
@@ -35,22 +37,15 @@ public interface ChainIdentityProvider {
     }
 
     /**
-     * Create the identity resolver for the requested identity type.
+     * Called once during chain assembly in sorted order. The provider inspects the identity
+     * type and shared state on the setup, then optionally calls {@link ChainSetup#addResolver}
+     * or {@link ChainSetup#addTerminalResolver} to register a resolver.
      *
-     * <p>Called once during chain assembly in slot order. Return:
-     * <ul>
-     *   <li>{@link CreateResult#pass()} — this provider does not participate</li>
-     *   <li>{@link CreateResult.PossibleMatch} — resolver added, assembly continues</li>
-     *   <li>{@link CreateResult.UnconditionalMatch} — resolver added, assembly stops</li>
-     * </ul>
-     *
-     * <p>Providers that need AWS config file data should read it from
-     * {@link ProviderContext#profile()}, populated by the {@code SHARED_CONFIG} provider.
+     * <p>If this provider's preconditions are not met (wrong identity type, source not
+     * configured), it simply returns without calling any add method.
      *
      * @param identityType the identity class the chain is resolving.
-     * @param context      shared resources provided by the chain.
-     * @param <I>          the identity type.
-     * @return the create result.
+     * @param setup        the chain setup context.
      */
-    <I extends Identity> CreateResult<I> create(Class<I> identityType, ProviderContext context);
+    void create(Class<? extends Identity> identityType, ChainSetup setup);
 }
