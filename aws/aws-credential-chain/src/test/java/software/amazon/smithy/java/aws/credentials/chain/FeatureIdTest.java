@@ -114,25 +114,21 @@ class FeatureIdTest {
             IdentityResolver<AwsCredentialsIdentity> resolver
     ) {
         return new ChainIdentityProvider() {
-            @Override
             public String name() {
                 return name;
             }
 
-            @Override
             public Set<CredentialFeatureId> featureIds() {
                 return featureIds;
             }
 
-            @Override
             public OrderingConstraint ordering() {
                 return new OrderingConstraint.Standard(slot);
             }
 
-            @Override
             @SuppressWarnings("unchecked")
-            public <I extends Identity> CreateResult<I> create(Class<I> identityType, ProviderContext context) {
-                return (CreateResult<I>) new CreateResult.PossibleMatch<>(resolver);
+            public void create(Class<? extends Identity> identityType, ChainSetup setup) {
+                setup.addResolver(resolver);
             }
         };
     }
@@ -140,12 +136,10 @@ class FeatureIdTest {
     private static IdentityResolver<AwsCredentialsIdentity> staticResolver(String ak, String sk) {
         IdentityResult<AwsCredentialsIdentity> result = IdentityResult.of(AwsCredentialsIdentity.create(ak, sk));
         return new IdentityResolver<>() {
-            @Override
             public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context ctx) {
                 return result;
             }
 
-            @Override
             public Class<AwsCredentialsIdentity> identityType() {
                 return AwsCredentialsIdentity.class;
             }
@@ -155,12 +149,10 @@ class FeatureIdTest {
     private static IdentityResolver<AwsCredentialsIdentity> errorResolver(String msg) {
         IdentityResult<AwsCredentialsIdentity> result = IdentityResult.ofError(FeatureIdTest.class, msg);
         return new IdentityResolver<>() {
-            @Override
             public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context ctx) {
                 return result;
             }
 
-            @Override
             public Class<AwsCredentialsIdentity> identityType() {
                 return AwsCredentialsIdentity.class;
             }

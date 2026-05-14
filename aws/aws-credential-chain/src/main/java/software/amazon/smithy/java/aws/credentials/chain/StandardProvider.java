@@ -20,18 +20,6 @@ import java.nio.file.Path;
  */
 public enum StandardProvider {
     /**
-     * Credentials explicitly provided in code (e.g., passed to a client builder).
-     *
-     * <p>No detection signal — this slot is only claimed when credentials are programmatically set.
-     */
-    CODE(null) {
-        @Override
-        public boolean isDetected() {
-            return false;
-        }
-    },
-
-    /**
      * Credentials from JVM system properties.
      *
      * <p>Detected when {@code aws.accessKeyId} is set. Skipped on platforms without
@@ -93,71 +81,12 @@ public enum StandardProvider {
      *
      * <p>Requires the STS module. Reads the active profile from {@link ProviderContext#profile()}.
      */
-    PROFILE_WEB_IDENTITY("software.amazon.smithy.java:aws-credentials-sts") {
-        @Override
-        public boolean isDetected() {
-            return false;
-        }
-    },
-
     /**
-     * Profile-based assume role ({@code role_arn} with {@code source_profile} or
-     * {@code credential_source}).
+     * Profile-based static keys ({@code aws_access_key_id} + {@code aws_secret_access_key}).
      *
-     * <p>Requires the STS module. Reads the active profile from {@link ProviderContext#profile()}.
+     * <p>Re-reads from the profile on each resolution to support live reload after invalidation.
      */
-    PROFILE_ASSUME_ROLE("software.amazon.smithy.java:aws-credentials-sts") {
-        @Override
-        public boolean isDetected() {
-            return false;
-        }
-    },
-
-    /**
-     * Profile-based SSO session ({@code sso_session} + {@code sso_account_id} +
-     * {@code sso_role_name}).
-     *
-     * <p>Requires the SSO module. Reads the active profile from {@link ProviderContext#profile()}.
-     */
-    PROFILE_SSO_SESSION("software.amazon.smithy.java:aws-credentials-sso") {
-        @Override
-        public boolean isDetected() {
-            return false;
-        }
-    },
-
-    /**
-     * Profile-based legacy SSO ({@code sso_start_url} + {@code sso_account_id} +
-     * {@code sso_role_name} + {@code sso_region}).
-     *
-     * <p>Requires the SSO module. Reads the active profile from {@link ProviderContext#profile()}.
-     */
-    PROFILE_LEGACY_SSO("software.amazon.smithy.java:aws-credentials-sso") {
-        @Override
-        public boolean isDetected() {
-            return false;
-        }
-    },
-
-    /**
-     * Profile-based login session ({@code login_session}).
-     *
-     * <p>Requires the login module. Reads the active profile from {@link ProviderContext#profile()}.
-     */
-    PROFILE_LOGIN("software.amazon.smithy.java:aws-credentials-login") {
-        @Override
-        public boolean isDetected() {
-            return false;
-        }
-    },
-
-    /**
-     * Profile-based credential process ({@code credential_process}).
-     *
-     * <p>Invokes an external process on each resolution. The command string is captured at
-     * assembly time from the active profile.
-     */
-    PROFILE_CREDENTIAL_PROCESS(null) {
+    PROFILE_STATIC_KEYS(null) {
         @Override
         public boolean isDetected() {
             return false;
@@ -178,11 +107,75 @@ public enum StandardProvider {
     },
 
     /**
-     * Profile-based static keys ({@code aws_access_key_id} + {@code aws_secret_access_key}).
+     * Profile-based assume role ({@code role_arn} with {@code source_profile} or
+     * {@code credential_source}).
      *
-     * <p>Re-reads from the profile on each resolution to support live reload after invalidation.
+     * <p>Requires the STS module. Reads the active profile from {@link ChainSetup#profile()}.
      */
-    PROFILE_STATIC_KEYS(null) {
+    PROFILE_ASSUME_ROLE("software.amazon.smithy.java:aws-credentials-sts") {
+        @Override
+        public boolean isDetected() {
+            return false;
+        }
+    },
+
+    /**
+     * Profile-based web identity token ({@code web_identity_token_file} + {@code role_arn}).
+     *
+     * <p>Requires the STS module. Reads the active profile from {@link ChainSetup#profile()}.
+     */
+    PROFILE_WEB_IDENTITY("software.amazon.smithy.java:aws-credentials-sts") {
+        @Override
+        public boolean isDetected() {
+            return false;
+        }
+    },
+
+    /**
+     * Profile-based SSO session ({@code sso_session} + {@code sso_account_id} +
+     * {@code sso_role_name}).
+     *
+     * <p>Requires the SSO module. Reads the active profile from {@link ChainSetup#profile()}.
+     */
+    PROFILE_SSO_SESSION("software.amazon.smithy.java:aws-credentials-sso") {
+        @Override
+        public boolean isDetected() {
+            return false;
+        }
+    },
+
+    /**
+     * Profile-based legacy SSO ({@code sso_start_url} + {@code sso_account_id} +
+     * {@code sso_role_name} + {@code sso_region}).
+     *
+     * <p>Requires the SSO module. Reads the active profile from {@link ChainSetup#profile()}.
+     */
+    PROFILE_LEGACY_SSO("software.amazon.smithy.java:aws-credentials-sso") {
+        @Override
+        public boolean isDetected() {
+            return false;
+        }
+    },
+
+    /**
+     * Profile-based login session ({@code login_session}).
+     *
+     * <p>Requires the login module. Reads the active profile from {@link ChainSetup#profile()}.
+     */
+    PROFILE_LOGIN("software.amazon.smithy.java:aws-credentials-login") {
+        @Override
+        public boolean isDetected() {
+            return false;
+        }
+    },
+
+    /**
+     * Profile-based credential process ({@code credential_process}).
+     *
+     * <p>Invokes an external process on each resolution. The command string is captured at
+     * assembly time from the active profile.
+     */
+    PROFILE_CREDENTIAL_PROCESS(null) {
         @Override
         public boolean isDetected() {
             return false;

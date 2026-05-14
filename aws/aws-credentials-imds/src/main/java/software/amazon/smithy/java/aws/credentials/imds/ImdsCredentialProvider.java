@@ -19,10 +19,9 @@ import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
 import software.amazon.smithy.java.aws.config.AwsProfile;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
-import software.amazon.smithy.java.aws.credentials.chain.CreateResult;
+import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
-import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
 import software.amazon.smithy.java.aws.credentials.chain.StandardProvider;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -49,25 +48,24 @@ public final class ImdsCredentialProvider implements ChainIdentityProvider {
     }
 
     @Override
-    public Set<CredentialFeatureId> featureIds() {
-        return FEATURE_IDS;
-    }
-
-    @Override
     public OrderingConstraint ordering() {
         return new OrderingConstraint.Standard(StandardProvider.EC2_INSTANCE_METADATA);
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public <I extends Identity> CreateResult<I> create(Class<I> identityType, ProviderContext context) {
+    public Set<CredentialFeatureId> featureIds() {
+        return FEATURE_IDS;
+    }
+
+    @Override
+    public void create(Class<? extends Identity> identityType, ChainSetup setup) {
         if (identityType != AwsCredentialsIdentity.class) {
-            return CreateResult.pass();
+            return;
         }
 
-        AwsProfileFile profileFile = context.profileFile();
+        AwsProfileFile profileFile = setup.profileFile();
         if (isDisabled(profileFile)) {
-            return CreateResult.pass();
+            return;
         }
 
         URI endpoint = resolveEndpoint();
@@ -75,8 +73,8 @@ public final class ImdsCredentialProvider implements ChainIdentityProvider {
         ImdsClient client = new ImdsClient(endpoint);
         AwsCredentialsResolver delegate = ctx -> fetchAndParse(client, profileName);
 
-        return (CreateResult<I>) new CreateResult.PossibleMatch<>(CachingIdentityResolver.builder(delegate)
-                .executor(context.executor())
+        setup.addResolver(CachingIdentityResolver.builder(delegate)
+                .executor(setup.executor())
                 .allowExpiredCredentials(true)
                 .build());
     }

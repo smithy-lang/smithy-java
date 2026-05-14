@@ -13,16 +13,16 @@ import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.config.AwsConfigCredentialSource;
 import software.amazon.smithy.java.aws.config.AwsProfile;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
-import software.amazon.smithy.java.aws.credentials.chain.CreateResult;
+import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
-import software.amazon.smithy.java.aws.credentials.chain.ProviderContext;
 import software.amazon.smithy.java.aws.credentials.chain.StandardProvider;
 import software.amazon.smithy.java.context.Context;
 
 /**
  * Resolves {@link AwsConfigCredentialSource.StaticKeys} from the active profile.
- * Re-reads the profile on each call to support live reload after invalidation.
+ * Re-reads from the setup's profile on each resolution to support live reload.
+ * Registers as terminal — static keys cannot fail.
  */
 public final class StaticKeysHandler implements ChainIdentityProvider {
 
@@ -48,52 +48,34 @@ public final class StaticKeysHandler implements ChainIdentityProvider {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public <I extends Identity> CreateResult<I> create(Class<I> identityType, ProviderContext context) {
+    public void create(Class<? extends Identity> identityType, ChainSetup setup) {
         if (identityType != AwsCredentialsIdentity.class) {
-            return CreateResult.pass();
+            return;
         }
-
-        AwsProfile profile = context.profile();
+        AwsProfile profile = setup.profile();
         if (profile == null) {
-            return CreateResult.pass();
+            return;
         }
-
-        // Check if this source type exists at assembly time
         for (AwsConfigCredentialSource source : profile.credentialSources()) {
-            if (source instanceof AwsConfigCredentialSource.StaticKeys) {
-                return (CreateResult<I>) new CreateResult.UnconditionalMatch<>(new Resolver(context));
+            if (source instanceof AwsConfigCredentialSource.StaticKeys s) {
+                IdentityResult<AwsCredentialsIdentity> result = IdentityResult.of(
+                        AwsCredentialsIdentity.create(
+                                s.accessKeyId(),
+                                s.secretAccessKey(),
+                                null,
+                                null,
+                                s.accountId()));
+                setup.addTerminalResolver(new IdentityResolver<AwsCredentialsIdentity>() {
+                    public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context c) {
+                        return result;
+                    }
+
+                    public Class<AwsCredentialsIdentity> identityType() {
+                        return AwsCredentialsIdentity.class;
+                    }
+                });
+                return;
             }
-        }
-
-        return CreateResult.pass();
-    }
-
-    private record Resolver(ProviderContext context) implements IdentityResolver<AwsCredentialsIdentity> {
-        @Override
-        public Class<AwsCredentialsIdentity> identityType() {
-            return AwsCredentialsIdentity.class;
-        }
-
-        @Override
-        public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context ctx) {
-            AwsProfile profile = context.profile();
-            if (profile == null) {
-                return NO_PROFILE;
-            }
-
-            for (AwsConfigCredentialSource source : profile.credentialSources()) {
-                if (source instanceof AwsConfigCredentialSource.StaticKeys(String accessKeyId, String secretAccessKey, String accountId)) {
-                    return IdentityResult.of(AwsCredentialsIdentity.create(
-                            accessKeyId,
-                            secretAccessKey,
-                            null,
-                            null,
-                            accountId));
-                }
-            }
-
-            return NOT_FOUND;
         }
     }
 }
