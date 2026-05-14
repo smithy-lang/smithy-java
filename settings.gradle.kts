@@ -90,6 +90,7 @@ include(":aws:aws-auth-api")
 include(":aws:aws-credential-chain")
 include(":aws:aws-config")
 include(":aws:aws-credentials-imds")
+include(":aws:aws-credentials-sts")
 
 // AWS service bundling code
 include(":aws:aws-service-bundle")

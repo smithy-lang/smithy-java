@@ -20,11 +20,11 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
  * AWS authentication or that already have an {@link AwsCredentialsIdentity} resolver registered.
  *
  * <p>Users can also add it explicitly:
- * <pre>{@code
+ * {@snippet lang="java" :
  * MyClient.builder()
  *     .addPlugin(new AwsCredentialChainPlugin())
  *     .build();
- * }</pre>
+ * }
  *
  * <p>To customize the chain (e.g., exclude providers), build the chain manually and register it as an identity
  * resolver directly instead of using this plugin.

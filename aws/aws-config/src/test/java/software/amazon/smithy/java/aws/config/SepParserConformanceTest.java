@@ -18,8 +18,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -209,8 +211,8 @@ class SepParserConformanceTest {
         }
     }
 
-    private static java.util.Set<String> profileNameSet(AwsProfileFile file) {
-        java.util.Set<String> names = new java.util.LinkedHashSet<>();
+    private static Set<String> profileNameSet(AwsProfileFile file) {
+        Set<String> names = new LinkedHashSet<>();
         for (AwsProfile p : file.profiles()) {
             names.add(p.name());
         }
