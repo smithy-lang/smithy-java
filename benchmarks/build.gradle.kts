@@ -25,4 +25,16 @@ subprojects {
             languageVersion.set(JavaLanguageVersion.of(25))
         }
     }
+
+    // SpotBugs's bundled ASM cannot read JDK 25 bytecode (class file major
+    // version 69), so it fails with `IllegalArgumentException: Unsupported
+    // class file major version 69` on every benchmark class file. Disable
+    // SpotBugs for benchmark modules — they're not production code, and the
+    // smithy-java codebase's lint rules don't apply to short-lived JMH
+    // microbenchmarks anyway.
+    plugins.withId("com.github.spotbugs") {
+        tasks.withType(com.github.spotbugs.snom.SpotBugsTask::class.java).configureEach {
+            enabled = false
+        }
+    }
 }
