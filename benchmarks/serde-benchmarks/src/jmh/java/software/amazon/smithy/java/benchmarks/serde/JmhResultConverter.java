@@ -120,7 +120,8 @@ public final class JmhResultConverter {
         List<ObjectNode> entries = new ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (Node element : jmhResults.expectArrayNode().getElements()) {
-            if (!element.isObjectNode()) continue;
+            if (!element.isObjectNode())
+                continue;
             ObjectNode result = element.expectObjectNode();
             String id = extractTestCaseId(result);
             if (id == null || !seen.add(id)) {
@@ -137,7 +138,8 @@ public final class JmhResultConverter {
     private static ObjectNode convertSingleResult(ObjectNode result, String id) {
         ObjectNode primary = result.getObjectMember("primaryMetric").orElse(Node.objectNode());
         double mean = primary.getNumberMember("score").map(NumberNode::getValue).map(Number::doubleValue).orElse(0.0);
-        double stdDev = primary.getNumberMember("scoreError").map(NumberNode::getValue).map(Number::doubleValue).orElse(0.0);
+        double stdDev =
+                primary.getNumberMember("scoreError").map(NumberNode::getValue).map(Number::doubleValue).orElse(0.0);
 
         ObjectNode percentiles = primary.getObjectMember("scorePercentiles").orElse(Node.objectNode());
         double p50 = percentiles.getNumberMember("50.0").map(NumberNode::getValue).map(Number::doubleValue).orElse(0.0);
@@ -170,9 +172,11 @@ public final class JmhResultConverter {
         }
         long total = 0;
         for (Node fork : histogramNode.expectArrayNode().getElements()) {
-            if (!fork.isArrayNode()) continue;
+            if (!fork.isArrayNode())
+                continue;
             for (Node iteration : fork.expectArrayNode().getElements()) {
-                if (!iteration.isArrayNode()) continue;
+                if (!iteration.isArrayNode())
+                    continue;
                 for (Node bin : iteration.expectArrayNode().getElements()) {
                     if (bin.isArrayNode()) {
                         var elems = bin.expectArrayNode().getElements();
@@ -225,16 +229,43 @@ public final class JmhResultConverter {
             pw.println("|id|n|mean|p50|p90|p95|p99|std_dev|");
             pw.println("|----:|----:|----:|----:|----:|----:|----:|----:|");
             for (Node bm : entries.getElements()) {
-                if (!bm.isObjectNode()) continue;
+                if (!bm.isObjectNode())
+                    continue;
                 ObjectNode entry = bm.expectObjectNode();
                 pw.println("|" + entry.getStringMemberOrDefault("id", "")
-                        + "|" + nf.format(entry.getNumberMember("n").map(NumberNode::getValue).map(Number::longValue).orElse(0L))
-                        + "|" + nf.format(Math.round(entry.getNumberMember("mean").map(NumberNode::getValue).map(Number::doubleValue).orElse(0.0)))
-                        + "|" + nf.format(Math.round(entry.getNumberMember("p50").map(NumberNode::getValue).map(Number::doubleValue).orElse(0.0)))
-                        + "|" + nf.format(Math.round(entry.getNumberMember("p90").map(NumberNode::getValue).map(Number::doubleValue).orElse(0.0)))
-                        + "|" + nf.format(Math.round(entry.getNumberMember("p95").map(NumberNode::getValue).map(Number::doubleValue).orElse(0.0)))
-                        + "|" + nf.format(Math.round(entry.getNumberMember("p99").map(NumberNode::getValue).map(Number::doubleValue).orElse(0.0)))
-                        + "|" + nf.format(Math.round(entry.getNumberMember("std_dev").map(NumberNode::getValue).map(Number::doubleValue).orElse(0.0)))
+                        + "|"
+                        + nf.format(
+                                entry.getNumberMember("n").map(NumberNode::getValue).map(Number::longValue).orElse(0L))
+                        + "|"
+                        + nf.format(Math.round(entry.getNumberMember("mean")
+                                .map(NumberNode::getValue)
+                                .map(Number::doubleValue)
+                                .orElse(0.0)))
+                        + "|"
+                        + nf.format(Math.round(entry.getNumberMember("p50")
+                                .map(NumberNode::getValue)
+                                .map(Number::doubleValue)
+                                .orElse(0.0)))
+                        + "|"
+                        + nf.format(Math.round(entry.getNumberMember("p90")
+                                .map(NumberNode::getValue)
+                                .map(Number::doubleValue)
+                                .orElse(0.0)))
+                        + "|"
+                        + nf.format(Math.round(entry.getNumberMember("p95")
+                                .map(NumberNode::getValue)
+                                .map(Number::doubleValue)
+                                .orElse(0.0)))
+                        + "|"
+                        + nf.format(Math.round(entry.getNumberMember("p99")
+                                .map(NumberNode::getValue)
+                                .map(Number::doubleValue)
+                                .orElse(0.0)))
+                        + "|"
+                        + nf.format(Math.round(entry.getNumberMember("std_dev")
+                                .map(NumberNode::getValue)
+                                .map(Number::doubleValue)
+                                .orElse(0.0)))
                         + "|");
             }
         }

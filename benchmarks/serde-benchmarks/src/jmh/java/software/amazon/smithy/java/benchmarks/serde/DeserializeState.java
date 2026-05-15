@@ -52,7 +52,8 @@ final class DeserializeState {
 
     private DeserializeState(
             ApiOperation<? extends SerializableStruct, ? extends SerializableStruct> operation,
-            HttpResponse response) {
+            HttpResponse response
+    ) {
         this.operation = operation;
         this.response = response;
         this.context = Context.create();
@@ -84,7 +85,8 @@ final class DeserializeState {
             String generatedPackage,
             byte[] emptyBody,
             String contentType,
-            boolean base64DecodeBody) {
+            boolean base64DecodeBody
+    ) {
         ResponseEntry entry = BenchmarkTestCases.response(testCaseId);
         OperationShape opShape = entry.operation;
 

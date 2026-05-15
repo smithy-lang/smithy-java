@@ -52,7 +52,8 @@ final class SerializeState {
 
     private SerializeState(
             ApiOperation<? extends SerializableStruct, ? extends SerializableStruct> operation,
-            SerializableStruct input) {
+            SerializableStruct input
+    ) {
         this.operation = operation;
         this.input = input;
         this.context = Context.create();

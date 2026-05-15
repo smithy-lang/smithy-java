@@ -23,14 +23,14 @@ final class ApiOperationLookup {
     private ApiOperationLookup() {}
 
     @SuppressWarnings("unchecked")
-    static ApiOperation<? extends SerializableStruct, ? extends SerializableStruct>
-            resolve(String generatedPackage, String operationName) {
+    static ApiOperation<? extends SerializableStruct,
+            ? extends SerializableStruct> resolve(String generatedPackage, String operationName) {
         String fqcn = generatedPackage + "." + operationName;
         try {
             Class<?> opClass = Class.forName(fqcn);
             Method instanceMethod = opClass.getMethod("instance");
-            return (ApiOperation<? extends SerializableStruct, ? extends SerializableStruct>)
-                    instanceMethod.invoke(null);
+            return (ApiOperation<? extends SerializableStruct, ? extends SerializableStruct>) instanceMethod
+                    .invoke(null);
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException(
                     "No generated ApiOperation class found at " + fqcn
@@ -38,7 +38,8 @@ final class ApiOperationLookup {
                     e);
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
             throw new IllegalStateException(
-                    "Failed to obtain instance of generated ApiOperation " + fqcn, e);
+                    "Failed to obtain instance of generated ApiOperation " + fqcn,
+                    e);
         }
     }
 }

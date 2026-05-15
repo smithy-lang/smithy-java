@@ -9,6 +9,20 @@ description = "Serde (serialization/deserialization) microbenchmarks for smithy-
 
 // Not published. No `smithy-java.module-conventions`, no publishing, no BOM entry.
 
+// Benchmarks intentionally target JDK 25 (the rest of smithy-java targets 21).
+// Performance measurements should reflect the latest JIT/runtime improvements
+// available to consumers; the runtime deps were compiled for 21 but run fine
+// on a newer JVM.
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(25)
+}
+
 dependencies {
     // Smithy traits needed at build time (smithy-build) AND at runtime (when
     // BenchmarkContext loads the model).
@@ -97,18 +111,20 @@ val generateSmithyManifest by tasks.registering(GenerateSmithyManifest::class) {
 // `build/smithyprojections/<project>/<projection>/java-codegen/java` into a
 // distinct package so same-named typed shapes from different protocols don't
 // collide.
-val codegenProjections = listOf(
-    "aws-json-rpc-1-0-client",
-    "aws-query-client",
-    "rest-json-client",
-    "rest-xml-client",
-    "rpc-v2-cbor-client",
-)
+val codegenProjections =
+    listOf(
+        "aws-json-rpc-1-0-client",
+        "aws-query-client",
+        "rest-json-client",
+        "rest-xml-client",
+        "rpc-v2-cbor-client",
+    )
 
 afterEvaluate {
-    val projectionPaths = codegenProjections.map { name ->
-        smithy.getPluginProjectionPath(name, "java-codegen").get()
-    }
+    val projectionPaths =
+        codegenProjections.map { name ->
+            smithy.getPluginProjectionPath(name, "java-codegen").get()
+        }
     sourceSets.named("jmh") {
         java {
             projectionPaths.forEach { srcDir("$it/java") }
