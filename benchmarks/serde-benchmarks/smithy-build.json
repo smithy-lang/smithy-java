@@ -1,0 +1,91 @@
+{
+  "version": "1.0",
+  "imports": ["model"],
+  "projections": {
+    "aws-json-rpc-1-0-client": {
+      "transforms": [
+        {
+          "name": "includeServices",
+          "args": {
+            "services": ["com.amazonaws.sdk.benchmark#AwsJsonRpc10DataPlane"]
+          }
+        }
+      ],
+      "plugins": {
+        "java-codegen": {
+          "service": "com.amazonaws.sdk.benchmark#AwsJsonRpc10DataPlane",
+          "namespace": "software.amazon.smithy.java.benchmarks.serde.generated.awsjson10",
+          "modes": ["client"]
+        }
+      }
+    },
+    "aws-query-client": {
+      "transforms": [
+        {
+          "name": "includeServices",
+          "args": {
+            "services": ["com.amazonaws.sdk.benchmark#AwsQueryDataPlane"]
+          }
+        }
+      ],
+      "plugins": {
+        "java-codegen": {
+          "service": "com.amazonaws.sdk.benchmark#AwsQueryDataPlane",
+          "namespace": "software.amazon.smithy.java.benchmarks.serde.generated.awsquery",
+          "modes": ["client"]
+        }
+      }
+    },
+    "rest-json-client": {
+      "transforms": [
+        {
+          "name": "includeServices",
+          "args": {
+            "services": ["com.amazonaws.sdk.benchmark#AwsRestJsonDataPlane"]
+          }
+        }
+      ],
+      "plugins": {
+        "java-codegen": {
+          "service": "com.amazonaws.sdk.benchmark#AwsRestJsonDataPlane",
+          "namespace": "software.amazon.smithy.java.benchmarks.serde.generated.restjson",
+          "modes": ["client"]
+        }
+      }
+    },
+    "rest-xml-client": {
+      "transforms": [
+        {
+          "name": "includeServices",
+          "args": {
+            "services": ["com.amazonaws.sdk.benchmark#AwsRestXmlDataPlane"]
+          }
+        }
+      ],
+      "plugins": {
+        "java-codegen": {
+          "service": "com.amazonaws.sdk.benchmark#AwsRestXmlDataPlane",
+          "namespace": "software.amazon.smithy.java.benchmarks.serde.generated.restxml",
+          "modes": ["client"]
+        }
+      }
+    },
+    "rpc-v2-cbor-client": {
+      "transforms": [
+        {
+          "name": "includeServices",
+          "args": {
+            "services": ["com.amazonaws.sdk.benchmark#SmithyRpcV2CborDataPlane"]
+          }
+        }
+      ],
+      "plugins": {
+        "java-codegen": {
+          "service": "com.amazonaws.sdk.benchmark#SmithyRpcV2CborDataPlane",
+          "namespace": "software.amazon.smithy.java.benchmarks.serde.generated.rpcv2cbor",
+          "modes": ["client"]
+        }
+      }
+    }
+  }
+}

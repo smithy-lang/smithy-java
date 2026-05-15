@@ -117,3 +117,7 @@ include(":mcp:mcp-server")
 
 include(":model-bundle")
 include(":model-bundle:model-bundle-api")
+
+// Benchmarks (not published)
+include(":benchmarks")
+include(":benchmarks:serde-benchmarks")
