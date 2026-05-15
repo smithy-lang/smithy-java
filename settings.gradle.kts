@@ -41,9 +41,6 @@ include(":codecs:codec-codegen")
 include(":codecs:json-codec")
 include(":codecs:xml-codec")
 
-// Benchmarks
-include(":benchmarks:codec-benchmarks")
-
 // Client
 include(":client:client-core")
 include(":client:client-auth-api")

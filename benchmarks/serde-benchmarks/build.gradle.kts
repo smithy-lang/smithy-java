@@ -47,6 +47,7 @@ dependencies {
     jmh(project(":codecs:json-codec", configuration = "shadow"))
     jmh(project(":codecs:cbor-codec"))
     jmh(project(":codecs:xml-codec"))
+    jmh(project(":codecs:codec-codegen"))
 
     // Client protocols — every benchmark drives the corresponding
     // ClientProtocol#createRequest / #deserializeResponse, mirroring the
