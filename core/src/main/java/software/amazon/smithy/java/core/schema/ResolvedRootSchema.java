@@ -47,6 +47,11 @@ final class ResolvedRootSchema extends Schema {
     }
 
     @Override
+    public Schema member(int memberIndex) {
+        return memberList.get(memberIndex);
+    }
+
+    @Override
     public Set<Integer> intEnumValues() {
         return intEnumValues;
     }

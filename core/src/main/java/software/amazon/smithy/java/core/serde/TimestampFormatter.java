@@ -8,7 +8,6 @@ package software.amazon.smithy.java.core.serde;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -217,19 +216,20 @@ public interface TimestampFormatter {
 
             @Override
             public String writeString(Instant value) {
-                return HTTP_DATE_FORMAT.format(value);
+                long epoch = value.getEpochSecond();
+                if (HttpDateFormat.isYearRepresentable(epoch)) {
+                    return HttpDateFormat.format(epoch);
+                }
+                // Out-of-range years (before 0001 or after 9999) — fall through
+                // to the JDK formatter so behaviour matches the legacy path.
+                return HttpDateFormat.formatFallback(value);
             }
 
             @Override
             public Instant readFromString(String value, boolean strict) {
-                return HTTP_DATE_FORMAT.parse(value, Instant::from);
+                return HttpDateFormat.parse(value);
             }
         };
-
-        private static final DateTimeFormatter HTTP_DATE_FORMAT = DateTimeFormatter
-                .ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'")
-                .withZone(ZoneId.of("UTC"))
-                .withLocale(Locale.US);
 
         @Override
         public String toString() {

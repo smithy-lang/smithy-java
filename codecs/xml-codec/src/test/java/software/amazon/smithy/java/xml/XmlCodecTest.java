@@ -49,6 +49,17 @@ public class XmlCodecTest {
     }
 
     @Test
+    public void deserializesEmptyBody() {
+        try (var codec = XmlCodec.builder().build()) {
+            // Empty ByteBuffer: top-level readStruct should be a no-op
+            var pojo = codec.deserializeShape(ByteBuffer.allocate(0), new TestPojo.Builder());
+            assertThat(pojo.name, equalTo(null));
+            assertThat(pojo.date, equalTo(null));
+            assertThat(pojo.numbers, equalTo(List.of()));
+        }
+    }
+
+    @Test
     public void serializesXml() {
         try (var codec = XmlCodec.builder().build()) {
             var builder = new TestPojo.Builder();

@@ -6,13 +6,11 @@
 package software.amazon.smithy.java.http.binding;
 
 import java.util.Objects;
-import java.util.concurrent.ConcurrentMap;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
-import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.Frame;
@@ -33,11 +31,8 @@ public final class ResponseSerializer {
     private boolean omitEmptyPayload = false;
     private HeaderErrorSerializer headerErrorSerializer = HeaderErrorSerializer.AMZN_ERROR_HEADER;
     private Context context = Context.empty();
-    private final ConcurrentMap<Schema, BindingMatcher> bindingCache;
 
-    ResponseSerializer(ConcurrentMap<Schema, BindingMatcher> bindingCache) {
-        this.bindingCache = bindingCache;
-    }
+    ResponseSerializer() {}
 
     /**
      * Schema of the operation response to serialize.
@@ -147,27 +142,20 @@ public final class ResponseSerializer {
      *
      * @return Returns the created response.
      */
-    @SuppressWarnings("unchecked")
     public HttpResponse serializeResponse() {
         Objects.requireNonNull(shapeValue, "shapeValue is not set");
         Objects.requireNonNull(operation, "operation is not set");
         Objects.requireNonNull(payloadCodec, "payloadCodec is not set");
         Objects.requireNonNull(payloadMediaType, "payloadMediaType is not set");
 
-        Schema schema;
         var isFailure = errorSchema != null;
-        if (isFailure) {
-            schema = errorSchema;
-        } else {
-            schema = operation.outputSchema();
-        }
 
-        var httpTrait = operation.schema().expectTrait(TraitKey.HTTP_TRAIT);
+        var operationBinding = HttpBindingSchemaExtensions.operationBindingOf(operation.schema());
         var serializer = new HttpBindingSerializer(
-                httpTrait,
+                operationBinding,
                 payloadCodec,
                 payloadMediaType,
-                bindingCache.computeIfAbsent(schema, BindingMatcher::responseMatcher),
+                true, // isResponse
                 omitEmptyPayload,
                 isFailure,
                 false,
@@ -176,8 +164,7 @@ public final class ResponseSerializer {
         shapeValue.serialize(serializer);
         serializer.flush();
 
-        var builder = HttpResponse.create()
-                .setStatusCode(serializer.getResponseStatus());
+        var builder = HttpResponse.create().setStatusCode(serializer.getResponseStatus());
 
         var eventStream = serializer.getEventStream();
         if (eventStream != null && operation.outputEventBuilderSupplier() != null) {
@@ -191,6 +178,6 @@ public final class ResponseSerializer {
             builder.setBody(serializer.getBody());
         }
 
-        return builder.setHeaders(serializer.getHeaders()).toUnmodifiable();
+        return builder.setHeaders(serializer.getHeaders());
     }
 }

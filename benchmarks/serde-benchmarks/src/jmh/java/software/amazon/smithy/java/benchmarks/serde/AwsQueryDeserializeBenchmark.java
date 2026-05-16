@@ -31,6 +31,14 @@ public class AwsQueryDeserializeBenchmark {
     private static final String VERSION = "1999-12-31";
     private static final String CONTENT_TYPE = "text/xml";
 
+    /**
+     * Empty body fixture for response tests that have no body. AWS Query responses are XML, so an empty
+     * {@code byte[]} cleanly hits the {@code XmlCodec} empty-buffer fast path. None of the current
+     * {@code GetMetricDataResponse_*} test cases have empty bodies, but keeping the fixture consistent with
+     * {@link RestXmlDeserializeBenchmark} makes the auto-derive workaround in {@link DeserializeState} unnecessary.
+     */
+    private static final byte[] EMPTY_XML_BODY = new byte[0];
+
     @Param({
             "awsQuery_GetMetricDataResponse_S",
             "awsQuery_GetMetricDataResponse_M",
@@ -44,7 +52,7 @@ public class AwsQueryDeserializeBenchmark {
     @Setup
     public void setup() {
         protocol = new AwsQueryClientProtocol(SERVICE_ID, VERSION);
-        state = DeserializeState.forTestCase(testCaseId, GENERATED_PACKAGE, null, CONTENT_TYPE, false);
+        state = DeserializeState.forTestCase(testCaseId, GENERATED_PACKAGE, EMPTY_XML_BODY, CONTENT_TYPE, false);
     }
 
     @Benchmark

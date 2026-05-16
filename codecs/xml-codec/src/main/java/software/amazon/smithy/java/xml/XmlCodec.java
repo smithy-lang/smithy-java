@@ -63,6 +63,10 @@ public final class XmlCodec implements Codec {
 
     @Override
     public ShapeDeserializer createDeserializer(ByteBuffer source) {
+        if (source == null || !source.hasRemaining()) {
+            return EmptyXmlDeserializer.INSTANCE;
+        }
+
         try {
             var reader = xmlInputFactory.createXMLStreamReader(ByteBufferUtils.byteBufferInputStream(source));
             return XmlDeserializer.topLevel(

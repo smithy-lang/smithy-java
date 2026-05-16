@@ -96,6 +96,12 @@ final class DeferredRootSchema extends Schema {
     }
 
     @Override
+    public Schema member(int memberIndex) {
+        resolveInternal();
+        return resolvedMembers.memberList.get(memberIndex);
+    }
+
+    @Override
     public Set<Integer> intEnumValues() {
         return intEnumValues;
     }

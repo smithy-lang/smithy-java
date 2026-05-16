@@ -6,13 +6,10 @@
 package software.amazon.smithy.java.http.binding;
 
 import java.util.Objects;
-import java.util.concurrent.ConcurrentMap;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
-import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
-import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.Frame;
@@ -33,11 +30,8 @@ public final class RequestSerializer {
     private EventEncoderFactory<?> eventStreamEncodingFactory;
     private boolean omitEmptyPayload = false;
     private boolean allowEmptyStructPayload = false;
-    private final ConcurrentMap<Schema, BindingMatcher> bindingCache;
 
-    RequestSerializer(ConcurrentMap<Schema, BindingMatcher> bindingCache) {
-        this.bindingCache = bindingCache;
-    }
+    RequestSerializer() {}
 
     /**
      * Schema of the operation to serialize.
@@ -136,13 +130,12 @@ public final class RequestSerializer {
         Objects.requireNonNull(endpoint, "endpoint is not set");
         Objects.requireNonNull(payloadMediaType, "payloadMediaType is not set");
 
-        var matcher = bindingCache.computeIfAbsent(operation.inputSchema(), BindingMatcher::requestMatcher);
-        var httpTrait = operation.schema().expectTrait(TraitKey.HTTP_TRAIT);
+        var operationBinding = HttpBindingSchemaExtensions.operationBindingOf(operation.schema());
         var serializer = new HttpBindingSerializer(
-                httpTrait,
+                operationBinding,
                 payloadCodec,
                 payloadMediaType,
-                matcher,
+                false, // isResponse
                 omitEmptyPayload,
                 false,
                 allowEmptyStructPayload,
@@ -158,7 +151,7 @@ public final class RequestSerializer {
         }
 
         var builder = HttpRequest.create()
-                .setMethod(httpTrait.getMethod())
+                .setMethod(operationBinding.httpTrait().getMethod())
                 .setUri(resolvedUri);
 
         var eventStream = serializer.getEventStream();
@@ -172,6 +165,6 @@ public final class RequestSerializer {
             builder.setBody(serializer.getBody());
         }
 
-        return builder.setHeaders(serializer.getHeaders()).toUnmodifiable();
+        return builder.setHeaders(serializer.getHeaders());
     }
 }

@@ -38,7 +38,9 @@ public interface HeaderErrorSerializer {
      * Write the error type discriminator for the given error schema.
      *
      * @param errorSchema Schema of the error being serialized.
-     * @param headers     Mutable header map to write discriminator headers to.
+     * @param headers     Mutable header map to write discriminator headers to. Keys are
+     *                    case-insensitive header names and values are the header value
+     *                    list (each entry produces one wire header line).
      * @param context     Context for the current request, which may contain protocol-specific
      *                    information such as the service namespace.
      */

@@ -19,6 +19,7 @@ import software.amazon.smithy.java.core.serde.SpecificShapeDeserializer;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamReader;
 import software.amazon.smithy.java.core.serde.event.ProtocolEventStreamReader;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.QueryStringParser;
@@ -39,7 +40,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private final Map<String, List<String>> queryStringParameters;
     private final int responseStatus;
     private final Map<String, String> requestPathLabels;
-    private final BindingMatcher bindingMatcher;
+    private final boolean isResponse;
     private final DataStream body;
     private final EventDecoderFactory<?> eventDecoderFactory;
     private final String payloadMediaType;
@@ -47,7 +48,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private HttpBindingDeserializer(Builder builder) {
         this.payloadCodec = Objects.requireNonNull(builder.payloadCodec, "payloadSerializer not set");
         this.headers = Objects.requireNonNull(builder.headers, "headers not set");
-        this.bindingMatcher = Objects.requireNonNull(builder.bindingMatcher, "bindingMatcher not set");
+        this.isResponse = builder.isResponse;
         this.eventDecoderFactory = builder.eventDecoderFactory;
         this.body = builder.body == null ? DataStream.ofEmpty() : builder.body;
         this.queryStringParameters = QueryStringParser.parse(builder.requestRawQueryString);
@@ -67,93 +68,175 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
 
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
-        // First parse members in the framing.
-        for (Schema member : schema.members()) {
-            BindingMatcher.Binding bindingLoc = bindingMatcher.match(member);
-            switch (bindingLoc) {
-                case LABEL -> {
-                    var labelValue = requestPathLabels.get(member.memberName());
-                    if (labelValue == null) {
-                        throw new IllegalStateException(
-                                "Expected a label value for " + member.memberName()
-                                        + " but it was null.");
-                    }
-                    structMemberConsumer.accept(
-                            state,
-                            member,
-                            new HttpPathLabelDeserializer(labelValue));
-                }
-                case QUERY -> {
-                    var paramValue = queryStringParameters.get(
-                            member.expectTrait(TraitKey.HTTP_QUERY_TRAIT).getValue());
-                    if (paramValue != null) {
-                        structMemberConsumer.accept(state, member, new HttpQueryStringDeserializer(paramValue));
-                    }
-                }
-                case QUERY_PARAMS ->
-                    structMemberConsumer.accept(state, member, new HttpQueryParamsDeserializer(queryStringParameters));
-                case HEADER -> {
-                    var header = member.expectTrait(TraitKey.HTTP_HEADER_TRAIT).getValue();
-                    if (member.type() == ShapeType.LIST) {
-                        var values = headers.allValues(header);
-                        if (!values.isEmpty()) {
-                            structMemberConsumer.accept(state, member, new HttpHeaderListDeserializer(member, values));
-                        }
-                    } else {
-                        var headerValue = headers.firstValue(header);
-                        if (headerValue != null) {
-                            structMemberConsumer.accept(state, member, new HttpHeaderDeserializer(headerValue));
-                        }
-                    }
-                }
-                case PREFIX_HEADERS ->
-                    structMemberConsumer.accept(state, member, new HttpPrefixHeadersDeserializer(headers));
-                case BODY -> {
-                } // handled below
-                case PAYLOAD -> {
-                    if (isEventStream(member)) {
-                        structMemberConsumer.accept(state, member, new SpecificShapeDeserializer() {
-                            @Override
-                            public EventStreamReader<? extends SerializableStruct> readEventStream(Schema schema) {
-                                return ProtocolEventStreamReader.newReader(body, eventDecoderFactory, false);
-                            }
-                        });
-                    } else if (member.hasTrait(TraitKey.STREAMING_TRAIT)) {
-                        // Set the payload on shape builder directly. This will fail for misconfigured shapes.
-                        structMemberConsumer.accept(state, member, new SpecificShapeDeserializer() {
-                            @Override
-                            public DataStream readDataStream(Schema schema) {
-                                return body;
-                            }
-                        });
-                    } else if (member.type() == ShapeType.STRUCTURE || member.type() == ShapeType.UNION
-                            || member.type() == ShapeType.LIST) {
-                        // Read the payload into a byte buffer to deserialize a shape in the body.
-                        ByteBuffer bb = bodyAsByteBuffer();
-                        if (bb.remaining() > 0) {
-                            structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bb));
-                        }
-                    } else if (body != null && body.contentLength() > 0) {
-                        structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
-                    }
-                }
-                case STATUS -> {
-                    structMemberConsumer.accept(state, member, new ResponseStatusDeserializer(responseStatus));
-                }
-                default -> throw new UnsupportedOperationException(bindingLoc + " not supported");
+        var ext = schema.getExtension(HttpBindingSchemaExtensions.KEY);
+        if (!(ext instanceof HttpBindingSchemaExtensions.StructBindings sb)) {
+            // Schema is not a structure / union — fall back to the legacy
+            // generic path so we still throw the same UnsupportedOperationException.
+            throw new IllegalStateException("Expected to parse a structure for HTTP bindings, but found " + schema);
+        }
+
+        if (isResponse) {
+            readResponseStruct(schema, state, structMemberConsumer, sb.response());
+        } else {
+            readRequestStruct(schema, state, structMemberConsumer, sb.request());
+        }
+    }
+
+    private <T> void readRequestStruct(
+            Schema schema,
+            T state,
+            StructMemberConsumer<T> structMemberConsumer,
+            HttpBindingSchemaExtensions.RequestBinding rb
+    ) {
+        readHeaderBindings(
+                state,
+                structMemberConsumer,
+                rb.listHeaderMembers,
+                rb.listHeaderNames,
+                rb.scalarHeadersByName,
+                rb.prefixHeadersMembers);
+
+        for (Schema member : rb.labelMembers) {
+            var labelValue = requestPathLabels.get(member.memberName());
+            if (labelValue == null) {
+                throw new IllegalStateException(
+                        "Expected a label value for " + member.memberName() + " but it was null.");
+            }
+            structMemberConsumer.accept(state, member, new HttpPathLabelDeserializer(labelValue));
+        }
+
+        for (int i = 0; i < rb.queryMembers.length; i++) {
+            var paramValue = queryStringParameters.get(rb.queryWireNames[i]);
+            if (paramValue != null) {
+                Schema member = rb.queryMembers[i];
+                structMemberConsumer.accept(state, member, new HttpQueryStringDeserializer(paramValue));
             }
         }
 
-        // Now parse members in the payload of body.
-        if (bindingMatcher.hasBody()) {
-            validateMediaType();
-            // Need to read the entire payload into a byte buffer to deserialize via a codec.
-            ByteBuffer bb = bodyAsByteBuffer();
-            payloadCodec.createDeserializer(bb).readStruct(schema, bindingMatcher, (body, m, de) -> {
-                if (bindingMatcher.match(m) == BindingMatcher.Binding.BODY) {
-                    structMemberConsumer.accept(state, m, de);
+        for (Schema member : rb.queryParamsMembers) {
+            structMemberConsumer.accept(state, member, new HttpQueryParamsDeserializer(queryStringParameters));
+        }
+
+        readPayloadAndBody(schema, state, structMemberConsumer, rb.payloadMember, rb.hasBody, rb.bindings);
+    }
+
+    private <T> void readResponseStruct(
+            Schema schema,
+            T state,
+            StructMemberConsumer<T> structMemberConsumer,
+            HttpBindingSchemaExtensions.ResponseBinding rb
+    ) {
+        readHeaderBindings(
+                state,
+                structMemberConsumer,
+                rb.listHeaderMembers(),
+                rb.listHeaderNames(),
+                rb.scalarHeadersByName(),
+                rb.prefixHeadersMembers());
+
+        if (rb.statusMember() != null) {
+            structMemberConsumer.accept(state, rb.statusMember(), new ResponseStatusDeserializer(responseStatus));
+        }
+
+        readPayloadAndBody(schema, state, structMemberConsumer, rb.payloadMember(), rb.hasBody(), rb.bindings());
+    }
+
+    /**
+     * Process the three header-binding kinds (list, scalar, prefix). Common to both
+     * request and response directions — both bindings expose the same field shapes.
+     */
+    private <T> void readHeaderBindings(
+            T state,
+            StructMemberConsumer<T> structMemberConsumer,
+            Schema[] listHeaderMembers,
+            HeaderName[] listHeaderNames,
+            Map<String, Schema> scalarHeadersByName,
+            Schema[] prefixHeadersMembers
+    ) {
+        for (int i = 0; i < listHeaderMembers.length; i++) {
+            var values = headers.allValues(listHeaderNames[i]);
+            if (!values.isEmpty()) {
+                Schema member = listHeaderMembers[i];
+                structMemberConsumer.accept(state, member, new HttpHeaderListDeserializer(member, values));
+            }
+        }
+
+        if (!scalarHeadersByName.isEmpty()) {
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            HeaderDispatchContext ctx = new HeaderDispatchContext(
+                    scalarHeadersByName,
+                    state,
+                    (StructMemberConsumer) structMemberConsumer);
+            headers.forEachEntry(ctx, HEADER_DISPATCHER);
+        }
+
+        for (Schema member : prefixHeadersMembers) {
+            structMemberConsumer.accept(state, member, new HttpPrefixHeadersDeserializer(headers));
+        }
+    }
+
+    /**
+     * Process the @httpPayload member (if any) and the codec-driven body. Common to
+     * both request and response directions.
+     */
+    private <T> void readPayloadAndBody(
+            Schema schema,
+            T state,
+            StructMemberConsumer<T> structMemberConsumer,
+            Schema payloadMember,
+            boolean hasBody,
+            HttpBindingSchemaExtensions.Binding[] bindings
+    ) {
+        if (payloadMember != null) {
+            handlePayload(payloadMember, state, structMemberConsumer);
+        }
+        if (hasBody) {
+            readBody(schema, state, structMemberConsumer, bindings);
+        }
+    }
+
+    private <T> void readBody(
+            Schema schema,
+            T state,
+            StructMemberConsumer<T> structMemberConsumer,
+            HttpBindingSchemaExtensions.Binding[] bindings
+    ) {
+        validateMediaType();
+        ByteBuffer bb = bodyAsByteBuffer();
+        // The codec's readStruct callback receives every member; filter to body members using the direction-specific
+        // bindings array (which was already chosen by the caller).
+        payloadCodec.createDeserializer(bb).readStruct(schema, bindings, (body, m, de) -> {
+            if (body[m.memberIndex()] == HttpBindingSchemaExtensions.Binding.BODY) {
+                structMemberConsumer.accept(state, m, de);
+            }
+        });
+    }
+
+    private <T> void handlePayload(Schema member, T state, StructMemberConsumer<T> structMemberConsumer) {
+        if (isEventStream(member)) {
+            structMemberConsumer.accept(state, member, new SpecificShapeDeserializer() {
+                @Override
+                public EventStreamReader<? extends SerializableStruct> readEventStream(Schema schema) {
+                    return ProtocolEventStreamReader.newReader(body, eventDecoderFactory, false);
                 }
             });
+        } else if (member.hasTrait(TraitKey.STREAMING_TRAIT)) {
+            // Set the payload on shape builder directly. This will fail for misconfigured shapes.
+            structMemberConsumer.accept(state, member, new SpecificShapeDeserializer() {
+                @Override
+                public DataStream readDataStream(Schema schema) {
+                    return body;
+                }
+            });
+        } else if (member.type() == ShapeType.STRUCTURE || member.type() == ShapeType.UNION
+                || member.type() == ShapeType.LIST) {
+            // Read the payload into a byte buffer to deserialize a shape in the body.
+            ByteBuffer bb = bodyAsByteBuffer();
+            if (bb.remaining() > 0) {
+                structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bb));
+            }
+        } else if (body != null && body.contentLength() > 0) {
+            structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
         }
     }
 
@@ -221,7 +304,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         private int responseStatus;
         private EventDecoderFactory<?> eventDecoderFactory;
         private String payloadMediaType;
-        private BindingMatcher bindingMatcher;
+        private boolean isResponse;
 
         private Builder() {}
 
@@ -312,9 +395,33 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
             return this;
         }
 
-        Builder bindingMatcher(BindingMatcher bindingMatcher) {
-            this.bindingMatcher = bindingMatcher;
+        Builder isResponse(boolean isResponse) {
+            this.isResponse = isResponse;
             return this;
         }
     }
+
+    /**
+     * Carrier passed to {@link HttpHeaders#forEachEntry(Object, HttpHeaders.HeaderWithValueConsumer)}
+     * so the per-pair callback doesn't allocate a capturing lambda per {@code readStruct} call. The fields hold
+     * everything the dispatcher needs to route a matching header value.
+     */
+    private record HeaderDispatchContext(
+            Map<String, Schema> byName,
+            Object state,
+            StructMemberConsumer<Object> consumer) {}
+
+    /**
+     * Stateless dispatcher: looks up a header name in the context's name->schema map and emits a
+     * {@link HttpHeaderDeserializer} for the matching member.
+     * <p>
+     * Allocated once and reused across all {@code readStruct} invocations.
+     */
+    private static final HttpHeaders.HeaderWithValueConsumer<HeaderDispatchContext> HEADER_DISPATCHER =
+            (ctx, name, value) -> {
+                Schema member = ctx.byName.get(name);
+                if (member != null) {
+                    ctx.consumer.accept(ctx.state, member, new HttpHeaderDeserializer(value));
+                }
+            };
 }

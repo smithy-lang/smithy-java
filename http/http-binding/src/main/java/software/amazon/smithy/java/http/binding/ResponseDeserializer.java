@@ -5,9 +5,7 @@
 
 package software.amazon.smithy.java.http.binding;
 
-import java.util.concurrent.ConcurrentMap;
 import software.amazon.smithy.java.core.error.ModeledException;
-import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
@@ -23,11 +21,8 @@ public final class ResponseDeserializer {
     private final HttpBindingDeserializer.Builder deserBuilder = HttpBindingDeserializer.builder();
     private ShapeBuilder<?> outputShapeBuilder;
     private ShapeBuilder<? extends ModeledException> errorShapeBuilder;
-    private final ConcurrentMap<Schema, BindingMatcher> bindingCache;
 
-    ResponseDeserializer(ConcurrentMap<Schema, BindingMatcher> bindingCache) {
-        this.bindingCache = bindingCache;
-    }
+    ResponseDeserializer() {}
 
     /**
      * Codec to use in the payload of responses.
@@ -114,17 +109,11 @@ public final class ResponseDeserializer {
      * Finish setting up and deserialize the response into the builder.
      */
     public void deserialize() {
-        Schema schema;
-        if (outputShapeBuilder != null) {
-            schema = outputShapeBuilder.schema();
-        } else if (errorShapeBuilder != null) {
-            schema = errorShapeBuilder.schema();
-        } else {
+        if (outputShapeBuilder == null && errorShapeBuilder == null) {
             throw new IllegalStateException("Either errorShapeBuilder or outputShapeBuilder must be set");
         }
 
-        var matcher = bindingCache.computeIfAbsent(schema, BindingMatcher::responseMatcher);
-        deserBuilder.bindingMatcher(matcher);
+        deserBuilder.isResponse(true);
 
         HttpBindingDeserializer deserializer = deserBuilder.build();
         var target = outputShapeBuilder != null ? outputShapeBuilder : errorShapeBuilder;

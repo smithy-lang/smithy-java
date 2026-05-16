@@ -548,6 +548,22 @@ public abstract sealed class Schema implements MemberLookup
     }
 
     /**
+     * Get a member by its index.
+     *
+     * <p>Index is the position of the member in declaration order, matching
+     * what {@link Schema#memberIndex()} returns for that member. Direct array
+     * indexing — significantly faster than {@link #member(String)} when the
+     * caller already has a member's index in hand (for example, when walking
+     * a precomputed plan).
+     *
+     * @param memberIndex Index of the member, 0-based in declaration order.
+     * @return the found member, or null if this schema has no such index.
+     */
+    public Schema member(int memberIndex) {
+        return null;
+    }
+
+    /**
      * Get the member of a list.
      *
      * <p>This method eliminates any overhead associated with hashmap lookups based on member names.

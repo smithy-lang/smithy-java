@@ -28,8 +28,11 @@ public class RestXmlDeserializeBenchmark {
             "software.amazon.smithy.java.benchmarks.serde.generated.restxml.model";
     private static final ShapeId SERVICE_ID =
             ShapeId.from("com.amazonaws.sdk.benchmark#AwsRestXmlDataPlane");
-    /** Pass null to DeserializeState to use the auto-derived <ShapeName/> default. */
-    private static final byte[] EMPTY_XML_BODY = null;
+    /**
+     * Empty body fixture for response tests that have no body. Feeding zero bytes here accurately models the wire
+     * reality of an empty 200 response and exercises that fast path.
+     */
+    private static final byte[] EMPTY_XML_BODY = new byte[0];
     private static final String CONTENT_TYPE = "application/xml";
 
     @Param({

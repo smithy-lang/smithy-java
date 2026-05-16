@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.http.binding;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -23,6 +22,7 @@ import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.event.EventStream;
+import software.amazon.smithy.java.io.ByteBufferOutputStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 final class PayloadSerializer implements ShapeSerializer {
@@ -31,12 +31,12 @@ final class PayloadSerializer implements ShapeSerializer {
     private static final byte[] FALSE_BYTES = "false".getBytes(StandardCharsets.UTF_8);
     private final HttpBindingSerializer serializer;
     private final ShapeSerializer structSerializer;
-    private final ByteArrayOutputStream outputStream;
+    private final ByteBufferOutputStream outputStream;
     private boolean payloadWritten = false;
 
     PayloadSerializer(HttpBindingSerializer serializer, Codec codec) {
         this.serializer = serializer;
-        this.outputStream = new ByteArrayOutputStream();
+        this.outputStream = new ByteBufferOutputStream();
         this.structSerializer = codec.createSerializer(outputStream);
     }
 
@@ -189,7 +189,7 @@ final class PayloadSerializer implements ShapeSerializer {
         return payloadWritten;
     }
 
-    byte[] toByteArray() {
-        return outputStream.toByteArray();
+    ByteBuffer toByteBuffer() {
+        return outputStream.toByteBuffer();
     }
 }
