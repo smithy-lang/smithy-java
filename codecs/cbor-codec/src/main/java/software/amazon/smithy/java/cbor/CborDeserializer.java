@@ -292,15 +292,11 @@ final class CborDeserializer implements ShapeDeserializer {
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> consumer) {
         byte token = parser.currentToken();
-        if (token == Token.FINISHED && schema.hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
-            // Empty input — treat as empty struct with no members.
+        if (token != Token.START_OBJECT) {
+            readStructEmpty(schema, token);
             return;
         }
-        if (token != Token.START_OBJECT) {
-            throw badType("struct", token);
-        }
 
-        // Use Schema extension for O(1) lookup instead of ConcurrentHashMap
         Schema structSchema = schema.isMember() ? schema.memberTarget() : schema;
         var ext = structSchema.getExtension(CborSchemaExtensions.KEY);
         CborMemberLookup lookup = ext != null ? ext.memberLookup() : null;
@@ -313,31 +309,23 @@ final class CborDeserializer implements ShapeDeserializer {
 
             int memberPos = parser.getPosition();
             int memberLen = parser.getItemLength();
-            // don't dispatch any events for explicit nulls
             if (parser.advance() == Token.NULL) {
                 continue;
             }
 
             Schema member = null;
 
-            // Fast path: only for definite-length member names (the common case)
             if (!CborParser.isIndefinite(memberLen) && lookup != null) {
-                // Speculative fast path: check expected next member via Arrays.equals
                 if (expectedNext >= 0 && expectedNext < lookup.orderedNameBytes.length) {
                     byte[] expected = lookup.orderedNameBytes[expectedNext];
                     if (expected.length == memberLen
                             && Arrays.equals(
-                                    payload,
-                                    memberPos,
-                                    memberPos + memberLen,
-                                    expected,
-                                    0,
-                                    memberLen)) {
+                                    payload, memberPos, memberPos + memberLen,
+                                    expected, 0, memberLen)) {
                         member = lookup.orderedSchemas[expectedNext];
                         expectedNext = member.memberIndex() + 1;
                     }
                 }
-                // Slow path: hash-based lookup
                 if (member == null) {
                     member = lookup.lookup(payload, memberPos, memberPos + memberLen, -1);
                     if (member != null) {
@@ -346,21 +334,35 @@ final class CborDeserializer implements ShapeDeserializer {
                 }
             }
 
-            // Fallback: string decode for indefinite-length or unknown members
             if (member == null) {
-                String name = CborReadUtil.readTextString(payload, memberPos, memberLen);
-                member = structSchema.member(name);
-                if (member != null) {
-                    expectedNext = member.memberIndex() + 1;
-                } else {
-                    consumer.unknownMember(state, name);
-                    skipUnknownMember();
-                    continue;
-                }
+                expectedNext = resolveMemberFallback(
+                        structSchema, memberPos, memberLen, expectedNext, state, consumer);
+                continue;
             }
 
             consumer.accept(state, member, this);
         }
+    }
+
+    private void readStructEmpty(Schema schema, byte token) {
+        if (token == Token.FINISHED && schema.hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
+            return;
+        }
+        throw badType("struct", token);
+    }
+
+    private <T> int resolveMemberFallback(
+            Schema structSchema, int memberPos, int memberLen, int expectedNext,
+            T state, StructMemberConsumer<T> consumer) {
+        String name = CborReadUtil.readTextString(payload, memberPos, memberLen);
+        Schema member = structSchema.member(name);
+        if (member != null) {
+            consumer.accept(state, member, this);
+            return member.memberIndex() + 1;
+        }
+        consumer.unknownMember(state, name);
+        skipUnknownMember();
+        return expectedNext;
     }
 
     private void skipUnknownMember() {
