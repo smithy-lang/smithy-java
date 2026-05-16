@@ -256,6 +256,7 @@ structure CopyObjectRequest {
     ExpectedSourceBucketOwner: String
 }
 
+@xmlName("CopyObjectResult")
 structure CopyObjectOutput {
     @httpHeader("x-amz-expiration")
     Expiration: String

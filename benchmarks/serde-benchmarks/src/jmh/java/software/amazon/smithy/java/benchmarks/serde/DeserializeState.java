@@ -12,6 +12,7 @@ import software.amazon.smithy.java.benchmarks.serde.BenchmarkTestCases.ResponseE
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
@@ -95,11 +96,15 @@ final class DeserializeState {
 
         byte[] resolvedEmpty = emptyBody;
         if (resolvedEmpty == null) {
-            // Default empty XML body uses the output shape's simple name as
+            // Default empty XML body uses the output shape's wire name as
             // the root element. This matches what an XML protocol response
-            // with header-only bindings looks like on the wire.
-            String outputShapeName = operation.outputSchema().id().getName();
-            resolvedEmpty = ("<" + outputShapeName + "/>").getBytes(StandardCharsets.UTF_8);
+            // with header-only bindings looks like on the wire. The wire
+            // name comes from @xmlName if present, otherwise the shape's
+            // simple name.
+            var schema = operation.outputSchema();
+            var xmlName = schema.getTrait(TraitKey.XML_NAME_TRAIT);
+            String rootName = xmlName != null ? xmlName.getValue() : schema.id().getName();
+            resolvedEmpty = ("<" + rootName + "/>").getBytes(StandardCharsets.UTF_8);
         }
         byte[] body = entry.testCase.getBody()
                 .map(s -> base64DecodeBody

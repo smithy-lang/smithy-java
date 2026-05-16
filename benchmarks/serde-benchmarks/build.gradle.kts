@@ -158,7 +158,7 @@ jmh {
     // are absent.
     warmupIterations = 5
     iterations = 10
-    fork = 0
+    fork = 1
     // Select the native smithy-java JSON provider (rather than the default
     // Jackson-backed provider, which has higher ServiceLoader priority).
     // The system property is read once during static initialization of

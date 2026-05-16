@@ -32,7 +32,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @Warmup(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 10, time = 5, timeUnit = TimeUnit.SECONDS)
-@Fork(0)
+@Fork(1)
 public class RpcV2CborSerializeBenchmark {
 
     private static final String GENERATED_PACKAGE =
