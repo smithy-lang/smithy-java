@@ -84,7 +84,7 @@ public final class MapGenerator
 
                                             static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
                                                 var size = Math.min(deserializer.containerSize(), deserializer.containerPreAllocationLimit());
-                                                ${shape:T} result = size == -1 ? new ${collectionImpl:T}<>() : new ${collectionImpl:T}<>(size);
+                                                ${shape:T} result = size == -1 ? new ${collectionImpl:T}<>() : ${collectionImpl:T}.${newMap:L}(size);
                                                 deserializer.readStringMap(schema, result, ${name:U}$$ValueDeserializer.INSTANCE);
                                                 return result;
                                             }
@@ -108,10 +108,12 @@ public final class MapGenerator
                             writer.putContext("value", valueSymbol);
                             writer.putContext("keySchema", keySchema);
                             writer.putContext("valueSchema", valueSchema);
+                            var collectionImpl = (Class<?>) directive.symbol()
+                                    .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS);
+                            writer.putContext("collectionImpl", collectionImpl);
                             writer.putContext(
-                                    "collectionImpl",
-                                    directive.symbol()
-                                            .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS));
+                                    "newMap",
+                                    "new" + collectionImpl.getSimpleName());
                             writer.putContext("schema", Schema.class);
                             writer.putContext("biConsumer", BiConsumer.class);
                             writer.putContext("mapSerializer", MapSerializer.class);
