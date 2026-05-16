@@ -172,6 +172,16 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
     }
 
     /**
+     * Add a header with a pre-validated value, bypassing value normalization.
+     *
+     * <p>Use this for values known to be valid (e.g., numeric content-length).
+     * The default delegates to {@link #addHeader(HeaderName, String)}.
+     */
+    default void addHeaderTrusted(HeaderName name, String value) {
+        addHeader(name, value);
+    }
+
+    /**
      * Remove a header and its values by name.
      *
      * @param name Case-insensitive name of the header to remove.

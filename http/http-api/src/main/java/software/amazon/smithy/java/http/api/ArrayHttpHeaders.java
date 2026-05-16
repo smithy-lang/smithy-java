@@ -42,6 +42,15 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
         size++;
     }
 
+    @Override
+    public void addHeaderTrusted(HeaderName name, String value) {
+        ensureCapacity();
+        int idx = size * 2;
+        array[idx] = name.name();
+        array[idx + 1] = value;
+        size++;
+    }
+
     /**
      * Add a header directly from bytes (zero-copy for known headers).
      *
