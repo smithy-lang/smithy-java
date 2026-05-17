@@ -261,8 +261,8 @@ final class CborSerializer implements ShapeSerializer {
     }
 
     private void writeBytes0(int type, byte[] b, int off, int len) {
-        tagAndLength(type, len);
-        ensureCapacity(len);
+        ensureCapacity(5 + len);
+        tagAndLengthUnchecked(type, len);
         System.arraycopy(b, off, buf, pos, len);
         pos += len;
     }
@@ -506,8 +506,8 @@ final class CborSerializer implements ShapeSerializer {
     @Override
     public void writeBlob(Schema schema, ByteBuffer value) {
         int len = value.remaining();
-        tagAndLength(TYPE_BYTESTRING, len);
-        ensureCapacity(len);
+        ensureCapacity(5 + len);
+        tagAndLengthUnchecked(TYPE_BYTESTRING, len);
         if (value.hasArray()) {
             System.arraycopy(value.array(), value.arrayOffset() + value.position(), buf, pos, len);
         } else {
