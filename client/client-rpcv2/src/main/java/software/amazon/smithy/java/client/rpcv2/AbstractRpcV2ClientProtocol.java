@@ -27,7 +27,6 @@ import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.ModifiableHttpRequest;
-import software.amazon.smithy.java.io.ByteBufferOutputStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.shapes.ShapeId;

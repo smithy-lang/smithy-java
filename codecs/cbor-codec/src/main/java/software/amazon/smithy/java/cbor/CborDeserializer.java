@@ -674,8 +674,12 @@ final class CborDeserializer implements ShapeDeserializer {
                     byte[] expected = lookup.orderedNameBytes[expectedNext];
                     if (expected.length == memberLen
                             && Arrays.equals(
-                                    payload, memberPos, memberPos + memberLen,
-                                    expected, 0, memberLen)) {
+                                    payload,
+                                    memberPos,
+                                    memberPos + memberLen,
+                                    expected,
+                                    0,
+                                    memberLen)) {
                         member = lookup.orderedSchemas[expectedNext];
                         expectedNext = member.memberIndex() + 1;
                     }
@@ -690,7 +694,12 @@ final class CborDeserializer implements ShapeDeserializer {
 
             if (member == null) {
                 expectedNext = resolveMemberFallback(
-                        structSchema, memberPos, memberLen, expectedNext, state, consumer);
+                        structSchema,
+                        memberPos,
+                        memberLen,
+                        expectedNext,
+                        state,
+                        consumer);
                 continue;
             }
 
@@ -706,8 +715,13 @@ final class CborDeserializer implements ShapeDeserializer {
     }
 
     private <T> int resolveMemberFallback(
-            Schema structSchema, int memberPos, int memberLen, int expectedNext,
-            T state, StructMemberConsumer<T> consumer) {
+            Schema structSchema,
+            int memberPos,
+            int memberLen,
+            int expectedNext,
+            T state,
+            StructMemberConsumer<T> consumer
+    ) {
         String name = CborReadUtil.readTextString(payload, memberPos, memberLen);
         Schema member = structSchema.member(name);
         if (member != null) {
