@@ -5,18 +5,11 @@
 
 package software.amazon.smithy.java.benchmarks.serde;
 
-import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.BenchmarkMode;
-import org.openjdk.jmh.annotations.Fork;
-import org.openjdk.jmh.annotations.Measurement;
-import org.openjdk.jmh.annotations.Mode;
-import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.core.schema.ApiOperation;
@@ -31,11 +24,6 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * generated client uses internally.
  */
 @State(Scope.Benchmark)
-@BenchmarkMode(Mode.SampleTime)
-@OutputTimeUnit(TimeUnit.NANOSECONDS)
-@Warmup(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
-@Measurement(iterations = 10, time = 5, timeUnit = TimeUnit.SECONDS)
-@Fork(1)
 public class AwsJson1_0SerializeBenchmark {
 
     private static final String GENERATED_PACKAGE =

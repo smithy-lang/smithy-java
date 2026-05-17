@@ -100,7 +100,6 @@ include(":aws:sdkv2:aws-sdkv2-auth")
 // Examples
 include(":examples")
 include(":examples:basic-server")
-include(":examples:dynamodb-client")
 include(":examples:transcribestreaming-client")
 include(":examples:end-to-end")
 include(":examples:event-streaming-client")

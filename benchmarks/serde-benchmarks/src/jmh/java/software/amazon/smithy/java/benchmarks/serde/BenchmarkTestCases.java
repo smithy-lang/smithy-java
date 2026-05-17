@@ -7,7 +7,6 @@ package software.amazon.smithy.java.benchmarks.serde;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.protocoltests.traits.HttpMessageTestCase;
@@ -27,13 +26,14 @@ import software.amazon.smithy.protocoltests.traits.HttpResponseTestsTrait;
  */
 final class BenchmarkTestCases {
 
-    /** The tag that marks a test case as a serde benchmark. */
     static final String TAG = "serde-benchmark";
 
-    /** Lazily-built map: test-case id -> request entry. */
-    private static final Map<String, RequestEntry> REQUESTS = indexRequests();
+    private static final Model MODEL = Model.assembler(BenchmarkTestCases.class.getClassLoader())
+            .discoverModels(BenchmarkTestCases.class.getClassLoader())
+            .assemble()
+            .unwrap();
 
-    /** Lazily-built map: test-case id -> response entry. */
+    private static final Map<String, RequestEntry> REQUESTS = indexRequests();
     private static final Map<String, ResponseEntry> RESPONSES = indexResponses();
 
     private BenchmarkTestCases() {}
@@ -58,17 +58,15 @@ final class BenchmarkTestCases {
 
     private static Map<String, RequestEntry> indexRequests() {
         Map<String, RequestEntry> result = new LinkedHashMap<>();
-        Model model = BenchmarkContext.MODEL;
-        for (OperationShape op : model.getOperationShapes()) {
-            Optional<HttpRequestTestsTrait> trait = op.getTrait(HttpRequestTestsTrait.class);
+        for (OperationShape op : MODEL.getOperationShapes()) {
+            var trait = op.getTrait(HttpRequestTestsTrait.class);
             if (trait.isEmpty()) {
                 continue;
             }
             for (HttpRequestTestCase tc : trait.get().getTestCases()) {
-                if (!hasBenchmarkTag(tc)) {
-                    continue;
+                if (hasBenchmarkTag(tc)) {
+                    result.put(tc.getId(), new RequestEntry(op, tc));
                 }
-                result.put(tc.getId(), new RequestEntry(op, tc));
             }
         }
         return result;
@@ -76,17 +74,15 @@ final class BenchmarkTestCases {
 
     private static Map<String, ResponseEntry> indexResponses() {
         Map<String, ResponseEntry> result = new LinkedHashMap<>();
-        Model model = BenchmarkContext.MODEL;
-        for (OperationShape op : model.getOperationShapes()) {
-            Optional<HttpResponseTestsTrait> trait = op.getTrait(HttpResponseTestsTrait.class);
+        for (OperationShape op : MODEL.getOperationShapes()) {
+            var trait = op.getTrait(HttpResponseTestsTrait.class);
             if (trait.isEmpty()) {
                 continue;
             }
             for (HttpResponseTestCase tc : trait.get().getTestCases()) {
-                if (!hasBenchmarkTag(tc)) {
-                    continue;
+                if (hasBenchmarkTag(tc)) {
+                    result.put(tc.getId(), new ResponseEntry(op, tc));
                 }
-                result.put(tc.getId(), new ResponseEntry(op, tc));
             }
         }
         return result;
@@ -96,25 +92,7 @@ final class BenchmarkTestCases {
         return tc.getTags().contains(TAG);
     }
 
-    /** Pairing of an operation with one of its benchmark request test cases. */
-    static final class RequestEntry {
-        final OperationShape operation;
-        final HttpRequestTestCase testCase;
+    record RequestEntry(OperationShape operation, HttpRequestTestCase testCase) {}
 
-        RequestEntry(OperationShape operation, HttpRequestTestCase testCase) {
-            this.operation = operation;
-            this.testCase = testCase;
-        }
-    }
-
-    /** Pairing of an operation with one of its benchmark response test cases. */
-    static final class ResponseEntry {
-        final OperationShape operation;
-        final HttpResponseTestCase testCase;
-
-        ResponseEntry(OperationShape operation, HttpResponseTestCase testCase) {
-            this.operation = operation;
-            this.testCase = testCase;
-        }
-    }
+    record ResponseEntry(OperationShape operation, HttpResponseTestCase testCase) {}
 }
