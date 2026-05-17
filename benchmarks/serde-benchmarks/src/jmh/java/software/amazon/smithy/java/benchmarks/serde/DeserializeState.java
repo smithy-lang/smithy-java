@@ -89,10 +89,10 @@ final class DeserializeState {
             boolean base64DecodeBody
     ) {
         ResponseEntry entry = BenchmarkTestCases.response(testCaseId);
-        OperationShape opShape = entry.operation;
+        OperationShape opShape = entry.operation();
 
         ApiOperation<? extends SerializableStruct, ? extends SerializableStruct> operation =
-                ApiOperationLookup.resolve(generatedPackage, opShape.getId().getName());
+                SerializeState.resolveOperation(generatedPackage, opShape.getId().getName());
 
         byte[] resolvedEmpty = emptyBody;
         if (resolvedEmpty == null) {
@@ -106,12 +106,13 @@ final class DeserializeState {
             String rootName = xmlName != null ? xmlName.getValue() : schema.id().getName();
             resolvedEmpty = ("<" + rootName + "/>").getBytes(StandardCharsets.UTF_8);
         }
-        byte[] body = entry.testCase.getBody()
+        byte[] body = entry.testCase()
+                .getBody()
                 .map(s -> base64DecodeBody
                         ? Base64.getMimeDecoder().decode(s)
                         : s.getBytes(StandardCharsets.UTF_8))
                 .orElse(resolvedEmpty);
-        int statusCode = entry.testCase.getCode();
+        int statusCode = entry.testCase().getCode();
 
         ModifiableHttpResponse response = HttpResponse.create()
                 .setStatusCode(statusCode)
@@ -119,7 +120,7 @@ final class DeserializeState {
 
         // Merge the trait's response.headers (if any) so the binding
         // deserializer's @httpHeader extraction sees realistic headers.
-        Map<String, String> traitHeaders = entry.testCase.getHeaders();
+        Map<String, String> traitHeaders = entry.testCase().getHeaders();
         if (traitHeaders != null) {
             for (Map.Entry<String, String> e : traitHeaders.entrySet()) {
                 response.setHeader(e.getKey(), e.getValue());

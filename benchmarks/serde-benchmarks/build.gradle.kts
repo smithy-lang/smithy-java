@@ -1,7 +1,7 @@
 plugins {
     id("smithy-java.java-conventions")
-    alias(libs.plugins.jmh)
     alias(libs.plugins.shadow)
+    alias(libs.plugins.jmh)
     id("software.amazon.smithy.gradle.smithy-base")
 }
 
@@ -24,19 +24,14 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 dependencies {
-    // Smithy traits needed at build time (smithy-build) AND at runtime (when
-    // BenchmarkContext loads the model).
+    // Smithy traits needed at build time (smithy-build) and at runtime (when
+    // BenchmarkTestCases loads the model). The jmh configuration extends
+    // implementation, so these are available to both.
     implementation(libs.smithy.model)
     implementation(libs.smithy.aws.traits)
     implementation(libs.smithy.protocol.traits)
     implementation(libs.smithy.protocol.test.traits)
     implementation(libs.smithy.utils)
-
-    jmh(libs.smithy.model)
-    jmh(libs.smithy.aws.traits)
-    jmh(libs.smithy.protocol.traits)
-    jmh(libs.smithy.protocol.test.traits)
-    jmh(libs.smithy.utils)
 
     // The Smithy Java codegen plugin produces typed shape classes plus
     // ApiOperation classes per service (see `smithy-build.json`). The
@@ -64,6 +59,9 @@ dependencies {
     jmh(project(":aws:client:aws-client-awsquery"))
     jmh(project(":aws:client:aws-client-restjson"))
     jmh(project(":aws:client:aws-client-restxml"))
+
+    // Protocol test document for converting test case params into typed shapes.
+    jmh(project(":protocol-test-harness"))
 }
 
 // Smithy benchmark model files (tagged @httpRequestTests / @httpResponseTests
@@ -73,11 +71,11 @@ dependencies {
 // `Model.assembler().discoverModels()`, which walks `META-INF/smithy/manifest`
 // resources on the classpath.
 abstract class GenerateSmithyManifest : DefaultTask() {
-    @get:org.gradle.api.tasks.InputDirectory
-    abstract val sourceDir: org.gradle.api.file.DirectoryProperty
+    @get:InputDirectory
+    abstract val sourceDir: DirectoryProperty
 
-    @get:org.gradle.api.tasks.OutputDirectory
-    abstract val outputDir: org.gradle.api.file.DirectoryProperty
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
 
     @org.gradle.api.tasks.TaskAction
     fun run() {
@@ -152,47 +150,66 @@ tasks.named("compileJmhJava") {
     dependsOn("smithyBuild")
 }
 
+// All JMH parameters are configured here (single source of truth).
+// Per-class annotations (@Warmup, @Measurement, @Fork, etc.) are not used.
+//
+// Fast mode:  -Pjmh.fast       (1 warmup, 3 measurement, 1 fork, 5s each)
+// Profilers:  -Pjmh.profilers=gc,stack   (comma-separated JMH profiler names)
+// Filter:     -Pjmh.includes=RpcV2CborSerializeBenchmark.serialize
+// Test case:  -Pjmh.testCaseId=rpcv2Cbor_PutItemRequest_BinaryData_S
+val fast = providers.gradleProperty("jmh.fast").isPresent
 jmh {
-    // Per-benchmark @Warmup / @Measurement / @Fork annotations on each class
-    // are authoritative. These extension defaults apply only when annotations
-    // are absent.
-    warmupIterations = 5
-    iterations = 10
+    benchmarkMode.addAll("sample")
+    timeUnit = "ns"
+    warmupIterations = if (fast) 1 else 5
+    warmup = if (fast) "5s" else "2s"
+    iterations = if (fast) 3 else 10
+    timeOnIteration = if (fast) "5s" else "5s"
     fork = 1
-    // Select the native smithy-java JSON provider (rather than the default
-    // Jackson-backed provider, which has higher ServiceLoader priority).
-    // The system property is read once during static initialization of
-    // `JsonSettings`, so it must be set before the codec class loads.
-    jvmArgs.addAll("-Dsmithy-java.json-provider=smithy")
+    jvmArgs.addAll(
+        "-Xms1g",
+        "-Xmx1g",
+        "-XX:+UseG1GC",
+        "-XX:+AlwaysPreTouch",
+        "-Dsmithy-java.json-provider=smithy",
+    )
     includes.addAll(
         providers
             .gradleProperty("jmh.includes")
             .map { listOf(it) }
             .orElse(emptyList()),
     )
-    // Emit JSON output so it can be picked up by the `convertJmhResults` task.
+    profilers.addAll(
+        providers
+            .gradleProperty("jmh.profilers")
+            .map { it.split(",") }
+            .orElse(emptyList()),
+    )
+    providers.gradleProperty("jmh.testCaseId").orNull?.let { id ->
+        val prop = objects.listProperty(String::class.java)
+        prop.add(id)
+        benchmarkParameters.put("testCaseId", prop)
+    }
     resultFormat = "json"
     resultsFile = layout.buildDirectory.file("results/jmh/results.json")
 }
 
-// The me.champeau.jmh plugin auto-integrates with com.gradleup.shadow when
-// both plugins are present: the `jmh` task uses a shadow-style classpath so
-// duplicate META-INF/services/ entries (one per upstream module) are merged
-// rather than overwritten. Without this, multiple TraitService SPI files
-// collide and only one wins.
-tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+// With shadow applied before jmh, jmhJar is a ShadowJar. Configure
+// mergeServiceFiles() so duplicate META-INF/services/ entries from
+// multiple codegen projections are concatenated rather than overwritten.
+tasks.jmhJar {
     mergeServiceFiles()
+    append("META-INF/smithy/manifest")
 }
 
 // Run the cross-language result converter. Reads the JMH JSON written by the
 // `jmh` task and writes a JSON + Markdown pair conforming to the shared
-// benchmark output schema.
+// benchmark output schema. OS, instance type (via EC2 IMDS), and smithy-java
+// version are detected at runtime.
 //
 //   ./gradlew :benchmarks:serde-benchmarks:convertJmhResults
 //
 // Optional properties:
-//   -Pinstance=m7i.xlarge   instance label written to metadata.instance
-//   -Pos="<descriptor>"     OS label written to metadata.os
 //   -PoutputPrefix=<path>   prefix for the output files (default: build/results/jmh/output)
 tasks.register<JavaExec>("convertJmhResults") {
     group = "benchmarks"
@@ -204,9 +221,6 @@ tasks.register<JavaExec>("convertJmhResults") {
     val inputFile = layout.buildDirectory.file("results/jmh/results.json")
     val defaultPrefix = layout.buildDirectory.file("results/jmh/output").map { it.asFile.absolutePath }
     val outputPrefix = providers.gradleProperty("outputPrefix").orElse(defaultPrefix)
-    val instance = providers.gradleProperty("instance").orElse("unknown")
-    val os = providers.gradleProperty("os").orElse(System.getProperty("os.name") + " " + System.getProperty("os.version"))
-    val smithyJavaVersion = project.file("${project.rootDir}/VERSION").readText().trim()
 
     inputs.file(inputFile)
     outputs.files(
@@ -219,11 +233,9 @@ tasks.register<JavaExec>("convertJmhResults") {
         inputFile.get().asFile.absolutePath,
         "--output-prefix",
         outputPrefix.get(),
-        "--instance",
-        instance.get(),
-        "--os",
-        os.get(),
-        "--software-version",
-        smithyJavaVersion,
     )
+}
+
+tasks.named("jmh") {
+    finalizedBy("convertJmhResults")
 }

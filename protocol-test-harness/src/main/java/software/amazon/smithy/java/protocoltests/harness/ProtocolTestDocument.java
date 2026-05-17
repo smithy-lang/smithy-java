@@ -38,7 +38,7 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
 /**
  * This is a document format used in smithy protocol tests to model expected modeled values.
  */
-final class ProtocolTestDocument implements Document {
+public final class ProtocolTestDocument implements Document {
 
     private static final Schema STRING_MAP_KEY = Schema.structureBuilder(PreludeSchemas.DOCUMENT.id())
             .putMember("key", PreludeSchemas.STRING)
@@ -68,8 +68,6 @@ final class ProtocolTestDocument implements Document {
             case STRING -> ShapeType.STRING;
             case BOOLEAN -> ShapeType.BOOLEAN;
             case NULL -> ShapeType.DOCUMENT;
-            // The default case should never be reached.
-            default -> throw new SerializationException("Expected JSON value: " + node.getType());
         };
         this.schema = PreludeSchemas.getSchemaForType(type);
     }
