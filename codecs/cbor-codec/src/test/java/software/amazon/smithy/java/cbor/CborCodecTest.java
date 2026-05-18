@@ -29,6 +29,7 @@ import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.MapSerializer;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
@@ -372,6 +373,24 @@ class CborCodecTest {
             assertEquals(new BigDecimal("3.14"), de.wingspan);
         }
 
+        // Regression: the original readTimestamp passed the tagged token (EPOCH_IPOS=16) to readLong,
+        // which rejected any token > NEG_INT(1), so integer epoch timestamps always threw.
+        @Test
+        void timestampIntegerEpoch() {
+            // tag(1) + uint8(100) - simplest valid integer epoch
+            byte[] payload = new byte[] {(byte) 0xC1, 0x18, 0x64};
+            ShapeDeserializer de = CODEC.newDeserializer(payload, SETTINGS);
+            assertEquals(Instant.ofEpochSecond(100), de.readTimestamp(PreludeSchemas.TIMESTAMP));
+        }
+
+        @Test
+        void timestampNegativeIntegerEpoch() {
+            // tag(1) + negint8(99) = -1 - 99 = -100 seconds
+            byte[] payload = new byte[] {(byte) 0xC1, 0x38, 0x63};
+            ShapeDeserializer de = CODEC.newDeserializer(payload, SETTINGS);
+            assertEquals(Instant.ofEpochSecond(-100), de.readTimestamp(PreludeSchemas.TIMESTAMP));
+        }
+
         @Test
         void timestampWholeSeconds() {
             Instant wholeSecond = Instant.ofEpochSecond(1700000000);
@@ -528,6 +547,25 @@ class CborCodecTest {
                 de.readDocument();
             });
             assertTrue(e.getMessage().contains("incomplete " + (map ? "map" : "array")), e.getMessage());
+        }
+
+        @Test
+        void timestampOutOfRange() {
+            // tag(1) + uint64(Long.MAX_VALUE) - epoch seconds far exceeding Instant.MAX
+            byte[] payload = new byte[] {
+                    (byte) 0xC1, // tag 1 (epoch timestamp)
+                    (byte) 0x1B, // 8-byte positive integer follows
+                    (byte) 0x7F,
+                    (byte) 0xFF,
+                    (byte) 0xFF,
+                    (byte) 0xFF,
+                    (byte) 0xFF,
+                    (byte) 0xFF,
+                    (byte) 0xFF,
+                    (byte) 0xFF
+            };
+            ShapeDeserializer de = CODEC.newDeserializer(payload, SETTINGS);
+            assertThrows(SerializationException.class, () -> de.readTimestamp(PreludeSchemas.TIMESTAMP));
         }
 
         @Test

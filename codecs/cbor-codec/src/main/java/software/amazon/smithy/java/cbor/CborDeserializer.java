@@ -13,6 +13,7 @@ import static software.amazon.smithy.java.cbor.CborReadUtil.readStrLen;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -691,11 +692,15 @@ final class CborDeserializer implements ShapeDeserializer {
     public Instant readTimestamp(Schema schema) {
         byte token = this.token;
         byte actual = (byte) (token ^ Token.TAG_FLAG);
-        if (actual <= Token.NEG_INT) {
-            return Instant.ofEpochSecond(readLong("timestamp", actual));
-        } else if (actual == Token.FLOAT) {
-            double d = readDouble("timestamp", actual);
-            return Instant.ofEpochMilli(Math.round(d * 1000d));
+        try {
+            if (actual <= Token.NEG_INT) {
+                return Instant.ofEpochSecond(readLong("timestamp", actual));
+            } else if (actual == Token.FLOAT) {
+                double d = readDouble("timestamp", actual);
+                return Instant.ofEpochMilli(Math.round(d * 1000d));
+            }
+        } catch (DateTimeException e) {
+            throw new SerializationException("timestamp out of range", e);
         }
         throw badType("timestamp", token);
     }
