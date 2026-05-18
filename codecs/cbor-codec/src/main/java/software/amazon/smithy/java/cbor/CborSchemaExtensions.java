@@ -10,6 +10,7 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaExtensionKey;
 import software.amazon.smithy.java.core.schema.SchemaExtensionProvider;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Pre-computes CBOR codec data on Schema objects.
@@ -18,13 +19,14 @@ import software.amazon.smithy.model.shapes.ShapeType;
  * For struct/union schemas: {@link CborMemberLookup} instances for hash-based field matching
  * and field name tables for O(1) lookup by memberIndex during serialization.
  */
+@SmithyInternalApi
 public final class CborSchemaExtensions
-        implements SchemaExtensionProvider<CborSchemaExtensions.NativeCborExtension> {
+        implements SchemaExtensionProvider<CborSchemaExtensions.CborExtension> {
 
     /**
      * Extension key for CBOR codec data.
      */
-    public static final SchemaExtensionKey<NativeCborExtension> KEY = new SchemaExtensionKey<>();
+    public static final SchemaExtensionKey<CborExtension> KEY = new SchemaExtensionKey<>();
 
     /**
      * Pre-computed CBOR data stored on a Schema.
@@ -33,18 +35,18 @@ public final class CborSchemaExtensions
      * @param memberLookup     Hash-based member lookup (null for non-structs)
      * @param fieldNameTable   Indexed by memberIndex: pre-computed name bytes per member (null for non-structs)
      */
-    public record NativeCborExtension(
+    public record CborExtension(
             byte[] memberNameBytes,
             CborMemberLookup memberLookup,
             byte[][] fieldNameTable) {}
 
     @Override
-    public SchemaExtensionKey<NativeCborExtension> key() {
+    public SchemaExtensionKey<CborExtension> key() {
         return KEY;
     }
 
     @Override
-    public NativeCborExtension provide(Schema schema) {
+    public CborExtension provide(Schema schema) {
         if (schema.isMember()) {
             return forMember(schema);
         }
@@ -55,15 +57,15 @@ public final class CborSchemaExtensions
         return null;
     }
 
-    private static NativeCborExtension forMember(Schema schema) {
+    private static CborExtension forMember(Schema schema) {
         byte[] memberNameBytes = CborSerializer.encodeMemberName(schema.memberName());
-        return new NativeCborExtension(memberNameBytes, null, null);
+        return new CborExtension(memberNameBytes, null, null);
     }
 
-    private static NativeCborExtension forStruct(Schema schema) {
+    private static CborExtension forStruct(Schema schema) {
         List<Schema> members = schema.members();
         if (members.isEmpty()) {
-            return new NativeCborExtension(null, null, null);
+            return new CborExtension(null, null, null);
         }
 
         CborMemberLookup memberLookup = new CborMemberLookup(members);
@@ -78,6 +80,6 @@ public final class CborSchemaExtensions
             fieldNameTable[idx] = CborSerializer.encodeMemberName(m.memberName());
         }
 
-        return new NativeCborExtension(null, memberLookup, fieldNameTable);
+        return new CborExtension(null, memberLookup, fieldNameTable);
     }
 }
