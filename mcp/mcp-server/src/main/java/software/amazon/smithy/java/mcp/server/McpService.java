@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,6 +28,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableShape;
@@ -74,6 +76,7 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 public final class McpService {
 
     private static final InternalLogger LOG = InternalLogger.getLogger(McpService.class);
+    private static final Context.Key<Boolean> ASYNC_DISPATCH = Context.key("mcp.asyncDispatch");
 
     private static final JsonCodec CODEC = JsonCodec.builder()
             .settings(JsonSettings.builder()
@@ -95,6 +98,7 @@ public final class McpService {
     private final AtomicReference<Boolean> proxiesInitialized = new AtomicReference<>(false);
     private final McpMetricsObserver metricsObserver;
     private final SchemaIndex schemaIndex;
+    private final McpServerInterceptor interceptor;
     private Consumer<JsonRpcRequest> notificationWriter;
 
     McpService(
@@ -103,7 +107,8 @@ public final class McpService {
             String name,
             String version,
             ToolFilter toolFilter,
-            McpMetricsObserver metricsObserver
+            McpMetricsObserver metricsObserver,
+            McpServerInterceptor interceptor
     ) {
         this.services = services;
         this.schemaIndex =
@@ -115,19 +120,79 @@ public final class McpService {
         this.proxies = proxyList.stream().collect(Collectors.toMap(McpServerProxy::name, p -> p));
         this.toolFilter = toolFilter;
         this.metricsObserver = metricsObserver;
+        this.interceptor = interceptor;
     }
 
     /**
-     * Handles a JSON-RPC request synchronously and returns a response.
-     * For proxy tool calls, the response callback is invoked asynchronously and this method returns null.
-     * For local operations, the response is returned immediately.
+     * Handles a JSON-RPC request, invoking interceptor hooks at each stage of the pipeline.
+     *
+     * <p>Responses are delivered through one of two channels:
+     * <ul>
+     *   <li><b>Synchronous (return value):</b> For most requests, the response is returned directly.</li>
+     *   <li><b>Asynchronous (callback):</b> For proxy tool calls, returns {@code null} and the callback
+     *       is invoked when the proxy responds.</li>
+     *   <li><b>Neither:</b> For notifications and unknown methods, returns {@code null} and the callback
+     *       is never invoked.</li>
+     * </ul>
      *
      * @param req The JSON-RPC request to handle
      * @param asyncResponseCallback Callback for async responses (used for proxy calls)
      * @param protocolVersion The protocol version for this request (may be null)
-     * @return The response for synchronous operations, or null for async operations
+     * @return The response for synchronous operations, or null for async/notification operations
      */
     public JsonRpcResponse handleRequest(
+            JsonRpcRequest req,
+            Consumer<JsonRpcResponse> asyncResponseCallback,
+            ProtocolVersion protocolVersion
+    ) {
+        // Zero-interceptor fast path: skip Context creation, hook allocation, and all hook invocations.
+        if (interceptor == McpServerInterceptor.NOOP) {
+            return handleRequestDirect(req, asyncResponseCallback, protocolVersion);
+        }
+
+        var hook = new McpExecutionHook(req, protocolVersion, Context.create());
+        JsonRpcResponse response = null;
+        RuntimeException caughtError = null;
+
+        try {
+            var currentReq = fireBeforeExecution(hook);
+            hook = hook.withRequest(currentReq);
+
+            // Dispatch
+            validate(currentReq);
+            var method = currentReq.getMethod();
+            response = switch (method) {
+                case "initialize" -> handleInitialize(currentReq);
+                case "ping" -> handlePing(currentReq);
+                default -> {
+                    initializeProxies(rpcResponse -> {});
+                    yield switch (method) {
+                        case "prompts/list" -> handlePromptsList(currentReq);
+                        case "prompts/get" -> handlePromptsGet(currentReq);
+                        case "tools/list" -> handleToolsList(currentReq, protocolVersion);
+                        case "tools/call" ->
+                            handleToolsCall(currentReq, asyncResponseCallback, protocolVersion, hook);
+                        default -> null;
+                    };
+                }
+            };
+            if (Boolean.TRUE.equals(hook.context().get(ASYNC_DISPATCH))) {
+                return null;
+            }
+        } catch (RuntimeException e) {
+            caughtError = e;
+        } catch (Exception e) {
+            caughtError = new RuntimeException(e);
+        }
+
+        return fireAfterExecution(hook, response, caughtError);
+    }
+
+    /**
+     * Direct dispatch path used when no interceptor is configured. Avoids Context creation,
+     * hook allocation, and all hook invocations.
+     */
+    private JsonRpcResponse handleRequestDirect(
             JsonRpcRequest req,
             Consumer<JsonRpcResponse> asyncResponseCallback,
             ProtocolVersion protocolVersion
@@ -144,7 +209,8 @@ public final class McpService {
                         case "prompts/list" -> handlePromptsList(req);
                         case "prompts/get" -> handlePromptsGet(req);
                         case "tools/list" -> handleToolsList(req, protocolVersion);
-                        case "tools/call" -> handleToolsCall(req, asyncResponseCallback, protocolVersion);
+                        case "tools/call" ->
+                            handleToolsCallDirect(req, asyncResponseCallback, protocolVersion);
                         default -> null; // Notifications or unknown methods
                     };
                 }
@@ -152,6 +218,38 @@ public final class McpService {
         } catch (Exception e) {
             return createErrorResponse(req, e);
         }
+    }
+
+    private JsonRpcRequest fireBeforeExecution(McpExecutionHook hook) {
+        interceptor.readBeforeExecution(hook);
+        return interceptor.modifyBeforeExecution(hook);
+    }
+
+    private JsonRpcRequest fireBeforeToolCall(McpToolCallHook hook) {
+        interceptor.readBeforeToolCall(hook);
+        return interceptor.modifyBeforeToolCall(hook);
+    }
+
+    private JsonRpcResponse fireAfterExecution(
+            McpExecutionHook hook,
+            JsonRpcResponse response,
+            RuntimeException error
+    ) {
+        try {
+            interceptor.readAfterExecution(hook, response, error);
+        } catch (RuntimeException e) {
+            error = swapError("readAfterExecution", error, e);
+        }
+        try {
+            response = interceptor.modifyAfterExecution(hook, response, error);
+            error = null;
+        } catch (RuntimeException e) {
+            error = e;
+        }
+        if (error != null) {
+            return createErrorResponse(hook.request(), error);
+        }
+        return response;
     }
 
     private JsonRpcResponse handleInitialize(JsonRpcRequest req) {
@@ -264,6 +362,103 @@ public final class McpService {
     private JsonRpcResponse handleToolsCall(
             JsonRpcRequest req,
             Consumer<JsonRpcResponse> asyncResponseCallback,
+            ProtocolVersion protocolVersion,
+            McpExecutionHook executionHook
+    ) {
+        if (metricsObserver != null) {
+            String toolName = req.getParams().getMember("name") != null
+                    ? req.getParams().getMember("name").asString()
+                    : null;
+            metricsObserver.onToolCall("tools/call", toolName);
+        }
+
+        var operationName = req.getParams().getMember("name").asString();
+        var tool = tools.get(operationName);
+
+        if (tool == null) {
+            return createErrorResponse(req, "No such tool: " + operationName);
+        }
+
+        var toolHook = new McpToolCallHook(
+                req,
+                protocolVersion,
+                executionHook.context(),
+                operationName,
+                tool.serverId(),
+                tool.proxy() != null);
+
+        ToolResult result;
+        try {
+            var currentReq = fireBeforeToolCall(toolHook);
+            toolHook = toolHook.withRequest(currentReq);
+
+            if (tool.proxy() != null) {
+                return dispatchProxy(tool, currentReq, toolHook, executionHook, asyncResponseCallback);
+            }
+
+            result = dispatchLocal(tool, currentReq, protocolVersion);
+        } catch (RuntimeException e) {
+            result = ToolResult.failure(e);
+        }
+
+        return fireAfterToolCall(toolHook, result.response(), result.error());
+    }
+
+    private JsonRpcResponse dispatchProxy(
+            Tool tool,
+            JsonRpcRequest currentReq,
+            McpToolCallHook toolHook,
+            McpExecutionHook executionHook,
+            Consumer<JsonRpcResponse> asyncResponseCallback
+    ) {
+        JsonRpcRequest proxyRequest = JsonRpcRequest.builder()
+                .id(currentReq.getId())
+                .method(currentReq.getMethod())
+                .params(currentReq.getParams())
+                .jsonrpc(currentReq.getJsonrpc())
+                .build();
+
+        executionHook.context().put(ASYNC_DISPATCH, true);
+
+        var finalToolHook = toolHook;
+        tool.proxy().rpc(proxyRequest).thenAccept(response -> {
+            var finalResponse = fireAfterToolCall(finalToolHook, response, null);
+            finalResponse = fireAfterExecution(executionHook, finalResponse, null);
+            asyncResponseCallback.accept(finalResponse);
+        }).exceptionally(ex -> {
+            var proxyError = new RuntimeException("Proxy error: " + ex.getMessage(), ex);
+            var errorResponse = fireAfterToolCall(finalToolHook, null, proxyError);
+            if (errorResponse == null) {
+                errorResponse = createErrorResponse(finalToolHook.request(), proxyError);
+            }
+            errorResponse = fireAfterExecution(executionHook, errorResponse, null);
+            asyncResponseCallback.accept(errorResponse);
+            return null;
+        });
+
+        return null;
+    }
+
+    private ToolResult dispatchLocal(Tool tool, JsonRpcRequest req, ProtocolVersion protocolVersion) {
+        try {
+            var operation = tool.operation();
+            var argumentsDoc = req.getParams().getMember("arguments");
+            var adaptedDoc = adaptDocument(argumentsDoc, operation.getApiOperation().inputSchema());
+            var input = adaptedDoc.asShape(operation.getApiOperation().inputBuilder());
+            var output = operation.function().apply(input, null);
+            var result = formatStructuredContent(tool, (SerializableShape) output, protocolVersion);
+            return ToolResult.success(createSuccessResponse(req.getId(), result));
+        } catch (RuntimeException e) {
+            return ToolResult.failure(e);
+        }
+    }
+
+    /**
+     * Direct tool dispatch used when no interceptor is configured. No hooks are invoked.
+     */
+    private JsonRpcResponse handleToolsCallDirect(
+            JsonRpcRequest req,
+            Consumer<JsonRpcResponse> asyncResponseCallback,
             ProtocolVersion protocolVersion
     ) {
         if (metricsObserver != null) {
@@ -280,9 +475,7 @@ public final class McpService {
             return createErrorResponse(req, "No such tool: " + operationName);
         }
 
-        // Check if this tool should be dispatched to a proxy
         if (tool.proxy() != null) {
-            // Forward the request to the proxy
             JsonRpcRequest proxyRequest = JsonRpcRequest.builder()
                     .id(req.getId())
                     .method(req.getMethod())
@@ -290,18 +483,17 @@ public final class McpService {
                     .jsonrpc(req.getJsonrpc())
                     .build();
 
-            // Get response asynchronously and invoke callback
-            tool.proxy().rpc(proxyRequest).thenAccept(asyncResponseCallback).exceptionally(ex -> {
-                LOG.error("Error from proxy RPC", ex);
-                asyncResponseCallback
-                        .accept(createErrorResponse(req, new RuntimeException("Proxy error: " + ex.getMessage(), ex)));
-                return null;
-            });
-
-            // Return null to indicate async handling
+            tool.proxy()
+                    .rpc(proxyRequest)
+                    .thenAccept(asyncResponseCallback)
+                    .exceptionally(ex -> {
+                        LOG.error("Error from proxy RPC", ex);
+                        asyncResponseCallback.accept(
+                                createErrorResponse(req, new RuntimeException("Proxy error: " + ex.getMessage(), ex)));
+                        return null;
+                    });
             return null;
         } else {
-            // Handle locally
             var operation = tool.operation();
             var argumentsDoc = req.getParams().getMember("arguments");
             var adaptedDoc = adaptDocument(argumentsDoc, operation.getApiOperation().inputSchema());
@@ -310,6 +502,38 @@ public final class McpService {
             var result = formatStructuredContent(tool, (SerializableShape) output, protocolVersion);
             return createSuccessResponse(req.getId(), result);
         }
+    }
+
+    private JsonRpcResponse fireAfterToolCall(
+            McpToolCallHook hook,
+            JsonRpcResponse response,
+            RuntimeException error
+    ) {
+        try {
+            interceptor.readAfterToolCall(hook, response, error);
+        } catch (RuntimeException e) {
+            error = swapError("readAfterToolCall", error, e);
+        }
+        try {
+            response = interceptor.modifyAfterToolCall(hook, response, error);
+            error = null;
+        } catch (RuntimeException e) {
+            error = e;
+        }
+        if (error != null) {
+            return createErrorResponse(hook.request(), error);
+        }
+        return response;
+    }
+
+    private static RuntimeException swapError(String hook, RuntimeException oldE, RuntimeException newE) {
+        if (oldE != null && oldE != newE) {
+            LOG.trace("Replacing error after {}: {} -> {}",
+                    hook,
+                    oldE.getClass().getName(),
+                    newE.getClass().getName());
+        }
+        return newE;
     }
 
     /**
@@ -927,6 +1151,16 @@ public final class McpService {
         }
     }
 
+    private record ToolResult(JsonRpcResponse response, RuntimeException error) {
+        static ToolResult success(JsonRpcResponse response) {
+            return new ToolResult(response, null);
+        }
+
+        static ToolResult failure(RuntimeException error) {
+            return new ToolResult(null, error);
+        }
+    }
+
     private static String appendSentences(String first, String second) {
         first = first.trim();
         if (!first.endsWith(".")) {
@@ -1165,6 +1399,7 @@ public final class McpService {
     public static class Builder {
         private Map<String, Service> services = new HashMap<>();
         private List<McpServerProxy> proxyList = new ArrayList<>();
+        private McpServerInterceptor interceptor = McpServerInterceptor.NOOP;
         private String name = "mcp-server";
         private String version = "1.0.0";
         private ToolFilter toolFilter = (serverId, toolName) -> true;
@@ -1200,8 +1435,19 @@ public final class McpService {
             return this;
         }
 
+        /**
+         * Sets the server interceptor. Use {@link McpServerInterceptor#chain(List)} to compose
+         * multiple interceptors into one.
+         *
+         * @see McpServerInterceptor for hook descriptions and the execution lifecycle
+         */
+        public Builder interceptor(McpServerInterceptor interceptor) {
+            this.interceptor = Objects.requireNonNull(interceptor, "interceptor");
+            return this;
+        }
+
         public McpService build() {
-            return new McpService(services, proxyList, name, version, toolFilter, metricsObserver);
+            return new McpService(services, proxyList, name, version, toolFilter, metricsObserver, interceptor);
         }
     }
 }

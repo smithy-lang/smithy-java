@@ -24,6 +24,7 @@ public final class McpServerBuilder {
     OutputStream os;
     Map<String, Service> services = new HashMap<>();
     List<McpServerProxy> proxyList = new ArrayList<>();
+    McpServerInterceptor interceptor;
     String name;
     String version;
     ToolFilter toolFilter = (server, tool) -> true;
@@ -72,6 +73,10 @@ public final class McpServerBuilder {
             builder.version(version);
         }
 
+        if (interceptor != null) {
+            builder.interceptor(interceptor);
+        }
+
         this.mcpService = builder.build();
         return new McpServer(this);
     }
@@ -98,6 +103,17 @@ public final class McpServerBuilder {
 
     public McpServerBuilder metricsObserver(McpMetricsObserver observer) {
         this.metricsObserver = observer;
+        return this;
+    }
+
+    /**
+     * Sets the server interceptor. Use {@link McpServerInterceptor#chain(List)} to compose
+     * multiple interceptors into one.
+     *
+     * @see McpServerInterceptor for hook descriptions and the execution lifecycle
+     */
+    public McpServerBuilder interceptor(McpServerInterceptor interceptor) {
+        this.interceptor = Objects.requireNonNull(interceptor, "interceptor");
         return this;
     }
 

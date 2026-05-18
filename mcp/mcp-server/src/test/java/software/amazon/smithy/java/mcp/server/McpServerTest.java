@@ -1695,7 +1695,7 @@ public class McpServerTest {
         }
 
         @Override
-        CompletableFuture<JsonRpcResponse> rpc(JsonRpcRequest request) {
+        protected CompletableFuture<JsonRpcResponse> rpc(JsonRpcRequest request) {
             // Notifications have no ID
             if (request.getId() == null) {
                 sentNotifications.add(request.getMethod());
@@ -1714,10 +1714,10 @@ public class McpServerTest {
         }
 
         @Override
-        void start() {}
+        protected void start() {}
 
         @Override
-        CompletableFuture<Void> shutdown() {
+        protected CompletableFuture<Void> shutdown() {
             return CompletableFuture.completedFuture(null);
         }
 
@@ -1729,5 +1729,841 @@ public class McpServerTest {
         void sendNotification(JsonRpcRequest notification) {
             notify(notification);
         }
+    }
+
+    // ==================== Read-only hooks ====================
+
+    @Test
+    void testReadBeforeAndAfterExecution() {
+        var capturedMethod = new AtomicReference<String>();
+        var capturedResponse = new AtomicReference<JsonRpcResponse>();
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public void readBeforeExecution(McpExecutionHook hook) {
+                        capturedMethod.set(hook.request().getMethod());
+                    }
+
+                    @Override
+                    public void readAfterExecution(
+                            McpExecutionHook hook,
+                            JsonRpcResponse response,
+                            RuntimeException error
+                    ) {
+                        capturedResponse.set(response);
+                    }
+                })
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        read();
+
+        assertEquals("ping", capturedMethod.get());
+        assertNotNull(capturedResponse.get());
+    }
+
+    @Test
+    void testReadBeforeAndAfterToolCallLocal() {
+        var capturedToolName = new AtomicReference<String>();
+        var capturedServerId = new AtomicReference<String>();
+        var capturedIsProxy = new AtomicReference<Boolean>();
+        var afterToolCallFired = new AtomicReference<>(false);
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public void readBeforeToolCall(McpToolCallHook hook) {
+                        capturedToolName.set(hook.toolName());
+                        capturedServerId.set(hook.serverId());
+                        capturedIsProxy.set(hook.isProxy());
+                    }
+
+                    @Override
+                    public void readAfterToolCall(
+                            McpToolCallHook hook,
+                            JsonRpcResponse response,
+                            RuntimeException error
+                    ) {
+                        afterToolCallFired.set(true);
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        read();
+
+        assertEquals("NoIOOperation", capturedToolName.get());
+        assertEquals("test-mcp", capturedServerId.get());
+        assertFalse(capturedIsProxy.get());
+        assertTrue(afterToolCallFired.get());
+    }
+
+    @Test
+    void testReadBeforeAndAfterToolCallProxy() {
+        var capturedToolName = new AtomicReference<String>();
+        var capturedIsProxy = new AtomicReference<Boolean>();
+        var afterToolCallFired = new AtomicReference<>(false);
+        var mockProxy = new CacheTestProxy(new AtomicInteger(0));
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .addService(mockProxy)
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public void readBeforeToolCall(McpToolCallHook hook) {
+                        capturedToolName.set(hook.toolName());
+                        capturedIsProxy.set(hook.isProxy());
+                    }
+
+                    @Override
+                    public void readAfterToolCall(
+                            McpToolCallHook hook,
+                            JsonRpcResponse response,
+                            RuntimeException error
+                    ) {
+                        afterToolCallFired.set(true);
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("test-tool"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        read();
+
+        assertEquals("test-tool", capturedToolName.get());
+        assertTrue(capturedIsProxy.get());
+        assertTrue(afterToolCallFired.get());
+    }
+
+    @Test
+    void testReadAfterExecutionAlwaysFires() {
+        var afterCount = new AtomicInteger(0);
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public void readAfterExecution(
+                            McpExecutionHook hook,
+                            JsonRpcResponse response,
+                            RuntimeException error
+                    ) {
+                        afterCount.incrementAndGet();
+                    }
+                })
+                .build();
+
+        server.start();
+
+        write("ping", Document.of(Map.of()));
+        read();
+        assertEquals(1, afterCount.get());
+
+        writeNotification("notifications/initialized", Document.of(Map.of()));
+        output.assertNoOutput();
+        assertEquals(2, afterCount.get());
+
+        write("ping", Document.of(Map.of()));
+        read();
+        assertEquals(3, afterCount.get());
+    }
+
+    @Test
+    void testReadAfterToolCallFiresWhenBeforeToolCallThrows() {
+        var afterToolCallFired = new AtomicReference<>(false);
+        var capturedErrorMessage = new AtomicReference<String>();
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public void readBeforeToolCall(McpToolCallHook hook) {
+                        throw new RuntimeException("blocked");
+                    }
+
+                    @Override
+                    public void readAfterToolCall(
+                            McpToolCallHook hook,
+                            JsonRpcResponse response,
+                            RuntimeException error
+                    ) {
+                        afterToolCallFired.set(true);
+                        if (error != null) {
+                            capturedErrorMessage.set(error.getMessage());
+                        }
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        read();
+
+        assertTrue(afterToolCallFired.get());
+        assertEquals("blocked", capturedErrorMessage.get());
+    }
+
+    @Test
+    void testReadAfterExecutionFiresForProxyToolCall() {
+        var afterExecutionFired = new AtomicReference<>(false);
+        var mockProxy = new CacheTestProxy(new AtomicInteger(0));
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .addService(mockProxy)
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public void readAfterExecution(
+                            McpExecutionHook hook,
+                            JsonRpcResponse response,
+                            RuntimeException error
+                    ) {
+                        afterExecutionFired.set(true);
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("test-tool"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        read();
+
+        assertTrue(afterExecutionFired.get());
+    }
+
+    @Test
+    void testReadBeforeExecutionThrowSkipsToolHooks() {
+        var beforeToolCallFired = new AtomicReference<>(false);
+        var afterExecutionError = new AtomicReference<RuntimeException>();
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public void readBeforeExecution(McpExecutionHook hook) {
+                        if ("tools/call".equals(hook.request().getMethod())) {
+                            throw new RuntimeException("execution-blocked");
+                        }
+                    }
+
+                    @Override
+                    public void readBeforeToolCall(McpToolCallHook hook) {
+                        beforeToolCallFired.set(true);
+                    }
+
+                    @Override
+                    public void readAfterExecution(
+                            McpExecutionHook hook,
+                            JsonRpcResponse response,
+                            RuntimeException error
+                    ) {
+                        if ("tools/call".equals(hook.request().getMethod())) {
+                            afterExecutionError.set(error);
+                        }
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        read();
+
+        assertFalse(beforeToolCallFired.get());
+        assertNotNull(afterExecutionError.get());
+        assertEquals("execution-blocked", afterExecutionError.get().getMessage());
+    }
+
+    @Test
+    void testContextPassesBetweenReadHooks() {
+        var duration = new AtomicReference<Long>();
+        software.amazon.smithy.java.context.Context.Key<Long> START_KEY =
+                software.amazon.smithy.java.context.Context.key("start");
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public void readBeforeExecution(McpExecutionHook hook) {
+                        hook.context().put(START_KEY, System.nanoTime());
+                    }
+
+                    @Override
+                    public void readAfterExecution(
+                            McpExecutionHook hook,
+                            JsonRpcResponse response,
+                            RuntimeException error
+                    ) {
+                        long start = hook.context().get(START_KEY);
+                        duration.set(System.nanoTime() - start);
+                    }
+                })
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        read();
+
+        assertNotNull(duration.get());
+        assertTrue(duration.get() > 0);
+    }
+
+    // ==================== Modify-only hooks ====================
+
+    @Test
+    void testModifyBeforeExecutionRewritesRequest() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public JsonRpcRequest modifyBeforeExecution(McpExecutionHook hook) {
+                        return JsonRpcRequest.builder()
+                                .id(hook.request().getId())
+                                .method("ping")
+                                .params(Document.of(Map.of()))
+                                .jsonrpc("2.0")
+                                .build();
+                    }
+                })
+                .build();
+
+        server.start();
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        assertTrue(response.getResult().asStringMap().isEmpty());
+    }
+
+    @Test
+    void testModifyBeforeToolCallModifiesRequest() {
+        var modifyHookCalled = new AtomicReference<>(false);
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public JsonRpcRequest modifyBeforeToolCall(McpToolCallHook hook) {
+                        modifyHookCalled.set(true);
+                        return hook.request();
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        var response = read();
+
+        assertTrue(modifyHookCalled.get());
+        assertNotNull(response);
+    }
+
+    @Test
+    void testModifyAfterExecutionTransformsResponse() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public JsonRpcResponse modifyAfterExecution(
+                            McpExecutionHook hook,
+                            JsonRpcResponse response,
+                            RuntimeException error
+                    ) {
+                        if (error != null) {
+                            throw error;
+                        }
+                        return JsonRpcResponse.builder()
+                                .id(hook.request().getId())
+                                .result(Document.of(Map.of("modified", Document.of("true"))))
+                                .jsonrpc("2.0")
+                                .build();
+                    }
+                })
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        var response = read();
+
+        assertEquals("true", response.getResult().getMember("modified").asString());
+    }
+
+    @Test
+    void testModifyAfterToolCallTransformsResponse() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public JsonRpcResponse modifyAfterToolCall(
+                            McpToolCallHook hook,
+                            JsonRpcResponse response,
+                            RuntimeException error
+                    ) {
+                        // Always return custom response, ignoring any tool error
+                        return JsonRpcResponse.builder()
+                                .id(hook.request().getId())
+                                .result(Document.of(Map.of("tool-modified", Document.of("true"))))
+                                .jsonrpc("2.0")
+                                .build();
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        var response = read();
+
+        assertEquals("true", response.getResult().getMember("tool-modified").asString());
+    }
+
+    // ==================== Error handling ====================
+
+    @Test
+    void testReadBeforeExecutionThrowShortCircuits() {
+        var afterExecutionError = new AtomicReference<RuntimeException>();
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public void readBeforeExecution(McpExecutionHook hook) {
+                        throw new RuntimeException("blocked");
+                    }
+
+                    @Override
+                    public void readAfterExecution(
+                            McpExecutionHook hook,
+                            JsonRpcResponse response,
+                            RuntimeException error
+                    ) {
+                        afterExecutionError.set(error);
+                    }
+                })
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        var response = read();
+
+        assertNotNull(response.getError());
+        assertTrue(response.getError().getMessage().contains("blocked"));
+        assertNotNull(afterExecutionError.get());
+        assertEquals("blocked", afterExecutionError.get().getMessage());
+    }
+
+    @Test
+    void testModifyAfterExecutionCanRecoverFromError() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpServerInterceptor() {
+                    @Override
+                    public void readBeforeExecution(McpExecutionHook hook) {
+                        throw new RuntimeException("original-error");
+                    }
+
+                    @Override
+                    public JsonRpcResponse modifyAfterExecution(
+                            McpExecutionHook hook,
+                            JsonRpcResponse response,
+                            RuntimeException error
+                    ) {
+                        // Recover from the error by returning a success response
+                        return JsonRpcResponse.builder()
+                                .id(hook.request().getId())
+                                .result(Document.of(Map.of()))
+                                .jsonrpc("2.0")
+                                .build();
+                    }
+                })
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        var response = read();
+
+        assertNull(response.getError());
+        assertNotNull(response.getResult());
+    }
+
+    // ==================== Chain composition ====================
+
+    @Test
+    void testChainReadHooksInvokedInOrder() {
+        var order = new ArrayList<String>();
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(McpServerInterceptor.chain(List.of(
+                        new McpServerInterceptor() {
+                            @Override
+                            public void readBeforeExecution(McpExecutionHook hook) {
+                                order.add("A-before");
+                            }
+
+                            @Override
+                            public void readAfterExecution(
+                                    McpExecutionHook hook,
+                                    JsonRpcResponse response,
+                                    RuntimeException error
+                            ) {
+                                order.add("A-after");
+                            }
+                        },
+                        new McpServerInterceptor() {
+                            @Override
+                            public void readBeforeExecution(McpExecutionHook hook) {
+                                order.add("B-before");
+                            }
+
+                            @Override
+                            public void readAfterExecution(
+                                    McpExecutionHook hook,
+                                    JsonRpcResponse response,
+                                    RuntimeException error
+                            ) {
+                                order.add("B-after");
+                            }
+                        })))
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        read();
+
+        assertEquals(List.of("A-before", "B-before", "A-after", "B-after"), order);
+    }
+
+    @Test
+    void testChainModifyBeforeToolCallPropagatesRequest() {
+        var capturedRequest = new AtomicReference<JsonRpcRequest>();
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(McpServerInterceptor.chain(List.of(
+                        new McpServerInterceptor() {
+                            @Override
+                            public JsonRpcRequest modifyBeforeToolCall(McpToolCallHook hook) {
+                                var params = hook.request().getParams().asStringMap();
+                                var newParams = new java.util.HashMap<>(params);
+                                newParams.put("injected", Document.of("from-first"));
+                                return JsonRpcRequest.builder()
+                                        .id(hook.request().getId())
+                                        .method(hook.request().getMethod())
+                                        .params(Document.of(newParams))
+                                        .jsonrpc(hook.request().getJsonrpc())
+                                        .build();
+                            }
+                        },
+                        new McpServerInterceptor() {
+                            @Override
+                            public JsonRpcRequest modifyBeforeToolCall(McpToolCallHook hook) {
+                                capturedRequest.set(hook.request());
+                                return hook.request();
+                            }
+                        })))
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        read();
+
+        assertNotNull(capturedRequest.get());
+        var injected = capturedRequest.get().getParams().getMember("injected");
+        assertNotNull(injected);
+        assertEquals("from-first", injected.asString());
+    }
+
+    @Test
+    void testChainModifyAfterExecutionErrorPropagates() {
+        // When a modify hook throws, the exception propagates immediately (no try/catch in
+        // chain modify hooks, matching ClientInterceptorChain). The caller converts it to
+        // an error response.
+        var secondInterceptorCalled = new AtomicReference<>(false);
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(McpServerInterceptor.chain(List.of(
+                        new McpServerInterceptor() {
+                            @Override
+                            public JsonRpcResponse modifyAfterExecution(
+                                    McpExecutionHook hook,
+                                    JsonRpcResponse response,
+                                    RuntimeException error
+                            ) {
+                                throw new RuntimeException("first-error");
+                            }
+                        },
+                        new McpServerInterceptor() {
+                            @Override
+                            public JsonRpcResponse modifyAfterExecution(
+                                    McpExecutionHook hook,
+                                    JsonRpcResponse response,
+                                    RuntimeException error
+                            ) {
+                                secondInterceptorCalled.set(true);
+                                return response;
+                            }
+                        })))
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        var response = read();
+
+        // Second interceptor never runs — exception propagates immediately
+        assertFalse(secondInterceptorCalled.get());
+        assertNotNull(response.getError());
+        assertTrue(response.getError().getMessage().contains("first-error"));
+    }
+
+    @Test
+    void testChainModifyAfterToolCallErrorPropagates() {
+        // When a modify hook throws, the exception propagates immediately (no try/catch in
+        // chain modify hooks, matching ClientInterceptorChain). The caller converts it to
+        // an error response.
+        var secondInterceptorCalled = new AtomicReference<>(false);
+
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(McpServerInterceptor.chain(List.of(
+                        new McpServerInterceptor() {
+                            @Override
+                            public JsonRpcResponse modifyAfterToolCall(
+                                    McpToolCallHook hook,
+                                    JsonRpcResponse response,
+                                    RuntimeException error
+                            ) {
+                                throw new RuntimeException("tool-error");
+                            }
+                        },
+                        new McpServerInterceptor() {
+                            @Override
+                            public JsonRpcResponse modifyAfterToolCall(
+                                    McpToolCallHook hook,
+                                    JsonRpcResponse response,
+                                    RuntimeException error
+                            ) {
+                                secondInterceptorCalled.set(true);
+                                return response;
+                            }
+                        })))
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        var response = read();
+
+        // Second interceptor never runs — exception propagates immediately
+        assertFalse(secondInterceptorCalled.get());
+        assertNotNull(response.getError());
+        assertTrue(response.getError().getMessage().contains("tool-error"));
     }
 }

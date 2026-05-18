@@ -101,11 +101,11 @@ public abstract class McpServerProxy {
         return protocolVersion.get();
     }
 
-    abstract CompletableFuture<JsonRpcResponse> rpc(JsonRpcRequest request);
+    protected abstract CompletableFuture<JsonRpcResponse> rpc(JsonRpcRequest request);
 
-    abstract void start();
+    protected abstract void start();
 
-    abstract CompletableFuture<Void> shutdown();
+    protected abstract CompletableFuture<Void> shutdown();
 
     protected <T extends SerializableStruct> CompletableFuture<T> rpc(String method, ShapeBuilder<T> builder) {
         JsonRpcRequest request = JsonRpcRequest.builder()
