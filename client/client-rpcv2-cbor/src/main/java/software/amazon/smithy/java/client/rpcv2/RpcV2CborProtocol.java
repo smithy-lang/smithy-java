@@ -11,8 +11,6 @@ import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
 import software.amazon.smithy.java.core.serde.Codec;
-import software.amazon.smithy.java.http.api.HttpVersion;
-import software.amazon.smithy.java.http.api.ModifiableHttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.protocol.traits.Rpcv2CborTrait;
 
@@ -30,11 +28,6 @@ public final class RpcV2CborProtocol extends AbstractRpcV2ClientProtocol {
     @Override
     protected Codec codec() {
         return CBOR_CODEC;
-    }
-
-    @Override
-    protected void customizeRequestBuilder(ModifiableHttpRequest builder) {
-        builder.setHttpVersion(HttpVersion.HTTP_2);
     }
 
     public static final class Factory implements ClientProtocolFactory<Rpcv2CborTrait> {

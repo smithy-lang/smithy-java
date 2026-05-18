@@ -73,14 +73,13 @@ final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
         return this;
     }
 
-    // Shared helper method with ModifiableHttpRequestImpl to set headers based on the provided body.
     static void addBodyHeaders(DataStream body, ModifiableHttpHeaders headers) {
         var ct = body.contentType();
         if (ct != null && !headers.hasHeader(HeaderName.CONTENT_TYPE)) {
-            headers.addHeader(HeaderName.CONTENT_TYPE, ct);
+            headers.addHeaderTrusted(HeaderName.CONTENT_TYPE, ct);
         }
         if (body.hasKnownLength() && !headers.hasHeader(HeaderName.CONTENT_LENGTH)) {
-            headers.addHeader(HeaderName.CONTENT_LENGTH, String.valueOf(body.contentLength()));
+            headers.addHeaderTrusted(HeaderName.CONTENT_LENGTH, Long.toString(body.contentLength()));
         }
     }
 

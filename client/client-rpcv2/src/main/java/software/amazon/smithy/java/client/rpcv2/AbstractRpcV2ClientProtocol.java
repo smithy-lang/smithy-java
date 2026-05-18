@@ -27,7 +27,6 @@ import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.ModifiableHttpRequest;
-import software.amazon.smithy.java.io.ByteBufferOutputStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -46,6 +45,8 @@ public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
     private final ShapeId service;
     private final String payloadMediaType;
     private final String smithyProtocolValue;
+    private final String targetPathPrefix;
+    private final ModifiableHttpRequest templateRequest;
     private volatile HttpErrorDeserializer errorDeserializer;
 
     private static final String SMITHY_PROTOCOL_PREFIX = "rpc-v2-";
@@ -67,6 +68,13 @@ public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
         this.payloadMediaType = payloadMediaType;
         this.smithyProtocolValue = SMITHY_PROTOCOL_PREFIX
                 + payloadMediaType.substring(MEDIA_TYPE_PREFIX_LENGTH);
+        this.targetPathPrefix = "/service/" + service.getName() + "/operation/";
+
+        var tmpl = HttpRequest.create();
+        tmpl.setMethod("POST");
+        tmpl.addHeader(HeaderName.SMITHY_PROTOCOL, smithyProtocolValue);
+        tmpl.addHeader(HeaderName.ACCEPT, payloadMediaType);
+        this.templateRequest = tmpl;
     }
 
     /** Returns the codec used for serialization and deserialization. */
@@ -92,14 +100,6 @@ public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
         return errorDeserializer;
     }
 
-    /**
-     * Hook for subclasses to customize the request builder before headers and body are set.
-     * For example, the CBOR protocol uses this to force HTTP/2.
-     */
-    protected void customizeRequestBuilder(ModifiableHttpRequest builder) {
-        // default: no customization
-    }
-
     @Override
     public <I extends SerializableStruct, O extends SerializableStruct> HttpRequest createRequest(
             ApiOperation<I, O> operation,
@@ -107,27 +107,20 @@ public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
             Context context,
             SmithyUri endpoint
     ) {
-        var target = "/service/" + service.getName() + "/operation/" + operation.schema().id().getName();
-        var builder = HttpRequest.create().setMethod("POST").setUri(endpoint.withConcatPath(target));
-
-        customizeRequestBuilder(builder);
+        var target = targetPathPrefix + operation.schema().id().getName();
+        var builder = templateRequest.toModifiableCopy();
+        builder.setUri(endpoint.withConcatPath(target));
 
         if (operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
-            builder.addHeader(HeaderName.SMITHY_PROTOCOL, smithyProtocolValue)
-                    .addHeader(HeaderName.ACCEPT, payloadMediaType)
-                    .setBody(DataStream.ofEmpty());
+            builder.setBody(DataStream.ofEmpty());
         } else if (operation.inputEventBuilderSupplier() != null) {
             var encoderFactory = getEventEncoderFactory(operation);
             var body = RpcEventStreamsUtil.bodyForEventStreaming(encoderFactory, input);
-            builder.addHeader(HeaderName.SMITHY_PROTOCOL, smithyProtocolValue)
-                    .addHeader(HeaderName.CONTENT_TYPE, "application/vnd.amazon.eventstream")
-                    .addHeader(HeaderName.ACCEPT, payloadMediaType)
-                    .setBody(body);
+            builder.addHeader(HeaderName.CONTENT_TYPE, "application/vnd.amazon.eventstream");
+            builder.setBody(body);
         } else {
-            builder.addHeader(HeaderName.SMITHY_PROTOCOL, smithyProtocolValue)
-                    .addHeader(HeaderName.CONTENT_TYPE, payloadMediaType)
-                    .addHeader(HeaderName.ACCEPT, payloadMediaType)
-                    .setBody(getBody(input));
+            builder.addHeader(HeaderName.CONTENT_TYPE, payloadMediaType);
+            builder.setBody(getBody(input));
         }
         return builder;
     }
@@ -166,11 +159,7 @@ public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
     }
 
     private DataStream getBody(SerializableStruct input) {
-        var sink = new ByteBufferOutputStream();
-        try (var serializer = codec().createSerializer(sink)) {
-            input.serialize(serializer);
-        }
-        return DataStream.ofByteBuffer(sink.toByteBuffer(), payloadMediaType);
+        return DataStream.ofByteBuffer(codec().serialize(input), payloadMediaType);
     }
 
     private EventEncoderFactory<AwsEventFrame> getEventEncoderFactory(ApiOperation<?, ?> operation) {

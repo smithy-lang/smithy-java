@@ -49,4 +49,34 @@ public class HttpHeadersTest {
 
         assertThat(httpHeaders.map(), equalTo(mod.map()));
     }
+
+    @Test
+    public void addHeaderTrustedBypassesNormalization() {
+        var headers = new ArrayHttpHeaders();
+        headers.addHeaderTrusted(HeaderName.CONTENT_LENGTH, "42");
+
+        assertThat(headers.firstValue("content-length"), equalTo("42"));
+    }
+
+    @Test
+    public void addHeaderTrustedUsesInternedName() {
+        var headers = new ArrayHttpHeaders();
+        headers.addHeaderTrusted(HeaderName.CONTENT_TYPE, "application/json");
+        headers.addHeaderTrusted(HeaderName.CONTENT_LENGTH, "100");
+
+        assertThat(headers.firstValue("content-type"), equalTo("application/json"));
+        assertThat(headers.firstValue("content-length"), equalTo("100"));
+    }
+
+    @Test
+    public void addHeaderTrustedCoexistsWithRegularHeaders() {
+        var headers = new ArrayHttpHeaders();
+        headers.addHeader(HeaderName.of("x-custom"), "value1");
+        headers.addHeaderTrusted(HeaderName.CONTENT_TYPE, "text/plain");
+        headers.addHeader(HeaderName.of("x-other"), "value2");
+
+        assertThat(headers.firstValue("x-custom"), equalTo("value1"));
+        assertThat(headers.firstValue("content-type"), equalTo("text/plain"));
+        assertThat(headers.firstValue("x-other"), equalTo("value2"));
+    }
 }

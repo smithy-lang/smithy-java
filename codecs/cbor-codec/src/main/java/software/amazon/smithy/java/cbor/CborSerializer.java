@@ -29,16 +29,17 @@ import static software.amazon.smithy.java.cbor.CborConstants.TYPE_TAG;
 import static software.amazon.smithy.java.cbor.CborConstants.TYPE_TEXTSTRING;
 import static software.amazon.smithy.java.cbor.CborReadUtil.flipBytes;
 
+import java.io.OutputStream;
+import java.lang.invoke.VarHandle;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
-import software.amazon.smithy.java.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -47,101 +48,168 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class CborSerializer implements ShapeSerializer {
+
+    private static final VarHandle BE_SHORT = CborReadUtil.BE_SHORT;
+    private static final VarHandle BE_INT = CborReadUtil.BE_INT;
+    private static final VarHandle BE_LONG = CborReadUtil.BE_LONG;
+
     private static final int MAP_STREAM = TYPE_MAP | INDEFINITE;
     private static final int ARRAY_STREAM = TYPE_ARRAY | INDEFINITE;
 
-    private boolean[] collection = new boolean[4];
-    private int collectionIdx = -1;
-    private final Sink sink;
-    private final CborMapSerializer mapSerializer = new CborMapSerializer();
+    private static final int DEFAULT_BUF_SIZE = 4096;
+    private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 4;
+
+    private static final int POOL_SLOTS;
+    private static final int POOL_MASK;
+    private static final AtomicReferenceArray<CborSerializer> POOL;
+    private static final int MAX_PROBE = 3;
+
+    static {
+        int processors = Runtime.getRuntime().availableProcessors();
+        int raw = processors * 4;
+        POOL_SLOTS = Integer.highestOneBit(raw - 1) << 1;
+        POOL_MASK = POOL_SLOTS - 1;
+        POOL = new AtomicReferenceArray<>(POOL_SLOTS);
+    }
+
+    byte[] buf;
+    int pos;
+
+    private final OutputStream sink;
+
+    // Bit i of collectionMask records whether level i was opened as indefinite-length.
+    private long collectionMask = 0L;
+    private int collectionDepth = 0;
+    private long[] collectionOverflow;
+
+    private byte[][] currentFieldNameTable;
+
     private final CborStructSerializer structSerializer = new CborStructSerializer();
+    private final CborMapSerializer mapSerializer = new CborMapSerializer();
     private SerializeDocumentContents serializeDocumentContents;
 
-    public CborSerializer(Sink sink) {
+    CborSerializer() {
+        this.sink = null;
+        this.buf = new byte[DEFAULT_BUF_SIZE];
+        this.pos = 0;
+    }
+
+    CborSerializer(OutputStream sink) {
         this.sink = sink;
+        this.buf = new byte[DEFAULT_BUF_SIZE];
+        this.pos = 0;
     }
 
-    private void startMap(int size) {
-        boolean indefinite = size < 0;
-        if (indefinite) {
-            sink.write(MAP_STREAM);
-        } else {
-            tagAndLength(TYPE_MAP, size);
+    static CborSerializer acquire() {
+        if (!Thread.currentThread().isVirtual()) {
+            int base = poolProbe();
+            for (int i = 0; i < MAX_PROBE; i++) {
+                int idx = (base + i) & POOL_MASK;
+                CborSerializer s = POOL.getPlain(idx);
+                if (s != null && POOL.compareAndExchangeAcquire(idx, s, null) == s) {
+                    s.pos = 0;
+                    s.collectionMask = 0L;
+                    s.collectionDepth = 0;
+                    s.currentFieldNameTable = null;
+                    return s;
+                }
+            }
         }
-        startCollection(indefinite);
+        return new CborSerializer();
     }
 
-    private void startArray(int size) {
-        boolean indefinite = size < 0;
-        if (indefinite) {
-            sink.write(ARRAY_STREAM);
-        } else {
-            tagAndLength(TYPE_ARRAY, size);
+    static void release(CborSerializer serializer, boolean exception) {
+        if (serializer.buf == null || serializer.sink != null || Thread.currentThread().isVirtual()) {
+            return;
         }
-        startCollection(indefinite);
-    }
-
-    private void startCollection(boolean indefinite) {
-        int idx = ++collectionIdx;
-        boolean[] coll = collection;
-        int l = coll.length;
-        if (idx == l) {
-            collection = (coll = Arrays.copyOf(coll, l + (l >> 1)));
+        if (serializer.buf.length > MAX_CACHEABLE_BUF) {
+            serializer.buf = new byte[DEFAULT_BUF_SIZE];
         }
-        coll[idx] = indefinite;
+        int base = poolProbe();
+        for (int i = 0; i < MAX_PROBE; i++) {
+            int idx = (base + i) & POOL_MASK;
+            if (POOL.getPlain(idx) == null
+                    && POOL.compareAndExchangeRelease(idx, null, serializer) == null) {
+                return;
+            }
+        }
+        // Pool full, let GC collect
     }
 
-    private void endMap() {
-        if (collection[collectionIdx--]) {
-            sink.write(TYPE_SIMPLE_BREAK_STREAM);
+    ByteBuffer extractResult() {
+        return ByteBuffer.wrap(Arrays.copyOf(buf, pos));
+    }
+
+    private static int poolProbe() {
+        long id = Thread.currentThread().threadId();
+        return (int) (id ^ (id >>> 16)) & POOL_MASK;
+    }
+
+    private void ensureCapacity(int needed) {
+        if (pos + needed > buf.length) {
+            grow(needed);
         }
     }
 
-    private void endArray() {
-        if (collection[collectionIdx--]) {
-            sink.write(TYPE_SIMPLE_BREAK_STREAM);
+    private void grow(int needed) {
+        buf = Arrays.copyOf(buf, Math.max(buf.length * 2, pos + needed));
+    }
+
+    @Override
+    public void flush() {
+        try {
+            if (sink != null && pos > 0) {
+                sink.write(buf, 0, pos);
+                pos = 0;
+                sink.flush();
+            }
+        } catch (Exception e) {
+            throw new SerializationException(e);
+        }
+    }
+
+    @Override
+    public void close() {
+        try {
+            if (sink != null && pos > 0) {
+                sink.write(buf, 0, pos);
+                pos = 0;
+            }
+        } catch (Exception e) {
+            throw new SerializationException(e);
         }
     }
 
     private void tagAndLength(int type, int len) {
+        ensureCapacity(5); // max: 1 type byte + 4 length bytes (int)
+        tagAndLengthUnchecked(type, len);
+    }
+
+    /** Write tag+length without ensureCapacity, caller must have reserved space. */
+    private void tagAndLengthUnchecked(int type, int len) {
         if (len < ONE_BYTE) {
-            sink.write(type | len);
+            buf[pos++] = (byte) (type | len);
         } else if (len <= 0xFF) {
-            sink.write(type | ONE_BYTE);
-            sink.write(len);
+            buf[pos++] = (byte) (type | ONE_BYTE);
+            buf[pos++] = (byte) len;
         } else if (len <= 0xFFFF) {
-            sink.write(type | TWO_BYTES);
-            write2Nonnegative(len);
+            buf[pos++] = (byte) (type | TWO_BYTES);
+            BE_SHORT.set(buf, pos, (short) len);
+            pos += 2;
         } else {
-            sink.write(type | FOUR_BYTES);
-            write4Nonnegative(len);
+            buf[pos++] = (byte) (type | FOUR_BYTES);
+            BE_INT.set(buf, pos, len);
+            pos += 4;
         }
     }
 
-    private void write8Nonnegative(long l) {
-        sink.write((int) ((l >> 56) & 0xFF));
-        sink.write((int) ((l >> 48) & 0xFF));
-        sink.write((int) ((l >> 40) & 0xFF));
-        sink.write((int) ((l >> 32) & 0xFF));
-        sink.write((int) ((l >> 24) & 0xFF));
-        sink.write((int) ((l >> 16) & 0xFF));
-        sink.write((int) ((l >> 8) & 0xFF));
-        sink.write((int) ((l) & 0xFF));
-    }
-
-    private void write4Nonnegative(int i) {
-        sink.write((i >> 24) & 0xFF);
-        sink.write((i >> 16) & 0xFF);
-        sink.write((i >> 8) & 0xFF);
-        sink.write((i) & 0xFF);
-    }
-
-    private void write2Nonnegative(int i) {
-        sink.write((i >> 8) & 0xFF);
-        sink.write((i) & 0xFF);
-    }
-
     private void writeLong(long l) {
+        ensureCapacity(9); // max: 1 type byte + 8 data bytes
+        writeLongUnchecked(l);
+    }
+
+    /** Write a CBOR integer without ensureCapacity, caller must have reserved 9 bytes. */
+    private void writeLongUnchecked(long l) {
         byte type;
         if (l < 0) {
             l = -l - 1;
@@ -151,32 +219,128 @@ final class CborSerializer implements ShapeSerializer {
         }
 
         if (l < ONE_BYTE) {
-            sink.write(type | (int) l);
+            buf[pos++] = (byte) (type | (int) l);
         } else if (l <= 0xFFL) {
-            sink.write(type | ONE_BYTE);
-            sink.write((int) l);
+            buf[pos++] = (byte) (type | ONE_BYTE);
+            buf[pos++] = (byte) l;
         } else if (l <= 0xFFFFL) {
-            sink.write(type | TWO_BYTES);
-            write2Nonnegative((int) l);
+            buf[pos++] = (byte) (type | TWO_BYTES);
+            BE_SHORT.set(buf, pos, (short) l);
+            pos += 2;
         } else if (l <= 0xFFFF_FFFFL) {
-            sink.write(type | FOUR_BYTES);
-            write4Nonnegative((int) l);
+            buf[pos++] = (byte) (type | FOUR_BYTES);
+            BE_INT.set(buf, pos, (int) l);
+            pos += 4;
         } else {
-            sink.write(type | EIGHT_BYTES);
-            write8Nonnegative(l);
+            buf[pos++] = (byte) (type | EIGHT_BYTES);
+            BE_LONG.set(buf, pos, l);
+            pos += 8;
         }
     }
 
+    private void writeDoubleUnchecked(long bits) {
+        buf[pos++] = (byte) TYPE_SIMPLE_DOUBLE;
+        BE_LONG.set(buf, pos, bits);
+        pos += 8;
+    }
+
     private void writeBytes0(int type, byte[] b, int off, int len) {
-        tagAndLength(type, len);
-        sink.write(b, off, len);
+        ensureCapacity(5 + len);
+        tagAndLengthUnchecked(type, len);
+        System.arraycopy(b, off, buf, pos, len);
+        pos += len;
+    }
+
+    private void startMap(int size) {
+        boolean indefinite = size < 0;
+        if (indefinite) {
+            ensureCapacity(1);
+            buf[pos++] = (byte) MAP_STREAM;
+        } else {
+            tagAndLength(TYPE_MAP, size);
+        }
+        startCollection(indefinite);
+    }
+
+    private void startArray(int size) {
+        boolean indefinite = size < 0;
+        if (indefinite) {
+            ensureCapacity(1);
+            buf[pos++] = (byte) ARRAY_STREAM;
+        } else {
+            tagAndLength(TYPE_ARRAY, size);
+        }
+        startCollection(indefinite);
+    }
+
+    private void startCollection(boolean indefinite) {
+        int d = collectionDepth;
+        if (d < 64) {
+            if (indefinite) {
+                collectionMask |= 1L << d;
+            } else {
+                collectionMask &= ~(1L << d);
+            }
+        } else {
+            pushOverflow(d, indefinite);
+        }
+        collectionDepth = d + 1;
+    }
+
+    private void pushOverflow(int d, boolean indefinite) {
+        int overflowIdx = d - 64;
+        long[] stack = collectionOverflow;
+        if (stack == null) {
+            stack = collectionOverflow = new long[Math.max(4, (overflowIdx >> 6) + 1)];
+        } else if ((overflowIdx >> 6) >= stack.length) {
+            stack = collectionOverflow = Arrays.copyOf(stack, stack.length * 2);
+        }
+        long bit = 1L << (overflowIdx & 63);
+        int slot = overflowIdx >>> 6;
+        if (indefinite) {
+            stack[slot] |= bit;
+        } else {
+            stack[slot] &= ~bit;
+        }
+    }
+
+    private boolean popIndefinite() {
+        int d = --collectionDepth;
+        if (d < 64) {
+            return ((collectionMask >>> d) & 1L) != 0L;
+        }
+        int overflowIdx = d - 64;
+        return ((collectionOverflow[overflowIdx >>> 6] >>> (overflowIdx & 63)) & 1L) != 0L;
+    }
+
+    private void endMap() {
+        if (popIndefinite()) {
+            ensureCapacity(1);
+            buf[pos++] = (byte) TYPE_SIMPLE_BREAK_STREAM;
+        }
+    }
+
+    private void endArray() {
+        if (popIndefinite()) {
+            ensureCapacity(1);
+            buf[pos++] = (byte) TYPE_SIMPLE_BREAK_STREAM;
+        }
     }
 
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
-        sink.write(MAP_STREAM);
+        ensureCapacity(1);
+        buf[pos++] = (byte) MAP_STREAM;
         startCollection(true);
+
+        byte[][] savedTable = currentFieldNameTable;
+        Schema structSchema = schema.isMember() ? schema.memberTarget() : schema;
+        var ext = structSchema.getExtension(CborSchemaExtensions.KEY);
+        currentFieldNameTable = ext != null ? ext.fieldNameTable() : null;
+
         struct.serializeMembers(structSerializer);
+
+        currentFieldNameTable = savedTable;
         endMap();
     }
 
@@ -196,7 +360,8 @@ final class CborSerializer implements ShapeSerializer {
 
     @Override
     public void writeBoolean(Schema schema, boolean value) {
-        sink.write(value ? TYPE_SIMPLE_TRUE : TYPE_SIMPLE_FALSE);
+        ensureCapacity(1);
+        buf[pos++] = (byte) (value ? TYPE_SIMPLE_TRUE : TYPE_SIMPLE_FALSE);
     }
 
     @Override
@@ -221,26 +386,112 @@ final class CborSerializer implements ShapeSerializer {
 
     @Override
     public void writeFloat(Schema schema, float value) {
-        sink.write(TYPE_SIMPLE_FLOAT);
-        write4Nonnegative(Float.floatToRawIntBits(value));
+        ensureCapacity(5);
+        buf[pos++] = (byte) TYPE_SIMPLE_FLOAT;
+        BE_INT.set(buf, pos, Float.floatToRawIntBits(value));
+        pos += 4;
     }
 
     @Override
     public void writeDouble(Schema schema, double value) {
-        sink.write(TYPE_SIMPLE_DOUBLE);
-        write8Nonnegative(Double.doubleToRawLongBits(value));
+        ensureCapacity(9);
+        writeDoubleUnchecked(Double.doubleToRawLongBits(value));
     }
 
     @Override
     public void writeString(Schema schema, String value) {
-        byte[] str = value.getBytes(StandardCharsets.UTF_8);
-        writeBytes0(TYPE_TEXTSTRING, str, 0, str.length);
+        writeStringValue(value);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void writeStringValue(String value) {
+        int charLen = value.length();
+        if (charLen == 0) {
+            ensureCapacity(1);
+            buf[pos++] = (byte) TYPE_TEXTSTRING;
+            return;
+        }
+        ensureCapacity(5 + charLen * 3);
+        int headerStart = pos;
+        //Don't scan if the string is too long.
+        if (charLen < 1000) {
+            int orAccum = 0;
+            for (int i = 0; i < charLen; i++) {
+                orAccum |= value.charAt(i);
+            }
+            if (orAccum < 0x80) {
+                tagAndLengthUnchecked(TYPE_TEXTSTRING, charLen);
+                value.getBytes(0, charLen, buf, pos);
+                pos += charLen;
+                return;
+            }
+        }
+        encodeUtf8TextStringRewind(value, charLen, headerStart);
+    }
+
+    /**
+     * Encodes {@code value} as a CBOR text string starting at {@code headerStart}. Caller must have
+     * reserved {@code 5 + charLen * 3} bytes from {@code headerStart}. Writes data into a 5-byte-header
+     * scratch area, backpatches the header with the actual UTF-8 byte length, and shifts the payload
+     * left if the real header is shorter than 5 bytes. On exit, {@code pos} points past the payload.
+     */
+    private void encodeUtf8TextStringRewind(String value, int charLen, int headerStart) {
+        int writeStart = headerStart + 5;
+        int p = writeStart;
+        for (int j = 0; j < charLen; j++) {
+            int c = value.charAt(j);
+            if (c < 0x80) {
+                buf[p++] = (byte) c;
+            } else if (c < 0x800) {
+                buf[p++] = (byte) (0xC0 | (c >> 6));
+                buf[p++] = (byte) (0x80 | (c & 0x3F));
+            } else if (c >= 0xD800 && c <= 0xDBFF && j + 1 < charLen) {
+                char low = value.charAt(j + 1);
+                if (low >= 0xDC00 && low <= 0xDFFF) {
+                    int cp = Character.toCodePoint((char) c, low);
+                    buf[p++] = (byte) (0xF0 | (cp >> 18));
+                    buf[p++] = (byte) (0x80 | ((cp >> 12) & 0x3F));
+                    buf[p++] = (byte) (0x80 | ((cp >> 6) & 0x3F));
+                    buf[p++] = (byte) (0x80 | (cp & 0x3F));
+                    j++;
+                } else {
+                    buf[p++] = (byte) 0xEF;
+                    buf[p++] = (byte) 0xBF;
+                    buf[p++] = (byte) 0xBD;
+                }
+            } else if (c >= 0xDC00 && c <= 0xDFFF) {
+                // Unpaired low surrogate, replace with U+FFFD to match JDK getBytes(UTF_8)
+                buf[p++] = (byte) 0xEF;
+                buf[p++] = (byte) 0xBF;
+                buf[p++] = (byte) 0xBD;
+            } else {
+                buf[p++] = (byte) (0xE0 | (c >> 12));
+                buf[p++] = (byte) (0x80 | ((c >> 6) & 0x3F));
+                buf[p++] = (byte) (0x80 | (c & 0x3F));
+            }
+        }
+        int byteLen = p - writeStart;
+        pos = headerStart;
+        tagAndLengthUnchecked(TYPE_TEXTSTRING, byteLen);
+        int actualHeaderLen = pos - headerStart;
+        int shift = 5 - actualHeaderLen;
+        if (shift > 0) {
+            System.arraycopy(buf, writeStart, buf, writeStart - shift, byteLen);
+        }
+        pos = headerStart + actualHeaderLen + byteLen;
     }
 
     @Override
     public void writeBlob(Schema schema, ByteBuffer value) {
-        tagAndLength(TYPE_BYTESTRING, value.remaining());
-        sink.write(value);
+        int len = value.remaining();
+        ensureCapacity(5 + len);
+        tagAndLengthUnchecked(TYPE_BYTESTRING, len);
+        if (value.hasArray()) {
+            System.arraycopy(value.array(), value.arrayOffset() + value.position(), buf, pos, len);
+        } else {
+            value.duplicate().get(buf, pos, len);
+        }
+        pos += len;
     }
 
     @Override
@@ -250,14 +501,23 @@ final class CborSerializer implements ShapeSerializer {
 
     @Override
     public void writeTimestamp(Schema schema, Instant value) {
-        double epochSeconds = value.toEpochMilli() / 1000D;
-        sink.write(TYPE_TAG | TAG_TIME_EPOCH);
-        writeDouble(schema, epochSeconds);
+        long millis = value.toEpochMilli();
+        if (millis % 1000 == 0) {
+            ensureCapacity(10);
+            buf[pos++] = (byte) (TYPE_TAG | TAG_TIME_EPOCH);
+            writeLongUnchecked(millis / 1000);
+        } else {
+            double epochSeconds = millis / 1000D;
+            ensureCapacity(10);
+            buf[pos++] = (byte) (TYPE_TAG | TAG_TIME_EPOCH);
+            writeDoubleUnchecked(Double.doubleToRawLongBits(epochSeconds));
+        }
     }
 
     @Override
     public void writeNull(Schema schema) {
-        sink.write(TYPE_SIMPLE_NULL);
+        ensureCapacity(1);
+        buf[pos++] = (byte) TYPE_SIMPLE_NULL;
     }
 
     @Override
@@ -267,8 +527,9 @@ final class CborSerializer implements ShapeSerializer {
 
     @Override
     public void writeBigDecimal(Schema schema, BigDecimal value) {
-        sink.write(TYPE_TAG | TAG_DECIMAL);
-        tagAndLength(TYPE_ARRAY, 2);
+        ensureCapacity(2);
+        buf[pos++] = (byte) (TYPE_TAG | TAG_DECIMAL);
+        tagAndLengthUnchecked(TYPE_ARRAY, 2);
         writeLong(-value.scale());
         writeBigInteger(value.unscaledValue());
     }
@@ -298,8 +559,11 @@ final class CborSerializer implements ShapeSerializer {
                 } else {
                     type = TYPE_POSINT;
                 }
-                sink.write(type | EIGHT_BYTES);
-                write8Nonnegative(value.longValue() ^ signum);
+                ensureCapacity(9);
+                buf[pos++] = (byte) (type | EIGHT_BYTES);
+                long v = value.longValue() ^ signum;
+                BE_LONG.set(buf, pos, v);
+                pos += 8;
             } else {
                 byte[] bytes = value.toByteArray();
                 byte tag;
@@ -309,19 +573,203 @@ final class CborSerializer implements ShapeSerializer {
                 } else {
                     tag = TAG_POS_BIG_INT;
                 }
-                sink.write(TYPE_TAG | tag);
+                ensureCapacity(1);
+                buf[pos++] = (byte) (TYPE_TAG | tag);
                 writeBytes0(TYPE_BYTESTRING, bytes, 0, bytes.length);
             }
         }
     }
 
-    private final class CborStructSerializer extends InterceptingSerializer {
+    private byte[] resolveFieldNameBytes(Schema schema) {
+        byte[][] table = currentFieldNameTable;
+        int idx = schema.memberIndex();
+        if (table != null && idx >= 0 && idx < table.length && table[idx] != null) {
+            return table[idx];
+        }
+        var ext = schema.getExtension(CborSchemaExtensions.KEY);
+        if (ext != null && ext.memberNameBytes() != null) {
+            return ext.memberNameBytes();
+        }
+        return encodeMemberName(schema.memberName());
+    }
+
+    @SuppressWarnings("deprecation")
+    static byte[] encodeMemberName(String name) {
+        int len = name.length();
+        int headerSize;
+        if (len < ONE_BYTE) {
+            headerSize = 1;
+        } else if (len <= 0xFF) {
+            headerSize = 2;
+        } else if (len <= 0xFFFF) {
+            headerSize = 3;
+        } else {
+            headerSize = 5;
+        }
+        byte[] result = new byte[headerSize + len];
+        int p = 0;
+        if (len < ONE_BYTE) {
+            result[p++] = (byte) (TYPE_TEXTSTRING | len);
+        } else if (len <= 0xFF) {
+            result[p++] = (byte) (TYPE_TEXTSTRING | ONE_BYTE);
+            result[p++] = (byte) len;
+        } else if (len <= 0xFFFF) {
+            result[p++] = (byte) (TYPE_TEXTSTRING | TWO_BYTES);
+            result[p++] = (byte) (len >> 8);
+            result[p++] = (byte) len;
+        } else {
+            result[p++] = (byte) (TYPE_TEXTSTRING | FOUR_BYTES);
+            result[p++] = (byte) (len >> 24);
+            result[p++] = (byte) (len >> 16);
+            result[p++] = (byte) (len >> 8);
+            result[p++] = (byte) len;
+        }
+        // Smithy member names are always ASCII
+        name.getBytes(0, len, result, p);
+        return result;
+    }
+
+    private final class CborStructSerializer implements ShapeSerializer {
+
         @Override
-        protected ShapeSerializer before(Schema schema) {
-            String name = schema.memberName();
-            tagAndLength(TYPE_TEXTSTRING, name.length());
-            sink.writeAscii(name);
-            return CborSerializer.this;
+        public void writeBoolean(Schema schema, boolean value) {
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 1);
+            System.arraycopy(nameBytes, 0, buf, pos, nameBytes.length);
+            pos += nameBytes.length;
+            buf[pos++] = (byte) (value ? TYPE_SIMPLE_TRUE : TYPE_SIMPLE_FALSE);
+        }
+
+        @Override
+        public void writeByte(Schema schema, byte value) {
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 9);
+            System.arraycopy(nameBytes, 0, buf, pos, nameBytes.length);
+            pos += nameBytes.length;
+            writeLongUnchecked(value);
+        }
+
+        @Override
+        public void writeShort(Schema schema, short value) {
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 9);
+            System.arraycopy(nameBytes, 0, buf, pos, nameBytes.length);
+            pos += nameBytes.length;
+            writeLongUnchecked(value);
+        }
+
+        @Override
+        public void writeInteger(Schema schema, int value) {
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 9);
+            System.arraycopy(nameBytes, 0, buf, pos, nameBytes.length);
+            pos += nameBytes.length;
+            writeLongUnchecked(value);
+        }
+
+        @Override
+        public void writeLong(Schema schema, long value) {
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 9);
+            System.arraycopy(nameBytes, 0, buf, pos, nameBytes.length);
+            pos += nameBytes.length;
+            writeLongUnchecked(value);
+        }
+
+        @Override
+        public void writeFloat(Schema schema, float value) {
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 5);
+            System.arraycopy(nameBytes, 0, buf, pos, nameBytes.length);
+            pos += nameBytes.length;
+            buf[pos++] = (byte) TYPE_SIMPLE_FLOAT;
+            BE_INT.set(buf, pos, Float.floatToRawIntBits(value));
+            pos += 4;
+        }
+
+        @Override
+        public void writeDouble(Schema schema, double value) {
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 9);
+            System.arraycopy(nameBytes, 0, buf, pos, nameBytes.length);
+            pos += nameBytes.length;
+            writeDoubleUnchecked(Double.doubleToRawLongBits(value));
+        }
+
+        @Override
+        public void writeNull(Schema schema) {
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length + 1);
+            System.arraycopy(nameBytes, 0, buf, pos, nameBytes.length);
+            pos += nameBytes.length;
+            buf[pos++] = (byte) TYPE_SIMPLE_NULL;
+        }
+
+        @Override
+        public void writeString(Schema schema, String value) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeString(schema, value);
+        }
+
+        @Override
+        public void writeBlob(Schema schema, ByteBuffer value) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeBlob(schema, value);
+        }
+
+        @Override
+        public void writeBlob(Schema schema, byte[] value) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeBlob(schema, value);
+        }
+
+        @Override
+        public void writeTimestamp(Schema schema, Instant value) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeTimestamp(schema, value);
+        }
+
+        @Override
+        public void writeBigInteger(Schema schema, BigInteger value) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeBigInteger(schema, value);
+        }
+
+        @Override
+        public void writeBigDecimal(Schema schema, BigDecimal value) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeBigDecimal(schema, value);
+        }
+
+        @Override
+        public void writeStruct(Schema schema, SerializableStruct struct) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeStruct(schema, struct);
+        }
+
+        @Override
+        public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeList(schema, listState, size, consumer);
+        }
+
+        @Override
+        public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeMap(schema, mapState, size, consumer);
+        }
+
+        @Override
+        public void writeDocument(Schema schema, Document value) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeDocument(schema, value);
+        }
+
+        private void writeFieldNameBytes(Schema schema) {
+            byte[] nameBytes = resolveFieldNameBytes(schema);
+            ensureCapacity(nameBytes.length);
+            System.arraycopy(nameBytes, 0, buf, pos, nameBytes.length);
+            pos += nameBytes.length;
         }
     }
 
@@ -333,11 +781,12 @@ final class CborSerializer implements ShapeSerializer {
                 T state,
                 BiConsumer<T, ShapeSerializer> valueSerializer
         ) {
-            byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
-            writeBytes0(TYPE_TEXTSTRING, keyBytes, 0, keyBytes.length);
+            writeStringValue(key);
             valueSerializer.accept(state, CborSerializer.this);
         }
     }
+
+    private static final byte[] TYPE_FIELD_BYTES = encodeMemberName("__type");
 
     private static final class SerializeDocumentContents extends SpecificShapeSerializer {
         private final CborSerializer parent;
@@ -348,16 +797,15 @@ final class CborSerializer implements ShapeSerializer {
 
         @Override
         public void writeStruct(Schema schema, SerializableStruct struct) {
-            try {
-                parent.startMap(-1);
-                parent.tagAndLength(TYPE_TEXTSTRING, 6);
-                parent.sink.writeAscii("__type");
-                parent.writeString(null, schema.id().toString());
-                struct.serializeMembers(parent.structSerializer);
-                parent.endMap();
-            } catch (Exception e) {
-                throw new SerializationException(e);
-            }
+            parent.ensureCapacity(1);
+            parent.buf[parent.pos++] = (byte) MAP_STREAM;
+            parent.startCollection(true);
+            parent.ensureCapacity(TYPE_FIELD_BYTES.length);
+            System.arraycopy(TYPE_FIELD_BYTES, 0, parent.buf, parent.pos, TYPE_FIELD_BYTES.length);
+            parent.pos += TYPE_FIELD_BYTES.length;
+            parent.writeString(null, schema.id().toString());
+            struct.serializeMembers(parent.structSerializer);
+            parent.endMap();
         }
     }
 }
