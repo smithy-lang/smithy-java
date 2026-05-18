@@ -432,22 +432,18 @@ final class CborSerializer implements ShapeSerializer {
             buf[pos++] = (byte) TYPE_TEXTSTRING;
             return;
         }
-        // Optimistic ASCII path: copy with deprecated getBytes (zero alloc, correct for ASCII).
-        // Use branchless OR accumulator to detect any non-ASCII byte.
-        ensureCapacity(5 + charLen * 3); // worst case for UTF-8
-        int headerStart = pos;
-        tagAndLengthUnchecked(TYPE_TEXTSTRING, charLen);
-        value.getBytes(0, charLen, buf, pos);
+        ensureCapacity(5 + charLen * 3);
         int orAccum = 0;
         for (int i = 0; i < charLen; i++) {
-            orAccum |= buf[pos + i];
+            orAccum |= value.charAt(i);
         }
-        if (orAccum >= 0) {
-            // All bytes have high bit clear — pure ASCII, encoding is correct
+        int headerStart = pos;
+        if (orAccum < 0x80) {
+            tagAndLengthUnchecked(TYPE_TEXTSTRING, charLen);
+            value.getBytes(0, charLen, buf, pos);
             pos += charLen;
             return;
         }
-        // Non-ASCII: rewind and inline-encode UTF-8 directly into buf (zero alloc).
         encodeUtf8TextStringRewind(value, charLen, headerStart);
     }
 
