@@ -119,6 +119,66 @@ use smithy.test#httpResponseTests
             """
         tags: ["serde-benchmark"]
     }
+    // section: out-of-order + unknown fields
+    {
+        id: "restXml_CopyObjectOutput_OutOfOrder"
+        documentation: """
+            Fields in reverse order with unknown elements interspersed.
+            """
+        protocol: restXml
+        code: 200
+        headers: { "x-amz-expiration": "expiry-date=\"Fri, 01 Jan 2022 00:00:00 GMT\", rule-id=\"rule1\"", "x-amz-copy-source-version-id": "source-version-id-12345", "x-amz-version-id": "dest-version-id-67890", "x-amz-server-side-encryption": "AES256", "x-amz-server-side-encryption-customer-algorithm": "AES256", "x-amz-server-side-encryption-customer-key-MD5": "customer-key-md5-hash", "x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012", "x-amz-server-side-encryption-context": "encryption-context", "x-amz-server-side-encryption-bucket-key-enabled": "true", "x-amz-request-charged": "requester" }
+        body: """
+            <CopyObjectResult>
+                <UnknownFirst>skip-this-value</UnknownFirst>
+                <ChecksumSHA256>checksum-sha256</ChecksumSHA256>
+                <ChecksumSHA1>checksum-sha1</ChecksumSHA1>
+                <UnknownMiddle>
+                    <Nested>should-be-ignored</Nested>
+                </UnknownMiddle>
+                <ChecksumCRC64NVME>checksum-crc64nvme</ChecksumCRC64NVME>
+                <ChecksumCRC32C>checksum-crc32c</ChecksumCRC32C>
+                <ChecksumCRC32>checksum-crc32</ChecksumCRC32>
+                <UnknownBool>true</UnknownBool>
+                <ChecksumType>SHA256</ChecksumType>
+                <LastModified>2021-01-01T00:00:00.000Z</LastModified>
+                <UnknownArray>
+                    <item>one</item>
+                    <item>two</item>
+                </UnknownArray>
+                <ETag>"9bb58f26192e4ba00f01e2e7b136bbd8"</ETag>
+                <UnknownLast>0</UnknownLast>
+            </CopyObjectResult>
+            """
+        tags: ["serde-benchmark"]
+    }
+    {
+        id: "restJson1_CopyObjectOutput_OutOfOrder"
+        documentation: """
+            Fields in reverse order with unknown fields interspersed.
+            """
+        protocol: restJson1
+        code: 200
+        headers: { "x-amz-expiration": "expiry-date=\"Fri, 01 Jan 2022 00:00:00 GMT\", rule-id=\"rule1\"", "x-amz-copy-source-version-id": "source-version-id-12345", "x-amz-version-id": "dest-version-id-67890", "x-amz-server-side-encryption": "AES256", "x-amz-server-side-encryption-customer-algorithm": "AES256", "x-amz-server-side-encryption-customer-key-MD5": "customer-key-md5-hash", "x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012", "x-amz-server-side-encryption-context": "encryption-context", "x-amz-server-side-encryption-bucket-key-enabled": "true", "x-amz-request-charged": "requester" }
+        body: """
+            {
+                "__unknownFirst": "skip-me",
+                "ChecksumSHA256": "checksum-sha256",
+                "ChecksumSHA1": "checksum-sha1",
+                "__unknownMiddleObj": {"foo": "bar", "num": 123},
+                "ChecksumCRC64NVME": "checksum-crc64nvme",
+                "ChecksumCRC32C": "checksum-crc32c",
+                "ChecksumCRC32": "checksum-crc32",
+                "__unknownBool": false,
+                "ChecksumType": "SHA256",
+                "LastModified": 1609459200,
+                "__unknownArray": [1, "two", true],
+                "ETag": "\\"9bb58f26192e4ba00f01e2e7b136bbd8\\"",
+                "__unknownLast": 0
+            }
+            """
+        tags: ["serde-benchmark"]
+    }
 ])
 operation CopyObject {
     input: CopyObjectRequest

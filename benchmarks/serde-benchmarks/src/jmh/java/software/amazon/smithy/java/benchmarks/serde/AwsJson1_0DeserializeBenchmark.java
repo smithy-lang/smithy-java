@@ -37,6 +37,7 @@ public class AwsJson1_0DeserializeBenchmark {
             "awsJson1_0_GetItemOutput_S",
             "awsJson1_0_GetItemOutput_M",
             "awsJson1_0_GetItemOutput_L",
+            "awsJson1_0_GetItemOutput_OutOfOrder",
             "awsJson1_0_GetItemOutputBinary_S",
             "awsJson1_0_GetItemOutputBinary_M",
             "awsJson1_0_GetItemOutputBinary_L",

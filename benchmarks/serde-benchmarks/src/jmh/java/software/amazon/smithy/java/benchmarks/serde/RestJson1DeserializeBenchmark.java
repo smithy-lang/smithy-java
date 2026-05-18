@@ -35,6 +35,7 @@ public class RestJson1DeserializeBenchmark {
     @Param({
             "restJson1_CopyObjectOutput_Baseline",
             "restJson1_CopyObjectOutput_M",
+            "restJson1_CopyObjectOutput_OutOfOrder",
             "restJson1_GetObject_S",
             "restJson1_GetObject_M",
             "restJson1_GetObject_L",

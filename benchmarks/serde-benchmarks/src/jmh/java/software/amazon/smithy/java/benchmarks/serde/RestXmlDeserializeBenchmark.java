@@ -35,6 +35,7 @@ public class RestXmlDeserializeBenchmark {
     @Param({
             "restXml_CopyObjectOutput_Baseline",
             "restXml_CopyObjectOutput_M",
+            "restXml_CopyObjectOutput_OutOfOrder",
             "restXml_GetObject_S",
             "restXml_GetObject_M",
             "restXml_GetObject_L",

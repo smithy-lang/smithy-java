@@ -1947,6 +1947,87 @@ use smithy.test#httpResponseTests
             """
         tags: ["serde-benchmark"]
     }
+    // section: out-of-order + unknown fields
+    {
+        id: "awsJson1_0_GetItemOutput_OutOfOrder"
+        documentation: """
+            Fields in reverse order with unknown fields interspersed.
+            """
+        protocol: awsJson1_0
+        code: 200
+        body: """
+            {
+              "__unknownString": "unexpected",
+              "ConsumedCapacity": {
+                "ReadCapacityUnits": 2.5,
+                "__unknownBool": true,
+                "CapacityUnits": 2.5,
+                "TableName": "pasta-recipes"
+              },
+              "__unknownNumber": 99999,
+              "Item": {
+                "nutrition": {
+                  "M": {
+                    "__unknownNested": { "S": "should-be-skipped" },
+                    "fat": { "N": "28" },
+                    "carbs": { "N": "45" },
+                    "protein": { "N": "18" },
+                    "calories": { "N": "520" }
+                  }
+                },
+                "ingredients": {
+                  "L": [
+                    { "M": { "amount": { "S": "1/2 cup" }, "item": { "S": "heavy cream" } } },
+                    { "M": { "amount": { "S": "1 cup grated" }, "item": { "S": "parmesan cheese" } } },
+                    { "M": { "amount": { "S": "1/2 cup" }, "item": { "S": "butter" } } },
+                    { "M": { "amount": { "S": "1 lb" }, "item": { "S": "fettuccine pasta" } } }
+                  ]
+                },
+                "tags": { "SS": ["vegetarian", "comfort-food", "creamy"] },
+                "rating": { "N": "4.6" },
+                "servings": { "N": "4" },
+                "cuisine": { "S": "Italian" },
+                "difficulty": { "S": "Easy" },
+                "prep_time": { "N": "15" },
+                "cook_time": { "N": "25" },
+                "description": {
+                  "S": "Creamy, rich pasta dish with butter, parmesan cheese, and fresh fettuccine noodles"
+                },
+                "name": { "S": "Fettuccine Alfredo" },
+                "id": { "S": "recipe-002" }
+              },
+              "__unknownArray": [1, 2, 3],
+              "__unknownObject": { "nested": "value", "count": 42 }
+            }
+            """
+        tags: ["serde-benchmark"]
+    }
+    {
+        id: "rpcv2Cbor_GetItemOutput_OutOfOrder"
+        documentation: """
+            Fields in reverse order with unknown fields interspersed (CBOR).
+            """
+        protocol: rpcv2Cbor
+        headers: { "smithy-protocol": "rpc-v2-cbor" }
+        code: 200
+        body: """
+            pm9fX3Vua25vd25TdHJpbmdqdW5leHBlY3RlZHBDb25zdW1lZENhcGFjaXR5pHFSZWFkQ2FwYWNp
+            dHlVbml0c/tABAAAAAAAAG1fX3Vua25vd25Cb29s9W1DYXBhY2l0eVVuaXRz+0AEAAAAAAAAaVRh
+            YmxlTmFtZW1wYXN0YS1yZWNpcGVzb19fdW5rbm93bk51bWJlchoAAYafZEl0ZW2saW51dHJpdGlv
+            bqFhTaVvX191bmtub3duTmVzdGVkoWFTcXNob3VsZC1iZS1za2lwcGVkY2ZhdKFhTmIyOGVjYXJi
+            c6FhTmI0NWdwcm90ZWluoWFOYjE4aGNhbG9yaWVzoWFOYzUyMGtpbmdyZWRpZW50c6FhTIShYU2i
+            ZmFtb3VudKFhU2cxLzIgY3VwZGl0ZW2hYVNraGVhdnkgY3JlYW2hYU2iZmFtb3VudKFhU2wxIGN1
+            cCBncmF0ZWRkaXRlbaFhU29wYXJtZXNhbiBjaGVlc2WhYU2iZmFtb3VudKFhU2cxLzIgY3VwZGl0
+            ZW2hYVNmYnV0dGVyoWFNomZhbW91bnShYVNkMSBsYmRpdGVtoWFTcGZldHR1Y2NpbmUgcGFzdGFk
+            dGFnc6FiU1ODanZlZ2V0YXJpYW5sY29tZm9ydC1mb29kZmNyZWFteWZyYXRpbmehYU5jNC42aHNl
+            cnZpbmdzoWFOYTRnY3Vpc2luZaFhU2dJdGFsaWFuamRpZmZpY3VsdHmhYVNkRWFzeWlwcmVwX3Rp
+            bWWhYU5iMTVpY29va190aW1loWFOYjI1a2Rlc2NyaXB0aW9uoWFTeFJDcmVhbXksIHJpY2ggcGFz
+            dGEgZGlzaCB3aXRoIGJ1dHRlciwgcGFybWVzYW4gY2hlZXNlLCBhbmQgZnJlc2ggZmV0dHVjY2lu
+            ZSBub29kbGVzZG5hbWWhYVNyRmV0dHVjY2luZSBBbGZyZWRvYmlkoWFTanJlY2lwZS0wMDJuX191
+            bmtub3duQXJyYXmDAQIDb19fdW5rbm93bk9iamVjdKJmbmVzdGVkZXZhbHVlZWNvdW50GCo=
+            """
+        tags: ["serde-benchmark"]
+    }
 ])
 operation GetItem {
     input: GetItemInput

@@ -41,6 +41,7 @@ public class RpcV2CborDeserializeBenchmark {
             "rpcv2Cbor_GetItemOutput_S",
             "rpcv2Cbor_GetItemOutput_M",
             "rpcv2Cbor_GetItemOutput_L",
+            "rpcv2Cbor_GetItemOutput_OutOfOrder",
             "rpcv2Cbor_GetItemOutputBinary_S",
             "rpcv2Cbor_GetItemOutputBinary_M",
             "rpcv2Cbor_GetItemOutputBinary_L",

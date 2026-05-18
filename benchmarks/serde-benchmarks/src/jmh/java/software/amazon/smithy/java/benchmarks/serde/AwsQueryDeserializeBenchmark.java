@@ -35,6 +35,7 @@ public class AwsQueryDeserializeBenchmark {
             "awsQuery_GetMetricDataResponse_S",
             "awsQuery_GetMetricDataResponse_M",
             "awsQuery_GetMetricDataResponse_L",
+            "awsQuery_GetMetricDataResponse_OutOfOrder",
     })
     public String testCaseId;
 

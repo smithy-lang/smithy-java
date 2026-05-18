@@ -2955,6 +2955,249 @@ use smithy.test#httpResponseTests
         }
         tags: ["serde-benchmark"]
     }
+    // section: out-of-order + unknown fields
+    {
+        id: "awsQuery_GetMetricDataResponse_OutOfOrder"
+        documentation: """
+            Fields in reverse order with unknown elements interspersed.
+            """
+        protocol: awsQuery
+        code: 200
+        body: """
+            <GetMetricDataResponse
+                xmlns="https://awsquerydataplane.amazonaws.com">
+                <GetMetricDataResult>
+                    <UnknownTopElement>should-skip</UnknownTopElement>
+                    <Messages>
+                        <member>
+                            <Code>InfoOnly</Code>
+                            <Value>Some metrics delayed</Value>
+                        </member>
+                    </Messages>
+                    <NextToken>nextTokenValue123</NextToken>
+                    <MetricDataResults>
+                        <member>
+                            <UnknownInMember>skip</UnknownInMember>
+                            <StatusCode>Complete</StatusCode>
+                            <Values>
+                                <member>72.5</member>
+                                <member>75</member>
+                            </Values>
+                            <Timestamps>
+                                <member>2021-01-01T00:05:00Z</member>
+                                <member>2021-01-01T00:00:00Z</member>
+                            </Timestamps>
+                            <Label>alpacas_found</Label>
+                            <Id>m1</Id>
+                        </member>
+                        <member>
+                            <StatusCode>Complete</StatusCode>
+                            <Values>
+                                <member>58</member>
+                                <member>60</member>
+                            </Values>
+                            <Timestamps>
+                                <member>2021-01-01T00:05:00Z</member>
+                                <member>2021-01-01T00:00:00Z</member>
+                            </Timestamps>
+                            <Label>llamas_sleeping</Label>
+                            <Id>m2</Id>
+                        </member>
+                        <member>
+                            <StatusCode>Complete</StatusCode>
+                            <Values>
+                                <member>47</member>
+                                <member>45</member>
+                            </Values>
+                            <Timestamps>
+                                <member>2021-01-01T00:05:00Z</member>
+                                <member>2021-01-01T00:00:00Z</member>
+                            </Timestamps>
+                            <Label>penguins_waddling</Label>
+                            <Id>m3</Id>
+                        </member>
+                        <member>
+                            <StatusCode>Complete</StatusCode>
+                            <Values>
+                                <member>1100</member>
+                                <member>1024</member>
+                            </Values>
+                            <Timestamps>
+                                <member>2021-01-01T00:05:00Z</member>
+                                <member>2021-01-01T00:00:00Z</member>
+                            </Timestamps>
+                            <Label>dolphins_jumping</Label>
+                            <Id>m4</Id>
+                        </member>
+                        <member>
+                            <StatusCode>Complete</StatusCode>
+                            <Values>
+                                <member>2200</member>
+                                <member>2048</member>
+                            </Values>
+                            <Timestamps>
+                                <member>2021-01-01T00:05:00Z</member>
+                                <member>2021-01-01T00:00:00Z</member>
+                            </Timestamps>
+                            <Label>elephants_trumpeting</Label>
+                            <Id>m5</Id>
+                        </member>
+                        <member>
+                            <StatusCode>Complete</StatusCode>
+                            <Values>
+                                <member>95</member>
+                                <member>100</member>
+                            </Values>
+                            <Timestamps>
+                                <member>2021-01-01T00:05:00Z</member>
+                                <member>2021-01-01T00:00:00Z</member>
+                            </Timestamps>
+                            <Label>giraffes_eating</Label>
+                            <Id>m6</Id>
+                        </member>
+                        <member>
+                            <StatusCode>Complete</StatusCode>
+                            <Values>
+                                <member>145</member>
+                                <member>150</member>
+                            </Values>
+                            <Timestamps>
+                                <member>2021-01-01T00:05:00Z</member>
+                                <member>2021-01-01T00:00:00Z</member>
+                            </Timestamps>
+                            <Label>zebras_running</Label>
+                            <Id>m7</Id>
+                        </member>
+                        <member>
+                            <StatusCode>Complete</StatusCode>
+                            <Values>
+                                <member>48</member>
+                                <member>50</member>
+                            </Values>
+                            <Timestamps>
+                                <member>2021-01-01T00:05:00Z</member>
+                                <member>2021-01-01T00:00:00Z</member>
+                            </Timestamps>
+                            <Label>pandas_munching</Label>
+                            <Id>m8</Id>
+                        </member>
+                        <member>
+                            <StatusCode>Complete</StatusCode>
+                            <Values>
+                                <member>72</member>
+                                <member>75</member>
+                            </Values>
+                            <Timestamps>
+                                <member>2021-01-01T00:05:00Z</member>
+                                <member>2021-01-01T00:00:00Z</member>
+                            </Timestamps>
+                            <Label>koalas_napping</Label>
+                            <Id>m9</Id>
+                        </member>
+                        <member>
+                            <StatusCode>Complete</StatusCode>
+                            <Values>
+                                <member>0</member>
+                                <member>0</member>
+                            </Values>
+                            <Timestamps>
+                                <member>2021-01-01T00:05:00Z</member>
+                                <member>2021-01-01T00:00:00Z</member>
+                            </Timestamps>
+                            <Label>kangaroos_hopping</Label>
+                            <Id>m10</Id>
+                        </member>
+                    </MetricDataResults>
+                    <UnknownBottomElement>also-skip</UnknownBottomElement>
+                </GetMetricDataResult>
+                <ResponseMetadata>
+                    <RequestId>12345678-1234-1234-1234-123456789014</RequestId>
+                </ResponseMetadata>
+            </GetMetricDataResponse>
+            """
+        params: {
+            MetricDataResults: [
+                {
+                    Id: "m1"
+                    Label: "alpacas_found"
+                    Timestamps: [1609459200, 1609459500]
+                    Values: [75.0, 72.5]
+                    StatusCode: "Complete"
+                }
+                {
+                    Id: "m2"
+                    Label: "llamas_sleeping"
+                    Timestamps: [1609459200, 1609459500]
+                    Values: [60.0, 58.0]
+                    StatusCode: "Complete"
+                }
+                {
+                    Id: "m3"
+                    Label: "penguins_waddling"
+                    Timestamps: [1609459200, 1609459500]
+                    Values: [45.0, 47.0]
+                    StatusCode: "Complete"
+                }
+                {
+                    Id: "m4"
+                    Label: "dolphins_jumping"
+                    Timestamps: [1609459200, 1609459500]
+                    Values: [1024.0, 1100.0]
+                    StatusCode: "Complete"
+                }
+                {
+                    Id: "m5"
+                    Label: "elephants_trumpeting"
+                    Timestamps: [1609459200, 1609459500]
+                    Values: [2048.0, 2200.0]
+                    StatusCode: "Complete"
+                }
+                {
+                    Id: "m6"
+                    Label: "giraffes_eating"
+                    Timestamps: [1609459200, 1609459500]
+                    Values: [100.0, 95.0]
+                    StatusCode: "Complete"
+                }
+                {
+                    Id: "m7"
+                    Label: "zebras_running"
+                    Timestamps: [1609459200, 1609459500]
+                    Values: [150.0, 145.0]
+                    StatusCode: "Complete"
+                }
+                {
+                    Id: "m8"
+                    Label: "pandas_munching"
+                    Timestamps: [1609459200, 1609459500]
+                    Values: [50.0, 48.0]
+                    StatusCode: "Complete"
+                }
+                {
+                    Id: "m9"
+                    Label: "koalas_napping"
+                    Timestamps: [1609459200, 1609459500]
+                    Values: [75.0, 72.0]
+                    StatusCode: "Complete"
+                }
+                {
+                    Id: "m10"
+                    Label: "kangaroos_hopping"
+                    Timestamps: [1609459200, 1609459500]
+                    Values: [0.0, 0.0]
+                    StatusCode: "Complete"
+                }
+            ]
+            NextToken: "nextTokenValue123"
+            Messages: [
+                {
+                    Code: "InfoOnly"
+                    Value: "Some metrics delayed"
+                }
+            ]
+        }
+        tags: ["serde-benchmark"]
+    }
 ])
 operation GetMetricData {
     input: GetMetricDataInput
