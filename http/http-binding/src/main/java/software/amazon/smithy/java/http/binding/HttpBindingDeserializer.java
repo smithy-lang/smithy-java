@@ -129,16 +129,16 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         readHeaderBindings(
                 state,
                 structMemberConsumer,
-                rb.listHeaderMembers(),
-                rb.listHeaderNames(),
-                rb.scalarHeadersByName(),
-                rb.prefixHeadersMembers());
+                rb.listHeaderMembers,
+                rb.listHeaderNames,
+                rb.scalarHeadersByName,
+                rb.prefixHeadersMembers);
 
-        if (rb.statusMember() != null) {
-            structMemberConsumer.accept(state, rb.statusMember(), new ResponseStatusDeserializer(responseStatus));
+        if (rb.statusMember != null) {
+            structMemberConsumer.accept(state, rb.statusMember, new ResponseStatusDeserializer(responseStatus));
         }
 
-        readPayloadAndBody(schema, state, structMemberConsumer, rb.payloadMember(), rb.hasBody(), rb.bindings());
+        readPayloadAndBody(schema, state, structMemberConsumer, rb.payloadMember, rb.hasBody, rb.bindings);
     }
 
     /**

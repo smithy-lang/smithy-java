@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.http.binding;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,7 +15,10 @@ import java.util.Set;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaExtensionKey;
 import software.amazon.smithy.java.core.schema.SchemaExtensionProvider;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.core.serde.Codec;
+import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -246,28 +250,101 @@ public final class HttpBindingSchemaExtensions
         boolean writeBody(boolean omitEmptyPayload) {
             return hasBody || (!omitEmptyPayload && !hasPayload);
         }
+
+        // Lazy cache for the codec output of an empty struct (no body members + no payload + force-write-empty).
+        // Bytes are determined by codec + schema, so caching once and duplicating views per request is safe.
+        private volatile ByteBuffer cachedEmptyBody;
+
+        ByteBuffer emptyBody(Codec codec, Schema schema) {
+            var b = cachedEmptyBody;
+            if (b == null) {
+                b = codec.serialize(new EmptyStruct(schema));
+                cachedEmptyBody = b;
+            }
+            return b.duplicate();
+        }
+    }
+
+    /**
+     * A no-member {@link SerializableStruct} used to seed the codec when caching the empty-body
+     * representation for {@link RequestBinding#emptyBody} / {@link ResponseBinding#emptyBody}.
+     */
+    private record EmptyStruct(Schema schema) implements SerializableStruct {
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {
+            // no members
+        }
+
+        @Override
+        public <T> T getMemberValue(Schema member) {
+            return null;
+        }
     }
 
     /**
      * Pre-computed response-direction binding data for one structure / union schema. Built lazily
      * by {@link StructBindings#response()} on first response-side access.
      */
-    record ResponseBinding(
-            Binding[] bindings,
-            MemberBinding[] memberBindings,
-            Map<String, Schema> scalarHeadersByName,
-            Schema[] listHeaderMembers,
-            HeaderName[] listHeaderNames,
-            Schema[] prefixHeadersMembers,
-            Schema payloadMember,
-            Schema statusMember,
-            boolean hasBody,
-            boolean hasPayload,
-            Set<String> headerWireNames,
-            int headerCount,
-            int defaultStatus) {
+    static final class ResponseBinding {
+        final Binding[] bindings;
+        final MemberBinding[] memberBindings;
+        final Map<String, Schema> scalarHeadersByName;
+        final Schema[] listHeaderMembers;
+        final HeaderName[] listHeaderNames;
+        final Schema[] prefixHeadersMembers;
+        final Schema payloadMember;
+        final Schema statusMember;
+        final boolean hasBody;
+        final boolean hasPayload;
+        final Set<String> headerWireNames;
+        final int headerCount;
+        // Default response status from @httpError or @error trait, or -1 when neither is present.
+        final int defaultStatus;
+        // Lazy cache for the codec output of an empty struct (no body members + no payload + force-write-empty).
+        // Bytes are determined by codec + schema, so caching once and duplicating views per request is safe.
+        private volatile ByteBuffer cachedEmptyBody;
+
+        ResponseBinding(
+                Binding[] bindings,
+                MemberBinding[] memberBindings,
+                Map<String, Schema> scalarHeadersByName,
+                Schema[] listHeaderMembers,
+                HeaderName[] listHeaderNames,
+                Schema[] prefixHeadersMembers,
+                Schema payloadMember,
+                Schema statusMember,
+                boolean hasBody,
+                boolean hasPayload,
+                Set<String> headerWireNames,
+                int headerCount,
+                int defaultStatus
+        ) {
+            this.bindings = bindings;
+            this.memberBindings = memberBindings;
+            this.scalarHeadersByName = scalarHeadersByName;
+            this.listHeaderMembers = listHeaderMembers;
+            this.listHeaderNames = listHeaderNames;
+            this.prefixHeadersMembers = prefixHeadersMembers;
+            this.payloadMember = payloadMember;
+            this.statusMember = statusMember;
+            this.hasBody = hasBody;
+            this.hasPayload = hasPayload;
+            this.headerWireNames = headerWireNames;
+            this.headerCount = headerCount;
+            this.defaultStatus = defaultStatus;
+        }
+
         boolean writeBody(boolean omitEmptyPayload) {
             return hasBody || (!omitEmptyPayload && !hasPayload);
+        }
+
+        ByteBuffer emptyBody(Codec codec, Schema schema) {
+            var b = cachedEmptyBody;
+            if (b == null) {
+                b = codec.serialize(new EmptyStruct(schema));
+                cachedEmptyBody = b;
+            }
+            return b.duplicate();
         }
     }
 
