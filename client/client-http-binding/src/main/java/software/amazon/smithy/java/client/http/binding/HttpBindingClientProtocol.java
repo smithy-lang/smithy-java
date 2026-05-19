@@ -22,7 +22,6 @@ import software.amazon.smithy.java.http.binding.HttpBinding;
 import software.amazon.smithy.java.http.binding.RequestSerializer;
 import software.amazon.smithy.java.http.binding.ResponseDeserializer;
 import software.amazon.smithy.java.io.uri.SmithyUri;
-import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -34,7 +33,6 @@ import software.amazon.smithy.model.shapes.ShapeId;
  */
 public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientProtocol {
 
-    private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpBindingClientProtocol.class);
     private final HttpBinding httpBinding = new HttpBinding();
 
     public HttpBindingClientProtocol(ShapeId id) {
@@ -95,8 +93,6 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
             throw createError(operation, context, typeRegistry, request, response);
         }
 
-        LOGGER.trace("Deserializing successful response with {}", getClass().getName());
-
         var outputBuilder = operation.outputBuilder();
         ResponseDeserializer deser = httpBinding.responseDeserializer()
                 .payloadCodec(payloadCodec())
@@ -109,9 +105,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
         }
 
         deser.deserialize();
-        O output = outputBuilder.errorCorrection().build();
-        LOGGER.trace("Successfully built {} from HTTP response with {}", output, getClass().getName());
-        return output;
+        return outputBuilder.errorCorrection().build();
     }
 
     /**

@@ -191,6 +191,8 @@ public final class HttpBindingSchemaExtensions
         final Schema payloadMember;
         final boolean hasBody;
         final boolean hasPayload;
+        // True iff the request struct has an {@code @httpPayload} member whose target is a {@code STRUCTURE}.
+        final boolean hasStructPayload;
         // Set of all declared header wire names. Used by HttpPrefixHeadersSerializer to skip
         // map keys that already collide with explicit @httpHeader members.
         final Set<String> headerWireNames;
@@ -215,6 +217,7 @@ public final class HttpBindingSchemaExtensions
                 Schema payloadMember,
                 boolean hasBody,
                 boolean hasPayload,
+                boolean hasStructPayload,
                 Set<String> headerWireNames,
                 boolean inputContentTypeHeader,
                 int headerCount
@@ -232,6 +235,7 @@ public final class HttpBindingSchemaExtensions
             this.payloadMember = payloadMember;
             this.hasBody = hasBody;
             this.hasPayload = hasPayload;
+            this.hasStructPayload = hasStructPayload;
             this.headerWireNames = headerWireNames;
             this.inputContentTypeHeader = inputContentTypeHeader;
             this.headerCount = headerCount;
@@ -570,6 +574,9 @@ public final class HttpBindingSchemaExtensions
         // over-allocating for AWS-S3-style structs that declare 50+ headers but populate few.
         int headerCount = Math.min(headers.size() + prefixHeaders.size() + 4, 32);
 
+        // True iff the @httpPayload member targets a STRUCTURE shape
+        boolean hasStructPayload = payload != null && payload.type() == ShapeType.STRUCTURE;
+
         return new RequestBinding(
                 bindings,
                 memberBindings,
@@ -584,6 +591,7 @@ public final class HttpBindingSchemaExtensions
                 payload,
                 hasBody,
                 hasPayload,
+                hasStructPayload,
                 headerWireNames,
                 hasContentTypeHeader,
                 headerCount);
