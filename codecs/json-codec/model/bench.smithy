@@ -305,3 +305,6 @@ structure AllListsStruct {
     blobs: BlobList
     timestamps: TimestampList
 }
+
+/// Empty structure with zero fields for regression testing
+structure EmptyStruct {}

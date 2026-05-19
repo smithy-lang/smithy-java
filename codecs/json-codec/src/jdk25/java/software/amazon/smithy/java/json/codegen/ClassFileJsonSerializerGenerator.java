@@ -496,12 +496,13 @@ final class ClassFileJsonSerializerGenerator {
                         code.checkcast(variantClass);
                         code.astore(variantSlot);
 
-                        // ensure capacity for { + field name + some value
-                        emitEnsure(code, thisClass, 2);
+                        // ensure capacity for { + field name
+                        int nameLen = fieldNameBytesList.get(i).length;
+                        emitEnsure(code, thisClass, 1 + nameLen);
                         emitWriteByte(code, '{');
 
                         // Write field name
-                        emitFieldNameCopy(code, thisClass, i, fieldNameBytesList.get(i).length);
+                        emitFieldNameCopy(code, thisClass, i, nameLen);
 
                         // Write value
                         emitWriteValueWithCapacity(code,

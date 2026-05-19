@@ -1452,4 +1452,31 @@ public final class JsonReadUtils {
             pos = skipValue(buf, pos, end, state);
         }
     }
+
+    /**
+     * Skips a JSON field name (from after the opening quote) and its value.
+     * Used by zero-field struct deserializers where all fields are unknown.
+     *
+     * @param pos position immediately after the opening quote of the field name
+     * @return position after the skipped value
+     */
+    public static int skipFieldAndValue(byte[] buf, int pos, int end, JsonParseState state) {
+        // Skip field name to closing quote
+        while (pos < end) {
+            byte b = buf[pos];
+            if (b == '"') {
+                pos++;
+                break;
+            }
+            if (b == '\\') {
+                pos++;
+            }
+            pos++;
+        }
+        // Skip colon (with optional whitespace)
+        pos = skipWhitespace(buf, pos, end);
+        pos++; // skip ':'
+        // Skip value
+        return skipValue(buf, pos, end, state);
+    }
 }

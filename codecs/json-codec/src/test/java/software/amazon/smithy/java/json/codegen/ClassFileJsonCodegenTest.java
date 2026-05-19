@@ -33,6 +33,7 @@ import software.amazon.smithy.java.json.bench.model.JsonNameStruct;
 import software.amazon.smithy.java.json.bench.model.NestedStruct;
 import software.amazon.smithy.java.json.bench.model.Priority;
 import software.amazon.smithy.java.json.bench.model.RecursiveStruct;
+import software.amazon.smithy.java.json.bench.model.EmptyStruct;
 import software.amazon.smithy.java.json.bench.model.SimpleStruct;
 import software.amazon.smithy.java.json.bench.model.SparseStruct;
 import software.amazon.smithy.java.json.bench.model.TimestampStruct;
@@ -64,6 +65,7 @@ public class ClassFileJsonCodegenTest {
         registry.warmup(DocumentHolder.$SCHEMA, DocumentHolder.class);
         registry.warmup(TimestampStruct.$SCHEMA, TimestampStruct.class);
         registry.warmup(UnionHolder.$SCHEMA, UnionHolder.class);
+        registry.warmup(EmptyStruct.$SCHEMA, EmptyStruct.class);
     }
 
     // ---- Serialization Tests ----
@@ -614,6 +616,37 @@ public class ClassFileJsonCodegenTest {
         assertEquals(normalizedDispatch,
                 normalizedCodegen,
                 "Codegen and dispatch should produce semantically equivalent JSON");
+    }
+
+    // ---- Empty Struct Tests ----
+
+    @Test
+    void testEmptyStructSerialization() {
+        EmptyStruct obj = EmptyStruct.builder().build();
+        String json = serializeToJson(obj);
+        assertEquals("{}", json);
+    }
+
+    @Test
+    void testEmptyStructDeserialization() {
+        String json = "{}";
+        EmptyStruct obj = deserialize(json, EmptyStruct.builder(), EmptyStruct.class);
+        assertNotNull(obj);
+    }
+
+    @Test
+    void testEmptyStructDeserializationWithUnknownFields() {
+        String json = "{\"unknown\":\"value\",\"other\":123}";
+        EmptyStruct obj = deserialize(json, EmptyStruct.builder(), EmptyStruct.class);
+        assertNotNull(obj);
+    }
+
+    @Test
+    void testEmptyStructRoundtrip() {
+        EmptyStruct original = EmptyStruct.builder().build();
+        String json = serializeToJson(original);
+        EmptyStruct deserialized = deserialize(json, EmptyStruct.builder(), EmptyStruct.class);
+        assertNotNull(deserialized);
     }
 
     // ---- Stress Test ----

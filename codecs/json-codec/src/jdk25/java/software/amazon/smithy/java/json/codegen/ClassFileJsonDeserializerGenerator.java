@@ -194,7 +194,9 @@ final class ClassFileJsonDeserializerGenerator {
                     deHoldersClassDataOffset,
                     tsSchemaClassDataOffset);
             emitConstructor(cb, thisClass);
-            emitDeserializeFieldMethod(cb, thisClass, plan);
+            if (!fields.isEmpty()) {
+                emitDeserializeFieldMethod(cb, thisClass, plan);
+            }
             emitDeserializeMethod(cb,
                     thisClass,
                     shapeClass,
@@ -426,91 +428,107 @@ final class ClassFileJsonDeserializerGenerator {
                     code.iinc(SLOT_POS, 1); // skip opening quote
                     code.labelBinding(afterCommaQuote);
 
-                    // matched = -1
-                    code.iconst_m1();
-                    code.istore(SLOT_MATCHED);
-
                     List<FieldPlan> fields = plan.fields();
 
-                    // Speculative matching via switch on expectedNext
-                    Label afterSpeculative = code.newLabel();
-                    emitSpeculativeMatch(code,
-                            thisClass,
-                            fields,
-                            fieldNameBytesList,
-                            jsonFieldNameBytesList,
-                            afterSpeculative);
-                    code.labelBinding(afterSpeculative);
+                    if (fields.isEmpty()) {
+                        // Zero fields: skip field name and value directly
+                        code.aload(SLOT_BUF);
+                        code.iload(SLOT_POS);
+                        code.iload(SLOT_END);
+                        code.aload(SLOT_CTX);
+                        code.invokestatic(CD_JsonReadUtils,
+                                "skipFieldAndValue",
+                                MethodTypeDesc.of(CD_int,
+                                        CD_byte_array,
+                                        CD_int,
+                                        CD_int,
+                                        CD_JsonParseState));
+                        code.istore(SLOT_POS);
+                    } else {
+                        // matched = -1
+                        code.iconst_m1();
+                        code.istore(SLOT_MATCHED);
 
-                    // Slow path: FNV-1a hash
-                    Label afterHash = code.newLabel();
-                    code.iload(SLOT_MATCHED);
-                    code.iconst_m1();
-                    code.if_icmpne(afterHash);
-                    emitHashDispatch(code,
-                            thisClass,
-                            fields,
-                            fieldNameBytesList,
-                            jsonFieldNameBytesList);
-                    code.labelBinding(afterHash);
+                        // Speculative matching via switch on expectedNext
+                        Label afterSpeculative = code.newLabel();
+                        emitSpeculativeMatch(code,
+                                thisClass,
+                                fields,
+                                fieldNameBytesList,
+                                jsonFieldNameBytesList,
+                                afterSpeculative);
+                        code.labelBinding(afterSpeculative);
 
-                    // Skip colon (with fast-path for minified JSON: no whitespace around ':')
-                    Label colonSlowPath = code.newLabel();
-                    Label afterColon = code.newLabel();
-                    code.iload(SLOT_POS);
-                    code.iload(SLOT_END);
-                    code.if_icmpge(colonSlowPath);
-                    code.aload(SLOT_BUF);
-                    code.iload(SLOT_POS);
-                    code.baload();
-                    code.bipush(':');
-                    code.if_icmpne(colonSlowPath);
-                    code.iinc(SLOT_POS, 1);
-                    // Check if next byte is not whitespace (common case)
-                    code.iload(SLOT_POS);
-                    code.iload(SLOT_END);
-                    code.if_icmpge(afterColon);
-                    code.aload(SLOT_BUF);
-                    code.iload(SLOT_POS);
-                    code.baload();
-                    code.bipush(' ');
-                    code.if_icmpgt(afterColon);
-                    // Rare: whitespace after colon
-                    emitSkipWhitespace(code);
-                    code.goto_(afterColon);
-                    code.labelBinding(colonSlowPath);
-                    emitSkipWhitespace(code);
-                    code.iinc(SLOT_POS, 1); // skip ':'
-                    emitSkipWhitespace(code);
-                    code.labelBinding(afterColon);
+                        // Slow path: FNV-1a hash
+                        Label afterHash = code.newLabel();
+                        code.iload(SLOT_MATCHED);
+                        code.iconst_m1();
+                        code.if_icmpne(afterHash);
+                        emitHashDispatch(code,
+                                thisClass,
+                                fields,
+                                fieldNameBytesList,
+                                jsonFieldNameBytesList);
+                        code.labelBinding(afterHash);
 
-                    // Check for null
-                    Label notNull = code.newLabel();
-                    emitNullCheck(code, notNull);
-                    code.iinc(SLOT_POS, 4);
-                    code.goto_(loopStart);
-                    code.labelBinding(notNull);
+                        // Skip colon (with fast-path for minified JSON: no whitespace around ':')
+                        Label colonSlowPath = code.newLabel();
+                        Label afterColon = code.newLabel();
+                        code.iload(SLOT_POS);
+                        code.iload(SLOT_END);
+                        code.if_icmpge(colonSlowPath);
+                        code.aload(SLOT_BUF);
+                        code.iload(SLOT_POS);
+                        code.baload();
+                        code.bipush(':');
+                        code.if_icmpne(colonSlowPath);
+                        code.iinc(SLOT_POS, 1);
+                        // Check if next byte is not whitespace (common case)
+                        code.iload(SLOT_POS);
+                        code.iload(SLOT_END);
+                        code.if_icmpge(afterColon);
+                        code.aload(SLOT_BUF);
+                        code.iload(SLOT_POS);
+                        code.baload();
+                        code.bipush(' ');
+                        code.if_icmpgt(afterColon);
+                        // Rare: whitespace after colon
+                        emitSkipWhitespace(code);
+                        code.goto_(afterColon);
+                        code.labelBinding(colonSlowPath);
+                        emitSkipWhitespace(code);
+                        code.iinc(SLOT_POS, 1); // skip ':'
+                        emitSkipWhitespace(code);
+                        code.labelBinding(afterColon);
 
-                    // Dispatch on matched field (extracted to separate method for JIT)
-                    code.aload(0); // this
-                    code.iload(SLOT_MATCHED);
-                    code.iconst_0(); // pad
-                    code.aload(SLOT_CTX);
-                    code.aload(SLOT_BUILDER);
-                    code.aload(SLOT_BUF);
-                    code.iload(SLOT_POS);
-                    code.iload(SLOT_END);
-                    code.invokevirtual(thisClass,
-                            "deserializeField$",
-                            MethodTypeDesc.of(CD_int,
-                                    CD_int,
-                                    CD_int,
-                                    CD_JsonReaderContext,
-                                    builderClass,
-                                    CD_byte_array,
-                                    CD_int,
-                                    CD_int));
-                    code.istore(SLOT_POS);
+                        // Check for null
+                        Label notNull = code.newLabel();
+                        emitNullCheck(code, notNull);
+                        code.iinc(SLOT_POS, 4);
+                        code.goto_(loopStart);
+                        code.labelBinding(notNull);
+
+                        // Dispatch on matched field (extracted to separate method for JIT)
+                        code.aload(0); // this
+                        code.iload(SLOT_MATCHED);
+                        code.iconst_0(); // pad
+                        code.aload(SLOT_CTX);
+                        code.aload(SLOT_BUILDER);
+                        code.aload(SLOT_BUF);
+                        code.iload(SLOT_POS);
+                        code.iload(SLOT_END);
+                        code.invokevirtual(thisClass,
+                                "deserializeField$",
+                                MethodTypeDesc.of(CD_int,
+                                        CD_int,
+                                        CD_int,
+                                        CD_JsonReaderContext,
+                                        builderClass,
+                                        CD_byte_array,
+                                        CD_int,
+                                        CD_int));
+                        code.istore(SLOT_POS);
+                    }
 
                     code.goto_(loopStart);
                     code.labelBinding(loopEnd);
@@ -659,28 +677,31 @@ final class ClassFileJsonDeserializerGenerator {
                     nextTempSlot = DF_SLOT_FIRST_TEMP;
 
                     Label defaultLabel = code.newLabel();
-                    var cases = new ArrayList<java.lang.classfile.instruction.SwitchCase>();
-                    Label[] fieldLabels = new Label[fields.size()];
-                    for (int i = 0; i < fields.size(); i++) {
-                        fieldLabels[i] = code.newLabel();
-                        cases.add(java.lang.classfile.instruction.SwitchCase.of(
-                                fieldOffset + i,
-                                fieldLabels[i]));
-                    }
 
-                    code.iload(DF_SLOT_MATCHED);
-                    code.tableswitch(defaultLabel, cases);
+                    if (!fields.isEmpty()) {
+                        var cases = new ArrayList<java.lang.classfile.instruction.SwitchCase>();
+                        Label[] fieldLabels = new Label[fields.size()];
+                        for (int i = 0; i < fields.size(); i++) {
+                            fieldLabels[i] = code.newLabel();
+                            cases.add(java.lang.classfile.instruction.SwitchCase.of(
+                                    fieldOffset + i,
+                                    fieldLabels[i]));
+                        }
 
-                    for (int i = 0; i < fields.size(); i++) {
-                        code.labelBinding(fieldLabels[i]);
-                        emitFieldDeserialization(code,
-                                thisClass,
-                                builderClass,
-                                fields.get(i),
-                                plan,
-                                actualBuilderClass);
-                        code.iload(SLOT_POS);
-                        code.ireturn();
+                        code.iload(DF_SLOT_MATCHED);
+                        code.tableswitch(defaultLabel, cases);
+
+                        for (int i = 0; i < fields.size(); i++) {
+                            code.labelBinding(fieldLabels[i]);
+                            emitFieldDeserialization(code,
+                                    thisClass,
+                                    builderClass,
+                                    fields.get(i),
+                                    plan,
+                                    actualBuilderClass);
+                            code.iload(SLOT_POS);
+                            code.ireturn();
+                        }
                     }
 
                     code.labelBinding(defaultLabel);
@@ -774,6 +795,10 @@ final class ClassFileJsonDeserializerGenerator {
             List<byte[]> jsonFieldNameBytesList,
             Label afterSpeculative
     ) {
+        if (fields.isEmpty()) {
+            return;
+        }
+
         // switch(expectedNext) { case 0: try DN_0 ... }
         Label defaultLabel = code.newLabel();
         Label[] caseLabels = new Label[fields.size()];
