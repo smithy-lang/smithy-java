@@ -28,84 +28,130 @@ import java.util.Objects;
  */
 public final class SmithyUri {
 
-    // Lookup tables for fast character validation (ASCII range only).
-    private static final boolean[] SCHEME_CONT = new boolean[128];
-    private static final boolean[] INVALID_HOST = new boolean[128];
-    private static final boolean[] VALID_PATH;
-    private static final boolean[] VALID_QUERY;
-    private static final boolean[] VALID_USERINFO;
-    private static final boolean[] IS_HEX = new boolean[128];
+    // ASCII (0..127) character classes encoded as 128-bit tables split into two longs each.
+    // Bit `c` of *_LOW (for c in 0..63) or bit `c - 64` of *_HIGH (for c in 64..127) is set iff `c` is in the class.
+    private static final long SCHEME_CONT_LOW;
+    private static final long SCHEME_CONT_HIGH;
+    private static final long INVALID_HOST_LOW;
+    private static final long INVALID_HOST_HIGH;
+    private static final long VALID_USERINFO_LOW;
+    private static final long VALID_USERINFO_HIGH;
+    private static final long VALID_PATH_LOW;
+    private static final long VALID_PATH_HIGH;
+    private static final long VALID_QUERY_LOW;
+    private static final long VALID_QUERY_HIGH;
+    private static final long IS_HEX_LOW;
+    private static final long IS_HEX_HIGH;
 
     static {
-        // Scheme continuation: lowercase alpha, digits, +, -, .
-        SCHEME_CONT['+'] = true;
-        SCHEME_CONT['-'] = true;
-        SCHEME_CONT['.'] = true;
+        // Working accumulators built up via setBit, then frozen into the static fields below.
+        long schLow = 0, schHigh = 0;
+        long badHostLow = 0, badHostHigh = 0;
+        long uiLow = 0, uiHigh = 0;
+        long pathLow = 0, pathHigh = 0;
+        long queryLow = 0, queryHigh = 0;
+        long hexLow = 0, hexHigh = 0;
 
-        INVALID_HOST['/'] = true;
-        INVALID_HOST['?'] = true;
-        INVALID_HOST['#'] = true;
-        INVALID_HOST['%'] = true;
-        INVALID_HOST['['] = true;
-        INVALID_HOST[']'] = true;
-        INVALID_HOST[' '] = true;
-        INVALID_HOST['\t'] = true;
-        INVALID_HOST['\n'] = true;
-        INVALID_HOST['\r'] = true;
+        // Scheme continuation: lowercase alpha, digits, +, -, .
+        schLow |= 1L << '+';
+        schLow |= 1L << '-';
+        schLow |= 1L << '.';
+
+        // Invalid host characters.
+        badHostLow |= 1L << '/';
+        badHostLow |= 1L << '?';
+        badHostLow |= 1L << '#';
+        badHostLow |= 1L << '%';
+        badHostHigh |= 1L << ('[' - 64);
+        badHostHigh |= 1L << (']' - 64);
+        badHostLow |= 1L << ' ';
+        badHostLow |= 1L << '\t';
+        badHostLow |= 1L << '\n';
+        badHostLow |= 1L << '\r';
 
         // RFC 3986 shared base: unreserved / pct-encoded / sub-delims
         // unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
         // sub-delims = "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
-        VALID_USERINFO = new boolean[128];
-        VALID_PATH = new boolean[128];
-        VALID_QUERY = new boolean[128];
         for (char c = 'a'; c <= 'z'; c++) {
-            SCHEME_CONT[c] = true;
-            VALID_USERINFO[c] = true;
-            VALID_PATH[c] = true;
-            VALID_QUERY[c] = true;
+            schHigh |= 1L << (c - 64);
+            uiHigh |= 1L << (c - 64);
+            pathHigh |= 1L << (c - 64);
+            queryHigh |= 1L << (c - 64);
         }
+
         for (char c = 'A'; c <= 'Z'; c++) {
-            VALID_USERINFO[c] = true;
-            VALID_PATH[c] = true;
-            VALID_QUERY[c] = true;
+            uiHigh |= 1L << (c - 64);
+            pathHigh |= 1L << (c - 64);
+            queryHigh |= 1L << (c - 64);
         }
+
         for (char c = '0'; c <= '9'; c++) {
-            VALID_USERINFO[c] = true;
-            VALID_PATH[c] = true;
-            VALID_QUERY[c] = true;
-            SCHEME_CONT[c] = true;
+            uiLow |= 1L << c;
+            pathLow |= 1L << c;
+            queryLow |= 1L << c;
+            schLow |= 1L << c;
         }
+
         for (char c : "-._~!$&'()*+,;=%".toCharArray()) {
-            VALID_USERINFO[c] = true;
-            VALID_PATH[c] = true;
-            VALID_QUERY[c] = true;
+            if (c < 64) {
+                uiLow |= 1L << c;
+                pathLow |= 1L << c;
+                queryLow |= 1L << c;
+            } else {
+                uiHigh |= 1L << (c - 64);
+                pathHigh |= 1L << (c - 64);
+                queryHigh |= 1L << (c - 64);
+            }
         }
 
         // userinfo adds ":"
-        VALID_USERINFO[':'] = true;
+        uiLow |= 1L << ':';
 
         // path adds ":" / "@" / "/"
-        VALID_PATH[':'] = true;
-        VALID_PATH['@'] = true;
-        VALID_PATH['/'] = true;
+        pathLow |= 1L << ':';
+        pathHigh |= 1L << ('@' - 64);
+        pathLow |= 1L << '/';
 
         // query adds everything path has plus "?"
-        VALID_QUERY[':'] = true;
-        VALID_QUERY['@'] = true;
-        VALID_QUERY['/'] = true;
-        VALID_QUERY['?'] = true;
+        queryLow |= 1L << ':';
+        queryHigh |= 1L << ('@' - 64);
+        queryLow |= 1L << '/';
+        queryLow |= 1L << '?';
 
-        // Hex setup
         for (char c = '0'; c <= '9'; c++) {
-            IS_HEX[c] = true;
+            hexLow |= 1L << c;
         }
+
         for (char c = 'a'; c <= 'f'; c++) {
-            IS_HEX[c] = true;
+            hexHigh |= 1L << (c - 64);
         }
+
         for (char c = 'A'; c <= 'F'; c++) {
-            IS_HEX[c] = true;
+            hexHigh |= 1L << (c - 64);
         }
+
+        SCHEME_CONT_LOW = schLow;
+        SCHEME_CONT_HIGH = schHigh;
+        INVALID_HOST_LOW = badHostLow;
+        INVALID_HOST_HIGH = badHostHigh;
+        VALID_USERINFO_LOW = uiLow;
+        VALID_USERINFO_HIGH = uiHigh;
+        VALID_PATH_LOW = pathLow;
+        VALID_PATH_HIGH = pathHigh;
+        VALID_QUERY_LOW = queryLow;
+        VALID_QUERY_HIGH = queryHigh;
+        IS_HEX_LOW = hexLow;
+        IS_HEX_HIGH = hexHigh;
+    }
+
+    /**
+     * Returns true iff {@code c} is a member of the class encoded by the (low, high) mask
+     * pair. Caller guarantees {@code 0 <= c < 128}.
+     */
+    private static boolean maskContains(long low, long high, int c) {
+        return c < 64
+                ? ((low >>> c) & 1L) != 0L
+                : ((high >>> (c - 64)) & 1L) != 0L;
     }
 
     private final String scheme;
@@ -657,14 +703,14 @@ public final class SmithyUri {
 
         for (int i = 1; i < scheme.length(); i++) {
             char c = scheme.charAt(i);
-            if (c >= 128 || !SCHEME_CONT[c]) {
+            if (c >= 128 || !maskContains(SCHEME_CONT_LOW, SCHEME_CONT_HIGH, c)) {
                 throw new IllegalArgumentException("Invalid character in scheme: '" + c + "' in " + scheme);
             }
         }
     }
 
     private static void validateUserInfo(String userInfo) {
-        validateComponent(userInfo, VALID_USERINFO, "userInfo");
+        validateComponent(userInfo, VALID_USERINFO_LOW, VALID_USERINFO_HIGH, "userInfo");
     }
 
     private static void validateHost(String host) {
@@ -677,7 +723,7 @@ public final class SmithyUri {
             if (c >= 'A' && c <= 'Z') {
                 throw new IllegalArgumentException("Host must be lowercase: " + host);
             }
-            if (c < 128 && INVALID_HOST[c]) {
+            if (c < 128 && maskContains(INVALID_HOST_LOW, INVALID_HOST_HIGH, c)) {
                 throw new IllegalArgumentException("Invalid character in host: '" + c + "' in " + host);
             }
         }
@@ -690,17 +736,17 @@ public final class SmithyUri {
     }
 
     private static void validatePath(String path) {
-        validateComponent(path, VALID_PATH, "path");
+        validateComponent(path, VALID_PATH_LOW, VALID_PATH_HIGH, "path");
     }
 
     private static void validateQuery(String query) {
-        validateComponent(query, VALID_QUERY, "query");
+        validateComponent(query, VALID_QUERY_LOW, VALID_QUERY_HIGH, "query");
     }
 
-    private static void validateComponent(String value, boolean[] allowed, String component) {
+    private static void validateComponent(String value, long allowedLow, long allowedHigh, String component) {
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
-            if (c >= 128 || !allowed[c]) {
+            if (c >= 128 || !maskContains(allowedLow, allowedHigh, c)) {
                 throw new IllegalArgumentException("Invalid character in " + component + ": '" + c + "'");
             }
             if (c == '%') {
@@ -719,6 +765,6 @@ public final class SmithyUri {
     }
 
     private static boolean isHex(char c) {
-        return c < 128 && IS_HEX[c];
+        return c < 128 && maskContains(IS_HEX_LOW, IS_HEX_HIGH, c);
     }
 }

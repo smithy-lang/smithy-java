@@ -5,81 +5,58 @@
 
 package software.amazon.smithy.java.io.uri;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Used to build a query string from key value pair parameters.
  */
 public final class QueryStringBuilder {
 
-    private final List<String> values = new ArrayList<>();
-    private final Set<String> keysFromHttpQuery = new HashSet<>();
+    private final StringBuilder builder = new StringBuilder();
+    private final HashSet<String> httpQueryKeys = new HashSet<>();
+    private boolean empty = true;
 
     /**
-     * Clears the contents of the query string builder.
+     * Clears the contents of the query string builder so it can be reused.
      */
     public void clear() {
-        values.clear();
+        builder.setLength(0);
+        empty = true;
+        httpQueryKeys.clear();
     }
 
     /**
      * Add a query string parameter and value to the query string.
-     * <p>
-     * The given key and value will be percent-encoded. If the value is already percent-encoded, it will be
-     * double percent-encoded.
+     *
+     * <p>The given key and value are percent-encoded. If the value is already
+     * percent-encoded, it will be double percent-encoded.
      *
      * @param key   Key of the parameter.
-     * @param value Value of the parameter (or null).
+     * @param value Value of the parameter (or null, which appends {@code key=}).
      */
     public void add(String key, String value) {
-        values.add(key);
-        keysFromHttpQuery.add(key);
-        values.add(value);
+        append(key, value);
+        httpQueryKeys.add(key);
     }
 
     /**
-     * Add a query string parameter and value to the query string comes from httpQueryParams trait.
-     * <p>
-     * The given key and value will be percent-encoded. If the value is already percent-encoded, it will be
-     * double percent-encoded. Query string parameters from httpQuery should take precedence if there are
-     * duplicate keys from @httpQuery.
+     * Add multiple values for the same key.
      *
-     * @param key   Key of the parameter.
-     * @param value Value of the parameter (or null).
-     */
-    public void addForQueryParams(String key, String value) {
-        if (!keysFromHttpQuery.contains(key)) {
-            values.add(key);
-            values.add(value);
-        }
-    }
-
-    /**
-     * Add a query string parameter and values to the query string.
-     * <p>
-     * The given key and values will be percent-encoded. If the values are already percent-encoded, it will be
-     * double percent-encoded.
-     *
-     * @param key   Key of the parameter.
-     * @param values List of values
+     * @param key    Key of the parameter.
+     * @param values Values to add (each is added as a separate {@code key=value} pair).
      */
     public void add(String key, List<String> values) {
-        for (String value : values) {
-            add(key, value);
+        for (String v : values) {
+            add(key, v);
         }
     }
 
     /**
-     * Add a query string parameter and values to the query string.
-     * <p>
-     * The given key and values will be percent-encoded. If the values are already percent-encoded, it will be
-     * double percent-encoded.
+     * Add all entries from a map of {@code key -> [value, ...]} to the query string.
      *
-     * @param values List of values
+     * @param values Map of keys to lists of values.
      */
     public void add(Map<String, List<String>> values) {
         for (var entry : values.entrySet()) {
@@ -88,12 +65,41 @@ public final class QueryStringBuilder {
     }
 
     /**
+     * Add a query string parameter and value from a {@code @httpQueryParams} member.
+     *
+     * <p>Skips the key if it was already added via {@link #add} so {@code @httpQuery}
+     * members take precedence over {@code @httpQueryParams} entries with the same key.
+     *
+     * @param key   Key of the parameter.
+     * @param value Value of the parameter (or null).
+     */
+    public void addForQueryParams(String key, String value) {
+        if (!httpQueryKeys.contains(key)) {
+            append(key, value);
+        }
+    }
+
+    private void append(String key, String value) {
+        if (!empty) {
+            builder.append('&');
+        } else {
+            empty = false;
+        }
+
+        URLEncoding.encodeUnreserved(key, builder, false);
+        builder.append('=');
+        if (value != null) {
+            URLEncoding.encodeUnreserved(value, builder, false);
+        }
+    }
+
+    /**
      * Check if the query string is empty.
      *
-     * @return Returns true if empty.
+     * @return Returns true if no parameters have been added.
      */
     public boolean isEmpty() {
-        return values.isEmpty();
+        return empty;
     }
 
     /**
@@ -103,28 +109,15 @@ public final class QueryStringBuilder {
      */
     @Override
     public String toString() {
-        StringBuilder result = new StringBuilder();
-        write(result);
-        return result.toString();
+        return builder.toString();
     }
 
     /**
-     * Write the query string directly to a string builder.
+     * Append the query string directly to a string builder.
      *
      * @param sink Where to write.
      */
     public void write(StringBuilder sink) {
-        for (int i = 0; i < values.size(); i += 2) {
-            if (i > 0) {
-                sink.append('&');
-            }
-            encode(values.get(i), sink);
-            sink.append('=');
-            encode(values.get(i + 1), sink);
-        }
-    }
-
-    private void encode(String raw, StringBuilder builder) {
-        URLEncoding.encodeUnreserved(raw, builder, false);
+        sink.append(builder);
     }
 }

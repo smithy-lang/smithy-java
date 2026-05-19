@@ -14,23 +14,44 @@ public final class URLEncoding {
 
     private URLEncoding() {}
 
-    private static final boolean[] UNRESERVED = new boolean[128];
+    // RFC 3986 unreserved character set encoded as a 128-bit table split into two longs.
+    // Bit `c` of UNRESERVED_LOW (for c in 0..63) or bit `c - 64` of UNRESERVED_HIGH
+    // (for c in 64..127) is set iff `c` is unreserved.
+    private static final long UNRESERVED_LOW;
+    private static final long UNRESERVED_HIGH;
     private static final char[] HEX = "0123456789ABCDEF".toCharArray();
 
     static {
+        long low = 0L;
+        long high = 0L;
         for (char c = 'A'; c <= 'Z'; c++) {
-            UNRESERVED[c] = true;
+            high |= 1L << (c - 64);
         }
         for (char c = 'a'; c <= 'z'; c++) {
-            UNRESERVED[c] = true;
+            high |= 1L << (c - 64);
         }
         for (char c = '0'; c <= '9'; c++) {
-            UNRESERVED[c] = true;
+            low |= 1L << c;
         }
-        UNRESERVED['-'] = true;
-        UNRESERVED['.'] = true;
-        UNRESERVED['_'] = true;
-        UNRESERVED['~'] = true;
+        low |= 1L << '-';
+        low |= 1L << '.';
+        high |= 1L << ('_' - 64);
+        high |= 1L << ('~' - 64);
+        UNRESERVED_LOW = low;
+        UNRESERVED_HIGH = high;
+    }
+
+    /**
+     * Returns true iff {@code c} is an RFC 3986 unreserved ASCII character.
+     */
+    private static boolean isUnreserved(int c) {
+        if (c >= 128) {
+            return false;
+        }
+
+        return c < 64
+                ? ((UNRESERVED_LOW >>> c) & 1L) != 0L
+                : ((UNRESERVED_HIGH >>> (c - 64)) & 1L) != 0L;
     }
 
     /**
@@ -42,10 +63,33 @@ public final class URLEncoding {
      * @param preserveSlashes true if '/' should be left unencoded.
      */
     public static void encodeUnreserved(String source, StringBuilder sink, boolean preserveSlashes) {
-        sink.ensureCapacity(sink.length() + source.length());
-        for (int i = 0; i < source.length(); i++) {
+        int len = source.length();
+        sink.ensureCapacity(sink.length() + len);
+
+        // Fast path: skip encoding if the input is already URL-safe.
+        int i = 0;
+        while (i < len) {
             char c = source.charAt(i);
-            if (c < 128 && UNRESERVED[c]) {
+            if (isUnreserved(c) || (preserveSlashes && c == '/')) {
+                i++;
+            } else {
+                break;
+            }
+        }
+
+        if (i == len) {
+            sink.append(source);
+            return;
+        }
+
+        if (i > 0) {
+            sink.append(source, 0, i);
+        }
+
+        // Slow path: encode the remainder character-by-character.
+        for (; i < len; i++) {
+            char c = source.charAt(i);
+            if (isUnreserved(c)) {
                 sink.append(c);
             } else if (preserveSlashes && c == '/') {
                 sink.append('/');
@@ -53,7 +97,7 @@ public final class URLEncoding {
                 percentEncode(sink, (byte) c);
             } else {
                 int codePoint;
-                if (Character.isHighSurrogate(c) && i + 1 < source.length()) {
+                if (Character.isHighSurrogate(c) && i + 1 < len) {
                     char d = source.charAt(i + 1);
                     if (Character.isLowSurrogate(d)) {
                         codePoint = Character.toCodePoint(c, d);
