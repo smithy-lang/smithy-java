@@ -58,6 +58,7 @@ public final class StructCodePlan {
             var jsonNameTrait = member.getTrait(TraitKey.JSON_NAME_TRAIT);
             String jsonName = jsonNameTrait != null ? jsonNameTrait.getValue() : null;
             String getterName = resolveGetter(shapeClass, memberName, target.type(), isUnion);
+            String setterName = resolveSetter(memberName);
             FieldCategory category = classify(target);
             boolean required = member.hasTrait(TraitKey.REQUIRED_TRAIT);
             boolean nullable = !required || isUnion;
@@ -89,6 +90,12 @@ public final class StructCodePlan {
                 } catch (NoSuchMethodException ignored) {
                     // fall through
                 }
+                if (elementClass == null && target.type() == ShapeType.LIST) {
+                    elementClass = resolveFromSchema(target, "member");
+                }
+                if (mapValueClass == null && target.type() == ShapeType.MAP) {
+                    mapValueClass = resolveFromSchema(target, "value");
+                }
             }
 
             fields.add(new FieldPlan(
@@ -96,6 +103,7 @@ public final class StructCodePlan {
                     memberName,
                     jsonName,
                     getterName,
+                    setterName,
                     member.memberIndex(),
                     category,
                     required,
@@ -131,13 +139,66 @@ public final class StructCodePlan {
         } catch (NoSuchMethodException e) {
             if (isUnion) {
                 // For unions, each variant is a separate record class. The getter name
-                // is the member name (record component accessor) on the variant class,
-                // not on the union interface. Return the member name as the getter since
-                // the serializer dispatches via instanceof to the correct variant class.
-                return memberName;
+                // is the record component accessor on the variant class (same naming as setter).
+                return resolveSetter(memberName);
             }
             throw new RuntimeException("No getter found for " + memberName + " on " + clazz.getName(), e);
         }
+    }
+
+    private static Class<?> resolveFromSchema(Schema target, String memberName) {
+        Schema memberSchema = target.member(memberName);
+        if (memberSchema != null) {
+            return memberSchema.memberTarget().shapeClass();
+        }
+        return null;
+    }
+
+    private static String resolveSetter(String memberName) {
+        if (memberName.indexOf('_') >= 0 || memberName.indexOf('-') >= 0 || memberName.indexOf(' ') >= 0) {
+            return toCamelCase(memberName);
+        }
+        return uncapitalizeAcronymAware(memberName);
+    }
+
+    private static String uncapitalizeAcronymAware(String str) {
+        if (Character.isLowerCase(str.charAt(0))) {
+            return str;
+        } else if (str.equals(str.toUpperCase())) {
+            return str.toLowerCase();
+        }
+        int strLen = str.length();
+        StringBuilder sb = new StringBuilder(strLen);
+        boolean nextIsUpperCase;
+        for (int idx = 0; idx < strLen; idx++) {
+            var currentChar = str.charAt(idx);
+            nextIsUpperCase = (idx + 1 < strLen) && Character.isUpperCase(str.charAt(idx + 1));
+            if (Character.isUpperCase(currentChar) && (nextIsUpperCase || idx == 0)) {
+                sb.append(Character.toLowerCase(currentChar));
+            } else {
+                sb.append(currentChar);
+            }
+        }
+        return sb.toString();
+    }
+
+    private static String toCamelCase(String str) {
+        StringBuilder sb = new StringBuilder(str.length());
+        boolean capitalizeNext = false;
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
+            if (c == '_' || c == '-' || c == ' ') {
+                capitalizeNext = true;
+            } else if (capitalizeNext) {
+                sb.append(Character.toUpperCase(c));
+                capitalizeNext = false;
+            } else if (i == 0) {
+                sb.append(Character.toLowerCase(c));
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     private static FieldCategory classify(Schema target) {

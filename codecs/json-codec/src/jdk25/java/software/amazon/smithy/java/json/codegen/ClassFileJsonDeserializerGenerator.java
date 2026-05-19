@@ -1090,7 +1090,7 @@ final class ClassFileJsonDeserializerGenerator {
             StructCodePlan plan,
             Class<?> actualBuilderClass
     ) {
-        String setter = field.memberName();
+        String setter = field.setterName();
         ClassDesc setterParam = resolveSetterParamType(actualBuilderClass, setter);
         ClassDesc setterReturn = resolveSetterReturnType(actualBuilderClass, setter);
         switch (field.category()) {
@@ -1434,7 +1434,7 @@ final class ClassFileJsonDeserializerGenerator {
             FieldPlan field,
             ClassDesc setterReturn
     ) {
-        String setter = field.memberName();
+        String setter = field.setterName();
         Integer tsIdx = timestampSchemaIndices.get(field.memberName());
         code.aload(SLOT_BUF);
         code.iload(SLOT_POS);
@@ -1471,7 +1471,7 @@ final class ClassFileJsonDeserializerGenerator {
             StructCodePlan plan,
             ClassDesc setterReturn
     ) {
-        String setter = field.memberName();
+        String setter = field.setterName();
         FieldCategory elemCategory = resolveElementCategory(field);
         int listSlot = nextTempSlot++;
 
@@ -1845,7 +1845,7 @@ final class ClassFileJsonDeserializerGenerator {
             StructCodePlan plan,
             ClassDesc setterReturn
     ) {
-        String setter = field.memberName();
+        String setter = field.setterName();
         FieldCategory valCategory = resolveMapValueCategory(field);
         int mapSlot = nextTempSlot++;
 

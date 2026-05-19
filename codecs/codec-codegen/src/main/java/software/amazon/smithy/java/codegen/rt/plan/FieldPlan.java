@@ -15,6 +15,7 @@ public record FieldPlan(
         String memberName,
         String jsonName,
         String getterName,
+        String setterName,
         int memberIndex,
         FieldCategory category,
         boolean required,
