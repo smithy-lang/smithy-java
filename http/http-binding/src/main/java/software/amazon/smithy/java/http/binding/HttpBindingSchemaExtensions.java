@@ -21,6 +21,7 @@ import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.http.api.HeaderName;
+import software.amazon.smithy.java.io.uri.URLEncoding;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.HttpTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -39,6 +40,10 @@ public final class HttpBindingSchemaExtensions
      * Extension key for HTTP binding pre-computed data.
      */
     public static final SchemaExtensionKey<HttpBindingExt> KEY = new SchemaExtensionKey<>();
+
+    private static final Schema[] NO_SCHEMAS = new Schema[0];
+    private static final HeaderName[] NO_HEADER_NAMES = new HeaderName[0];
+    private static final String[] NO_STRINGS = new String[0];
 
     /**
      * Look up the {@link MemberBinding} for a member schema. Throws if no binding or not a member.
@@ -86,9 +91,6 @@ public final class HttpBindingSchemaExtensions
         }
         return sb;
     }
-
-    private static final Schema[] NO_SCHEMAS = new Schema[0];
-    private static final String[] NO_QUERY_LITERALS = new String[0];
 
     /**
      * Binding kind for a single member, derived from the traits applied to it.
@@ -356,12 +358,14 @@ public final class HttpBindingSchemaExtensions
      * Pre-computed HTTP-binding data for an operation schema.
      *
      * @param httpTrait the cached {@code @http} trait — saves an {@code expectTrait} call per request.
-     * @param queryLiterals flat array of (name, value) pairs from the URI's static query literals, or empty.
+     * @param queryLiteralKeys raw {@code @http} URI query literal keys (e.g. {@code ["x-id"]}).
+     * @param queryLiteralEntries pre-encoded {@code "key=value"} strings parallel to {@link #queryLiteralKeys}.
      * @param defaultResponseStatus default response status declared by the {@code @http} trait.
      */
     record OperationBinding(
             HttpTrait httpTrait,
-            String[] queryLiterals,
+            String[] queryLiteralKeys,
+            String[] queryLiteralEntries,
             int defaultResponseStatus) implements HttpBindingExt {}
 
     @Override
@@ -732,9 +736,6 @@ public final class HttpBindingSchemaExtensions
         return list.isEmpty() ? NO_SCHEMAS : list.toArray(new Schema[0]);
     }
 
-    private static final HeaderName[] NO_HEADER_NAMES = new HeaderName[0];
-    private static final String[] NO_STRINGS = new String[0];
-
     /**
      * Pre-resolve canonical {@link HeaderName}s parallel to a {@code Schema[]} of
      * list-header members. Reading the name later in the deserializer becomes a
@@ -772,21 +773,31 @@ public final class HttpBindingSchemaExtensions
         var httpTrait = schema.expectTrait(TraitKey.HTTP_TRAIT);
         var uriPattern = httpTrait.getUri();
 
-        // Flatten query literals into a (name, value) pair array. The trait's own map iteration is stable for a
-        // given trait instance, but this avoids the per-call iterator + Map.Entry allocations.
+        // Pre-encode static @http URI query literals into "key=value" strings so the request hot path can append
+        // them verbatim instead of re-encoding per call.
         var queryLiteralMap = uriPattern.getQueryLiterals();
-        String[] queryLiterals;
+        String[] queryLiteralKeys;
+        String[] queryLiteralEntries;
         if (queryLiteralMap.isEmpty()) {
-            queryLiterals = NO_QUERY_LITERALS;
+            queryLiteralKeys = NO_STRINGS;
+            queryLiteralEntries = NO_STRINGS;
         } else {
-            queryLiterals = new String[2 * queryLiteralMap.size()];
+            int n = queryLiteralMap.size();
+            queryLiteralKeys = new String[n];
+            queryLiteralEntries = new String[n];
             int i = 0;
+            StringBuilder pair = new StringBuilder();
             for (var entry : queryLiteralMap.entrySet()) {
-                queryLiterals[i++] = entry.getKey();
-                queryLiterals[i++] = entry.getValue();
+                pair.setLength(0);
+                URLEncoding.encodeUnreserved(entry.getKey(), pair, false);
+                pair.append('=');
+                URLEncoding.encodeUnreserved(entry.getValue(), pair, false);
+                queryLiteralKeys[i] = entry.getKey();
+                queryLiteralEntries[i] = pair.toString();
+                i++;
             }
         }
 
-        return new OperationBinding(httpTrait, queryLiterals, httpTrait.getCode());
+        return new OperationBinding(httpTrait, queryLiteralKeys, queryLiteralEntries, httpTrait.getCode());
     }
 }

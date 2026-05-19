@@ -79,6 +79,23 @@ public final class QueryStringBuilder {
         }
     }
 
+    /**
+     * Append a pre-encoded {@code "key=value"} entry to the query string and register its raw key with the
+     * {@code @httpQuery} dedupe set so a subsequent {@link #addForQueryParams} with the same key will be skipped.
+     *
+     * @param rawKey            raw (unencoded) key, used only for the dedupe set.
+     * @param encodedKeyEqValue {@code "encodedKey=encodedValue"} as a single ready-to-append string.
+     */
+    public void addPreEncoded(String rawKey, String encodedKeyEqValue) {
+        if (!empty) {
+            builder.append('&');
+        } else {
+            empty = false;
+        }
+        builder.append(encodedKeyEqValue);
+        httpQueryKeys.add(rawKey);
+    }
+
     private void append(String key, String value) {
         if (!empty) {
             builder.append('&');

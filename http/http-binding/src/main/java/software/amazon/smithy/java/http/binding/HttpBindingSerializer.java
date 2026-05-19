@@ -144,12 +144,13 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
         headers = HttpHeaders.ofModifiable(headerCount);
 
-        // Add fixed query string parameters from @http trait's uri field.
-        String[] qLits = operationBinding.queryLiterals();
-        if (qLits.length > 0) {
+        // Append the static @http URI query literals
+        String[] qKeys = operationBinding.queryLiteralKeys();
+        if (qKeys.length > 0) {
             QueryStringBuilder qsb = queryStringParams();
-            for (int i = 0; i < qLits.length; i += 2) {
-                qsb.add(qLits[i], qLits[i + 1]);
+            String[] qEntries = operationBinding.queryLiteralEntries();
+            for (int i = 0; i < qKeys.length; i++) {
+                qsb.addPreEncoded(qKeys[i], qEntries[i]);
             }
         }
 
