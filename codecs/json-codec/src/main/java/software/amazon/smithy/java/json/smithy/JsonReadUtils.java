@@ -220,7 +220,9 @@ public final class JsonReadUtils {
         while (pos < end) {
             byte b = buf[pos];
             if (b == '"') {
-                deser.parsedString = new String(buf, start, pos - start,
+                deser.parsedString = new String(buf,
+                        start,
+                        pos - start,
                         ascii ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8);
                 deser.parsedEndPos = pos + 1;
                 return;
@@ -493,8 +495,13 @@ public final class JsonReadUtils {
      * Returns pos + nameLen + 1 (past closing quote) on match, or -1.
      */
     public static int matchFieldName2Long(
-            byte[] buf, int pos, int end,
-            long expected0, long expected1, long mask1, int nameLen
+            byte[] buf,
+            int pos,
+            int end,
+            long expected0,
+            long expected1,
+            long mask1,
+            int nameLen
     ) {
         if (pos + nameLen + 1 > end || buf[pos + nameLen] != '"') {
             return -1;
@@ -1023,7 +1030,9 @@ public final class JsonReadUtils {
         while (pos < end) {
             byte b = buf[pos];
             if (b == '"') {
-                state.parsedString = new String(buf, start, pos - start,
+                state.parsedString = new String(buf,
+                        start,
+                        pos - start,
                         ascii ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8);
                 state.parsedEndPos = pos + 1;
                 return;

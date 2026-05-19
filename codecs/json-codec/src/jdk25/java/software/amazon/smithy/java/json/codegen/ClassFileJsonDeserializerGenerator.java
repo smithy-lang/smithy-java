@@ -188,7 +188,10 @@ final class ClassFileJsonDeserializerGenerator {
                         ClassFile.ACC_PRIVATE | ClassFile.ACC_STATIC | ClassFile.ACC_FINAL);
             }
 
-            emitClassInit(cb, thisClass, fieldNameBytesList, deHoldersClassDataOffset,
+            emitClassInit(cb,
+                    thisClass,
+                    fieldNameBytesList,
+                    deHoldersClassDataOffset,
                     tsSchemaClassDataOffset);
             emitConstructor(cb, thisClass);
             emitDeserializeFieldMethod(cb, thisClass, plan);
@@ -558,8 +561,15 @@ final class ClassFileJsonDeserializerGenerator {
 
         if (fields.size() <= DE_CHUNK_SIZE) {
             // Small struct: single method with all fields inline
-            emitDeserializeFieldMethodBody(cb, thisClass, builderClass, fields,
-                    plan, actualBuilderClass, "deserializeField$", fieldMethodDesc, 0);
+            emitDeserializeFieldMethodBody(cb,
+                    thisClass,
+                    builderClass,
+                    fields,
+                    plan,
+                    actualBuilderClass,
+                    "deserializeField$",
+                    fieldMethodDesc,
+                    0);
         } else {
             // Large struct: thin dispatcher + chunk methods
             int numChunks = (fields.size() + DE_CHUNK_SIZE - 1) / DE_CHUNK_SIZE;
@@ -567,9 +577,15 @@ final class ClassFileJsonDeserializerGenerator {
                 int start = chunk * DE_CHUNK_SIZE;
                 int end = Math.min(start + DE_CHUNK_SIZE, fields.size());
                 List<FieldPlan> chunkFields = fields.subList(start, end);
-                emitDeserializeFieldMethodBody(cb, thisClass, builderClass, chunkFields,
-                        plan, actualBuilderClass, "deserializeField$" + chunk,
-                        fieldMethodDesc, start);
+                emitDeserializeFieldMethodBody(cb,
+                        thisClass,
+                        builderClass,
+                        chunkFields,
+                        plan,
+                        actualBuilderClass,
+                        "deserializeField$" + chunk,
+                        fieldMethodDesc,
+                        start);
             }
 
             // Thin dispatcher: route matched index to the correct chunk method
@@ -648,7 +664,8 @@ final class ClassFileJsonDeserializerGenerator {
                     for (int i = 0; i < fields.size(); i++) {
                         fieldLabels[i] = code.newLabel();
                         cases.add(java.lang.classfile.instruction.SwitchCase.of(
-                                fieldOffset + i, fieldLabels[i]));
+                                fieldOffset + i,
+                                fieldLabels[i]));
                     }
 
                     code.iload(DF_SLOT_MATCHED);
@@ -858,8 +875,14 @@ final class ClassFileJsonDeserializerGenerator {
             code.ldc(nameLen);
             code.invokestatic(CD_JsonReadUtils,
                     "matchFieldName2Long",
-                    MethodTypeDesc.of(CD_int, CD_byte_array, CD_int, CD_int,
-                            CD_long, CD_long, CD_long, CD_int));
+                    MethodTypeDesc.of(CD_int,
+                            CD_byte_array,
+                            CD_int,
+                            CD_int,
+                            CD_long,
+                            CD_long,
+                            CD_long,
+                            CD_int));
         } else {
             code.getstatic(thisClass, staticFieldName, CD_byte_array);
             code.invokestatic(CD_JsonReadUtils,
