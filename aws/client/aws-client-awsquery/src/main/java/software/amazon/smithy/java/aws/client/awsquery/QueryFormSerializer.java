@@ -12,7 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
-import software.amazon.smithy.aws.traits.protocols.Ec2QueryNameTrait;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -82,17 +81,6 @@ final class QueryFormSerializer implements ShapeSerializer {
         sink.writeUrlEncoded(value);
     }
 
-    private void writeParam(String key, String value) {
-        sink.writeByte('&');
-        writeCurrentPrefix();
-        if (prefixDepth > 0) {
-            sink.writeByte('.');
-        }
-        sink.writeUrlEncoded(key);
-        sink.writeByte('=');
-        sink.writeUrlEncoded(value);
-    }
-
     private void writeCurrentPrefix() {
         for (int i = 0; i < prefixDepth; i++) {
             if (i > 0) {
@@ -100,10 +88,6 @@ final class QueryFormSerializer implements ShapeSerializer {
             }
             sink.writeBytes(prefixCache[i], 0, prefixCache[i].length);
         }
-    }
-
-    private void pushPrefix(String prefix) {
-        pushPrefix(encodePrefix(prefix));
     }
 
     private void pushPrefix(byte[] prefix) {
@@ -131,15 +115,6 @@ final class QueryFormSerializer implements ShapeSerializer {
         prefixDepth--;
     }
 
-    private byte[] encodePrefix(String prefix) {
-        FormUrlEncodedSink tmp = new FormUrlEncodedSink(prefix.length() * 3);
-        tmp.writeUrlEncoded(prefix);
-        ByteBuffer bb = tmp.finish();
-        byte[] result = new byte[bb.remaining()];
-        bb.get(result);
-        return result;
-    }
-
     @SuppressWarnings("deprecation")
     private byte[] encodeIndexedPrefix(byte[] base, int index) {
         String indexStr = Integer.toString(index);
@@ -160,38 +135,15 @@ final class QueryFormSerializer implements ShapeSerializer {
 
     // --- Member name resolution (protocol-specific) ---
 
-    private String getMemberName(Schema schema) {
-        return switch (variant) {
-            case AWS_QUERY -> getAwsQueryMemberName(schema);
-            case EC2_QUERY -> getEc2QueryMemberName(schema);
-        };
-    }
-
-    private static String getAwsQueryMemberName(Schema schema) {
-        var xmlName = schema.getTrait(TraitKey.XML_NAME_TRAIT);
-        if (xmlName != null) {
-            return xmlName.getValue();
+    /**
+     * Read the pre-computed URL-encoded member-name bytes from the schema extension.
+     */
+    private byte[] getMemberNameBytes(Schema schema) {
+        var ext = schema.getExtension(AwsQuerySchemaExtensions.KEY);
+        if (ext == null) {
+            return null;
         }
-        return schema.memberName();
-    }
-
-    private static String getEc2QueryMemberName(Schema schema) {
-        var ec2Name = schema.getTrait(TraitKey.get(Ec2QueryNameTrait.class));
-        if (ec2Name != null) {
-            return ec2Name.getValue();
-        }
-        var xmlName = schema.getTrait(TraitKey.XML_NAME_TRAIT);
-        if (xmlName != null) {
-            return capitalize(xmlName.getValue());
-        }
-        return capitalize(schema.memberName());
-    }
-
-    private static String capitalize(String s) {
-        if (s == null || s.isEmpty() || Character.isUpperCase(s.charAt(0))) {
-            return s;
-        }
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
+        return variant == QueryVariant.AWS_QUERY ? ext.awsQueryNameBytes() : ext.ec2QueryNameBytes();
     }
 
     // --- Struct ---
@@ -199,15 +151,13 @@ final class QueryFormSerializer implements ShapeSerializer {
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
         if (schema.isMember()) {
-            String memberName = getMemberName(schema);
-            if (memberName != null) {
-                pushPrefix(memberName);
-                struct.serializeMembers(this);
-                popPrefix();
-                return;
-            }
+            // Member schemas always have a non-null QueryMemberBinding (see provider).
+            pushPrefix(getMemberNameBytes(schema));
+            struct.serializeMembers(this);
+            popPrefix();
+        } else {
+            struct.serializeMembers(this);
         }
-        struct.serializeMembers(this);
     }
 
     // --- List (protocol-specific) ---
@@ -231,7 +181,7 @@ final class QueryFormSerializer implements ShapeSerializer {
         Schema memberSchema = schema.listMember();
 
         if (schema.isMember()) {
-            pushPrefix(getMemberName(schema));
+            pushPrefix(getMemberNameBytes(schema));
         }
 
         if (size == 0) {
@@ -261,7 +211,7 @@ final class QueryFormSerializer implements ShapeSerializer {
     private <T> void writeEc2List(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
         // EC2 Query lists are always flattened - no .member. segment
         if (schema.isMember()) {
-            pushPrefix(getMemberName(schema));
+            pushPrefix(getMemberNameBytes(schema));
         }
 
         if (size == 0) {
@@ -443,7 +393,7 @@ final class QueryFormSerializer implements ShapeSerializer {
         Schema valueSchema = schema.mapValueMember();
 
         if (schema.isMember()) {
-            pushPrefix(getMemberName(schema));
+            pushPrefix(getMemberNameBytes(schema));
         }
 
         var keyXmlName = keySchema.getTrait(TraitKey.XML_NAME_TRAIT);
@@ -641,77 +591,77 @@ final class QueryFormSerializer implements ShapeSerializer {
 
     @Override
     public void writeBoolean(Schema schema, boolean value) {
-        writeParam(getMemberName(schema), value ? "true" : "false");
+        writeParam(getMemberNameBytes(schema), value ? "true" : "false");
     }
 
     @Override
     public void writeByte(Schema schema, byte value) {
-        writeParam(getMemberName(schema), Byte.toString(value));
+        writeParam(getMemberNameBytes(schema), Byte.toString(value));
     }
 
     @Override
     public void writeShort(Schema schema, short value) {
-        writeParam(getMemberName(schema), Short.toString(value));
+        writeParam(getMemberNameBytes(schema), Short.toString(value));
     }
 
     @Override
     public void writeInteger(Schema schema, int value) {
-        writeParam(getMemberName(schema), Integer.toString(value));
+        writeParam(getMemberNameBytes(schema), Integer.toString(value));
     }
 
     @Override
     public void writeLong(Schema schema, long value) {
-        writeParam(getMemberName(schema), Long.toString(value));
+        writeParam(getMemberNameBytes(schema), Long.toString(value));
     }
 
     @Override
     public void writeFloat(Schema schema, float value) {
-        String memberName = getMemberName(schema);
+        byte[] memberNameBytes = getMemberNameBytes(schema);
         if (Float.isNaN(value)) {
-            writeParam(memberName, "NaN");
+            writeParam(memberNameBytes, "NaN");
         } else if (Float.isInfinite(value)) {
-            writeParam(memberName, value > 0 ? "Infinity" : "-Infinity");
+            writeParam(memberNameBytes, value > 0 ? "Infinity" : "-Infinity");
         } else {
-            writeParam(memberName, Float.toString(value));
+            writeParam(memberNameBytes, Float.toString(value));
         }
     }
 
     @Override
     public void writeDouble(Schema schema, double value) {
-        String memberName = getMemberName(schema);
+        byte[] memberNameBytes = getMemberNameBytes(schema);
         if (Double.isNaN(value)) {
-            writeParam(memberName, "NaN");
+            writeParam(memberNameBytes, "NaN");
         } else if (Double.isInfinite(value)) {
-            writeParam(memberName, value > 0 ? "Infinity" : "-Infinity");
+            writeParam(memberNameBytes, value > 0 ? "Infinity" : "-Infinity");
         } else {
-            writeParam(memberName, Double.toString(value));
+            writeParam(memberNameBytes, Double.toString(value));
         }
     }
 
     @Override
     public void writeBigInteger(Schema schema, BigInteger value) {
-        writeParam(getMemberName(schema), value.toString());
+        writeParam(getMemberNameBytes(schema), value.toString());
     }
 
     @Override
     public void writeBigDecimal(Schema schema, BigDecimal value) {
-        writeParam(getMemberName(schema), value.toPlainString());
+        writeParam(getMemberNameBytes(schema), value.toPlainString());
     }
 
     @Override
     public void writeString(Schema schema, String value) {
-        writeParam(getMemberName(schema), value);
+        writeParam(getMemberNameBytes(schema), value);
     }
 
     @Override
     public void writeBlob(Schema schema, ByteBuffer value) {
-        writeParam(getMemberName(schema), ByteBufferUtils.base64Encode(value));
+        writeParam(getMemberNameBytes(schema), ByteBufferUtils.base64Encode(value));
     }
 
     @Override
     public void writeTimestamp(Schema schema, Instant value) {
         TimestampFormatter formatter = TimestampFormatter.of(schema, TimestampFormatTrait.Format.DATE_TIME);
-        writeParam(getMemberName(schema), formatter.writeString(value));
+        writeParam(getMemberNameBytes(schema), formatter.writeString(value));
     }
 
     @Override

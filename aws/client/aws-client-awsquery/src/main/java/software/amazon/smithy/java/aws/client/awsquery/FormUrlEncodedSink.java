@@ -108,7 +108,7 @@ final class FormUrlEncodedSink {
         return ByteBuffer.wrap(bytes, 0, pos);
     }
 
-    private static boolean isUnreserved(char c) {
+    static boolean isUnreserved(char c) {
         return (c >= 'A' && c <= 'Z')
                 || (c >= 'a' && c <= 'z')
                 || (c >= '0' && c <= '9')
