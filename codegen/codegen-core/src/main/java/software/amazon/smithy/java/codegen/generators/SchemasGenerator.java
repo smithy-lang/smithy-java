@@ -511,7 +511,7 @@ public final class SchemasGenerator
         @Override
         public Void unionShape(UnionShape shape) {
             writer.write(
-                    "static final ${schemaBuilder:T} ${name:L} = ${schemaClass:T}.structureBuilder(${shapeId:T}.from(${id:S})${traits:C});");
+                    "static final ${schemaBuilder:T} ${name:L} = ${schemaClass:T}.unionBuilder(${shapeId:T}.from(${id:S})${traits:C});");
             return null;
         }
     }
