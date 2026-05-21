@@ -82,7 +82,13 @@ public abstract class Client implements Closeable {
             RequestOverrideConfig overrideConfig
     ) {
         if (callDecorator != null) {
-            return callDecorator.apply(this, operation, input, overrideConfig, this::doCall);
+            return callDecorator.apply(
+                    this,
+                    operation,
+                    input,
+                    overrideConfig,
+                    overrideConfig == null ? null : overrideConfig.context(),
+                    this::doCall);
         }
 
         return this.doCall(input, operation, overrideConfig);

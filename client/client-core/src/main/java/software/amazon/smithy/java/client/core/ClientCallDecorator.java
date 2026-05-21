@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.client.core;
 
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 
@@ -26,6 +27,7 @@ public interface ClientCallDecorator<C> {
      * @param operation the API operation being invoked.
      * @param input the operation input.
      * @param overrideConfig optional per-request configuration overrides, or {@code null}.
+     * @param overrideContext optional per-request context overrides, or {@code null}.
      * @param next the next invoker in the chain to delegate the actual call to.
      * @param <I> the input type.
      * @param <O> the output type.
@@ -36,6 +38,7 @@ public interface ClientCallDecorator<C> {
             ApiOperation<I, O> operation,
             I input,
             RequestOverrideConfig overrideConfig,
+            Context overrideContext,
             ClientCallInvoker next
     );
 }
