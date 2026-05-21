@@ -36,6 +36,8 @@ import software.amazon.smithy.java.client.http.plugins.ApplyHttpRetryInfoPlugin;
 import software.amazon.smithy.java.client.http.plugins.HttpChecksumPlugin;
 import software.amazon.smithy.java.client.http.plugins.RequestCompressionPlugin;
 import software.amazon.smithy.java.client.http.plugins.UserAgentPlugin;
+import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.dynamicclient.plugins.DetectProtocolPlugin;
@@ -300,5 +302,41 @@ public class ClientTest {
                 .build();
 
         c.call("GetSprocket");
+    }
+
+    @Test
+    public void setsCallDecorator() throws URISyntaxException {
+        var queue = new MockQueue();
+        queue.enqueue(HttpResponse.create().setStatusCode(200).toUnmodifiable());
+
+        DynamicClient c = DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(MockPlugin.builder().addQueue(queue).build())
+                .addPlugin(config -> config.callDecorator(new ClientCallDecorator<DynamicClient>() {
+                    @Override
+                    public <I extends SerializableStruct, O extends SerializableStruct> O apply(
+                            DynamicClient client,
+                            ApiOperation<I, O> operation,
+                            I input,
+                            RequestOverrideConfig overrideConfig,
+                            ClientCallInvoker next
+                    ) {
+                        assertThat(overrideConfig.context().get(ClientContext.APPLICATION_ID), equalTo("foo"));
+                        throw new IllegalStateException("Prevent calling the service");
+                    }
+                }))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
+                .build();
+
+        Assertions.assertThrows(IllegalStateException.class, () -> {
+            c.call("GetSprocket",
+                    Document.ofObject(new HashMap<>()),
+                    RequestOverrideConfig.builder()
+                            .putConfig(ClientContext.APPLICATION_ID, "foo")
+                            .build());
+        }, "Prevent calling the service");
     }
 }
