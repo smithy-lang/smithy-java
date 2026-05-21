@@ -36,6 +36,7 @@ import software.amazon.smithy.java.client.http.plugins.ApplyHttpRetryInfoPlugin;
 import software.amazon.smithy.java.client.http.plugins.HttpChecksumPlugin;
 import software.amazon.smithy.java.client.http.plugins.RequestCompressionPlugin;
 import software.amazon.smithy.java.client.http.plugins.UserAgentPlugin;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -321,9 +322,10 @@ public class ClientTest {
                             ApiOperation<I, O> operation,
                             I input,
                             RequestOverrideConfig overrideConfig,
+                            Context overrideContext,
                             ClientCallInvoker next
                     ) {
-                        assertThat(overrideConfig.context().get(ClientContext.APPLICATION_ID), equalTo("foo"));
+                        assertThat(overrideContext.get(ClientContext.APPLICATION_ID), equalTo("foo"));
                         throw new IllegalStateException("Prevent calling the service");
                     }
                 }))
