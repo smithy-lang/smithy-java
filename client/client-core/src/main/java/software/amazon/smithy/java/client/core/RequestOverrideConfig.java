@@ -74,7 +74,12 @@ public final class RequestOverrideConfig {
         return identityResolvers;
     }
 
-    Context context() {
+    /**
+     * Get the context of the override request config.
+     *
+     * @return the context.
+     */
+    public Context context() {
         return context;
     }
 
