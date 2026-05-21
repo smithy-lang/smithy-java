@@ -53,6 +53,7 @@ public final class ClientConfig {
     private final RetryStrategy retryStrategy;
     private final String retryScope;
     private final Set<Class<? extends ClientPlugin>> appliedPluginClasses;
+    private final ClientCallDecorator<?> callDecorator;
 
     private ClientConfig(Builder builder) {
         // Collect and apply plugins, updating builder.appliedPluginClasses as we go
@@ -95,6 +96,7 @@ public final class ClientConfig {
 
         this.context = Context.unmodifiableCopy(builder.context);
         this.service = Objects.requireNonNull(builder.service, "Missing required service schema");
+        this.callDecorator = builder.callDecorator;
     }
 
     private static List<ClientPlugin> collectPlugins(
@@ -223,6 +225,10 @@ public final class ClientConfig {
         return retryScope;
     }
 
+    ClientCallDecorator<?> callDecorator() {
+        return callDecorator;
+    }
+
     /**
      * Create a new builder to build {@link ClientConfig}.
      *
@@ -322,6 +328,7 @@ public final class ClientConfig {
         private final Map<Class<? extends ClientPlugin>, ClientPlugin> plugins = new LinkedHashMap<>();
         // Mutable set that tracks which plugin classes have been applied to this builder
         private final Set<Class<? extends ClientPlugin>> appliedPluginClasses = new HashSet<>();
+        private ClientCallDecorator<?> callDecorator;
 
         public Builder() {
             plugins.put(DefaultPlugin.class, DefaultPlugin.INSTANCE);
@@ -657,6 +664,17 @@ public final class ClientConfig {
          */
         public Builder addPluginPredicate(Predicate<ClientPlugin> pluginPredicate) {
             return pluginPredicate(this.pluginPredicate.and(pluginPredicate));
+        }
+
+        /**
+         * Sets the decorator to wrap client call execution.
+         *
+         * @param callDecorator the client call decorator.
+         * @return the builder.
+         */
+        public Builder callDecorator(ClientCallDecorator<?> callDecorator) {
+            this.callDecorator = callDecorator;
+            return this;
         }
 
         /**

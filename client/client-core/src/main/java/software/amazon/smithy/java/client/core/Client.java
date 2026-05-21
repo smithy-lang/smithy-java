@@ -43,7 +43,9 @@ public abstract class Client implements Closeable {
     private final ClientInterceptor interceptor;
     private final IdentityResolvers identityResolvers;
     private final RetryStrategy retryStrategy;
+    private final ClientCallDecorator<Client> callDecorator;
 
+    @SuppressWarnings("unchecked")
     protected Client(Builder<?, ?> builder) {
         ClientConfig.Builder configBuilder = builder.configBuilder();
         this.config = configBuilder.build();
@@ -61,6 +63,7 @@ public abstract class Client implements Closeable {
         if (retryStrategy instanceof Claimable c) {
             c.claim(this);
         }
+        this.callDecorator = (ClientCallDecorator<Client>) this.config.callDecorator();
     }
 
     /**
@@ -74,6 +77,18 @@ public abstract class Client implements Closeable {
      * @return Returns the deserialized output.
      */
     protected <I extends SerializableStruct, O extends SerializableStruct> O call(
+            I input,
+            ApiOperation<I, O> operation,
+            RequestOverrideConfig overrideConfig
+    ) {
+        if (callDecorator != null) {
+            return callDecorator.apply(this, operation, input, overrideConfig, this::doCall);
+        }
+
+        return this.doCall(input, operation, overrideConfig);
+    }
+
+    private <I extends SerializableStruct, O extends SerializableStruct> O doCall(
             I input,
             ApiOperation<I, O> operation,
             RequestOverrideConfig overrideConfig
@@ -367,7 +382,7 @@ public abstract class Client implements Closeable {
          * plugin class. Plugins are applied in a sorted {@link ClientPlugin.Phase} and insertion order.
          *
          * @see ClientConfig.Builder#pluginPredicate()
-         * @see ClientConfig.Builder#addPlugin(ClientPlugin) 
+         * @see ClientConfig.Builder#addPlugin(ClientPlugin)
          * @param plugin Plugin to add.
          * @return the builder.
          */
@@ -415,6 +430,18 @@ public abstract class Client implements Closeable {
                     return AutoPlugin.INSTANCE != plugin;
                 }
             }.and(configBuilder.pluginPredicate()));
+        }
+
+        /**
+         * Sets the decorator to wrap client call execution.
+         *
+         * @param callDecorator the client call decorator.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B callDecorator(ClientCallDecorator<I> callDecorator) {
+            configBuilder.callDecorator(callDecorator);
+            return (B) this;
         }
 
         /**
