@@ -20,7 +20,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.tools.Diagnostic;
@@ -33,6 +36,7 @@ import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.parallel.Execution;
@@ -57,10 +61,25 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 @EnabledIfSystemProperty(named = "awsModelsTests", matches = "true")
 class AwsModelCodegenCompilationTest {
 
+    private static final Map<String, Long> artifactSizes = new ConcurrentHashMap<>();
+
     private static final Set<String> IGNORED_SDK_IDS = Set.of(
             "timestream-write",
             "timestream-query",
             "clouddirectory");
+
+    @AfterAll
+    static void writeArtifactSizeStatistics() throws IOException {
+        var sb = new StringBuilder();
+        artifactSizes.forEach((key, value) -> sb.append(key)
+                .append('\t')
+                .append(value)
+                .append('\n'));
+
+        Path outputDir = Path.of(System.getProperty("artifactStatsDir", "build"));
+        Files.createDirectories(outputDir);
+        Files.writeString(outputDir.resolve("artifact-size-stats.tsv"), sb.toString());
+    }
 
     static Stream<Named<URL>> awsModels() {
         return ModelDiscovery.findModels()
@@ -148,6 +167,7 @@ class AwsModelCodegenCompilationTest {
                         fail(Arrays.toString(modes) + " compilation failed for " + service.getId()
                                 + ". Generated sources dumped to: " + dumpFile + "\n" + errors);
                     }
+                    artifactSizes.put(artifactName(modelUrl), fm.getTotalBytesWritten());
                 }
             }
         } catch (Throwable t) {
@@ -201,11 +221,17 @@ class AwsModelCodegenCompilationTest {
     }
 
     /**
-     * In-memory output manager — discards .class bytes.
+     * In-memory output manager — captures .class byte counts.
      */
     private static class InMemoryFileManager extends ForwardingJavaFileManager<StandardJavaFileManager> {
+        private final AtomicLong totalBytesWritten = new AtomicLong();
+
         InMemoryFileManager(StandardJavaFileManager delegate) {
             super(delegate);
+        }
+
+        long getTotalBytesWritten() {
+            return totalBytesWritten.get();
         }
 
         @Override
@@ -220,7 +246,13 @@ class AwsModelCodegenCompilationTest {
                     kind) {
                 @Override
                 public OutputStream openOutputStream() {
-                    return new ByteArrayOutputStream();
+                    return new ByteArrayOutputStream() {
+                        @Override
+                        public void close() throws IOException {
+                            super.close();
+                            totalBytesWritten.addAndGet(size());
+                        }
+                    };
                 }
             };
         }

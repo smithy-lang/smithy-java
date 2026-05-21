@@ -1,3 +1,5 @@
+import java.io.Serializable
+
 plugins {
     id("smithy-java.codegen-plugin-conventions")
     id("smithy-java.publishing-conventions")
@@ -95,4 +97,64 @@ tasks.test {
 
 configureIntegTests {
     awsModelTests = true
+}
+
+val artifactStatsDir = project.layout.buildDirectory.dir("reports/artifact-stats")
+
+class PrintArtifactSizeStats(
+    private val statsPath: String,
+) : Action<Task>,
+    Serializable {
+    override fun execute(task: Task) {
+        val statsFile = File(statsPath, "artifact-size-stats.tsv")
+        if (!statsFile.exists()) {
+            return
+        }
+
+        val entries =
+            statsFile
+                .readLines()
+                .filter { it.isNotBlank() }
+                .map { line ->
+                    val (name, size) = line.split('\t')
+                    name to size.toLong()
+                }.sortedBy { it.second }
+
+        if (entries.isEmpty()) {
+            return
+        }
+
+        val total = entries.sumOf { it.second }
+        val avg = total / entries.size
+        val (minName, minSize) = entries.first()
+        val (maxName, maxSize) = entries.last()
+
+        fun humanReadable(bytes: Long): String =
+            when {
+                bytes < 1024 -> "$bytes B"
+                bytes < 1024 * 1024 -> "%.1f KB".format(bytes / 1024.0)
+                else -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
+            }
+
+        println()
+        println("========== Compiled Artifact Size Statistics ==========")
+        println("  SDKs processed: ${entries.size}")
+        println("  Average size:   ${humanReadable(avg)} (%,d bytes)".format(avg))
+        println("  Min size:       ${humanReadable(minSize)} (%,d bytes) -> $minName".format(minSize))
+        println("  Max size:       ${humanReadable(maxSize)} (%,d bytes) -> $maxName".format(maxSize))
+        println("  Total:          ${humanReadable(total)} (%,d bytes)".format(total))
+        println("=======================================================")
+        println()
+        println("Top 5 largest SDKs:")
+        for ((name, size) in entries.takeLast(5).reversed()) {
+            println("  %-50s %s".format(name, humanReadable(size)))
+        }
+    }
+}
+
+tasks.named<Test>("integ") {
+    val statsPath = artifactStatsDir.get().asFile.absolutePath
+    systemProperty("artifactStatsDir", statsPath)
+    outputs.dir(artifactStatsDir)
+    doLast(PrintArtifactSizeStats(statsPath))
 }
