@@ -26,11 +26,11 @@ public final class Version {
 
     static String getVersion() {
         try (InputStream is = Objects.requireNonNull(Version.class.getResourceAsStream(VERSION_RESOURCE_FILE))) {
-                var properties = new Properties();
-                    properties.load(is);
-                        return properties.get(VERSION_PROPERTY).toString();
+            var properties = new Properties();
+            properties.load(is);
+            return properties.get(VERSION_PROPERTY).toString();
         } catch (IOException e) {
-                throw new UncheckedIOException(e);
+            throw new UncheckedIOException(e);
         }
     }
 
