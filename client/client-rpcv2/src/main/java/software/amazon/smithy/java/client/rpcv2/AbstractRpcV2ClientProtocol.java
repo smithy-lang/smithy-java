@@ -155,7 +155,7 @@ public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
     private static DataStream bodyDataStream(HttpResponse response) {
         var contentType = response.headers().contentType();
         var contentLength = response.headers().contentLength();
-        return DataStream.withMetadata(response.body(), contentType, contentLength, null);
+        return DataStream.withMetadata(response.body(), contentType, contentLength == null ? -1 : contentLength);
     }
 
     private DataStream getBody(SerializableStruct input) {

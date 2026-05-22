@@ -30,7 +30,7 @@ public class WrappedDataStreamTest {
     @Test
     public void delegatesIsAvailableToUnderlyingStream() {
         var ds = DataStream.ofInputStream(new ByteArrayInputStream("foo".getBytes(StandardCharsets.UTF_8)));
-        var wrapped = DataStream.withMetadata(ds, "text/plain", 3L, null);
+        var wrapped = DataStream.withMetadata(ds, "text/plain", 3L);
 
         assertThat(wrapped.isAvailable(), is(true));
         ds.asInputStream();

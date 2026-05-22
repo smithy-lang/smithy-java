@@ -8,9 +8,9 @@ package software.amazon.smithy.java.io.datastream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 
 final class ByteBufferDataStream implements DataStream {
@@ -20,9 +20,6 @@ final class ByteBufferDataStream implements DataStream {
     private final long contentLength;
 
     ByteBufferDataStream(ByteBuffer buffer, String contentType) {
-        if (!buffer.hasArray()) {
-            throw new IllegalArgumentException("Only ByteBuffers with an accessible byte array are supported");
-        }
         this.buffer = buffer;
         this.contentLength = buffer.remaining();
         this.contentType = contentType;
@@ -57,7 +54,14 @@ final class ByteBufferDataStream implements DataStream {
 
     @Override
     public void writeTo(OutputStream out) throws IOException {
-        out.write(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());
+        if (buffer.hasArray()) {
+            out.write(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());
+        } else {
+            var dup = buffer.duplicate();
+            var tmp = new byte[dup.remaining()];
+            dup.get(tmp);
+            out.write(tmp);
+        }
     }
 
     @Override
@@ -77,8 +81,34 @@ final class ByteBufferDataStream implements DataStream {
 
     @Override
     public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
-        HttpRequest.BodyPublishers
-                .ofByteArray(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining())
-                .subscribe(subscriber);
+        if (contentLength == 0) {
+            EmptyDataStream.PUBLISHER.subscribe(subscriber);
+        } else {
+            subscriber.onSubscribe(new Subscription(subscriber));
+        }
+    }
+
+    // Zero-copy byte-buffer subscription.
+    private final class Subscription implements Flow.Subscription {
+        private final AtomicBoolean completed = new AtomicBoolean();
+        private final Flow.Subscriber<? super ByteBuffer> subscriber;
+
+        Subscription(Flow.Subscriber<? super ByteBuffer> subscriber) {
+            this.subscriber = subscriber;
+        }
+
+        @Override
+        public void request(long n) {
+            if (n <= 0 || !completed.compareAndSet(false, true)) {
+                return;
+            }
+            subscriber.onNext(buffer.duplicate());
+            subscriber.onComplete();
+        }
+
+        @Override
+        public void cancel() {
+            completed.set(true);
+        }
     }
 }

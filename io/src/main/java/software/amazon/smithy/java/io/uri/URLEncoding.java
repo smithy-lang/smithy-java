@@ -42,16 +42,16 @@ public final class URLEncoding {
     }
 
     /**
-     * Returns true iff {@code c} is an RFC 3986 unreserved ASCII character.
+     * Returns {@code true} iff {@code c} is an RFC 3986 unreserved ASCII character
+     * (alphanumeric, '-', '.', '_', or '~'). Non-ASCII codepoints always return
+     * {@code false}.
      */
-    private static boolean isUnreserved(int c) {
+    public static boolean isUnreserved(int c) {
         if (c >= 128) {
             return false;
         }
 
-        return c < 64
-                ? ((UNRESERVED_LOW >>> c) & 1L) != 0L
-                : ((UNRESERVED_HIGH >>> (c - 64)) & 1L) != 0L;
+        return c < 64 ? ((UNRESERVED_LOW >>> c) & 1L) != 0L : ((UNRESERVED_HIGH >>> (c - 64)) & 1L) != 0L;
     }
 
     /**

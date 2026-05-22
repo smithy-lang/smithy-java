@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.http.api;
 
+import software.amazon.smithy.java.io.datastream.DataStream;
+
 /**
  * HTTP response.
  */
@@ -44,5 +46,18 @@ public interface HttpResponse extends HttpMessage {
      */
     static ModifiableHttpResponse create() {
         return new ModifiableHttpResponseImpl();
+    }
+
+    /**
+     * Create an unmodifiable {@link HttpResponse} from its four fields directly.
+     *
+     * @param httpVersion the HTTP version of the response.
+     * @param statusCode the response status code.
+     * @param headers the response headers (must already be unmodifiable).
+     * @param body the response body.
+     * @return the constructed unmodifiable response.
+     */
+    static HttpResponse of(HttpVersion httpVersion, int statusCode, HttpHeaders headers, DataStream body) {
+        return new HttpResponseImpl(httpVersion, statusCode, headers, body);
     }
 }

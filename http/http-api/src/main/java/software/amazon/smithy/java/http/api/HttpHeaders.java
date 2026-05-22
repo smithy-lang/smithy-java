@@ -207,7 +207,7 @@ public interface HttpHeaders {
         } else {
             ModifiableHttpHeaders copy = new ArrayHttpHeaders(size());
             for (var e : map().entrySet()) {
-                copy.addHeader(e.getKey(), e.getValue());
+                copy.setHeader(e.getKey(), e.getValue());
             }
             return copy;
         }

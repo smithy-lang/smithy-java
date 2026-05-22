@@ -14,7 +14,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Objects;
+import java.util.List;
 import java.util.concurrent.Flow;
 
 /**
@@ -258,6 +258,26 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
     }
 
     /**
+     * Create a DataStream from a list of in-memory {@link ByteBuffer}s.
+     *
+     * <p>The buffers are not stitched into a single buffer until {@link #asByteBuffer()} is
+     * called, so consumers that subscribe (or write directly to an output stream) avoid the
+     * concatenation copy.
+     *
+     * @param buffers buffers to expose in order.
+     * @param contentLength sum of all actual data in each buffer.
+     * @param contentType content-type of the data, if known.
+     * @return the created DataStream.
+     */
+    static DataStream ofByteBuffers(List<ByteBuffer> buffers, long contentLength, String contentType) {
+        return switch (buffers.size()) {
+            case 0 -> EmptyDataStream.INSTANCE;
+            case 1 -> ofByteBuffer(buffers.getFirst(), contentType);
+            default -> new MultiByteBufferDataStream(buffers, contentLength, contentType);
+        };
+    }
+
+    /**
      * Create a DataStream from a ByteBuffer.
      *
      * @param buffer Bytes to read.
@@ -343,37 +363,51 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
     /**
      * Creates DataStream that returns potentially more specific metadata about the stream.
      *
-     * <p>This might be necessary if the payload of a request is streaming, but an HTTP response gave a Content-Length.
+     * <p>Useful when, e.g., the request body publisher reports unknown length but the HTTP
+     * response carries an authoritative Content-Length header that should override it.
+     *
+     * <p>Returns the input {@code ds} unchanged when none of the requested overrides differ
+     * from what {@code ds} already reports.
      *
      * @param ds The DataStream to wrap, if necessary.
-     * @param contentType Content-Type to associate with the stream. Can be null to not attempt to alter it.
-     * @param contentLength Content length of the stream. Can be null to not attempt to alter it.
-     * @param isReplayable True if the publisher can be replayed. Can be null to not attempt to alter it.
-     * @return the wrapped DataStream.
+     * @param contentType Content-Type to associate. Pass null to inherit from {@code ds}.
+     * @param contentLength Content-Length to associate. Use {@code -1} to inherit from {@code ds},
+     *                      otherwise {@code 0} or greater for the byte length.
+     * @return the wrapped DataStream, or {@code ds} unchanged if no override changes anything.
      */
-    static DataStream withMetadata(DataStream ds, String contentType, Long contentLength, Boolean isReplayable) {
-        boolean isChanged = false;
-        var changedContentType = ds.contentType();
-        var changedContentLength = ds.contentLength();
-        var changedIsReplayable = ds.isReplayable();
+    static DataStream withMetadata(DataStream ds, String contentType, long contentLength) {
+        return withMetadata(ds, contentType, contentLength, ds.isReplayable());
+    }
 
-        if (contentType != null && !Objects.equals(contentType, ds.contentType())) {
-            isChanged = true;
-            changedContentType = contentType;
+    /**
+     * Creates a DataStream that exposes potentially-different metadata than the underlying stream.
+     *
+     * <p>Useful when, e.g., the request body publisher reports unknown length but the HTTP
+     * response carries an authoritative Content-Length header that should override it.
+     *
+     * <p>Returns the input {@code ds} unchanged when none of the requested overrides differ
+     * from what {@code ds} already reports.
+     *
+     * @param ds The DataStream to wrap, if necessary.
+     * @param contentType Content-Type to associate. Pass null to inherit from {@code ds}.
+     * @param contentLength Content-Length to associate. Use {@code -1} to inherit from {@code ds},
+     *                      otherwise {@code 0} or greater for the byte length.
+     * @param isReplayable Replayability to associate.
+     * @return the wrapped DataStream, or {@code ds} unchanged if no override changes anything.
+     */
+    static DataStream withMetadata(DataStream ds, String contentType, long contentLength, boolean isReplayable) {
+        boolean changeContentType = contentType != null && !contentType.equals(ds.contentType());
+        boolean changeContentLength = contentLength >= 0 && contentLength != ds.contentLength();
+        boolean changeReplayable = isReplayable != ds.isReplayable();
+
+        if (!changeContentType && !changeContentLength && !changeReplayable) {
+            return ds;
         }
 
-        if (contentLength != null && !Objects.equals(contentLength, ds.contentLength())) {
-            isChanged = true;
-            changedContentLength = contentLength;
-        }
-
-        if (isReplayable != null && !Objects.equals(isReplayable, ds.isReplayable())) {
-            isChanged = true;
-            changedIsReplayable = isReplayable;
-        }
-
-        return isChanged
-                ? new WrappedDataStream(ds, changedContentLength, changedContentType, changedIsReplayable)
-                : ds;
+        return new WrappedDataStream(
+                ds,
+                changeContentLength ? contentLength : ds.contentLength(),
+                changeContentType ? contentType : ds.contentType(),
+                isReplayable);
     }
 }

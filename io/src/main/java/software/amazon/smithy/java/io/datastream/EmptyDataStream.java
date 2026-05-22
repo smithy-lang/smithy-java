@@ -7,15 +7,39 @@ package software.amazon.smithy.java.io.datastream;
 
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 final class EmptyDataStream implements DataStream {
+    /**
+     * Minimal empty publisher.
+     */
+    static final Flow.Publisher<ByteBuffer> PUBLISHER = subscriber -> {
+        subscriber.onSubscribe(new Flow.Subscription() {
+            private final AtomicBoolean done = new AtomicBoolean();
+
+            @Override
+            public void request(long n) {
+                if (!done.compareAndSet(false, true)) {
+                    return;
+                }
+                if (n <= 0) {
+                    subscriber.onError(new IllegalArgumentException("non-positive subscription request"));
+                } else {
+                    subscriber.onComplete();
+                }
+            }
+
+            @Override
+            public void cancel() {
+                done.set(true);
+            }
+        });
+    };
 
     static final EmptyDataStream INSTANCE = new EmptyDataStream();
     private static final byte[] EMPTY_BYTES = new byte[0];
-    private static final Flow.Publisher<ByteBuffer> PUBLISHER = HttpRequest.BodyPublishers.noBody();
 
     @Override
     public ByteBuffer asByteBuffer() {

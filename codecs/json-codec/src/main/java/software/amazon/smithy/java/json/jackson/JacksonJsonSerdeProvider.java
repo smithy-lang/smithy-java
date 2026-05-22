@@ -66,11 +66,22 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
 
     @Override
     public ShapeDeserializer newDeserializer(ByteBuffer source, JsonSettings settings) {
-        int offset = source.arrayOffset() + source.position();
-        int length = source.remaining();
         var ctx = readCtx(settings);
         try {
-            return new JacksonJsonDeserializer(FACTORY.createParser(ctx, source.array(), offset, length), settings);
+            byte[] array;
+            int offset;
+            int length = source.remaining();
+            if (source.hasArray()) {
+                array = source.array();
+                offset = source.arrayOffset() + source.position();
+            } else {
+                // Direct or read-only buffer: copy via duplicate() so we don't disturb the caller's position.
+                var dup = source.duplicate();
+                array = new byte[length];
+                dup.get(array);
+                offset = 0;
+            }
+            return new JacksonJsonDeserializer(FACTORY.createParser(ctx, array, offset, length), settings);
         } catch (JacksonException e) {
             throw new SerializationException(e);
         }

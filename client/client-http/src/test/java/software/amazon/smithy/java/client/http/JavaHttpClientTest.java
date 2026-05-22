@@ -14,7 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.InputStream;
 import java.net.Authenticator;
 import java.net.CookieHandler;
 import java.net.ProxySelector;
@@ -168,7 +167,6 @@ public class JavaHttpClientTest {
         var transport = new JavaHttpClientTransport();
         var response = transport.createSmithyResponse(fakeResponse);
 
-        assertInstanceOf(JavaHttpResponse.class, response);
         assertInstanceOf(JavaHttpHeaders.class, response.headers());
         assertFalse(response.headers().map().containsKey(":status"),
                 "Response headers should not contain :status pseudo-header");
@@ -176,7 +174,10 @@ public class JavaHttpClientTest {
     }
 
     @Test
-    public void usesPublisherFastPathForKnownLengthBodies() {
+    public void publishesBodyViaSubscribeForKnownLengthBodies() {
+        // The transport delegates body publication to DataStream.subscribe() through
+        // DataStreamBodyPublisher; per-DataStream-impl subscribe overrides (e.g.,
+        // ByteBufferDataStream's zero-copy single-onNext) carry the optimization.
         byte[] payload = new byte[128 * 1024];
         Arrays.fill(payload, (byte) 'a');
         var client = new CapturingHttpClient();
@@ -184,47 +185,7 @@ public class JavaHttpClientTest {
         var request = software.amazon.smithy.java.http.api.HttpRequest.create()
                 .setUri(URI.create("http://localhost/test"))
                 .setMethod("POST")
-                .setBody(new DataStream() {
-                    @Override
-                    public long contentLength() {
-                        return payload.length;
-                    }
-
-                    @Override
-                    public String contentType() {
-                        return null;
-                    }
-
-                    @Override
-                    public boolean isReplayable() {
-                        return true;
-                    }
-
-                    @Override
-                    public boolean isAvailable() {
-                        return true;
-                    }
-
-                    @Override
-                    public InputStream asInputStream() {
-                        throw new AssertionError("asInputStream should not be called");
-                    }
-
-                    @Override
-                    public ByteBuffer asByteBuffer() {
-                        return ByteBuffer.wrap(payload);
-                    }
-
-                    @Override
-                    public boolean hasByteBuffer() {
-                        return true;
-                    }
-
-                    @Override
-                    public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
-                        throw new AssertionError("subscribe should not be called");
-                    }
-                })
+                .setBody(DataStream.ofBytes(payload))
                 .toUnmodifiable();
 
         try (var response = transport.send(Context.create(), request)) {

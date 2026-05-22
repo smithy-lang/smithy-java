@@ -141,6 +141,6 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
     private static DataStream bodyDataStream(HttpResponse response) {
         var contentType = response.headers().contentType();
         var contentLength = response.headers().contentLength();
-        return DataStream.withMetadata(response.body(), contentType, contentLength, null);
+        return DataStream.withMetadata(response.body(), contentType, contentLength == null ? -1 : contentLength);
     }
 }
