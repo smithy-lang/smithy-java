@@ -30,7 +30,7 @@ import software.amazon.smithy.java.versionspi.SmithyVersionProvider;
  */
 public final class VersionCheck {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(VersionCheck.class);
-    private static final String SKIP_PROPERTY = "smithy.java.skipVersionCheck";
+    private static final String SKIP_VERSION_CHECK_PROPERTY = "smithy.java.skipVersionCheck";
     private static final AtomicBoolean CHECKED = new AtomicBoolean(false);
 
     private VersionCheck() {}
@@ -47,11 +47,11 @@ public final class VersionCheck {
         if (CHECKED.get()) {
             return;
         }
-        if (Boolean.getBoolean(SKIP_PROPERTY)) {
+        if (Boolean.getBoolean(SKIP_VERSION_CHECK_PROPERTY)) {
             LOGGER.warn("Smithy Java version compatibility check is disabled via '{}'. "
                     + "This is not recommended and should only be used as a temporary workaround. "
                     + "Running with mismatched module versions may cause unexpected runtime errors.",
-                    SKIP_PROPERTY);
+                    SKIP_VERSION_CHECK_PROPERTY);
             CHECKED.set(true);
             return;
         }
@@ -120,4 +120,5 @@ public final class VersionCheck {
     static void reset() {
         CHECKED.set(false);
     }
+
 }
