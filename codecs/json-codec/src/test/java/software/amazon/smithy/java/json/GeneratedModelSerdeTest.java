@@ -745,4 +745,18 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
         }
         return arguments.stream();
     }
+
+    @PerProvider
+    void deserializeShapeWithNestedMissingRequiredFieldReportsFieldName(JsonSerdeProvider provider) {
+        var codec = codec(provider);
+        // NestedStruct requires field1 (String) and field2 (Integer).
+        // Omitting field2 from the nested struct inside a list should produce
+        // a SerializationException mentioning the missing field, not an NPE from close().
+        byte[] json =
+                "{\"id\":\"x\",\"count\":1,\"enabled\":true,\"ratio\":1.0,\"score\":1.0,\"bigCount\":1,\"structList\":[{\"field1\":\"hello\"}]}"
+                        .getBytes(StandardCharsets.UTF_8);
+        var e = assertThrows(SerializationException.class,
+                () -> codec.deserializeShape(json, ComplexStruct.builder()));
+        assertThat(e.getMessage()).contains("field2");
+    }
 }

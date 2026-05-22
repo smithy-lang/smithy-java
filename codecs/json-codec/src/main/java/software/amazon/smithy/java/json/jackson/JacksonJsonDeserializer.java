@@ -51,16 +51,18 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     public void close() {
         if (parser != null && !parser.isClosed()) {
             try {
-                // Close the parser, but also ensure there's no trailing garbage input.
                 var nextToken = parser.nextToken();
+                // Capture token description before nulling parser to avoid NPE in describeToken().
+                var tokenDesc = nextToken != null ? JsonToken.valueDescFor(nextToken) : null;
                 parser.close();
                 parser = null;
-                if (nextToken != null) {
-                    throw new SerializationException("Unexpected JSON content: " + describeToken());
+                if (tokenDesc != null) {
+                    throw new SerializationException("Unexpected JSON content: " + tokenDesc);
                 }
             } catch (SerializationException e) {
                 throw e;
             } catch (Exception e) {
+                parser = null;
                 throw new SerializationException(e);
             }
         }
