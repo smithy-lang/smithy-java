@@ -25,6 +25,6 @@ public class AwsRestJson1ProtocolProvider implements ServerProtocolProvider {
 
     @Override
     public int precision() {
-        return 0;
+        return 7;
     }
 }

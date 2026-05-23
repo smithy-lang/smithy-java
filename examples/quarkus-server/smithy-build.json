@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "sources": ["src/main/smithy"],
+  "plugins": {
+    "java-codegen": {
+      "service": "com.example#CoffeeShop",
+      "namespace": "software.amazon.smithy.java.example.quarkus",
+      "modes": ["server"]
+    }
+  }
+}
