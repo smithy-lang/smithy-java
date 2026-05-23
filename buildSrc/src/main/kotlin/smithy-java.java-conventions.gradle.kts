@@ -1,5 +1,6 @@
 import com.github.spotbugs.snom.Effort
 import org.gradle.accessors.dm.LibrariesForLibs
+import software.amazon.smithy.java.buildtools.ShortenFullyQualifiedNames
 
 plugins {
     `java-library`
@@ -84,6 +85,8 @@ spotless {
         endWithNewline()
 
         eclipse().configFile("${project.rootDir}/config/spotless/formatting.xml")
+
+        addStep(ShortenFullyQualifiedNames.createStep())
 
         // Static first, then everything else alphabetically
         removeUnusedImports()
