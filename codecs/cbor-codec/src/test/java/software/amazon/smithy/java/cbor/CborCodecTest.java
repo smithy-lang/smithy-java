@@ -14,11 +14,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Nested;
@@ -81,7 +83,7 @@ class CborCodecTest {
 
         @Test
         void streamingSerializerNotPooled() {
-            var s = new CborSerializer(java.io.OutputStream.nullOutputStream());
+            var s = new CborSerializer(OutputStream.nullOutputStream());
             CborSerializer.release(s, false);
             // Should not throw, and the streaming serializer should not be returned from acquire
             var s2 = CborSerializer.acquire();
@@ -142,7 +144,7 @@ class CborCodecTest {
             var s = CborSerializer.acquire();
             try {
                 s.writeString(PreludeSchemas.STRING, value);
-                return java.util.Arrays.copyOf(s.buf, s.pos);
+                return Arrays.copyOf(s.buf, s.pos);
             } finally {
                 CborSerializer.release(s, false);
             }

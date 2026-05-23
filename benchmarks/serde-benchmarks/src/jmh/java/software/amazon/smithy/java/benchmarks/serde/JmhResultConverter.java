@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.benchmarks.serde;
 
+import com.sun.management.OperatingSystemMXBean;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.management.ManagementFactory;
@@ -289,7 +290,7 @@ public final class JmhResultConverter {
 
         // Fall back to cores + RAM summary
         int cores = Runtime.getRuntime().availableProcessors();
-        long ramMb = ManagementFactory.getOperatingSystemMXBean() instanceof com.sun.management.OperatingSystemMXBean os
+        long ramMb = ManagementFactory.getOperatingSystemMXBean() instanceof OperatingSystemMXBean os
                 ? os.getTotalMemorySize() / (1024 * 1024)
                 : Runtime.getRuntime().maxMemory() / (1024 * 1024);
         String ramLabel = ramMb >= 1024 ? (ramMb / 1024) + "GB" : ramMb + "MB";

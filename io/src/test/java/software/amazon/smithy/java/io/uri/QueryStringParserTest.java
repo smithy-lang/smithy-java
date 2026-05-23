@@ -9,6 +9,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -52,7 +53,7 @@ class QueryStringParserTest {
 
     @Test
     void visitorCanStopEarly() {
-        var result = new java.util.ArrayList<String>();
+        var result = new ArrayList<String>();
         boolean completed = QueryStringParser.parse("a=1&b=2&c=3", (key, value) -> {
             result.add(key);
             return !"b".equals(key); // stop after "b"

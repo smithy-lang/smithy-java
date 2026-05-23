@@ -10,10 +10,14 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +31,7 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
@@ -103,7 +108,7 @@ public class JsonSerializerTest extends ProviderTestBase {
     static List<Arguments> serializesJsonValuesWithProvider() {
         var values = serializesJsonValuesProvider();
         var provs = providers();
-        List<Arguments> result = new java.util.ArrayList<>();
+        List<Arguments> result = new ArrayList<>();
         for (var prov : provs) {
             for (var val : values) {
                 result.add(Arguments.of(prov.get()[0], val.get()[0], val.get()[1]));
@@ -129,7 +134,7 @@ public class JsonSerializerTest extends ProviderTestBase {
                 Arguments.of(true, "\"1970-01-01T00:00:00Z\""),
                 Arguments.of(false, "0"));
         var provs = providers();
-        List<Arguments> result = new java.util.ArrayList<>();
+        List<Arguments> result = new ArrayList<>();
         for (var prov : provs) {
             for (var cfg : configs) {
                 result.add(Arguments.of(prov.get()[0], cfg.get()[0], cfg.get()[1]));
@@ -166,7 +171,7 @@ public class JsonSerializerTest extends ProviderTestBase {
                 Arguments.of(true, "{\"name\":\"Toucan\",\"Color\":\"red\"}"),
                 Arguments.of(false, "{\"name\":\"Toucan\",\"color\":\"red\"}"));
         var provs = providers();
-        List<Arguments> result = new java.util.ArrayList<>();
+        List<Arguments> result = new ArrayList<>();
         for (var prov : provs) {
             for (var cfg : configs) {
                 result.add(Arguments.of(prov.get()[0], cfg.get()[0], cfg.get()[1]));
@@ -517,27 +522,27 @@ public class JsonSerializerTest extends ProviderTestBase {
 
     @Test
     public void smithyProviderNameAndPriority() {
-        var provider = new software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider();
+        var provider = new SmithyJsonSerdeProvider();
         assertThat(provider.getName(), equalTo("smithy"));
         assertThat(provider.getPriority(), equalTo(5));
     }
 
     @Test
     public void smithyProviderDirectSerializeReturnsBuffer() {
-        var provider = new software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider();
+        var provider = new SmithyJsonSerdeProvider();
         var struct = new NestedStruct();
-        java.nio.ByteBuffer result = provider.serialize(struct, JsonSettings.builder().build());
+        ByteBuffer result = provider.serialize(struct, JsonSettings.builder().build());
         assertThat(result != null, equalTo(true));
         assertThat(result.remaining() > 0, equalTo(true));
     }
 
     @Test
     public void smithyProviderPrettyPrintFallsBackToJackson() throws Exception {
-        var provider = new software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider();
+        var provider = new SmithyJsonSerdeProvider();
         var struct = new NestedStruct();
         var settings = JsonSettings.builder().prettyPrint(true).build();
         // serialize(ByteBuffer) path
-        java.nio.ByteBuffer result = provider.serialize(struct, settings);
+        ByteBuffer result = provider.serialize(struct, settings);
         assertThat(result.remaining() > 0, equalTo(true));
         // newSerializer path
         var output = new ByteArrayOutputStream();
@@ -549,10 +554,10 @@ public class JsonSerializerTest extends ProviderTestBase {
 
     @Test
     public void smithyProviderNonArrayBackedByteBuffer() {
-        var provider = new software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider();
+        var provider = new SmithyJsonSerdeProvider();
         var settings = JsonSettings.builder().build();
         // Direct ByteBuffer is not array-backed
-        java.nio.ByteBuffer direct = java.nio.ByteBuffer.allocateDirect(4);
+        ByteBuffer direct = ByteBuffer.allocateDirect(4);
         direct.put("\"hi\"".getBytes(StandardCharsets.UTF_8));
         direct.flip();
         var de = provider.newDeserializer(direct, settings);
@@ -623,7 +628,7 @@ public class JsonSerializerTest extends ProviderTestBase {
     @PerProvider
     public void writesBlobFromDirectByteBuffer(JsonSerdeProvider provider) throws Exception {
         byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
-        java.nio.ByteBuffer direct = java.nio.ByteBuffer.allocateDirect(data.length);
+        ByteBuffer direct = ByteBuffer.allocateDirect(data.length);
         direct.put(data);
         direct.flip();
         try (var codec = codec(provider); var output = new ByteArrayOutputStream()) {
@@ -668,7 +673,7 @@ public class JsonSerializerTest extends ProviderTestBase {
                 () -> {
                     try (var codec = JsonCodec.builder()
                             .overrideSerdeProvider(
-                                    new software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider())
+                                    new SmithyJsonSerdeProvider())
                             .build();
                             var output = new ByteArrayOutputStream()) {
                         try (var serializer = codec.createSerializer(output)) {
@@ -681,13 +686,13 @@ public class JsonSerializerTest extends ProviderTestBase {
     @Test
     public void smithySerializerHandlesIOExceptionOnFlush() {
         var settings = JsonSettings.builder().build();
-        var failingStream = new java.io.OutputStream() {
+        var failingStream = new OutputStream() {
             @Override
-            public void write(int b) throws java.io.IOException {
-                throw new java.io.IOException("simulated");
+            public void write(int b) throws IOException {
+                throw new IOException("simulated");
             }
         };
-        var provider = new software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider();
+        var provider = new SmithyJsonSerdeProvider();
         var serializer = provider.newSerializer(failingStream, settings);
         serializer.writeInteger(PreludeSchemas.INTEGER, 42);
         Assertions.assertThrows(
@@ -698,13 +703,13 @@ public class JsonSerializerTest extends ProviderTestBase {
     @Test
     public void smithySerializerHandlesIOExceptionOnClose() {
         var settings = JsonSettings.builder().build();
-        var failingStream = new java.io.OutputStream() {
+        var failingStream = new OutputStream() {
             @Override
-            public void write(int b) throws java.io.IOException {
-                throw new java.io.IOException("simulated");
+            public void write(int b) throws IOException {
+                throw new IOException("simulated");
             }
         };
-        var provider = new software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider();
+        var provider = new SmithyJsonSerdeProvider();
         var serializer = provider.newSerializer(failingStream, settings);
         serializer.writeInteger(PreludeSchemas.INTEGER, 42);
         Assertions.assertThrows(

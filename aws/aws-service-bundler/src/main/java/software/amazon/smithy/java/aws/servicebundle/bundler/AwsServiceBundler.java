@@ -186,7 +186,7 @@ public final class AwsServiceBundler extends ModelBundler {
         }
     }
 
-    private static String serializeModel(software.amazon.smithy.model.Model model) {
+    private static String serializeModel(Model model) {
         return ObjectNode.printJson(ModelSerializer.builder()
                 .build()
                 .serialize(model));

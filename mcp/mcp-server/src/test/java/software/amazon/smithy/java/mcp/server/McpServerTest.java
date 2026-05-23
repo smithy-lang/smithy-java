@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -28,12 +29,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.InputHook;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicschemas.StructDocument;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
+import software.amazon.smithy.java.mcp.model.JsonObjectSchema;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
+import software.amazon.smithy.java.mcp.model.PromptInfo;
+import software.amazon.smithy.java.mcp.model.ToolInfo;
 import software.amazon.smithy.java.server.ProxyService;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.model.Model;
@@ -1679,18 +1684,18 @@ public class McpServerTest {
         }
 
         @Override
-        public List<software.amazon.smithy.java.mcp.model.ToolInfo> listTools() {
+        public List<ToolInfo> listTools() {
             callCounter.incrementAndGet();
             return List.of(
-                    software.amazon.smithy.java.mcp.model.ToolInfo.builder()
+                    ToolInfo.builder()
                             .name("test-tool")
                             .description("Test")
-                            .inputSchema(software.amazon.smithy.java.mcp.model.JsonObjectSchema.builder().build())
+                            .inputSchema(JsonObjectSchema.builder().build())
                             .build());
         }
 
         @Override
-        public List<software.amazon.smithy.java.mcp.model.PromptInfo> listPrompts() {
+        public List<PromptInfo> listPrompts() {
             return List.of();
         }
 
@@ -2071,8 +2076,8 @@ public class McpServerTest {
     @Test
     void testContextPassesBetweenReadHooks() {
         var duration = new AtomicReference<Long>();
-        software.amazon.smithy.java.context.Context.Key<Long> START_KEY =
-                software.amazon.smithy.java.context.Context.key("start");
+        Context.Key<Long> START_KEY =
+                Context.key("start");
 
         server = McpServer.builder()
                 .name("smithy-mcp-server")
@@ -2422,7 +2427,7 @@ public class McpServerTest {
                             @Override
                             public JsonRpcRequest modifyBeforeToolCall(McpToolCallHook hook) {
                                 var params = hook.request().getParams().asStringMap();
-                                var newParams = new java.util.HashMap<>(params);
+                                var newParams = new HashMap<>(params);
                                 newParams.put("injected", Document.of("from-first"));
                                 return JsonRpcRequest.builder()
                                         .id(hook.request().getId())

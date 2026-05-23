@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen;
 
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -174,7 +175,7 @@ public final class JavaCodegenPlugin implements SmithyBuildPlugin {
                                         + "'. Valid modes: client, server, types");
                     }
                 })
-                .collect(Collectors.toCollection(() -> java.util.EnumSet.noneOf(CodegenMode.class)));
+                .collect(Collectors.toCollection(() -> EnumSet.noneOf(CodegenMode.class)));
         if (modes.isEmpty()) {
             throw new CodegenException("java-codegen plugin requires at least one mode. "
                     + "Valid modes: client, server, types");

@@ -30,6 +30,7 @@ import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.json.bench.model.AllListsStruct;
 import software.amazon.smithy.java.json.bench.model.BenchUnion;
 import software.amazon.smithy.java.json.bench.model.BlobStruct;
 import software.amazon.smithy.java.json.bench.model.Color;
@@ -546,7 +547,7 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
     @ParameterizedTest
     @MethodSource("crossProviders")
     void allListTypesRoundtrip(JsonSerdeProvider ser, JsonSerdeProvider de) {
-        var original = software.amazon.smithy.java.json.bench.model.AllListsStruct.builder()
+        var original = AllListsStruct.builder()
                 .booleans(List.of(true, false, true))
                 .bytes(List.of((byte) 1, (byte) -128, (byte) 127))
                 .shorts(List.of((short) 1, (short) -32768, (short) 32767))
@@ -565,7 +566,7 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
         assertThat(roundtrip(ser,
                 de,
                 original,
-                software.amazon.smithy.java.json.bench.model.AllListsStruct.builder())).isEqualTo(original);
+                AllListsStruct.builder())).isEqualTo(original);
     }
 
     private static String serializeToJson(SerializableShape shape) {

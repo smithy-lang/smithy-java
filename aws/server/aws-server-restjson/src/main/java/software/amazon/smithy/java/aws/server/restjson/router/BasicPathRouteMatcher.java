@@ -8,6 +8,7 @@ package software.amazon.smithy.java.aws.server.restjson.router;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import software.amazon.smithy.java.aws.server.restjson.router.PathPattern.Segment;
 
@@ -40,7 +41,7 @@ class BasicPathRouteMatcher implements RouteMatcher {
 
     @Override
     public Match match(String path) {
-        java.util.regex.Matcher m = pattern.matcher(path);
+        Matcher m = pattern.matcher(path);
 
         if (!m.matches()) {
             return null;

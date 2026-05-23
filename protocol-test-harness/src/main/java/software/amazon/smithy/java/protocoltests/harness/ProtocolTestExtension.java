@@ -126,7 +126,7 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                                 service,
                                 serviceId.getNamespace(),
                                 serviceId.getName(),
-                                java.util.Set.of(CodegenMode.SERVER)));
+                                Set.of(CodegenMode.SERVER)));
                 Map<Class<?>, MockOperation> mockOperationMap = new HashMap<>();
                 var serverTestOperations = new ArrayList<ServerTestOperation>();
                 for (var testOperation : testOperations) {

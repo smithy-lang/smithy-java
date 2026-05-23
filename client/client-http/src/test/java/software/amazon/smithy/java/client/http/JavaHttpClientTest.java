@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
 import java.net.Authenticator;
 import java.net.CookieHandler;
 import java.net.ProxySelector;
@@ -437,7 +438,7 @@ public class JavaHttpClientTest {
         }
 
         private static byte[] collect(HttpRequest.BodyPublisher publisher) {
-            var out = new java.io.ByteArrayOutputStream();
+            var out = new ByteArrayOutputStream();
             publisher.subscribe(new Flow.Subscriber<>() {
                 @Override
                 public void onSubscribe(Flow.Subscription subscription) {

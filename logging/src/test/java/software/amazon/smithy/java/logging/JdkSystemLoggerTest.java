@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
+import java.util.logging.Logger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 
@@ -57,7 +58,7 @@ class JdkSystemLoggerTest extends LoggerTestBase {
         testLog.warnEnabled = true;
     }
 
-    private static final class TestLogger extends java.util.logging.Logger {
+    private static final class TestLogger extends Logger {
         final StringWriter buffer = new StringWriter();
         final PrintWriter writer = new PrintWriter(buffer);
 
@@ -69,7 +70,7 @@ class JdkSystemLoggerTest extends LoggerTestBase {
 
         @Override
         public void log(Level level, String msg) {
-            if (level == java.util.logging.Level.WARNING && !warnEnabled) {
+            if (level == Level.WARNING && !warnEnabled) {
                 throw new IllegalStateException();
             }
             writer.write(level + " ");
@@ -79,7 +80,7 @@ class JdkSystemLoggerTest extends LoggerTestBase {
 
         @Override
         public void log(Level level, String msg, Throwable thrown) {
-            if (level == java.util.logging.Level.WARNING && !warnEnabled) {
+            if (level == Level.WARNING && !warnEnabled) {
                 throw new IllegalStateException();
             }
             writer.write(level + " ");
@@ -92,7 +93,7 @@ class JdkSystemLoggerTest extends LoggerTestBase {
 
         @Override
         public boolean isLoggable(Level level) {
-            return level != java.util.logging.Level.WARNING || warnEnabled;
+            return level != Level.WARNING || warnEnabled;
         }
     }
 

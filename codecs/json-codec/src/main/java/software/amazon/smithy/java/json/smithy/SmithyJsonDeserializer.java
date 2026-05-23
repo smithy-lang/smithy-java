@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -287,7 +288,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                     }
                     try {
                         return Instant.ofEpochSecond(epochSecond, nano);
-                    } catch (java.time.DateTimeException e) {
+                    } catch (DateTimeException e) {
                         throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
                     }
                 }
@@ -297,7 +298,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                 pos = endPos;
                 try {
                     return Instant.ofEpochSecond(parsedLong);
-                } catch (java.time.DateTimeException e) {
+                } catch (DateTimeException e) {
                     throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
                 }
             }
@@ -326,7 +327,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             String s = readStringValue();
             try {
                 return format.readFromString(s, true);
-            } catch (java.time.DateTimeException e) {
+            } catch (DateTimeException e) {
                 throw new SerializationException("Invalid timestamp: " + s, e);
             }
         }

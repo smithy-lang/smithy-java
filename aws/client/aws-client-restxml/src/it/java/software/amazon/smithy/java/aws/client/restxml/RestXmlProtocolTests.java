@@ -20,6 +20,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.protocoltests.harness.HttpClientRequestTests;
@@ -80,7 +81,7 @@ public class RestXmlProtocolTests {
             dbf.setIgnoringElementContentWhitespace(true);
 
             DocumentBuilder db = dbf.newDocumentBuilder();
-            return db.parse(new org.xml.sax.InputSource(new StringReader(xml)));
+            return db.parse(new InputSource(new StringReader(xml)));
         }
 
         private static void removeWhitespaceNodes(Node node) {

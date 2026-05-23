@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.build.MockManifest;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.build.SmithyBuildPlugin;
+import software.amazon.smithy.java.codegen.JavaCodegenPlugin;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.ObjectNode;
@@ -27,7 +28,7 @@ public class CodegenTest {
             .assemble()
             .unwrap();
 
-    private final SmithyBuildPlugin plugin = new software.amazon.smithy.java.codegen.JavaCodegenPlugin();
+    private final SmithyBuildPlugin plugin = new JavaCodegenPlugin();
     private MockManifest manifest;
     private PluginContext.Builder contextBuilder;
     private ObjectNode.Builder settingsBuilder;

@@ -19,13 +19,13 @@ import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
 
 final class NettyHttpHeaders implements ModifiableHttpHeaders {
 
-    private final io.netty.handler.codec.http.HttpHeaders nettyHeaders;
+    private final HttpHeaders nettyHeaders;
 
     NettyHttpHeaders() {
         this.nettyHeaders = new DefaultHttpHeaders();
     }
 
-    NettyHttpHeaders(io.netty.handler.codec.http.HttpHeaders nettyHeaders) {
+    NettyHttpHeaders(HttpHeaders nettyHeaders) {
         this.nettyHeaders = nettyHeaders;
     }
 

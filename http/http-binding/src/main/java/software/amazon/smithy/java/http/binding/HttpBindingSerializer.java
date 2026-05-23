@@ -26,6 +26,7 @@ import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpHeaders;
@@ -490,7 +491,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         }
 
         @Override
-        public void writeDocument(Schema schema, software.amazon.smithy.java.core.serde.document.Document value) {
+        public void writeDocument(Schema schema, Document value) {
             if (activeBindings[schema.memberIndex()] == HttpBindingSchemaExtensions.Binding.PAYLOAD) {
                 payload(schema).writeDocument(schema, value);
             }

@@ -22,6 +22,7 @@ import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 @State(Scope.Thread)
@@ -71,7 +72,7 @@ public class SchemaConverterBench {
 
         if ("large".equals(modelSize)) {
             recursiveShape = model.expectShape(
-                    software.amazon.smithy.model.shapes.ShapeId.from("smithy.bench#T5_0"));
+                    ShapeId.from("smithy.bench#T5_0"));
         } else {
             recursiveShape = structureShapes.getFirst();
         }

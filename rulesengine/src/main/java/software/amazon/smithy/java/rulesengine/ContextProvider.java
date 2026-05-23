@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.rulesengine;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -176,8 +177,8 @@ sealed interface ContextProvider {
             }
             // Trim to actual size
             if (count != indices.length) {
-                indices = java.util.Arrays.copyOf(indices, count);
-                values = java.util.Arrays.copyOf(values, count);
+                indices = Arrays.copyOf(indices, count);
+                values = Arrays.copyOf(values, count);
             }
             // Write resolvedValues before resolvedIndices to ensure publication
             resolvedValues = values;

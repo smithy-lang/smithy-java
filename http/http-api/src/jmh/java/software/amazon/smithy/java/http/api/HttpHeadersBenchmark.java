@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.http.api;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -67,7 +68,7 @@ public class HttpHeadersBenchmark {
     private static final Map<String, List<String>> HEADER_MAP;
 
     static {
-        var builder = new java.util.LinkedHashMap<String, List<String>>();
+        var builder = new LinkedHashMap<String, List<String>>();
         for (int i = 0; i < HEADER_NAMES.length; i++) {
             builder.put(HEADER_NAMES[i], List.of(HEADER_VALUES[i]));
         }

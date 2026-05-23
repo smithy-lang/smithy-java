@@ -21,6 +21,7 @@ package software.amazon.smithy.java.logging;
 import static java.lang.Character.toLowerCase;
 
 import java.text.SimpleDateFormat;
+import java.time.temporal.Temporal;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
@@ -768,7 +769,7 @@ final class ParameterFormatter {
                 stringBuilder.append(((Float) obj).floatValue());
             } else if (obj instanceof Byte) {
                 stringBuilder.append(((Byte) obj).byteValue());
-            } else if (isTime(obj) || obj instanceof java.time.temporal.Temporal) {
+            } else if (isTime(obj) || obj instanceof Temporal) {
                 stringBuilder.append(obj);
             } else {
                 return false;
