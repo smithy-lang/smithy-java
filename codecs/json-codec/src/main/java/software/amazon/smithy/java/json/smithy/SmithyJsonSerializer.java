@@ -11,10 +11,15 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.RandomAccess;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.SmithyEnum;
+import software.amazon.smithy.java.core.schema.SmithyIntEnum;
 import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -420,6 +425,1873 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     }
 
     @Override
+    public void writeStructList(
+            Schema schema,
+            List<? extends SerializableStruct> values,
+            Schema memberSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeStruct(memberSchema, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeStruct(memberSchema, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeStringList(Schema schema, List<String> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(values.get(i)));
+                pos = JsonWriteUtils.writeQuotedString(buf, pos, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(v));
+                pos = JsonWriteUtils.writeQuotedString(buf, pos, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeBoolean(memberSchema, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeBoolean(memberSchema, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeByte(memberSchema, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeByte(memberSchema, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeShortList(Schema schema, List<Short> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeShort(memberSchema, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeShort(memberSchema, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeInteger(memberSchema, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeInteger(memberSchema, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeLongList(Schema schema, List<Long> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeLong(memberSchema, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeLong(memberSchema, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeFloat(memberSchema, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeFloat(memberSchema, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeDouble(memberSchema, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeDouble(memberSchema, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeBigInteger(memberSchema, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeBigInteger(memberSchema, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeBigDecimal(memberSchema, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeBigDecimal(memberSchema, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeBlob(memberSchema, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeBlob(memberSchema, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeTimestamp(memberSchema, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeTimestamp(memberSchema, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeDocumentList(
+            Schema schema,
+            List<? extends Document> values,
+            Schema memberSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeDocument(memberSchema, values.get(i));
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeDocument(memberSchema, v);
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeEnumList(
+            Schema schema,
+            List<? extends SmithyEnum> values,
+            Schema memberSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeString(memberSchema, values.get(i).getValue());
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeString(memberSchema, v.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeIntEnumList(
+            Schema schema,
+            List<? extends SmithyIntEnum> values,
+            Schema memberSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                writeInteger(memberSchema, values.get(i).getValue());
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                writeInteger(memberSchema, v.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseStructList(
+            Schema schema,
+            List<? extends SerializableStruct> values,
+            Schema memberSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeStruct(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeStruct(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseStringList(Schema schema, List<String> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeString(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeString(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeInteger(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeInteger(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseLongList(Schema schema, List<Long> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeLong(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeLong(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeDouble(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeDouble(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeBlob(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeBlob(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeTimestamp(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeTimestamp(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseDocumentList(
+            Schema schema,
+            List<? extends Document> values,
+            Schema memberSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeDocument(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeDocument(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeBoolean(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeBoolean(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeByte(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeByte(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseShortList(Schema schema, List<Short> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeShort(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeShort(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeFloat(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeFloat(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeBigInteger(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeBigInteger(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeBigDecimal(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeBigDecimal(memberSchema, v);
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseEnumList(
+            Schema schema,
+            List<? extends SmithyEnum> values,
+            Schema memberSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeString(memberSchema, v.getValue());
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeString(memberSchema, v.getValue());
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeSparseIntEnumList(
+            Schema schema,
+            List<? extends SmithyIntEnum> values,
+            Schema memberSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '[';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        if (values instanceof RandomAccess) {
+            for (int i = 0, sz = values.size(); i < sz; i++) {
+                writeCommaIfNeeded();
+                var v = values.get(i);
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeInteger(memberSchema, v.getValue());
+                }
+            }
+        } else {
+            for (var v : values) {
+                writeCommaIfNeeded();
+                if (v == null) {
+                    writeNull(memberSchema);
+                } else {
+                    writeInteger(memberSchema, v.getValue());
+                }
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = ']';
+    }
+
+    @Override
+    public void writeStructMap(
+            Schema schema,
+            Map<String, ? extends SerializableStruct> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeStruct(valueSchema, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeStringMap(
+            Schema schema,
+            Map<String, String> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(
+                    JsonWriteUtils.maxQuotedStringBytes(entry.getKey())
+                            + 1
+                            + JsonWriteUtils.maxQuotedStringBytes(entry.getValue()));
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeBooleanMap(
+            Schema schema,
+            Map<String, Boolean> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeBoolean(valueSchema, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeByteMap(Schema schema, Map<String, Byte> values, Schema keySchema, Schema valueSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeByte(valueSchema, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeShortMap(
+            Schema schema,
+            Map<String, Short> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeShort(valueSchema, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeIntegerMap(
+            Schema schema,
+            Map<String, Integer> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeInteger(valueSchema, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeLongMap(Schema schema, Map<String, Long> values, Schema keySchema, Schema valueSchema) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeLong(valueSchema, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeFloatMap(
+            Schema schema,
+            Map<String, Float> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeFloat(valueSchema, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeDoubleMap(
+            Schema schema,
+            Map<String, Double> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeDouble(valueSchema, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeBigIntegerMap(
+            Schema schema,
+            Map<String, BigInteger> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeBigInteger(valueSchema, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeBigDecimalMap(
+            Schema schema,
+            Map<String, BigDecimal> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeBigDecimal(valueSchema, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeBlobMap(
+            Schema schema,
+            Map<String, ByteBuffer> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeBlob(valueSchema, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeTimestampMap(
+            Schema schema,
+            Map<String, Instant> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeTimestamp(valueSchema, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeDocumentMap(
+            Schema schema,
+            Map<String, ? extends Document> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeDocument(valueSchema, entry.getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeEnumMap(
+            Schema schema,
+            Map<String, ? extends SmithyEnum> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeString(valueSchema, entry.getValue().getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeIntEnumMap(
+            Schema schema,
+            Map<String, ? extends SmithyIntEnum> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            writeInteger(valueSchema, entry.getValue().getValue());
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseStructMap(
+            Schema schema,
+            Map<String, ? extends SerializableStruct> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeStruct(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseStringMap(
+            Schema schema,
+            Map<String, String> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeString(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseIntegerMap(
+            Schema schema,
+            Map<String, Integer> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeInteger(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseLongMap(
+            Schema schema,
+            Map<String, Long> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeLong(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseDoubleMap(
+            Schema schema,
+            Map<String, Double> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeDouble(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseBlobMap(
+            Schema schema,
+            Map<String, ByteBuffer> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeBlob(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseTimestampMap(
+            Schema schema,
+            Map<String, Instant> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeTimestamp(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseDocumentMap(
+            Schema schema,
+            Map<String, ? extends Document> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeDocument(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseBooleanMap(
+            Schema schema,
+            Map<String, Boolean> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeBoolean(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseByteMap(
+            Schema schema,
+            Map<String, Byte> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeByte(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseShortMap(
+            Schema schema,
+            Map<String, Short> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeShort(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseFloatMap(
+            Schema schema,
+            Map<String, Float> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeFloat(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseBigIntegerMap(
+            Schema schema,
+            Map<String, BigInteger> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeBigInteger(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseBigDecimalMap(
+            Schema schema,
+            Map<String, BigDecimal> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeBigDecimal(valueSchema, entry.getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseEnumMap(
+            Schema schema,
+            Map<String, ? extends SmithyEnum> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeString(valueSchema, entry.getValue().getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
+    public void writeSparseIntEnumMap(
+            Schema schema,
+            Map<String, ? extends SmithyIntEnum> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        ensureCapacity(2);
+        buf[pos++] = '{';
+        depth++;
+        if (depth >= MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        needsComma[depth] = false;
+        for (var entry : values.entrySet()) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(entry.getKey()) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, entry.getKey());
+            buf[pos++] = ':';
+            if (entry.getValue() == null) {
+                writeNull(valueSchema);
+            } else {
+                writeInteger(valueSchema, entry.getValue().getValue());
+            }
+        }
+        depth--;
+        ensureCapacity(1);
+        buf[pos++] = '}';
+    }
+
+    @Override
     public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
         ensureCapacity(2);
         buf[pos++] = '{';
@@ -647,6 +2519,582 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         }
 
         @Override
+        public void writeStructList(
+                Schema schema,
+                List<? extends SerializableStruct> values,
+                Schema memberSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeStructList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeStringList(Schema schema, List<String> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeStringList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeBooleanList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeByteList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeShortList(Schema schema, List<Short> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeShortList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeIntegerList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeLongList(Schema schema, List<Long> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeLongList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeFloatList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeDoubleList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeBigIntegerList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeBigDecimalList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeBlobList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeTimestampList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeDocumentList(
+                Schema schema,
+                List<? extends Document> values,
+                Schema memberSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeDocumentList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeEnumList(
+                Schema schema,
+                List<? extends SmithyEnum> values,
+                Schema memberSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeEnumList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeIntEnumList(
+                Schema schema,
+                List<? extends SmithyIntEnum> values,
+                Schema memberSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeIntEnumList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseStructList(
+                Schema schema,
+                List<? extends SerializableStruct> values,
+                Schema memberSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseStructList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseStringList(Schema schema, List<String> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseStringList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseIntegerList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseLongList(Schema schema, List<Long> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseLongList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseDoubleList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseBlobList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseTimestampList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseDocumentList(
+                Schema schema,
+                List<? extends Document> values,
+                Schema memberSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseDocumentList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseBooleanList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseByteList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseShortList(Schema schema, List<Short> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseShortList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseFloatList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseBigIntegerList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseBigDecimalList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseEnumList(
+                Schema schema,
+                List<? extends SmithyEnum> values,
+                Schema memberSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseEnumList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseIntEnumList(
+                Schema schema,
+                List<? extends SmithyIntEnum> values,
+                Schema memberSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseIntEnumList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeStructMap(
+                Schema schema,
+                Map<String, ? extends SerializableStruct> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeStructMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeStringMap(
+                Schema schema,
+                Map<String, String> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeStringMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeBooleanMap(
+                Schema schema,
+                Map<String, Boolean> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeBooleanMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeByteMap(
+                Schema schema,
+                Map<String, Byte> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeByteMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeShortMap(
+                Schema schema,
+                Map<String, Short> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeShortMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeIntegerMap(
+                Schema schema,
+                Map<String, Integer> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeIntegerMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeLongMap(
+                Schema schema,
+                Map<String, Long> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeLongMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeFloatMap(
+                Schema schema,
+                Map<String, Float> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeFloatMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeDoubleMap(
+                Schema schema,
+                Map<String, Double> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeDoubleMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeBigIntegerMap(
+                Schema schema,
+                Map<String, BigInteger> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeBigIntegerMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeBigDecimalMap(
+                Schema schema,
+                Map<String, BigDecimal> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeBigDecimalMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeBlobMap(
+                Schema schema,
+                Map<String, ByteBuffer> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeBlobMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeTimestampMap(
+                Schema schema,
+                Map<String, Instant> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeTimestampMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeDocumentMap(
+                Schema schema,
+                Map<String, ? extends Document> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeDocumentMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeEnumMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeIntEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyIntEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeIntEnumMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseStructMap(
+                Schema schema,
+                Map<String, ? extends SerializableStruct> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseStructMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseStringMap(
+                Schema schema,
+                Map<String, String> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseStringMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseIntegerMap(
+                Schema schema,
+                Map<String, Integer> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseIntegerMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseLongMap(
+                Schema schema,
+                Map<String, Long> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseLongMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseDoubleMap(
+                Schema schema,
+                Map<String, Double> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseDoubleMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseBlobMap(
+                Schema schema,
+                Map<String, ByteBuffer> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseBlobMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseTimestampMap(
+                Schema schema,
+                Map<String, Instant> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseTimestampMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseDocumentMap(
+                Schema schema,
+                Map<String, ? extends Document> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseDocumentMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseBooleanMap(
+                Schema schema,
+                Map<String, Boolean> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseBooleanMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseByteMap(
+                Schema schema,
+                Map<String, Byte> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseByteMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseShortMap(
+                Schema schema,
+                Map<String, Short> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseShortMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseFloatMap(
+                Schema schema,
+                Map<String, Float> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseFloatMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseBigIntegerMap(
+                Schema schema,
+                Map<String, BigInteger> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseBigIntegerMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseBigDecimalMap(
+                Schema schema,
+                Map<String, BigDecimal> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseBigDecimalMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseEnumMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseIntEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyIntEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            SmithyJsonSerializer.this.writeSparseIntEnumMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
         public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
             writeFieldNameBytes(schema);
             SmithyJsonSerializer.this.writeMap(schema, mapState, size, consumer);
@@ -784,6 +3232,150 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
             buf[pos++] = ':';
             valueSerializer.accept(state, SmithyJsonSerializer.this);
+        }
+
+        @Override
+        public void writeStructEntry(Schema keySchema, String key, Schema valueSchema, SerializableStruct value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeStruct(valueSchema, value);
+        }
+
+        @Override
+        public void writeStringEntry(Schema keySchema, String key, Schema valueSchema, String value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + JsonWriteUtils.maxQuotedStringBytes(value) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, value);
+        }
+
+        @Override
+        public void writeBooleanEntry(Schema keySchema, String key, Schema valueSchema, Boolean value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeBoolean(valueSchema, value);
+        }
+
+        @Override
+        public void writeByteEntry(Schema keySchema, String key, Schema valueSchema, Byte value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeByte(valueSchema, value);
+        }
+
+        @Override
+        public void writeShortEntry(Schema keySchema, String key, Schema valueSchema, Short value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeShort(valueSchema, value);
+        }
+
+        @Override
+        public void writeIntegerEntry(Schema keySchema, String key, Schema valueSchema, Integer value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeInteger(valueSchema, value);
+        }
+
+        @Override
+        public void writeLongEntry(Schema keySchema, String key, Schema valueSchema, Long value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeLong(valueSchema, value);
+        }
+
+        @Override
+        public void writeFloatEntry(Schema keySchema, String key, Schema valueSchema, Float value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeFloat(valueSchema, value);
+        }
+
+        @Override
+        public void writeDoubleEntry(Schema keySchema, String key, Schema valueSchema, Double value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeDouble(valueSchema, value);
+        }
+
+        @Override
+        public void writeBigIntegerEntry(Schema keySchema, String key, Schema valueSchema, BigInteger value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeBigInteger(valueSchema, value);
+        }
+
+        @Override
+        public void writeBigDecimalEntry(Schema keySchema, String key, Schema valueSchema, BigDecimal value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeBigDecimal(valueSchema, value);
+        }
+
+        @Override
+        public void writeBlobEntry(Schema keySchema, String key, Schema valueSchema, ByteBuffer value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeBlob(valueSchema, value);
+        }
+
+        @Override
+        public void writeTimestampEntry(Schema keySchema, String key, Schema valueSchema, Instant value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeTimestamp(valueSchema, value);
+        }
+
+        @Override
+        public void writeDocumentEntry(Schema keySchema, String key, Schema valueSchema, Document value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeDocument(valueSchema, value);
+        }
+
+        @Override
+        public void writeNullEntry(Schema keySchema, String key, Schema valueSchema) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeNull(valueSchema);
+        }
+
+        @Override
+        public void writeIntEnumEntry(Schema keySchema, String key, Schema valueSchema, int value) {
+            writeCommaIfNeeded();
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
+            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            buf[pos++] = ':';
+            SmithyJsonSerializer.this.writeInteger(valueSchema, value);
         }
     }
 

@@ -168,10 +168,10 @@ public final class NamingStruct implements SerializableStruct {
             serializer.writeStruct($SCHEMA_LIST, list);
         }
         if (listOfList != null) {
-            serializer.writeList($SCHEMA_LIST_OF_LIST, listOfList, listOfList.size(), SharedSerde.ListOfListSerializer.INSTANCE);
+            serializer.writeStructList($SCHEMA_LIST_OF_LIST, listOfList, Schemas.LIST_OF_LIST.listMember());
         }
         if (mapOfMap != null) {
-            serializer.writeMap($SCHEMA_MAP_OF_MAP, mapOfMap, mapOfMap.size(), SharedSerde.MapOfMapSerializer.INSTANCE);
+            serializer.writeStructMap($SCHEMA_MAP_OF_MAP, mapOfMap, Schemas.MAP_OF_MAP.mapKeyMember(), Schemas.MAP_OF_MAP.mapValueMember());
         }
     }
 

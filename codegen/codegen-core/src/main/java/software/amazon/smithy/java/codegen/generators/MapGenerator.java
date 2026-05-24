@@ -16,6 +16,7 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
@@ -50,15 +51,38 @@ public final class MapGenerator
                             var name = CodegenUtils.getDefaultName(directive.shape(), directive.service());
 
                             writer.pushState();
-                            var template =
+                            boolean isSparse = directive.shape().hasTrait(SparseTrait.class);
+                            boolean hasEnumKey = directive.model()
+                                    .expectShape(directive.shape().getKey().getTarget())
+                                    .isEnumShape();
+                            var specializedMethod = resolveSpecializedEntryMethod(value);
+                            boolean hasTopLevelSpecialized = hasSpecializedMapMethod(value, hasEnumKey);
+                            boolean needsSerializerClass = !hasTopLevelSpecialized
+                                    && (isSparse || hasEnumKey || specializedMethod == null);
+                            writer.putContext("needsSerializerClass", needsSerializerClass);
+                            writer.putContext("specializedMethod", specializedMethod);
+                            String template =
                                     """
-                                            static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${mapSerializer:T}> {
+                                            ${?needsSerializerClass}static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${mapSerializer:T}> {
                                                 static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
 
                                                 @Override
                                                 public void accept(${shape:T} values, ${mapSerializer:T} serializer) {
                                                     var $$k = ${keySchema:L}.mapKeyMember();
+                                                    ${?specializedMethod}var $$v = ${valueSchema:L};
                                                     for (var valueEntry : values.entrySet()) {
+                                                        ${?sparse}if (valueEntry.getValue() == null) {
+                                                            serializer.writeNullEntry($$k, valueEntry.getKey()${?enumKey}.getValue()${/enumKey}, $$v);
+                                                            continue;
+                                                        }
+                                                        ${/sparse}serializer.${specializedMethod:L}(
+                                                            $$k,
+                                                            valueEntry.getKey()${?enumKey}.getValue()${/enumKey},
+                                                            $$v,
+                                                            valueEntry.getValue()${?enumValue}.getValue()${/enumValue}
+                                                        );
+                                                    }
+                                                    ${/specializedMethod}${^specializedMethod}for (var valueEntry : values.entrySet()) {
                                                         serializer.writeEntry(
                                                             $$k,
                                                             valueEntry.getKey()${?enumKey}.getValue()${/enumKey},
@@ -66,10 +90,11 @@ public final class MapGenerator
                                                             ${name:U}$$ValueSerializer.INSTANCE
                                                         );
                                                     }
+                                                    ${/specializedMethod}
                                                 }
                                             }
 
-                                            private static final class ${name:U}$$ValueSerializer implements ${biConsumer:T}<${value:B}, ${shapeSerializer:T}> {
+                                            ${^specializedMethod}private static final class ${name:U}$$ValueSerializer implements ${biConsumer:T}<${value:B}, ${shapeSerializer:T}> {
                                                 private static final ${name:U}$$ValueSerializer INSTANCE = new ${name:U}$$ValueSerializer();
 
                                                 @Override
@@ -82,7 +107,7 @@ public final class MapGenerator
                                                 }
                                             }
 
-                                            static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
+                                            ${/specializedMethod}${/needsSerializerClass}static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
                                                 var size = Math.min(deserializer.containerSize(), deserializer.containerPreAllocationLimit());
                                                 ${shape:T} result = size == -1 ? new ${collectionImpl:T}<>() : ${collectionImpl:T}.${newMap:L}(size);
                                                 deserializer.readStringMap(schema, result, ${name:U}$$ValueDeserializer.INSTANCE);
@@ -142,6 +167,7 @@ public final class MapGenerator
                                     directive.model()
                                             .expectShape(directive.shape().getKey().getTarget())
                                             .isEnumShape());
+                            writer.putContext("enumValue", value.isEnumShape() || value.isIntEnumShape());
                             writer.putContext("sparse", directive.shape().hasTrait(SparseTrait.class));
                             writer.write(template);
                             writer.popState();
@@ -149,5 +175,38 @@ public final class MapGenerator
                             // Writes any existing text
                             writer.writeInlineWithNoFormatting(t);
                         }));
+    }
+
+    private static String resolveSpecializedEntryMethod(Shape valueShape) {
+        return switch (valueShape.getType()) {
+            case STRUCTURE, UNION -> "writeStructEntry";
+            case STRING, ENUM -> "writeStringEntry";
+            case BOOLEAN -> "writeBooleanEntry";
+            case BYTE -> "writeByteEntry";
+            case SHORT -> "writeShortEntry";
+            case INTEGER -> "writeIntegerEntry";
+            case INT_ENUM -> "writeIntEnumEntry";
+            case LONG -> "writeLongEntry";
+            case FLOAT -> "writeFloatEntry";
+            case DOUBLE -> "writeDoubleEntry";
+            case BIG_INTEGER -> "writeBigIntegerEntry";
+            case BIG_DECIMAL -> "writeBigDecimalEntry";
+            case BLOB -> "writeBlobEntry";
+            case TIMESTAMP -> "writeTimestampEntry";
+            case DOCUMENT -> "writeDocumentEntry";
+            default -> null; // LIST, MAP, etc. use generic writeEntry
+        };
+    }
+
+    private static boolean hasSpecializedMapMethod(Shape valueShape, boolean hasEnumKey) {
+        if (hasEnumKey) {
+            return false;
+        }
+        return switch (valueShape.getType()) {
+            case STRUCTURE, UNION, STRING, ENUM, INT_ENUM, BOOLEAN, BYTE, SHORT, INTEGER, LONG, FLOAT, DOUBLE,
+                    BIG_INTEGER, BIG_DECIMAL, BLOB, TIMESTAMP, DOCUMENT ->
+                true;
+            default -> false;
+        };
     }
 }

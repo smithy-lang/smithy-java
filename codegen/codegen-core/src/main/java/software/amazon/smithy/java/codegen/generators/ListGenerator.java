@@ -17,6 +17,7 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
@@ -43,35 +44,48 @@ public final class ListGenerator
                                             .schemaFieldOrder()
                                             .getSchemaFieldName(directive.shape(), writer));
                             writer.pushState();
-                            var template =
-                                    """
-                                            static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${shapeSerializer:T}> {
-                                                static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
 
-                                                @Override
-                                                public void accept(${shape:B} values, ${shapeSerializer:T} serializer) {
-                                                    var $$m = ${valueSchema:L};
-                                                    if (values instanceof ${randomAccess:T}) {
-                                                        for (int i = 0, size = values.size(); i < size; i++) {
-                                                            var value = values.get(i);
-                                                            ${?sparse}if (value == null) {
-                                                                serializer.writeNull($$m);
-                                                                continue;
+                            boolean isSparse = directive.shape().hasTrait(SparseTrait.class);
+                            boolean needsSerializerClass = !hasSpecializedListMethod(target, isSparse);
+
+                            String template;
+                            if (needsSerializerClass) {
+                                template =
+                                        """
+                                                static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${shapeSerializer:T}> {
+                                                    static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
+
+                                                    @Override
+                                                    public void accept(${shape:B} values, ${shapeSerializer:T} serializer) {
+                                                        var $$m = ${valueSchema:L};
+                                                        if (values instanceof ${randomAccess:T}) {
+                                                            for (int i = 0, size = values.size(); i < size; i++) {
+                                                                var value = values.get(i);
+                                                                ${?sparse}if (value == null) {
+                                                                    serializer.writeNull($$m);
+                                                                    continue;
+                                                                }
+                                                                ${/sparse}${memberSerializer:C|};
                                                             }
-                                                            ${/sparse}${memberSerializer:C|};
-                                                        }
-                                                    } else {
-                                                        for (var value : values) {
-                                                            ${?sparse}if (value == null) {
-                                                                serializer.writeNull($$m);
-                                                                continue;
+                                                        } else {
+                                                            for (var value : values) {
+                                                                ${?sparse}if (value == null) {
+                                                                    serializer.writeNull($$m);
+                                                                    continue;
+                                                                }
+                                                                ${/sparse}${memberSerializer:C|};
                                                             }
-                                                            ${/sparse}${memberSerializer:C|};
                                                         }
                                                     }
                                                 }
-                                            }
 
+                                                """;
+                            } else {
+                                template = "";
+                            }
+
+                            template +=
+                                    """
                                             static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
                                                 var size = Math.min(deserializer.containerSize(), deserializer.containerPreAllocationLimit());
                                                 ${shape:T} result = size == -1 ? new ${collectionImpl:T}<>() : new ${collectionImpl:T}<>(size);
@@ -92,6 +106,7 @@ public final class ListGenerator
                                                 }
                                             }
                                             """;
+
                             writer.putContext("shape", directive.symbol());
                             writer.putContext("name", name);
                             writer.putContext(
@@ -103,7 +118,7 @@ public final class ListGenerator
                             writer.putContext("shapeSerializer", ShapeSerializer.class);
                             writer.putContext("shapeDeserializer", ShapeDeserializer.class);
                             writer.putContext("serdeException", SerializationException.class);
-                            writer.putContext("sparse", directive.shape().hasTrait(SparseTrait.class));
+                            writer.putContext("sparse", isSparse);
                             writer.putContext("valueSchema", valueSchema);
                             writer.putContext("randomAccess", RandomAccess.class);
                             writer.putContext(
@@ -130,5 +145,14 @@ public final class ListGenerator
                             // Writes any existing text
                             writer.writeInlineWithNoFormatting(t);
                         }));
+    }
+
+    private static boolean hasSpecializedListMethod(Shape elementShape, boolean isSparse) {
+        return switch (elementShape.getType()) {
+            case STRUCTURE, UNION, STRING, ENUM, INT_ENUM, BOOLEAN, BYTE, SHORT, INTEGER, LONG, FLOAT, DOUBLE,
+                    BIG_INTEGER, BIG_DECIMAL, BLOB, TIMESTAMP, DOCUMENT ->
+                true;
+            default -> false;
+        };
     }
 }

@@ -105,18 +105,79 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void listShape(ListShape listShape) {
-        writer.write(
-                "serializer.writeList(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
-                CodegenUtils.getDefaultName(listShape, service));
+        var memberTarget = model.expectShape(listShape.getMember().getTarget());
+        boolean isSparse = listShape.hasTrait(software.amazon.smithy.model.traits.SparseTrait.class);
+        var specializedMethod = resolveSpecializedListMethod(memberTarget, isSparse);
+        if (specializedMethod != null) {
+            writer.write(
+                    "serializer.$L(${schema:L}, ${state:L}, $L.listMember())",
+                    specializedMethod,
+                    directive.context()
+                            .schemaFieldOrder()
+                            .getSchemaFieldName(listShape, writer));
+        } else {
+            writer.write(
+                    "serializer.writeList(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
+                    CodegenUtils.getDefaultName(listShape, service));
+        }
         return null;
+    }
+
+    private static String resolveSpecializedListMethod(Shape elementShape, boolean isSparse) {
+        var typeName = resolveSpecializedTypeName(elementShape);
+        return typeName.isEmpty() ? null : (isSparse ? "writeSparse" : "write") + typeName + "List";
     }
 
     @Override
     public Void mapShape(MapShape mapShape) {
-        writer.write(
-                "serializer.writeMap(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
-                CodegenUtils.getDefaultName(mapShape, service));
+        var valueTarget = model.expectShape(mapShape.getValue().getTarget());
+        boolean isSparse = mapShape.hasTrait(software.amazon.smithy.model.traits.SparseTrait.class);
+        boolean hasEnumKey = model.expectShape(mapShape.getKey().getTarget()).isEnumShape();
+        var specializedMethod = resolveSpecializedMapMethod(valueTarget, isSparse, hasEnumKey);
+        if (specializedMethod != null) {
+            var schemaFieldOrder = directive.context().schemaFieldOrder();
+            var mapSchemaRef = schemaFieldOrder.getSchemaFieldName(mapShape, writer);
+            writer.write(
+                    "serializer.$L(${schema:L}, ${state:L}, $L.mapKeyMember(), $L.mapValueMember())",
+                    specializedMethod,
+                    mapSchemaRef,
+                    mapSchemaRef);
+        } else {
+            writer.write(
+                    "serializer.writeMap(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
+                    CodegenUtils.getDefaultName(mapShape, service));
+        }
         return null;
+    }
+
+    private static String resolveSpecializedMapMethod(Shape valueShape, boolean isSparse, boolean hasEnumKey) {
+        if (hasEnumKey) {
+            return null;
+        }
+        var typeName = resolveSpecializedTypeName(valueShape);
+        return typeName.isEmpty() ? null : (isSparse ? "writeSparse" : "write") + typeName + "Map";
+    }
+
+    private static String resolveSpecializedTypeName(Shape shape) {
+        return switch (shape.getType()) {
+            case STRUCTURE, UNION -> "Struct";
+            case STRING -> "String";
+            case ENUM -> "Enum";
+            case INT_ENUM -> "IntEnum";
+            case BOOLEAN -> "Boolean";
+            case BYTE -> "Byte";
+            case SHORT -> "Short";
+            case INTEGER -> "Integer";
+            case LONG -> "Long";
+            case FLOAT -> "Float";
+            case DOUBLE -> "Double";
+            case BIG_INTEGER -> "BigInteger";
+            case BIG_DECIMAL -> "BigDecimal";
+            case BLOB -> "Blob";
+            case TIMESTAMP -> "Timestamp";
+            case DOCUMENT -> "Document";
+            default -> "";
+        };
     }
 
     @Override

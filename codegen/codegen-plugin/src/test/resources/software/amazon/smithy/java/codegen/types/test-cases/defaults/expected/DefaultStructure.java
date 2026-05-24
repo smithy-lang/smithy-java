@@ -323,8 +323,8 @@ public final class DefaultStructure implements SerializableStruct {
         serializer.writeDocument($SCHEMA_FLOATING_POINTNUMBER_DOC, floatingPointnumberDoc);
         serializer.writeDocument($SCHEMA_LIST_DOC, listDoc);
         serializer.writeDocument($SCHEMA_MAP_DOC, mapDoc);
-        serializer.writeList($SCHEMA_LIST, list, list.size(), SharedSerde.ListOfStringSerializer.INSTANCE);
-        serializer.writeMap($SCHEMA_MAP, map, map.size(), SharedSerde.StringStringMapSerializer.INSTANCE);
+        serializer.writeStringList($SCHEMA_LIST, list, Schemas.LIST_OF_STRING.listMember());
+        serializer.writeStringMap($SCHEMA_MAP, map, Schemas.STRING_STRING_MAP.mapKeyMember(), Schemas.STRING_STRING_MAP.mapValueMember());
         serializer.writeTimestamp($SCHEMA_TIMESTAMP, timestamp);
         serializer.writeString($SCHEMA_ENUM_MEMBER, enumMember.getValue());
         serializer.writeInteger($SCHEMA_INT_ENUM, intEnum.getValue());

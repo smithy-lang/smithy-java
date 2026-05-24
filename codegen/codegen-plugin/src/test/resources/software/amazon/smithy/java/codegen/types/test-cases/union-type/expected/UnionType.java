@@ -89,7 +89,7 @@ public sealed interface UnionType extends SerializableStruct {
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeList($SCHEMA_LIST_VALUE, listValue, listValue.size(), SharedSerde.ListOfStringSerializer.INSTANCE);
+            serializer.writeStringList($SCHEMA_LIST_VALUE, listValue, Schemas.LIST_OF_STRING.listMember());
         }
 
         @Override
@@ -112,7 +112,7 @@ public sealed interface UnionType extends SerializableStruct {
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeMap($SCHEMA_MAP_VALUE, mapValue, mapValue.size(), SharedSerde.StringStringMapSerializer.INSTANCE);
+            serializer.writeStringMap($SCHEMA_MAP_VALUE, mapValue, Schemas.STRING_STRING_MAP.mapKeyMember(), Schemas.STRING_STRING_MAP.mapValueMember());
         }
 
         @Override

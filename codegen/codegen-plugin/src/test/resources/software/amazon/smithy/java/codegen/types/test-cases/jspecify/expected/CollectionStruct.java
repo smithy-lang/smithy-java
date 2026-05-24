@@ -201,13 +201,13 @@ public final class CollectionStruct implements SerializableStruct {
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
         if (nonSparseList != null) {
-            serializer.writeList($SCHEMA_NON_SPARSE_LIST, nonSparseList, nonSparseList.size(), SharedSerde.NonSparseStringListSerializer.INSTANCE);
+            serializer.writeStringList($SCHEMA_NON_SPARSE_LIST, nonSparseList, Schemas.NON_SPARSE_STRING_LIST.listMember());
         }
-        serializer.writeList($SCHEMA_SPARSE_LIST, sparseList, sparseList.size(), SharedSerde.SparseStringListSerializer.INSTANCE);
+        serializer.writeSparseStringList($SCHEMA_SPARSE_LIST, sparseList, Schemas.SPARSE_STRING_LIST.listMember());
         if (nonSparseMap != null) {
-            serializer.writeMap($SCHEMA_NON_SPARSE_MAP, nonSparseMap, nonSparseMap.size(), SharedSerde.NonSparseStringMapSerializer.INSTANCE);
+            serializer.writeStringMap($SCHEMA_NON_SPARSE_MAP, nonSparseMap, Schemas.NON_SPARSE_STRING_MAP.mapKeyMember(), Schemas.NON_SPARSE_STRING_MAP.mapValueMember());
         }
-        serializer.writeMap($SCHEMA_SPARSE_MAP, sparseMap, sparseMap.size(), SharedSerde.SparseStringMapSerializer.INSTANCE);
+        serializer.writeSparseStringMap($SCHEMA_SPARSE_MAP, sparseMap, Schemas.SPARSE_STRING_MAP.mapKeyMember(), Schemas.SPARSE_STRING_MAP.mapValueMember());
         if (nonSparseListOfSparseMap != null) {
             serializer.writeList($SCHEMA_NON_SPARSE_LIST_OF_SPARSE_MAP, nonSparseListOfSparseMap, nonSparseListOfSparseMap.size(), SharedSerde.NonSparseListOfSparseMapSerializer.INSTANCE);
         }
