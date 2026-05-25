@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
@@ -41,6 +42,7 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.dynamicclient.plugins.DetectProtocolPlugin;
 import software.amazon.smithy.java.dynamicclient.plugins.SimpleAuthDetectionPlugin;
+import software.amazon.smithy.java.dynamicschemas.StructDocument;
 import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -392,5 +394,88 @@ public class ClientTest {
 
         // outer was added first, so it wraps inner: outer-before -> inner-before -> inner-after -> outer-after
         assertThat(order, equalTo(List.of("outer-before", "inner-before", "inner-after", "outer-after")));
+    }
+
+    @Test
+    public void modifyBeforeCallCanInstallDecorator() throws URISyntaxException {
+        var queue = new MockQueue();
+        queue.enqueue(HttpResponse.create().setStatusCode(200).toUnmodifiable());
+
+        CallDecorator<DynamicClient> installed = new CallDecorator<>() {
+            @Override
+            public <I extends SerializableStruct, O extends SerializableStruct> O apply(
+                    DynamicClient client,
+                    ClientCallView<I, O> call,
+                    Invoker next
+            ) {
+                throw new IllegalStateException("installed-by-modifyBeforeCall");
+            }
+        };
+
+        DynamicClient c = DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(MockPlugin.builder().addQueue(queue).build())
+                .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
+                    @Override
+                    public ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
+                        return hook.config().toBuilder().addCallDecorator(installed).build();
+                    }
+                }))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
+                .build();
+
+        Assertions.assertThrows(
+                IllegalStateException.class,
+                () -> c.call("GetSprocket", Document.ofObject(new HashMap<>())),
+                "installed-by-modifyBeforeCall");
+    }
+
+    @Test
+    public void decoratorCanSwapInput() throws URISyntaxException {
+        var queue = new MockQueue();
+        queue.enqueue(HttpResponse.create().setStatusCode(200).toUnmodifiable());
+        var seenInputs = new ArrayList<Object>();
+
+        CallDecorator<DynamicClient> swapper = new CallDecorator<>() {
+            @SuppressWarnings("unchecked")
+            @Override
+            public <I extends SerializableStruct, O extends SerializableStruct> O apply(
+                    DynamicClient client,
+                    ClientCallView<I, O> call,
+                    Invoker next
+            ) {
+                var inputSchema = call.operation().inputSchema();
+                I rewritten = (I) StructDocument.of(
+                        inputSchema,
+                        Document.ofObject(Map.of("id", "swapped")),
+                        SERVICE);
+                return next.invoke(call.withInput(rewritten));
+            }
+        };
+
+        DynamicClient c = DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(MockPlugin.builder().addQueue(queue).build())
+                .addPlugin(config -> config.addCallDecorator(swapper))
+                .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
+                    @Override
+                    public void readBeforeExecution(InputHook<?, ?> hook) {
+                        seenInputs.add(hook.input());
+                    }
+                }))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
+                .build();
+
+        c.call("GetSprocket", Document.ofObject(Map.of("id", "original")));
+
+        assertThat(seenInputs.size(), equalTo(1));
+        var seen = (StructDocument) seenInputs.get(0);
+        assertThat(seen.getMember("id").asString(), equalTo("swapped"));
     }
 }

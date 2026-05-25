@@ -26,7 +26,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * @param <I> the operation input type.
  * @param <O> the operation output type.
  */
-public interface ClientCallView<I extends SerializableStruct, O extends SerializableStruct> {
+public sealed interface ClientCallView<I extends SerializableStruct, O extends SerializableStruct> permits ClientCall {
     /**
      * @return the operation input.
      */
@@ -69,4 +69,12 @@ public interface ClientCallView<I extends SerializableStruct, O extends Serializ
      * @return the identity resolvers available for this call.
      */
     IdentityResolvers identityResolvers();
+
+    /**
+     * Creates a new ClientCallView with a different, compatible Input.
+     *
+     * @param newInput the input to substitute (must not be {@code null}).
+     * @return a view backed by the same call state with the new input.
+     */
+    ClientCallView<I, O> withInput(I newInput);
 }

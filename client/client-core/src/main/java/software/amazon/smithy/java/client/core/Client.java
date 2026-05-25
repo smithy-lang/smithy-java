@@ -22,8 +22,6 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
-import software.amazon.smithy.java.core.serde.event.Frame;
-import software.amazon.smithy.java.core.serde.event.ProtocolEventStreamWriter;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
@@ -43,10 +41,8 @@ public abstract class Client implements Closeable {
     private final ClientInterceptor interceptor;
     private final IdentityResolvers identityResolvers;
     private final RetryStrategy retryStrategy;
-    private final CallDecorator<Client> callDecorator;
     private static final CallDecorator.Invoker CALL_INVOKER = Client::sendCall;
 
-    @SuppressWarnings("unchecked")
     protected Client(Builder<?, ?> builder) {
         ClientConfig.Builder configBuilder = builder.configBuilder();
         this.config = configBuilder.build();
@@ -64,7 +60,6 @@ public abstract class Client implements Closeable {
         if (retryStrategy instanceof Claimable c) {
             c.claim(this);
         }
-        this.callDecorator = (CallDecorator<Client>) this.config.callDecorator();
     }
 
     /**
@@ -77,26 +72,12 @@ public abstract class Client implements Closeable {
      * @param <O>         Output shape.
      * @return Returns the deserialized output.
      */
+    @SuppressWarnings("unchecked")
     protected <I extends SerializableStruct, O extends SerializableStruct> O call(
             I input,
             ApiOperation<I, O> operation,
             RequestOverrideConfig overrideConfig
     ) {
-        ClientCall<I, O> call = buildCall(input, operation, overrideConfig);
-        return callDecorator != null
-                ? callDecorator.apply(this, call, CALL_INVOKER)
-                : sendCall(call);
-    }
-
-    private <I extends SerializableStruct, O extends SerializableStruct> ClientCall<I, O> buildCall(
-            I input,
-            ApiOperation<I, O> operation,
-            RequestOverrideConfig overrideConfig
-    ) {
-        ProtocolEventStreamWriter<SerializableStruct, SerializableStruct, Frame<?>> eventStreamWriter = null;
-        if (operation.inputEventBuilderSupplier() != null) {
-            eventStreamWriter = ProtocolEventStreamWriter.of(input.getMemberValue(operation.inputStreamMember()));
-        }
         ClientPipeline<?, ?> callPipeline = pipeline;
         IdentityResolvers callIdentityResolvers = identityResolvers;
         ClientInterceptor callInterceptor = interceptor;
@@ -123,18 +104,21 @@ public abstract class Client implements Closeable {
             callIdentityResolvers = IdentityResolvers.of(callConfig.identityResolvers());
         }
 
-        var callBuilder = ClientCall.<I, O>builder();
-        callBuilder.input = input;
-        callBuilder.eventStreamWriter = eventStreamWriter;
-        callBuilder.operation = operation;
-        callBuilder.interceptor = callInterceptor;
-        callBuilder.identityResolvers = callIdentityResolvers;
-        // Create a copy of the type registry that adds the errors this operation can encounter.
-        callBuilder.typeRegistry = TypeRegistry.compose(operation.errorRegistry(), typeRegistry);
-        callBuilder.retryStrategy = retryStrategy;
-        callBuilder.pipeline = callPipeline;
-        callBuilder.withConfig(callConfig);
-        return callBuilder.build();
+        ClientCall<I, O> call = new ClientCall<>(
+                input,
+                operation,
+                callConfig,
+                callPipeline,
+                callInterceptor,
+                callIdentityResolvers,
+                // Compose a type registry that adds the errors this operation can encounter.
+                TypeRegistry.compose(operation.errorRegistry(), typeRegistry),
+                retryStrategy);
+
+        // Resolve the decorator from the (possibly modifyBeforeCall-mutated) config so an
+        // interceptor can install or replace it.
+        var decorator = (CallDecorator<Client>) callConfig.callDecorator();
+        return decorator != null ? decorator.apply(this, call, CALL_INVOKER) : sendCall(call);
     }
 
     private static <I extends SerializableStruct, O extends SerializableStruct> O sendCall(ClientCallView<I, O> call) {

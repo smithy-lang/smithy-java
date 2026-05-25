@@ -8,10 +8,27 @@ package software.amazon.smithy.java.client.core;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 
 /**
- * A decorator that wraps client call execution, allowing cross-cutting behavior to be applied
- * around operation invocations.
+ * A decorator that wraps client call execution, allowing control-flow behavior to be applied
+ * around whole operation invocations.
  *
- * <p>Implementations can short-circuit the call (e.g. returning a cached result) by not invoking {@code next}.
+ * <p>Decorators sit <em>outside</em> the retry loop and <em>outside</em> the interceptor pipeline, so they can:
+ * <ul>
+ *   <li>Short-circuit a call (e.g. return a cached result) by not invoking {@code next}.</li>
+ *   <li>Wrap retries: measure total-call time, apply a total-call timeout, fall back on failure.</li>
+ *   <li>Re-invoke {@code next} more than once (request hedging, retry-with-different-creds).</li>
+ *   <li>Catch and recover from failures that the standard retry loop wouldn't have retried.</li>
+ * </ul>
+ *
+ * <p><strong>Decorators are for control flow, not for state mutation.</strong> If you only need to read or modify
+ * state at well-defined points in a call's lifecycle, write a {@code ClientInterceptor} instead — it composes more
+ * cleanly with other interceptors and runs inside the retry loop where appropriate. In particular:
+ * <ul>
+ *   <li>To swap the resolved {@link ClientConfig} for a call (different endpoint, retry strategy, auth, etc.),
+ *       use {@code ClientInterceptor.modifyBeforeCall}.</li>
+ *   <li>To rewrite the input on the wire, use {@code ClientInterceptor.modifyBeforeSerialization}.</li>
+ *   <li>To rewrite the request bytes, use the per-attempt modify hooks ({@code modifyBeforeSigning},
+ *       {@code modifyBeforeTransmit}, etc.).</li>
+ * </ul>
  *
  * @param <C> the client type this decorator is applied to.
  */

@@ -350,6 +350,7 @@ public final class ClientConfig {
             builder.plugins.putAll(plugins);
             builder.pluginPredicate = pluginPredicate;
             builder.appliedPluginClasses.addAll(appliedPluginClasses);
+            builder.callDecorator = callDecorator;
             return builder;
         }
 

@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.client.core;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
@@ -37,12 +35,11 @@ import software.amazon.smithy.model.shapes.ShapeType;
 final class ClientCall<I extends SerializableStruct, O extends SerializableStruct> implements ClientCallView<I, O> {
 
     final I input;
-    final EndpointResolver endpointResolver;
     final ApiOperation<I, O> operation;
-
     final Context context;
     final TypeRegistry typeRegistry;
     final ClientInterceptor interceptor;
+    final EndpointResolver endpointResolver;
     final AuthSchemeResolver authSchemeResolver;
     final Map<ShapeId, AuthScheme<?, ?>> supportedAuthSchemes;
     final IdentityResolvers identityResolvers;
@@ -52,6 +49,65 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
     final ClientPipeline<?, ?> pipeline;
     RetryToken retryToken;
     int attemptCount = 1;
+
+    ClientCall(
+            I input,
+            ApiOperation<I, O> operation,
+            ClientConfig callConfig,
+            ClientPipeline<?, ?> pipeline,
+            ClientInterceptor interceptor,
+            IdentityResolvers identityResolvers,
+            TypeRegistry typeRegistry,
+            RetryStrategy retryStrategy
+    ) {
+        this.input = Objects.requireNonNull(input, "input is null");
+        this.operation = Objects.requireNonNull(operation, "operation is null");
+        Objects.requireNonNull(callConfig, "callConfig is null");
+        this.pipeline = Objects.requireNonNull(pipeline, "pipeline is null");
+        this.interceptor = Objects.requireNonNullElse(interceptor, ClientInterceptor.NOOP);
+        this.identityResolvers = Objects.requireNonNull(identityResolvers, "identityResolvers is null");
+        this.typeRegistry = Objects.requireNonNull(typeRegistry, "typeRegistry is null");
+        this.retryStrategy = Objects.requireNonNull(retryStrategy, "retryStrategy is null");
+
+        this.context = Context.modifiableCopy(callConfig.context());
+        this.endpointResolver = Objects.requireNonNull(callConfig.endpointResolver(), "endpointResolver is null");
+        this.authSchemeResolver = Objects.requireNonNull(callConfig.authSchemeResolver(), "authSchemeResolver is null");
+        this.retryScope = Objects.requireNonNullElse(callConfig.retryScope(), "");
+        this.supportedAuthSchemes = callConfig.supportedAuthSchemes()
+                .stream()
+                .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity(), (a, b) -> a));
+        this.eventStreamWriter = operation.inputEventBuilderSupplier() != null
+                ? ProtocolEventStreamWriter.of(input.getMemberValue(operation.inputStreamMember()))
+                : null;
+
+        this.context.put(CallContext.ENDPOINT_RESOLVER, endpointResolver);
+        this.context.put(CallContext.RETRY_MAX, retryStrategy.maxAttempts());
+    }
+
+    /**
+     * Copy constructor that swaps the input and recomputes the event stream writer.
+     *
+     * <p>The new call shares the source call's context (mutable), pipeline, interceptors, and all other
+     * resolved configuration. Retry state is shared too — decorators run before the retry loop starts,
+     * so {@code attemptCount}/{@code retryToken} are at their initial values either way.
+     */
+    private ClientCall(ClientCall<I, O> source, I newInput) {
+        this.input = Objects.requireNonNull(newInput, "input is null");
+        this.operation = source.operation;
+        this.context = source.context;
+        this.typeRegistry = source.typeRegistry;
+        this.interceptor = source.interceptor;
+        this.endpointResolver = source.endpointResolver;
+        this.authSchemeResolver = source.authSchemeResolver;
+        this.supportedAuthSchemes = source.supportedAuthSchemes;
+        this.identityResolvers = source.identityResolvers;
+        this.retryStrategy = source.retryStrategy;
+        this.retryScope = source.retryScope;
+        this.pipeline = source.pipeline;
+        this.eventStreamWriter = operation.inputEventBuilderSupplier() != null
+                ? ProtocolEventStreamWriter.of(newInput.getMemberValue(operation.inputStreamMember()))
+                : null;
+    }
 
     @Override
     public I input() {
@@ -93,26 +149,9 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
         return identityResolvers;
     }
 
-    private ClientCall(Builder<I, O> builder) {
-        input = Objects.requireNonNull(builder.input, "input is null");
-        operation = Objects.requireNonNull(builder.operation, "operation is null");
-        eventStreamWriter = builder.eventStreamWriter;
-        context = Objects.requireNonNull(builder.context, "context is null");
-        typeRegistry = Objects.requireNonNull(builder.typeRegistry, "typeRegistry is null");
-        endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
-        interceptor = Objects.requireNonNullElse(builder.interceptor, ClientInterceptor.NOOP);
-        authSchemeResolver = Objects.requireNonNull(builder.authSchemeResolver, "authSchemeResolver is null");
-        identityResolvers = Objects.requireNonNull(builder.identityResolvers, "identityResolvers is null");
-        pipeline = Objects.requireNonNull(builder.pipeline, "pipeline is null");
-        supportedAuthSchemes = builder.supportedAuthSchemes.stream()
-                .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity(), (key1, key2) -> key1));
-
-        context.put(CallContext.ENDPOINT_RESOLVER, endpointResolver);
-
-        // Retries
-        retryStrategy = Objects.requireNonNull(builder.retryStrategy, "retryStrategy is null");
-        retryScope = Objects.requireNonNullElse(builder.retryScope, "");
-        context.put(CallContext.RETRY_MAX, retryStrategy.maxAttempts());
+    @Override
+    public ClientCallView<I, O> withInput(I newInput) {
+        return new ClientCall<>(this, newInput);
     }
 
     /**
@@ -130,52 +169,5 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
             return !stream.isReplayable();
         }
         return false;
-    }
-
-    static <I extends SerializableStruct, O extends SerializableStruct> Builder<I, O> builder() {
-        return new Builder<>();
-    }
-
-    static final class Builder<I extends SerializableStruct, O extends SerializableStruct> {
-        I input;
-        EndpointResolver endpointResolver;
-        ApiOperation<I, O> operation;
-        ProtocolEventStreamWriter<SerializableStruct, SerializableStruct, Frame<?>> eventStreamWriter;
-        Context context;
-        TypeRegistry typeRegistry;
-        ClientInterceptor interceptor;
-        AuthSchemeResolver authSchemeResolver;
-        final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
-        IdentityResolvers identityResolvers;
-        RetryStrategy retryStrategy;
-        String retryScope = "";
-        ClientPipeline<?, ?> pipeline;
-
-        private Builder() {}
-
-        void withConfig(ClientConfig callConfig) {
-            context = Context.modifiableCopy(callConfig.context());
-            supportedAuthSchemes.addAll(callConfig.supportedAuthSchemes());
-
-            if (callConfig.endpointResolver() != null) {
-                endpointResolver = callConfig.endpointResolver();
-            }
-
-            if (callConfig.authSchemeResolver() != null) {
-                authSchemeResolver = callConfig.authSchemeResolver();
-            }
-
-            if (callConfig.retryScope() != null) {
-                retryScope = callConfig.retryScope();
-            }
-
-            if (callConfig.retryStrategy() != null) {
-                retryStrategy = callConfig.retryStrategy();
-            }
-        }
-
-        ClientCall<I, O> build() {
-            return new ClientCall<>(this);
-        }
     }
 }
