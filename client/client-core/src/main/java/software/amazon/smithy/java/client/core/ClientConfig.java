@@ -53,7 +53,7 @@ public final class ClientConfig {
     private final RetryStrategy retryStrategy;
     private final String retryScope;
     private final Set<Class<? extends ClientPlugin>> appliedPluginClasses;
-    private final ClientCallDecorator<?> callDecorator;
+    private final CallDecorator<?> callDecorator;
 
     private ClientConfig(Builder builder) {
         // Collect and apply plugins, updating builder.appliedPluginClasses as we go
@@ -225,7 +225,7 @@ public final class ClientConfig {
         return retryScope;
     }
 
-    ClientCallDecorator<?> callDecorator() {
+    CallDecorator<?> callDecorator() {
         return callDecorator;
     }
 
@@ -328,7 +328,7 @@ public final class ClientConfig {
         private final Map<Class<? extends ClientPlugin>, ClientPlugin> plugins = new LinkedHashMap<>();
         // Mutable set that tracks which plugin classes have been applied to this builder
         private final Set<Class<? extends ClientPlugin>> appliedPluginClasses = new HashSet<>();
-        private ClientCallDecorator<?> callDecorator;
+        private CallDecorator<?> callDecorator;
 
         public Builder() {
             plugins.put(DefaultPlugin.class, DefaultPlugin.INSTANCE);
@@ -667,13 +667,16 @@ public final class ClientConfig {
         }
 
         /**
-         * Sets the decorator to wrap client call execution.
+         * Adds a decorator that wraps client call execution. Multiple decorators compose: the first
+         * added is the outermost wrapper.
          *
-         * @param callDecorator the client call decorator.
+         * @param callDecorator the call decorator to add.
          * @return the builder.
          */
-        public Builder callDecorator(ClientCallDecorator<?> callDecorator) {
-            this.callDecorator = callDecorator;
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        public Builder addCallDecorator(CallDecorator<?> callDecorator) {
+            this.callDecorator = CallDecorator.chain((CallDecorator) this.callDecorator,
+                    (CallDecorator) callDecorator);
             return this;
         }
 

@@ -43,7 +43,8 @@ public abstract class Client implements Closeable {
     private final ClientInterceptor interceptor;
     private final IdentityResolvers identityResolvers;
     private final RetryStrategy retryStrategy;
-    private final ClientCallDecorator<Client> callDecorator;
+    private final CallDecorator<Client> callDecorator;
+    private static final CallDecorator.Invoker CALL_INVOKER = Client::sendCall;
 
     @SuppressWarnings("unchecked")
     protected Client(Builder<?, ?> builder) {
@@ -63,7 +64,7 @@ public abstract class Client implements Closeable {
         if (retryStrategy instanceof Claimable c) {
             c.claim(this);
         }
-        this.callDecorator = (ClientCallDecorator<Client>) this.config.callDecorator();
+        this.callDecorator = (CallDecorator<Client>) this.config.callDecorator();
     }
 
     /**
@@ -81,20 +82,13 @@ public abstract class Client implements Closeable {
             ApiOperation<I, O> operation,
             RequestOverrideConfig overrideConfig
     ) {
-        if (callDecorator != null) {
-            return callDecorator.apply(
-                    this,
-                    operation,
-                    input,
-                    overrideConfig,
-                    overrideConfig == null ? null : overrideConfig.context(),
-                    this::doCall);
-        }
-
-        return this.doCall(input, operation, overrideConfig);
+        ClientCall<I, O> call = buildCall(input, operation, overrideConfig);
+        return callDecorator != null
+                ? callDecorator.apply(this, call, CALL_INVOKER)
+                : sendCall(call);
     }
 
-    private <I extends SerializableStruct, O extends SerializableStruct> O doCall(
+    private <I extends SerializableStruct, O extends SerializableStruct> ClientCall<I, O> buildCall(
             I input,
             ApiOperation<I, O> operation,
             RequestOverrideConfig overrideConfig
@@ -136,10 +130,16 @@ public abstract class Client implements Closeable {
         callBuilder.interceptor = callInterceptor;
         callBuilder.identityResolvers = callIdentityResolvers;
         // Create a copy of the type registry that adds the errors this operation can encounter.
-        callBuilder.typeRegistry = TypeRegistry.compose(operation.errorRegistry(), typeRegistry);;
+        callBuilder.typeRegistry = TypeRegistry.compose(operation.errorRegistry(), typeRegistry);
         callBuilder.retryStrategy = retryStrategy;
+        callBuilder.pipeline = callPipeline;
         callBuilder.withConfig(callConfig);
-        return callPipeline.send(callBuilder.build());
+        return callBuilder.build();
+    }
+
+    private static <I extends SerializableStruct, O extends SerializableStruct> O sendCall(ClientCallView<I, O> call) {
+        ClientCall<I, O> impl = (ClientCall<I, O>) call;
+        return impl.pipeline.send(impl);
     }
 
     /**
@@ -439,14 +439,15 @@ public abstract class Client implements Closeable {
         }
 
         /**
-         * Sets the decorator to wrap client call execution.
+         * Adds a decorator that wraps client call execution. Multiple decorators compose: the first
+         * added is the outermost wrapper.
          *
-         * @param callDecorator the client call decorator.
+         * @param callDecorator the call decorator to add.
          * @return the builder.
          */
         @SuppressWarnings("unchecked")
-        public B callDecorator(ClientCallDecorator<I> callDecorator) {
-            configBuilder.callDecorator(callDecorator);
+        public B addCallDecorator(CallDecorator<I> callDecorator) {
+            configBuilder.addCallDecorator(callDecorator);
             return (B) this;
         }
 

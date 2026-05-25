@@ -36,8 +36,6 @@ import software.amazon.smithy.java.client.http.plugins.ApplyHttpRetryInfoPlugin;
 import software.amazon.smithy.java.client.http.plugins.HttpChecksumPlugin;
 import software.amazon.smithy.java.client.http.plugins.RequestCompressionPlugin;
 import software.amazon.smithy.java.client.http.plugins.UserAgentPlugin;
-import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
@@ -315,17 +313,14 @@ public class ClientTest {
                 .serviceId(SERVICE)
                 .protocol(new RestJsonClientProtocol(SERVICE))
                 .addPlugin(MockPlugin.builder().addQueue(queue).build())
-                .addPlugin(config -> config.callDecorator(new ClientCallDecorator<DynamicClient>() {
+                .addPlugin(config -> config.addCallDecorator(new CallDecorator<DynamicClient>() {
                     @Override
                     public <I extends SerializableStruct, O extends SerializableStruct> O apply(
                             DynamicClient client,
-                            ApiOperation<I, O> operation,
-                            I input,
-                            RequestOverrideConfig overrideConfig,
-                            Context overrideContext,
-                            ClientCallInvoker next
+                            ClientCallView<I, O> call,
+                            Invoker next
                     ) {
-                        assertThat(overrideContext.get(ClientContext.APPLICATION_ID), equalTo("foo"));
+                        assertThat(call.context().get(ClientContext.APPLICATION_ID), equalTo("foo"));
                         throw new IllegalStateException("Prevent calling the service");
                     }
                 }))
@@ -340,5 +335,62 @@ public class ClientTest {
                             .putConfig(ClientContext.APPLICATION_ID, "foo")
                             .build());
         }, "Prevent calling the service");
+    }
+
+    @Test
+    public void chainsCallDecorators() throws URISyntaxException {
+        var queue = new MockQueue();
+        queue.enqueue(HttpResponse.create().setStatusCode(200).toUnmodifiable());
+        var order = new ArrayList<String>();
+
+        CallDecorator<DynamicClient> outer = new CallDecorator<>() {
+            @Override
+            public <I extends SerializableStruct, O extends SerializableStruct> O apply(
+                    DynamicClient client,
+                    ClientCallView<I, O> call,
+                    Invoker next
+            ) {
+                order.add("outer-before");
+                try {
+                    return next.invoke(call);
+                } finally {
+                    order.add("outer-after");
+                }
+            }
+        };
+
+        CallDecorator<DynamicClient> inner = new CallDecorator<>() {
+            @Override
+            public <I extends SerializableStruct, O extends SerializableStruct> O apply(
+                    DynamicClient client,
+                    ClientCallView<I, O> call,
+                    Invoker next
+            ) {
+                order.add("inner-before");
+                try {
+                    throw new IllegalStateException("stop");
+                } finally {
+                    order.add("inner-after");
+                }
+            }
+        };
+
+        DynamicClient c = DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(MockPlugin.builder().addQueue(queue).build())
+                .addPlugin(config -> config.addCallDecorator(outer))
+                .addPlugin(config -> config.addCallDecorator(inner))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
+                .build();
+
+        Assertions.assertThrows(IllegalStateException.class, () -> {
+            c.call("GetSprocket", Document.ofObject(new HashMap<>()));
+        });
+
+        // outer was added first, so it wraps inner: outer-before -> inner-before -> inner-after -> outer-after
+        assertThat(order, equalTo(List.of("outer-before", "inner-before", "inner-after", "outer-after")));
     }
 }

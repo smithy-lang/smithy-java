@@ -34,7 +34,7 @@ import software.amazon.smithy.model.shapes.ShapeType;
  * @param <I> Input to send.
  * @param <O> Output to return.
  */
-final class ClientCall<I extends SerializableStruct, O extends SerializableStruct> {
+final class ClientCall<I extends SerializableStruct, O extends SerializableStruct> implements ClientCallView<I, O> {
 
     final I input;
     final EndpointResolver endpointResolver;
@@ -49,8 +49,49 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
     final ProtocolEventStreamWriter<SerializableStruct, SerializableStruct, Frame<?>> eventStreamWriter;
     final RetryStrategy retryStrategy;
     final String retryScope;
+    final ClientPipeline<?, ?> pipeline;
     RetryToken retryToken;
     int attemptCount = 1;
+
+    @Override
+    public I input() {
+        return input;
+    }
+
+    @Override
+    public ApiOperation<I, O> operation() {
+        return operation;
+    }
+
+    @Override
+    public Context context() {
+        return context;
+    }
+
+    @Override
+    public EndpointResolver endpointResolver() {
+        return endpointResolver;
+    }
+
+    @Override
+    public TypeRegistry typeRegistry() {
+        return typeRegistry;
+    }
+
+    @Override
+    public AuthSchemeResolver authSchemeResolver() {
+        return authSchemeResolver;
+    }
+
+    @Override
+    public Map<ShapeId, AuthScheme<?, ?>> supportedAuthSchemes() {
+        return supportedAuthSchemes;
+    }
+
+    @Override
+    public IdentityResolvers identityResolvers() {
+        return identityResolvers;
+    }
 
     private ClientCall(Builder<I, O> builder) {
         input = Objects.requireNonNull(builder.input, "input is null");
@@ -62,6 +103,7 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
         interceptor = Objects.requireNonNullElse(builder.interceptor, ClientInterceptor.NOOP);
         authSchemeResolver = Objects.requireNonNull(builder.authSchemeResolver, "authSchemeResolver is null");
         identityResolvers = Objects.requireNonNull(builder.identityResolvers, "identityResolvers is null");
+        pipeline = Objects.requireNonNull(builder.pipeline, "pipeline is null");
         supportedAuthSchemes = builder.supportedAuthSchemes.stream()
                 .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity(), (key1, key2) -> key1));
 
@@ -107,6 +149,7 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
         IdentityResolvers identityResolvers;
         RetryStrategy retryStrategy;
         String retryScope = "";
+        ClientPipeline<?, ?> pipeline;
 
         private Builder() {}
 
