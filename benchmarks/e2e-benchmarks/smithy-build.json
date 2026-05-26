@@ -1,0 +1,55 @@
+{
+  "version": "1.0",
+  "projections": {
+    "dynamodb-client": {
+      "transforms": [
+        {
+          "name": "includeServices",
+          "args": {
+            "services": ["com.amazonaws.dynamodb#DynamoDB_20120810"]
+          }
+        },
+        {
+          "name": "removeUnusedShapes"
+        }
+      ],
+      "plugins": {
+        "java-codegen": {
+          "service": "com.amazonaws.dynamodb#DynamoDB_20120810",
+          "name": "DynamoDB",
+          "namespace": "software.amazon.smithy.java.benchmarks.e2e.dynamodb",
+          "protocol": "aws.protocols#awsJson1_0",
+          "transport": {
+            "http-java": {}
+          },
+          "modes": ["client"]
+        }
+      }
+    },
+    "s3-client": {
+      "transforms": [
+        {
+          "name": "includeServices",
+          "args": {
+            "services": ["com.amazonaws.s3#AmazonS3"]
+          }
+        },
+        {
+          "name": "removeUnusedShapes"
+        }
+      ],
+      "plugins": {
+        "java-codegen": {
+          "service": "com.amazonaws.s3#AmazonS3",
+          "name": "S3",
+          "namespace": "software.amazon.smithy.java.benchmarks.e2e.s3",
+          "protocol": "aws.protocols#restXml",
+          "transport": {
+            "http-java": {}
+          },
+          "modes": ["client"]
+        }
+      }
+    }
+  }
+}
