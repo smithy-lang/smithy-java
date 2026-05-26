@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.auth.api.SignResult;
@@ -257,6 +258,127 @@ public class ClientPipelineTest {
         client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
 
         assertThat(capturedProperties.get().get(TEST_KEY), equalTo("overridden-value"));
+    }
+
+    @Test
+    public void endpointAuthSchemeSwapsToDifferentScheme() {
+        var service = ShapeId.from("smithy.example#Sprockets");
+        var resolverChosenId = ShapeId.from("smithy.test#chosenAuth");
+        var endpointTargetId = ShapeId.from("smithy.test#targetAuth");
+        var TEST_KEY = Context.<String>key("test-signing-override");
+
+        var resolverScheme = AuthScheme.of(
+                resolverChosenId,
+                HttpRequest.class,
+                Identity.class,
+                (request, identity, properties) -> {
+                    throw new AssertionError(
+                            "Resolver-chosen scheme should not have signed: endpoint asked for "
+                                    + endpointTargetId);
+                });
+
+        var capturedProperties = new AtomicReference<Context>();
+        var targetScheme = AuthScheme.of(
+                endpointTargetId,
+                HttpRequest.class,
+                Identity.class,
+                (request, identity, properties) -> {
+                    capturedProperties.set(properties);
+                    return new SignResult<>(request);
+                });
+
+        EndpointResolver endpointResolver = params -> Endpoint.builder()
+                .uri("https://example.com")
+                .addAuthScheme(
+                        EndpointAuthScheme.builder()
+                                .authSchemeId(endpointTargetId.toString())
+                                .putProperty(TEST_KEY, "from-endpoint")
+                                .build())
+                .build();
+
+        var mockQueue = new MockQueue()
+                .enqueue(HttpResponse.create()
+                        .setStatusCode(200)
+                        .setBody(DataStream.ofString("{\"id\":\"1\"}"))
+                        .toUnmodifiable());
+        var mock = MockPlugin.builder().addQueue(mockQueue).build();
+
+        var client = DynamicClient.builder()
+                .serviceId(service)
+                .model(MODEL)
+                .addPlugin(mock)
+                .endpointResolver(endpointResolver)
+                .authSchemeResolver(params -> List.of(new AuthSchemeOption(resolverChosenId)))
+                .putSupportedAuthSchemes(resolverScheme, targetScheme)
+                .addIdentityResolver(new IdentityResolver<>() {
+                    @Override
+                    public IdentityResult<Identity> resolveIdentity(Context requestProperties) {
+                        return IdentityResult.of(new Identity() {});
+                    }
+
+                    @Override
+                    public Class<Identity> identityType() {
+                        return Identity.class;
+                    }
+                })
+                .build();
+
+        client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
+
+        assertThat(capturedProperties.get().get(TEST_KEY), equalTo("from-endpoint"));
+    }
+
+    @Test
+    public void endpointAuthSchemeUnsupportedNameFails() {
+        var service = ShapeId.from("smithy.example#Sprockets");
+        var resolverChosenId = ShapeId.from("smithy.test#chosenAuth");
+        var endpointTargetId = ShapeId.from("smithy.test#unknownAuth");
+
+        var resolverScheme = AuthScheme.of(
+                resolverChosenId,
+                HttpRequest.class,
+                Identity.class,
+                (request, identity, properties) -> new SignResult<>(request));
+
+        EndpointResolver endpointResolver = params -> Endpoint.builder()
+                .uri("https://example.com")
+                .addAuthScheme(
+                        EndpointAuthScheme.builder()
+                                .authSchemeId(endpointTargetId.toString())
+                                .build())
+                .build();
+
+        var mockQueue = new MockQueue()
+                .enqueue(HttpResponse.create()
+                        .setStatusCode(200)
+                        .setBody(DataStream.ofString("{\"id\":\"1\"}"))
+                        .toUnmodifiable());
+        var mock = MockPlugin.builder().addQueue(mockQueue).build();
+
+        var client = DynamicClient.builder()
+                .serviceId(service)
+                .model(MODEL)
+                .addPlugin(mock)
+                .endpointResolver(endpointResolver)
+                .authSchemeResolver(params -> List.of(new AuthSchemeOption(resolverChosenId)))
+                .putSupportedAuthSchemes(resolverScheme)
+                .addIdentityResolver(new IdentityResolver<>() {
+                    @Override
+                    public IdentityResult<Identity> resolveIdentity(Context requestProperties) {
+                        return IdentityResult.of(new Identity() {});
+                    }
+
+                    @Override
+                    public Class<Identity> identityType() {
+                        return Identity.class;
+                    }
+                })
+                .build();
+
+        var ex = Assertions.assertThrows(
+                Exception.class,
+                () -> client.call("GetSprocket", Document.ofObject(Map.of("id", "1"))));
+        assertThat(ex.getMessage(), Matchers.containsString(endpointTargetId.toString()));
     }
 
     private static final class Token implements RetryToken {
