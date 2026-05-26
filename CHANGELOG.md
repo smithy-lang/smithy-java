@@ -1,6 +1,6 @@
 # Change Log
 
-## 1.3.0 (5/20/2026)
+## 1.3.0 (5/26/2026)
 > [!IMPORTANT]
 > All client modules are considered stable.  Some modules, including
 > server, CLI, and MCP, are still in developer-preview and may contain
