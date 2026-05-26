@@ -111,15 +111,29 @@ public final class AwsProfileFile {
     }
 
     /**
-     * Returns the active profile based on {@code AWS_PROFILE} env var, {@code aws.profile} system property,
-     * or {@code "default"}.
+     * Returns the active profile based on {@code aws.profile} system property, the {@code AWS_PROFILE}
+     * env var, or {@code "default"}.
      *
      * @return the active profile, or {@code null} if not found.
      */
     public AwsProfile activeProfile() {
+        return activeProfile(System::getenv);
+    }
+
+    /**
+     * Returns the active profile based on {@code aws.profile} system property, the {@code AWS_PROFILE}
+     * env var, or {@code "default"}.
+     *
+     * <p>Use this overload from contexts that already have an injectable env source (for example {@code ChainSetup})
+     * so test-time env overrides apply consistently.
+     *
+     * @param envGetter environment variable lookup.
+     * @return the active profile, or {@code null} if not found.
+     */
+    public AwsProfile activeProfile(Function<String, String> envGetter) {
         String name = System.getProperty("aws.profile");
         if (name == null) {
-            name = System.getenv("AWS_PROFILE");
+            name = envGetter.apply("AWS_PROFILE");
         }
         if (name == null) {
             name = "default";

@@ -35,10 +35,10 @@ public final class SharedConfigProvider implements ChainIdentityProvider {
         if (profileFile != null) {
             setup.setProfileFile(profileFile);
             String name = setup.profileNameOverride();
-            if (name == null) {
-                setup.setProfile(profileFile.activeProfile());
-            } else {
+            if (name != null) {
                 setup.setProfile(profileFile.profile(name));
+            } else {
+                setup.setProfile(profileFile.activeProfile(setup::getenv));
             }
         }
     }

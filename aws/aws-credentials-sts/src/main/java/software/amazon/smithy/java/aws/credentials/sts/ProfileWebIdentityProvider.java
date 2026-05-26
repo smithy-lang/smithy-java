@@ -48,7 +48,8 @@ public final class ProfileWebIdentityProvider implements ChainIdentityProvider {
 
         for (AwsConfigCredentialSource source : setup.profile().credentialSources()) {
             if (source instanceof AwsConfigCredentialSource.WebIdentityToken wit) {
-                setup.addTerminalResolver(new StsWebIdentityResolver(wit, StsClientFactory.createNoAuth()));
+                var endpoint = StsEndpointConfig.resolve(wit.region(), setup);
+                setup.addTerminalResolver(new StsWebIdentityResolver(wit, StsClientFactory.createNoAuth(endpoint)));
                 return;
             }
         }
