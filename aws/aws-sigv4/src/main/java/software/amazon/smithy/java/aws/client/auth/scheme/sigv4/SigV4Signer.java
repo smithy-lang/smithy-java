@@ -18,6 +18,8 @@ import javax.crypto.spec.SecretKeySpec;
 import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.aws.client.core.settings.EndpointAuthSchemeSettings;
+import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
@@ -64,8 +66,12 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     @Override
     public SignResult<HttpRequest> sign(HttpRequest request, AwsCredentialsIdentity identity, Context properties) {
-        var region = properties.expect(SigV4Settings.REGION);
-        var name = properties.expect(SigV4Settings.SIGNING_NAME);
+        // Endpoint-emitted authSchemes property overrides the scheme-level signingName/signingRegion
+        // when present (per the Endpoints 2.0 implementation SEP §"Endpoint Properties (authSchemes)").
+        var name = properties.getOrDefault(EndpointAuthSchemeSettings.SIGNING_NAME,
+                properties.expect(SigV4Settings.SIGNING_NAME));
+        var region = properties.getOrDefault(EndpointAuthSchemeSettings.SIGNING_REGION,
+                properties.expect(RegionSetting.REGION));
         var clock = properties.getOrDefault(SigV4Settings.CLOCK, Clock.systemUTC());
 
         // TODO: Add support for query signing?
