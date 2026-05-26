@@ -16,6 +16,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -160,10 +161,26 @@ public class SigV4TestRunner {
                 Signer<HttpRequest, AwsCredentialsIdentity> signer
         ) throws ExecutionException, InterruptedException {
             var signedRequest = signer.sign(request, context.identity, context.properties).signedRequest();
-            boolean isValid = signedRequest.headers().equals(expected.headers())
+            boolean isValid = headersEqualIgnoringContentLength(signedRequest.headers(), expected.headers())
                     && signedRequest.uri().equals(expected.uri())
                     && signedRequest.method().equals(expected.method());
             return new Result(signedRequest, expected, isValid);
+        }
+
+        /**
+         * The AWS sigv4 fixture corpus omits {@code Content-Length}, but smithy-java's
+         * request implementation auto-derives it from the body when the body is set. The
+         * header is in {@code HEADERS_TO_IGNORE_IN_LOWER_CASE} on the signer side, so it
+         * never participates in the signature; only the wire-level inclusion differs.
+         */
+        private static boolean headersEqualIgnoringContentLength(HttpHeaders actual, HttpHeaders expected) {
+            return mapWithoutContentLength(actual).equals(mapWithoutContentLength(expected));
+        }
+
+        private static Map<String, List<String>> mapWithoutContentLength(HttpHeaders h) {
+            var map = new LinkedHashMap<String, List<String>>(h.map());
+            map.remove("content-length");
+            return map;
         }
     }
 
@@ -202,9 +219,13 @@ public class SigV4TestRunner {
         public Result unwrap() {
             if (!isValid()) {
                 throw new AssertionError(
-                        "Expected does not match actual. \n"
-                                + "Expected: -------------- \n" + expected()
-                                + "\n  Actual -------------- \n" + actual());
+                        "Expected does not match actual.\n"
+                                + "Expected URI:     " + expected().uri() + "\n"
+                                + "Expected method:  " + expected().method() + "\n"
+                                + "Expected headers: " + expected().headers().map() + "\n"
+                                + "Actual URI:       " + actual().uri() + "\n"
+                                + "Actual method:    " + actual().method() + "\n"
+                                + "Actual headers:   " + actual().headers().map());
             }
             return this;
         }

@@ -12,26 +12,20 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
 import javax.crypto.spec.SecretKeySpec;
 import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HeaderName;
-import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.ModifiableHttpRequest;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.io.uri.URLEncoding;
 import software.amazon.smithy.java.logging.InternalLogger;
-import software.amazon.smithy.utils.Pair;
 
 /**
  * AWS signature version 4 signing implementation.
@@ -79,28 +73,31 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         // TODO: support UNSIGNED
 
         var payloadHash = getPayloadHash(request.body());
-        var signatureAndSignedHeaders = createSignedHeaders(
-                request.method(),
-                request.uri(),
-                request.headers(),
+        var mod = request.toModifiable();
+        var signature = signInPlace(
+                mod,
                 payloadHash,
                 region,
                 name,
                 clock.instant(),
                 identity.accessKeyId(),
                 identity.secretAccessKey(),
-                identity.sessionToken(),
-                !request.body().hasKnownLength());
-        var signedHeaders = signatureAndSignedHeaders.right;
-        var mod = request.toModifiable();
-        mod.setHeaders(signedHeaders);
-        return new SignResult<>(mod, signatureAndSignedHeaders.left);
+                identity.sessionToken());
+
+        return new SignResult<>(mod, signature);
     }
 
     private String getPayloadHash(DataStream dataStream) {
-        if (!dataStream.hasKnownLength()) {
+        if (dataStream == null || dataStream.contentLength() == 0) {
             return EMPTY_BODY_HASH;
         }
+
+        if (!dataStream.hasKnownLength()) {
+            throw new UnsupportedOperationException(
+                    "Cannot SigV4-sign a body whose length is unknown without UNSIGNED-PAYLOAD "
+                            + "or chunked signing, neither of which is implemented yet.");
+        }
+
         return hexHash(dataStream.asByteBuffer());
     }
 
@@ -108,61 +105,173 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         return HexFormat.of().formatHex(hash(bytes));
     }
 
-    private Pair<String, Map<String, List<String>>> createSignedHeaders(
-            String method,
-            SmithyUri uri,
-            HttpHeaders httpHeaders,
+    private String signInPlace(
+            ModifiableHttpRequest request,
             String payloadHash,
             String regionName,
             String serviceName,
             Instant signingTimestamp,
             String accessKeyId,
             String secretAccessKey,
-            String sessionToken,
-            boolean isStreaming
+            String sessionToken
     ) {
-        var headers = copyHeaders(httpHeaders);
+        var uri = request.uri();
+        var method = request.method();
 
-        // AWS4 requires a number of headers to be set before signing including 'Host' and 'X-Amz-Date'
-        var hostHeader = uriUsingStandardPort(uri) ? uri.getHost() + ':' + uri.getPort() : uri.getHost();
-        headers.put(HeaderName.HOST.name(), List.of(hostHeader));
+        // Collect every header into the reusable strided buffer.
+        signingResources.headerCount = 0;
+        request.headers().forEachEntry(signingResources, SigningResources::addHeader);
+
+        // Append the port only for non-default, explicitly-set ports.
+        var existingHeaders = request.headers();
+        if (!existingHeaders.hasHeader(HeaderName.HOST)) {
+            var hostHeader = uriUsesDefaultPort(uri) ? uri.getHost() : uri.getHost() + ':' + uri.getPort();
+            signingResources.addHeader(HeaderName.HOST.name(), hostHeader);
+        }
 
         var sb = signingResources.sb;
         var signingDate = signingTimestamp.atOffset(ZoneOffset.UTC).toLocalDateTime();
         var dateStamp = formatDate(signingDate, sb);
         var requestTime = formatRfc3339(signingDate, dateStamp, sb);
-        headers.put(HeaderName.X_AMZ_DATE.name(), List.of(requestTime));
-
-        if (sessionToken != null) {
-            headers.put(HeaderName.X_AMZ_SECURITY_TOKEN.name(), List.of(sessionToken));
+        // Use the request's existing X-Amz-Date if present so the canonical-request value
+        // matches what's on the wire. Otherwise add the freshly-computed timestamp.
+        String existingDate = existingHeaders.firstValue(HeaderName.X_AMZ_DATE);
+        if (existingDate != null) {
+            requestTime = existingDate;
+        } else {
+            signingResources.addHeader(HeaderName.X_AMZ_DATE.name(), requestTime);
         }
 
-        // Determine sorted list of headers to sign
-        var signedHeaders = getSignedHeaders(headers.keySet(), sb);
+        if (sessionToken != null && !existingHeaders.hasHeader(HeaderName.X_AMZ_SECURITY_TOKEN)) {
+            signingResources.addHeader(HeaderName.X_AMZ_SECURITY_TOKEN.name(), sessionToken);
+        }
 
-        // Build canonicalRequest and compute its signature
-        var canonicalRequest = getCanonicalRequest(
+        // S3 requires x-amz-content-sha256 on the wire (and in the signature) but other services don't accept it as
+        // part of the signed-header set, so add it conditionally. The header is signature-relevant: if it's in the
+        // canonical request, it must also be on the wire (and vice-versa).
+        boolean isS3 = "s3".equals(serviceName) || "s3express".equals(serviceName);
+        if (isS3 && !existingHeaders.hasHeader(HeaderName.X_AMZ_CONTENT_SHA256)) {
+            signingResources.addHeader(HeaderName.X_AMZ_CONTENT_SHA256.name(), payloadHash);
+        }
+
+        signingResources.sortHeadersByName();
+
+        var signedHeaders = buildSignedHeadersString(signingResources, sb);
+        int canonicalLen = buildCanonicalRequest(
                 method,
                 uri,
-                headers,
-                headers.keySet(),
+                signingResources,
                 signedHeaders,
                 payloadHash,
                 sb);
 
-        var signingKey = deriveSigningKey(
-                secretAccessKey,
-                dateStamp,
-                regionName,
-                serviceName,
-                signingTimestamp);
+        var signingKey = deriveSigningKey(secretAccessKey, dateStamp, regionName, serviceName, signingTimestamp);
         var scope = createScope(dateStamp, regionName, serviceName, sb);
-        var signature = computeSignature(canonicalRequest, scope, requestTime, signingKey, sb);
-
+        var signature = computeSignature(signingResources.canonicalRequestBytes,
+                canonicalLen,
+                scope,
+                requestTime,
+                signingKey,
+                sb);
         var authorizationHeader = getAuthHeader(accessKeyId, scope, signedHeaders, signature, sb);
-        headers.put("authorization", List.of(authorizationHeader));
 
-        return Pair.of(signature, headers);
+        // Now mutate the actual request. setHeader is a single-key operation per header; no wholesale map replacement.
+        var headers = request.headers();
+        headers.setHeader(HeaderName.X_AMZ_DATE, requestTime);
+        if (sessionToken != null) {
+            headers.setHeader(HeaderName.X_AMZ_SECURITY_TOKEN, sessionToken);
+        }
+
+        if (isS3) {
+            headers.setHeader(HeaderName.X_AMZ_CONTENT_SHA256, payloadHash);
+        }
+
+        headers.setHeader("authorization", authorizationHeader);
+        return signature;
+    }
+
+    /**
+     * Emit the SignedHeaders semicolon-joined list directly from the sorted strided buffer.
+     * Skips ignored headers and dedupes consecutive duplicates produced by multi-valued headers.
+     */
+    private static String buildSignedHeadersString(SigningResources r, StringBuilder sb) {
+        sb.setLength(0);
+        String previous = null;
+
+        for (int i = 0; i < r.headerCount; i++) {
+            String name = r.headers[i * 2];
+            if (name.equals(previous) || HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(name)) {
+                continue;
+            }
+            if (!sb.isEmpty()) {
+                sb.append(';');
+            }
+            sb.append(name);
+            previous = name;
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * Build the canonical request into the reusable byte buffer in {@link SigningResources}.
+     * Returns the number of bytes written. The canonical request is ASCII, so each char in
+     * the StringBuilder maps to one byte without UTF-8 encoding.
+     */
+    private static int buildCanonicalRequest(
+            String method,
+            SmithyUri uri,
+            SigningResources r,
+            String signedHeaders,
+            String payloadHash,
+            StringBuilder sb
+    ) {
+        sb.setLength(0);
+        sb.append(method).append('\n');
+        addCanonicalizedResourcePath(uri, sb);
+        sb.append('\n');
+        addCanonicalizedQueryString(uri, r, sb);
+        sb.append('\n');
+        addCanonicalizedHeaderString(r, sb);
+        sb.append('\n');
+        sb.append(signedHeaders).append('\n').append(payloadHash);
+
+        int len = sb.length();
+        byte[] dst = r.ensureCanonicalRequestCapacity(len);
+        for (int i = 0; i < len; i++) {
+            // Canonical request chars are ASCII (0x00-0x7F) by construction. Asserted-safe
+            // narrowing cast skips the UTF-8 encoder allocations String.getBytes would do.
+            dst[i] = (byte) sb.charAt(i);
+        }
+        return len;
+    }
+
+    /**
+     * Walk the sorted strided buffer, emitting one canonical-header line per distinct name,
+     * comma-joining the values of multi-valued headers (which the sort placed consecutively).
+     */
+    private static void addCanonicalizedHeaderString(SigningResources r, StringBuilder builder) {
+        int i = 0;
+        while (i < r.headerCount) {
+            String name = r.headers[i * 2];
+            int next = i + 1;
+            while (next < r.headerCount && name.equals(r.headers[next * 2])) {
+                next++;
+            }
+            if (HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(name)) {
+                i = next;
+                continue;
+            }
+            builder.append(name).append(':');
+            for (int j = i; j < next; j++) {
+                addAndTrim(builder, r.headers[j * 2 + 1]);
+                builder.append(',');
+            }
+            // Trim trailing comma.
+            builder.setLength(builder.length() - 1);
+            builder.append('\n');
+            i = next;
+        }
     }
 
     private static String createScope(String dateStamp, String regionName, String serviceName, StringBuilder sb) {
@@ -172,14 +281,6 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         sb.append(serviceName).append('/');
         sb.append(TERMINATOR);
         return sb.toString();
-    }
-
-    private static Map<String, List<String>> copyHeaders(HttpHeaders httpHeaders) {
-        Map<String, List<String>> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        httpHeaders.forEachEntry(headers, (h, name, value) -> {
-            h.computeIfAbsent(name, k -> new ArrayList<>(1)).add(value);
-        });
-        return headers;
     }
 
     // Formats the equivalent of "yyyyMMdd".
@@ -210,24 +311,17 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         sb.append(value);
     }
 
-    private static boolean uriUsingStandardPort(SmithyUri uri) {
-        return switch (uri.getPort()) {
-            case 80 -> uri.getScheme().equals("http");
-            case 443 -> uri.getScheme().equals("https");
+    private static boolean uriUsesDefaultPort(SmithyUri uri) {
+        int port = uri.getPort();
+        if (port == -1) {
+            return true;
+        }
+
+        return switch (port) {
+            case 80 -> "http".equals(uri.getScheme());
+            case 443 -> "https".equals(uri.getScheme());
             default -> false;
         };
-    }
-
-    private static String getSignedHeaders(Set<String> sortedHeaderKeys, StringBuilder sb) {
-        sb.setLength(0);
-        for (var header : sortedHeaderKeys) {
-            if (!HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(header)) {
-                sb.append(header).append(';');
-            }
-        }
-        // Remove the trailing ";".
-        sb.setLength(sb.length() - 1);
-        return sb.toString();
     }
 
     private static String getAuthHeader(
@@ -250,29 +344,6 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         return sb.toString();
     }
 
-    private byte[] getCanonicalRequest(
-            String method,
-            SmithyUri uri,
-            Map<String, List<String>> headers,
-            Set<String> sortedHeaderKeys,
-            String signedHeaders,
-            String payloadHash,
-            StringBuilder sb
-    ) {
-        sb.setLength(0);
-        sb.append(method).append('\n');
-        addCanonicalizedResourcePath(uri, sb);
-        sb.append('\n');
-        addCanonicalizedQueryString(uri, sb);
-        sb.append('\n');
-        addCanonicalizedHeaderString(headers, sortedHeaderKeys, sb);
-        sb.append('\n');
-        sb.append(signedHeaders)
-                .append('\n')
-                .append(payloadHash);
-        return sb.toString().getBytes(StandardCharsets.UTF_8);
-    }
-
     private static void addCanonicalizedResourcePath(SmithyUri uri, StringBuilder builder) {
         String path = uri.getNormalizedPath();
         if (path == null || path.isEmpty()) {
@@ -285,48 +356,95 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         URLEncoding.encodeUnreserved(path, builder, true);
     }
 
-    private static void addCanonicalizedQueryString(SmithyUri uri, StringBuilder builder) {
+    /**
+     * Emit the canonical query-string component per the SigV4 spec.
+     *
+     * <p>Splits the raw query on {@code &}, optionally re-encodes each name/value pair,
+     * sorts by encoded name (then encoded value), and concatenates. The strided pair buffer
+     * is pooled in {@link SigningResources} to avoid per-call ArrayList allocations.
+     *
+     * <p>Fast path: if the entire query string is already canonically encoded (every char is
+     * unreserved or part of an uppercase {@code %XX} escape), the substring values are used
+     * directly without decode+re-encode. smithy-java's own {@code QueryStringBuilder} produces
+     * canonical output, so this is the typical case for codegen-generated requests.
+     */
+    private static void addCanonicalizedQueryString(SmithyUri uri, SigningResources r, StringBuilder builder) {
+        r.queryPairCount = 0;
+
         var query = uri.getQuery();
-        if (query == null) {
+        if (query == null || query.isEmpty()) {
             return;
         }
-        var params = query.split("&");
-        var pairs = new ArrayList<String>(params.length / 2);
 
-        for (var param : params) {
-            var keyVal = param.split("=");
-            var key = keyVal[0];
-            var value = keyVal.length == 2 ? keyVal[1] : "";
-            pairs.add(key + "=" + value);
+        boolean canonical = isAlreadyCanonical(query);
+        int len = query.length();
+        int start = 0;
+        while (start <= len) {
+            int amp = query.indexOf('&', start);
+            int end = amp == -1 ? len : amp;
+            int eq = query.indexOf('=', start, end);
+            String rawKey;
+            String rawValue;
+            if (eq == -1) {
+                rawKey = query.substring(start, end);
+                rawValue = "";
+            } else {
+                rawKey = query.substring(start, eq);
+                rawValue = query.substring(eq + 1, end);
+            }
+            if (!rawKey.isEmpty()) {
+                if (canonical) {
+                    r.addQueryPair(rawKey, rawValue);
+                } else {
+                    r.addQueryPair(
+                            URLEncoding.encodeUnreserved(URLEncoding.urlDecode(rawKey), false),
+                            URLEncoding.encodeUnreserved(URLEncoding.urlDecode(rawValue), false));
+                }
+            }
+            if (amp == -1) {
+                break;
+            }
+            start = amp + 1;
         }
 
-        Collections.sort(pairs);
-        for (var entry : pairs) {
-            builder.append(entry).append('&');
+        if (r.queryPairCount == 0) {
+            return;
         }
-        // Remove the trailing '&'.
-        builder.setLength(builder.length() - 1);
+
+        r.sortQueryPairs();
+
+        for (int i = 0; i < r.queryPairCount; i++) {
+            if (i > 0) {
+                builder.append('&');
+            }
+            builder.append(r.queryPairs[i * 2]).append('=').append(r.queryPairs[i * 2 + 1]);
+        }
     }
 
-    private static void addCanonicalizedHeaderString(
-            Map<String, List<String>> headers,
-            Set<String> sortedHeaderKeys,
-            StringBuilder builder
-    ) {
-        for (var headerKey : sortedHeaderKeys) {
-            if (HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(headerKey)) {
+    // Returns true if every character in the query string is either an RFC 3986 unreserved
+    // char or part of an already-uppercase {@code %XX} escape
+    private static boolean isAlreadyCanonical(String s) {
+        int len = s.length();
+        for (int i = 0; i < len; i++) {
+            char c = s.charAt(i);
+            if (c == '&' || c == '=') {
                 continue;
             }
-            builder.append(headerKey);
-            builder.append(':');
-            for (String headerValue : headers.get(headerKey)) {
-                addAndTrim(builder, headerValue);
-                builder.append(',');
+            if (URLEncoding.isUnreserved(c)) {
+                continue;
             }
-            // Remove the trailing comma.
-            builder.setLength(builder.length() - 1);
-            builder.append('\n');
+            if (c == '%' && i + 2 < len && isUppercaseHex(s.charAt(i + 1)) && isUppercaseHex(s.charAt(i + 2))) {
+                i += 2;
+                continue;
+            }
+            return false;
         }
+
+        return true;
+    }
+
+    private static boolean isUppercaseHex(char c) {
+        return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F');
     }
 
     private static void addAndTrim(StringBuilder result, String value) {
@@ -414,6 +532,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     private String computeSignature(
             byte[] canonicalRequest,
+            int canonicalRequestLength,
             String scope,
             String requestTime,
             byte[] signingKey,
@@ -426,7 +545,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
                 .append('\n')
                 .append(scope)
                 .append('\n')
-                .append(HexFormat.of().formatHex(hash(canonicalRequest)));
+                .append(HexFormat.of().formatHex(hash(canonicalRequest, 0, canonicalRequestLength)));
         var toSign = sb.toString();
         var signatureBytes = sign(toSign, signingKey);
         return HexFormat.of().formatHex(signatureBytes);
@@ -450,10 +569,10 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         return sha256Digest.digest();
     }
 
-    private byte[] hash(byte[] data) {
+    private byte[] hash(byte[] data, int offset, int length) {
         var sha256Digest = signingResources.sha256Digest;
         sha256Digest.reset();
-        sha256Digest.update(data);
+        sha256Digest.update(data, offset, length);
         return sha256Digest.digest();
     }
 }
