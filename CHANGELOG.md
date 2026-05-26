@@ -1,12 +1,23 @@
 # Change Log
 
-## 1.2.0 (5/20/2026)
+## 1.3.0 (5/20/2026)
 > [!IMPORTANT]
 > All client modules are considered stable.  Some modules, including
 > server, CLI, and MCP, are still in developer-preview and may contain
 > bugs.  No guarantee is made about their API stability. Unstable
 > modules are marked with a warning in their `README.md` and with the
 > `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Features
+
+- Improved Java HTTP client integration. ([#1206](https://github.com/smithy-lang/smithy-java/pull/1206))
+
+### Bug Fixes
+
+- Fixed NPE in JsonCodec.deserializeShape that suppresses deserialization errors. ([#1203](https://github.com/smithy-lang/smithy-java/pull/1203))
+- Moved version SPI into dedicated module to avoid classpath conflicts. ([#1213](https://github.com/smithy-lang/smithy-java/pull/1213))
+
+## 1.2.0 (5/20/2026)
 
 ### Features
 - Added custom constraints validation support for shapes. ([#1171](https://github.com/smithy-lang/smithy-java/pull/1171))
