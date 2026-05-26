@@ -5,12 +5,15 @@
 
 package software.amazon.smithy.java.aws.client.rulesengine;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;
@@ -32,6 +35,7 @@ import software.amazon.smithy.java.rulesengine.Bytecode;
 import software.amazon.smithy.java.rulesengine.BytecodeEndpointResolver;
 import software.amazon.smithy.java.rulesengine.RulesEngineBuilder;
 import software.amazon.smithy.java.rulesengine.RulesEngineSettings;
+import software.amazon.smithy.java.rulesengine.RulesExtension;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.pattern.UriPattern;
@@ -60,10 +64,34 @@ public class S3EndpointBenchmark {
     private static class SharedResolver {
         private static final Path CACHE_DIR = Path.of(System.getProperty("java.io.tmpdir"));
 
-        static final EndpointResolver RESOLVER;
-        static final EndpointResolver REWRITTEN_RESOLVER;
+        static final Map<String, EndpointResolver> RESOLVERS = new ConcurrentHashMap<>();
         static final DynamicClient CLIENT;
         static final ApiOperation<?, ?> GET_OBJECT;
+        private static ServiceShape SERVICE;
+        private static RulesEngineBuilder ENGINE;
+        private static List<RulesExtension> EXTENSIONS;
+        private static Map<String,
+                Function<Context, Object>> BUILTINS;
+
+        // All transform combinations to test
+        private static final Map<String, S3TreeRewriter.Transform[]> TRANSFORM_COMBOS = Map.ofEntries(
+                Map.entry("none", new S3TreeRewriter.Transform[0]),
+                Map.entry("az", new S3TreeRewriter.Transform[] {S3TreeRewriter.Transform.AZ_CANONICALIZATION}),
+                Map.entry("region", new S3TreeRewriter.Transform[] {S3TreeRewriter.Transform.REGION_UNIFICATION}),
+                Map.entry("express", new S3TreeRewriter.Transform[] {S3TreeRewriter.Transform.S3EXPRESS_ENDPOINTS}),
+                Map.entry("az+region",
+                        new S3TreeRewriter.Transform[] {S3TreeRewriter.Transform.AZ_CANONICALIZATION,
+                                S3TreeRewriter.Transform.REGION_UNIFICATION}),
+                Map.entry("az+express",
+                        new S3TreeRewriter.Transform[] {S3TreeRewriter.Transform.AZ_CANONICALIZATION,
+                                S3TreeRewriter.Transform.S3EXPRESS_ENDPOINTS}),
+                Map.entry("region+express",
+                        new S3TreeRewriter.Transform[] {S3TreeRewriter.Transform.REGION_UNIFICATION,
+                                S3TreeRewriter.Transform.S3EXPRESS_ENDPOINTS}),
+                Map.entry("all",
+                        new S3TreeRewriter.Transform[] {S3TreeRewriter.Transform.AZ_CANONICALIZATION,
+                                S3TreeRewriter.Transform.REGION_UNIFICATION,
+                                S3TreeRewriter.Transform.S3EXPRESS_ENDPOINTS}));
 
         static {
             Model model = Model.assembler()
@@ -73,51 +101,42 @@ public class S3EndpointBenchmark {
                     .unwrap();
             model = customizeS3Model(model);
 
-            ServiceShape service = model.expectShape(ShapeId.from("com.amazonaws.s3#AmazonS3"), ServiceShape.class);
-            RulesEngineBuilder engine = new RulesEngineBuilder();
+            SERVICE = model.expectShape(ShapeId.from("com.amazonaws.s3#AmazonS3"), ServiceShape.class);
+            ENGINE = new RulesEngineBuilder();
 
             CLIENT = DynamicClient.builder()
                     .model(model)
-                    .serviceId(service.getId())
+                    .serviceId(SERVICE.getId())
                     .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-                    .putConfig(RulesEngineSettings.RULES_ENGINE_BUILDER, engine)
+                    .putConfig(RulesEngineSettings.RULES_ENGINE_BUILDER, ENGINE)
                     .addPlugin(new EndpointRulesPlugin())
                     .build();
 
-            var extensions = engine.getExtensions();
-            var builtins = engine.getBuiltinProviders();
-
-            RESOLVER = new BytecodeEndpointResolver(
-                    loadOrCompileBytecode(service, engine, false),
-                    extensions,
-                    builtins);
-            REWRITTEN_RESOLVER = new BytecodeEndpointResolver(
-                    loadOrCompileBytecode(service, engine, true),
-                    extensions,
-                    builtins);
-
+            EXTENSIONS = ENGINE.getExtensions();
+            BUILTINS = ENGINE.getBuiltinProviders();
             GET_OBJECT = CLIENT.getOperation("GetObject");
         }
 
-        private static Bytecode loadOrCompileBytecode(
+        static EndpointResolver getResolver(String treeMode) {
+            return RESOLVERS.computeIfAbsent(treeMode, mode -> {
+                var transforms = TRANSFORM_COMBOS.get(mode);
+                var bytecode = compileBytecode(SERVICE, ENGINE, mode, transforms);
+                return new BytecodeEndpointResolver(bytecode, EXTENSIONS, BUILTINS);
+            });
+        }
+
+        private static Bytecode compileBytecode(
                 ServiceShape service,
                 RulesEngineBuilder engine,
-                boolean rewrite
+                String label,
+                S3TreeRewriter.Transform[] transforms
         ) {
-            var cacheName = rewrite ? "s3-endpoint-bytecode-rewritten.bin" : "s3-endpoint-bytecode.bin";
-            var cache = CACHE_DIR.resolve(cacheName);
-            try {
-                if (Files.exists(cache)) {
-                    return engine.load(Files.readAllBytes(cache));
-                }
-            } catch (IOException ignored) {
-                // Fall through to compile
-            }
-
             var ruleSetTrait = service.expectTrait(EndpointRuleSetTrait.class);
             var ruleSet = ruleSetTrait.getEndpointRuleSet();
-            if (rewrite) {
-                ruleSet = S3TreeRewriter.transform(ruleSet);
+            if (transforms.length > 0) {
+                ruleSet = S3TreeRewriter.transform(ruleSet,
+                        transforms[0],
+                        Arrays.copyOfRange(transforms, 1, transforms.length));
             }
             var cfg = Cfg.from(ruleSet);
             var bddTrait = EndpointBddTrait.from(cfg);
@@ -125,13 +144,10 @@ public class S3EndpointBenchmark {
             var costOptimizedTrait = CostOptimization.builder().cfg(cfg).build().apply(siftedTrait);
             var finalTrait = new NodeReversal().apply(costOptimizedTrait);
             var bytecode = engine.compile(finalTrait);
-
-            try {
-                Files.write(cache, bytecode.getBytecode());
-            } catch (IOException e) {
-                throw new UncheckedIOException("Failed to cache bytecode", e);
-            }
-
+            System.out.println("[bytecode] " + label
+                    + ": " + bytecode.getBytecode().length + " bytes"
+                    + ", " + bytecode.getConditionCount() + " conditions"
+                    + ", " + bytecode.getResultCount() + " results");
             return bytecode;
         }
 
@@ -154,12 +170,30 @@ public class S3EndpointBenchmark {
         }
     }
 
+    @AuxCounters(AuxCounters.Type.EVENTS)
+    @State(Scope.Benchmark)
+    public static class BytecodeMetrics {
+        public int conditions;
+        public int results;
+        public int bddNodes;
+        public int bytecodeBytes;
+
+        @Setup
+        public void setup(ParamState params) {
+            var bytecode = ((BytecodeEndpointResolver) params.resolver).getBytecode();
+            conditions = bytecode.getConditionCount();
+            results = bytecode.getResultCount();
+            bddNodes = bytecode.getBddNodeCount();
+            bytecodeBytes = bytecode.getBytecode().length;
+        }
+    }
+
     @State(Scope.Benchmark)
     public static class ParamState {
-        @Param({"binding", "canned"})
+        @Param({/*"binding",*/ "canned"})
         private String paramMode;
 
-        @Param({"none", "rewritten"})
+        @Param({"none", "az", "express", "az+express"})
         private String treeMode;
 
         EndpointResolver resolver;
@@ -172,9 +206,7 @@ public class S3EndpointBenchmark {
         @Setup
         public void setup() {
             boolean canned = "canned".equals(paramMode);
-            resolver = "rewritten".equals(treeMode)
-                    ? SharedResolver.REWRITTEN_RESOLVER
-                    : SharedResolver.RESOLVER;
+            resolver = SharedResolver.getResolver(treeMode);
             var client = SharedResolver.CLIENT;
             var getObject = SharedResolver.GET_OBJECT;
 

@@ -60,13 +60,3 @@ jmh {
     // profilers.add("gc")
     duplicateClassesStrategy = DuplicatesStrategy.EXCLUDE // don't dump a bunch of warnings.
 }
-
-// Clean cached bytecode before running benchmarks so stale compilations aren't reused.
-tasks.named("jmh") {
-    doFirst {
-        fileTree(System.getProperty("java.io.tmpdir"))
-            .matching {
-                include("s3-endpoint-bytecode-*.bin")
-            }.forEach { delete(it) }
-    }
-}
