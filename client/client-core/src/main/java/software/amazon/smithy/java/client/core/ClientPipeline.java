@@ -28,6 +28,7 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.event.Frame;
 import software.amazon.smithy.java.core.serde.event.FrameProcessor;
 import software.amazon.smithy.java.endpoints.Endpoint;
+import software.amazon.smithy.java.endpoints.EndpointAuthScheme;
 import software.amazon.smithy.java.endpoints.EndpointResolverParams;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -37,6 +38,7 @@ import software.amazon.smithy.java.retries.api.RefreshRetryTokenRequest;
 import software.amazon.smithy.java.retries.api.RetryInfo;
 import software.amazon.smithy.java.retries.api.RetryToken;
 import software.amazon.smithy.java.retries.api.TokenAcquisitionFailedException;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * Handles sending a {@link ClientCall} using a {@link ClientProtocol} and {@link ClientTransport}.
@@ -184,8 +186,8 @@ final class ClientPipeline<RequestT, ResponseT> {
         Endpoint endpoint = resolveEndpoint(call);
         call.context.put(CallContext.ENDPOINT, endpoint);
 
-        // Augment signer properties with endpoint auth scheme overrides if present.
-        resolvedAuthScheme = applyEndpointAuthSchemeOverrides(endpoint, resolvedAuthScheme);
+        // Augment or swap the resolved auth scheme based on the endpoint's authSchemes property.
+        resolvedAuthScheme = applyEndpointAuthSchemeOverrides(call, endpoint, resolvedAuthScheme);
 
         RequestT req = protocol.setServiceEndpoint(requestHook.request(), endpoint);
         var signResult = resolvedAuthScheme.sign(req);
@@ -306,32 +308,84 @@ final class ClientPipeline<RequestT, ResponseT> {
         return call.endpointResolver.resolveEndpoint(request);
     }
 
+    /**
+     * Apply the {@code authSchemes} property emitted by an Endpoints 2.0 rule set:
+     *
+     * <ul>
+     *     <li>If no {@code authSchemes} entries are emitted, keep the resolver-chosen scheme.</li>
+     *     <li>Iterate emitted entries; pick the first one whose ID is in {@code supportedAuthSchemes}.</li>
+     *     <li>If that entry matches the resolver-chosen scheme, merge its property overrides onto
+     *         the existing signer Context (no re-resolution).</li>
+     *     <li>If it differs, swap to the new scheme: re-resolve identity for it, then apply the
+     *         property overrides to its signer properties.</li>
+     *     <li>If no emitted entry is supported, throw {@link CallException}.</li>
+     * </ul>
+     *
+     * <p>This is a deprecated compat path kept alive for the four services that depend on it
+     * (s3, ses, eventbridge, cloudfront-keyvaluestore). New services should use a custom
+     * {@link AuthSchemeResolver} instead of stuffing scheme selection into endpoint rules.
+     */
     @SuppressWarnings("unchecked")
-    private <IdentityT extends Identity> ResolvedScheme<IdentityT, RequestT> applyEndpointAuthSchemeOverrides(
-            Endpoint endpoint,
-            ResolvedScheme<IdentityT, RequestT> resolvedScheme
-    ) {
+    private <I extends SerializableStruct,
+            O extends SerializableStruct> ResolvedScheme<?, RequestT> applyEndpointAuthSchemeOverrides(
+                    ClientCall<I, O> call,
+                    Endpoint endpoint,
+                    ResolvedScheme<?, RequestT> resolvedScheme
+            ) {
         var endpointAuthSchemes = endpoint.authSchemes();
-        if (!endpointAuthSchemes.isEmpty()) {
-            var schemeId = resolvedScheme.authScheme().schemeId().toString();
-            for (var endpointAuthScheme : endpointAuthSchemes) {
-                if (schemeId.equals(endpointAuthScheme.authSchemeId())) {
-                    var overrides = endpointAuthScheme.properties();
-                    if (overrides.isEmpty()) {
-                        return resolvedScheme;
-                    }
-                    // Apply the found overrides for the auth scheme.
-                    var merged = Context.create();
-                    resolvedScheme.signerProperties().copyTo(merged);
-                    for (var key : overrides) {
-                        merged.put((Context.Key<Object>) key, endpointAuthScheme.property(key));
-                    }
-                    return new ResolvedScheme<>(merged, resolvedScheme.authScheme(), resolvedScheme.identity());
-                }
+        if (endpointAuthSchemes.isEmpty()) {
+            return resolvedScheme;
+        }
+
+        var resolvedSchemeId = resolvedScheme.authScheme().schemeId().toString();
+        for (var endpointAuthScheme : endpointAuthSchemes) {
+            String endpointSchemeId = endpointAuthScheme.authSchemeId();
+            if (resolvedSchemeId.equals(endpointSchemeId)) {
+                return mergeOverrides(resolvedScheme, endpointAuthScheme);
+            }
+
+            // Endpoint asked for a different scheme. If the client supports it, swap.
+            ShapeId targetId = ShapeId.from(endpointSchemeId);
+            AuthScheme<?, ?> swapped = call.supportedAuthSchemes.get(targetId);
+            if (swapped == null) {
+                continue;
+            }
+            AuthScheme<RequestT, ?> targetScheme = (AuthScheme<RequestT, ?>) swapped;
+            var swappedScheme = createResolvedSchema(
+                    call.identityResolvers,
+                    call.context,
+                    targetScheme,
+                    new AuthSchemeOption(targetId));
+            if (swappedScheme != null) {
+                return mergeOverrides(swappedScheme, endpointAuthScheme);
             }
         }
 
-        return resolvedScheme;
+        var options = new StringJoiner(", ", "[", "]");
+        for (var endpointAuthScheme : endpointAuthSchemes) {
+            options.add(endpointAuthScheme.authSchemeId());
+        }
+        throw new CallException(
+                "UnsupportedOperationException: This operation requested one of " + options
+                        + " from endpoint resolution, but the client only supports "
+                        + call.supportedAuthSchemes.keySet());
+    }
+
+    @SuppressWarnings("unchecked")
+    private <IdentityT extends Identity> ResolvedScheme<IdentityT, RequestT> mergeOverrides(
+            ResolvedScheme<IdentityT, RequestT> resolvedScheme,
+            EndpointAuthScheme endpointAuthScheme
+    ) {
+        var overrides = endpointAuthScheme.properties();
+        if (overrides.isEmpty()) {
+            return resolvedScheme;
+        }
+        var merged = Context.create();
+        resolvedScheme.signerProperties().copyTo(merged);
+        for (var key : overrides) {
+            merged.put((Context.Key<Object>) key, endpointAuthScheme.property(key));
+        }
+        return new ResolvedScheme<>(merged, resolvedScheme.authScheme(), resolvedScheme.identity());
     }
 
     private <I extends SerializableStruct, O extends SerializableStruct> O deserialize(
