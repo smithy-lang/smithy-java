@@ -306,7 +306,7 @@ public class ClientTest {
     }
 
     @Test
-    public void setsCallDecorator() throws URISyntaxException {
+    public void interceptCallSeesContextAndShortCircuits() throws URISyntaxException {
         var queue = new MockQueue();
         queue.enqueue(HttpResponse.create().setStatusCode(200).toUnmodifiable());
 
@@ -315,14 +315,20 @@ public class ClientTest {
                 .serviceId(SERVICE)
                 .protocol(new RestJsonClientProtocol(SERVICE))
                 .addPlugin(MockPlugin.builder().addQueue(queue).build())
-                .addPlugin(config -> config.addCallDecorator(new CallDecorator<DynamicClient>() {
+                .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
                     @Override
-                    public <I extends SerializableStruct, O extends SerializableStruct> O apply(
-                            DynamicClient client,
-                            ClientCallView<I, O> call,
-                            Invoker next
+                    public boolean interceptCalls() {
+                        return true;
+                    }
+
+                    @Override
+                    public <I extends SerializableStruct, O extends SerializableStruct> O interceptCall(
+                            InputHook<I, O> hook,
+                            NextCall<I, O> next
                     ) {
-                        assertThat(call.context().get(ClientContext.APPLICATION_ID), equalTo("foo"));
+                        assertThat(hook.context().get(ClientContext.APPLICATION_ID), equalTo("foo"));
+                        assertThat(hook.context().get(ClientContext.CLIENT),
+                                equalTo(hook.context().get(ClientContext.CLIENT)));
                         throw new IllegalStateException("Prevent calling the service");
                     }
                 }))
@@ -340,33 +346,41 @@ public class ClientTest {
     }
 
     @Test
-    public void chainsCallDecorators() throws URISyntaxException {
+    public void chainsInterceptCalls() throws URISyntaxException {
         var queue = new MockQueue();
         queue.enqueue(HttpResponse.create().setStatusCode(200).toUnmodifiable());
         var order = new ArrayList<String>();
 
-        CallDecorator<DynamicClient> outer = new CallDecorator<>() {
+        ClientInterceptor outer = new ClientInterceptor() {
             @Override
-            public <I extends SerializableStruct, O extends SerializableStruct> O apply(
-                    DynamicClient client,
-                    ClientCallView<I, O> call,
-                    Invoker next
+            public boolean interceptCalls() {
+                return true;
+            }
+
+            @Override
+            public <I extends SerializableStruct, O extends SerializableStruct> O interceptCall(
+                    InputHook<I, O> hook,
+                    NextCall<I, O> next
             ) {
                 order.add("outer-before");
                 try {
-                    return next.invoke(call);
+                    return next.invoke(hook);
                 } finally {
                     order.add("outer-after");
                 }
             }
         };
 
-        CallDecorator<DynamicClient> inner = new CallDecorator<>() {
+        ClientInterceptor inner = new ClientInterceptor() {
             @Override
-            public <I extends SerializableStruct, O extends SerializableStruct> O apply(
-                    DynamicClient client,
-                    ClientCallView<I, O> call,
-                    Invoker next
+            public boolean interceptCalls() {
+                return true;
+            }
+
+            @Override
+            public <I extends SerializableStruct, O extends SerializableStruct> O interceptCall(
+                    InputHook<I, O> hook,
+                    NextCall<I, O> next
             ) {
                 order.add("inner-before");
                 try {
@@ -382,8 +396,8 @@ public class ClientTest {
                 .serviceId(SERVICE)
                 .protocol(new RestJsonClientProtocol(SERVICE))
                 .addPlugin(MockPlugin.builder().addQueue(queue).build())
-                .addPlugin(config -> config.addCallDecorator(outer))
-                .addPlugin(config -> config.addCallDecorator(inner))
+                .addPlugin(config -> config.addInterceptor(outer))
+                .addPlugin(config -> config.addInterceptor(inner))
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
                 .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
                 .build();
@@ -397,16 +411,20 @@ public class ClientTest {
     }
 
     @Test
-    public void modifyBeforeCallCanInstallDecorator() throws URISyntaxException {
+    public void modifyBeforeCallCanInstallInterceptor() throws URISyntaxException {
         var queue = new MockQueue();
         queue.enqueue(HttpResponse.create().setStatusCode(200).toUnmodifiable());
 
-        CallDecorator<DynamicClient> installed = new CallDecorator<>() {
+        ClientInterceptor installed = new ClientInterceptor() {
             @Override
-            public <I extends SerializableStruct, O extends SerializableStruct> O apply(
-                    DynamicClient client,
-                    ClientCallView<I, O> call,
-                    Invoker next
+            public boolean interceptCalls() {
+                return true;
+            }
+
+            @Override
+            public <I extends SerializableStruct, O extends SerializableStruct> O interceptCall(
+                    InputHook<I, O> hook,
+                    NextCall<I, O> next
             ) {
                 throw new IllegalStateException("installed-by-modifyBeforeCall");
             }
@@ -420,7 +438,7 @@ public class ClientTest {
                 .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
                     @Override
                     public ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
-                        return hook.config().toBuilder().addCallDecorator(installed).build();
+                        return hook.config().toBuilder().addInterceptor(installed).build();
                     }
                 }))
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
@@ -434,25 +452,29 @@ public class ClientTest {
     }
 
     @Test
-    public void decoratorCanSwapInput() throws URISyntaxException {
+    public void interceptCallCanSwapInput() throws URISyntaxException {
         var queue = new MockQueue();
         queue.enqueue(HttpResponse.create().setStatusCode(200).toUnmodifiable());
         var seenInputs = new ArrayList<Object>();
 
-        CallDecorator<DynamicClient> swapper = new CallDecorator<>() {
+        ClientInterceptor swapper = new ClientInterceptor() {
+            @Override
+            public boolean interceptCalls() {
+                return true;
+            }
+
             @SuppressWarnings("unchecked")
             @Override
-            public <I extends SerializableStruct, O extends SerializableStruct> O apply(
-                    DynamicClient client,
-                    ClientCallView<I, O> call,
-                    Invoker next
+            public <I extends SerializableStruct, O extends SerializableStruct> O interceptCall(
+                    InputHook<I, O> hook,
+                    NextCall<I, O> next
             ) {
-                var inputSchema = call.operation().inputSchema();
+                var inputSchema = hook.operation().inputSchema();
                 I rewritten = (I) StructDocument.of(
                         inputSchema,
                         Document.ofObject(Map.of("id", "swapped")),
                         SERVICE);
-                return next.invoke(call.withInput(rewritten));
+                return next.invoke(hook.withInput(rewritten));
             }
         };
 
@@ -461,7 +483,7 @@ public class ClientTest {
                 .serviceId(SERVICE)
                 .protocol(new RestJsonClientProtocol(SERVICE))
                 .addPlugin(MockPlugin.builder().addQueue(queue).build())
-                .addPlugin(config -> config.addCallDecorator(swapper))
+                .addPlugin(config -> config.addInterceptor(swapper))
                 .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
                     @Override
                     public void readBeforeExecution(InputHook<?, ?> hook) {

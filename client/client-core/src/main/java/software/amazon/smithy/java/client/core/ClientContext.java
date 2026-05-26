@@ -39,5 +39,14 @@ public final class ClientContext {
      */
     public static final Context.Key<Duration> API_CALL_ATTEMPT_TIMEOUT = Context.key("API call attempt timeout");
 
+    /**
+     * The {@link Client} instance making the call.
+     *
+     * <p>Set automatically on every call's context. Interceptors that need to re-enter the client
+     * (for example, a wrapping interceptor that retries with different overrides) can read this key
+     * and cast to the appropriate concrete client type.
+     */
+    public static final Context.Key<Client> CLIENT = Context.key("Client");
+
     private ClientContext() {}
 }

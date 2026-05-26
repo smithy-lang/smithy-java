@@ -17,6 +17,7 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.interceptors.CallHook;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.client.core.plugins.AutoPlugin;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
@@ -41,7 +42,6 @@ public abstract class Client implements Closeable {
     private final ClientInterceptor interceptor;
     private final IdentityResolvers identityResolvers;
     private final RetryStrategy retryStrategy;
-    private static final CallDecorator.Invoker CALL_INVOKER = Client::sendCall;
 
     protected Client(Builder<?, ?> builder) {
         ClientConfig.Builder configBuilder = builder.configBuilder();
@@ -72,7 +72,6 @@ public abstract class Client implements Closeable {
      * @param <O>         Output shape.
      * @return Returns the deserialized output.
      */
-    @SuppressWarnings("unchecked")
     protected <I extends SerializableStruct, O extends SerializableStruct> O call(
             I input,
             ApiOperation<I, O> operation,
@@ -115,15 +114,21 @@ public abstract class Client implements Closeable {
                 TypeRegistry.compose(operation.errorRegistry(), typeRegistry),
                 retryStrategy);
 
-        // Resolve the decorator from the (possibly modifyBeforeCall-mutated) config so an
-        // interceptor can install or replace it.
-        var decorator = (CallDecorator<Client>) callConfig.callDecorator();
-        return decorator != null ? decorator.apply(this, call, CALL_INVOKER) : sendCall(call);
-    }
+        // Make the running client available to interceptors that need to re-enter.
+        call.context.put(ClientContext.CLIENT, this);
 
-    private static <I extends SerializableStruct, O extends SerializableStruct> O sendCall(ClientCallView<I, O> call) {
-        ClientCall<I, O> impl = (ClientCall<I, O>) call;
-        return impl.pipeline.send(impl);
+        if (!callInterceptor.interceptCalls()) {
+            return callPipeline.send(call);
+        }
+
+        // Build an InputHook for interceptCall and a terminal Invoker that sends the
+        // (possibly input-substituted) call through the pipeline.
+        InputHook<I, O> hook = new InputHook<>(operation, call.context, input);
+        return callInterceptor.interceptCall(hook, h -> {
+            return h.input() == call.input
+                    ? call.pipeline.send(call)
+                    : call.pipeline.send(new ClientCall<>(call, h.input()));
+        });
     }
 
     /**
@@ -420,19 +425,6 @@ public abstract class Client implements Closeable {
                     return AutoPlugin.INSTANCE != plugin;
                 }
             }.and(configBuilder.pluginPredicate()));
-        }
-
-        /**
-         * Adds a decorator that wraps client call execution. Multiple decorators compose: the first
-         * added is the outermost wrapper.
-         *
-         * @param callDecorator the call decorator to add.
-         * @return the builder.
-         */
-        @SuppressWarnings("unchecked")
-        public B addCallDecorator(CallDecorator<I> callDecorator) {
-            configBuilder.addCallDecorator(callDecorator);
-            return (B) this;
         }
 
         /**

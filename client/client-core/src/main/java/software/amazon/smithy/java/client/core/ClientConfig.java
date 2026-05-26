@@ -53,7 +53,6 @@ public final class ClientConfig {
     private final RetryStrategy retryStrategy;
     private final String retryScope;
     private final Set<Class<? extends ClientPlugin>> appliedPluginClasses;
-    private final CallDecorator<?> callDecorator;
 
     private ClientConfig(Builder builder) {
         // Collect and apply plugins, updating builder.appliedPluginClasses as we go
@@ -96,7 +95,6 @@ public final class ClientConfig {
 
         this.context = Context.unmodifiableCopy(builder.context);
         this.service = Objects.requireNonNull(builder.service, "Missing required service schema");
-        this.callDecorator = builder.callDecorator;
     }
 
     private static List<ClientPlugin> collectPlugins(
@@ -225,10 +223,6 @@ public final class ClientConfig {
         return retryScope;
     }
 
-    CallDecorator<?> callDecorator() {
-        return callDecorator;
-    }
-
     /**
      * Create a new builder to build {@link ClientConfig}.
      *
@@ -328,7 +322,6 @@ public final class ClientConfig {
         private final Map<Class<? extends ClientPlugin>, ClientPlugin> plugins = new LinkedHashMap<>();
         // Mutable set that tracks which plugin classes have been applied to this builder
         private final Set<Class<? extends ClientPlugin>> appliedPluginClasses = new HashSet<>();
-        private CallDecorator<?> callDecorator;
 
         public Builder() {
             plugins.put(DefaultPlugin.class, DefaultPlugin.INSTANCE);
@@ -350,7 +343,6 @@ public final class ClientConfig {
             builder.plugins.putAll(plugins);
             builder.pluginPredicate = pluginPredicate;
             builder.appliedPluginClasses.addAll(appliedPluginClasses);
-            builder.callDecorator = callDecorator;
             return builder;
         }
 
@@ -665,20 +657,6 @@ public final class ClientConfig {
          */
         public Builder addPluginPredicate(Predicate<ClientPlugin> pluginPredicate) {
             return pluginPredicate(this.pluginPredicate.and(pluginPredicate));
-        }
-
-        /**
-         * Adds a decorator that wraps client call execution. Multiple decorators compose: the first
-         * added is the outermost wrapper.
-         *
-         * @param callDecorator the call decorator to add.
-         * @return the builder.
-         */
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        public Builder addCallDecorator(CallDecorator<?> callDecorator) {
-            this.callDecorator = CallDecorator.chain((CallDecorator) this.callDecorator,
-                    (CallDecorator) callDecorator);
-            return this;
         }
 
         /**

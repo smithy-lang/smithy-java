@@ -15,11 +15,32 @@ final class ClientInterceptorChain implements ClientInterceptor {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientInterceptorChain.class);
     private final ClientInterceptor[] interceptors;
 
+    // Subset of interceptors where intercepts() == true. Folded for interceptCall.
+    private final ClientInterceptor[] wrappers;
+    private final boolean interceptsCalls;
+
     public ClientInterceptorChain(List<ClientInterceptor> interceptors) {
         if (interceptors.isEmpty()) {
             throw new IllegalArgumentException("Interceptors cannot be empty");
         }
         this.interceptors = interceptors.toArray(ClientInterceptor[]::new);
+        this.wrappers = interceptors.stream()
+                .filter(ClientInterceptor::interceptCalls)
+                .toArray(ClientInterceptor[]::new);
+        this.interceptsCalls = this.wrappers.length > 0;
+    }
+
+    @Override
+    public boolean interceptCalls() {
+        return interceptsCalls;
+    }
+
+    @Override
+    public <I extends SerializableStruct, O extends SerializableStruct> O interceptCall(
+            InputHook<I, O> hook,
+            NextCall<I, O> next
+    ) {
+        return new ChainInvoker<>(wrappers, next).invoke(hook);
     }
 
     @Override

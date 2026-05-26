@@ -7,6 +7,7 @@ package software.amazon.smithy.java.client.core.interceptors;
 
 import java.util.List;
 import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 
@@ -63,6 +64,60 @@ public interface ClientInterceptor {
      */
     default ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
         return hook.config();
+    }
+
+    /**
+     * Returns true if this interceptor wraps the call via {@link #interceptCall(InputHook, NextCall)}.
+     *
+     * <p>The chain only folds interceptors where this returns true; non-wrapping interceptors pay no
+     * per-call cost for the wrap path. Override and return true to opt in.
+     *
+     * @return whether this interceptor wraps calls.
+     */
+    default boolean interceptCalls() {
+        return false;
+    }
+
+    /**
+     * Wraps the entire call. Runs after {@code modifyBeforeCall} and outside the retry loop. Override
+     * (and return {@code true} from {@link #interceptCalls()}) to short-circuit, hedge, time, fall back,
+     * or otherwise control how the call executes.
+     *
+     * <p>Composes by nesting: the first interceptor registered is the outermost wrapper, unlike the
+     * read/modify hooks on this interface which iterate.
+     *
+     * <p>To re-enter the client from within {@code interceptCall} (for example, to retry under
+     * different credentials), read {@link ClientContext#CLIENT} from {@code hook.context()} and cast
+     * to the concrete client type.
+     *
+     * @param hook the input hook for the call.
+     * @param next invoker to delegate to.
+     * @param <I> the input type.
+     * @param <O> the output type.
+     * @return the operation output.
+     */
+    default <I extends SerializableStruct, O extends SerializableStruct> O interceptCall(
+            InputHook<I, O> hook,
+            NextCall<I, O> next
+    ) {
+        return next.invoke(hook);
+    }
+
+    /**
+     * Invokes the next step in the {@link #interceptCall(InputHook, NextCall)} chain.
+     *
+     * @param <I> the input type.
+     * @param <O> the output type.
+     */
+    @FunctionalInterface
+    interface NextCall<I extends SerializableStruct, O extends SerializableStruct> {
+        /**
+         * Invokes the next interceptor or the call itself.
+         *
+         * @param hook the (possibly substituted) input hook to invoke with.
+         * @return the operation output.
+         */
+        O invoke(InputHook<I, O> hook);
     }
 
     /**

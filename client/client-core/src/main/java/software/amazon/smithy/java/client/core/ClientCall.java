@@ -32,7 +32,7 @@ import software.amazon.smithy.model.shapes.ShapeType;
  * @param <I> Input to send.
  * @param <O> Output to return.
  */
-final class ClientCall<I extends SerializableStruct, O extends SerializableStruct> implements ClientCallView<I, O> {
+final class ClientCall<I extends SerializableStruct, O extends SerializableStruct> {
 
     final I input;
     final ApiOperation<I, O> operation;
@@ -91,7 +91,7 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
      * resolved configuration. Retry state is shared too — decorators run before the retry loop starts,
      * so {@code attemptCount}/{@code retryToken} are at their initial values either way.
      */
-    private ClientCall(ClientCall<I, O> source, I newInput) {
+    ClientCall(ClientCall<I, O> source, I newInput) {
         this.input = Objects.requireNonNull(newInput, "input is null");
         this.operation = source.operation;
         this.context = source.context;
@@ -107,51 +107,6 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
         this.eventStreamWriter = operation.inputEventBuilderSupplier() != null
                 ? ProtocolEventStreamWriter.of(newInput.getMemberValue(operation.inputStreamMember()))
                 : null;
-    }
-
-    @Override
-    public I input() {
-        return input;
-    }
-
-    @Override
-    public ApiOperation<I, O> operation() {
-        return operation;
-    }
-
-    @Override
-    public Context context() {
-        return context;
-    }
-
-    @Override
-    public EndpointResolver endpointResolver() {
-        return endpointResolver;
-    }
-
-    @Override
-    public TypeRegistry typeRegistry() {
-        return typeRegistry;
-    }
-
-    @Override
-    public AuthSchemeResolver authSchemeResolver() {
-        return authSchemeResolver;
-    }
-
-    @Override
-    public Map<ShapeId, AuthScheme<?, ?>> supportedAuthSchemes() {
-        return supportedAuthSchemes;
-    }
-
-    @Override
-    public IdentityResolvers identityResolvers() {
-        return identityResolvers;
-    }
-
-    @Override
-    public ClientCallView<I, O> withInput(I newInput) {
-        return new ClientCall<>(this, newInput);
     }
 
     /**
