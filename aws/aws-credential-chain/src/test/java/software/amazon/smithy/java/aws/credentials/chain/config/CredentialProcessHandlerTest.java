@@ -132,7 +132,7 @@ class CredentialProcessHandlerTest {
             Files.writeString(configPath, "[default]\ncredential_process=" + cp.commandLine() + "\n");
             var file = AwsProfileFile.builder().configFile(configPath).credentialsFile(null).build();
             setup.setProfileFile(file);
-            setup.setProfile(file.activeProfile());
+            setup.setProfile(file.activeProfile(k -> null));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
