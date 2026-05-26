@@ -18,6 +18,8 @@ import software.amazon.smithy.java.context.Context;
 
 class StsWebIdentityResolverTest {
 
+    private static final StsEndpointConfig TEST_ENDPOINT = new StsEndpointConfig("us-east-1", false);
+
     @Test
     void failsWhenTokenFileDoesNotExist() {
         var source = new AwsConfigCredentialSource.WebIdentityToken(
@@ -25,7 +27,7 @@ class StsWebIdentityResolverTest {
                 "/nonexistent/path/token",
                 "session",
                 null);
-        var resolver = new StsWebIdentityResolver(source, StsClientFactory.createNoAuth());
+        var resolver = new StsWebIdentityResolver(source, StsClientFactory.createNoAuth(TEST_ENDPOINT));
 
         var ex = assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
         assertTrue(ex.getMessage().contains("Failed to assume role with web identity"));
@@ -41,7 +43,7 @@ class StsWebIdentityResolverTest {
                 tokenFile.toString(),
                 "my-session",
                 null);
-        var resolver = new StsWebIdentityResolver(source, StsClientFactory.createNoAuth());
+        var resolver = new StsWebIdentityResolver(source, StsClientFactory.createNoAuth(TEST_ENDPOINT));
 
         // Will fail at the HTTP call (no real STS endpoint), but verifies token was read
         // and the call was attempted with correct parameters

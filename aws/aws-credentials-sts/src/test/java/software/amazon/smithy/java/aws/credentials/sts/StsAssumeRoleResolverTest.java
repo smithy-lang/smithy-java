@@ -18,6 +18,8 @@ import software.amazon.smithy.java.context.Context;
 
 class StsAssumeRoleResolverTest {
 
+    private static final StsEndpointConfig TEST_ENDPOINT = new StsEndpointConfig("us-east-1", false);
+
     private static AwsConfigCredentialSource.AssumeRole assumeRole(
             String roleArn,
             String sourceProfile,
@@ -49,7 +51,7 @@ class StsAssumeRoleResolverTest {
 
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", "src", null);
-        var resolver = new StsAssumeRoleResolver(source, profileFile);
+        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT);
 
         // Source creds resolve, STS call fails (no real endpoint) — that's expected
         assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
@@ -71,7 +73,7 @@ class StsAssumeRoleResolverTest {
 
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", "src", null);
-        var resolver = new StsAssumeRoleResolver(source, profileFile);
+        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT);
 
         // Session keys resolve, STS call fails — expected
         assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
@@ -92,7 +94,7 @@ class StsAssumeRoleResolverTest {
 
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", "B", null);
-        var resolver = new StsAssumeRoleResolver(source, profileFile);
+        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT);
 
         assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
     }
@@ -108,7 +110,7 @@ class StsAssumeRoleResolverTest {
 
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", "nonexistent", null);
-        var resolver = new StsAssumeRoleResolver(source, profileFile);
+        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT);
 
         assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
     }
@@ -116,7 +118,7 @@ class StsAssumeRoleResolverTest {
     @Test
     void failsWithUnsupportedCredentialSource() {
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", null, "CustomUnsupportedProvider");
-        var resolver = new StsAssumeRoleResolver(source, null);
+        var resolver = new StsAssumeRoleResolver(source, null, TEST_ENDPOINT);
 
         assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
     }
@@ -124,7 +126,7 @@ class StsAssumeRoleResolverTest {
     @Test
     void failsWhenNeitherSourceProfileNorCredentialSource() {
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", null, null);
-        var resolver = new StsAssumeRoleResolver(source, null);
+        var resolver = new StsAssumeRoleResolver(source, null, TEST_ENDPOINT);
 
         assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
     }
@@ -143,7 +145,7 @@ class StsAssumeRoleResolverTest {
 
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", "empty", null);
-        var resolver = new StsAssumeRoleResolver(source, profileFile);
+        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT);
 
         assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
     }
@@ -151,7 +153,7 @@ class StsAssumeRoleResolverTest {
     @Test
     void failsWhenProfileFileIsNull() {
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", "src", null);
-        var resolver = new StsAssumeRoleResolver(source, null);
+        var resolver = new StsAssumeRoleResolver(source, null, TEST_ENDPOINT);
 
         assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
     }
@@ -175,7 +177,7 @@ class StsAssumeRoleResolverTest {
 
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var source = assumeRole("arn:aws:iam::111:role/RoleA", "B", null);
-        var resolver = new StsAssumeRoleResolver(source, profileFile);
+        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT);
 
         // Walks A -> B -> C (static keys), then attempts STS calls which fail
         assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
@@ -186,7 +188,7 @@ class StsAssumeRoleResolverTest {
         // This test requires real env vars — will fail if AWS_ACCESS_KEY_ID not set
         // We test the error path (env vars not set)
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", null, "Environment");
-        var resolver = new StsAssumeRoleResolver(source, null);
+        var resolver = new StsAssumeRoleResolver(source, null, TEST_ENDPOINT);
 
         // Fails because AWS_ACCESS_KEY_ID is not set in test environment
         assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));

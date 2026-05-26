@@ -22,6 +22,8 @@ import software.amazon.smithy.java.context.Context;
 
 class ProfileAssumeRoleProviderTest {
 
+    private static final StsEndpointConfig TEST_ENDPOINT = new StsEndpointConfig("us-east-1", false);
+
     private static AwsConfigCredentialSource.AssumeRole assumeRole(
             String roleArn,
             String sourceProfile,
@@ -54,7 +56,7 @@ class ProfileAssumeRoleProviderTest {
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var setup = ChainSetup.builder().build();
         setup.setProfileFile(profileFile);
-        setup.setProfile(profileFile.activeProfile());
+        setup.setProfile(profileFile.activeProfile(k -> null));
         var provider = new ProfileAssumeRoleProvider();
         setup.setCurrentProvider(provider);
 
@@ -74,7 +76,7 @@ class ProfileAssumeRoleProviderTest {
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var setup = ChainSetup.builder().build();
         setup.setProfileFile(profileFile);
-        setup.setProfile(profileFile.activeProfile());
+        setup.setProfile(profileFile.activeProfile(k -> null));
         var provider = new ProfileAssumeRoleProvider();
         setup.setCurrentProvider(provider);
 
@@ -97,7 +99,7 @@ class ProfileAssumeRoleProviderTest {
 
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", "B", null);
-        var resolver = new StsAssumeRoleResolver(source, profileFile);
+        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT);
 
         var ex = assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
         assertTrue(ex.getMessage().contains("Circular") || ex.getCause().getMessage().contains("Circular"));
@@ -114,7 +116,7 @@ class ProfileAssumeRoleProviderTest {
 
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", "nonexistent", null);
-        var resolver = new StsAssumeRoleResolver(source, profileFile);
+        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT);
 
         var ex = assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
         assertTrue(ex.getMessage().contains("nonexistent") || ex.getCause().getMessage().contains("nonexistent"));
@@ -123,7 +125,7 @@ class ProfileAssumeRoleProviderTest {
     @Test
     void failsWithUnsupportedCredentialSource() {
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", null, "CustomUnsupportedProvider");
-        var resolver = new StsAssumeRoleResolver(source, null);
+        var resolver = new StsAssumeRoleResolver(source, null, TEST_ENDPOINT);
 
         var ex = assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
         assertTrue(ex.getMessage().contains("Unsupported") || ex.getCause().getMessage().contains("Unsupported"));

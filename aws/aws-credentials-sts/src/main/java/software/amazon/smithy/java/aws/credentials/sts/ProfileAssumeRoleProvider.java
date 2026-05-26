@@ -51,7 +51,8 @@ public final class ProfileAssumeRoleProvider implements ChainIdentityProvider {
 
         for (AwsConfigCredentialSource source : setup.profile().credentialSources()) {
             if (source instanceof AwsConfigCredentialSource.AssumeRole ar) {
-                setup.addTerminalResolver(new StsAssumeRoleResolver(ar, setup.profileFile()));
+                var endpoint = StsEndpointConfig.resolve(ar.region(), setup);
+                setup.addTerminalResolver(new StsAssumeRoleResolver(ar, setup.profileFile(), endpoint));
                 return;
             }
         }

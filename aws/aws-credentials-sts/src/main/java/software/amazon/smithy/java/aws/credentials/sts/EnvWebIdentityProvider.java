@@ -52,7 +52,8 @@ public final class EnvWebIdentityProvider implements ChainIdentityProvider {
             if (roleArn != null) {
                 String sessionName = setup.getenv("AWS_ROLE_SESSION_NAME");
                 var wit = new AwsConfigCredentialSource.WebIdentityToken(roleArn, tokenFile, sessionName, null);
-                setup.addTerminalResolver(new StsWebIdentityResolver(wit, StsClientFactory.createNoAuth()));
+                var endpoint = StsEndpointConfig.resolve(null, setup);
+                setup.addTerminalResolver(new StsWebIdentityResolver(wit, StsClientFactory.createNoAuth(endpoint)));
             }
         }
     }

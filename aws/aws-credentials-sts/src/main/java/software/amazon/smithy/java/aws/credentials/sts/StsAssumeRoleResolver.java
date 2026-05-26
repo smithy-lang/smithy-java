@@ -30,10 +30,16 @@ final class StsAssumeRoleResolver implements IdentityResolver<AwsCredentialsIden
 
     private final AwsConfigCredentialSource.AssumeRole source;
     private final AwsProfileFile profileFile;
+    private final StsEndpointConfig endpoint;
 
-    StsAssumeRoleResolver(AwsConfigCredentialSource.AssumeRole source, AwsProfileFile profileFile) {
+    StsAssumeRoleResolver(
+            AwsConfigCredentialSource.AssumeRole source,
+            AwsProfileFile profileFile,
+            StsEndpointConfig endpoint
+    ) {
         this.source = source;
         this.profileFile = profileFile;
+        this.endpoint = endpoint;
     }
 
     @Override
@@ -137,7 +143,7 @@ final class StsAssumeRoleResolver implements IdentityResolver<AwsCredentialsIden
         // Create a static resolver for the source credentials
         var sourceResolver = createSourceResolver(sourceCredentials);
 
-        try (DynamicClient client = StsClientFactory.create(sourceResolver)) {
+        try (DynamicClient client = StsClientFactory.create(sourceResolver, endpoint)) {
             Map<String, Object> input = Map.of(
                     "RoleArn",
                     roleArn,

@@ -30,7 +30,7 @@ class ProfileWebIdentityProviderTest {
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var setup = ChainSetup.builder().build();
         setup.setProfileFile(profileFile);
-        setup.setProfile(profileFile.activeProfile());
+        setup.setProfile(profileFile.activeProfile(k -> null));
         var provider = new ProfileWebIdentityProvider();
         setup.setCurrentProvider(provider);
 
@@ -50,7 +50,7 @@ class ProfileWebIdentityProviderTest {
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var setup = ChainSetup.builder().build();
         setup.setProfileFile(profileFile);
-        setup.setProfile(profileFile.activeProfile());
+        setup.setProfile(profileFile.activeProfile(k -> null));
         var provider = new ProfileWebIdentityProvider();
         setup.setCurrentProvider(provider);
 
@@ -70,7 +70,7 @@ class ProfileWebIdentityProviderTest {
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var setup = ChainSetup.builder().build();
         setup.setProfileFile(profileFile);
-        setup.setProfile(profileFile.activeProfile());
+        setup.setProfile(profileFile.activeProfile(k -> null));
         var provider = new ProfileWebIdentityProvider();
         setup.setCurrentProvider(provider);
 
