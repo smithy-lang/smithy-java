@@ -46,6 +46,18 @@ public interface S3EndpointSettings<B extends ClientSetting<B>> extends Endpoint
     Context.Key<Boolean> S3_CONTROL_USE_ARN_REGION = Context.key("AWS::S3Control::UseArnRegion");
 
     /**
+     * If true, S3 Express bucket calls fall back to regular SigV4 instead of using bucket-scoped session credentials.
+     * Defaults to false (session auth enabled).
+     */
+    Context.Key<Boolean> S3_DISABLE_EXPRESS_SESSION_AUTH = Context.key("AWS::S3::DisableS3ExpressSessionAuth");
+
+    /**
+     * Internal endpoint-rule parameter indicating an S3 Express request should be routed to the control plane
+     * (e.g., CreateBucket) instead of the data plane.
+     */
+    Context.Key<Boolean> S3_USE_EXPRESS_CONTROL_ENDPOINT = Context.key("AWS::S3::UseS3ExpressControlEndpoint");
+
+    /**
      * Configures if the SDK client is configured to use S3 transfer acceleration, defaults to false.
      *
      * @param useS3Accelerate True to enable.
