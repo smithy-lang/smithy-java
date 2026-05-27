@@ -143,6 +143,54 @@ final class PublisherDataStream implements DataStream {
         }
     }
 
+    @Override
+    public void discard() throws IOException {
+        if (consumed) {
+            return;
+        }
+
+        consumed = true;
+        var error = new AtomicReference<Throwable>();
+        var done = new CountDownLatch(1);
+
+        publisher.subscribe(new Flow.Subscriber<>() {
+            @Override
+            public void onSubscribe(Flow.Subscription s) {
+                s.request(Long.MAX_VALUE);
+            }
+
+            @Override
+            public void onNext(ByteBuffer buf) {
+                // drop on the floor
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                error.set(t);
+                done.countDown();
+            }
+
+            @Override
+            public void onComplete() {
+                done.countDown();
+            }
+        });
+
+        try {
+            done.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while discarding publisher data", e);
+        }
+
+        Throwable t = error.get();
+        if (t instanceof IOException ioe) {
+            throw ioe;
+        } else if (t != null) {
+            throw new IOException("Publisher error", t);
+        }
+    }
+
     private void innerSubscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
         consumed = true;
         publisher.subscribe(subscriber);

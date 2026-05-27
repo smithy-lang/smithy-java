@@ -78,4 +78,59 @@ class PublisherDataStreamTest {
 
         assertEquals(0, out.size());
     }
+
+    @Test
+    void discardDrainsPublisherToCompletion() throws IOException {
+        var publisher = new SubmissionPublisher<ByteBuffer>();
+        var ds = DataStream.ofPublisher(publisher, null, -1);
+
+        var discardThread = Thread.startVirtualThread(() -> {
+            try {
+                ds.discard();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        // Wait for discard's subscriber to register before submitting items.
+        while (publisher.getNumberOfSubscribers() < 1) {
+            Thread.onSpinWait();
+        }
+        publisher.submit(ByteBuffer.wrap("dropped".getBytes(StandardCharsets.UTF_8)));
+        publisher.close();
+
+        try {
+            discardThread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        // After discard, the stream is consumed and no longer available for replay.
+        assertEquals(false, ds.isAvailable());
+    }
+
+    @Test
+    void discardIsIdempotent() throws IOException {
+        var publisher = new SubmissionPublisher<ByteBuffer>();
+        var ds = DataStream.ofPublisher(publisher, null, -1);
+
+        Thread.startVirtualThread(publisher::close);
+        ds.discard();
+
+        // Second call exits immediately without re-subscribing.
+        ds.discard();
+    }
+
+    @Test
+    void discardPropagatesPublisherError() {
+        var publisher = new SubmissionPublisher<ByteBuffer>();
+        var ds = DataStream.ofPublisher(publisher, null, -1);
+
+        var ex = new RuntimeException("boom");
+        Thread.startVirtualThread(() -> publisher.closeExceptionally(ex));
+
+        var thrown = assertThrows(IOException.class, ds::discard);
+        assertEquals("Publisher error", thrown.getMessage());
+        assertEquals(ex, thrown.getCause());
+    }
 }

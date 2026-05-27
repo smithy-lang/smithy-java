@@ -102,6 +102,20 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
     }
 
     /**
+     * Drain and release the underlying source without producing the bytes.
+     *
+     * <p>For in-memory backings this is a no-op. The data already arrived and lives in heap memory, so there's
+     * nothing to release. For sources backed by an {@link InputStream} or reactive
+     * {@link java.util.concurrent.Flow.Publisher}, this method consumes (or cancels and closes) the source so any
+     * underlying transport (socket, file descriptor, subscriber registration) can be released.
+     *
+     * @throws IOException if releasing the underlying source fails.
+     */
+    default void discard() throws IOException {
+        // no-op for in-memory backings
+    }
+
+    /**
      * Read the contents of the stream into a ByteBuffer by reading all bytes from {@link #asInputStream()}.
      *
      * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,

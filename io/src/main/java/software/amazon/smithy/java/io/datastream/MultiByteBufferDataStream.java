@@ -35,6 +35,8 @@ import software.amazon.smithy.java.io.ByteBufferUtils;
  */
 final class MultiByteBufferDataStream implements DataStream {
 
+    private static final int COPY_BUF_SIZE = 16384;
+
     private final List<ByteBuffer> buffers;
     private final long contentLength;
     private final String contentType;
@@ -124,14 +126,20 @@ final class MultiByteBufferDataStream implements DataStream {
 
     @Override
     public void writeTo(OutputStream out) throws IOException {
+        byte[] scratch = null;
         for (var buf : buffers) {
-            var dup = buf.duplicate();
-            if (dup.hasArray()) {
-                out.write(dup.array(), dup.arrayOffset() + dup.position(), dup.remaining());
+            if (buf.hasArray()) {
+                out.write(buf.array(), buf.arrayOffset() + buf.position(), buf.remaining());
             } else {
-                var tmp = new byte[dup.remaining()];
-                dup.get(tmp);
-                out.write(tmp);
+                if (scratch == null) {
+                    scratch = new byte[COPY_BUF_SIZE];
+                }
+                var dup = buf.duplicate();
+                while (dup.hasRemaining()) {
+                    int n = Math.min(scratch.length, dup.remaining());
+                    dup.get(scratch, 0, n);
+                    out.write(scratch, 0, n);
+                }
             }
         }
     }

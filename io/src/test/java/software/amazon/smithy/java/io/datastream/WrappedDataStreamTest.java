@@ -48,4 +48,25 @@ public class WrappedDataStreamTest {
 
         assertArrayEquals(data, out.toByteArray());
     }
+
+    @Test
+    public void discardDelegates() throws IOException {
+        // The wrapped stream's discard must reach through to the underlying source so InputStream
+        // / Publisher resources actually get released. Verify via observable side effect on
+        // InputStreamDataStream (drain-to-EOF + close).
+        var closed = new boolean[] {false};
+        var src = new ByteArrayInputStream("payload".getBytes(StandardCharsets.UTF_8)) {
+            @Override
+            public void close() throws IOException {
+                closed[0] = true;
+                super.close();
+            }
+        };
+        var inner = DataStream.ofInputStream(src);
+        var ds = DataStream.withMetadata(inner, "text/plain", 7L, false);
+
+        ds.discard();
+
+        assertThat(closed[0], is(true));
+    }
 }

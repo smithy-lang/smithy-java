@@ -46,6 +46,11 @@ final class WrappedDataStream implements DataStream {
     }
 
     @Override
+    public void discard() throws IOException {
+        delegate.discard();
+    }
+
+    @Override
     public long contentLength() {
         return contentLength;
     }

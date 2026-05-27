@@ -39,6 +39,21 @@ final class InputStreamDataStream implements DataStream {
     }
 
     @Override
+    public void discard() throws IOException {
+        if (consumed || closed) {
+            return;
+        }
+
+        consumed = true;
+        closed = true;
+        try (var is = inputStream) {
+            // skipNBytes is allowed to refuse and return early on some streams; transferTo to a
+            // null sink is the contract-correct way to drain to EOF without holding the bytes.
+            is.transferTo(OutputStream.nullOutputStream());
+        }
+    }
+
+    @Override
     public boolean isReplayable() {
         return false;
     }

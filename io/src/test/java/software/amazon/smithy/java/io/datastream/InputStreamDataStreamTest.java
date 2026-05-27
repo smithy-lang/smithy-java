@@ -111,4 +111,42 @@ public class InputStreamDataStreamTest {
 
         assertThrows(IllegalStateException.class, () -> ds.writeTo(new ByteArrayOutputStream()));
     }
+
+    @Test
+    public void discardDrainsAndClosesUnderlyingStream() throws IOException {
+        // Track that the underlying stream got closed and drained without copying out the bytes.
+        var data = new byte[] {1, 2, 3, 4, 5};
+        var closed = new boolean[] {false};
+        var src = new ByteArrayInputStream(data) {
+            @Override
+            public void close() throws IOException {
+                closed[0] = true;
+                super.close();
+            }
+        };
+        var ds = DataStream.ofInputStream(src);
+
+        ds.discard();
+
+        assertThat(closed[0], is(true));
+        assertThat(ds.isAvailable(), is(false));
+        // Drained to EOF.
+        assertThat(src.available(), equalTo(0));
+    }
+
+    @Test
+    public void discardIsIdempotent() throws IOException {
+        var ds = DataStream.ofInputStream(new ByteArrayInputStream(new byte[] {1, 2, 3}));
+
+        ds.discard();
+        ds.discard(); // Second discard must not throw
+    }
+
+    @Test
+    public void discardAfterConsumptionIsNoOp() throws IOException {
+        var ds = DataStream.ofInputStream(new ByteArrayInputStream(new byte[] {1, 2, 3}));
+        ds.asInputStream();
+
+        ds.discard(); // Don't reopen the stream just to discard it
+    }
 }
