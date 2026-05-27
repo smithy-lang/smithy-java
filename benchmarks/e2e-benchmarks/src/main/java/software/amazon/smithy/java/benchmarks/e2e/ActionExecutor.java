@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.benchmarks.e2e;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.util.Map;
 import software.amazon.smithy.java.benchmarks.e2e.dynamodb.client.DynamoDBClient;
@@ -19,10 +18,7 @@ import software.amazon.smithy.java.benchmarks.e2e.s3.model.PutObjectInput;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
- * Wraps the smithy-java DynamoDB and S3 clients with the four operations the
- * benchmark exercises. Smithy-java currently only generates synchronous
- * clients, so the throughput tests achieve concurrency by submitting work to
- * a thread pool from {@link WorkloadRunner}.
+ * Wraps the smithy-java DynamoDB and S3 clients with the four operations the benchmark exercises.
  */
 final class ActionExecutor {
 
@@ -51,9 +47,8 @@ final class ActionExecutor {
     }
 
     void putObject(String bucket, String key, int objectSize) {
-        // The reference runner reuses a single in-memory body across all
-        // uploads. DataStream.ofBytes wraps the array without copying, so
-        // each call is a thin handle over the same buffer.
+        // The reference runner reuses a single in-memory body across all uploads.
+        // DataStream.ofBytes wraps the array without copying, so each call is a thin handle over the same buffer.
         var body = DataStream.ofBytes(payload, 0, objectSize, "application/octet-stream");
         s3.putObject(PutObjectInput.builder()
                 .bucket(bucket)
@@ -68,19 +63,14 @@ final class ActionExecutor {
                 .bucket(bucket)
                 .key(key)
                 .build());
-        // Drain the body so the download time is what we measure, not just
-        // the response headers. writeTo(nullOutputStream) walks the stream
-        // without forcing a single-contiguous-ByteBuffer materialization, so
-        // we exercise the SDK's most efficient consume path (multi-chunk
-        // delivery from the wire is fed straight through with no stitch).
+        // discard() drains and releases the underlying source.
         var body = output.getBody();
         if (body != null) {
             try {
-                body.writeTo(OutputStream.nullOutputStream());
+                body.discard();
             } catch (IOException e) {
-                throw new UncheckedIOException("Failed to drain S3 GetObject body", e);
+                throw new UncheckedIOException("Failed to discard S3 GetObject body", e);
             }
         }
     }
-
 }

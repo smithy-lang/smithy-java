@@ -8,21 +8,19 @@ package software.amazon.smithy.java.benchmarks.e2e;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Map;
+import software.amazon.smithy.model.node.BooleanNode;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 
 /**
- * In-memory representation of a workload JSON file as defined in
- * {@code https://github.com/aws/e2e-benchmark-framework/blob/main/workloads/WORKLOAD-SPEC.md}.
- *
- * <p>Only the v1 fields used by smithy-java's runner are exposed. Unknown
- * fields are ignored so that newer workload files do not break older runners.
+ * In-memory representation of a workload JSON file.
  */
 final class WorkloadConfig {
     final String name;
     final String service; // "dynamodb" or "s3"
     final String action; // "putitem" / "getitem" / "upload" / "download"
-    final ObjectNode actionConfig;
+    ObjectNode actionConfig;
     final int batchActions;
     final boolean sequential;
     final int warmupBatches;
@@ -48,7 +46,7 @@ final class WorkloadConfig {
         var measurement = root.expectObjectMember("measurement");
         this.measurementBatches = measurement.expectNumberMember("batches").getValue().intValue();
         this.collectMetrics = measurement.getBooleanMember("collectMetrics")
-                .map(b -> b.getValue())
+                .map(BooleanNode::getValue)
                 .orElse(false);
         this.metricsIntervalMs = measurement.getNumberMember("metricsInterval")
                 .map(n -> n.getValue().intValue())
@@ -59,6 +57,19 @@ final class WorkloadConfig {
         var bytes = Files.readAllBytes(Paths.get(path));
         var node = Node.parse(new String(bytes)).expectObjectNode();
         return new WorkloadConfig(node);
+    }
+
+    /**
+     * Replace string members on {@code actionConfig} with the given values. Used to wire CLI
+     * overrides like {@code --bucket}, {@code --table}, {@code --region} into the workload at
+     * runtime so the JSON files don't have to be edited per environment.
+     */
+    void overrideActionConfig(Map<String, String> overrides) {
+        var builder = actionConfig.toBuilder();
+        for (var entry : overrides.entrySet()) {
+            builder.withMember(entry.getKey(), entry.getValue());
+        }
+        this.actionConfig = builder.build();
     }
 
     String stringConfig(String name) {
