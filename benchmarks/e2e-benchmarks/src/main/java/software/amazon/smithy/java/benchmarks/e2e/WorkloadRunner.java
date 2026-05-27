@@ -8,38 +8,26 @@ package software.amazon.smithy.java.benchmarks.e2e;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Semaphore;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.AttributeValue;
 
 /**
  * smithy-java implementation of the e2e benchmark workload runner. Reads the
- * shared workload JSON spec
- * ({@code https://github.com/aws/e2e-benchmark-framework}) and produces
- * results comparable to the reference Java SDK v2 runner.
- *
- * <p>Limitations:
- *
- * <ul>
- *     <li>smithy-java's generated clients are synchronous; there is no
- *         {@code xxxAsync} API. The {@code --client async} flag from the
- *         reference runner is not accepted. Throughput-style workloads still
- *         drive concurrency through a thread pool, which is the SDK's
- *         idiomatic concurrency pattern.</li>
- * </ul>
+ * shared workload JSON spec and produces results comparable to other SDK runners.
  */
 public final class WorkloadRunner {
 
     private final WorkloadConfig workload;
     private final ActionExecutor executor;
-    private final byte[] payload;
     private final int payloadSize;
     private final List<Long> measuredDurationsNs = Collections.synchronizedList(new ArrayList<>());
     private final ResourceMonitor monitor = new ResourceMonitor();
@@ -47,7 +35,7 @@ public final class WorkloadRunner {
     private WorkloadRunner(WorkloadConfig workload) {
         this.workload = workload;
         this.payloadSize = maxPayloadSize(workload);
-        this.payload = new byte[payloadSize];
+        byte[] payload = new byte[payloadSize];
         new Random(0xC0FFEEL).nextBytes(payload);
 
         var region = workload.stringConfig("region");
@@ -137,40 +125,41 @@ public final class WorkloadRunner {
                 }
             }
         } else {
-            // The reference runner uses 2x cores; smithy-java's blocking
-            // client is idiomatically driven from a thread pool, so match
-            // it for fair comparison.
-            int threads = Runtime.getRuntime().availableProcessors() * 2;
-            ExecutorService pool = Executors.newFixedThreadPool(threads, r -> {
-                var t = new Thread(r, "e2e-worker");
-                t.setDaemon(true);
-                return t;
-            });
-            List<Future<Long>> futures = new ArrayList<>(workload.batchActions);
-            for (int i = 0; i < workload.batchActions; i++) {
-                final int index = i;
-                futures.add(pool.submit(() -> {
-                    long s = System.nanoTime();
-                    executeAction(index);
-                    return System.nanoTime() - s;
-                }));
-            }
-            for (var f : futures) {
-                try {
-                    long d = f.get();
-                    if (measure) {
-                        measuredDurationsNs.add(d);
-                    }
-                } catch (Exception e) {
-                    System.err.println("Task failed: " + e.getMessage());
-                    e.printStackTrace();
+            // smithy-java's blocking client is driven from a virtual-thread executor: each
+            // action task gets its own virtual thread that blocks on the HTTP call, no platform
+            // thread is held while the call is in flight. The submitting thread acquires a
+            // permit before submitting so only `concurrency` tasks are ever in flight at once.
+            // Multiplier configurable via -De2e.concurrency.multiplier so we can sweep
+            // without rebuilding. Default is 4× cores.
+            int multiplier = Integer.getInteger("e2e.concurrency.multiplier", 4);
+            int concurrency = Runtime.getRuntime().availableProcessors() * multiplier;
+            var permits = new Semaphore(concurrency);
+            try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
+                List<Future<Long>> futures = new ArrayList<>(workload.batchActions);
+                for (int i = 0; i < workload.batchActions; i++) {
+                    permits.acquireUninterruptibly();
+                    final int index = i;
+                    futures.add(pool.submit(() -> {
+                        try {
+                            long s = System.nanoTime();
+                            executeAction(index);
+                            return System.nanoTime() - s;
+                        } finally {
+                            permits.release();
+                        }
+                    }));
                 }
-            }
-            pool.shutdown();
-            try {
-                pool.awaitTermination(5, TimeUnit.MINUTES);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                for (var f : futures) {
+                    try {
+                        long d = f.get();
+                        if (measure) {
+                            measuredDurationsNs.add(d);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Task failed: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                }
             }
         }
     }
@@ -326,41 +315,61 @@ public final class WorkloadRunner {
             var rootLogger = Logger.getLogger("");
             rootLogger.setLevel(java.util.logging.Level.WARNING);
         }
-        // Mirror the reference runner's CLI:
-        //   java -jar runner.jar [--client sync|async] <workload-file> <region>
-        // We only support sync (smithy-java has no async client). The
-        // <region> CLI argument is accepted but ignored — region is read
-        // from the workload's actionConfig like every other field.
-        int idx = 0;
-        if (args.length > 0 && "--client".equals(args[0])) {
-            if (args.length < 2) {
-                fail("Error: --client requires a value (sync or async)");
+        //   java -jar runner.jar [--client sync|async]
+        //                        [--bucket <name>] [--table <name>] [--region <region>]
+        //                        <workload-file>
+        // smithy-java only generates synchronous clients; --client is accepted for parity with
+        // other runners but only "sync" is supported. The --bucket / --table / --region flags
+        // override the corresponding fields in the workload's actionConfig so the same workload
+        // JSON works across environments without editing.
+        String workloadPath = null;
+        Map<String, String> overrides = new LinkedHashMap<>();
+        for (int i = 0; i < args.length; i++) {
+            switch (args[i]) {
+                case "--client" -> {
+                    String mode = requireValue(args, ++i, "--client");
+                    if ("async".equals(mode)) {
+                        System.err.println("WARNING: smithy-java does not generate async clients. "
+                                + "Running with the synchronous client; throughput tests will use a thread pool.");
+                    } else if (!"sync".equals(mode)) {
+                        fail("Error: Invalid client mode '" + mode + "'. Valid values are: sync, async");
+                    }
+                }
+                case "--bucket" -> overrides.put("bucketName", requireValue(args, ++i, "--bucket"));
+                case "--table" -> overrides.put("tableName", requireValue(args, ++i, "--table"));
+                case "--region" -> overrides.put("region", requireValue(args, ++i, "--region"));
+                default -> {
+                    if (args[i].startsWith("--")) {
+                        fail("Error: Unknown flag '" + args[i] + "'");
+                    }
+                    if (workloadPath != null) {
+                        fail("Error: Unexpected positional argument '" + args[i] + "'");
+                    }
+                    workloadPath = args[i];
+                }
             }
-            String mode = args[1];
-            if ("async".equals(mode)) {
-                System.err.println("WARNING: smithy-java does not generate async clients. "
-                        + "Running with the synchronous client; throughput tests will use a thread pool.");
-            } else if (!"sync".equals(mode)) {
-                fail("Error: Invalid client mode '" + mode + "'. Valid values are: sync, async");
-            }
-            idx = 2;
         }
-        if (args.length - idx < 2) {
-            fail("Usage: java -jar smithy-java-e2e-benchmark-runner.jar [--client sync|async] <workload-file> <region>");
+        if (workloadPath == null) {
+            fail("Usage: java -jar smithy-java-e2e-benchmark-runner.jar [--client sync|async]"
+                    + " [--bucket <name>] [--table <name>] [--region <region>] <workload-file>");
         }
-        var workloadPath = args[idx];
-        // args[idx + 1] is the region from the orchestration script; we
-        // intentionally ignore it (the workload JSON is the source of truth)
-        // to match the format expected by run-benchmark.py.
         var workload = WorkloadConfig.load(workloadPath);
+        if (!overrides.isEmpty()) {
+            workload.overrideActionConfig(overrides);
+        }
         printActiveJsonProvider();
         new WorkloadRunner(workload).run();
     }
 
+    private static String requireValue(String[] args, int i, String flag) {
+        if (i >= args.length) {
+            fail("Error: " + flag + " requires a value");
+        }
+        return args[i];
+    }
+
     private static void printActiveJsonProvider() {
-        // Reflectively read JsonSettings.PROVIDER so we can confirm which
-        // implementation actually got picked, without depending on
-        // package-private getters.
+        // Reflectively read JsonSettings.PROVIDER so we can confirm which implementation actually got picked
         try {
             var clazz = Class.forName("software.amazon.smithy.java.json.JsonSettings");
             var field = clazz.getDeclaredField("PROVIDER");

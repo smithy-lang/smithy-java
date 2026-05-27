@@ -134,8 +134,7 @@ final class ResourceMonitor {
         if (cpu < 0) {
             cpu = 0;
         }
-        long mem = memoryMXBean.getHeapMemoryUsage().getUsed()
-                + memoryMXBean.getNonHeapMemoryUsage().getUsed();
+        long mem = memoryMXBean.getHeapMemoryUsage().getUsed() + memoryMXBean.getNonHeapMemoryUsage().getUsed();
         samples.add(new Sample(cpu * 100.0, mem));
     }
 }
