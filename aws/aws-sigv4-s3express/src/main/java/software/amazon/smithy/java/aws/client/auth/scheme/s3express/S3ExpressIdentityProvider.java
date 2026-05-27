@@ -10,7 +10,6 @@ import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
-import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.context.Context;
 
 /**
@@ -92,17 +91,7 @@ public final class S3ExpressIdentityProvider implements IdentityResolver<S3Expre
         }
 
         var perBucket = cache.get(new S3ExpressIdentityKey(bucket, base));
-        var result = perBucket.resolveIdentity(requestProperties);
-
-        // Emit the S3_EXPRESS_BUCKET business metric on successful resolve. Aligns with how
-        // the credential chain providers tag FEATURE_IDS on the call context after a hit.
-        if (result.identity() != null) {
-            var ids = requestProperties.get(CallContext.FEATURE_IDS);
-            if (ids != null) {
-                ids.add(S3ExpressFeatureId.S3_EXPRESS_BUCKET);
-            }
-        }
-        return result;
+        return perBucket.resolveIdentity(requestProperties);
     }
 
     @Override

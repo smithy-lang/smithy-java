@@ -13,8 +13,7 @@ import software.amazon.smithy.java.client.core.FeatureId;
 public enum S3ExpressFeatureId implements FeatureId {
 
     /**
-     * Emitted on every operation call that resolves a bucket-scoped S3 Express identity (i.e.
-     * the request used {@code aws.auth#sigv4-s3express}).
+     * Emitted on every operation call that resolves a bucket-scoped S3 Express identity.
      */
     S3_EXPRESS_BUCKET("J");
 

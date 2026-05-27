@@ -37,7 +37,7 @@ public class UserAgentPluginTest {
         var context = Context.create();
         var req = HttpRequest.create().setUri(new URI("/")).setMethod("GET").toUnmodifiable();
         var foo = new Foo();
-        var updated = interceptor.modifyBeforeSigning(new RequestHook<>(createOperation(), context, foo, req));
+        var updated = interceptor.modifyBeforeTransmit(new RequestHook<>(createOperation(), context, foo, req));
 
         var hd = updated.headers().allValues("user-agent");
 
@@ -53,7 +53,7 @@ public class UserAgentPluginTest {
         context.put(ClientContext.APPLICATION_ID, "hello there");
         var req = HttpRequest.create().setUri(new URI("/")).setMethod("GET").toUnmodifiable();
         var foo = new Foo();
-        var updated = interceptor.modifyBeforeSigning(new RequestHook<>(createOperation(), context, foo, req));
+        var updated = interceptor.modifyBeforeTransmit(new RequestHook<>(createOperation(), context, foo, req));
 
         var hd = updated.headers().allValues("user-agent");
 
@@ -85,7 +85,7 @@ public class UserAgentPluginTest {
 
         var req = HttpRequest.create().setUri(new URI("/")).setMethod("GET").toUnmodifiable();
         var foo = new Foo();
-        var updated = interceptor.modifyBeforeSigning(new RequestHook<>(createOperation(), context, foo, req));
+        var updated = interceptor.modifyBeforeTransmit(new RequestHook<>(createOperation(), context, foo, req));
 
         var hd = updated.headers().allValues("user-agent");
 
