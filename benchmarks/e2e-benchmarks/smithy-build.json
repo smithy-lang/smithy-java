@@ -22,7 +22,12 @@
           "transport": {
             "http-java": {}
           },
-          "modes": ["client"]
+          "modes": ["client"],
+          "runtimeTraits": [
+            "smithy.rules#contextParam",
+            "smithy.rules#staticContextParams",
+            "smithy.rules#operationContextParams"
+          ]
         }
       }
     },
@@ -47,7 +52,12 @@
           "transport": {
             "http-java": {}
           },
-          "modes": ["client"]
+          "modes": ["client"],
+          "runtimeTraits": [
+            "smithy.rules#contextParam",
+            "smithy.rules#staticContextParams",
+            "smithy.rules#operationContextParams"
+          ]
         }
       }
     }
