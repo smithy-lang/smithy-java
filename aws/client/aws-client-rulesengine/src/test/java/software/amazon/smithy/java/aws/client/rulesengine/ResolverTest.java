@@ -16,14 +16,21 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.auth.api.Signer;
+import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
+import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
 import software.amazon.smithy.java.aws.client.core.settings.S3EndpointSettings;
 import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
+import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.rulesengine.EndpointRulesPlugin;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.endpoints.Endpoint;
@@ -93,9 +100,57 @@ public class ResolverTest {
                 .model(model)
                 .serviceId(service.getId())
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                // Endpoint rules in S3 emit aws.auth#sigv4 / sigv4a in the authSchemes property; the
+                // pipeline now swaps to the endpoint-requested scheme if the client supports it. The
+                // test uses NO_AUTH for resolution but registers stub schemes here so the swap can
+                // succeed and the URL gets captured by the readBeforeTransmit interceptor.
+                .putSupportedAuthSchemes(
+                        new StubAuthScheme(ShapeId.from("aws.auth#sigv4")),
+                        new StubAuthScheme(ShapeId.from("aws.auth#sigv4a")),
+                        new StubAuthScheme(ShapeId.from("aws.auth#sigv4S3express")))
                 .putConfig(RulesEngineSettings.RULES_ENGINE_BUILDER, engine)
                 .addPlugin(plugin)
                 .build();
+    }
+
+    /**
+     * A no-op auth scheme that mirrors {@code smithy.api#noAuth} but with an arbitrary scheme ID.
+     * Used by tests to satisfy endpoint-driven auth-scheme swapping without actually signing.
+     */
+    private record StubAuthScheme(ShapeId schemeId) implements AuthScheme<Object, Identity> {
+        private static final IdentityResolver<Identity> NULL_RESOLVER = new IdentityResolver<>() {
+            private static final IdentityResult<Identity> NULL_IDENTITY = IdentityResult.of(new Identity() {});
+
+            @Override
+            public IdentityResult<Identity> resolveIdentity(Context requestProperties) {
+                return NULL_IDENTITY;
+            }
+
+            @Override
+            public Class<Identity> identityType() {
+                return Identity.class;
+            }
+        };
+
+        @Override
+        public Class<Object> requestClass() {
+            return Object.class;
+        }
+
+        @Override
+        public Class<Identity> identityClass() {
+            return Identity.class;
+        }
+
+        @Override
+        public IdentityResolver<Identity> identityResolver(IdentityResolvers resolvers) {
+            return NULL_RESOLVER;
+        }
+
+        @Override
+        public Signer<Object, Identity> signer() {
+            return Signer.nullSigner();
+        }
     }
 
     @ParameterizedTest

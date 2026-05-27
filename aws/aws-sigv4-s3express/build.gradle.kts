@@ -13,7 +13,10 @@ dependencies {
     api(project(":aws:client:aws-client-core"))
     api(project(":auth-api"))
     api(project(":client:client-auth-api"))
+    api(project(":client:client-core"))
+    api(project(":core"))
     api(project(":http:http-api"))
+    implementation(project(":aws:aws-config"))
     implementation(project(":logging"))
     implementation(libs.smithy.aws.traits)
 }
