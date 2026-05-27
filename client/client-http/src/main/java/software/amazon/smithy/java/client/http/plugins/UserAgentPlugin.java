@@ -76,7 +76,11 @@ public final class UserAgentPlugin implements AutoClientPlugin {
         }
 
         @Override
-        public <RequestT> RequestT modifyBeforeSigning(RequestHook<?, ?, RequestT> hook) {
+        public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
+            // Run after auth resolution + signing so business-metric IDs from identity resolvers
+            // (CredentialChain providers, S3ExpressIdentityProvider, etc.) are reflected in the
+            // "m/..." segment. user-agent is not part of SigV4's signed-headers list, so stamping
+            // it after signing is safe.
             if (hook.request() instanceof HttpRequest req && !req.headers().hasHeader(HeaderName.USER_AGENT)) {
                 var updated = req.toModifiable();
                 updated.headers().setHeader(HeaderName.USER_AGENT, createUa(hook.context()));

@@ -19,6 +19,7 @@ import software.amazon.smithy.java.aws.client.core.settings.StsEndpointSettings;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointAuthScheme;
+import software.amazon.smithy.java.rulesengine.EndpointUtils;
 import software.amazon.smithy.java.rulesengine.RulesExtension;
 import software.amazon.smithy.java.rulesengine.RulesFunction;
 import software.amazon.smithy.utils.SmithyUnstableApi;
@@ -103,28 +104,33 @@ public class AwsRulesExtension implements RulesExtension {
     private static List<EndpointAuthScheme> buildAuthSchemes(List<?> entries) {
         var result = new ArrayList<EndpointAuthScheme>(entries.size());
         for (Object entry : entries) {
-            if (!(entry instanceof Map<?, ?> map)) {
-                continue;
-            }
-            Object name = map.get("name");
+            // Each entry is either a Map (when the rules engine emits via MAPN) or a
+            // PropertyGetter (the STRUCTN fast path for small fixed-key blocks).
+            // EndpointUtils.getProperty handles both.
+            Object name = EndpointUtils.getProperty(entry, "name");
             if (!(name instanceof String schemeName) || schemeName.isEmpty()) {
                 continue;
             }
-            var schemeBuilder = EndpointAuthScheme.builder().authSchemeId("aws.auth#" + schemeName);
+            // Endpoint rules emit names like "sigv4-s3express" with hyphens, but Smithy ShapeIds
+            // (used as map keys for AuthScheme registration) only allow alphanumerics and '_'.
+            // Map each hyphen + following segment to upper-camel ("sigv4-s3express" ->
+            // "sigv4S3Express"). AuthScheme implementations need to use the same mapping for
+            // their canonical id (e.g. S3ExpressAuthScheme.SCHEME_ID).
+            var schemeBuilder = EndpointAuthScheme.builder().authSchemeId(toShapeIdName(schemeName));
 
-            Object signingName = map.get("signingName");
+            Object signingName = EndpointUtils.getProperty(entry, "signingName");
             if (signingName instanceof String s && !s.isEmpty()) {
                 schemeBuilder.putProperty(EndpointAuthSchemeSettings.SIGNING_NAME, s);
             }
-            Object signingRegion = map.get("signingRegion");
+            Object signingRegion = EndpointUtils.getProperty(entry, "signingRegion");
             if (signingRegion instanceof String s && !s.isEmpty()) {
                 schemeBuilder.putProperty(EndpointAuthSchemeSettings.SIGNING_REGION, s);
             }
-            Object disableDoubleEncoding = map.get("disableDoubleEncoding");
+            Object disableDoubleEncoding = EndpointUtils.getProperty(entry, "disableDoubleEncoding");
             if (disableDoubleEncoding instanceof Boolean b) {
                 schemeBuilder.putProperty(EndpointAuthSchemeSettings.DISABLE_DOUBLE_ENCODING, b);
             }
-            Object signingRegionSet = map.get("signingRegionSet");
+            Object signingRegionSet = EndpointUtils.getProperty(entry, "signingRegionSet");
             if (signingRegionSet instanceof List<?> set) {
                 schemeBuilder.putProperty(EndpointAuthSchemeSettings.SIGNING_REGION_SET, (List<String>) set);
             }
@@ -132,5 +138,25 @@ public class AwsRulesExtension implements RulesExtension {
             result.add(schemeBuilder.build());
         }
         return List.copyOf(result);
+    }
+
+    /**
+     * Convert an endpoint-rule auth scheme name like {@code sigv4-s3express} into a valid
+     * Smithy ShapeId-style id ({@code aws.auth#sigv4S3Express}). Hyphenated segments are
+     * upper-camel-joined; the leading segment is left as-is.
+     */
+    private static String toShapeIdName(String wireName) {
+        StringBuilder sb = new StringBuilder("aws.auth#");
+        boolean upperNext = false;
+        for (int i = 0; i < wireName.length(); i++) {
+            char c = wireName.charAt(i);
+            if (c == '-') {
+                upperNext = true;
+                continue;
+            }
+            sb.append(upperNext ? Character.toUpperCase(c) : c);
+            upperNext = false;
+        }
+        return sb.toString();
     }
 }

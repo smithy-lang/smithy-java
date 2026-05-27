@@ -13,7 +13,8 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 
 /**
- * Signer for the {@code aws.auth#sigv4-s3express} auth scheme.
+ * Signer for the S3 Express auth scheme (wire name {@code sigv4-s3express}, smithy-java id
+ * {@code aws.auth#sigv4S3Express}).
  *
  * <p>Wraps a regular SigV4 signer with two adjustments mandated by the S3 Express SEP:
  *

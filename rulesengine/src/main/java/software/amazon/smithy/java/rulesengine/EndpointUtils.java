@@ -86,8 +86,16 @@ public final class EndpointUtils {
         return ((instructions[offset] & 0xFF) << 8) | (instructions[offset + 1] & 0xFF);
     }
 
-    // Get a property from a PropertyGetter, map, or URI. Returns null if not found.
-    static Object getProperty(Object target, String propertyName) {
+    /**
+     * Get a property from a {@link PropertyGetter}, {@link Map}, or {@link SmithyUri}, returning
+     * {@code null} if not found.
+     *
+     * <p>Used to read endpoint properties without having to know which concrete representation
+     * the rules-engine emitter produced — the {@code STRUCTN} fast path returns
+     * {@link ArrayPropertyGetter}, the generic {@code MAPN} path returns a {@link Map}, and URL
+     * subfields use {@link SmithyUri}.
+     */
+    public static Object getProperty(Object target, String propertyName) {
         return switch (target) {
             case PropertyGetter pg -> pg.getProperty(propertyName);
             case Map<?, ?> m -> m.get(propertyName);
