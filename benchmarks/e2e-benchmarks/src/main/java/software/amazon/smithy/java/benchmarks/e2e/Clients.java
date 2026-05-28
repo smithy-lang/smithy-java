@@ -19,6 +19,14 @@ import software.amazon.smithy.java.aws.credentials.imds.ImdsCredentialProvider;
 import software.amazon.smithy.java.benchmarks.e2e.dynamodb.client.DynamoDBClient;
 import software.amazon.smithy.java.benchmarks.e2e.s3.client.S3Client;
 import software.amazon.smithy.java.benchmarks.e2e.s3.model.CreateSessionInput;
+import software.amazon.smithy.java.client.core.ClientTransport;
+import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
+import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
+import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
+import software.amazon.smithy.java.client.http.smithy.SmithyHttpClientTransport;
+import software.amazon.smithy.java.http.client.HttpClient;
+import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
+import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 
 /**
  * Constructs the smithy-java-generated DynamoDB and S3 clients used by the benchmark.
@@ -30,11 +38,52 @@ final class Clients {
 
     private Clients() {}
 
+    /**
+     * Returns the alternate transport selected via {@code -De2e.transport=...}, or null for the
+     * default JDK HttpClient. Recognized values: {@code netty}, {@code smithy}.
+     */
+    private static ClientTransport<?, ?> selectTransport() {
+        var name = System.getProperty("e2e.transport", "").trim().toLowerCase();
+        return switch (name) {
+            case "", "jdk" -> null;
+            case "netty" -> new NettyHttpClientTransport();
+            case "apache" -> {
+                var cfg = new ApacheHttpTransportConfig()
+                        .maxConnectionsPerHost(512)
+                        .ioThreads(Runtime.getRuntime().availableProcessors());
+                yield new ApacheHttpClientTransport(cfg);
+            }
+            case "smithy" -> {
+                // Smithy HTTP client defaults to ENFORCE_HTTP_2 which fails on S3 (H1-only).
+                // AUTOMATIC also fails: the pool routes HTTPS routes to the H2 manager, which
+                // refuses an ALPN result of "http/1.1". Force ENFORCE_HTTP_1_1 so the pool
+                // routes to the H1 manager from the start.
+                //
+                // The pool defaults to maxConnectionsPerRoute=20 which throttles us hard at
+                // higher concurrency since the benchmark targets a single bucket (= one route).
+                // Bump both caps to match the benchmark's max in-flight count plus headroom.
+                var pool = HttpConnectionPool.builder()
+                        .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
+                        .maxTotalConnections(512)
+                        .maxConnectionsPerRoute(512)
+                        .build();
+                var http = HttpClient.builder().connectionPool(pool).build();
+                yield new SmithyHttpClientTransport(http);
+            }
+            default -> throw new IllegalArgumentException(
+                    "Unknown e2e.transport: '" + name + "' (expected one of: jdk, netty, smithy, apache)");
+        };
+    }
+
     static DynamoDBClient dynamodb(String region) {
-        return DynamoDBClient.builder()
+        var b = DynamoDBClient.builder()
                 .putConfig(RegionSetting.REGION, region)
-                .addIdentityResolver(IMDS)
-                .build();
+                .addIdentityResolver(IMDS);
+        var transport = selectTransport();
+        if (transport != null) {
+            b.transport(transport);
+        }
+        return b.build();
     }
 
     static S3Client s3(String region) {
@@ -58,11 +107,15 @@ final class Clients {
                     c.getSessionToken(),
                     c.getExpiration());
         };
-        S3Client client = S3Client.builder()
+        var b = S3Client.builder()
                 .putConfig(RegionSetting.REGION, region)
                 .putConfig(S3ExpressContext.CREATE_SESSION_CALLBACK, createSession)
-                .addIdentityResolver(IMDS)
-                .build();
+                .addIdentityResolver(IMDS);
+        var transport = selectTransport();
+        if (transport != null) {
+            b.transport(transport);
+        }
+        S3Client client = b.build();
         clientRef.set(client);
         return client;
     }
