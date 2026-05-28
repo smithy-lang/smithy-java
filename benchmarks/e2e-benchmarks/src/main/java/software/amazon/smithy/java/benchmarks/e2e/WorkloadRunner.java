@@ -7,7 +7,6 @@ package software.amazon.smithy.java.benchmarks.e2e;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +15,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.AttributeValue;
@@ -31,6 +31,15 @@ public final class WorkloadRunner {
     private final int payloadSize;
     private final List<Long> measuredDurationsNs = Collections.synchronizedList(new ArrayList<>());
     private final ResourceMonitor monitor = new ResourceMonitor();
+    // Hoist actionConfig string/int reads out of the per-request hot path. These were resolved
+    // anew on every executeAction call before, costing one Optional + ObjectNode lookup each.
+    private final String service;
+    private final String action;
+    private final String bucketName;
+    private final String tableName;
+    private final String keyPrefix;
+    private final int objectSize;
+    private final int dataLength;
 
     private WorkloadRunner(WorkloadConfig workload) {
         this.workload = workload;
@@ -39,10 +48,20 @@ public final class WorkloadRunner {
         new Random(0xC0FFEEL).nextBytes(payload);
 
         var region = workload.stringConfig("region");
-        var ddb = "dynamodb".equals(workload.service) ? Clients.dynamodb(region) : null;
-        var s3 = "s3".equals(workload.service) ? Clients.s3(region) : null;
+        this.service = workload.service;
+        this.action = workload.action;
+        this.bucketName = "s3".equals(service) ? workload.stringConfig("bucketName") : null;
+        this.tableName = "dynamodb".equals(service) ? workload.stringConfig("tableName") : null;
+        this.keyPrefix = workload.stringConfig("keyPrefix");
+        this.objectSize = "s3".equals(service) ? workload.intConfig("objectSize") : 0;
+        this.dataLength = workload.actionConfig.getMember("dataLength").isPresent()
+                ? workload.intConfig("dataLength")
+                : 0;
+
+        var ddb = "dynamodb".equals(service) ? Clients.dynamodb(region) : null;
+        var s3 = "s3".equals(service) ? Clients.s3(region) : null;
         if (ddb == null && s3 == null) {
-            throw new IllegalArgumentException("Unknown service: " + workload.service);
+            throw new IllegalArgumentException("Unknown service: " + service);
         }
         // Build the unused client too — the executor stores nullable refs and
         // the runner only invokes the path matching workload.service.
@@ -53,8 +72,8 @@ public final class WorkloadRunner {
 
         System.out.println("Initialized smithy-java WorkloadRunner:");
         System.out.println("  Workload: " + workload.name);
-        System.out.println("  Service:  " + workload.service);
-        System.out.println("  Action:   " + workload.action);
+        System.out.println("  Service:  " + service);
+        System.out.println("  Action:   " + action);
         System.out.println("  Region:   " + region);
         System.out.println("  Sequential:        " + workload.sequential);
         System.out.println("  Actions per batch: " + workload.batchActions);
@@ -131,11 +150,15 @@ public final class WorkloadRunner {
             // permit before submitting so only `concurrency` tasks are ever in flight at once.
             // Multiplier configurable via -De2e.concurrency.multiplier so we can sweep
             // without rebuilding. Default is 4× cores.
+            //
+            // Each task pushes its duration into measuredDurationsNs directly and returns null,
+            // so the future doesn't autobox the long. The futures are kept around solely so the
+            // submitting thread can wait for completion and surface task exceptions.
             int multiplier = Integer.getInteger("e2e.concurrency.multiplier", 4);
             int concurrency = Runtime.getRuntime().availableProcessors() * multiplier;
             var permits = new Semaphore(concurrency);
             try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
-                List<Future<Long>> futures = new ArrayList<>(workload.batchActions);
+                List<Future<?>> futures = new ArrayList<>(workload.batchActions);
                 for (int i = 0; i < workload.batchActions; i++) {
                     permits.acquireUninterruptibly();
                     final int index = i;
@@ -143,7 +166,9 @@ public final class WorkloadRunner {
                         try {
                             long s = System.nanoTime();
                             executeAction(index);
-                            return System.nanoTime() - s;
+                            if (measure) {
+                                measuredDurationsNs.add(System.nanoTime() - s);
+                            }
                         } finally {
                             permits.release();
                         }
@@ -151,10 +176,7 @@ public final class WorkloadRunner {
                 }
                 for (var f : futures) {
                     try {
-                        long d = f.get();
-                        if (measure) {
-                            measuredDurationsNs.add(d);
-                        }
+                        f.get();
                     } catch (Exception e) {
                         System.err.println("Task failed: " + e.getMessage());
                         e.printStackTrace();
@@ -165,32 +187,28 @@ public final class WorkloadRunner {
     }
 
     private void executeAction(int index) {
-        var action = workload.action;
         try {
-            if ("s3".equals(workload.service)) {
-                var bucket = workload.stringConfig("bucketName");
+            if ("s3".equals(service)) {
                 var key = generateKey(index);
                 if ("upload".equals(action)) {
-                    executor.putObject(bucket, key, workload.intConfig("objectSize"));
+                    executor.putObject(bucketName, key, objectSize);
                 } else if ("download".equals(action)) {
-                    executor.getObject(bucket, key);
+                    executor.getObject(bucketName, key);
                 } else {
                     throw new IllegalArgumentException("Unknown S3 action: " + action);
                 }
-            } else if ("dynamodb".equals(workload.service)) {
-                var tableName = workload.stringConfig("tableName");
+            } else if ("dynamodb".equals(service)) {
                 if ("putitem".equals(action)) {
                     executor.putItem(tableName, buildItem(index));
                 } else if ("getitem".equals(action)) {
-                    Map<String, AttributeValue> key = new HashMap<>();
-                    key.put("pk", AttributeValue.builder().s(generateKey(index)).build());
-                    executor.getItem(tableName, key);
+                    var pk = AttributeValue.builder().s(generateKey(index)).build();
+                    executor.getItem(tableName, Map.of("pk", pk));
                 } else {
                     throw new IllegalArgumentException("Unknown DynamoDB action: " + action);
                 }
             }
         } catch (RuntimeException e) {
-            System.err.println("Action failed: service=" + workload.service + ", action=" + action);
+            System.err.println("Action failed: service=" + service + ", action=" + action);
             System.err.println("Error: " + e.getClass().getName() + ": " + e.getMessage());
             if (e.getCause() != null) {
                 System.err
@@ -201,22 +219,21 @@ public final class WorkloadRunner {
     }
 
     private Map<String, AttributeValue> buildItem(int index) {
-        Map<String, AttributeValue> item = new HashMap<>();
-        item.put("pk", AttributeValue.builder().s(generateKey(index)).build());
-        int dataLength = workload.intConfig("dataLength");
-        item.put("data", AttributeValue.builder().s(randomString(dataLength)).build());
-        return item;
+        var pk = AttributeValue.builder().s(generateKey(index)).build();
+        var data = AttributeValue.builder().s(randomString(dataLength)).build();
+        return Map.of("pk", pk, "data", data);
     }
 
     private String generateKey(int index) {
-        return workload.stringConfig("keyPrefix") + (index + 1);
+        return keyPrefix + (index + 1);
     }
 
     private static String randomString(int length) {
-        // Reference runner uses [A-Za-z0-9]; matched here for byte-for-byte
-        // compatibility on the wire.
+        // Reference runner uses [A-Za-z0-9]; matched here for byte-for-byte compatibility on the
+        // wire. ThreadLocalRandom avoids the per-call Random allocation that a fresh `new Random()`
+        // would require.
         var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        var random = new Random();
+        var random = ThreadLocalRandom.current();
         var sb = new StringBuilder(length);
         for (int i = 0; i < length; i++) {
             sb.append(chars.charAt(random.nextInt(chars.length())));
