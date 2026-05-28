@@ -28,3 +28,5 @@ mise.toml
 .claude/settings.local.json
 
 **/bin
+
+benchmarks/e2e-benchmarks/profiles
