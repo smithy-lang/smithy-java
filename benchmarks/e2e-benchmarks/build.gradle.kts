@@ -71,6 +71,11 @@ dependencies {
     // smithy-java credential chain
     implementation(project(":aws:aws-credential-chain"))
     implementation(project(":aws:aws-credentials-imds"))
+
+    // Alternate transports — selected at runtime via -De2e.transport=netty|smithy|apache
+    implementation(project(":client:client-http-netty"))
+    implementation(project(":client:client-http-smithy"))
+    implementation(project(":client:client-http-apache"))
 }
 
 // Two projections so that DynamoDB and S3 generate into different namespaces
