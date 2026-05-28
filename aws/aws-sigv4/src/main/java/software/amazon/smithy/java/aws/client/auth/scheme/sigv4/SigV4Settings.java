@@ -48,6 +48,22 @@ public interface SigV4Settings<B extends ClientSetting<B>> extends ClockSetting<
     Context.Key<String> SIGNING_NAME = Context.key("Signing name to use for computing SigV4 signatures.");
 
     /**
+     * If set, this string is used verbatim as the body-hash component of the SigV4 canonical
+     * request and as the value of the {@code x-amz-content-sha256} header — bypassing the SHA-256
+     * computation over the request body.
+     *
+     * <p>Used by callers that frame the body in {@code aws-chunked} form and emit a checksum
+     * trailer instead of including a body SHA-256 in the signature. The expected values come
+     * from the AWS sigv4-streaming spec, e.g. {@code "STREAMING-UNSIGNED-PAYLOAD-TRAILER"} or
+     * {@code "UNSIGNED-PAYLOAD"}.
+     *
+     * <p>The setter is responsible for replacing the request body with chunked-encoded bytes and
+     * adjusting {@code Content-Length} / {@code Content-Encoding} accordingly. The signer just
+     * stamps the override string and trusts the caller's framing.
+     */
+    Context.Key<String> PAYLOAD_HASH_OVERRIDE = Context.key("SigV4 body-hash override (e.g. STREAMING-UNSIGNED-PAYLOAD-TRAILER).");
+
+    /**
      * Signing name to use for the SigV4 signing process.
      *
      * <p>The signing name is typically the name of the service. For example {@code "lambda"}.
