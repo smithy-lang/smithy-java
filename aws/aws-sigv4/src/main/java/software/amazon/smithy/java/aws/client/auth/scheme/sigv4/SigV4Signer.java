@@ -75,10 +75,22 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         var clock = properties.getOrDefault(SigV4Settings.CLOCK, Clock.systemUTC());
 
         // TODO: Add support for query signing?
-        // TODO: Support chunk encoding
-        // TODO: support UNSIGNED
 
-        var payloadHash = getPayloadHash(request.body());
+        // Caller can short-circuit the body SHA-256 by either:
+        //   (a) stamping a sentinel string on SigV4Settings.PAYLOAD_HASH_OVERRIDE in the signer
+        //       properties, or
+        //   (b) pre-setting the x-amz-content-sha256 request header.
+        // Both are used by aws-chunked + trailer-checksum requests where the body SHA-256 is
+        // unnecessary. The expected sentinel values are defined by the AWS sigv4-streaming spec:
+        // "STREAMING-UNSIGNED-PAYLOAD-TRAILER", "UNSIGNED-PAYLOAD", etc.
+        String payloadHash;
+        var hashOverride = properties.get(SigV4Settings.PAYLOAD_HASH_OVERRIDE);
+        if (hashOverride != null) {
+            payloadHash = hashOverride;
+        } else {
+            String existing = request.headers().firstValue(HeaderName.X_AMZ_CONTENT_SHA256);
+            payloadHash = existing != null ? existing : getPayloadHash(request.body());
+        }
         var mod = request.toModifiable();
         var signature = signInPlace(
                 mod,

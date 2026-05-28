@@ -5,10 +5,8 @@
 
 package software.amazon.smithy.java.aws.client.auth.scheme.s3express;
 
-import java.nio.ByteBuffer;
-import java.util.Base64;
-import java.util.zip.CRC32;
 import software.amazon.smithy.aws.traits.HttpChecksumTrait;
+import software.amazon.smithy.java.aws.client.auth.scheme.sigv4.AwsChunkedDataStream;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -16,8 +14,10 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
- * Stamps a CRC32 flexible checksum on S3 Express data-plane requests when the user did not
- * already specify one.
+ * Frames the request body in {@code aws-chunked} content-encoding and emits a CRC32 checksum
+ * trailer for S3 Express data-plane requests. Pairs with the unsigned-payload-trailer signing
+ * mode so the SigV4 canonical request hashes the literal string
+ * {@code STREAMING-UNSIGNED-PAYLOAD-TRAILER} instead of the body bytes.
  *
  * <p>Conditions for activation, all of which must hold:
  * <ul>
@@ -27,13 +27,15 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  *         {@code requestAlgorithmMember}.</li>
  *     <li>No {@code x-amz-checksum-*} or {@code x-amz-trailer} header is already present (the
  *         user, codec, or upstream interceptor did not pre-stamp a checksum).</li>
- *     <li>The request body is replayable and exposes a {@link ByteBuffer}. Streaming bodies are
- *         intentionally skipped — supporting them requires {@code aws-chunked} encoding plus
- *         trailer support, which is a separate work item.</li>
+ *     <li>The request body is replayable and exposes a {@link java.nio.ByteBuffer}. Streaming
+ *         bodies fall through unchanged.</li>
  * </ul>
  *
- * <p>Runs in {@code modifyBeforeSigning} so the {@code x-amz-checksum-crc32} header is included
- * in the SigV4 canonical request and signed as part of the request.
+ * <p>Runs in {@code modifyBeforeSigning} so the framing-related headers
+ * ({@code x-amz-trailer}, {@code x-amz-content-sha256}, {@code content-encoding},
+ * {@code content-length}, {@code x-amz-decoded-content-length}) are part of the SigV4 canonical
+ * request. The {@code x-amz-checksum-crc32} value itself is emitted at send time inside the body
+ * bytes; the SigV4 signature only covers the trailer's <em>name</em> via {@code x-amz-trailer}.
  */
 final class S3ExpressChecksumInterceptor implements ClientInterceptor {
 
@@ -42,9 +44,15 @@ final class S3ExpressChecksumInterceptor implements ClientInterceptor {
     private static final TraitKey<HttpChecksumTrait> HTTP_CHECKSUM_TRAIT = TraitKey.get(HttpChecksumTrait.class);
     private static final String CHECKSUM_HEADER_PREFIX = "x-amz-checksum-";
     private static final String SDK_CHECKSUM_ALGORITHM_HEADER = "x-amz-sdk-checksum-algorithm";
-    private static final String CHECKSUM_CRC32_HEADER = "x-amz-checksum-crc32";
     private static final String TRAILER_HEADER = "x-amz-trailer";
+    private static final String CONTENT_ENCODING_HEADER = "content-encoding";
+    private static final String CONTENT_LENGTH_HEADER = "content-length";
+    private static final String DECODED_CONTENT_LENGTH_HEADER = "x-amz-decoded-content-length";
+    private static final String CHECKSUM_TRAILER_NAME = "x-amz-checksum-crc32";
+    private static final String AWS_CHUNKED = "aws-chunked";
+    private static final String STREAMING_UNSIGNED_PAYLOAD_TRAILER = "STREAMING-UNSIGNED-PAYLOAD-TRAILER";
     private static final String CRC32_NAME = "CRC32";
+    private static final String CONTENT_SHA256_HEADER = "x-amz-content-sha256";
 
     private S3ExpressChecksumInterceptor() {}
 
@@ -71,26 +79,26 @@ final class S3ExpressChecksumInterceptor implements ClientInterceptor {
             return hook.request();
         }
         if (!body.isReplayable() || !body.hasByteBuffer()) {
-            // Streaming or non-replayable body — needs aws-chunked + trailers, not implemented yet.
+            // Streaming or non-replayable body — supporting it requires multi-chunk framing,
+            // which AwsChunkedDataStream doesn't do yet. Skip the wrapping; SigV4 will fall
+            // back to body-SHA256 mode for now.
             return hook.request();
         }
 
-        ByteBuffer buf = body.asByteBuffer();
-        var crc = new CRC32();
-        crc.update(buf);
-        long value = crc.getValue();
-
-        // 4-byte big-endian, then base64.
-        byte[] crcBytes = {
-                (byte) ((value >>> 24) & 0xff),
-                (byte) ((value >>> 16) & 0xff),
-                (byte) ((value >>> 8) & 0xff),
-                (byte) (value & 0xff)};
-        String crc32B64 = Base64.getEncoder().encodeToString(crcBytes);
-
+        var chunked = new AwsChunkedDataStream(body);
         var modifiable = req.toModifiable();
-        modifiable.headers().setHeader(SDK_CHECKSUM_ALGORITHM_HEADER, CRC32_NAME);
-        modifiable.headers().setHeader(CHECKSUM_CRC32_HEADER, crc32B64);
+        modifiable.setBody(chunked);
+        var headers = modifiable.headers();
+        headers.setHeader(SDK_CHECKSUM_ALGORITHM_HEADER, CRC32_NAME);
+        headers.setHeader(CONTENT_ENCODING_HEADER, AWS_CHUNKED);
+        headers.setHeader(DECODED_CONTENT_LENGTH_HEADER, Long.toString(chunked.decodedLength()));
+        headers.setHeader(CONTENT_LENGTH_HEADER, Long.toString(chunked.contentLength()));
+        headers.setHeader(TRAILER_HEADER, CHECKSUM_TRAILER_NAME);
+        // Pre-set x-amz-content-sha256 with the unsigned-payload-trailer sentinel. SigV4Signer
+        // detects this and uses the literal as the body-hash component of the canonical request
+        // instead of computing SHA-256 of the body. That's the whole CPU win.
+        headers.setHeader(CONTENT_SHA256_HEADER, STREAMING_UNSIGNED_PAYLOAD_TRAILER);
+
         return hook.asRequestType(modifiable);
     }
 
