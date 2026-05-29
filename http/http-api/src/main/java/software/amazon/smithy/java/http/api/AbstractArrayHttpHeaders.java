@@ -232,6 +232,13 @@ abstract class AbstractArrayHttpHeaders implements HttpHeaders {
         }
     }
 
+    @Override
+    public <C> void forEachEntry(C contextValue, HeaderWithValueConsumer<C> consumer) {
+        for (int i = 0; i < size * 2; i += 2) {
+            consumer.accept(contextValue, array[i], array[i + 1]);
+        }
+    }
+
     /**
      * Create a new ArrayHttpHeaders by copying raw array data.
      */
