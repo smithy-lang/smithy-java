@@ -10,18 +10,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class ChannelDataStreamTest {
 
     @Test
     void asChannelReadsFromChannel() throws Exception {
-        DataStream dataStream = DataStream.ofChannel(() -> new TrackingChannel(new byte[] {1, 2, 3}));
+        DataStream dataStream = DataStream.ofChannel(new TrackingChannel(new byte[] {1, 2, 3}));
 
         ByteBuffer dst = ByteBuffer.allocate(3);
 
@@ -31,7 +30,7 @@ class ChannelDataStreamTest {
 
     @Test
     void asChannelConsumesStream() {
-        DataStream dataStream = DataStream.ofChannel(() -> new TrackingChannel(new byte[0]));
+        DataStream dataStream = DataStream.ofChannel(new TrackingChannel(new byte[0]));
 
         dataStream.asChannel();
 
@@ -40,72 +39,46 @@ class ChannelDataStreamTest {
     }
 
     @Test
-    void asChannelDoesNotCreateInputStream() {
-        AtomicInteger streamsCreated = new AtomicInteger();
-        AtomicInteger channelsCreated = new AtomicInteger();
-        DataStream dataStream = DataStream.ofStreamOrChannel(
-                () -> {
-                    streamsCreated.incrementAndGet();
-                    return new TrackingInputStream(new byte[] {9});
-                },
-                () -> {
-                    channelsCreated.incrementAndGet();
-                    return new TrackingChannel(new byte[] {1});
-                },
-                null,
-                -1);
-
-        dataStream.asChannel();
-
-        assertEquals(0, streamsCreated.get());
-        assertEquals(1, channelsCreated.get());
-    }
-
-    @Test
-    void asInputStreamDoesNotCreateChannel() {
-        AtomicInteger streamsCreated = new AtomicInteger();
-        AtomicInteger channelsCreated = new AtomicInteger();
-        DataStream dataStream = DataStream.ofStreamOrChannel(
-                () -> {
-                    streamsCreated.incrementAndGet();
-                    return new TrackingInputStream(new byte[] {9});
-                },
-                () -> {
-                    channelsCreated.incrementAndGet();
-                    return new TrackingChannel(new byte[] {1});
-                },
-                null,
-                -1);
-
-        dataStream.asInputStream();
-
-        assertEquals(1, streamsCreated.get());
-        assertEquals(0, channelsCreated.get());
-    }
-
-    @Test
     void closeClosesCreatedChannel() {
         var channel = new TrackingChannel(new byte[] {1});
-        DataStream dataStream = DataStream.ofChannel(() -> channel);
+        DataStream dataStream = DataStream.ofChannel(channel);
 
-        dataStream.asChannel();
         dataStream.close();
 
         assertTrue(channel.closed);
     }
 
-    private static final class TrackingInputStream extends ByteArrayInputStream {
-        private boolean closed;
+    @Test
+    void writeToOutputStreamCopiesFromChannel() throws IOException {
+        DataStream dataStream = DataStream.ofChannel(new TrackingChannel(new byte[] {1, 2, 3}));
+        var out = new ByteArrayOutputStream();
 
-        TrackingInputStream(byte[] bytes) {
-            super(bytes);
-        }
+        dataStream.writeTo(out);
 
-        @Override
-        public void close() throws IOException {
-            closed = true;
-            super.close();
-        }
+        assertEquals(ByteBuffer.wrap(new byte[] {1, 2, 3}), ByteBuffer.wrap(out.toByteArray()));
+    }
+
+    @Test
+    void discardDrainsAndClosesChannel() throws IOException {
+        var channel = new TrackingChannel(new byte[] {1, 2, 3});
+        DataStream dataStream = DataStream.ofChannel(channel);
+
+        dataStream.discard();
+
+        assertFalse(dataStream.isAvailable());
+        assertTrue(channel.closed);
+        assertFalse(channel.data.hasRemaining());
+    }
+
+    @Test
+    void discardKnownLengthDrainsOnlyContentLength() throws IOException {
+        var channel = new TrackingChannel(new byte[] {1, 2, 3, 4});
+        DataStream dataStream = DataStream.ofChannel(channel, null, 2);
+
+        dataStream.discard();
+
+        assertTrue(channel.closed);
+        assertEquals(2, channel.data.position());
     }
 
     private static final class TrackingChannel implements ReadableByteChannel {
