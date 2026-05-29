@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.http.client.h1;
 
 import java.io.IOException;
+import java.nio.channels.ReadableByteChannel;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.net.ssl.SSLSession;
@@ -178,6 +179,10 @@ public final class H1Connection implements HttpConnection {
 
     UnsyncBufferedOutputStream getOutputStream() {
         return socketOut;
+    }
+
+    ReadableByteChannel getReadableChannel() throws IOException {
+        return transport.readableChannel();
     }
 
     void markInactive() {

@@ -27,35 +27,54 @@ final class H1Utils {
      * @return the interned header name, or null if line is malformed (no colon)
      */
     static String parseHeaderLine(byte[] buf, int len, ModifiableHttpHeaders headers) {
-        // Find colon
-        int colon = -1;
-        for (int i = 0; i < len; i++) {
-            if (buf[i] == ':') {
-                colon = i;
-                break;
-            }
-        }
-
+        int colon = findHeaderColon(buf, len);
         if (colon <= 0) {
             return null;
         }
 
+        int valueStart = headerValueStart(buf, colon, len);
+        int valueEnd = headerValueEnd(buf, valueStart, len);
+        return parseHeaderLine(buf, colon, valueStart, valueEnd, headers);
+    }
+
+    static String parseHeaderLine(
+            byte[] buf,
+            int colon,
+            int valueStart,
+            int valueEnd,
+            ModifiableHttpHeaders headers
+    ) {
         // Normalize header name using centralized registry
         String name = HeaderName.canonicalize(buf, 0, colon);
 
-        // Find value bounds, skip leading/trailing OWS (space or tab per RFC 9110)
+        String value = new String(buf, valueStart, valueEnd - valueStart, StandardCharsets.US_ASCII);
+        headers.addHeaderTrusted(name, value);
+        return name;
+    }
+
+    static int findHeaderColon(byte[] buf, int len) {
+        for (int i = 0; i < len; i++) {
+            if (buf[i] == ':') {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    static int headerValueStart(byte[] buf, int colon, int len) {
         int valueStart = colon + 1;
-        int valueEnd = len;
-        while (valueStart < valueEnd && isOWS(buf[valueStart])) {
+        while (valueStart < len && isOWS(buf[valueStart])) {
             valueStart++;
         }
+        return valueStart;
+    }
+
+    static int headerValueEnd(byte[] buf, int valueStart, int len) {
+        int valueEnd = len;
         while (valueEnd > valueStart && isOWS(buf[valueEnd - 1])) {
             valueEnd--;
         }
-
-        String value = new String(buf, valueStart, valueEnd - valueStart, StandardCharsets.US_ASCII);
-        headers.addHeader(name, value);
-        return name;
+        return valueEnd;
     }
 
     /**
