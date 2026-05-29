@@ -17,22 +17,8 @@ import javax.net.ssl.SSLSocket;
 
 /**
  * Transport backed by a plain {@link Socket} or {@link SSLSocket}.
- *
- * <p>Used for plaintext connections and as a fallback for TLS when SSLEngine
- * transport is not available (e.g., proxy tunneling to the proxy itself).
  */
-public final class SocketTransport implements Transport {
-
-    private final Socket socket;
-
-    public SocketTransport(Socket socket) {
-        this.socket = socket;
-    }
-
-    Socket socket() {
-        return socket;
-    }
-
+record SocketTransport(Socket socket) implements ConnectionTransport {
     @Override
     public InputStream inputStream() throws IOException {
         return socket.getInputStream();

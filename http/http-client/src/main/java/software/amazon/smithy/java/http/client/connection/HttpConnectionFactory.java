@@ -107,19 +107,19 @@ record HttpConnectionFactory(
             }
         }
 
-        Transport transport;
+        ConnectionTransport transport;
         if (route.isSecure()) {
             transport = versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1
                     ? performTlsSocketHandshake(socket, route)
                     : performTlsHandshake(socket, route);
         } else {
-            transport = new SocketTransport(socket);
+            transport = ConnectionTransport.of(socket);
         }
 
         return createProtocolConnection(transport, route);
     }
 
-    private Transport performTlsHandshake(Socket socket, Route route) throws IOException {
+    private ConnectionTransport performTlsHandshake(Socket socket, Route route) throws IOException {
         try {
             SSLEngine engine = createClientEngine(route);
 
@@ -128,7 +128,7 @@ record HttpConnectionFactory(
             try {
                 SSLEngineTransport transport = new SSLEngineTransport(socket, engine);
                 transport.handshake();
-                return new SSLEngineBackedTransport(transport);
+                return transport;
             } finally {
                 socket.setSoTimeout(originalTimeout);
             }
@@ -138,7 +138,7 @@ record HttpConnectionFactory(
         }
     }
 
-    private Transport performTlsSocketHandshake(Socket socket, Route route) throws IOException {
+    private ConnectionTransport performTlsSocketHandshake(Socket socket, Route route) throws IOException {
         try {
             SSLSocket sslSocket = (SSLSocket) sslContext.getSocketFactory()
                     .createSocket(socket, route.host(), route.port(), true);
@@ -158,7 +158,7 @@ record HttpConnectionFactory(
                 sslSocket.setSoTimeout(originalTimeout);
             }
 
-            return new SocketTransport(sslSocket);
+            return ConnectionTransport.of(sslSocket);
         } catch (IOException e) {
             closeQuietly(socket);
             throw new IOException("TLS handshake failed for " + route.host(), e);
@@ -195,7 +195,7 @@ record HttpConnectionFactory(
         return dst;
     }
 
-    private HttpConnection createProtocolConnection(Transport transport, Route route) throws IOException {
+    private HttpConnection createProtocolConnection(ConnectionTransport transport, Route route) throws IOException {
         String protocol = "http/1.1";
 
         String negotiated = transport.negotiatedProtocol();
@@ -289,13 +289,13 @@ record HttpConnectionFactory(
                     throw new IOException("Proxy CONNECT failed: " + result.statusCode());
                 }
 
-                Transport transport = versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1
+                ConnectionTransport transport = versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1
                         ? performTlsSocketHandshake(proxySocket, route)
                         : performTlsHandshake(proxySocket, route);
                 return createProtocolConnection(transport, route);
             }
 
-            return createProtocolConnection(new SocketTransport(proxySocket), route);
+            return createProtocolConnection(ConnectionTransport.of(proxySocket), route);
         } catch (IOException e) {
             closeQuietly(proxySocket);
             throw new IOException(

@@ -49,7 +49,7 @@ import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpExchange;
 import software.amazon.smithy.java.http.client.connection.MultiplexedHttpConnection;
 import software.amazon.smithy.java.http.client.connection.Route;
-import software.amazon.smithy.java.http.client.connection.Transport;
+import software.amazon.smithy.java.http.client.connection.ConnectionTransport;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -85,7 +85,7 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
     private static final int SETTINGS_TIMEOUT_MS = 10_000;
     private static final int GRACEFUL_SHUTDOWN_MS = 1000;
 
-    private final Transport transport;
+    private final ConnectionTransport transport;
     private final Route route;
     private final H2FrameCodec frameCodec;
     private final H2Muxer muxer;
@@ -128,7 +128,7 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
      * @param bufferSize I/O buffer size in bytes
      */
     public H2Connection(
-            Transport transport,
+            ConnectionTransport transport,
             Route route,
             Duration readTimeout,
             Duration writeTimeout,
