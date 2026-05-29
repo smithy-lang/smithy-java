@@ -16,7 +16,7 @@ import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
 import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
 import software.amazon.smithy.java.http.client.connection.Route;
-import software.amazon.smithy.java.http.client.connection.Transport;
+import software.amazon.smithy.java.http.client.connection.ConnectionTransport;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -47,7 +47,7 @@ public final class H1Connection implements HttpConnection {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(H1Connection.class);
 
-    private final Transport transport;
+    private final ConnectionTransport transport;
     private final UnsyncBufferedInputStream socketIn;
     private final UnsyncBufferedOutputStream socketOut;
     private final Route route;
@@ -66,7 +66,7 @@ public final class H1Connection implements HttpConnection {
      * @param readTimeout timeout for read operations
      * @throws IOException if streams cannot be obtained
      */
-    public H1Connection(Transport transport, Route route, Duration readTimeout) throws IOException {
+    public H1Connection(ConnectionTransport transport, Route route, Duration readTimeout) throws IOException {
         this.transport = transport;
         this.socketIn = new UnsyncBufferedInputStream(transport.inputStream(), 16384);
         this.socketOut = new UnsyncBufferedOutputStream(transport.outputStream(), 8192);
