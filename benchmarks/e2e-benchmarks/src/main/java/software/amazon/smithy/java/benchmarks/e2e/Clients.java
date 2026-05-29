@@ -45,12 +45,22 @@ final class Clients {
      * (with {@code -1} meaning "kernel autotune").
      */
     private static void applyBufferProp(String prop, java.util.function.IntConsumer setter) {
+        Integer value = parseBufferProp(prop);
+        if (value != null) {
+            setter.accept(value);
+        }
+    }
+
+    /**
+     * Parse a {@code -D<prop>=<bytes|auto>} property: {@code -1} for "auto", null if unset.
+     */
+    private static Integer parseBufferProp(String prop) {
         var value = System.getProperty(prop);
         if (value == null) {
-            return;
+            return null;
         }
         var trimmed = value.trim().toLowerCase();
-        setter.accept("auto".equals(trimmed) ? -1 : Integer.parseInt(trimmed));
+        return "auto".equals(trimmed) ? -1 : Integer.parseInt(trimmed);
     }
 
     /**

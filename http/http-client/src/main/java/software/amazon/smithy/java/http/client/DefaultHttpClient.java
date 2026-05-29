@@ -107,7 +107,7 @@ final class DefaultHttpClient implements HttpClient {
             String contentType = exchange.responseContentType();
             long contentLength = exchange.responseContentLength();
 
-            DataStream responseBody = DataStream.ofStreamOrChannel(
+            DataStream responseBody = new ResponseBodyDataStream(
                     exchange::responseBody,
                     exchange::responseBodyChannel,
                     contentType,

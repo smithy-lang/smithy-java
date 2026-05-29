@@ -36,7 +36,7 @@ import javax.net.ssl.SSLSession;
  * The SSLEngine is protected by a lock for unwrap/wrap, but socket I/O happens
  * outside the lock.
  */
-final class SSLEngineTransport implements AutoCloseable {
+final class SSLEngineTransport implements ConnectionTransport {
 
     private final InputStream socketIn;
     private final OutputStream socketOut;
@@ -235,28 +235,35 @@ final class SSLEngineTransport implements AutoCloseable {
         return socketChannel != null ? ByteBuffer.allocateDirect(size) : ByteBuffer.allocate(size);
     }
 
-    boolean isClosed() {
-        return closed;
-    }
-
-    void setReadTimeout(int timeoutMs) throws IOException {
+    @Override
+    public void setReadTimeout(int timeoutMs) throws IOException {
         socket.setSoTimeout(timeoutMs);
     }
 
-    int getReadTimeout() throws IOException {
+    @Override
+    public int getReadTimeout() throws IOException {
         return socket.getSoTimeout();
     }
 
-    boolean hasBufferedData() {
+    @Override
+    public boolean hasBufferedData() {
         return appIn.hasRemaining();
     }
 
-    SSLSession getSession() {
+    @Override
+    public SSLSession sslSession() {
         return engine.getSession();
     }
 
-    String getApplicationProtocol() {
-        return engine.getApplicationProtocol();
+    @Override
+    public String negotiatedProtocol() {
+        String proto = engine.getApplicationProtocol();
+        return (proto != null && !proto.isEmpty()) ? proto : null;
+    }
+
+    @Override
+    public boolean isOpen() {
+        return !closed;
     }
 
     // ==================== Stream-based I/O (InputStream/OutputStream) ====================
@@ -352,13 +359,10 @@ final class SSLEngineTransport implements AutoCloseable {
     int readChannel(ByteBuffer dst) throws IOException {
         if (closed) {
             return -1;
-        }
-        if (!dst.hasRemaining()) {
+        } else if (!dst.hasRemaining()) {
             return 0;
-        }
-
-        // Fast path: drain any leftover plaintext from appIn
-        if (appIn.hasRemaining()) {
+        } else if (appIn.hasRemaining()) {
+            // Fast path: drain any leftover plaintext from appIn
             return drainAppIn(dst);
         }
 
@@ -369,12 +373,8 @@ final class SSLEngineTransport implements AutoCloseable {
         while (true) {
             if (eof && netIn.position() == 0) {
                 return -1;
-            }
-
-            if (netIn.position() == 0) {
-                if (!readIntoNetIn()) {
-                    return -1;
-                }
+            } else if (netIn.position() == 0 && !readIntoNetIn()) {
+                return -1;
             }
 
             netIn.flip();
@@ -561,7 +561,8 @@ final class SSLEngineTransport implements AutoCloseable {
 
     // ==================== Channel adapters ====================
 
-    ReadableByteChannel readableChannel() {
+    @Override
+    public ReadableByteChannel readableChannel() {
         return new ReadableByteChannel() {
             @Override
             public int read(ByteBuffer dst) throws IOException {
@@ -580,7 +581,8 @@ final class SSLEngineTransport implements AutoCloseable {
         };
     }
 
-    WritableByteChannel writableChannel() {
+    @Override
+    public WritableByteChannel writableChannel() {
         return new WritableByteChannel() {
             @Override
             public int write(ByteBuffer src) throws IOException {
@@ -601,11 +603,13 @@ final class SSLEngineTransport implements AutoCloseable {
 
     // ==================== Stream adapters ====================
 
-    InputStream inputStream() {
+    @Override
+    public InputStream inputStream() {
         return new TransportInputStream();
     }
 
-    OutputStream outputStream() {
+    @Override
+    public OutputStream outputStream() {
         return new TransportOutputStream();
     }
 
