@@ -104,12 +104,14 @@ final class DefaultHttpClient implements HttpClient {
             HttpHeaders headers = exchange.responseHeaders();
             HttpVersion version = exchange.responseVersion();
             boolean isH2 = version == HttpVersion.HTTP_2;
+            String contentType = exchange.responseContentType();
+            long contentLength = exchange.responseContentLength();
 
             DataStream responseBody = DataStream.ofStreamOrChannel(
                     exchange::responseBody,
                     exchange::responseBodyChannel,
-                    headers.contentType(),
-                    headers.contentLength() != null ? headers.contentLength() : -1);
+                    contentType,
+                    contentLength);
 
             // Wrap body so close releases connection
             DataStream managedBody = new ManagedResponseBody(responseBody, exchange, conn, isH2);
@@ -244,8 +246,44 @@ final class DefaultHttpClient implements HttpClient {
         }
 
         @Override
-        public void discard() {
-            close();
+        public void discard() throws IOException {
+            if (closed) {
+                return;
+            }
+            closed = true;
+
+            boolean errored = false;
+            try {
+                if (!isH2) {
+                    if (wrappedStream == null) {
+                        exchange.discardResponseBody();
+                    } else {
+                        byte[] buf = DRAIN_BUFFER.get();
+                        while (wrappedStream.read(buf) != -1) {
+                            // discard
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                errored = true;
+                throw e;
+            } finally {
+                try {
+                    delegate.close();
+                } catch (Exception ignored) {}
+
+                try {
+                    exchange.close();
+                } catch (Exception e) {
+                    errored = true;
+                }
+
+                if (errored) {
+                    connectionPool.evict(conn, true);
+                } else {
+                    connectionPool.release(conn);
+                }
+            }
         }
 
         @Override
@@ -260,17 +298,20 @@ final class DefaultHttpClient implements HttpClient {
             // H1: drain body for connection reuse. H2: skip — exchange.close() sends RST_STREAM.
             // The body may not have been read at all (wrappedStream == null) — e.g. when the
             // SDK calls discard() without first opening the stream. In that case we still need
-            // to drain via the delegate so the H1 keepalive contract is honored; reusing the
+            // to drain through the exchange so the H1 keepalive contract is honored; reusing the
             // connection without consuming the response body would corrupt the next exchange.
             //
             // Use a 64 KiB drain buffer rather than InputStream.transferTo's 16 KiB default so
             // a typical 256 KiB body drains in 4 read trips instead of 16.
             if (!isH2) {
                 try {
-                    InputStream toDrain = wrappedStream != null ? wrappedStream : delegate.asInputStream();
-                    byte[] buf = DRAIN_BUFFER.get();
-                    while (toDrain.read(buf) != -1) {
-                        // discard
+                    if (wrappedStream == null) {
+                        exchange.discardResponseBody();
+                    } else {
+                        byte[] buf = DRAIN_BUFFER.get();
+                        while (wrappedStream.read(buf) != -1) {
+                            // discard
+                        }
                     }
                 } catch (IOException ignored) {
                     errored = true;

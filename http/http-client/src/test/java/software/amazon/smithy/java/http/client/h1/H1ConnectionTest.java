@@ -274,6 +274,10 @@ class H1ConnectionTest {
         public void close() {
             closed = true;
         }
+
+        String outputString() {
+            return out.toString(StandardCharsets.US_ASCII);
+        }
     }
 
     static final class FailingAvailableSocket extends FakeSocket {

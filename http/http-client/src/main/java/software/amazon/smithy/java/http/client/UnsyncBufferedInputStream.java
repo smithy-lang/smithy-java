@@ -263,6 +263,44 @@ public final class UnsyncBufferedInputStream extends InputStream {
     }
 
     /**
+     * Reads and discards exactly {@code n} bytes without routing through an {@link OutputStream}.
+     *
+     * @param n number of bytes to discard.
+     * @throws IOException if an I/O error occurs or EOF is reached before {@code n} bytes are discarded.
+     */
+    public void discard(long n) throws IOException {
+        if (closed) {
+            throw new IOException("Stream closed");
+        }
+        if (n < 0) {
+            throw new IllegalArgumentException("n must be non-negative: " + n);
+        }
+
+        long remaining = n;
+        int buffered = limit - pos;
+        if (buffered > 0) {
+            int consumed = (int) Math.min((long) buffered, remaining);
+            pos += consumed;
+            remaining -= consumed;
+            if (remaining == 0) {
+                return;
+            }
+        }
+
+        while (remaining > 0) {
+            int toRead = (int) Math.min((long) buf.length, remaining);
+            int read = in.read(buf, 0, toRead);
+            if (read < 0) {
+                throw new IOException("Premature EOF while discarding " + remaining + " bytes");
+            }
+            remaining -= read;
+        }
+
+        pos = 0;
+        limit = 0;
+    }
+
+    /**
      * Ensures at least {@code n} bytes are available in the buffer.
      *
      * <p>If fewer than {@code n} bytes are currently buffered, this method compacts
