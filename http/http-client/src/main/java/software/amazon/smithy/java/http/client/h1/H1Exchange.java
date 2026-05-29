@@ -11,7 +11,7 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
-import software.amazon.smithy.java.http.api.HeaderUtils;
+import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -76,6 +76,9 @@ public final class H1Exchange implements HttpExchange {
     private ChunkedInputStream chunkedResponseIn; // Reference for trailer access
     private HttpHeaders responseHeaders;
     private HttpVersion responseVersion;
+    private String responseContentType;
+    private long responseContentLength = -1;
+    private boolean responseChunked;
     private int statusCode = -1;
     private boolean requestWritten = false;
     private boolean expectContinueHandled = false;
@@ -161,6 +164,44 @@ public final class H1Exchange implements HttpExchange {
     }
 
     @Override
+    public void discardResponseBody() throws IOException {
+        if (responseIn != null) {
+            try {
+                responseIn.transferTo(OutputStream.nullOutputStream());
+            } finally {
+                responseIn.close();
+            }
+            return;
+        }
+
+        ensureRequestComplete();
+        if (statusCode == -1) {
+            parseStatusLineAndHeaders();
+        }
+
+        if (responseChunked) {
+            responseIn = new DelegatedClosingInputStream(createResponseStream(), in -> close());
+            try {
+                responseIn.transferTo(OutputStream.nullOutputStream());
+            } finally {
+                responseIn.close();
+            }
+        } else if (responseContentLength >= 0) {
+            connection.getInputStream().discard(responseContentLength);
+            close();
+        } else if (noBodyResponseStatus(statusCode) || "HEAD".equalsIgnoreCase(request.method())) {
+            close();
+        } else {
+            responseIn = new DelegatedClosingInputStream(createResponseStream(), in -> close());
+            try {
+                responseIn.transferTo(OutputStream.nullOutputStream());
+            } finally {
+                responseIn.close();
+            }
+        }
+    }
+
+    @Override
     public void setRequestTrailers(HttpHeaders trailers) {
         if (!(requestOut instanceof ChunkedOutputStream cos)) {
             throw new IllegalStateException("Request trailers require chunked transfer encoding");
@@ -175,6 +216,24 @@ public final class H1Exchange implements HttpExchange {
             parseStatusLineAndHeaders();
         }
         return responseHeaders;
+    }
+
+    @Override
+    public String responseContentType() throws IOException {
+        if (responseHeaders == null) {
+            ensureRequestComplete();
+            parseStatusLineAndHeaders();
+        }
+        return responseContentType;
+    }
+
+    @Override
+    public long responseContentLength() throws IOException {
+        if (responseHeaders == null) {
+            ensureRequestComplete();
+            parseStatusLineAndHeaders();
+        }
+        return responseContentLength;
     }
 
     @Override
@@ -346,7 +405,7 @@ public final class H1Exchange implements HttpExchange {
 
     private void writeHeaders(UnsyncBufferedOutputStream out, HttpHeaders headers) throws IOException {
         // Ensure Host header is present
-        if (headers.firstValue("host") == null) {
+        if (headers.firstValue(HeaderName.HOST) == null) {
             var uri = request.uri();
             out.write(HOST_HEADER);
             out.writeAscii(uri.getHost());
@@ -487,6 +546,7 @@ public final class H1Exchange implements HttpExchange {
                 throw new IOException("Invalid header line: "
                         + new String(responseLineBuffer, 0, lineLen, StandardCharsets.US_ASCII));
             }
+            captureControlHeader(responseLineBuffer, lineLen, name);
 
             if ("connection".equals(name)) {
                 String value = headers.firstValue(name);
@@ -505,26 +565,72 @@ public final class H1Exchange implements HttpExchange {
         }
     }
 
+    private void captureControlHeader(byte[] line, int len, String name) throws IOException {
+        int colon = -1;
+        for (int i = 0; i < len; i++) {
+            if (line[i] == ':') {
+                colon = i;
+                break;
+            }
+        }
+        if (colon <= 0) {
+            return;
+        }
+
+        int valueStart = colon + 1;
+        int valueEnd = len;
+        while (valueStart < valueEnd && isOWS(line[valueStart])) {
+            valueStart++;
+        }
+        while (valueEnd > valueStart && isOWS(line[valueEnd - 1])) {
+            valueEnd--;
+        }
+
+        switch (name) {
+            case "content-length" -> responseContentLength = parseContentLength(line, valueStart, valueEnd);
+            case "transfer-encoding" -> responseChunked = containsChunked(line, valueStart, valueEnd);
+            case "content-type" -> responseContentType = new String(
+                    line,
+                    valueStart,
+                    valueEnd - valueStart,
+                    StandardCharsets.US_ASCII);
+            default -> {}
+        }
+    }
+
+    private static boolean isOWS(byte b) {
+        return b == ' ' || b == '\t';
+    }
+
+    private static long parseContentLength(byte[] line, int start, int end) throws IOException {
+        if (start == end) {
+            throw new IOException("Invalid empty Content-Length header");
+        }
+        long result = 0;
+        for (int i = start; i < end; i++) {
+            byte b = line[i];
+            if (b < '0' || b > '9') {
+                throw new IOException("Invalid Content-Length header: "
+                        + new String(line, start, end - start, StandardCharsets.US_ASCII));
+            }
+            result = result * 10 + (b - '0');
+            if (result < 0) {
+                throw new IOException("Invalid Content-Length header: value overflow");
+            }
+        }
+        return result;
+    }
+
     private InputStream createResponseStream() throws IOException {
         UnsyncBufferedInputStream socketIn = connection.getInputStream();
 
-        String transferEncoding = responseHeaders.firstValue("transfer-encoding");
-        if (transferEncoding != null && containsChunked(transferEncoding)) {
+        if (responseChunked) {
             chunkedResponseIn = new ChunkedInputStream(socketIn);
             return chunkedResponseIn;
         }
 
-        String contentLength = responseHeaders.firstValue("content-length");
-        if (contentLength != null) {
-            try {
-                long length = Long.parseLong(contentLength.trim());
-                if (length < 0) {
-                    throw new IOException("Invalid negative Content-Length: " + length);
-                }
-                return new BoundedInputStream(socketIn, length);
-            } catch (NumberFormatException e) {
-                throw new IOException("Invalid Content-Length header: " + contentLength);
-            }
+        if (responseContentLength >= 0) {
+            return new BoundedInputStream(socketIn, responseContentLength);
         }
 
         // No body for certain status codes or HEAD response.
@@ -540,28 +646,49 @@ public final class H1Exchange implements HttpExchange {
     /**
      * Fast check for "chunked" token in transfer-encoding value.
      */
-    private static boolean containsChunked(String value) {
-        int len = value.length();
+    private static boolean containsChunked(byte[] value, int start, int end) {
+        int len = end - start;
         if (len < 7) {
             return false;
         }
 
         // Fast path: exact match
-        if (value.equalsIgnoreCase("chunked")) {
+        if (len == 7 && equalsIgnoreCase(value, start, end, "chunked")) {
             return true;
         }
 
-        // Multi-value (rare): split and check each token
-        if (value.indexOf(',') >= 0) {
-            for (String token : value.split(",")) {
-                // Only allocates a string when needed
-                if (HeaderUtils.normalizeValue(token).equals("chunked")) {
+        int tokenStart = start;
+        for (int i = start; i <= end; i++) {
+            if (i == end || value[i] == ',') {
+                int tokenEnd = i;
+                while (tokenStart < tokenEnd && isOWS(value[tokenStart])) {
+                    tokenStart++;
+                }
+                while (tokenEnd > tokenStart && isOWS(value[tokenEnd - 1])) {
+                    tokenEnd--;
+                }
+                if (tokenEnd - tokenStart == 7 && equalsIgnoreCase(value, tokenStart, tokenEnd, "chunked")) {
                     return true;
                 }
+                tokenStart = i + 1;
             }
         }
 
         return false;
+    }
+
+    private static boolean equalsIgnoreCase(byte[] bytes, int start, int end, String expected) {
+        if (end - start != expected.length()) {
+            return false;
+        }
+        for (int i = 0; i < expected.length(); i++) {
+            byte b = bytes[start + i];
+            char c = expected.charAt(i);
+            if ((b | 0x20) != c) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
