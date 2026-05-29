@@ -149,6 +149,7 @@ public final class HttpConnectionPool implements ConnectionPool {
 
     // Listeners for pool lifecycle events
     private final List<ConnectionPoolListener> listeners;
+    private final boolean hasListeners;
 
     HttpConnectionPool(HttpConnectionPoolBuilder builder) {
         this.defaultMaxConnectionsPerRoute = builder.maxConnectionsPerRoute;
@@ -180,6 +181,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         this.h1Manager = new H1ConnectionManager(this.maxIdleTimeNanos);
         this.connectionPermits = new Semaphore(builder.maxTotalConnections, false);
         this.listeners = List.copyOf(builder.listeners);
+        this.hasListeners = !listeners.isEmpty();
         this.h2Manager = new H2ConnectionManager(builder.h2StreamsPerConnection,
                 builder.h2LoadBalancer,
                 this.acquireTimeoutMs,
@@ -475,30 +477,45 @@ public final class HttpConnectionPool implements ConnectionPool {
     }
 
     private void notifyConnected(HttpConnection connection) {
+        if (!hasListeners) {
+            return;
+        }
         for (ConnectionPoolListener listener : listeners) {
             listener.onConnected(connection);
         }
     }
 
     private void notifyConnectFailed(Route route, IOException cause) {
+        if (!hasListeners) {
+            return;
+        }
         for (ConnectionPoolListener listener : listeners) {
             listener.onConnectFailed(route, cause);
         }
     }
 
     private void notifyAcquire(HttpConnection connection, boolean reused) {
+        if (!hasListeners) {
+            return;
+        }
         for (ConnectionPoolListener listener : listeners) {
             listener.onAcquire(connection, reused);
         }
     }
 
     private void notifyReturn(HttpConnection connection) {
+        if (!hasListeners) {
+            return;
+        }
         for (ConnectionPoolListener listener : listeners) {
             listener.onReturn(connection);
         }
     }
 
     private void notifyClosed(HttpConnection connection, CloseReason reason) {
+        if (!hasListeners) {
+            return;
+        }
         for (ConnectionPoolListener listener : listeners) {
             listener.onClosed(connection, reason);
         }

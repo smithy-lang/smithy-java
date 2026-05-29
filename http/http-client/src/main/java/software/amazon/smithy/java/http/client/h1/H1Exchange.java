@@ -10,6 +10,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpHeaders;
@@ -161,6 +165,31 @@ public final class H1Exchange implements HttpExchange {
             responseIn = new DelegatedClosingInputStream(createResponseStream(), in -> close());
         }
         return responseIn;
+    }
+
+    @Override
+    public ReadableByteChannel responseBodyChannel() throws IOException {
+        if (responseIn != null) {
+            return Channels.newChannel(responseIn);
+        }
+
+        ensureRequestComplete();
+        if (statusCode == -1) {
+            parseStatusLineAndHeaders();
+        }
+
+        if (responseChunked || responseContentLength < 0) {
+            return Channels.newChannel(responseBody());
+        }
+
+        if (noBodyResponseStatus(statusCode) || "HEAD".equalsIgnoreCase(request.method())) {
+            return new FixedLengthResponseChannel(connection.getInputStream(), connection.getReadableChannel(), 0);
+        }
+
+        return new FixedLengthResponseChannel(
+                connection.getInputStream(),
+                connection.getReadableChannel(),
+                responseContentLength);
     }
 
     @Override
@@ -541,12 +570,15 @@ public final class H1Exchange implements HttpExchange {
                         + " exceeds maximum of " + MAX_RESPONSE_HEADER_COUNT);
             }
 
-            String name = H1Utils.parseHeaderLine(responseLineBuffer, lineLen, headers);
-            if (name == null) {
+            int colon = H1Utils.findHeaderColon(responseLineBuffer, lineLen);
+            if (colon <= 0) {
                 throw new IOException("Invalid header line: "
                         + new String(responseLineBuffer, 0, lineLen, StandardCharsets.US_ASCII));
             }
-            captureControlHeader(responseLineBuffer, lineLen, name);
+            int valueStart = H1Utils.headerValueStart(responseLineBuffer, colon, lineLen);
+            int valueEnd = H1Utils.headerValueEnd(responseLineBuffer, valueStart, lineLen);
+            String name = H1Utils.parseHeaderLine(responseLineBuffer, colon, valueStart, valueEnd, headers);
+            captureControlHeader(responseLineBuffer, valueStart, valueEnd, name);
 
             if ("connection".equals(name)) {
                 String value = headers.firstValue(name);
@@ -565,27 +597,7 @@ public final class H1Exchange implements HttpExchange {
         }
     }
 
-    private void captureControlHeader(byte[] line, int len, String name) throws IOException {
-        int colon = -1;
-        for (int i = 0; i < len; i++) {
-            if (line[i] == ':') {
-                colon = i;
-                break;
-            }
-        }
-        if (colon <= 0) {
-            return;
-        }
-
-        int valueStart = colon + 1;
-        int valueEnd = len;
-        while (valueStart < valueEnd && isOWS(line[valueStart])) {
-            valueStart++;
-        }
-        while (valueEnd > valueStart && isOWS(line[valueEnd - 1])) {
-            valueEnd--;
-        }
-
+    private void captureControlHeader(byte[] line, int valueStart, int valueEnd, String name) throws IOException {
         switch (name) {
             case "content-length" -> responseContentLength = parseContentLength(line, valueStart, valueEnd);
             case "transfer-encoding" -> responseChunked = containsChunked(line, valueStart, valueEnd);
@@ -703,5 +715,91 @@ public final class H1Exchange implements HttpExchange {
      */
     private static int defaultPort(String scheme) {
         return "https".equalsIgnoreCase(scheme) ? 443 : 80;
+    }
+
+    private final class FixedLengthResponseChannel implements ReadableByteChannel {
+        private final UnsyncBufferedInputStream buffered;
+        private final ReadableByteChannel channel;
+        private long remaining;
+        private boolean open = true;
+        private boolean completed;
+
+        FixedLengthResponseChannel(UnsyncBufferedInputStream buffered, ReadableByteChannel channel, long remaining) {
+            this.buffered = buffered;
+            this.channel = channel;
+            this.remaining = remaining;
+        }
+
+        @Override
+        public int read(ByteBuffer dst) throws IOException {
+            if (completed) {
+                return -1;
+            }
+            if (!open) {
+                throw new ClosedChannelException();
+            }
+            if (!dst.hasRemaining()) {
+                return 0;
+            }
+            if (remaining == 0) {
+                finish();
+                return -1;
+            }
+
+            int originalLimit = dst.limit();
+            if (remaining < dst.remaining()) {
+                dst.limit(dst.position() + (int) remaining);
+            }
+            try {
+                int total = drainBuffered(dst);
+                if (dst.hasRemaining() && remaining > 0) {
+                    int n = channel.read(dst);
+                    if (n < 0) {
+                        finish();
+                        return total == 0 ? -1 : total;
+                    }
+                    total += n;
+                    remaining -= n;
+                }
+                if (remaining == 0) {
+                    finish();
+                }
+                return total == 0 ? 0 : total;
+            } finally {
+                dst.limit(originalLimit);
+            }
+        }
+
+        private int drainBuffered(ByteBuffer dst) {
+            int bufferedBytes = Math.min(buffered.buffered(), dst.remaining());
+            if (bufferedBytes == 0) {
+                return 0;
+            }
+            dst.put(buffered.buffer(), buffered.position(), bufferedBytes);
+            buffered.consume(bufferedBytes);
+            remaining -= bufferedBytes;
+            return bufferedBytes;
+        }
+
+        @Override
+        public boolean isOpen() {
+            return open && !completed;
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (open) {
+                open = false;
+                H1Exchange.this.close();
+            }
+        }
+
+        private void finish() throws IOException {
+            if (!completed) {
+                completed = true;
+                open = false;
+                H1Exchange.this.close();
+            }
+        }
     }
 }

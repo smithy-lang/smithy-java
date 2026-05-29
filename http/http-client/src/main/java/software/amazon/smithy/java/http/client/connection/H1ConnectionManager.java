@@ -6,11 +6,11 @@
 package software.amazon.smithy.java.http.client.connection;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -30,6 +30,8 @@ final class H1ConnectionManager {
 
     private final ConcurrentHashMap<Route, HostPool> pools = new ConcurrentHashMap<>();
     private final long maxIdleTimeNanos;
+    private volatile Route cachedRoute;
+    private volatile HostPool cachedPool;
 
     H1ConnectionManager(long maxIdleTimeNanos) {
         this.maxIdleTimeNanos = maxIdleTimeNanos;
@@ -72,14 +74,27 @@ final class H1ConnectionManager {
      * @throws IllegalStateException if a pool exists with a different maxConnections
      */
     HostPool getOrCreatePool(Route route, int maxConnections) {
+        Route currentRoute = cachedRoute;
+        HostPool currentPool = cachedPool;
+        if (route.equals(currentRoute) && currentPool != null) {
+            if (currentPool.maxConnections != maxConnections) {
+                throw new IllegalStateException(
+                        "Pool for " + route + " already exists with maxConnections=" + currentPool.maxConnections
+                                + ", cannot change to " + maxConnections);
+            }
+            return currentPool;
+        }
+
         return pools.compute(route, (k, existing) -> {
             if (existing == null) {
-                return new HostPool(maxConnections);
+                existing = new HostPool(maxConnections);
             } else if (existing.maxConnections != maxConnections) {
                 throw new IllegalStateException(
                         "Pool for " + route + " already exists with maxConnections=" + existing.maxConnections
                                 + ", cannot change to " + maxConnections);
             }
+            cachedRoute = route;
+            cachedPool = existing;
             return existing;
         });
     }
@@ -98,24 +113,22 @@ final class H1ConnectionManager {
             return false;
         }
 
-        HostPool hostPool = pools.get(route);
+        HostPool hostPool = getCachedPool(route);
+        if (hostPool == null) {
+            hostPool = pools.get(route);
+        }
         if (hostPool == null) {
             return false;
         }
 
-        try {
-            var conn = new PooledConnection(connection, System.nanoTime());
-            boolean pooled = hostPool.offer(conn, 10, TimeUnit.MILLISECONDS);
-            if (pooled) {
-                LOGGER.debug("Released h1 connection to pool for {}", route);
-            } else {
-                LOGGER.debug("h1 pool full, not pooling connection to {}", route);
-            }
-            return pooled;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return false;
+        var conn = new PooledConnection(connection, System.nanoTime());
+        boolean pooled = hostPool.offer(conn);
+        if (pooled) {
+            LOGGER.debug("Released h1 connection to pool for {}", route);
+        } else {
+            LOGGER.debug("h1 pool full, not pooling connection to {}", route);
         }
+        return pooled;
     }
 
     /**
@@ -126,6 +139,12 @@ final class H1ConnectionManager {
         if (hostPool != null) {
             hostPool.remove(connection);
         }
+    }
+
+    private HostPool getCachedPool(Route route) {
+        Route currentRoute = cachedRoute;
+        HostPool currentPool = cachedPool;
+        return route.equals(currentRoute) ? currentPool : null;
     }
 
     /**
@@ -142,6 +161,7 @@ final class H1ConnectionManager {
 
         // Remove empty pools to prevent unbounded growth with dynamic routes
         pools.entrySet().removeIf(e -> e.getValue().isEmpty());
+        clearStaleCache();
         return totalRemoved;
     }
 
@@ -153,6 +173,17 @@ final class H1ConnectionManager {
             pool.closeAll(exceptions, onClose);
         }
         pools.clear();
+        cachedRoute = null;
+        cachedPool = null;
+    }
+
+    private void clearStaleCache() {
+        Route currentRoute = cachedRoute;
+        HostPool currentPool = cachedPool;
+        if (currentRoute != null && currentPool != null && pools.get(currentRoute) != currentPool) {
+            cachedRoute = null;
+            cachedPool = null;
+        }
     }
 
     private boolean validateConnection(PooledConnection pooled) {
@@ -178,68 +209,103 @@ final class H1ConnectionManager {
     record PooledConnection(HttpConnection connection, long idleSinceNanos) {}
 
     /**
-     * Per-route connection pool using blocking deque (LIFO).
+     * Per-route connection pool using a lock-protected LIFO stack.
      */
     private static final class HostPool {
-        private final LinkedBlockingDeque<PooledConnection> available;
+        private final ArrayDeque<PooledConnection> available;
+        private final ReentrantLock lock = new ReentrantLock();
         private final int maxConnections;
 
         HostPool(int maxConnections) {
             this.maxConnections = maxConnections;
-            this.available = new LinkedBlockingDeque<>(maxConnections);
+            this.available = new ArrayDeque<>(maxConnections);
         }
 
         boolean isEmpty() {
-            return available.isEmpty();
+            lock.lock();
+            try {
+                return available.isEmpty();
+            } finally {
+                lock.unlock();
+            }
         }
 
         PooledConnection poll() {
-            return available.pollFirst();
+            lock.lock();
+            try {
+                return available.pollFirst();
+            } finally {
+                lock.unlock();
+            }
         }
 
-        boolean offer(PooledConnection connection, long timeout, TimeUnit unit) throws InterruptedException {
-            return available.offerFirst(connection, timeout, unit);
+        boolean offer(PooledConnection connection) {
+            lock.lock();
+            try {
+                if (available.size() >= maxConnections) {
+                    return false;
+                }
+                available.offerFirst(connection);
+                return true;
+            } finally {
+                lock.unlock();
+            }
         }
 
         void remove(HttpConnection connection) {
-            available.removeIf(pc -> pc.connection == connection);
+            lock.lock();
+            try {
+                available.removeIf(pc -> pc.connection == connection);
+            } finally {
+                lock.unlock();
+            }
         }
 
         int removeIdleConnections(long maxIdleNanos, BiConsumer<HttpConnection, CloseReason> onRemove) {
             int removed = 0;
             long now = System.nanoTime();
-            Iterator<PooledConnection> iter = available.iterator();
-            while (iter.hasNext()) {
-                PooledConnection pc = iter.next();
-                long idleNanos = now - pc.idleSinceNanos;
-                boolean unhealthy = !pc.connection.isActive();
-                boolean expired = idleNanos > maxIdleNanos;
-                if (unhealthy || expired) {
-                    CloseReason reason = expired && !unhealthy
-                            ? CloseReason.IDLE_TIMEOUT
-                            : CloseReason.UNEXPECTED_CLOSE;
-                    try {
-                        pc.connection.close();
-                    } catch (IOException ignored) {
-                        // ignored
+            lock.lock();
+            try {
+                Iterator<PooledConnection> iter = available.iterator();
+                while (iter.hasNext()) {
+                    PooledConnection pc = iter.next();
+                    long idleNanos = now - pc.idleSinceNanos;
+                    boolean unhealthy = !pc.connection.isActive();
+                    boolean expired = idleNanos > maxIdleNanos;
+                    if (unhealthy || expired) {
+                        CloseReason reason = expired && !unhealthy
+                                ? CloseReason.IDLE_TIMEOUT
+                                : CloseReason.UNEXPECTED_CLOSE;
+                        try {
+                            pc.connection.close();
+                        } catch (IOException ignored) {
+                            // ignored
+                        }
+                        onRemove.accept(pc.connection, reason);
+                        iter.remove();
+                        removed++;
                     }
-                    onRemove.accept(pc.connection, reason);
-                    iter.remove();
-                    removed++;
                 }
+            } finally {
+                lock.unlock();
             }
             return removed;
         }
 
         void closeAll(List<IOException> exceptions, Consumer<HttpConnection> onClose) {
-            PooledConnection pc;
-            while ((pc = available.poll()) != null) {
-                try {
-                    pc.connection.close();
-                } catch (IOException e) {
-                    exceptions.add(e);
+            lock.lock();
+            try {
+                PooledConnection pc;
+                while ((pc = available.poll()) != null) {
+                    try {
+                        pc.connection.close();
+                    } catch (IOException e) {
+                        exceptions.add(e);
+                    }
+                    onClose.accept(pc.connection);
                 }
-                onClose.accept(pc.connection);
+            } finally {
+                lock.unlock();
             }
         }
     }

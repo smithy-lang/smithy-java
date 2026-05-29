@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpRequest;
@@ -118,6 +120,43 @@ class H1ExchangeTest {
     }
 
     @Test
+    void readsFixedLengthResponseBodyAsChannel() throws IOException {
+        var conn = connection(
+                "HTTP/1.1 200 OK\r\n"
+                        + "Content-Length: 5\r\n"
+                        + "\r\n"
+                        + "hello");
+        var exchange = conn.newExchange(getRequest());
+        var out = new java.io.ByteArrayOutputStream();
+
+        Channels.newInputStream(exchange.responseBodyChannel()).transferTo(out);
+
+        assertEquals("hello", out.toString(java.nio.charset.StandardCharsets.US_ASCII));
+    }
+
+    @Test
+    void responseBodyChannelReleasesConnectionAtEof() throws IOException {
+        var conn = connection(
+                "HTTP/1.1 200 OK\r\n"
+                        + "Content-Length: 5\r\n"
+                        + "\r\n"
+                        + "hello"
+                        + "HTTP/1.1 204 No Content\r\n"
+                        + "Content-Length: 0\r\n"
+                        + "\r\n");
+
+        var first = conn.newExchange(getRequest());
+        var channel = first.responseBodyChannel();
+        ByteBuffer dst = ByteBuffer.allocate(16);
+        assertEquals(5, channel.read(dst));
+        assertEquals(-1, channel.read(dst.clear()));
+
+        var second = conn.newExchange(getRequest());
+        assertEquals(204, second.responseStatusCode());
+        second.close();
+    }
+
+    @Test
     void exposesCachedContentHeaders() throws IOException {
         var conn = connection(
                 "HTTP/1.1 200 OK\r\n"
@@ -166,4 +205,5 @@ class H1ExchangeTest {
         assertTrue(socket.outputString().startsWith("GET /a%2Fb?prefix=x%2Fy HTTP/1.1\r\n"));
         exchange.close();
     }
+
 }
