@@ -182,6 +182,17 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
     }
 
     /**
+     * Add a header with a pre-canonicalized name and pre-validated value, bypassing
+     * name canonicalization and value normalization when supported.
+     *
+     * <p>Use this only when {@code name} is already canonical lowercase and
+     * {@code value} is known to be valid.
+     */
+    default void addHeaderTrusted(String name, String value) {
+        addHeader(name, value);
+    }
+
+    /**
      * Remove a header and its values by name.
      *
      * @param name Case-insensitive name of the header to remove.
