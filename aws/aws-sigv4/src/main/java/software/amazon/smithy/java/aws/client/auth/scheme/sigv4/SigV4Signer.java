@@ -7,13 +7,13 @@ package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.DigestException;
 import java.security.InvalidKeyException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
-import java.util.List;
 import javax.crypto.spec.SecretKeySpec;
 import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.Signer;
@@ -35,18 +35,12 @@ import software.amazon.smithy.java.logging.InternalLogger;
 final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(SigV4Signer.class);
-    private static final List<String> HEADERS_TO_IGNORE_IN_LOWER_CASE = List.of(
-            HeaderName.CONNECTION.name(),
-            HeaderName.CONTENT_LENGTH.name(),
-            HeaderName.X_AMZN_TRACE_ID.name(),
-            HeaderName.USER_AGENT.name(),
-            HeaderName.EXPECT.name());
-
     private static final String ALGORITHM = "AWS4-HMAC-SHA256";
     private static final String TERMINATOR = "aws4_request";
     private static final String HMAC_SHA_256 = "HmacSHA256";
     private static final SigningCache SIGNER_CACHE = new SigningCache(300);
     private static final String EMPTY_BODY_HASH = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    private static final byte[] HEX_DIGITS = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);
 
     private final SigningResources signingResources;
 
@@ -189,8 +183,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
                 canonicalLen,
                 scope,
                 requestTime,
-                signingKey,
-                sb);
+                signingKey);
         var authorizationHeader = getAuthHeader(accessKeyId, scope, signedHeaders, signature, sb);
 
         // Now mutate the actual request. setHeader is a single-key operation per header; no wholesale map replacement.
@@ -218,7 +211,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
         for (int i = 0; i < r.headerCount; i++) {
             String name = r.headers[i * 2];
-            if (name.equals(previous) || HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(name)) {
+            if (name.equals(previous) || isIgnoredHeader(name)) {
                 continue;
             }
             if (!sb.isEmpty()) {
@@ -276,7 +269,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             while (next < r.headerCount && name.equals(r.headers[next * 2])) {
                 next++;
             }
-            if (HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(name)) {
+            if (isIgnoredHeader(name)) {
                 i = next;
                 continue;
             }
@@ -396,6 +389,14 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
         boolean canonical = isAlreadyCanonical(query);
         int len = query.length();
+        if (canonical) {
+            int amp = query.indexOf('&');
+            if (amp == -1) {
+                appendSingleCanonicalQueryPair(query, builder);
+                return;
+            }
+        }
+
         int start = 0;
         while (start <= len) {
             int amp = query.indexOf('&', start);
@@ -436,6 +437,18 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
                 builder.append('&');
             }
             builder.append(r.queryPairs[i * 2]).append('=').append(r.queryPairs[i * 2 + 1]);
+        }
+    }
+
+    private static void appendSingleCanonicalQueryPair(String query, StringBuilder builder) {
+        int eq = query.indexOf('=');
+        if (eq == 0) {
+            return;
+        }
+
+        builder.append(query);
+        if (eq == -1) {
+            builder.append('=');
         }
     }
 
@@ -514,6 +527,13 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         return ch == ' ' || (ch >= '\t' && ch <= '\f');
     }
 
+    private static boolean isIgnoredHeader(String name) {
+        return switch (name) {
+            case "connection", "content-length", "x-amzn-trace-id", "user-agent", "expect" -> true;
+            default -> false;
+        };
+    }
+
     /**
      * AWS4 uses a series of derived keys, formed by hashing different pieces of data
      */
@@ -553,20 +573,24 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             int canonicalRequestLength,
             String scope,
             String requestTime,
-            byte[] signingKey,
-            StringBuilder sb
+            byte[] signingKey
     ) {
-        sb.setLength(0);
-        sb.append(ALGORITHM)
-                .append('\n')
-                .append(requestTime)
-                .append('\n')
-                .append(scope)
-                .append('\n')
-                .append(HexFormat.of().formatHex(hash(canonicalRequest, 0, canonicalRequestLength)));
-        var toSign = sb.toString();
-        var signatureBytes = sign(toSign, signingKey);
-        return HexFormat.of().formatHex(signatureBytes);
+        byte[] canonicalRequestHash = hash(canonicalRequest, 0, canonicalRequestLength, signingResources.hashBytes);
+        int stringToSignLength = ALGORITHM.length() + requestTime.length() + scope.length() + 67;
+        byte[] stringToSign = signingResources.ensureStringToSignCapacity(stringToSignLength);
+
+        int pos = writeAscii(ALGORITHM, stringToSign, 0);
+        stringToSign[pos++] = '\n';
+        pos = writeAscii(requestTime, stringToSign, pos);
+        stringToSign[pos++] = '\n';
+        pos = writeAscii(scope, stringToSign, pos);
+        stringToSign[pos++] = '\n';
+        pos = writeHex(canonicalRequestHash, stringToSign, pos);
+
+        byte[] signatureBytes = sign(stringToSign, 0, pos, signingKey, signingResources.signatureBytes);
+        byte[] signatureHex = signingResources.signatureHexBytes;
+        writeHex(signatureBytes, signatureHex, 0);
+        return new String(signatureHex, 0, signatureHex.length, StandardCharsets.US_ASCII);
     }
 
     private byte[] sign(String data, byte[] key) {
@@ -578,6 +602,36 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         } catch (InvalidKeyException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private byte[] sign(byte[] data, int offset, int length, byte[] key, byte[] output) {
+        try {
+            var sha256Mac = signingResources.sha256Mac;
+            sha256Mac.reset();
+            sha256Mac.init(new SecretKeySpec(key, HMAC_SHA_256));
+            sha256Mac.update(data, offset, length);
+            sha256Mac.doFinal(output, 0);
+            return output;
+        } catch (InvalidKeyException e) {
+            throw new RuntimeException(e);
+        } catch (javax.crypto.ShortBufferException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static int writeAscii(String value, byte[] dst, int offset) {
+        for (int i = 0; i < value.length(); i++) {
+            dst[offset++] = (byte) value.charAt(i);
+        }
+        return offset;
+    }
+
+    private static int writeHex(byte[] bytes, byte[] dst, int offset) {
+        for (byte b : bytes) {
+            dst[offset++] = HEX_DIGITS[(b >>> 4) & 0x0F];
+            dst[offset++] = HEX_DIGITS[b & 0x0F];
+        }
+        return offset;
     }
 
     private byte[] hash(ByteBuffer data) {
@@ -592,5 +646,17 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         sha256Digest.reset();
         sha256Digest.update(data, offset, length);
         return sha256Digest.digest();
+    }
+
+    private byte[] hash(byte[] data, int offset, int length, byte[] output) {
+        try {
+            var sha256Digest = signingResources.sha256Digest;
+            sha256Digest.reset();
+            sha256Digest.update(data, offset, length);
+            sha256Digest.digest(output, 0, output.length);
+            return output;
+        } catch (DigestException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

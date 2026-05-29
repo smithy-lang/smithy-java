@@ -46,6 +46,10 @@ final class SigningResources {
      * StringBuilder chars directly as bytes without going through {@code String.getBytes}.
      */
     byte[] canonicalRequestBytes;
+    byte[] stringToSignBytes;
+    final byte[] hashBytes;
+    final byte[] signatureBytes;
+    final byte[] signatureHexBytes;
 
     /**
      * Ensure {@link #canonicalRequestBytes} has at least {@code minLength} bytes of capacity,
@@ -59,11 +63,27 @@ final class SigningResources {
         return canonicalRequestBytes;
     }
 
+    /**
+     * Ensure {@link #stringToSignBytes} has at least {@code minLength} bytes of capacity,
+     * growing to the next power of two if not.
+     */
+    byte[] ensureStringToSignCapacity(int minLength) {
+        if (stringToSignBytes.length < minLength) {
+            int newLen = Integer.highestOneBit(minLength - 1) << 1;
+            stringToSignBytes = new byte[newLen];
+        }
+        return stringToSignBytes;
+    }
+
     SigningResources() {
         this.sb = new StringBuilder(BUFFER_SIZE);
         this.headers = new String[INITIAL_HEADER_CAPACITY * 2];
         this.queryPairs = new String[INITIAL_HEADER_CAPACITY * 2];
         this.canonicalRequestBytes = new byte[BUFFER_SIZE];
+        this.stringToSignBytes = new byte[BUFFER_SIZE];
+        this.hashBytes = new byte[32];
+        this.signatureBytes = new byte[32];
+        this.signatureHexBytes = new byte[64];
 
         try {
             this.sha256Digest = MessageDigest.getInstance("SHA-256");
@@ -92,6 +112,9 @@ final class SigningResources {
         if (headers.length > INITIAL_HEADER_CAPACITY * 8) {
             // Reallocate in case the header array grew too large
             headers = new String[INITIAL_HEADER_CAPACITY * 2];
+        }
+        if (stringToSignBytes.length > BUFFER_SIZE) {
+            stringToSignBytes = new byte[BUFFER_SIZE];
         }
     }
 
