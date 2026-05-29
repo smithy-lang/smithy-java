@@ -18,7 +18,6 @@ import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.RequestOptions;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
-import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
  * A client transport using Smithy's native blocking HTTP client with full HTTP/2 bidirectional streaming.
@@ -58,34 +57,7 @@ public final class SmithyHttpClientTransport implements ClientTransport<HttpRequ
             var options = RequestOptions.builder()
                     .requestTimeout(context.get(HttpContext.HTTP_REQUEST_TIMEOUT))
                     .build();
-            HttpResponse response = client.send(request, options);
-            // Eagerly drain and close the response body so the connection returns to the pool.
-            // The SDK pipeline doesn't always read the body (e.g. PutObject responses are empty),
-            // and even when it does read via asByteBuffer the close-on-consume path goes through
-            // a wrapping DataStream that swallows close. Buffering here guarantees release at the
-            // cost of an extra byte[] copy; acceptable for non-streaming RPC bodies.
-            DataStream original = response.body();
-            if (original != null) {
-                try {
-                    var buf = original.asByteBuffer();
-                    byte[] bytes;
-                    if (buf.hasArray() && buf.arrayOffset() == 0 && buf.position() == 0
-                            && buf.remaining() == buf.array().length) {
-                        bytes = buf.array();
-                    } else {
-                        bytes = new byte[buf.remaining()];
-                        buf.duplicate().get(bytes);
-                    }
-                    var buffered = DataStream.ofBytes(bytes, original.contentType());
-                    return HttpResponse.of(response.httpVersion(), response.statusCode(),
-                            response.headers(), buffered);
-                } finally {
-                    try {
-                        original.close();
-                    } catch (Exception ignored) {}
-                }
-            }
-            return response;
+            return client.send(request, options);
         } catch (Exception e) {
             throw ClientTransport.remapExceptions(e);
         }
@@ -116,7 +88,20 @@ public final class SmithyHttpClientTransport implements ClientTransport<HttpRequ
             }
             if (config.maxConnections() != null) {
                 poolBuilder.maxTotalConnections(config.maxConnections());
-                poolBuilder.maxConnectionsPerRoute(config.maxConnections());
+                // If maxConnectionsPerRoute is not explicitly set, default it to maxConnections
+                // for back-compat with prior behavior.
+                if (config.maxConnectionsPerRoute() == null) {
+                    poolBuilder.maxConnectionsPerRoute(config.maxConnections());
+                }
+            }
+            if (config.maxConnectionsPerRoute() != null) {
+                poolBuilder.maxConnectionsPerRoute(config.maxConnectionsPerRoute());
+            }
+            if (config.socketReceiveBufferSize() != null) {
+                poolBuilder.socketReceiveBufferSize(config.socketReceiveBufferSize());
+            }
+            if (config.socketSendBufferSize() != null) {
+                poolBuilder.socketSendBufferSize(config.socketSendBufferSize());
             }
             if (config.h2StreamsPerConnection() != null) {
                 poolBuilder.h2StreamsPerConnection(config.h2StreamsPerConnection());

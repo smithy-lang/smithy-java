@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.http.api.TrailerSupport;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPoolBuilder;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.http.client.it.server.NettyTestServer;
@@ -48,7 +49,7 @@ public class TrailerHeadersHttp11Test extends BaseHttpClientIntegTest {
             var content = new String(body.asInputStream().readAllBytes());
             assertEquals(RESPONSE_CONTENTS, content);
 
-            if (body instanceof software.amazon.smithy.java.http.api.TrailerSupport ts) {
+            if (body instanceof TrailerSupport ts) {
                 var trailers = ts.trailerHeaders();
                 assertNotNull(trailers, "Should have trailer headers");
                 assertEquals("abc123", trailers.firstValue("x-checksum"));

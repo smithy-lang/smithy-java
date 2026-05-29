@@ -5,10 +5,13 @@
 
 package software.amazon.smithy.java.http.client.h2;
 
-import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -35,8 +38,6 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.connection.Route;
-import software.amazon.smithy.java.http.hpack.HpackDecoder;
-import software.amazon.smithy.java.http.hpack.HpackEncoder;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
@@ -442,7 +443,8 @@ final class ConnectionAgentH2Transport implements AutoCloseable {
                 int sendWindow,
                 CompletableFuture<HttpResponse> responseFuture,
                 RequestBodySource requestBody,
-                Runnable responseCancelAction) {
+                Runnable responseCancelAction
+        ) {
             this.streamId = streamId;
             this.sendWindow = sendWindow;
             this.responseFuture = responseFuture;
@@ -451,7 +453,8 @@ final class ConnectionAgentH2Transport implements AutoCloseable {
         }
     }
 
-    private sealed interface RequestBodySource extends AutoCloseable permits EmptyRequestBodySource, ByteArrayRequestBodySource, StreamingRequestBodySource {
+    private sealed interface RequestBodySource extends AutoCloseable
+            permits EmptyRequestBodySource, ByteArrayRequestBodySource, StreamingRequestBodySource {
         boolean isFinished();
 
         ByteBuffer nextChunk(int maxBytes) throws IOException;
@@ -594,7 +597,7 @@ final class ConnectionAgentH2Transport implements AutoCloseable {
 
         @Override
         public ReadableByteChannel asChannel() {
-            return java.nio.channels.Channels.newChannel(asInputStream());
+            return Channels.newChannel(asInputStream());
         }
 
         private void enqueue(Chunk chunk) {
@@ -671,7 +674,7 @@ final class ConnectionAgentH2Transport implements AutoCloseable {
         }
 
         @Override
-        public long transferTo(java.io.OutputStream out) throws IOException {
+        public long transferTo(OutputStream out) throws IOException {
             long transferred = 0;
             while (true) {
                 if (current != null && current.buffer.hasRemaining()) {
@@ -834,8 +837,7 @@ final class ConnectionAgentH2Transport implements AutoCloseable {
         } catch (Exception e) {
             try {
                 body.close();
-            } catch (IOException ignored) {
-            }
+            } catch (IOException ignored) {}
             throw new IOException("Request failed: " + request.method() + " " + request.uri(), e);
         }
     }
@@ -961,7 +963,11 @@ final class ConnectionAgentH2Transport implements AutoCloseable {
             markActivity();
             nextStreamId += 2;
             var stream = new StreamState(
-                    streamId, remoteInitialWindow, future, body, () -> cancelResponseStream(streamId));
+                    streamId,
+                    remoteInitialWindow,
+                    future,
+                    body,
+                    () -> cancelResponseStream(streamId));
             streams.put(streamId, stream);
             activeStreamCount = streams.size();
 
@@ -986,7 +992,7 @@ final class ConnectionAgentH2Transport implements AutoCloseable {
     }
 
     private byte[] encodeHeaders(HttpRequest request) throws IOException {
-        var out = new java.io.ByteArrayOutputStream(512);
+        var out = new ByteArrayOutputStream(512);
         var uri = request.uri();
         String path = uri.getPath();
         if (uri.getQuery() != null && !uri.getQuery().isEmpty()) {
@@ -1031,7 +1037,10 @@ final class ConnectionAgentH2Transport implements AutoCloseable {
             }
             int chunk = slice.remaining();
             boolean end = stream.requestBody.isFinished();
-            frameCodec.writeFrame(H2Constants.FRAME_TYPE_DATA, end ? H2Constants.FLAG_END_STREAM : 0, stream.streamId, slice);
+            frameCodec.writeFrame(H2Constants.FRAME_TYPE_DATA,
+                    end ? H2Constants.FLAG_END_STREAM : 0,
+                    stream.streamId,
+                    slice);
             stream.sendWindow -= chunk;
             sendWindow -= chunk;
             if (end) {
@@ -1232,7 +1241,9 @@ final class ConnectionAgentH2Transport implements AutoCloseable {
 
     private void completeStream(StreamState stream) throws IOException {
         H2ResponseHeaderProcessor.validateContentLength(
-                stream.expectedContentLength, stream.receivedContentLength, stream.streamId);
+                stream.expectedContentLength,
+                stream.receivedContentLength,
+                stream.streamId);
         streams.remove(stream.streamId);
         activeStreamCount = streams.size();
         onStreamReleased();

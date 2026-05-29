@@ -17,6 +17,7 @@ import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Measurement;
+import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
@@ -25,9 +26,12 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
-import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
+import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -40,7 +44,7 @@ import software.amazon.smithy.java.io.uri.SmithyUri;
  * <p>This uses JMH threads directly rather than the internal virtual-thread fanout so SampleTime
  * percentile output reflects per-request latency under real concurrent pressure.
  */
-@BenchmarkMode(org.openjdk.jmh.annotations.Mode.SampleTime)
+@BenchmarkMode(Mode.SampleTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Warmup(iterations = 2, time = 3)
 @Measurement(iterations = 3, time = 5)
@@ -65,8 +69,8 @@ public class H2TinyRpcBenchmark {
     private ExecutorService javaExecutor;
     private JavaHttpClientTransport javaTransport;
     private ApacheHttpClientTransport apacheTransport;
-    private software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport productionNettyTransport;
-    private software.amazon.smithy.java.context.Context transportContext;
+    private NettyHttpClientTransport productionNettyTransport;
+    private Context transportContext;
     private HttpRequest smithyRequest;
 
     @Setup(Level.Trial)
@@ -83,7 +87,7 @@ public class H2TinyRpcBenchmark {
                         .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
                         .sslContext(sslContext)
                         .dnsResolver(BenchmarkSupport.staticDns())
-                .build())
+                        .build())
                 .build();
 
         javaExecutor = Executors.newVirtualThreadPerTaskExecutor();
@@ -101,13 +105,13 @@ public class H2TinyRpcBenchmark {
         apacheConfig.readBufferSize(apacheReadBufferSize);
         apacheTransport = new ApacheHttpClientTransport(apacheConfig, sslContext);
 
-        var nettyTransportConfig = new software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig()
+        var nettyTransportConfig = new NettyHttpTransportConfig()
                 .maxConnectionsPerHost(connections)
                 .h2StreamsPerConnection(streamsPerConnection)
                 .httpVersionPolicy(software.amazon.smithy.java.client.http.netty.HttpVersionPolicy.ENFORCE_HTTP_2);
         productionNettyTransport =
-                new software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport(nettyTransportConfig);
-        transportContext = software.amazon.smithy.java.context.Context.create();
+                new NettyHttpClientTransport(nettyTransportConfig);
+        transportContext = Context.create();
 
         BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H2_URL);
 

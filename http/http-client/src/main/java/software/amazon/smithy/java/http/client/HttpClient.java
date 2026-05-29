@@ -7,8 +7,6 @@ package software.amazon.smithy.java.http.client;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.Objects;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -17,8 +15,6 @@ import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 
 /**
  * Blocking, virtual-thread-friendly HTTP client.
- *
- * <p>The client is intentionally minimal. Behavior can be layered on top via {@link HttpInterceptor}s.
  */
 public interface HttpClient extends AutoCloseable {
     /**
@@ -74,33 +70,9 @@ public interface HttpClient extends AutoCloseable {
     final class Builder {
         ConnectionPool connectionPool;
         Duration requestTimeout;
-        final Deque<HttpInterceptor> interceptors = new ArrayDeque<>();
         ProxySelector proxySelector = ProxySelector.direct();
 
         private Builder() {}
-
-        /**
-         * Add an interceptor to customize request/response handling.
-         *
-         * @param interceptor the interceptor to add
-         * @return this builder
-         */
-        public Builder addInterceptor(HttpInterceptor interceptor) {
-            interceptors.add(Objects.requireNonNull(interceptor, "interceptor"));
-            return this;
-        }
-
-        /**
-         * Add an interceptor to the front of the list of interceptors to apply.
-         *
-         * @param interceptor the interceptor to add to the front.
-         * @return this builder
-         * @see #addInterceptor(HttpInterceptor)
-         */
-        public Builder addInterceptorFirst(HttpInterceptor interceptor) {
-            interceptors.addFirst(Objects.requireNonNull(interceptor, "interceptor"));
-            return this;
-        }
 
         /**
          * Set a custom connection pool.
@@ -114,10 +86,9 @@ public interface HttpClient extends AutoCloseable {
         }
 
         /**
-         * Set total request timeout including redirects and retries (default: none).
+         * Set total request timeout (default: none).
          *
-         * <p>If set, the entire buffered request (including any interceptor retries,
-         * redirects, and authentication flows) must complete within this duration,
+         * <p>If set, the entire buffered request must complete within this duration,
          * or an {@link IOException} is thrown.
          *
          * <p><b>Scope:</b> This timeout only applies to {@link HttpClient#send} calls
@@ -125,8 +96,8 @@ public interface HttpClient extends AutoCloseable {
          * bounded by this timeout since the caller controls when to read/write.
          *
          * <p><b>Implementation:</b> Timeout is enforced via {@link Thread#interrupt()}.
-         * Interceptors and underlying I/O must be interruptible for the timeout to be
-         * effective. Code that swallows interrupts may delay the actual abort.
+         * Underlying I/O must be interruptible for the timeout to be effective. Code that
+         * swallows interrupts may delay the actual abort.
          *
          * <p>If not set (null), requests have no overall timeout and are only limited by
          * the connect and read timeouts.

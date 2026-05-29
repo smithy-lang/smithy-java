@@ -27,9 +27,12 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
-import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
+import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -66,8 +69,8 @@ public class H2MixedGetPutBenchmark {
     private ExecutorService javaExecutor;
     private JavaHttpClientTransport javaTransport;
     private ApacheHttpClientTransport apacheTransport;
-    private software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport productionNettyTransport;
-    private software.amazon.smithy.java.context.Context transportContext;
+    private NettyHttpClientTransport productionNettyTransport;
+    private Context transportContext;
     private MixedRequests mixedRequests;
     private String runId;
 
@@ -85,7 +88,7 @@ public class H2MixedGetPutBenchmark {
                         .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
                         .sslContext(sslContext)
                         .dnsResolver(BenchmarkSupport.staticDns())
-                .build())
+                        .build())
                 .build();
 
         smithyPlatformReaderClient = HttpClient.builder()
@@ -99,7 +102,7 @@ public class H2MixedGetPutBenchmark {
                         .sslContext(sslContext)
                         .dnsResolver(BenchmarkSupport.staticDns())
                         .usePlatformReaderForH2(true)
-                .build())
+                        .build())
                 .build();
 
         connectionAgentClient = HttpClient.builder()
@@ -130,13 +133,13 @@ public class H2MixedGetPutBenchmark {
         apacheConfig.ioThreads(1);
         apacheTransport = new ApacheHttpClientTransport(apacheConfig, sslContext);
 
-        var nettyTransportConfig = new software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig()
+        var nettyTransportConfig = new NettyHttpTransportConfig()
                 .maxConnectionsPerHost(connections)
                 .h2StreamsPerConnection(streamsPerConnection)
                 .httpVersionPolicy(software.amazon.smithy.java.client.http.netty.HttpVersionPolicy.ENFORCE_HTTP_2);
         productionNettyTransport =
-                new software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport(nettyTransportConfig);
-        transportContext = software.amazon.smithy.java.context.Context.create();
+                new NettyHttpClientTransport(nettyTransportConfig);
+        transportContext = Context.create();
 
         BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H2_URL);
         runId = BenchmarkSupport.createRunId("h2-mixed");
@@ -273,7 +276,8 @@ public class H2MixedGetPutBenchmark {
         private void assertClientIoMatches(BenchmarkSupport.IoStats expectedStats) {
             long expectedRequestBytes = expectedStats.putMbBytesReceived();
             long expectedResponseBytes = expectedStats.getMbBytesSent();
-            if (clientRequestBytes.get() != expectedRequestBytes || clientResponseBytes.get() != expectedResponseBytes) {
+            if (clientRequestBytes.get() != expectedRequestBytes
+                    || clientResponseBytes.get() != expectedResponseBytes) {
                 throw new IllegalStateException("H2 mixed client IO mismatch. expectedRequestBytes="
                         + expectedRequestBytes + ", actualRequestBytes=" + clientRequestBytes.get()
                         + ", expectedResponseBytes=" + expectedResponseBytes + ", actualResponseBytes="

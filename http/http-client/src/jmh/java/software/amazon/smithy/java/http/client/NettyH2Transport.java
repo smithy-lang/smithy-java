@@ -39,12 +39,14 @@ import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.LockSupport;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
@@ -166,7 +168,7 @@ final class NettyH2Transport implements AutoCloseable {
             if (cause instanceof IOException io)
                 throw io;
             throw new IOException("Request failed", cause);
-        } catch (java.util.concurrent.TimeoutException e) {
+        } catch (TimeoutException e) {
             throw new IOException("Request timed out waiting for headers", e);
         }
 
@@ -218,7 +220,7 @@ final class NettyH2Transport implements AutoCloseable {
                 .path(path)
                 .scheme(uri.getScheme())
                 .authority(uri.getHost() + (uri.getPort() > 0 ? ":" + uri.getPort() : ""));
-        for (Map.Entry<String, java.util.List<String>> e : request.headers().map().entrySet()) {
+        for (Map.Entry<String, List<String>> e : request.headers().map().entrySet()) {
             String name = e.getKey().toLowerCase(Locale.ROOT);
             for (String v : e.getValue()) {
                 headers.add(name, v);

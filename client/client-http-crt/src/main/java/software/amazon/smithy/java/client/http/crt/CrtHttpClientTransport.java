@@ -665,6 +665,7 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
         private boolean eof;
         private boolean closed;
         private boolean manualWindowManagement = true;
+        private boolean lifetimeReleased;
 
         void bindLifetime(RequestLifetime lifetime, boolean manualWindowManagement) {
             this.lifetime = Objects.requireNonNull(lifetime);
@@ -685,14 +686,30 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
         synchronized void complete() {
             eof = true;
             notifyAll();
+            // Release the lifetime if there is nothing left for a consumer to read. This handles
+            // the no-body case (e.g. PutObject 200 with empty body) where the consumer never
+            // reads the stream, so without this the connection would be held until close() is
+            // called — and the SDK doesn't always close empty bodies promptly.
+            releaseLifetimeIfDone();
         }
 
         synchronized void fail(IOException failure) {
             this.failure = failure;
             eof = true;
             notifyAll();
-            if (lifetime != null) {
+            if (lifetime != null && !lifetimeReleased) {
+                lifetimeReleased = true;
                 lifetime.abort();
+            }
+        }
+
+        private void releaseLifetimeIfDone() {
+            if (lifetimeReleased || lifetime == null) {
+                return;
+            }
+            if (eof && current == null && chunks.isEmpty()) {
+                lifetimeReleased = true;
+                lifetime.complete();
             }
         }
 
@@ -716,9 +733,7 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
                         throw failure;
                     }
                     if (eof) {
-                        if (lifetime != null) {
-                            lifetime.complete();
-                        }
+                        releaseLifetimeIfDone();
                         return -1;
                     }
                     try {
@@ -735,9 +750,7 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
                     if (manualWindowManagement) {
                         chunk.stream.incrementWindow(chunk.bytes.length);
                     }
-                    if (eof && chunks.isEmpty() && lifetime != null) {
-                        lifetime.complete();
-                    }
+                    releaseLifetimeIfDone();
                 }
                 return copied;
             }
@@ -755,9 +768,7 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
                             throw failure;
                         }
                         if (eof) {
-                            if (lifetime != null) {
-                                lifetime.complete();
-                            }
+                            releaseLifetimeIfDone();
                             return transferred;
                         }
                         try {
@@ -780,9 +791,7 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
                         if (manualWindowManagement) {
                             chunk.stream.incrementWindow(chunk.bytes.length);
                         }
-                        if (eof && chunks.isEmpty() && lifetime != null) {
-                            lifetime.complete();
-                        }
+                        releaseLifetimeIfDone();
                     }
                 }
             }
@@ -790,6 +799,7 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
 
         @Override
         public void close() throws IOException {
+            boolean abort;
             synchronized (this) {
                 if (closed) {
                     return;
@@ -803,8 +813,12 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
                     current = null;
                 }
                 notifyAll();
+                abort = lifetime != null && !lifetimeReleased;
+                if (abort) {
+                    lifetimeReleased = true;
+                }
             }
-            if (lifetime != null) {
+            if (abort) {
                 lifetime.abort();
             }
         }

@@ -6,6 +6,8 @@
 package software.amazon.smithy.java.http.client.connection;
 
 import java.io.IOException;
+import java.net.Socket;
+import java.nio.channels.SocketChannel;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -167,7 +169,7 @@ public final class HttpConnectionPool implements ConnectionPool {
                 builder.sslParameters,
                 builder.versionPolicy,
                 dnsResolver,
-                builder.socketFactory,
+                resolveSocketFactory(builder),
                 builder.useConnectionAgentForH2c,
                 builder.useConnectionAgentForH2,
                 builder.usePlatformReaderForH2,
@@ -538,5 +540,38 @@ public final class HttpConnectionPool implements ConnectionPool {
                 break;
             }
         }
+    }
+
+    /**
+     * Resolve the effective socket factory. If the user supplied an explicit {@code socketFactory}
+     * we honor it verbatim. Otherwise, if either of the buffer-size knobs was set on the builder,
+     * build a factory that uses the library defaults (TCP_NODELAY, SO_KEEPALIVE, 64 KiB send/recv)
+     * and overrides whichever buffer knob the user supplied. {@code -1} means "kernel autotune"
+     * — that direction is omitted from the socket configuration entirely.
+     */
+    private static HttpSocketFactory resolveSocketFactory(HttpConnectionPoolBuilder builder) {
+        if (builder.socketFactoryExplicit) {
+            return builder.socketFactory;
+        }
+        Integer recv = builder.socketReceiveBufferSize;
+        Integer send = builder.socketSendBufferSize;
+        if (recv == null && send == null) {
+            return builder.socketFactory;
+        }
+        // Treat unset as the library default (64 KiB); -1 sentinel means "leave unset, kernel autotunes".
+        int effectiveRecv = recv != null ? recv : 64 * 1024;
+        int effectiveSend = send != null ? send : 64 * 1024;
+        return (route, endpoints) -> {
+            Socket socket = SocketChannel.open().socket();
+            socket.setTcpNoDelay(true);
+            socket.setKeepAlive(true);
+            if (effectiveSend != -1) {
+                socket.setSendBufferSize(effectiveSend);
+            }
+            if (effectiveRecv != -1) {
+                socket.setReceiveBufferSize(effectiveRecv);
+            }
+            return socket;
+        };
     }
 }

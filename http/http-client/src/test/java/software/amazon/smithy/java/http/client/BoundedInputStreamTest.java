@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
 class BoundedInputStreamTest {
@@ -35,7 +36,7 @@ class BoundedInputStreamTest {
         int n = stream.read(buf, 0, 10);
 
         assertEquals(3, n);
-        assertArrayEquals(new byte[] {1, 2, 3}, java.util.Arrays.copyOf(buf, n));
+        assertArrayEquals(new byte[] {1, 2, 3}, Arrays.copyOf(buf, n));
     }
 
     @Test

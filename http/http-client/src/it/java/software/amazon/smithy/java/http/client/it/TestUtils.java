@@ -73,7 +73,7 @@ public class TestUtils {
     ) throws Exception {
         return SslContextBuilder
                 .forServer(bundle.serverPrivateKey, bundle.serverCertificate)
-                .applicationProtocolConfig(new io.netty.handler.ssl.ApplicationProtocolConfig(
+                .applicationProtocolConfig(new ApplicationProtocolConfig(
                         ApplicationProtocolConfig.Protocol.ALPN,
                         ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
                         ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,

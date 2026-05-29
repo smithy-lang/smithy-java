@@ -25,6 +25,7 @@ import io.netty.handler.codec.http2.Http2DataFrame;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
+import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.Http2StreamFrame;
@@ -153,7 +154,7 @@ public class H2cScalingBenchmark {
                                 .addLast(
                                         Http2FrameCodecBuilder.forClient()
                                                 .initialSettings(
-                                                        io.netty.handler.codec.http2.Http2Settings.defaultSettings()
+                                                        Http2Settings.defaultSettings()
                                                                 .maxConcurrentStreams(100000)
                                                                 .initialWindowSize(1024 * 1024))
                                                 .build(),
@@ -349,7 +350,7 @@ public class H2cScalingBenchmark {
                     }
                 });
 
-                streamChannel.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(h, true));
+                streamChannel.writeAndFlush(new DefaultHttp2HeadersFrame(h, true));
             });
 
             latch.await();
@@ -414,7 +415,7 @@ public class H2cScalingBenchmark {
                     }
                 });
 
-                streamChannel.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(h, true));
+                streamChannel.writeAndFlush(new DefaultHttp2HeadersFrame(h, true));
             });
 
             latch.await();

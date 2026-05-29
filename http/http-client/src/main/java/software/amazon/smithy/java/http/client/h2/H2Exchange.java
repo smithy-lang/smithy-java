@@ -12,7 +12,6 @@ import static software.amazon.smithy.java.http.client.h2.H2Constants.ERROR_STREA
 import static software.amazon.smithy.java.http.client.h2.H2Constants.FLAG_END_STREAM;
 import static software.amazon.smithy.java.http.client.h2.H2StreamState.RS_DONE;
 import static software.amazon.smithy.java.http.client.h2.H2StreamState.RS_ERROR;
-import static software.amazon.smithy.java.http.client.h2.H2StreamState.RS_READING;
 import static software.amazon.smithy.java.http.client.h2.H2StreamState.SS_CLOSED;
 
 import java.io.IOException;
@@ -30,13 +29,13 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.DelegatedClosingInputStream;
-import software.amazon.smithy.java.http.client.DelegatedClosingOutputStream;
 import software.amazon.smithy.java.http.client.HttpExchange;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
@@ -97,7 +96,7 @@ public final class H2Exchange implements HttpExchange {
 
     // Read-side synchronization (state is in packedState)
     private final ReentrantLock dataLock = new ReentrantLock();
-    private final java.util.concurrent.locks.Condition dataAvailable = dataLock.newCondition();
+    private final Condition dataAvailable = dataLock.newCondition();
     private volatile boolean readWaiterRegistered;
     private volatile IOException readError;
 
@@ -188,7 +187,8 @@ public final class H2Exchange implements HttpExchange {
         this.initialWindowSize = initialWindowSize;
         this.streamRecvWindow = initialWindowSize;
         this.streamBody = new H2StreamBody(128, this::discardChunk);
-        this.requestBodyState = new H2StreamRequestBody(this, muxer, this::onRequestStreamClosedUnchecked, state::isEndStreamSent);
+        this.requestBodyState =
+                new H2StreamRequestBody(this, muxer, this::onRequestStreamClosedUnchecked, state::isEndStreamSent);
     }
 
     /**
@@ -460,8 +460,7 @@ public final class H2Exchange implements HttpExchange {
      * stream (to flush pending data before processing another stream's frames).
      * This is lock-free and can be called without holding any locks.
      */
-    void signalDataAvailable() {
-    }
+    void signalDataAvailable() {}
 
     private void signalReadWaiterLocked() {
         if (readWaiterRegistered) {
