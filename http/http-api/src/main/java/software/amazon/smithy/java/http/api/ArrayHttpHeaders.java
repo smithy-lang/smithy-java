@@ -44,9 +44,14 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
 
     @Override
     public void addHeaderTrusted(HeaderName name, String value) {
+        addHeaderTrusted(name.name(), value);
+    }
+
+    @Override
+    public void addHeaderTrusted(String name, String value) {
         ensureCapacity();
         int idx = size * 2;
-        array[idx] = name.name();
+        array[idx] = name;
         array[idx + 1] = value;
         size++;
     }
