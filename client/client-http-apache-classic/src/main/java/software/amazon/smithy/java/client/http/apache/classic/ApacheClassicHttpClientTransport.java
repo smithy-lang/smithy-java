@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.http.apache.classic;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.Map;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
@@ -96,7 +98,10 @@ public final class ApacheClassicHttpClientTransport implements ClientTransport<H
                 apacheReq.setEntity(new DataStreamHttpEntity(body));
             }
 
-            return client.execute(apacheReq, response -> {
+            @SuppressWarnings("deprecation")
+            CloseableHttpResponse response = client.execute(apacheReq);
+            boolean returnResponse = false;
+            try {
                 int status = response.getCode();
                 Map<String, List<String>> respHeaders = new LinkedHashMap<>();
                 for (var h : response.getHeaders()) {
@@ -106,21 +111,24 @@ public final class ApacheClassicHttpClientTransport implements ClientTransport<H
                 }
                 HttpHeaders headers = HttpHeaders.of(respHeaders);
 
-                byte[] bytes;
                 var entity = response.getEntity();
-                if (entity == null) {
-                    bytes = new byte[0];
-                } else {
-                    try (var in = entity.getContent()) {
-                        bytes = in.readAllBytes();
-                    }
+                if (entity == null || entity.getContentLength() == 0) {
+                    return HttpResponse.of(HttpVersion.HTTP_1_1, status, headers, DataStream.ofEmpty());
                 }
+
                 String contentType = headers.firstValue("content-type");
-                DataStream respBody = bytes.length == 0
-                        ? DataStream.ofEmpty()
-                        : DataStream.ofBytes(bytes, contentType);
-                return HttpResponse.of(HttpVersion.HTTP_1_1, status, headers, respBody);
-            });
+                DataStream respBody = DataStream.ofInputStream(
+                        new CloseResponseInputStream(entity.getContent(), response),
+                        contentType,
+                        entity.getContentLength());
+                HttpResponse result = HttpResponse.of(HttpVersion.HTTP_1_1, status, headers, respBody);
+                returnResponse = true;
+                return result;
+            } finally {
+                if (!returnResponse) {
+                    response.close();
+                }
+            }
         } catch (IOException e) {
             throw ClientTransport.remapExceptions(e);
         }
@@ -168,5 +176,65 @@ public final class ApacheClassicHttpClientTransport implements ClientTransport<H
 
         @Override
         public void close() {}
+    }
+
+    private static final class CloseResponseInputStream extends InputStream {
+        private final InputStream delegate;
+        private final CloseableHttpResponse response;
+        private boolean closed;
+
+        CloseResponseInputStream(InputStream delegate, CloseableHttpResponse response) {
+            this.delegate = delegate;
+            this.response = response;
+        }
+
+        @Override
+        public int read() throws IOException {
+            return delegate.read();
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            return delegate.read(b, off, len);
+        }
+
+        @Override
+        public long transferTo(OutputStream out) throws IOException {
+            return delegate.transferTo(out);
+        }
+
+        @Override
+        public int available() throws IOException {
+            return delegate.available();
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            IOException thrown = null;
+
+            try {
+                delegate.close();
+            } catch (IOException e) {
+                thrown = e;
+            }
+
+            try {
+                response.close();
+            } catch (IOException e) {
+                if (thrown == null) {
+                    thrown = e;
+                } else {
+                    thrown.addSuppressed(e);
+                }
+            }
+
+            if (thrown != null) {
+                throw thrown;
+            }
+        }
     }
 }
