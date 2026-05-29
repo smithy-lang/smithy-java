@@ -27,9 +27,17 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport;
+import software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig;
+import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
+import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
+import software.amazon.smithy.java.http.client.h2.ConnectionAgentH2cPool;
+import software.amazon.smithy.java.http.client.h2.ConnectionAgentH2cTransport;
+import software.amazon.smithy.java.http.client.h2.EventLoopH2cTransport;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
@@ -55,14 +63,14 @@ public class H2cMixedGetPutBenchmark {
 
     private HttpClient smithyClient;
     private HttpClient connectionAgentClient;
-    private software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport productionNettyTransport;
-    private software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport crtTransport;
-    private software.amazon.smithy.java.context.Context transportContext;
+    private NettyHttpClientTransport productionNettyTransport;
+    private CrtHttpClientTransport crtTransport;
+    private Context transportContext;
     private List<EventLoopH2cTransport> eventLoopTransports;
     private AtomicInteger eventLoopIndex;
     private List<ConnectionAgentH2cTransport> agentTransports;
     private AtomicInteger agentIndex;
-    private software.amazon.smithy.java.http.client.h2.ConnectionAgentH2cPool agentCodecPool;
+    private ConnectionAgentH2cPool agentCodecPool;
     private MixedRequests mixedRequests;
 
     @Setup(Level.Trial)
@@ -91,18 +99,18 @@ public class H2cMixedGetPutBenchmark {
                         .build())
                 .build();
 
-        var nettyTransportConfig = new software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig()
+        var nettyTransportConfig = new NettyHttpTransportConfig()
                 .maxConnectionsPerHost(connections)
                 .h2StreamsPerConnection(streamsPerConnection)
                 .httpVersionPolicy(software.amazon.smithy.java.client.http.netty.HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE);
         productionNettyTransport =
-                new software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport(nettyTransportConfig);
-        var crtConfig = new software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig()
+                new NettyHttpClientTransport(nettyTransportConfig);
+        var crtConfig = new CrtHttpTransportConfig()
                 .maxConnectionsPerHost(connections)
                 .h2StreamsPerConnection(streamsPerConnection);
         crtConfig.httpVersion(software.amazon.smithy.java.http.api.HttpVersion.HTTP_2);
-        crtTransport = new software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport(crtConfig);
-        transportContext = software.amazon.smithy.java.context.Context.create();
+        crtTransport = new CrtHttpClientTransport(crtConfig);
+        transportContext = Context.create();
         eventLoopTransports = new ArrayList<>(connections);
         for (int i = 0; i < connections; i++) {
             eventLoopTransports.add(new EventLoopH2cTransport("localhost", 18081));
@@ -113,8 +121,10 @@ public class H2cMixedGetPutBenchmark {
             agentTransports.add(new ConnectionAgentH2cTransport("localhost", 18081));
         }
         agentIndex = new AtomicInteger();
-        agentCodecPool = new software.amazon.smithy.java.http.client.h2.ConnectionAgentH2cPool(
-                connections, streamsPerConnection, 30_000);
+        agentCodecPool = new ConnectionAgentH2cPool(
+                connections,
+                streamsPerConnection,
+                30_000);
 
         BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H2C_URL);
 

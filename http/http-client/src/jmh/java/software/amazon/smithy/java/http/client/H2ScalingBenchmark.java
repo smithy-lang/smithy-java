@@ -16,7 +16,9 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
+import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
 import io.netty.handler.codec.http2.Http2DataFrame;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
@@ -39,8 +41,8 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.ByteBuffer;
 import java.time.Duration;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.AuxCounters;
@@ -58,12 +60,16 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
-import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
+import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
+import software.amazon.smithy.java.http.client.h2.EventLoopH2Transport;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
@@ -102,8 +108,8 @@ public class H2ScalingBenchmark {
     private Channel nettyChannel;
     private NettyH2Transport nettyTransport;
     private EventLoopH2Transport eventLoopTransport;
-    private software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport productionNettyTransport;
-    private software.amazon.smithy.java.context.Context transportContext;
+    private NettyHttpClientTransport productionNettyTransport;
+    private Context transportContext;
 
     @Setup(Level.Trial)
     public void setupIteration() throws Exception {
@@ -189,13 +195,13 @@ public class H2ScalingBenchmark {
         eventLoopTransport = new EventLoopH2Transport("localhost", 18443);
 
         // Productionized client-http-netty transport
-        var nettyTransportConfig = new software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig()
+        var nettyTransportConfig = new NettyHttpTransportConfig()
                 .maxConnectionsPerHost(connections)
                 .h2StreamsPerConnection(streamsPerConnection)
                 .httpVersionPolicy(software.amazon.smithy.java.client.http.netty.HttpVersionPolicy.ENFORCE_HTTP_2);
         productionNettyTransport =
-                new software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport(nettyTransportConfig);
-        transportContext = software.amazon.smithy.java.context.Context.create();
+                new NettyHttpClientTransport(nettyTransportConfig);
+        transportContext = Context.create();
     }
 
     @TearDown(Level.Trial)
@@ -324,7 +330,7 @@ public class H2ScalingBenchmark {
                     .path("/get")
                     .scheme("https")
                     .authority("localhost:18443");
-            stream.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, true));
+            stream.writeAndFlush(new DefaultHttp2HeadersFrame(headers, true));
             future.join();
         }, nettyChannel, counter);
 
@@ -357,8 +363,8 @@ public class H2ScalingBenchmark {
                     .path("/post")
                     .scheme("https")
                     .authority("localhost:18443");
-            stream.write(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, false));
-            stream.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2DataFrame(
+            stream.write(new DefaultHttp2HeadersFrame(headers, false));
+            stream.writeAndFlush(new DefaultHttp2DataFrame(
                     Unpooled.wrappedBuffer(BenchmarkSupport.POST_PAYLOAD),
                     true));
             future.join();
@@ -393,8 +399,8 @@ public class H2ScalingBenchmark {
                     .path("/putmb")
                     .scheme("https")
                     .authority("localhost:18443");
-            stream.write(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, false));
-            stream.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2DataFrame(
+            stream.write(new DefaultHttp2HeadersFrame(headers, false));
+            stream.writeAndFlush(new DefaultHttp2DataFrame(
                     Unpooled.wrappedBuffer(BenchmarkSupport.MB_PAYLOAD),
                     true));
             future.join();
@@ -703,7 +709,7 @@ public class H2ScalingBenchmark {
                     .path("/getmb")
                     .scheme("https")
                     .authority("localhost:18443");
-            stream.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, true));
+            stream.writeAndFlush(new DefaultHttp2HeadersFrame(headers, true));
             future.join();
         }, nettyChannel, counter);
 
@@ -787,7 +793,7 @@ public class H2ScalingBenchmark {
                     .path("/get10mb")
                     .scheme("https")
                     .authority("localhost:18443");
-            stream.writeAndFlush(new io.netty.handler.codec.http2.DefaultHttp2HeadersFrame(headers, true));
+            stream.writeAndFlush(new DefaultHttp2HeadersFrame(headers, true));
             future.join();
         }, nettyChannel, counter);
 

@@ -40,6 +40,7 @@ import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
+import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2StreamFrame;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -217,16 +218,24 @@ public final class BenchmarkServer {
         if (runStats == null) {
             return statsJson();
         }
-        return statsJson(runStats.getMbRequests.get(), runStats.getMbBytesSent.get(),
-                runStats.putMbRequests.get(), runStats.putMbBytesReceived.get());
+        return statsJson(runStats.getMbRequests.get(),
+                runStats.getMbBytesSent.get(),
+                runStats.putMbRequests.get(),
+                runStats.putMbBytesReceived.get());
     }
 
     private static byte[] ioStatsJson() {
-        return ioStatsJson(GET_MB_REQUESTS.get(), GET_MB_BYTES_SENT.get(), PUT_MB_REQUESTS.get(), PUT_MB_BYTES_RECEIVED.get());
+        return ioStatsJson(GET_MB_REQUESTS.get(),
+                GET_MB_BYTES_SENT.get(),
+                PUT_MB_REQUESTS.get(),
+                PUT_MB_BYTES_RECEIVED.get());
     }
 
     private static byte[] statsJson() {
-        return statsJson(GET_MB_REQUESTS.get(), GET_MB_BYTES_SENT.get(), PUT_MB_REQUESTS.get(), PUT_MB_BYTES_RECEIVED.get());
+        return statsJson(GET_MB_REQUESTS.get(),
+                GET_MB_BYTES_SENT.get(),
+                PUT_MB_REQUESTS.get(),
+                PUT_MB_BYTES_RECEIVED.get());
     }
 
     private static byte[] ioStatsJson(long getRequests, long getBytesSent, long putRequests, long putBytesReceived) {
@@ -331,7 +340,7 @@ public final class BenchmarkServer {
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) {
-                        var settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings()
+                        var settings = Http2Settings.defaultSettings()
                                 .maxConcurrentStreams(H2_MAX_CONCURRENT_STREAMS)
                                 .initialWindowSize(H2_INITIAL_WINDOW_SIZE)
                                 .maxFrameSize(H2_MAX_FRAME_SIZE);
@@ -485,7 +494,7 @@ public final class BenchmarkServer {
         @Override
         protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
-                var settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings()
+                var settings = Http2Settings.defaultSettings()
                         .maxConcurrentStreams(H2_TLS_MAX_CONCURRENT_STREAMS)
                         .initialWindowSize(H2_TLS_INITIAL_WINDOW_SIZE)
                         .maxFrameSize(H2_MAX_FRAME_SIZE);

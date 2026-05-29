@@ -22,7 +22,6 @@ val jmhServerImplementation by configurations.getting
 
 dependencies {
     api(project(":http:http-api"))
-    api(project(":http:http-hpack"))
     api(project(":context"))
     api(project(":logging"))
 
@@ -168,11 +167,12 @@ jmh {
         jvmArgsAppend = jvmArgsProp.split(Regex("\\s*;\\s*")).filter { it.isNotEmpty() }
     }
     if (profilersProp != null) {
-        val profilerSpecs = if (profilersProp.contains(";;")) {
-            profilersProp.split(Regex("\\s*;;\\s*")).filter { it.isNotEmpty() }
-        } else {
-            listOf(profilersProp)
-        }
+        val profilerSpecs =
+            if (profilersProp.contains(";;")) {
+                profilersProp.split(Regex("\\s*;;\\s*")).filter { it.isNotEmpty() }
+            } else {
+                listOf(profilersProp)
+            }
         profilers.addAll(profilerSpecs)
     }
     // Use standalone asprof for profiling instead of bundled async profiler

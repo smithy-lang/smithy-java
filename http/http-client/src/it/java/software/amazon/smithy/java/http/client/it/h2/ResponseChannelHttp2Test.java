@@ -22,6 +22,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPoolBuilder;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -134,7 +135,7 @@ public class ResponseChannelHttp2Test extends BaseHttpClientIntegTest {
         assertEquals(SMALL_RESPONSE, readBody(smallResponse));
     }
 
-    private software.amazon.smithy.java.http.api.HttpRequest request(String path) {
+    private HttpRequest request(String path) {
         return TestUtils.plainTextRequest(HttpVersion.HTTP_2, uri(path), "");
     }
 

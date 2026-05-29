@@ -41,6 +41,9 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport;
+import software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -77,8 +80,8 @@ public class H1ScalingBenchmark {
     private WebClient helidonClient;
     private java.net.http.HttpClient javaClient;
     private JavaHttpClientTransport javaTransport;
-    private software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport crtTransport;
-    private software.amazon.smithy.java.context.Context transportContext;
+    private CrtHttpClientTransport crtTransport;
+    private Context transportContext;
 
     // Pre-built requests (read-only during benchmark)
     private HttpRequest smithyGetRequest;
@@ -133,11 +136,11 @@ public class H1ScalingBenchmark {
         javaTransport = new JavaHttpClientTransport(javaClient);
 
         // CRT transport
-        var crtConfig = new software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig()
+        var crtConfig = new CrtHttpTransportConfig()
                 .maxConnectionsPerHost(maxConnections);
         crtConfig.httpVersion(software.amazon.smithy.java.http.api.HttpVersion.HTTP_1_1);
-        crtTransport = new software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport(crtConfig);
-        transportContext = software.amazon.smithy.java.context.Context.create();
+        crtTransport = new CrtHttpClientTransport(crtConfig);
+        transportContext = Context.create();
 
         BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H1_URL);
 

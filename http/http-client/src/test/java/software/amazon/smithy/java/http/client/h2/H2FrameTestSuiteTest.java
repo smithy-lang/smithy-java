@@ -18,6 +18,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -352,10 +353,10 @@ class H2FrameTestSuiteTest {
     private static final int BUF_SIZE = 8192;
 
     private static ChannelFrameReader wrapIn(byte[] data) {
-        return new ChannelFrameReader(java.nio.channels.Channels.newChannel(new ByteArrayInputStream(data)), BUF_SIZE);
+        return new ChannelFrameReader(Channels.newChannel(new ByteArrayInputStream(data)), BUF_SIZE);
     }
 
     private static ChannelFrameWriter wrapOut(ByteArrayOutputStream out) {
-        return new ChannelFrameWriter(java.nio.channels.Channels.newChannel(out), BUF_SIZE);
+        return new ChannelFrameWriter(Channels.newChannel(out), BUF_SIZE);
     }
 }

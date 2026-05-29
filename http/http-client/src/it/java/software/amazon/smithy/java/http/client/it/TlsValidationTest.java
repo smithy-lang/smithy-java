@@ -11,9 +11,11 @@ import io.netty.handler.ssl.SslContextBuilder;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
+import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -173,7 +175,7 @@ public class TlsValidationTest {
         Throwable current = ex;
         while (current != null) {
             if (current instanceof SSLHandshakeException
-                    || (current instanceof java.net.SocketException
+                    || (current instanceof SocketException
                             && current.getMessage() != null
                             && current.getMessage().contains("closed"))) {
                 return;
@@ -314,5 +316,5 @@ public class TlsValidationTest {
         return new JcaX509CertificateConverter().getCertificate(certBuilder.build(signer));
     }
 
-    private record SelfSignedCert(X509Certificate certificate, java.security.PrivateKey privateKey) {}
+    private record SelfSignedCert(X509Certificate certificate, PrivateKey privateKey) {}
 }

@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
+import java.nio.channels.Channels;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +19,7 @@ class ChannelFrameReaderTest {
     void hasBufferedDataIncludesTransportBufferedPlaintext() {
         AtomicBoolean transportBuffered = new AtomicBoolean(false);
         ChannelFrameReader reader = new ChannelFrameReader(
-                java.nio.channels.Channels.newChannel(new ByteArrayInputStream(new byte[0])),
+                Channels.newChannel(new ByteArrayInputStream(new byte[0])),
                 8,
                 transportBuffered::get);
 
@@ -32,7 +33,7 @@ class ChannelFrameReaderTest {
     @Test
     void hasBufferedDataIncludesReaderBuffer() throws Exception {
         ChannelFrameReader reader = new ChannelFrameReader(
-                java.nio.channels.Channels.newChannel(new ByteArrayInputStream(new byte[] {1})),
+                Channels.newChannel(new ByteArrayInputStream(new byte[] {1})),
                 8);
 
         reader.ensure(1);

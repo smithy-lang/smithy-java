@@ -10,9 +10,10 @@ import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
-import java.util.UUID;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -250,7 +251,7 @@ public final class BenchmarkSupport {
 
             var routesField = h2Manager.getClass().getDeclaredField("routes");
             routesField.setAccessible(true);
-            var routes = (java.util.concurrent.ConcurrentHashMap<?, ?>) routesField.get(h2Manager);
+            var routes = (ConcurrentHashMap<?, ?>) routesField.get(h2Manager);
 
             var sb = new StringBuilder();
             for (var entry : routes.values()) {

@@ -6,8 +6,9 @@
 package software.amazon.smithy.java.http.client.h2;
 
 import java.io.IOException;
-import javax.net.ssl.SSLSession;
+import java.net.Socket;
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLSession;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -15,7 +16,6 @@ import software.amazon.smithy.java.http.client.HttpExchange;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
 import software.amazon.smithy.java.http.client.connection.MultiplexedHttpConnection;
 import software.amazon.smithy.java.http.client.connection.Route;
-import java.net.Socket;
 
 /**
  * Experimental HTTP/2 cleartext connection backed by the connection-agent transport.

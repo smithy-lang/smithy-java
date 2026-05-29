@@ -5,8 +5,12 @@
 
 package software.amazon.smithy.java.http.binding;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import software.amazon.smithy.java.core.error.ModeledException;
+import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.Frame;
@@ -21,6 +25,7 @@ public final class ResponseDeserializer {
     private final HttpBindingDeserializer.Builder deserBuilder = HttpBindingDeserializer.builder();
     private ShapeBuilder<?> outputShapeBuilder;
     private ShapeBuilder<? extends ModeledException> errorShapeBuilder;
+    private DataStream responseBody;
 
     ResponseDeserializer() {}
 
@@ -58,6 +63,7 @@ public final class ResponseDeserializer {
      */
     public ResponseDeserializer response(HttpResponse response) {
         DataStream bodyDataStream = bodyDataStream(response);
+        responseBody = bodyDataStream;
         deserBuilder.headers(response.headers())
                 .responseStatus(response.statusCode())
                 .body(bodyDataStream);
@@ -117,6 +123,39 @@ public final class ResponseDeserializer {
 
         HttpBindingDeserializer deserializer = deserBuilder.build();
         var target = outputShapeBuilder != null ? outputShapeBuilder : errorShapeBuilder;
-        target.deserialize(deserializer);
+        Throwable failure = null;
+        try {
+            target.deserialize(deserializer);
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            if (!hasStreamingPayload(target.schema())) {
+                discardResponseBody(failure);
+            }
+        }
+    }
+
+    private static boolean hasStreamingPayload(Schema schema) {
+        var ext = schema.getExtension(HttpBindingSchemaExtensions.KEY);
+        if (ext instanceof HttpBindingSchemaExtensions.StructBindings sb) {
+            var payloadMember = sb.response().payloadMember;
+            return payloadMember != null && payloadMember.hasTrait(TraitKey.STREAMING_TRAIT);
+        }
+        return false;
+    }
+
+    private void discardResponseBody(Throwable failure) {
+        if (responseBody != null) {
+            try {
+                responseBody.discard();
+            } catch (IOException e) {
+                var wrapped = new UncheckedIOException(e);
+                if (failure == null) {
+                    throw wrapped;
+                }
+                failure.addSuppressed(wrapped);
+            }
+        }
     }
 }

@@ -21,7 +21,9 @@ import software.amazon.smithy.java.benchmarks.e2e.s3.client.S3Client;
 import software.amazon.smithy.java.benchmarks.e2e.s3.model.CreateSessionInput;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
+import software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
+import software.amazon.smithy.java.client.http.apache.classic.ApacheClassicHttpClientTransport;
 import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
 import software.amazon.smithy.java.client.http.smithy.SmithyHttpClientTransport;
 import software.amazon.smithy.java.http.client.HttpClient;
@@ -39,6 +41,19 @@ final class Clients {
     private Clients() {}
 
     /**
+     * Apply a {@code -D<prop>=<bytes|auto>} system property to a setter that accepts an int
+     * (with {@code -1} meaning "kernel autotune").
+     */
+    private static void applyBufferProp(String prop, java.util.function.IntConsumer setter) {
+        var value = System.getProperty(prop);
+        if (value == null) {
+            return;
+        }
+        var trimmed = value.trim().toLowerCase();
+        setter.accept("auto".equals(trimmed) ? -1 : Integer.parseInt(trimmed));
+    }
+
+    /**
      * Returns the alternate transport selected via {@code -De2e.transport=...}, or null for the
      * default JDK HttpClient. Recognized values: {@code netty}, {@code smithy}.
      */
@@ -53,6 +68,12 @@ final class Clients {
                         .ioThreads(Runtime.getRuntime().availableProcessors());
                 yield new ApacheHttpClientTransport(cfg);
             }
+            case "apache-classic" -> new ApacheClassicHttpClientTransport(512, 512);
+            case "crt" -> {
+                var cfg = new software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig()
+                        .maxConnectionsPerHost(512);
+                yield new CrtHttpClientTransport(cfg);
+            }
             case "smithy" -> {
                 // Smithy HTTP client defaults to ENFORCE_HTTP_2 which fails on S3 (H1-only).
                 // AUTOMATIC also fails: the pool routes HTTPS routes to the H2 manager, which
@@ -62,16 +83,21 @@ final class Clients {
                 // The pool defaults to maxConnectionsPerRoute=20 which throttles us hard at
                 // higher concurrency since the benchmark targets a single bucket (= one route).
                 // Bump both caps to match the benchmark's max in-flight count plus headroom.
-                var pool = HttpConnectionPool.builder()
+                int maxConns = Integer.getInteger("e2e.smithy.maxconns", 512);
+                var poolBuilder = HttpConnectionPool.builder()
                         .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
-                        .maxTotalConnections(512)
-                        .maxConnectionsPerRoute(512)
-                        .build();
-                var http = HttpClient.builder().connectionPool(pool).build();
+                        .maxTotalConnections(maxConns)
+                        .maxConnectionsPerRoute(maxConns);
+                // -De2e.smithy.recvbuf=<bytes|auto>; -De2e.smithy.sendbuf=<bytes|auto>.
+                // "auto" maps to -1 (kernel autotune).
+                applyBufferProp("e2e.smithy.recvbuf", poolBuilder::socketReceiveBufferSize);
+                applyBufferProp("e2e.smithy.sendbuf", poolBuilder::socketSendBufferSize);
+                var http = HttpClient.builder().connectionPool(poolBuilder.build()).build();
                 yield new SmithyHttpClientTransport(http);
             }
             default -> throw new IllegalArgumentException(
-                    "Unknown e2e.transport: '" + name + "' (expected one of: jdk, netty, smithy, apache)");
+                    "Unknown e2e.transport: '" + name
+                            + "' (expected one of: jdk, netty, smithy, apache, apache-classic, crt)");
         };
     }
 

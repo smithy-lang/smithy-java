@@ -7,7 +7,6 @@ package software.amazon.smithy.java.http.client.h2;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.function.Supplier;
 import software.amazon.smithy.java.http.client.DelegatedClosingOutputStream;

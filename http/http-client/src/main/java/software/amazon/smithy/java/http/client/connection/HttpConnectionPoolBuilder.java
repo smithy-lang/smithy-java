@@ -44,6 +44,9 @@ public final class HttpConnectionPoolBuilder {
     HttpVersionPolicy versionPolicy = HttpVersionPolicy.AUTOMATIC;
     DnsResolver dnsResolver;
     HttpSocketFactory socketFactory = HttpSocketFactory.DEFAULT;
+    boolean socketFactoryExplicit;
+    Integer socketReceiveBufferSize;
+    Integer socketSendBufferSize;
     final List<ConnectionPoolListener> listeners = new LinkedList<>();
 
     /**
@@ -391,6 +394,53 @@ public final class HttpConnectionPoolBuilder {
      */
     public HttpConnectionPoolBuilder socketFactory(HttpSocketFactory socketFactory) {
         this.socketFactory = Objects.requireNonNull(socketFactory, "socketFactory");
+        this.socketFactoryExplicit = true;
+        return this;
+    }
+
+    /**
+     * Set the SO_RCVBUF (TCP receive buffer) size in bytes for new connection sockets.
+     *
+     * <p>Has no effect when an explicit {@link #socketFactory} has been set; that factory is then
+     * fully responsible for socket configuration. When unset, the default factory uses 64 KiB.
+     * Pass {@code -1} to leave SO_RCVBUF unset and let the kernel autotune.
+     *
+     * <p><b>Tuning guidance:</b> A larger receive buffer helps low-concurrency throughput on
+     * high-bandwidth/high-latency links because each connection needs a window large enough to
+     * cover the bandwidth-delay product. At high concurrency, however, large per-connection
+     * receive buffers can cause bufferbloat: each connection holds bytes the application has not
+     * yet read, inflating tail latency. 64 KiB is the conservative default; raising to 96-128 KiB
+     * (or {@code -1} for kernel autotune) improves low-VT GET throughput on fat pipes at some
+     * cost in high-VT P99.
+     *
+     * @param bytes SO_RCVBUF in bytes, or {@code -1} to defer to the kernel
+     * @return this builder
+     * @throws IllegalArgumentException if {@code bytes} is 0 or less than -1
+     */
+    public HttpConnectionPoolBuilder socketReceiveBufferSize(int bytes) {
+        if (bytes < -1 || bytes == 0) {
+            throw new IllegalArgumentException("socketReceiveBufferSize must be positive or -1: " + bytes);
+        }
+        this.socketReceiveBufferSize = bytes;
+        return this;
+    }
+
+    /**
+     * Set the SO_SNDBUF (TCP send buffer) size in bytes for new connection sockets.
+     *
+     * <p>Has no effect when an explicit {@link #socketFactory} has been set; that factory is then
+     * fully responsible for socket configuration. When unset, the default factory uses 64 KiB.
+     * Pass {@code -1} to leave SO_SNDBUF unset and let the kernel autotune.
+     *
+     * @param bytes SO_SNDBUF in bytes, or {@code -1} to defer to the kernel
+     * @return this builder
+     * @throws IllegalArgumentException if {@code bytes} is 0 or less than -1
+     */
+    public HttpConnectionPoolBuilder socketSendBufferSize(int bytes) {
+        if (bytes < -1 || bytes == 0) {
+            throw new IllegalArgumentException("socketSendBufferSize must be positive or -1: " + bytes);
+        }
+        this.socketSendBufferSize = bytes;
         return this;
     }
 

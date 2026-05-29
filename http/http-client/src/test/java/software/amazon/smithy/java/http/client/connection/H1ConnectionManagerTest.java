@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.net.ssl.SSLSession;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -275,7 +276,7 @@ class H1ConnectionManagerTest {
 
         manager.getOrCreatePool(TEST_ROUTE, 10);
 
-        var ex = org.junit.jupiter.api.Assertions.assertThrows(
+        var ex = Assertions.assertThrows(
                 IllegalStateException.class,
                 () -> manager.getOrCreatePool(TEST_ROUTE, 20));
 

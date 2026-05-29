@@ -47,11 +47,9 @@ import javax.net.ssl.SSLSession;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpExchange;
-import software.amazon.smithy.java.http.client.connection.HttpConnection;
 import software.amazon.smithy.java.http.client.connection.MultiplexedHttpConnection;
 import software.amazon.smithy.java.http.client.connection.Route;
 import software.amazon.smithy.java.http.client.connection.Transport;
-import software.amazon.smithy.java.http.hpack.HpackDecoder;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**

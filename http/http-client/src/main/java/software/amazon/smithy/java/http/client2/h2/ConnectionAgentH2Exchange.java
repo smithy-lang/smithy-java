@@ -5,13 +5,13 @@
 
 package software.amazon.smithy.java.http.client.h2;
 
+import java.io.ByteArrayOutputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.io.ByteArrayOutputStream;
 import java.nio.channels.ReadableByteChannel;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;

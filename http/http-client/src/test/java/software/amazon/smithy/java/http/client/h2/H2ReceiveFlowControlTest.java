@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
@@ -27,9 +28,9 @@ class H2ReceiveFlowControlTest {
     void setUp() {
         connectionCreditReleased = new AtomicInteger();
         var codec = new H2FrameCodec(
-                new ChannelFrameReader(java.nio.channels.Channels.newChannel(new ByteArrayInputStream(new byte[0])),
+                new ChannelFrameReader(Channels.newChannel(new ByteArrayInputStream(new byte[0])),
                         256),
-                new ChannelFrameWriter(java.nio.channels.Channels.newChannel(new ByteArrayOutputStream()), 256),
+                new ChannelFrameWriter(Channels.newChannel(new ByteArrayOutputStream()), 256),
                 16384);
         muxer = new H2Muxer(
                 new H2Muxer.ConnectionCallback() {

@@ -109,7 +109,9 @@ record HttpConnectionFactory(
 
         Transport transport;
         if (route.isSecure()) {
-            transport = performTlsHandshake(socket, route);
+            transport = versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1
+                    ? performTlsSocketHandshake(socket, route)
+                    : performTlsHandshake(socket, route);
         } else {
             transport = new SocketTransport(socket);
         }
@@ -130,6 +132,33 @@ record HttpConnectionFactory(
             } finally {
                 socket.setSoTimeout(originalTimeout);
             }
+        } catch (IOException e) {
+            closeQuietly(socket);
+            throw new IOException("TLS handshake failed for " + route.host(), e);
+        }
+    }
+
+    private Transport performTlsSocketHandshake(Socket socket, Route route) throws IOException {
+        try {
+            SSLSocket sslSocket = (SSLSocket) sslContext.getSocketFactory()
+                    .createSocket(socket, route.host(), route.port(), true);
+
+            SSLParameters params = sslParameters != null
+                    ? copyParameters(sslParameters)
+                    : sslSocket.getSSLParameters();
+            params.setEndpointIdentificationAlgorithm("HTTPS");
+            params.setApplicationProtocols(versionPolicy.alpnProtocols());
+            sslSocket.setSSLParameters(params);
+
+            int originalTimeout = sslSocket.getSoTimeout();
+            sslSocket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
+            try {
+                sslSocket.startHandshake();
+            } finally {
+                sslSocket.setSoTimeout(originalTimeout);
+            }
+
+            return new SocketTransport(sslSocket);
         } catch (IOException e) {
             closeQuietly(socket);
             throw new IOException("TLS handshake failed for " + route.host(), e);
@@ -260,8 +289,9 @@ record HttpConnectionFactory(
                     throw new IOException("Proxy CONNECT failed: " + result.statusCode());
                 }
 
-                // Proxy tunnel uses SSLSocket fallback (no SocketChannel through tunnel)
-                Transport transport = performTlsHandshake(proxySocket, route);
+                Transport transport = versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1
+                        ? performTlsSocketHandshake(proxySocket, route)
+                        : performTlsHandshake(proxySocket, route);
                 return createProtocolConnection(transport, route);
             }
 
