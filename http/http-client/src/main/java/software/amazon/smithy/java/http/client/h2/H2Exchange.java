@@ -35,7 +35,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
-import software.amazon.smithy.java.http.client.DelegatedClosingInputStream;
 import software.amazon.smithy.java.http.client.HttpExchange;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
@@ -618,12 +617,11 @@ public final class H2Exchange implements HttpExchange {
             boolean isEmpty = expectedContentLength == 0
                     || (state.isEndStreamReceived() && streamBody.isEmpty());
             if (isEmpty) {
-                var nio = InputStream.nullInputStream();
-                responseIn = new DelegatedClosingInputStream(nio, this::onResponseStreamClosed);
+                responseIn = new H2EmptyResponseInputStream(this);
             } else {
                 H2DataInputStream dataStream = new H2DataInputStream(this, muxer::returnBuffer);
                 responseDataStream = dataStream;
-                responseIn = new DelegatedClosingInputStream(dataStream, this::onResponseStreamClosed);
+                responseIn = dataStream;
             }
         }
         return responseIn;
@@ -669,7 +667,7 @@ public final class H2Exchange implements HttpExchange {
         }
     }
 
-    private void onResponseStreamClosed(InputStream _ignored) throws IOException {
+    void onResponseStreamClosed() throws IOException {
         if (closedStreamCount.incrementAndGet() == BOTH_STREAMS_CLOSED) {
             close();
         }

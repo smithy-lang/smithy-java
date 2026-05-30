@@ -25,6 +25,7 @@ final class ChunkedInputStream extends InputStream {
     private static final int MAX_LINE_LENGTH = 8192;
 
     private final UnsyncBufferedInputStream delegate;
+    private final H1Exchange exchange;
     private long chunkRemaining = -1; // -1 means need to read chunk size
     private boolean eof;
     private boolean closed;
@@ -32,7 +33,12 @@ final class ChunkedInputStream extends InputStream {
     private HttpHeaders trailers; // Trailer headers parsed from final chunk (RFC 7230 Section 4.1.2)
 
     ChunkedInputStream(UnsyncBufferedInputStream delegate) {
+        this(delegate, null);
+    }
+
+    ChunkedInputStream(UnsyncBufferedInputStream delegate, H1Exchange exchange) {
         this.delegate = delegate;
+        this.exchange = exchange;
     }
 
     private static long readMaxChunkSize() {
@@ -153,6 +159,7 @@ final class ChunkedInputStream extends InputStream {
         }
 
         closed = true;
+        responseBodyComplete();
         // Note: we don't close the delegate since the connection may be reused
     }
 
@@ -182,6 +189,7 @@ final class ChunkedInputStream extends InputStream {
             readTrailers();
             eof = true;
             chunkRemaining = 0;
+            responseBodyComplete();
             return false;
         }
 
@@ -276,6 +284,12 @@ final class ChunkedInputStream extends InputStream {
      */
     HttpHeaders getTrailers() {
         return trailers;
+    }
+
+    private void responseBodyComplete() throws IOException {
+        if (exchange != null) {
+            exchange.responseBodyClosed();
+        }
     }
 
     private void readCRLF() throws IOException {

@@ -17,12 +17,18 @@ import java.nio.ByteBuffer;
 final class H2DataOutputStream extends OutputStream {
     private final H2Exchange exchange;
     private final H2Muxer muxer;
+    private final Runnable onClose;
     private ByteBuffer buffer;
     private boolean closed = false;
 
     H2DataOutputStream(H2Exchange exchange, H2Muxer muxer, int bufferSize) {
+        this(exchange, muxer, bufferSize, null);
+    }
+
+    H2DataOutputStream(H2Exchange exchange, H2Muxer muxer, int bufferSize, Runnable onClose) {
         this.exchange = exchange;
         this.muxer = muxer;
+        this.onClose = onClose;
         this.buffer = bufferSize > 0 ? muxer.borrowBuffer(bufferSize) : null;
     }
 
@@ -100,6 +106,9 @@ final class H2DataOutputStream extends OutputStream {
                 muxer.returnBuffer(buffer);
                 buffer = null;
             }
+        }
+        if (onClose != null) {
+            onClose.run();
         }
     }
 }
