@@ -23,6 +23,7 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
 public final class HttpConnectionPoolBuilder {
     int maxTotalConnections = 256;
     int maxConnectionsPerRoute = 20;
+    ActiveConnectionLimit activeConnectionLimit = ActiveConnectionLimit.unlimited();
     int h2StreamsPerConnection = 100;
     H2LoadBalancer h2LoadBalancer = null;
     int h2InitialWindowSize = 65535; // RFC 9113 default
@@ -58,8 +59,8 @@ public final class HttpConnectionPoolBuilder {
      * <p>Each route (unique scheme+host+port+proxy combination) gets its own
      * connection pool with this capacity.
      *
-     * <p><b>HTTP/1.1:</b> This limits concurrent requests, since each connection
-     * handles one request at a time.
+     * <p><b>HTTP/1.1:</b> This limits how many idle connections are retained for reuse.
+     * Use {@link #activeConnectionLimit(ActiveConnectionLimit)} to cap leased concurrency.
      *
      * <p><b>HTTP/2:</b> This limits physical connections. Maximum concurrent streams
      * per route = {@code maxConnectionsPerRoute × h2StreamsPerConnection}. For example,
@@ -98,7 +99,8 @@ public final class HttpConnectionPoolBuilder {
      * <p>Host matching is case-insensitive. If a port-specific limit is set,
      * it takes precedence over the host-only limit.
      *
-     * <p><b>HTTP/1.1:</b> Limits concurrent requests to the host.
+     * <p><b>HTTP/1.1:</b> Limits how many idle connections are retained for this host.
+     * Use {@link #activeConnectionLimit(ActiveConnectionLimit)} to cap leased concurrency.
      *
      * <p><b>HTTP/2:</b> Limits physical connections to the host. Maximum concurrent
      * streams = {@code maxConnectionsForHost × h2StreamsPerConnection}. For example,
@@ -120,6 +122,24 @@ public final class HttpConnectionPoolBuilder {
             throw new IllegalArgumentException("max must be positive: " + max);
         }
         perHostLimits.put(host.toLowerCase(), max);
+        return this;
+    }
+
+    /**
+     * Set how many HTTP/1.1 connections can be actively leased for a route.
+     *
+     * <p>This is separate from {@link #maxConnectionsPerRoute(int)}. The max-connections setting controls how many
+     * idle connections may be retained for reuse; this active limit controls how many route connections can be checked
+     * out and doing work at the same time.
+     *
+     * <p>The default is {@link ActiveConnectionLimit#unlimited()}, meaning active HTTP/1.1 concurrency is bounded by
+     * {@link #maxTotalConnections(int)}.
+     *
+     * @param limit active connection limit policy.
+     * @return this builder.
+     */
+    public HttpConnectionPoolBuilder activeConnectionLimit(ActiveConnectionLimit limit) {
+        this.activeConnectionLimit = Objects.requireNonNull(limit, "activeConnectionLimit");
         return this;
     }
 
