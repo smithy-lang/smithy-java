@@ -13,6 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -106,7 +108,7 @@ class ResponseBodyChannelTest {
         var started = new CountDownLatch(1);
         byte[] payload = bytes(1024);
         var buf = new byte[2048];
-        var nRef = new java.util.concurrent.atomic.AtomicInteger();
+        var nRef = new AtomicInteger();
         var consumer = Thread.ofVirtual().start(() -> {
             try {
                 started.countDown();
@@ -250,7 +252,7 @@ class ResponseBodyChannelTest {
     @Test
     void noByteBufLeaksAfterFullConsumption() throws Exception {
         var ch = newChannel(new AtomicReference<>());
-        var bufs = new java.util.ArrayList<ByteBuf>();
+        var bufs = new ArrayList<ByteBuf>();
         for (int i = 0; i < 50; i++) {
             ByteBuf b = Unpooled.buffer().writeBytes(bytes(64));
             bufs.add(b);
@@ -367,7 +369,7 @@ class ResponseBodyChannelTest {
         var consumers = new Thread[streams];
 
         // Use real ByteBufs so ref-counting is exercised; track them for leak check.
-        var allBufs = java.util.Collections.synchronizedList(new java.util.ArrayList<ByteBuf>());
+        var allBufs = Collections.synchronizedList(new ArrayList<ByteBuf>());
 
         for (int i = 0; i < streams; i++) {
             channels[i] = new ResponseBodyChannel(new AtomicReference<>(), x -> {}, null, HIGH, LOW);

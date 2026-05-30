@@ -178,13 +178,16 @@ public final class H1Exchange implements HttpExchange {
         }
 
         if (noBodyResponseStatus(statusCode) || "HEAD".equalsIgnoreCase(request.method())) {
-            return new FixedLengthResponseChannel(this, connection.getInputStream(), connection.getReadableChannel(), 0);
+            return new FixedLengthResponseChannel(this,
+                    connection.getInputStream(),
+                    connection.getReadableChannel(),
+                    0);
         }
 
         return new FixedLengthResponseChannel(this,
-                                              connection.getInputStream(),
-                                              connection.getReadableChannel(),
-                                              responseContentLength);
+                connection.getInputStream(),
+                connection.getReadableChannel(),
+                responseContentLength);
     }
 
     @Override
@@ -611,10 +614,10 @@ public final class H1Exchange implements HttpExchange {
             }
             case "content-type" -> {
                 responseContentType = new String(
-                    line,
-                    valueStart,
-                    valueEnd - valueStart,
-                    StandardCharsets.US_ASCII);
+                        line,
+                        valueStart,
+                        valueEnd - valueStart,
+                        StandardCharsets.US_ASCII);
                 yield null;
             }
             case "connection" -> {

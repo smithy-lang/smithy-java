@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.http.apache.classic;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +17,6 @@ import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.io.entity.AbstractHttpEntity;
@@ -87,7 +87,8 @@ public final class ApacheClassicHttpClientTransport implements ClientTransport<H
             request.headers().forEachEntry((name, value) -> {
                 String lower = name.toLowerCase(java.util.Locale.ROOT);
                 if (lower.equals("content-length") || lower.equals("content-type")
-                        || lower.equals("transfer-encoding") || lower.equals("host")) {
+                        || lower.equals("transfer-encoding")
+                        || lower.equals("host")) {
                     return;
                 }
                 apacheReq.addHeader(name, value);
@@ -106,7 +107,7 @@ public final class ApacheClassicHttpClientTransport implements ClientTransport<H
                 Map<String, List<String>> respHeaders = new LinkedHashMap<>();
                 for (var h : response.getHeaders()) {
                     respHeaders.computeIfAbsent(h.getName().toLowerCase(java.util.Locale.ROOT),
-                            k -> new java.util.ArrayList<>(1))
+                            k -> new ArrayList<>(1))
                             .add(h.getValue());
                 }
                 HttpHeaders headers = HttpHeaders.of(respHeaders);
@@ -160,7 +161,7 @@ public final class ApacheClassicHttpClientTransport implements ClientTransport<H
         }
 
         @Override
-        public java.io.InputStream getContent() {
+        public InputStream getContent() {
             return body.asInputStream();
         }
 

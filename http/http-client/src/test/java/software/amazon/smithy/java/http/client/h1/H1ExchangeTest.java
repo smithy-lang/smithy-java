@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
@@ -16,8 +17,8 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
-import software.amazon.smithy.java.http.client.connection.Route;
 import software.amazon.smithy.java.http.client.connection.ConnectionTransport;
+import software.amazon.smithy.java.http.client.connection.Route;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
 class H1ExchangeTest {
@@ -127,7 +128,7 @@ class H1ExchangeTest {
                         + "\r\n"
                         + "hello");
         var exchange = conn.newExchange(getRequest());
-        var out = new java.io.ByteArrayOutputStream();
+        var out = new ByteArrayOutputStream();
 
         Channels.newInputStream(exchange.responseBodyChannel()).transferTo(out);
 

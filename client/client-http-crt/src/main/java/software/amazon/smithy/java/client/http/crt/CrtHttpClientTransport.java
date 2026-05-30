@@ -6,8 +6,13 @@
 package software.amazon.smithy.java.client.http.crt;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
@@ -131,8 +136,7 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
     private static void closeQuietly(AutoCloseable closeable) {
         try {
             closeable.close();
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
     }
 
     private static <T> T await(CompletableFuture<T> future, Duration timeout)
@@ -216,7 +220,7 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
             RequestLifetime lifetime = null;
             try {
                 var body = CrtRequestBodyAdapter.from(request.body());
-                var responseHandler = new CrtResponseHandler(software.amazon.awssdk.crt.http.HttpVersion.HTTP_2, false);
+                var responseHandler = new CrtResponseHandler(HttpVersion.HTTP_2, false);
                 var streamFuture = manager.acquireStream(toCrtH2Request(request, body), responseHandler);
                 var stream = await(streamFuture, effectiveAcquireTimeout(timeout));
                 lifetime = RequestLifetime.forH2(stream, body);
@@ -279,12 +283,10 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
             if (connection.isOpen()) {
                 connection.shutdown();
             }
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
         try {
             manager.releaseConnection(connection);
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
     }
 
     private static software.amazon.awssdk.crt.http.HttpRequest toCrtRequest(
@@ -294,7 +296,10 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
     ) {
         HttpHeader[] headers = toCrtHeaders(request, body, isH2);
         if (body.isEmpty()) {
-            return new software.amazon.awssdk.crt.http.HttpRequest(request.method(), encodedPath(request), headers, null);
+            return new software.amazon.awssdk.crt.http.HttpRequest(request.method(),
+                    encodedPath(request),
+                    headers,
+                    null);
         }
         return new software.amazon.awssdk.crt.http.HttpRequest(request.method(), encodedPath(request), headers, body);
     }
@@ -381,8 +386,7 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
             int port,
             boolean secure,
             software.amazon.smithy.java.http.api.HttpVersion version,
-            URI baseUri
-    ) {
+            URI baseUri) {
         private static RouteKey from(HttpRequest request, CrtHttpTransportConfig config) {
             var uri = request.uri().toURI();
             int port = uri.getPort();
@@ -409,7 +413,12 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
         private final Runnable onAbort;
         private boolean finished;
 
-        private RequestLifetime(HttpStreamBase stream, CrtRequestBodyAdapter body, Runnable onSuccess, Runnable onAbort) {
+        private RequestLifetime(
+                HttpStreamBase stream,
+                CrtRequestBodyAdapter body,
+                Runnable onSuccess,
+                Runnable onAbort
+        ) {
             this.stream = stream;
             this.body = body;
             this.onSuccess = onSuccess;
@@ -436,13 +445,11 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
                             if (connection.isOpen()) {
                                 connection.shutdown();
                             }
-                        } catch (Exception ignored) {
-                        }
+                        } catch (Exception ignored) {}
                         closeQuietly(stream);
                         try {
                             manager.releaseConnection(connection);
-                        } catch (Exception ignored) {
-                        }
+                        } catch (Exception ignored) {}
                     });
         }
 
@@ -482,8 +489,8 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
         private final DataStream body;
         private final long length;
         private final String contentType;
-        private final java.nio.ByteBuffer sourceBuffer;
-        private java.nio.channels.ReadableByteChannel channel;
+        private final ByteBuffer sourceBuffer;
+        private ReadableByteChannel channel;
 
         private CrtRequestBodyAdapter(DataStream body) {
             this.body = body;
@@ -509,7 +516,7 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
         }
 
         @Override
-        public boolean sendRequestBody(java.nio.ByteBuffer bodyBytesOut) {
+        public boolean sendRequestBody(ByteBuffer bodyBytesOut) {
             try {
                 if (sourceBuffer != null) {
                     if (!sourceBuffer.hasRemaining()) {
@@ -572,8 +579,7 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
             if (channel != null) {
                 try {
                     channel.close();
-                } catch (IOException ignored) {
-                } finally {
+                } catch (IOException ignored) {} finally {
                     channel = null;
                 }
             }
@@ -610,7 +616,12 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
         }
 
         @Override
-        public void onResponseHeaders(HttpStreamBase stream, int responseStatusCode, int blockType, HttpHeader[] nextHeaders) {
+        public void onResponseHeaders(
+                HttpStreamBase stream,
+                int responseStatusCode,
+                int blockType,
+                HttpHeader[] nextHeaders
+        ) {
             if (headersDelivered) {
                 return;
             }
@@ -657,8 +668,8 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
         }
     }
 
-    private static final class CrtResponseInputStream extends java.io.InputStream {
-        private final java.util.ArrayDeque<Chunk> chunks = new java.util.ArrayDeque<>();
+    private static final class CrtResponseInputStream extends InputStream {
+        private final ArrayDeque<Chunk> chunks = new ArrayDeque<>();
         private Chunk current;
         private RequestLifetime lifetime;
         private IOException failure;
@@ -757,7 +768,7 @@ public final class CrtHttpClientTransport implements ClientTransport<HttpRequest
         }
 
         @Override
-        public long transferTo(java.io.OutputStream out) throws IOException {
+        public long transferTo(OutputStream out) throws IOException {
             long transferred = 0;
             while (true) {
                 Chunk chunk;

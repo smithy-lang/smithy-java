@@ -24,8 +24,8 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
-import software.amazon.smithy.java.http.client.connection.Route;
 import software.amazon.smithy.java.http.client.connection.ConnectionTransport;
+import software.amazon.smithy.java.http.client.connection.Route;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
 class H1ConnectionTest {
