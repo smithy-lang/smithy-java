@@ -18,6 +18,7 @@ public final class SmithyHttpTransportConfig extends HttpTransportConfig {
 
     private Integer maxConnections;
     private Integer maxConnectionsPerRoute;
+    private Integer activeConnectionLimit;
     private Duration maxIdleTime;
     private Integer h2StreamsPerConnection;
     private Integer h2InitialWindowSize;
@@ -35,10 +36,8 @@ public final class SmithyHttpTransportConfig extends HttpTransportConfig {
     }
 
     /**
-     * Maximum concurrent connections per route (host+port+proxy). When unset, the route limit
-     * defaults to {@link #maxConnections}. Setting a smaller value reduces high-concurrency
-     * fan-out and tail latency from receive-buffer queueing at the cost of peak per-route
-     * throughput.
+     * Maximum idle connections retained per route (host+port+proxy). When unset, the route limit
+     * defaults to {@link #maxConnections}.
      */
     public Integer maxConnectionsPerRoute() {
         return maxConnectionsPerRoute;
@@ -46,6 +45,19 @@ public final class SmithyHttpTransportConfig extends HttpTransportConfig {
 
     public SmithyHttpTransportConfig maxConnectionsPerRoute(int maxConnectionsPerRoute) {
         this.maxConnectionsPerRoute = maxConnectionsPerRoute;
+        return this;
+    }
+
+    /**
+     * Maximum HTTP/1.1 connections actively leased per route. This limits active socket work without reducing the
+     * number of idle connections the pool may retain for reuse.
+     */
+    public Integer activeConnectionLimit() {
+        return activeConnectionLimit;
+    }
+
+    public SmithyHttpTransportConfig activeConnectionLimit(int activeConnectionLimit) {
+        this.activeConnectionLimit = activeConnectionLimit;
         return this;
     }
 
@@ -126,6 +138,11 @@ public final class SmithyHttpTransportConfig extends HttpTransportConfig {
         var maxConnsPerRoute = config.get("maxConnectionsPerRoute");
         if (maxConnsPerRoute != null) {
             this.maxConnectionsPerRoute = maxConnsPerRoute.asInteger();
+        }
+
+        var activeConns = config.get("activeConnectionLimit");
+        if (activeConns != null) {
+            this.activeConnectionLimit = activeConns.asInteger();
         }
 
         var recvBuf = config.get("socketReceiveBufferSize");

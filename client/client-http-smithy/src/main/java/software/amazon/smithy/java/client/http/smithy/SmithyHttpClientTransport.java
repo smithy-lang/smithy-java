@@ -17,6 +17,7 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.RequestOptions;
+import software.amazon.smithy.java.http.client.connection.ActiveConnectionLimit;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 
 /**
@@ -96,6 +97,9 @@ public final class SmithyHttpClientTransport implements ClientTransport<HttpRequ
             }
             if (config.maxConnectionsPerRoute() != null) {
                 poolBuilder.maxConnectionsPerRoute(config.maxConnectionsPerRoute());
+            }
+            if (config.activeConnectionLimit() != null) {
+                poolBuilder.activeConnectionLimit(ActiveConnectionLimit.fixed(config.activeConnectionLimit()));
             }
             if (config.socketReceiveBufferSize() != null) {
                 poolBuilder.socketReceiveBufferSize(config.socketReceiveBufferSize());

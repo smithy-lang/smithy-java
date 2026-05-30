@@ -27,6 +27,7 @@ import software.amazon.smithy.java.client.http.apache.classic.ApacheClassicHttpC
 import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
 import software.amazon.smithy.java.client.http.smithy.SmithyHttpClientTransport;
 import software.amazon.smithy.java.http.client.HttpClient;
+import software.amazon.smithy.java.http.client.connection.ActiveConnectionLimit;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 
@@ -98,6 +99,40 @@ final class Clients {
                         .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                         .maxTotalConnections(maxConns)
                         .maxConnectionsPerRoute(maxConns);
+                String activeConns = System.getProperty("e2e.smithy.activeconns");
+                if (activeConns != null && !activeConns.isBlank()) {
+                    if (activeConns.equalsIgnoreCase("bandit")) {
+                        poolBuilder.activeConnectionLimit(ActiveConnectionLimit.adaptiveBandit()
+                                .candidates(parseIntList(
+                                        System.getProperty("e2e.smithy.activeconns.candidates"),
+                                        16, 24, 32, 40, 48, 64, 96))
+                                .initial(Integer.getInteger("e2e.smithy.activeconns.initial", 32))
+                                .windowSize(Integer.getInteger("e2e.smithy.activeconns.window", 200))
+                                .explorationInterval(Integer.getInteger("e2e.smithy.activeconns.explore", 6))
+                                .ewmaAlpha(Double.parseDouble(
+                                        System.getProperty("e2e.smithy.activeconns.ewma", "0.25")))
+                                .tailRatioWeight(Double.parseDouble(
+                                        System.getProperty("e2e.smithy.activeconns.tailweight", "0.20")))
+                                .build());
+                    } else if (activeConns.equalsIgnoreCase("latency")) {
+                        poolBuilder.activeConnectionLimit(ActiveConnectionLimit.adaptiveLatency()
+                                .min(Integer.getInteger("e2e.smithy.activeconns.min", 8))
+                                .initial(Integer.getInteger("e2e.smithy.activeconns.initial", 32))
+                                .max(Integer.getInteger("e2e.smithy.activeconns.max", 128))
+                                .windowSize(Integer.getInteger("e2e.smithy.activeconns.window", 200))
+                                .initialStep(Integer.getInteger("e2e.smithy.activeconns.step", 4))
+                                .tailRatioWeight(Double.parseDouble(
+                                        System.getProperty("e2e.smithy.activeconns.tailweight", "0.25")))
+                                .throughputNoiseFloor(Double.parseDouble(
+                                        System.getProperty("e2e.smithy.activeconns.noisefloor", "0.01")))
+                                .build());
+                    } else {
+                        int activeConnLimit = Integer.parseInt(activeConns);
+                        if (activeConnLimit > 0) {
+                            poolBuilder.activeConnectionLimit(ActiveConnectionLimit.fixed(activeConnLimit));
+                        }
+                    }
+                }
                 // -De2e.smithy.recvbuf=<bytes|auto>; -De2e.smithy.sendbuf=<bytes|auto>.
                 // "auto" maps to -1 (kernel autotune).
                 applyBufferProp("e2e.smithy.recvbuf", poolBuilder::socketReceiveBufferSize);
@@ -109,6 +144,18 @@ final class Clients {
                     "Unknown e2e.transport: '" + name
                             + "' (expected one of: jdk, netty, smithy, apache, apache-classic, crt)");
         };
+    }
+
+    private static int[] parseIntList(String value, int... fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        String[] parts = value.split(",");
+        int[] result = new int[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            result[i] = Integer.parseInt(parts[i].trim());
+        }
+        return result;
     }
 
     static DynamoDBClient dynamodb(String region) {

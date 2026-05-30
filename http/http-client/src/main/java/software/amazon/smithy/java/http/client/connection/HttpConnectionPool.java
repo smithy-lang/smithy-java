@@ -129,6 +129,7 @@ public final class HttpConnectionPool implements ConnectionPool {
     private final int defaultMaxConnectionsPerRoute;
     private final Map<String, Integer> perHostLimits;
     private final int maxTotalConnections;
+    private final ActiveConnectionLimit activeConnectionLimit;
     private final long acquireTimeoutMs; // Timeout for acquiring a connection when pool is exhausted
     private final long maxIdleTimeNanos; // Max idle time before closing connections
     private final HttpVersionPolicy versionPolicy;
@@ -155,6 +156,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         this.defaultMaxConnectionsPerRoute = builder.maxConnectionsPerRoute;
         this.perHostLimits = Map.copyOf(builder.perHostLimits);
         this.maxTotalConnections = builder.maxTotalConnections;
+        this.activeConnectionLimit = builder.activeConnectionLimit;
         // Cached to avoid Duration.toNanos() in hot path
         this.maxIdleTimeNanos = builder.maxIdleTime.toNanos();
         this.acquireTimeoutMs = builder.acquireTimeout.toMillis();
@@ -215,30 +217,50 @@ public final class HttpConnectionPool implements ConnectionPool {
     private HttpConnection acquireH1(Route route) throws IOException {
         int maxConns = getMaxConnectionsForRoute(route);
 
-        // Try to get a permit without blocking
-        if (connectionPermits.tryAcquire()) {
-            // Got a permit, so now try to reuse a pooled connection first
-            H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(route, maxConns);
+        long leaseStartedNanos = h1Manager.acquireActive(
+                route,
+                maxConns,
+                activeConnectionLimit,
+                maxTotalConnections,
+                acquireTimeoutMs);
+
+        try {
+            // Try to get a permit without blocking
+            if (connectionPermits.tryAcquire()) {
+                // Got a permit, so now try to reuse a pooled connection first
+                H1ConnectionManager.PooledConnection pooled =
+                        h1Manager.tryAcquire(route, maxConns, activeConnectionLimit, maxTotalConnections);
+                if (pooled != null) {
+                    notifyAcquire(pooled.connection(), true);
+                    h1Manager.trackActive(route, pooled.connection(), leaseStartedNanos);
+                    return pooled.connection();
+                } else {
+                    // No pooled connection, but we have a permit to create one.
+                    HttpConnection connection = createH1Connection(route);
+                    h1Manager.trackActive(route, connection, leaseStartedNanos);
+                    return connection;
+                }
+            }
+
+            // No permit available immediately. Block on global capacity with timeout.
+            acquirePermit();
+
+            // Re-check pool after acquiring the permit, since a connection may have been released while waiting.
+            H1ConnectionManager.PooledConnection pooled =
+                    h1Manager.tryAcquire(route, maxConns, activeConnectionLimit, maxTotalConnections);
             if (pooled != null) {
                 notifyAcquire(pooled.connection(), true);
+                h1Manager.trackActive(route, pooled.connection(), leaseStartedNanos);
                 return pooled.connection();
-            } else {
-                // No pooled connection, but we have a permit to create one.
-                return createH1Connection(route);
             }
+
+            HttpConnection connection = createH1Connection(route);
+            h1Manager.trackActive(route, connection, leaseStartedNanos);
+            return connection;
+        } catch (IOException | RuntimeException e) {
+            h1Manager.releaseActive(route);
+            throw e;
         }
-
-        // No permit available immediately. Block on global capacity with timeout.
-        acquirePermit();
-
-        // Re-check pool after acquiring the permit, since a connection may have been released while waiting.
-        H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(route, maxConns);
-        if (pooled != null) {
-            notifyAcquire(pooled.connection(), true);
-            return pooled.connection();
-        }
-
-        return createH1Connection(route);
     }
 
     private HttpConnection createH1Connection(Route route) throws IOException {
@@ -334,10 +356,14 @@ public final class HttpConnectionPool implements ConnectionPool {
             return;
         }
 
-        if (!h1Manager.release(route, connection, closed)) {
-            closeAndReleasePermit(connection, CloseReason.POOL_FULL);
-        } else {
-            connectionPermits.release();
+        try {
+            if (!h1Manager.release(route, connection, closed)) {
+                closeAndReleasePermit(connection, CloseReason.POOL_FULL);
+            } else {
+                connectionPermits.release();
+            }
+        } finally {
+            h1Manager.releaseActive(connection);
         }
     }
 
@@ -350,6 +376,7 @@ public final class HttpConnectionPool implements ConnectionPool {
             h2Manager.unregister(route, h2conn);
         } else {
             h1Manager.remove(route, connection);
+            h1Manager.releaseActive(connection);
         }
 
         closeAndReleasePermit(connection, isError ? CloseReason.ERRORED : CloseReason.EVICTED);
