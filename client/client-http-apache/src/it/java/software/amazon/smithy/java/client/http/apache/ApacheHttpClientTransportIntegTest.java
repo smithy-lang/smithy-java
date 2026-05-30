@@ -11,6 +11,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -117,7 +118,7 @@ class ApacheHttpClientTransportIntegTest {
         readAll(exchange.getRequestBody());
     }
 
-    private static byte[] readAll(java.io.InputStream body) throws IOException {
+    private static byte[] readAll(InputStream body) throws IOException {
         try (body; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             body.transferTo(out);
             return out.toByteArray();

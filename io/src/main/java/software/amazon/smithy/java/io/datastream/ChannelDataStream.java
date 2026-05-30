@@ -8,6 +8,7 @@ package software.amazon.smithy.java.io.datastream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
@@ -101,7 +102,7 @@ final class ChannelDataStream implements DataStream {
             try {
                 channel.close();
             } catch (IOException e) {
-                throw new java.io.UncheckedIOException("Failed to close data stream", e);
+                throw new UncheckedIOException("Failed to close data stream", e);
             }
         }
     }

@@ -9,9 +9,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
 import com.sun.net.httpserver.HttpServer;
-import java.io.IOException;
-import java.net.URI;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -37,8 +36,9 @@ class CrtHttpClientTransportTest {
         server = HttpServer.create(new InetSocketAddress(0), 0);
         server.createContext("/echo", exchange -> {
             byte[] requestBytes = exchange.getRequestBody().readAllBytes();
-            byte[] responseBytes = (exchange.getRequestMethod() + ":" + new String(requestBytes, StandardCharsets.UTF_8))
-                    .getBytes(StandardCharsets.UTF_8);
+            byte[] responseBytes =
+                    (exchange.getRequestMethod() + ":" + new String(requestBytes, StandardCharsets.UTF_8))
+                            .getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("content-type", "text/plain");
             exchange.sendResponseHeaders(200, responseBytes.length);
             exchange.getResponseBody().write(responseBytes);

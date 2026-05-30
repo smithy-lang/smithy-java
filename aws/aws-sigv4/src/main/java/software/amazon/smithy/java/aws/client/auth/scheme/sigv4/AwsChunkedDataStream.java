@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -62,7 +63,8 @@ public final class AwsChunkedDataStream implements DataStream {
         int hexSizeLen = hexLen(decodedLength);
         int trailerLineLen = TRAILER_NAME.length + 8 /* base64(crc32) */ + CRLF.length;
         this.encodedLength = (long) hexSizeLen + CRLF.length
-                + decodedLength + CRLF.length
+                + decodedLength
+                + CRLF.length
                 + TERMINATOR.length
                 + trailerLineLen
                 + CRLF.length;
@@ -104,7 +106,7 @@ public final class AwsChunkedDataStream implements DataStream {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        return new java.io.ByteArrayInputStream(out.toByteArray());
+        return new ByteArrayInputStream(out.toByteArray());
     }
 
     @Override

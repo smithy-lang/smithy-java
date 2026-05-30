@@ -8,8 +8,10 @@ package software.amazon.smithy.java.client.http.netty;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.socket.SocketChannel;
@@ -27,8 +29,11 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.net.ssl.SSLException;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -270,13 +275,13 @@ final class NettyConnectionPool implements AutoCloseable {
         SslContext sslCtx;
         try {
             sslCtx = NettyUtils.buildSslContext(policy.alpnProtocols(), /*trustAll=*/true);
-        } catch (javax.net.ssl.SSLException e) {
+        } catch (SSLException e) {
             throw new IOException("Failed to build SSL context", e);
         }
 
         var resolvedModeHolder = new NettyConnection[1];
-        var readyLatch = new java.util.concurrent.CountDownLatch(1);
-        var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        var readyLatch = new CountDownLatch(1);
+        var failure = new AtomicReference<Throwable>();
 
         Bootstrap b = baseBootstrap().handler(new ChannelInitializer<SocketChannel>() {
             @Override
@@ -284,7 +289,7 @@ final class NettyConnectionPool implements AutoCloseable {
                 ch.pipeline().addLast(sslCtx.newHandler(ch.alloc(), route.host(), route.port()));
                 ch.pipeline().addLast(new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_1_1) {
                     @Override
-                    protected void configurePipeline(io.netty.channel.ChannelHandlerContext ctx, String protocol) {
+                    protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
                         try {
                             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                                 configureH2Pipeline(ctx);
@@ -304,7 +309,7 @@ final class NettyConnectionPool implements AutoCloseable {
                     }
 
                     @Override
-                    protected void handshakeFailure(io.netty.channel.ChannelHandlerContext ctx, Throwable cause) {
+                    protected void handshakeFailure(ChannelHandlerContext ctx, Throwable cause) {
                         failure.set(cause);
                         readyLatch.countDown();
                         ctx.close();
@@ -402,15 +407,15 @@ final class NettyConnectionPool implements AutoCloseable {
         return conn;
     }
 
-    private void configureH1Pipeline(io.netty.channel.ChannelPipeline pipeline) {
+    private void configureH1Pipeline(ChannelPipeline pipeline) {
         pipeline.addLast(new HttpClientCodec());
     }
 
-    private void configureH1Pipeline(io.netty.channel.ChannelHandlerContext ctx) {
+    private void configureH1Pipeline(ChannelHandlerContext ctx) {
         configureH1Pipeline(ctx.pipeline());
     }
 
-    private void configureH2Pipeline(io.netty.channel.ChannelPipeline pipeline) {
+    private void configureH2Pipeline(ChannelPipeline pipeline) {
         pipeline.addLast(Http2FrameCodecBuilder.forClient()
                 .initialSettings(Http2Settings.defaultSettings()
                         .initialWindowSize(config.initialWindowSize())
@@ -423,7 +428,7 @@ final class NettyConnectionPool implements AutoCloseable {
         }));
     }
 
-    private void configureH2Pipeline(io.netty.channel.ChannelHandlerContext ctx) {
+    private void configureH2Pipeline(ChannelHandlerContext ctx) {
         configureH2Pipeline(ctx.pipeline());
     }
 }

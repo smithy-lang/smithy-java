@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
+import javax.crypto.ShortBufferException;
 import javax.crypto.spec.SecretKeySpec;
 import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.Signer;
@@ -614,7 +615,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             return output;
         } catch (InvalidKeyException e) {
             throw new RuntimeException(e);
-        } catch (javax.crypto.ShortBufferException e) {
+        } catch (ShortBufferException e) {
             throw new RuntimeException(e);
         }
     }
