@@ -7,7 +7,6 @@ package software.amazon.smithy.java.http.client.connection;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
-import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -76,9 +75,7 @@ final class H1ConnectionManager {
      * @return the pool for the route
      * @throws IllegalStateException if a pool exists with a different maxConnections
      */
-    HostPool getOrCreatePool(
-            Route route,
-            int maxConnections) {
+    HostPool getOrCreatePool(Route route, int maxConnections) {
         Route currentRoute = cachedRoute;
         HostPool currentPool = cachedPool;
         if (route.equals(currentRoute) && currentPool != null) {
@@ -98,10 +95,7 @@ final class H1ConnectionManager {
         });
     }
 
-    long acquireActive(
-            Route route,
-            int maxConnections,
-            long acquireTimeoutMs) throws IOException {
+    void acquireActive(Route route, int maxConnections, long acquireTimeoutMs) throws IOException {
         HostPool hostPool = getOrCreatePool(route, maxConnections);
         try {
             if (!hostPool.tryAcquireActive(acquireTimeoutMs)) {
@@ -109,7 +103,6 @@ final class H1ConnectionManager {
                         + ": " + maxConnections + " connections in use (timed out after "
                         + acquireTimeoutMs + "ms)");
             }
-            return System.nanoTime();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted while waiting for active connection permit", e);
@@ -123,26 +116,6 @@ final class H1ConnectionManager {
         }
         if (hostPool != null) {
             hostPool.releaseActive();
-        }
-    }
-
-    void trackActive(Route route, HttpConnection connection, long leaseStartedNanos) {
-        HostPool hostPool = getCachedPool(route);
-        if (hostPool == null) {
-            hostPool = pools.get(route);
-        }
-        if (hostPool != null) {
-            hostPool.trackActive(connection, leaseStartedNanos);
-        }
-    }
-
-    void releaseActive(HttpConnection connection) {
-        HostPool hostPool = getCachedPool(connection.route());
-        if (hostPool == null) {
-            hostPool = pools.get(connection.route());
-        }
-        if (hostPool != null) {
-            hostPool.releaseActive(connection);
         }
     }
 
@@ -264,7 +237,6 @@ final class H1ConnectionManager {
      */
     private static final class HostPool {
         private final ArrayDeque<PooledConnection> available;
-        private final IdentityHashMap<HttpConnection, Long> active = new IdentityHashMap<>();
         private final ReentrantLock lock = new ReentrantLock();
         private final Condition activeReleased = lock.newCondition();
         private final int maxConnections;
@@ -292,32 +264,16 @@ final class H1ConnectionManager {
             }
         }
 
-        void trackActive(HttpConnection connection, long leaseStartedNanos) {
-            lock.lock();
-            try {
-                active.put(connection, leaseStartedNanos);
-            } finally {
-                lock.unlock();
-            }
-        }
-
         void releaseActive() {
-            releaseActive(null);
-        }
-
-        void releaseActive(HttpConnection connection) {
             lock.lock();
             try {
-                releaseActiveLocked(connection);
+                releaseActiveLocked();
             } finally {
                 lock.unlock();
             }
         }
 
-        private void releaseActiveLocked(HttpConnection connection) {
-            if (connection != null) {
-                active.remove(connection);
-            }
+        private void releaseActiveLocked() {
             if (activeLeases > 0) {
                 activeLeases--;
                 activeReleased.signalAll();
@@ -345,25 +301,12 @@ final class H1ConnectionManager {
         boolean release(HttpConnection connection, boolean poolClosed) {
             lock.lock();
             try {
-                releaseActiveLocked(connection);
+                releaseActiveLocked();
                 if (!connection.isActive() || poolClosed || available.size() >= maxConnections) {
                     return false;
                 }
                 available.offerFirst(new PooledConnection(connection, System.nanoTime()));
                 activeReleased.signalAll();
-                return true;
-            } finally {
-                lock.unlock();
-            }
-        }
-
-        boolean offer(PooledConnection connection) {
-            lock.lock();
-            try {
-                if (available.size() >= maxConnections) {
-                    return false;
-                }
-                available.offerFirst(connection);
                 return true;
             } finally {
                 lock.unlock();
