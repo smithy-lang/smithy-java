@@ -10,9 +10,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.SocketTimeoutException;
-import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.http.api.HeaderName;
@@ -128,7 +126,7 @@ public final class H1Exchange implements HttpExchange {
             var headers = request.headers();
 
             // Handle Expect: 100-continue before creating output stream
-            String expectHeader = headers.firstValue("expect");
+            String expectHeader = headers.firstValue(HeaderName.EXPECT);
             if (expectHeader != null && expectHeader.equalsIgnoreCase("100-continue")) {
                 try {
                     handleExpectContinue();
@@ -139,10 +137,10 @@ public final class H1Exchange implements HttpExchange {
                 }
             }
 
-            String transferEncoding = headers.firstValue("transfer-encoding");
+            String transferEncoding = headers.firstValue(HeaderName.TRANSFER_ENCODING);
             if ("chunked".equalsIgnoreCase(transferEncoding)) {
                 // RFC 9110 Section 6.3: Content-Length MUST NOT be sent with Transfer-Encoding
-                if (headers.firstValue("content-length") != null) {
+                if (headers.firstValue(HeaderName.CONTENT_LENGTH) != null) {
                     throw new IllegalArgumentException(
                             "Request cannot have both Content-Length and Transfer-Encoding headers");
                 }
@@ -183,13 +181,13 @@ public final class H1Exchange implements HttpExchange {
         }
 
         if (noBodyResponseStatus(statusCode) || "HEAD".equalsIgnoreCase(request.method())) {
-            return new FixedLengthResponseChannel(connection.getInputStream(), connection.getReadableChannel(), 0);
+            return new FixedLengthResponseChannel(this, connection.getInputStream(), connection.getReadableChannel(), 0);
         }
 
-        return new FixedLengthResponseChannel(
-                connection.getInputStream(),
-                connection.getReadableChannel(),
-                responseContentLength);
+        return new FixedLengthResponseChannel(this,
+                                              connection.getInputStream(),
+                                              connection.getReadableChannel(),
+                                              responseContentLength);
     }
 
     @Override
@@ -578,15 +576,9 @@ public final class H1Exchange implements HttpExchange {
             int valueStart = H1Utils.headerValueStart(responseLineBuffer, colon, lineLen);
             int valueEnd = H1Utils.headerValueEnd(responseLineBuffer, valueStart, lineLen);
             String name = H1Utils.parseHeaderLine(responseLineBuffer, colon, valueStart, valueEnd, headers);
-            captureControlHeader(responseLineBuffer, valueStart, valueEnd, name);
-
-            if ("connection".equals(name)) {
-                String value = headers.firstValue(name);
-                if ("close".equalsIgnoreCase(value)) {
-                    keepAlive = false;
-                } else if ("keep-alive".equalsIgnoreCase(value)) {
-                    keepAlive = true;
-                }
+            Boolean keepAliveOverride = captureControlHeader(responseLineBuffer, valueStart, valueEnd, name);
+            if (keepAliveOverride != null) {
+                keepAlive = keepAliveOverride;
             }
         }
 
@@ -597,17 +589,34 @@ public final class H1Exchange implements HttpExchange {
         }
     }
 
-    private void captureControlHeader(byte[] line, int valueStart, int valueEnd, String name) throws IOException {
-        switch (name) {
-            case "content-length" -> responseContentLength = parseContentLength(line, valueStart, valueEnd);
-            case "transfer-encoding" -> responseChunked = containsChunked(line, valueStart, valueEnd);
-            case "content-type" -> responseContentType = new String(
+    private Boolean captureControlHeader(byte[] line, int valueStart, int valueEnd, String name) throws IOException {
+        return switch (name) {
+            case "content-length" -> {
+                responseContentLength = parseContentLength(line, valueStart, valueEnd);
+                yield null;
+            }
+            case "transfer-encoding" -> {
+                responseChunked = containsChunked(line, valueStart, valueEnd);
+                yield null;
+            }
+            case "content-type" -> {
+                responseContentType = new String(
                     line,
                     valueStart,
                     valueEnd - valueStart,
                     StandardCharsets.US_ASCII);
-            default -> {}
-        }
+                yield null;
+            }
+            case "connection" -> {
+                if (equalsIgnoreCase(line, valueStart, valueEnd, "close")) {
+                    yield false;
+                } else if (equalsIgnoreCase(line, valueStart, valueEnd, "keep-alive")) {
+                    yield true;
+                }
+                yield null;
+            }
+            default -> null;
+        };
     }
 
     private static boolean isOWS(byte b) {
@@ -715,91 +724,5 @@ public final class H1Exchange implements HttpExchange {
      */
     private static int defaultPort(String scheme) {
         return "https".equalsIgnoreCase(scheme) ? 443 : 80;
-    }
-
-    private final class FixedLengthResponseChannel implements ReadableByteChannel {
-        private final UnsyncBufferedInputStream buffered;
-        private final ReadableByteChannel channel;
-        private long remaining;
-        private boolean open = true;
-        private boolean completed;
-
-        FixedLengthResponseChannel(UnsyncBufferedInputStream buffered, ReadableByteChannel channel, long remaining) {
-            this.buffered = buffered;
-            this.channel = channel;
-            this.remaining = remaining;
-        }
-
-        @Override
-        public int read(ByteBuffer dst) throws IOException {
-            if (completed) {
-                return -1;
-            }
-            if (!open) {
-                throw new ClosedChannelException();
-            }
-            if (!dst.hasRemaining()) {
-                return 0;
-            }
-            if (remaining == 0) {
-                finish();
-                return -1;
-            }
-
-            int originalLimit = dst.limit();
-            if (remaining < dst.remaining()) {
-                dst.limit(dst.position() + (int) remaining);
-            }
-            try {
-                int total = drainBuffered(dst);
-                if (dst.hasRemaining() && remaining > 0) {
-                    int n = channel.read(dst);
-                    if (n < 0) {
-                        finish();
-                        return total == 0 ? -1 : total;
-                    }
-                    total += n;
-                    remaining -= n;
-                }
-                if (remaining == 0) {
-                    finish();
-                }
-                return total == 0 ? 0 : total;
-            } finally {
-                dst.limit(originalLimit);
-            }
-        }
-
-        private int drainBuffered(ByteBuffer dst) {
-            int bufferedBytes = Math.min(buffered.buffered(), dst.remaining());
-            if (bufferedBytes == 0) {
-                return 0;
-            }
-            dst.put(buffered.buffer(), buffered.position(), bufferedBytes);
-            buffered.consume(bufferedBytes);
-            remaining -= bufferedBytes;
-            return bufferedBytes;
-        }
-
-        @Override
-        public boolean isOpen() {
-            return open && !completed;
-        }
-
-        @Override
-        public void close() throws IOException {
-            if (open) {
-                open = false;
-                H1Exchange.this.close();
-            }
-        }
-
-        private void finish() throws IOException {
-            if (!completed) {
-                completed = true;
-                open = false;
-                H1Exchange.this.close();
-            }
-        }
     }
 }

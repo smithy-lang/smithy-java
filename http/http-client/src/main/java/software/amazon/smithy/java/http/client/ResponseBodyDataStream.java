@@ -14,6 +14,7 @@ import java.nio.channels.WritableByteChannel;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 final class ResponseBodyDataStream implements DataStream {
+
     @FunctionalInterface
     interface IOSupplier<T> {
         T get() throws IOException;

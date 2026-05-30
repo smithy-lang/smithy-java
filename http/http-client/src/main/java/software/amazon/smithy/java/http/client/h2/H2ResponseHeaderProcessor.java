@@ -91,7 +91,7 @@ final class H2ResponseHeaderProcessor {
                         throw new H2Exception(ERROR_PROTOCOL_ERROR, streamId, "Invalid Content-Length: " + value);
                     }
                 }
-                headers.addHeader(name, value);
+                headers.addHeaderCanonical(name, value);
             }
         }
 
@@ -121,7 +121,7 @@ final class H2ResponseHeaderProcessor {
             if (name.startsWith(":")) {
                 throw new H2Exception(ERROR_PROTOCOL_ERROR, streamId, "Trailer contains pseudo-header '" + name + "'");
             }
-            trailers.addHeader(name, fields.get(i + 1));
+            trailers.addHeaderCanonical(name, fields.get(i + 1));
         }
         return trailers;
     }

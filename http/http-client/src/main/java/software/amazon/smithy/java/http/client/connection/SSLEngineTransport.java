@@ -44,6 +44,9 @@ final class SSLEngineTransport implements ConnectionTransport {
     private final ReentrantLock engineLock = new ReentrantLock();
     private final Socket socket;
     private final SocketChannel socketChannel;
+    private final ByteBuffer emptyBuffer = ByteBuffer.allocate(0);
+    private final byte[] singleByteRead = new byte[1];
+    private final byte[] singleByteWrite = new byte[1];
 
     // Network-side buffers (ciphertext). netIn is always in "write" mode (position = end of data).
     private ByteBuffer netIn;
@@ -91,9 +94,9 @@ final class SSLEngineTransport implements ConnectionTransport {
     }
 
     private HandshakeStatus handshakeWrap() throws IOException {
-        ByteBuffer empty = ByteBuffer.allocate(0);
         netOut.clear();
-        SSLEngineResult result = engine.wrap(empty, netOut);
+        emptyBuffer.clear();
+        SSLEngineResult result = engine.wrap(emptyBuffer, netOut);
         if (result.getStatus() == Status.BUFFER_OVERFLOW) {
             netOut = allocateNetBuffer(engine.getSession().getPacketBufferSize());
             return result.getHandshakeStatus();
@@ -624,7 +627,8 @@ final class SSLEngineTransport implements ConnectionTransport {
             try {
                 engine.closeOutbound();
                 netOut.clear();
-                engine.wrap(ByteBuffer.allocate(0), netOut);
+                emptyBuffer.clear();
+                engine.wrap(emptyBuffer, netOut);
                 netOut.flip();
                 if (netOut.hasRemaining()) {
                     writeNetOut();
@@ -655,9 +659,8 @@ final class SSLEngineTransport implements ConnectionTransport {
     private final class TransportInputStream extends InputStream {
         @Override
         public int read() throws IOException {
-            byte[] b = new byte[1];
-            int n = SSLEngineTransport.this.read(b, 0, 1);
-            return n < 0 ? -1 : b[0] & 0xFF;
+            int n = SSLEngineTransport.this.read(singleByteRead, 0, 1);
+            return n < 0 ? -1 : singleByteRead[0] & 0xFF;
         }
 
         @Override
@@ -674,7 +677,8 @@ final class SSLEngineTransport implements ConnectionTransport {
     private final class TransportOutputStream extends OutputStream {
         @Override
         public void write(int b) throws IOException {
-            SSLEngineTransport.this.write(new byte[] {(byte) b}, 0, 1);
+            singleByteWrite[0] = (byte) b;
+            SSLEngineTransport.this.write(singleByteWrite, 0, 1);
         }
 
         @Override
