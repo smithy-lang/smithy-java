@@ -48,7 +48,7 @@ final class H1Utils {
         String name = HeaderName.canonicalize(buf, 0, colon);
 
         String value = new String(buf, valueStart, valueEnd - valueStart, StandardCharsets.US_ASCII);
-        headers.addHeaderTrusted(name, value);
+        headers.addHeaderCanonical(name, value);
         return name;
     }
 
