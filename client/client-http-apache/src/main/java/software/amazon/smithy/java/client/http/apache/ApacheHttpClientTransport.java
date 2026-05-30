@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.http.apache;
 
 import java.io.IOException;
+import java.nio.channels.CancelledKeyException;
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -138,7 +139,7 @@ public final class ApacheHttpClientTransport implements ClientTransport<HttpRequ
     public void close() throws IOException {
         try {
             client.close();
-        } catch (java.nio.channels.CancelledKeyException ignored) {}
+        } catch (CancelledKeyException ignored) {}
     }
 
     public static final class Factory implements ClientTransportFactory<HttpRequest, HttpResponse> {

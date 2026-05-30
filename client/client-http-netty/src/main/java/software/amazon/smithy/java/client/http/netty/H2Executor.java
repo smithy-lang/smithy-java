@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.http.netty;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -217,7 +218,7 @@ final class H2Executor {
         private final ResponseBodyChannel body;
         private final AtomicReference<Throwable> error;
         private int status;
-        private io.netty.buffer.CompositeByteBuf batch; // accumulated DATA within a read-complete turn
+        private CompositeByteBuf batch; // accumulated DATA within a read-complete turn
         private boolean pendingEos;
 
         ResponseHandler(

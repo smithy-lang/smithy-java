@@ -15,8 +15,8 @@ import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.ModifiableHttpRequest;
 import software.amazon.smithy.java.http.client.HttpCredentials;
 import software.amazon.smithy.java.http.client.HttpExchange;
-import software.amazon.smithy.java.http.client.connection.Route;
 import software.amazon.smithy.java.http.client.connection.ConnectionTransport;
+import software.amazon.smithy.java.http.client.connection.Route;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
 /**

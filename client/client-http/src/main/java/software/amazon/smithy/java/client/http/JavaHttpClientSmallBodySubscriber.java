@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.client.http;
 
+import java.net.http.HttpHeaders;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -47,7 +48,7 @@ final class JavaHttpClientSmallBodySubscriber implements HttpResponse.BodySubscr
     private int position;
     private final CompletableFuture<DataStream> body = new CompletableFuture<>();
 
-    JavaHttpClientSmallBodySubscriber(java.net.http.HttpHeaders headers, int contentLength) {
+    JavaHttpClientSmallBodySubscriber(HttpHeaders headers, int contentLength) {
         this.contentType = headers.firstValue("content-type").orElse(null);
         // Math.max guards against a negative Content-Length header (malformed server).
         this.bytes = new byte[Math.max(contentLength, 0)];
