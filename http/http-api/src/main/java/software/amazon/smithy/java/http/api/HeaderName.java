@@ -90,6 +90,11 @@ public final class HeaderName {
     public static final HeaderName AMZ_SDK_REQUEST = HeaderName.builtin("amz-sdk-request");
     public static final HeaderName X_AMZN_REQUESTID = HeaderName.builtin("x-amzn-requestid");
     public static final HeaderName X_AMZN_TRACE_ID = HeaderName.builtin("x-amzn-trace-id");
+    public static final HeaderName X_AMZ_CHECKSUM_CRC32 = HeaderName.builtin("x-amz-checksum-crc32");
+    public static final HeaderName X_AMZ_CHECKSUM_CRC32C = HeaderName.builtin("x-amz-checksum-crc32c");
+    public static final HeaderName X_AMZ_CHECKSUM_CRC64NVME = HeaderName.builtin("x-amz-checksum-crc64nvme");
+    public static final HeaderName X_AMZ_CHECKSUM_SHA1 = HeaderName.builtin("x-amz-checksum-sha1");
+    public static final HeaderName X_AMZ_CHECKSUM_SHA256 = HeaderName.builtin("x-amz-checksum-sha256");
     public static final HeaderName X_AMZ_CONTENT_SHA256 = HeaderName.builtin("x-amz-content-sha256");
     public static final HeaderName X_AMZ_DATE = HeaderName.builtin("x-amz-date");
     public static final HeaderName X_AMZ_REQUEST_ID = HeaderName.builtin("x-amz-request-id");
