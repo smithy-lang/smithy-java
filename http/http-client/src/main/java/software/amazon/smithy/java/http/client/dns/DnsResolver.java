@@ -94,6 +94,30 @@ public interface DnsResolver {
     }
 
     /**
+     * Creates a DNS resolver that rotates the system resolver's results across calls.
+     *
+     * @return a round-robin DNS resolver backed by the system resolver.
+     */
+    static DnsResolver roundRobin() {
+        return roundRobin(system());
+    }
+
+    /**
+     * Decorates a DNS resolver so that multi-address results are rotated across calls.
+     *
+     * <p>This preserves each resolved address set but changes the first address on subsequent calls. Connection
+     * factories that try addresses in returned order will spread new connections across multi-answer DNS records while
+     * still retaining failover to the remaining addresses.
+     *
+     * @param resolver resolver to decorate.
+     * @return a round-robin DNS resolver.
+     * @throws NullPointerException if resolver is null.
+     */
+    static DnsResolver roundRobin(DnsResolver resolver) {
+        return new RoundRobinDnsResolver(resolver);
+    }
+
+    /**
      * Creates a DNS resolver with static hostname mappings.
      *
      * <p>Returns pre-configured addresses without performing DNS queries.

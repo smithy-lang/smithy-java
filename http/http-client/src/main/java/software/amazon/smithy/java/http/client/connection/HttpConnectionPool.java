@@ -161,7 +161,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         this.maxIdleTimeNanos = builder.maxIdleTime.toNanos();
         this.acquireTimeoutMs = builder.acquireTimeout.toMillis();
         this.versionPolicy = builder.versionPolicy;
-        DnsResolver dnsResolver = builder.dnsResolver != null ? builder.dnsResolver : DnsResolver.system();
+        DnsResolver dnsResolver = builder.dnsResolver != null ? builder.dnsResolver : DnsResolver.roundRobin();
 
         this.connectionFactory = new HttpConnectionFactory(
                 builder.connectTimeout,
