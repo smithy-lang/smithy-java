@@ -32,6 +32,7 @@ final class H2DataInputStream extends InputStream {
     private int currentFlowControlBytes;
     private boolean eof = false;
     private boolean closed = false;
+    private boolean responseClosed;
     private final byte[] singleBuff = new byte[1];
     private final byte[] transferBuffer = new byte[65536];
 
@@ -132,6 +133,7 @@ final class H2DataInputStream extends InputStream {
 
         if (!exchange.awaitNextChunk(currentChunk)) {
             eof = true;
+            responseBodyComplete();
             return false;
         }
         current = currentChunk.data;
@@ -183,15 +185,16 @@ final class H2DataInputStream extends InputStream {
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         if (closed) {
             return;
         }
         closed = true;
 
-        if (currentChunk != null) {
+        if (current != null) {
             releaseCurrentChunk();
         }
+        responseBodyComplete();
     }
 
     @Override
@@ -204,12 +207,14 @@ final class H2DataInputStream extends InputStream {
 
         if (current != null && current.hasRemaining()) {
             transferred += writeCurrentTo(out);
+            releaseCurrentChunk();
         }
 
         while (true) {
             int drained = exchange.awaitChunks(localBatch, BATCH_SIZE);
             if (drained < 0) {
                 eof = true;
+                responseBodyComplete();
                 return transferred;
             }
 
@@ -243,5 +248,12 @@ final class H2DataInputStream extends InputStream {
             exchange.onDataConsumed(toCopy);
         }
         return written;
+    }
+
+    private void responseBodyComplete() throws IOException {
+        if (!responseClosed) {
+            responseClosed = true;
+            exchange.onResponseStreamClosed();
+        }
     }
 }

@@ -18,8 +18,6 @@ import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
-import software.amazon.smithy.java.http.client.BoundedInputStream;
-import software.amazon.smithy.java.http.client.DelegatedClosingInputStream;
 import software.amazon.smithy.java.http.client.HttpExchange;
 import software.amazon.smithy.java.http.client.NonClosingOutputStream;
 import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
@@ -159,8 +157,7 @@ public final class H1Exchange implements HttpExchange {
             if (statusCode == -1) {
                 parseStatusLineAndHeaders();
             }
-            // For HTTP/1.1, request is already complete, so close exchange when response closes
-            responseIn = new DelegatedClosingInputStream(createResponseStream(), in -> close());
+            responseIn = createResponseStream();
         }
         return responseIn;
     }
@@ -207,7 +204,7 @@ public final class H1Exchange implements HttpExchange {
         }
 
         if (responseChunked) {
-            responseIn = new DelegatedClosingInputStream(createResponseStream(), in -> close());
+            responseIn = createResponseStream();
             try {
                 responseIn.transferTo(OutputStream.nullOutputStream());
             } finally {
@@ -219,7 +216,7 @@ public final class H1Exchange implements HttpExchange {
         } else if (noBodyResponseStatus(statusCode) || "HEAD".equalsIgnoreCase(request.method())) {
             close();
         } else {
-            responseIn = new DelegatedClosingInputStream(createResponseStream(), in -> close());
+            responseIn = createResponseStream();
             try {
                 responseIn.transferTo(OutputStream.nullOutputStream());
             } finally {
@@ -289,6 +286,19 @@ public final class H1Exchange implements HttpExchange {
                 if (responseIn != null) {
                     responseIn.close();
                 }
+                if (requestOut != null) {
+                    requestOut.close();
+                }
+            } finally {
+                connection.releaseExchange();
+            }
+        }
+    }
+
+    void responseBodyClosed() throws IOException {
+        if (!closed) {
+            closed = true;
+            try {
                 if (requestOut != null) {
                     requestOut.close();
                 }
@@ -646,22 +656,22 @@ public final class H1Exchange implements HttpExchange {
         UnsyncBufferedInputStream socketIn = connection.getInputStream();
 
         if (responseChunked) {
-            chunkedResponseIn = new ChunkedInputStream(socketIn);
+            chunkedResponseIn = new ChunkedInputStream(socketIn, this);
             return chunkedResponseIn;
         }
 
         if (responseContentLength >= 0) {
-            return new BoundedInputStream(socketIn, responseContentLength);
+            return new FixedLengthResponseInputStream(this, socketIn, responseContentLength);
         }
 
         // No body for certain status codes or HEAD response.
         if (noBodyResponseStatus(statusCode) || "HEAD".equalsIgnoreCase(request.method())) {
-            return new BoundedInputStream(socketIn, 0);
+            return new FixedLengthResponseInputStream(this, socketIn, 0);
         }
 
         // Read until close (HTTP/1.0 style)
         connection.setKeepAlive(false);
-        return socketIn;
+        return new CloseReleasingResponseInputStream(this, socketIn);
     }
 
     /**

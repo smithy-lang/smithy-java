@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.channels.ReadableByteChannel;
 import java.util.function.Supplier;
-import software.amazon.smithy.java.http.client.DelegatedClosingOutputStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
@@ -42,13 +41,9 @@ final class H2StreamRequestBody {
 
     synchronized OutputStream outputStream() {
         if (requestOut == null) {
-            H2DataOutputStream rawOut = endStreamSent.get()
-                    ? new H2DataOutputStream(exchange, muxer, 0)
-                    : new H2DataOutputStream(exchange, muxer, muxer.getRemoteMaxFrameSize());
-            requestOut = new DelegatedClosingOutputStream(rawOut, rw -> {
-                rw.close();
-                onRequestStreamClosed.run();
-            });
+            requestOut = endStreamSent.get()
+                    ? new H2DataOutputStream(exchange, muxer, 0, onRequestStreamClosed)
+                    : new H2DataOutputStream(exchange, muxer, muxer.getRemoteMaxFrameSize(), onRequestStreamClosed);
         }
         return requestOut;
     }
