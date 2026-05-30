@@ -34,7 +34,8 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
      * @param key   pre-interned header name (must be from HeaderNameRegistry)
      * @param value header value
      */
-    void addHeaderCanonical(String key, String value) {
+    @Override
+    public void addHeaderCanonical(String key, String value) {
         ensureCapacity();
         int idx = size * 2;
         array[idx] = key;
