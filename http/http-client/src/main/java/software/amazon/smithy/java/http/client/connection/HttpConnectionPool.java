@@ -221,8 +221,7 @@ public final class HttpConnectionPool implements ConnectionPool {
             // Try to get a permit without blocking
             if (connectionPermits.tryAcquire()) {
                 // Got a permit, so now try to reuse a pooled connection first
-                H1ConnectionManager.PooledConnection pooled =
-                        h1Manager.tryAcquire(route, maxConns);
+                H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(route, maxConns);
                 if (pooled != null) {
                     notifyAcquire(pooled.connection(), true);
                     return pooled.connection();
@@ -236,8 +235,7 @@ public final class HttpConnectionPool implements ConnectionPool {
             acquirePermit();
 
             // Re-check pool after acquiring the permit, since a connection may have been released while waiting.
-            H1ConnectionManager.PooledConnection pooled =
-                    h1Manager.tryAcquire(route, maxConns);
+            H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(route, maxConns);
             if (pooled != null) {
                 notifyAcquire(pooled.connection(), true);
                 return pooled.connection();
@@ -572,9 +570,9 @@ public final class HttpConnectionPool implements ConnectionPool {
     /**
      * Resolve the effective socket factory. If the user supplied an explicit {@code socketFactory}
      * we honor it verbatim. Otherwise, if either of the buffer-size knobs was set on the builder,
-     * build a factory that uses the library defaults (TCP_NODELAY, SO_KEEPALIVE, 64 KiB send/recv)
-     * and overrides whichever buffer knob the user supplied. {@code -1} means "kernel autotune"
-     * — that direction is omitted from the socket configuration entirely.
+     * build a factory that uses the library defaults (TCP_NODELAY, SO_KEEPALIVE) and applies only
+     * the supplied buffer knobs. {@code -1} means "kernel autotune" — that direction is omitted
+     * from the socket configuration entirely.
      */
     private static HttpSocketFactory resolveSocketFactory(HttpConnectionPoolBuilder builder) {
         if (builder.socketFactoryExplicit) {
@@ -585,18 +583,15 @@ public final class HttpConnectionPool implements ConnectionPool {
         if (recv == null && send == null) {
             return builder.socketFactory;
         }
-        // Treat unset as the library default (64 KiB); -1 sentinel means "leave unset, kernel autotunes".
-        int effectiveRecv = recv != null ? recv : 64 * 1024;
-        int effectiveSend = send != null ? send : 64 * 1024;
         return (route, endpoints) -> {
             Socket socket = SocketChannel.open().socket();
             socket.setTcpNoDelay(true);
             socket.setKeepAlive(true);
-            if (effectiveSend != -1) {
-                socket.setSendBufferSize(effectiveSend);
+            if (send != null && send != -1) {
+                socket.setSendBufferSize(send);
             }
-            if (effectiveRecv != -1) {
-                socket.setReceiveBufferSize(effectiveRecv);
+            if (recv != null && recv != -1) {
+                socket.setReceiveBufferSize(recv);
             }
             return socket;
         };

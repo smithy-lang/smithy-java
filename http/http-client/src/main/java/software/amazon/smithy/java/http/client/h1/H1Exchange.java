@@ -619,9 +619,9 @@ public final class H1Exchange implements HttpExchange {
             }
             case "connection" -> {
                 if (equalsIgnoreCase(line, valueStart, valueEnd, "close")) {
-                    yield false;
+                    yield Boolean.FALSE;
                 } else if (equalsIgnoreCase(line, valueStart, valueEnd, "keep-alive")) {
-                    yield true;
+                    yield Boolean.TRUE;
                 }
                 yield null;
             }
