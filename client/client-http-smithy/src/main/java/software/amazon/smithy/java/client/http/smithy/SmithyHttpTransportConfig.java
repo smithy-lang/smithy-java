@@ -50,7 +50,7 @@ public final class SmithyHttpTransportConfig extends HttpTransportConfig {
     /**
      * SO_RCVBUF for new connection sockets. Larger values help low-concurrency throughput on
      * high-bandwidth links; smaller values bound per-connection bufferbloat at high concurrency.
-     * 64 KiB is the library default. Pass {@code -1} to defer to the kernel's autotune. See
+     * Unset or {@code -1} defers to the kernel's autotune. See
      * {@code HttpConnectionPoolBuilder#socketReceiveBufferSize(int)} for full guidance.
      */
     public Integer socketReceiveBufferSize() {
@@ -63,8 +63,7 @@ public final class SmithyHttpTransportConfig extends HttpTransportConfig {
     }
 
     /**
-     * SO_SNDBUF for new connection sockets. 64 KiB is the library default. Pass {@code -1} to
-     * defer to the kernel's autotune.
+     * SO_SNDBUF for new connection sockets. Unset or {@code -1} defers to the kernel's autotune.
      */
     public Integer socketSendBufferSize() {
         return socketSendBufferSize;

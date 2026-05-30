@@ -199,23 +199,11 @@ public final class Route {
      * @throws IllegalArgumentException if URI is invalid
      */
     public static Route from(SmithyUri uri, ProxyConfiguration proxy) {
-        String scheme = uri.getScheme();
-        if (scheme == null) {
-            throw new IllegalArgumentException("URI must have a scheme: " + uri);
-        }
-
-        String host = uri.getHost();
-        if (host == null) {
-            throw new IllegalArgumentException("URI must have a host: " + uri);
-        }
-
         int port = uri.getPort();
         if (port == -1) {
-            // Use scheme default
-            port = "https".equals(scheme) ? 443 : 80;
+            port = "https".equals(uri.getScheme()) ? 443 : 80;
         }
-
-        return new Route(scheme, host, port, proxy);
+        return new Route(uri.getScheme(), uri.getHost(), port, proxy);
     }
 
     /**
