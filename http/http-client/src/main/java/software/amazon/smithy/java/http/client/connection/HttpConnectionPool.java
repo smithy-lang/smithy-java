@@ -215,10 +215,7 @@ public final class HttpConnectionPool implements ConnectionPool {
     private HttpConnection acquireH1(Route route) throws IOException {
         int maxConns = getMaxConnectionsForRoute(route);
 
-        long leaseStartedNanos = h1Manager.acquireActive(
-                route,
-                maxConns,
-                acquireTimeoutMs);
+        h1Manager.acquireActive(route, maxConns, acquireTimeoutMs);
 
         try {
             // Try to get a permit without blocking
@@ -228,13 +225,10 @@ public final class HttpConnectionPool implements ConnectionPool {
                         h1Manager.tryAcquire(route, maxConns);
                 if (pooled != null) {
                     notifyAcquire(pooled.connection(), true);
-                    h1Manager.trackActive(route, pooled.connection(), leaseStartedNanos);
                     return pooled.connection();
                 } else {
                     // No pooled connection, but we have a permit to create one.
-                    HttpConnection connection = createH1Connection(route);
-                    h1Manager.trackActive(route, connection, leaseStartedNanos);
-                    return connection;
+                    return createH1Connection(route);
                 }
             }
 
@@ -246,13 +240,10 @@ public final class HttpConnectionPool implements ConnectionPool {
                     h1Manager.tryAcquire(route, maxConns);
             if (pooled != null) {
                 notifyAcquire(pooled.connection(), true);
-                h1Manager.trackActive(route, pooled.connection(), leaseStartedNanos);
                 return pooled.connection();
             }
 
-            HttpConnection connection = createH1Connection(route);
-            h1Manager.trackActive(route, connection, leaseStartedNanos);
-            return connection;
+            return createH1Connection(route);
         } catch (IOException | RuntimeException e) {
             h1Manager.releaseActive(route);
             throw e;
@@ -368,7 +359,7 @@ public final class HttpConnectionPool implements ConnectionPool {
             h2Manager.unregister(route, h2conn);
         } else {
             h1Manager.remove(route, connection);
-            h1Manager.releaseActive(connection);
+            h1Manager.releaseActive(route);
         }
 
         closeAndReleasePermit(connection, isError ? CloseReason.ERRORED : CloseReason.EVICTED);
