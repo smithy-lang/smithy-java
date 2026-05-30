@@ -377,7 +377,7 @@ public final class HttpConnectionPoolBuilder {
     }
 
     /**
-     * Set DNS resolver for hostname resolution (default: system resolver with 1-minute cache).
+     * Set DNS resolver for hostname resolution (default: round-robin system resolver).
      *
      * @param resolver the DNS resolver to use
      * @return this builder
