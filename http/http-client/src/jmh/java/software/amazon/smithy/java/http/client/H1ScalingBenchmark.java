@@ -32,6 +32,7 @@ import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.OperationsPerInvocation;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
@@ -68,6 +69,9 @@ import software.amazon.smithy.java.io.uri.SmithyUri;
 @Fork(value = 1, jvmArgs = {"-Xms2g", "-Xmx2g"})
 @State(Scope.Benchmark)
 public class H1ScalingBenchmark {
+
+    /** Total requests issued per @Benchmark invocation; matched on each smithy method via @OperationsPerInvocation. */
+    private static final int OPS = 1000;
 
     @Param({"1", "10", "100"})
     private int concurrency;
@@ -206,8 +210,9 @@ public class H1ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
+    @OperationsPerInvocation(OPS)
     public void h1SmithyGet(Counter counter) throws InterruptedException {
-        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+        BenchmarkSupport.runBenchmark(concurrency, OPS, (HttpRequest req) -> {
             smithyClient.send(req).close();
         }, smithyGetRequest, counter);
 
@@ -267,8 +272,9 @@ public class H1ScalingBenchmark {
 
     @Benchmark
     @Threads(1)
+    @OperationsPerInvocation(OPS)
     public void h1SmithyPost(Counter counter) throws InterruptedException {
-        BenchmarkSupport.runBenchmark(concurrency, concurrency, (HttpRequest req) -> {
+        BenchmarkSupport.runBenchmark(concurrency, OPS, (HttpRequest req) -> {
             smithyClient.send(req).close();
         }, smithyPostRequest, counter);
 
