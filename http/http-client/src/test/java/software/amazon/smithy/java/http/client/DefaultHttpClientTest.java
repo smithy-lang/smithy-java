@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.http.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -275,6 +276,41 @@ class DefaultHttpClientTest {
 
             assertThrows(IOException.class, () -> client.send(request));
             assertTrue(evicted.get(), "Connection should be evicted on exchange creation failure");
+        }
+    }
+
+    @Test
+    void readNBytesExactKnownLengthReleasesConnection() throws IOException {
+        var released = new AtomicBoolean(false);
+        var pool = new TestConnectionPool() {
+            @Override
+            protected HttpExchange createExchange() {
+                return new TestHttpExchange() {
+                    @Override
+                    public long responseContentLength() {
+                        return 9;
+                    }
+                };
+            }
+
+            @Override
+            public void release(HttpConnection connection) {
+                released.set(true);
+            }
+        };
+        try (var client = HttpClient.builder().connectionPool(pool).build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            var response = client.send(request);
+            var stream = response.body().asInputStream();
+
+            assertEquals("test", new String(stream.readNBytes(4)));
+            assertFalse(released.get(), "Connection should remain leased until the known body length is consumed");
+
+            assertEquals("-body", new String(stream.readNBytes(5)));
+            assertTrue(released.get(), "Connection should release when readNBytes consumes the known body length");
         }
     }
 

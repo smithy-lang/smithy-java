@@ -56,8 +56,10 @@ final class FixedLengthResponseChannel implements ReadableByteChannel {
             if (dst.hasRemaining() && remaining > 0) {
                 int n = channel.read(dst);
                 if (n < 0) {
-                    finish();
-                    return total == 0 ? -1 : total;
+                    if (total != 0) {
+                        return total;
+                    }
+                    throw prematureEof();
                 }
                 total += n;
                 remaining -= n;
@@ -91,7 +93,14 @@ final class FixedLengthResponseChannel implements ReadableByteChannel {
     public void close() throws IOException {
         if (open) {
             open = false;
-            h1Exchange.close();
+            try {
+                if (remaining > 0) {
+                    buffered.discard(remaining);
+                    remaining = 0;
+                }
+            } finally {
+                finish();
+            }
         }
     }
 
@@ -101,5 +110,10 @@ final class FixedLengthResponseChannel implements ReadableByteChannel {
             open = false;
             h1Exchange.close();
         }
+    }
+
+    private IOException prematureEof() {
+        return new IOException("Premature EOF: expected " + remaining
+                + " more bytes based on Content-Length");
     }
 }
