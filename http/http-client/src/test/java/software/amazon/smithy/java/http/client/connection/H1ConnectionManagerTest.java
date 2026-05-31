@@ -50,7 +50,7 @@ class H1ConnectionManagerTest {
         var result = manager.tryAcquire(TEST_ROUTE, 10);
 
         assertNotNull(result, "Should return pooled connection");
-        assertEquals(connection, result.connection(), "Should return the same connection");
+        assertEquals(connection, result, "Should return the same connection");
     }
 
     @Test
@@ -117,7 +117,7 @@ class H1ConnectionManagerTest {
         var result = manager.tryAcquire(TEST_ROUTE, 10);
 
         assertNotNull(result, "Should return valid connection");
-        assertEquals(validConnection, result.connection(), "Should skip invalid and return valid");
+        assertEquals(validConnection, result, "Should skip invalid and return valid");
     }
 
     @Test
