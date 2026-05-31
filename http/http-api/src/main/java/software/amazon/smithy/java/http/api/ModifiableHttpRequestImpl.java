@@ -19,6 +19,10 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
 
     ModifiableHttpRequestImpl() {}
 
+    ModifiableHttpRequestImpl(ModifiableHttpHeaders headers) {
+        this.headers = Objects.requireNonNull(headers);
+    }
+
     ModifiableHttpRequestImpl(ModifiableHttpRequestImpl copy) {
         this.httpVersion = copy.httpVersion;
         this.method = copy.method;

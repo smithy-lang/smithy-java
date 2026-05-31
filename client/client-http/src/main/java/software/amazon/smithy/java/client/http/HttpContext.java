@@ -9,6 +9,7 @@ import java.time.Duration;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HttpRequestFactory;
 
 /**
  * {@link Context} keys used with HTTP-based clients.
@@ -38,6 +39,15 @@ public final class HttpContext {
      */
     public static final Context.Key<Boolean> DISABLE_REQUEST_COMPRESSION =
             Context.key("If request compression is disabled");
+
+    /**
+     * A transport-supplied factory for the request's mutable containers (headers, and in future the
+     * body), letting an HTTP protocol serialize the request directly into the transport's native
+     * representation. Published by a transport via {@code ClientTransport.contributeRequestFactory}
+     * and read by the protocol's {@code createRequest}. Absent for transports that do not opt in.
+     */
+    public static final Context.Key<HttpRequestFactory> TRANSPORT_REQUEST_FACTORY =
+            Context.key("Transport-supplied HTTP request factory");
 
     private HttpContext() {}
 }

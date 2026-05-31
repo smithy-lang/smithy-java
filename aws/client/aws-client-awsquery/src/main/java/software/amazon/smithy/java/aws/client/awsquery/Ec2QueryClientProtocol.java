@@ -80,7 +80,7 @@ public final class Ec2QueryClientProtocol extends HttpClientProtocol {
 
         ByteBuffer body = serializer.finish();
 
-        return HttpRequest.create()
+        return HttpRequest.create(requestFactory(context))
                 .setMethod("POST")
                 .setUri(endpoint)
                 .setHeader(HeaderName.CONTENT_TYPE, CONTENT_TYPE)

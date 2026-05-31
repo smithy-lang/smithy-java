@@ -10,7 +10,6 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.DefaultHttpContent;
-import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -100,11 +99,11 @@ final class H1Executor {
         boolean hasBody = request.body() != null && request.body().contentLength() != 0;
         long contentLength = hasBody ? request.body().contentLength() : 0;
 
-        var nettyReq = new DefaultHttpRequest(
+        var nettyReq = NettyUtils.buildH1Request(
+                request,
                 HttpVersion.HTTP_1_1,
                 HttpMethod.valueOf(request.method()),
                 buildRequestLine(request));
-        NettyUtils.fillH1Headers(request, nettyReq.headers());
         if (hasBody && contentLength > 0) {
             nettyReq.headers().set(HttpHeaderNames.CONTENT_LENGTH, contentLength);
         } else if (hasBody) {
