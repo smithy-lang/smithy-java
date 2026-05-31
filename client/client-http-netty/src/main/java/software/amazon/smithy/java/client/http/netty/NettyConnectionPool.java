@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.net.ssl.SSLException;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -49,9 +50,12 @@ final class NettyConnectionPool implements AutoCloseable {
     private final SslContext defaultSslCtx;
 
     private final ReentrantLock lock = new ReentrantLock();
+    private final Condition capacityAvailable = lock.newCondition();
     private final Map<Route, Deque<NettyConnection>> idle = new HashMap<>();
     private final Map<Route, Integer> connectionCounts = new HashMap<>();
     private boolean closed;
+
+    private SslContext cachedSslCtx;
 
     NettyConnectionPool(EventLoopGroup group, NettyHttpTransportConfig config, SslContext defaultSslCtx) {
         this.group = group;
@@ -64,20 +68,48 @@ final class NettyConnectionPool implements AutoCloseable {
      * Caller must eventually call {@link #release(NettyConnection)} or {@link #dispose(NettyConnection)}.
      */
     NettyConnection acquire(Route route) throws IOException {
+        return acquire(route, false);
+    }
+
+    /**
+     * Acquire a guaranteed-fresh connection, bypassing reuse of any pooled connection. Used by the
+     * stale-connection retry path so a request that failed on a server-closed keep-alive does not
+     * immediately land on another potentially-stale pooled connection.
+     */
+    NettyConnection acquireFresh(Route route) throws IOException {
+        return acquire(route, true);
+    }
+
+    private NettyConnection acquire(Route route, boolean forceFresh) throws IOException {
         long deadlineNanos = System.nanoTime() + config.acquireTimeout().toNanos();
         while (true) {
             NettyConnection existing;
-            boolean shouldOpen = false;
             lock.lock();
             try {
                 if (closed)
                     throw new IOException("Pool closed");
-                existing = pickReusable(route);
+                existing = forceFresh ? null : pickReusable(route);
                 if (existing == null) {
                     int count = connectionCounts.getOrDefault(route, 0);
                     if (count < config.maxConnectionsPerHost()) {
+                        // Reserve a slot, then open the connection outside the lock below.
                         connectionCounts.merge(route, 1, Integer::sum);
-                        shouldOpen = true;
+                    } else {
+                        // Pool full with no reusable connection: wait to be signalled by a
+                        // release/dispose rather than sleep-polling. Loop re-checks on wakeup.
+                        long remaining = deadlineNanos - System.nanoTime();
+                        if (remaining <= 0) {
+                            throw new IOException("Timed out acquiring connection for " + route);
+                        }
+                        try {
+                            // Return value ignored: the enclosing while-loop revalidates capacity
+                            // and the deadline on the next iteration (also handles spurious wakeups).
+                            long ignored = capacityAvailable.awaitNanos(remaining);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            throw new IOException("Interrupted acquiring connection", e);
+                        }
+                        continue;
                     }
                 }
             } finally {
@@ -87,32 +119,20 @@ final class NettyConnectionPool implements AutoCloseable {
             if (existing != null) {
                 return existing;
             }
-            if (shouldOpen) {
-                try {
-                    return openNewConnection(route);
-                } catch (Throwable t) {
-                    lock.lock();
-                    try {
-                        connectionCounts.merge(route, -1, Integer::sum);
-                    } finally {
-                        lock.unlock();
-                    }
-                    if (t instanceof IOException io)
-                        throw io;
-                    throw new IOException("Failed to open connection", t);
-                }
-            }
-
-            // Pool full, no reusable. Wait briefly then retry.
-            long remaining = deadlineNanos - System.nanoTime();
-            if (remaining <= 0) {
-                throw new IOException("Timed out acquiring connection for " + route);
-            }
+            // We reserved a slot under the lock above; open the new connection now.
             try {
-                Thread.sleep(Math.min(10, TimeUnit.NANOSECONDS.toMillis(remaining)));
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException("Interrupted acquiring connection", e);
+                return openNewConnection(route);
+            } catch (Throwable t) {
+                lock.lock();
+                try {
+                    connectionCounts.merge(route, -1, Integer::sum);
+                    capacityAvailable.signalAll();
+                } finally {
+                    lock.unlock();
+                }
+                if (t instanceof IOException io)
+                    throw io;
+                throw new IOException("Failed to open connection", t);
             }
         }
     }
@@ -128,11 +148,13 @@ final class NettyConnectionPool implements AutoCloseable {
         var dq = idle.get(route);
         if (dq == null)
             return null;
+        long reuseIdleNanos = config.reuseIdleTimeout().toNanos();
+        long now = System.nanoTime();
         while (!dq.isEmpty()) {
             var c = dq.peekFirst();
             if (!c.isActive()) {
                 dq.pollFirst();
-                connectionCounts.merge(route, -1, Integer::sum);
+                evictDead(c);
                 continue;
             }
             if (c.mode == NettyConnection.Mode.H2) {
@@ -144,12 +166,26 @@ final class NettyConnectionPool implements AutoCloseable {
                 // H2 maxed; skip (don't remove; might have capacity later after releases)
                 return null;
             } else {
-                // H1: exclusive use; remove from idle
+                if (reuseIdleNanos > 0 && now - c.lastUsedNanos >= reuseIdleNanos) {
+                    dq.pollFirst();
+                    evictDead(c);
+                    continue;
+                }
                 dq.pollFirst();
+                c.fromReuse = true;
                 return c;
             }
         }
         return null;
+    }
+
+    private void evictDead(NettyConnection c) {
+        if (c.markClosedOnce()) {
+            connectionCounts.merge(c.route, -1, Integer::sum);
+            try {
+                c.channel.close();
+            } catch (Exception ignored) {}
+        }
     }
 
     /**
@@ -175,16 +211,16 @@ final class NettyConnectionPool implements AutoCloseable {
                 idle.computeIfAbsent(c.route, k -> new ArrayDeque<>()).addLast(c);
                 c.lastUsedNanos = System.nanoTime();
             }
+            capacityAvailable.signalAll();
         } finally {
             lock.unlock();
         }
     }
 
-    /**
-     * Permanently dispose of a connection (close, reduce count, remove from idle).
-     */
     void dispose(NettyConnection c) {
-        c.markClosed();
+        if (!c.markClosedOnce()) {
+            return;
+        }
         try {
             c.channel.close();
         } catch (Exception ignored) {}
@@ -195,6 +231,9 @@ final class NettyConnectionPool implements AutoCloseable {
                 dq.remove(c);
             }
             connectionCounts.merge(c.route, -1, Integer::sum);
+            // Freed a slot for the route — a waiter may now open a new connection. signalAll
+            // because one shared condition serves all routes (see acquire()).
+            capacityAvailable.signalAll();
         } finally {
             lock.unlock();
         }
@@ -207,19 +246,23 @@ final class NettyConnectionPool implements AutoCloseable {
         long cutoff = System.nanoTime() - config.maxIdleTime().toNanos();
         lock.lock();
         try {
+            boolean freed = false;
             for (var dq : idle.values()) {
                 Iterator<NettyConnection> it = dq.iterator();
                 while (it.hasNext()) {
                     var c = it.next();
                     if (c.lastUsedNanos < cutoff && c.inFlightStreams.get() == 0) {
                         it.remove();
-                        try {
-                            c.channel.close();
-                        } catch (Exception ignored) {}
-                        c.markClosed();
-                        connectionCounts.merge(c.route, -1, Integer::sum);
+                        // markClosedOnce + decrement so the close-future dispose listener does not
+                        // double-decrement the route count.
+                        evictDead(c);
+                        freed = true;
                     }
                 }
+            }
+            if (freed) {
+                // Freed one or more slots — wake all waiters to re-check capacity.
+                capacityAvailable.signalAll();
             }
         } finally {
             lock.unlock();
@@ -241,6 +284,8 @@ final class NettyConnectionPool implements AutoCloseable {
                 dq.clear();
             }
             connectionCounts.clear();
+            // Wake every waiter so they observe `closed` and fail fast instead of blocking.
+            capacityAvailable.signalAll();
         } finally {
             lock.unlock();
         }
@@ -271,10 +316,25 @@ final class NettyConnectionPool implements AutoCloseable {
                         new WriteBufferWaterMark(config.writeBufferLowWater(), config.writeBufferHighWater()));
     }
 
+    private SslContext sslContext(HttpVersionPolicy policy) throws SSLException {
+        if (defaultSslCtx != null) {
+            return defaultSslCtx;
+        }
+        lock.lock();
+        try {
+            if (cachedSslCtx == null) {
+                cachedSslCtx = NettyUtils.buildSslContext(policy.alpnProtocols(), /*trustAll=*/true);
+            }
+            return cachedSslCtx;
+        } finally {
+            lock.unlock();
+        }
+    }
+
     private NettyConnection openTlsConnection(Route route, HttpVersionPolicy policy) throws IOException {
         SslContext sslCtx;
         try {
-            sslCtx = NettyUtils.buildSslContext(policy.alpnProtocols(), /*trustAll=*/true);
+            sslCtx = sslContext(policy);
         } catch (SSLException e) {
             throw new IOException("Failed to build SSL context", e);
         }

@@ -54,13 +54,13 @@ class RouteTest {
 
     @Test
     void fromUriThrowsOnMissingScheme() {
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(NullPointerException.class,
                 () -> Route.from(SmithyUri.of("example.com/path")));
     }
 
     @Test
     void fromUriThrowsOnMissingHost() {
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(NullPointerException.class,
                 () -> Route.from(SmithyUri.of("http:///path")));
     }
 
