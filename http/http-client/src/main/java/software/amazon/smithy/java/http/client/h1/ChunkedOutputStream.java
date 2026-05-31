@@ -8,6 +8,7 @@ package software.amazon.smithy.java.http.client.h1;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.util.Objects;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 
@@ -25,7 +26,7 @@ final class ChunkedOutputStream extends OutputStream {
     private HttpHeaders trailers;
 
     // Default chunk size: 8KB
-    private static final int DEFAULT_CHUNK_SIZE = 8192;
+    static final int DEFAULT_CHUNK_SIZE = 8192;
 
     /**
      * Create a ChunkedOutputStream with default chunk size (8KB).
@@ -49,6 +50,14 @@ final class ChunkedOutputStream extends OutputStream {
 
         this.delegate = delegate;
         this.buffer = new byte[chunkSize];
+    }
+
+    ChunkedOutputStream(UnsyncBufferedOutputStream delegate, byte[] buffer) {
+        this.delegate = Objects.requireNonNull(delegate, "delegate");
+        this.buffer = Objects.requireNonNull(buffer, "buffer");
+        if (buffer.length == 0) {
+            throw new IllegalArgumentException("buffer must not be empty");
+        }
     }
 
     /**
