@@ -305,6 +305,30 @@ class H1ExchangeTest {
     }
 
     @Test
+    void discardsChunkedBodyWithoutOpeningResponseStream() throws IOException {
+        var conn = connection(
+                "HTTP/1.1 200 OK\r\n"
+                        + "Transfer-Encoding: chunked\r\n"
+                        + "\r\n"
+                        + "5;ignored=extension\r\n"
+                        + "hello\r\n"
+                        + "0\r\n"
+                        + "Trailer: value\r\n"
+                        + "\r\n"
+                        + "HTTP/1.1 204 No Content\r\n"
+                        + "Content-Length: 0\r\n"
+                        + "\r\n");
+
+        var first = conn.newExchange(getRequest());
+        assertEquals(200, first.responseStatusCode());
+        first.discardResponseBody();
+
+        var second = conn.newExchange(getRequest());
+        assertEquals(204, second.responseStatusCode());
+        second.close();
+    }
+
+    @Test
     void headResponseIgnoresContentLengthWhenCreatingBody() throws IOException {
         var conn = connection(
                 "HTTP/1.1 200 OK\r\n"
