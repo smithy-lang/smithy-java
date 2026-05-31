@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.http.client.connection;
 
+import io.netty.util.Timeout;
+import io.netty.util.Timer;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,11 +14,11 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
@@ -48,6 +50,9 @@ final class SSLEngineTransport implements ConnectionTransport {
     private final ReentrantLock engineLock = new ReentrantLock();
     private final Socket socket;
     private final SocketChannel socketChannel;
+    // Shared watchdog enforcing the read deadline on the blocking-channel path. Null => fall back to
+    // an untimed blocking read (deadline still bounded by the request-level timeout above the stack).
+    private final Timer readTimer;
     private final ByteBuffer emptyBuffer = ByteBuffer.allocate(0);
     private final byte[] singleByteRead = new byte[1];
     private final byte[] singleByteWrite = new byte[1];
@@ -63,16 +68,22 @@ final class SSLEngineTransport implements ConnectionTransport {
     private boolean eof;
 
     SSLEngineTransport(Socket socket, SSLEngine engine) throws IOException {
-        this(socket, engine, () -> {});
+        this(socket, engine, () -> {}, null);
     }
 
     SSLEngineTransport(Socket socket, SSLEngine engine, Runnable engineReleaser) throws IOException {
+        this(socket, engine, engineReleaser, null);
+    }
+
+    SSLEngineTransport(Socket socket, SSLEngine engine, Runnable engineReleaser, Timer readTimer)
+            throws IOException {
         this.socket = socket;
         this.socketIn = socket.getInputStream();
         this.socketOut = socket.getOutputStream();
         this.socketChannel = socket.getChannel();
         this.engine = engine;
         this.engineReleaser = engineReleaser != null ? engineReleaser : () -> {};
+        this.readTimer = readTimer;
 
         SSLSession session = engine.getSession();
         int packetSize = session.getPacketBufferSize();
@@ -182,9 +193,11 @@ final class SSLEngineTransport implements ConnectionTransport {
         int n;
         if (socketChannel != null) {
             int timeoutMs = socket.getSoTimeout();
-            if (timeoutMs > 0 && socketChannel.isBlocking()) {
+            if (timeoutMs > 0 && readTimer != null) {
                 n = readWithTimeout(timeoutMs);
             } else {
+                // No deadline (or no shared timer): a plain blocking channel read parks the calling
+                // virtual thread cleanly. The request-level timeout above the stack still bounds it.
                 n = socketChannel.read(netIn);
             }
         } else {
@@ -200,26 +213,35 @@ final class SSLEngineTransport implements ConnectionTransport {
         return true;
     }
 
+    /**
+     * Blocking-channel read with a watchdog-enforced deadline. A blocking {@link SocketChannel#read}
+     * ignores {@code SO_TIMEOUT}, so instead of opening an epoll {@code Selector} per read (which cost
+     * an {@code epoll_create1}/{@code eventfd}/{@code close} cycle and a blocking-mode flip every call)
+     * the read parks the virtual thread and a single shared {@link #readTimer} closes the channel if
+     * the deadline passes — waking the parked read with an {@code AsynchronousCloseException} that is
+     * surfaced as a {@link SocketTimeoutException}. The channel stays in blocking mode throughout.
+     */
     private int readWithTimeout(int timeoutMs) throws IOException {
-        boolean wasBlocking = socketChannel.isBlocking();
-        try (Selector selector = Selector.open()) {
-            socketChannel.configureBlocking(false);
-            socketChannel.register(selector, SelectionKey.OP_READ);
-            while (true) {
-                int ready = selector.select(timeoutMs);
-                if (ready == 0) {
-                    throw new SocketTimeoutException("Read timed out");
-                }
-                selector.selectedKeys().clear();
-                int n = socketChannel.read(netIn);
-                if (n != 0) {
-                    return n;
-                }
+        Timeout watchdog = readTimer.newTimeout(t -> closeChannelQuietly(), timeoutMs, TimeUnit.MILLISECONDS);
+        try {
+            return socketChannel.read(netIn);
+        } catch (ClosedChannelException e) {
+            // The watchdog (or a concurrent close) closed the channel out from under the read
+            // (AsynchronousCloseException is the watchdog case; both extend ClosedChannelException).
+            if (watchdog.isExpired()) {
+                throw new SocketTimeoutException("Read timed out after " + timeoutMs + "ms");
             }
+            throw e;
         } finally {
-            if (wasBlocking) {
-                socketChannel.configureBlocking(true);
-            }
+            watchdog.cancel();
+        }
+    }
+
+    private void closeChannelQuietly() {
+        try {
+            socketChannel.close();
+        } catch (IOException ignored) {
+            // best effort — the parked read will unblock with AsynchronousCloseException
         }
     }
 
