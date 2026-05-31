@@ -47,6 +47,7 @@ record HttpConnectionFactory(
         Duration writeTimeout,
         SSLContext sslContext,
         SSLParameters sslParameters,
+        ClientSslEngineFactory sslEngineFactory,
         HttpVersionPolicy versionPolicy,
         DnsResolver dnsResolver,
         HttpSocketFactory socketFactory,
@@ -99,7 +100,10 @@ record HttpConnectionFactory(
 
         ConnectionTransport transport;
         if (route.isSecure()) {
-            transport = versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1
+            // With a custom SSLEngine factory (e.g. native BoringSSL), drive every secure connection
+            // — HTTP/1.1 included — through the zero-copy SSLEngineTransport so the native engine is
+            // used uniformly. Without it, keep the JDK SSLSocket fast-path for ENFORCE_HTTP_1_1.
+            transport = (versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1 && sslEngineFactory == null)
                     ? performTlsSocketHandshake(socket, route)
                     : performTlsHandshake(socket, route);
         } else {
@@ -110,21 +114,39 @@ record HttpConnectionFactory(
     }
 
     private ConnectionTransport performTlsHandshake(Socket socket, Route route) throws IOException {
+        Runnable releaser = () -> {};
         try {
-            SSLEngine engine = createClientEngine(route);
+            SSLEngine engine;
+            if (sslEngineFactory != null) {
+                var handle = sslEngineFactory.newEngine(
+                        route.host(),
+                        route.port(),
+                        List.of(versionPolicy.alpnProtocols()));
+                engine = handle.engine();
+                releaser = handle.releaser();
+            } else {
+                engine = createClientEngine(route);
+            }
 
             int originalTimeout = socket.getSoTimeout();
             socket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
             try {
-                SSLEngineTransport transport = new SSLEngineTransport(socket, engine);
+                SSLEngineTransport transport = new SSLEngineTransport(socket, engine, releaser);
                 transport.handshake();
                 return transport;
             } finally {
                 socket.setSoTimeout(originalTimeout);
             }
         } catch (IOException e) {
+            // Handshake/setup failed before SSLEngineTransport took ownership of the engine; release
+            // any native engine resources here so they don't leak on the error path.
+            releaser.run();
             closeQuietly(socket);
             throw new IOException("TLS handshake failed for " + route.host(), e);
+        } catch (RuntimeException e) {
+            releaser.run();
+            closeQuietly(socket);
+            throw e;
         }
     }
 

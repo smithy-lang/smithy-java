@@ -169,6 +169,7 @@ public final class HttpConnectionPool implements ConnectionPool {
                 builder.writeTimeout,
                 builder.sslContext,
                 builder.sslParameters,
+                builder.sslEngineFactory,
                 builder.versionPolicy,
                 dnsResolver,
                 resolveSocketFactory(builder),
