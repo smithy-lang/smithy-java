@@ -67,10 +67,10 @@ public final class H1Exchange implements HttpExchange {
     private static final byte[] HOST_HEADER = "Host: ".getBytes(StandardCharsets.US_ASCII);
 
     private final H1Connection connection;
-    private final HttpRequest request;
     private final Route route;
-    private final byte[] responseLineBuffer; // Reused buffer for header parsing
+    private final byte[] responseLineBuffer = new byte[H1Connection.RESPONSE_LINE_BUFFER_SIZE];
 
+    private HttpRequest request;
     private OutputStream requestOut;
     private InputStream responseIn;
     private ChunkedInputStream chunkedResponseIn; // Reference for trailer access
@@ -85,31 +85,52 @@ public final class H1Exchange implements HttpExchange {
     private boolean closed;
 
     /**
-     * Create a new HTTP/1.1 exchange.
+     * Create a reusable HTTP/1.1 exchange.
+     *
+     * @param connection the HTTP/1.1 connection to use
+     * @param route the route this connection is for (needed for proxy formatting)
+     */
+    H1Exchange(H1Connection connection, Route route) {
+        this.connection = connection;
+        this.route = route;
+    }
+
+    /**
+     * Initializes this exchange for the next request on the connection.
      *
      * <p>Immediately writes request line and headers to the connection.
      *
-     * @param connection the HTTP/1.1 connection to use
      * @param request the HTTP request to send
-     * @param route the route this connection is for (needed for proxy formatting)
-     * @param lineBuffer reusable buffer for reading response header lines
+     * @return this reusable exchange
      * @throws IOException if writing request line or headers fails
      */
-    H1Exchange(H1Connection connection, HttpRequest request, Route route, byte[] lineBuffer) throws IOException {
-        this.connection = connection;
+    H1Exchange init(HttpRequest request) throws IOException {
         this.request = request;
-        this.route = route;
-        this.responseLineBuffer = lineBuffer;
+        this.requestOut = null;
+        this.responseIn = null;
+        this.chunkedResponseIn = null;
+        this.responseHeaders = null;
+        this.responseVersion = null;
+        this.responseContentType = null;
+        this.responseContentLength = -1;
+        this.responseChunked = false;
+        this.statusCode = -1;
+        this.requestWritten = false;
+        this.expectContinueHandled = false;
+        this.closed = false;
 
         // Write request line and headers directly to output buffer
         UnsyncBufferedOutputStream out = connection.getOutputStream();
         writeRequestLine(out);
         writeHeaders(out, request.headers());
+
         // Only flush if no body - otherwise body write will flush
         if (request.body() == null || request.body().contentLength() == 0) {
             out.flush();
             requestWritten = true;
         }
+
+        return this;
     }
 
     @Override
@@ -413,7 +434,7 @@ public final class H1Exchange implements HttpExchange {
             out.writeAscii(uri.toString());
         } else {
             String path = uri.getPath();
-            if (path == null || path.isEmpty()) {
+            if (path.isEmpty()) {
                 out.write('/');
             } else {
                 out.writeAscii(path);
