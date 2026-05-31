@@ -171,8 +171,6 @@ public final class HttpConnectionPool implements ConnectionPool {
                 builder.versionPolicy,
                 dnsResolver,
                 resolveSocketFactory(builder),
-                builder.useConnectionAgentForH2c,
-                builder.useConnectionAgentForH2,
                 builder.usePlatformReaderForH2,
                 builder.h2InitialWindowSize,
                 builder.h2MaxFrameSize,
