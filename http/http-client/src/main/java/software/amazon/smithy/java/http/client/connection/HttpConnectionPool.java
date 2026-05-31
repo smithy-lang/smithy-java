@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.http.client.connection;
 
+import io.netty.util.HashedWheelTimer;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.channels.SocketChannel;
@@ -148,6 +150,12 @@ public final class HttpConnectionPool implements ConnectionPool {
     private final Thread cleanupThread;
     private volatile boolean closed = false;
 
+    // Shared single-thread watchdog enforcing read deadlines for the SSLEngineTransport channel path.
+    // A blocking SocketChannel.read ignores SO_TIMEOUT, so instead of opening an epoll Selector per
+    // read (epoll_create1/eventfd/close churn) the read parks the VT and this timer closes the channel
+    // if the deadline passes. One wheel for the whole pool — O(1) arm/cancel per read.
+    private final HashedWheelTimer readTimer;
+
     // Listeners for pool lifecycle events
     private final List<ConnectionPoolListener> listeners;
     private final boolean hasListeners;
@@ -162,6 +170,11 @@ public final class HttpConnectionPool implements ConnectionPool {
         this.versionPolicy = builder.versionPolicy;
         DnsResolver dnsResolver = builder.dnsResolver != null ? builder.dnsResolver : DnsResolver.roundRobin();
 
+        this.readTimer = new HashedWheelTimer(
+                new DefaultThreadFactory("smithy-http-read-timeout", true),
+                100,
+                TimeUnit.MILLISECONDS);
+
         this.connectionFactory = new HttpConnectionFactory(
                 builder.connectTimeout,
                 builder.tlsNegotiationTimeout,
@@ -173,6 +186,7 @@ public final class HttpConnectionPool implements ConnectionPool {
                 builder.versionPolicy,
                 dnsResolver,
                 resolveSocketFactory(builder),
+                readTimer,
                 builder.usePlatformReaderForH2,
                 builder.h2InitialWindowSize,
                 builder.h2MaxFrameSize,
@@ -364,6 +378,7 @@ public final class HttpConnectionPool implements ConnectionPool {
 
         closed = true;
         cleanupThread.interrupt();
+        readTimer.stop();
 
         List<IOException> exceptions = new ArrayList<>();
 
@@ -400,6 +415,7 @@ public final class HttpConnectionPool implements ConnectionPool {
 
         closed = true; // Stop new acquires
         cleanupThread.interrupt();
+        readTimer.stop();
 
         // Wait for connections to be closed (permits represent physical connections, not streams).
         // For HTTP/2, permits are released when the connection closes, not when streams finish.

@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.http.client.connection;
 
+import io.netty.util.Timer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
@@ -51,6 +52,7 @@ record HttpConnectionFactory(
         HttpVersionPolicy versionPolicy,
         DnsResolver dnsResolver,
         HttpSocketFactory socketFactory,
+        Timer readTimer,
         boolean usePlatformReaderForH2,
         int h2InitialWindowSize,
         int h2MaxFrameSize,
@@ -131,7 +133,7 @@ record HttpConnectionFactory(
             int originalTimeout = socket.getSoTimeout();
             socket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
             try {
-                SSLEngineTransport transport = new SSLEngineTransport(socket, engine, releaser);
+                SSLEngineTransport transport = new SSLEngineTransport(socket, engine, releaser, readTimer);
                 transport.handshake();
                 return transport;
             } finally {

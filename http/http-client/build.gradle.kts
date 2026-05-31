@@ -25,6 +25,10 @@ dependencies {
     api(project(":context"))
     api(project(":logging"))
 
+    // netty-common provides HashedWheelTimer: a single shared timer wheel backs the per-read
+    // deadline watchdog in SSLEngineTransport (arm/cancel is O(1), no per-read epoll Selector).
+    implementation("io.netty:netty-common:4.2.13.Final")
+
     // Netty for HTTP/2 integration tests
     testImplementation("io.netty:netty-all:4.2.7.Final")
     testImplementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
