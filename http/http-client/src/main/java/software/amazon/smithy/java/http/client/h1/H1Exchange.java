@@ -668,7 +668,7 @@ public final class H1Exchange implements HttpExchange {
         }
 
         if (responseChunked) {
-            chunkedResponseIn = new ChunkedInputStream(socketIn, this);
+            chunkedResponseIn = new ChunkedInputStream(socketIn, this, responseLineBuffer);
             return chunkedResponseIn;
         }
 
