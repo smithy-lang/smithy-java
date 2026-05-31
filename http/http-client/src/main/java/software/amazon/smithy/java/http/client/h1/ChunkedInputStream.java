@@ -117,19 +117,50 @@ final class ChunkedInputStream extends InputStream {
             return 0;
         }
 
-        byte[] buffer = new byte[8192];
         long remaining = n;
 
         while (remaining > 0) {
-            int toRead = (int) Math.min(buffer.length, remaining);
-            int bytesRead = read(buffer, 0, toRead);
-            if (bytesRead == -1) {
-                break;
+            if (chunkRemaining == -1 || chunkRemaining == 0) {
+                if (!readNextChunk()) {
+                    break;
+                }
             }
-            remaining -= bytesRead;
+
+            long toDiscard = Math.min(remaining, chunkRemaining);
+            delegate.discard(toDiscard);
+            chunkRemaining -= toDiscard;
+            remaining -= toDiscard;
         }
 
         return n - remaining;
+    }
+
+    @Override
+    public long transferTo(OutputStream out) throws IOException {
+        if (closed || eof) {
+            return 0;
+        }
+
+        byte[] buffer = delegate.buffer();
+        long transferred = 0;
+
+        while (!eof) {
+            if (chunkRemaining == -1 || chunkRemaining == 0) {
+                if (!readNextChunk()) {
+                    break;
+                }
+            }
+
+            int toRead = (int) Math.min(buffer.length, chunkRemaining);
+            int bytesRead = read(buffer, 0, toRead);
+            if (bytesRead < 0) {
+                break;
+            }
+            out.write(buffer, 0, bytesRead);
+            transferred += bytesRead;
+        }
+
+        return transferred;
     }
 
     @Override
