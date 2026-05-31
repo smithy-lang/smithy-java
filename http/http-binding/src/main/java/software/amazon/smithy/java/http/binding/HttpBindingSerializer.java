@@ -30,6 +30,7 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HttpRequestFactory;
 import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -55,6 +56,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private final boolean allowEmptyStructPayload;
     private final HeaderErrorSerializer headerErrorSerializer;
     private final Context context;
+    private final HttpRequestFactory requestFactory;
     private ModifiableHttpHeaders headers;
     private QueryStringBuilder queryStringParams;
 
@@ -91,7 +93,8 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             boolean isFailure,
             boolean allowEmptyStructPayload,
             HeaderErrorSerializer headerErrorSerializer,
-            Context context
+            Context context,
+            HttpRequestFactory requestFactory
     ) {
         this.operationBinding = operationBinding;
         responseStatus = operationBinding.defaultResponseStatus();
@@ -103,6 +106,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         this.allowEmptyStructPayload = allowEmptyStructPayload;
         this.headerErrorSerializer = headerErrorSerializer;
         this.context = context;
+        this.requestFactory = requestFactory;
     }
 
     @Override
@@ -143,7 +147,12 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             }
         }
 
-        headers = HttpHeaders.ofModifiable(headerCount);
+        // Allocate the header set from the transport-supplied factory when present (so header
+        // writes land directly in the transport's native container), else the default array impl.
+        // Only the request direction opts in; responses always use the default.
+        headers = (!isResponse && requestFactory != null)
+                ? requestFactory.newRequestHeaders(headerCount)
+                : HttpHeaders.ofModifiable(headerCount);
 
         // Append the static @http URI query literals
         String[] qKeys = operationBinding.queryLiteralKeys();

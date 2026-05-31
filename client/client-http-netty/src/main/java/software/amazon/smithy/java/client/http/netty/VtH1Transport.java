@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.client.http.netty;
 
+import io.netty.util.ResourceLeakDetector;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -21,6 +22,17 @@ import software.amazon.smithy.java.logging.InternalLogger;
 final class VtH1Transport implements AutoCloseable {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(VtH1Transport.class);
+
+    static {
+        // Netty defaults the buffer leak detector to SIMPLE, which captures a Throwable stack trace
+        // for a sampled fraction of every buffer allocate/release. On this hot client path that
+        // showed up as ~1% CPU in Throwable.fillInStackTrace with no diagnostic value. Disable it
+        // unless the operator has explicitly chosen a level via either Netty system property.
+        if (System.getProperty("io.netty.leakDetection.level") == null
+                && System.getProperty("io.netty.leakDetectionLevel") == null) {
+            ResourceLeakDetector.setLevel(io.netty.util.ResourceLeakDetector.Level.DISABLED);
+        }
+    }
 
     private final VtConnectionPool pool;
     private final VtTlsContext tlsContext;

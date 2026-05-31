@@ -5,7 +5,10 @@
 
 package software.amazon.smithy.java.client.http.netty;
 
+import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
@@ -83,19 +86,36 @@ final class NettyUtils {
     }
 
     /**
-     * Convert Smithy headers + method/path into Netty HTTP/1.1 request headers.
-     * Returns the headers for an {@code io.netty.handler.codec.http.HttpRequest}.
+     * Build a Netty HTTP/1.1 request line + headers for a smithy request.
+     *
+     * <p>When the request's headers were serialized into a Netty-backed container
+     * ({@link NettyModifiableH1Headers}, supplied via {@link NettyHttpRequestFactory}), that exact
+     * container is reused by reference — the protocol already wrote every header into it, so there is
+     * NO per-entry copy here. Otherwise headers are copied entry-by-entry into a fresh container via
+     * {@code forEachEntry} (which avoids materializing the smithy grouped {@code map()}). Either way,
+     * the {@code Host} header is set from the URI.
      */
-    static void fillH1Headers(HttpRequest smithyRequest, io.netty.handler.codec.http.HttpHeaders out) {
+    static io.netty.handler.codec.http.HttpRequest buildH1Request(
+            HttpRequest smithyRequest,
+            HttpVersion version,
+            HttpMethod method,
+            String requestLine
+    ) {
         var uri = smithyRequest.uri();
         String authority = uri.getHost() + (uri.getPort() > 0 ? ":" + uri.getPort() : "");
-        out.set(HttpHeaderNames.HOST, authority);
-        for (Map.Entry<String, List<String>> e : smithyRequest.headers().map().entrySet()) {
-            String name = e.getKey();
-            for (String v : e.getValue()) {
-                out.add(name, v);
-            }
+
+        if (smithyRequest.headers() instanceof NettyModifiableH1Headers nettyHeaders) {
+            // Zero-copy: reuse the very header container the protocol serialized into.
+            var backing = nettyHeaders.nettyHeaders();
+            backing.set(HttpHeaderNames.HOST, authority);
+            return new DefaultHttpRequest(version, method, requestLine, backing);
         }
+
+        var nettyReq = new DefaultHttpRequest(version, method, requestLine);
+        var out = nettyReq.headers();
+        out.set(HttpHeaderNames.HOST, authority);
+        smithyRequest.headers().forEachEntry(out, io.netty.handler.codec.http.HttpHeaders::add);
+        return nettyReq;
     }
 
     /**

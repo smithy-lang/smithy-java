@@ -72,7 +72,8 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
                 .shapeValue(input)
                 .endpoint(endpoint)
                 .omitEmptyPayload(omitEmptyPayload())
-                .allowEmptyStructPayload(httpBinding().hasStructPayload(input.schema()));
+                .allowEmptyStructPayload(httpBinding().hasStructPayload(input.schema()))
+                .requestFactory(requestFactory(context));
 
         if (operation.inputEventBuilderSupplier() != null) {
             serializer.eventEncoderFactory(getEventEncoderFactory(operation));
