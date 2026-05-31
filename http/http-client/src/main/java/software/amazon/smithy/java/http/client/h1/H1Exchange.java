@@ -213,12 +213,8 @@ public final class H1Exchange implements HttpExchange {
         if (noBodyResponseStatus(statusCode) || "HEAD".equalsIgnoreCase(request.method())) {
             close();
         } else if (responseChunked) {
-            responseIn = createResponseStream();
-            try {
-                responseIn.transferTo(OutputStream.nullOutputStream());
-            } finally {
-                responseIn.close();
-            }
+            discardChunkedResponseBody(connection.getInputStream());
+            close();
         } else if (responseContentLength >= 0) {
             connection.getInputStream().discard(responseContentLength);
             close();
@@ -731,6 +727,82 @@ public final class H1Exchange implements HttpExchange {
             }
         }
         return true;
+    }
+
+    private void discardChunkedResponseBody(UnsyncBufferedInputStream in) throws IOException {
+        for (;;) {
+            int lineLen = readLine(in);
+            long chunkSize = parseChunkSize(responseLineBuffer, lineLen);
+
+            if (chunkSize == 0) {
+                discardTrailers(in);
+                return;
+            }
+
+            in.discard(chunkSize);
+            readChunkCrlf(in);
+        }
+    }
+
+    private void discardTrailers(UnsyncBufferedInputStream in) throws IOException {
+        int trailerCount = 0;
+        while (readLine(in) > 0) {
+            trailerCount++;
+            if (trailerCount > MAX_RESPONSE_HEADER_COUNT) {
+                throw new IOException("Too many HTTP trailers: " + trailerCount
+                        + " exceeds maximum of " + MAX_RESPONSE_HEADER_COUNT);
+            }
+        }
+    }
+
+    private static long parseChunkSize(byte[] line, int lineLen) throws IOException {
+        if (lineLen <= 0) {
+            throw new IOException("Empty chunk size line");
+        }
+
+        int sizeEnd = lineLen;
+        for (int i = 0; i < lineLen; i++) {
+            byte b = line[i];
+            if (b == ';' || isOWS(b)) {
+                sizeEnd = i;
+                break;
+            }
+        }
+
+        if (sizeEnd == 0) {
+            throw new IOException("Missing chunk size");
+        }
+
+        long value = 0;
+        for (int i = 0; i < sizeEnd; i++) {
+            byte b = line[i];
+            int digit;
+            if (b >= '0' && b <= '9') {
+                digit = b - '0';
+            } else if (b >= 'a' && b <= 'f') {
+                digit = 10 + (b - 'a');
+            } else if (b >= 'A' && b <= 'F') {
+                digit = 10 + (b - 'A');
+            } else {
+                throw new IOException("Invalid hex character in chunk size: " + (char) b);
+            }
+            if ((value & 0xF000_0000_0000_0000L) != 0) {
+                throw new IOException("HTTP/1.1 chunk size overflow");
+            }
+            value = (value << 4) | digit;
+        }
+        return value;
+    }
+
+    private static void readChunkCrlf(UnsyncBufferedInputStream in) throws IOException {
+        int cr = in.read();
+        int lf = in.read();
+        if (cr == -1 || lf == -1) {
+            throw new IOException("Unexpected end of stream: expected CRLF after chunk data");
+        }
+        if (cr != '\r' || lf != '\n') {
+            throw new IOException(String.format("Expected CRLF after chunk data, got 0x%02X 0x%02X", cr, lf));
+        }
     }
 
     /**
