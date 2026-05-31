@@ -117,6 +117,11 @@ final class ClientPipeline<RequestT, ResponseT> {
         // 4. Interceptors: Invoke ReadBeforeSerialization.
         call.interceptor.readBeforeSerialization(inputHook);
 
+        // 4.a. Let the transport advertise per-call request-construction capabilities (e.g. a
+        //      request factory that serializes headers directly into the transport's native
+        //      representation). No-op for transports that do not opt in.
+        transport.contributeRequestFactory(call.context);
+
         // 5. Serialize the input message into a protocol request message.
         //    Use the UNRESOLVED URI of "/" for now, and resolve the actual endpoint later.
         RequestT request = protocol.createRequest(call.operation, input, call.context, UNRESOLVED);

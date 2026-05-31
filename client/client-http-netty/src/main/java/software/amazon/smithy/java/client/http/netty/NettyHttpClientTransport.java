@@ -75,6 +75,17 @@ public final class NettyHttpClientTransport implements ClientTransport<HttpReque
     }
 
     @Override
+    public void contributeRequestFactory(Context context) {
+        // Publish the Netty-backed request factory only for the VT/H1 native path, so the protocol
+        // serializes request headers straight into a Netty header container that the send path
+        // reuses by reference. H2-forcing policies keep the default array-backed headers (no native
+        // H2 header impl yet); the event-loop fallback also tolerates either representation.
+        if (vtBlocking && usesVtPath()) {
+            context.put(HttpContext.TRANSPORT_REQUEST_FACTORY, NettyHttpRequestFactory.INSTANCE);
+        }
+    }
+
+    @Override
     public HttpResponse send(Context context, HttpRequest request) {
         try {
             var uri = request.uri();

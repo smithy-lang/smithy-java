@@ -14,10 +14,10 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -56,9 +56,10 @@ public final class VtH1Connection implements AutoCloseable {
 
     private final Socket socket;
     private final InputStream socketIn;
-    private final OutputStream socketOut;
+    private final SocketChannel socketChannel;
     private final EmbeddedChannel channel;
     private final boolean tls;
+    private final boolean openSsl;
     private final Route route;
 
     private final byte[] readBuffer = new byte[SOCKET_READ_CHUNK];
@@ -69,12 +70,14 @@ public final class VtH1Connection implements AutoCloseable {
     private boolean fromReuse;
     private long lastUsedNanos;
 
-    private VtH1Connection(Socket socket, EmbeddedChannel channel, boolean tls, Route route) throws IOException {
+    private VtH1Connection(Socket socket, EmbeddedChannel channel, boolean tls, boolean openSsl, Route route)
+            throws IOException {
         this.socket = socket;
         this.socketIn = socket.getInputStream();
-        this.socketOut = socket.getOutputStream();
+        this.socketChannel = socket.getChannel();
         this.channel = channel;
         this.tls = tls;
+        this.openSsl = openSsl;
         this.route = route;
         this.lastUsedNanos = System.nanoTime();
     }
@@ -105,13 +108,15 @@ public final class VtH1Connection implements AutoCloseable {
             socket.setSoTimeout(readTimeoutMs);
 
             EmbeddedChannel channel = new EmbeddedChannel();
+            boolean openSsl = false;
             if (tls) {
                 SslHandler ssl = tlsContext.newHandler(channel.alloc(), route.host(), route.port());
                 channel.pipeline().addLast(ssl);
+                openSsl = tlsContext.isOpenSsl();
             }
             channel.pipeline().addLast(new HttpClientCodec());
 
-            var conn = new VtH1Connection(socket, channel, tls, route);
+            var conn = new VtH1Connection(socket, channel, tls, openSsl, route);
             if (tls) {
                 conn.handshake();
             }
@@ -156,6 +161,17 @@ public final class VtH1Connection implements AutoCloseable {
 
     EmbeddedChannel channel() {
         return channel;
+    }
+
+    /**
+     * Whether this connection's TLS is the tcnative/OpenSSL engine ({@code wantsDirectBuffer=true}).
+     * When true, staging the request body into a pooled <em>direct</em> {@link ByteBuf} lets
+     * {@code SslHandler.wrap} encrypt it in place instead of copying heap plaintext into a direct
+     * scratch buffer per 16&nbsp;KiB record. False for cleartext or the JDK engine (which is
+     * already copy-free on heap input, so staging would only add a copy).
+     */
+    boolean usesOpenSslTls() {
+        return openSsl;
     }
 
     boolean isOpen() {
@@ -214,13 +230,36 @@ public final class VtH1Connection implements AutoCloseable {
             try {
                 int len = out.readableBytes();
                 if (len > 0) {
-                    out.readBytes(socketOut, len);
+                    writeFully(out);
                 }
             } finally {
                 ReferenceCountUtil.release(out);
             }
         }
-        socketOut.flush();
+    }
+
+    /**
+     * Write all readable bytes of {@code buf} to the socket. Uses the {@link java.nio.channels.SocketChannel}
+     * directly with the buffer's NIO view: for the direct (off-heap) ciphertext buffers tcnative/SslHandler
+     * produce, {@code nioBuffer()} is a zero-copy view, so this avoids the temp-{@code byte[]} copy that
+     * {@code ByteBuf.readBytes(OutputStream)} performs to bridge an off-heap buffer to an
+     * {@code OutputStream} (previously ~1.8% CPU in {@code ByteBuffer.getArray} on the upload path).
+     */
+    private void writeFully(ByteBuf buf) throws IOException {
+        int len = buf.readableBytes();
+        int idx = buf.readerIndex();
+        if (buf.nioBufferCount() == 1) {
+            ByteBuffer nio = buf.nioBuffer(idx, len);
+            while (nio.hasRemaining()) {
+                socketChannel.write(nio);
+            }
+        } else {
+            ByteBuffer[] nios = buf.nioBuffers(idx, len);
+            long remaining = len;
+            while (remaining > 0) {
+                remaining -= socketChannel.write(nios);
+            }
+        }
     }
 
     // ---- Inbound: read ciphertext from the socket and feed the pipeline ----
@@ -232,6 +271,8 @@ public final class VtH1Connection implements AutoCloseable {
      * retrieved by {@link #readInbound()}.
      */
     boolean pumpInboundOnce() throws IOException {
+        // Read via the socket InputStream so the blocking read honours SO_TIMEOUT on the virtual
+        // thread (a blocking SocketChannel.read would ignore it and could hang on a stalled server).
         int n = socketIn.read(readBuffer);
         if (n < 0) {
             return false;
@@ -239,11 +280,18 @@ public final class VtH1Connection implements AutoCloseable {
         if (n == 0) {
             return true;
         }
-        // The reusable readBuffer is overwritten on the next socket read, and the SslHandler /
-        // HttpClientCodec may cumulate (retain) bytes across writeInbound calls when a TLS record or
-        // HTTP message spans reads, so copy into a fresh buffer the pipeline can own.
-        ByteBuf buf = channel.alloc().heapBuffer(n);
-        buf.writeBytes(readBuffer, 0, n);
+        // Copy into a fresh pooled buffer the pipeline takes ownership of (the SslHandler /
+        // HttpClientCodec may cumulate across reads, so the buffer cannot be the reused scratch
+        // array). For tcnative (wantsDirectBuffer + COMPOSITE cumulator) stage into a DIRECT buffer
+        // so unwrap() reads the ciphertext in place — this replaces the heap->direct copy that
+        // unwrap would otherwise do per TLS record with this single copy. Cleartext/JDK stays heap.
+        ByteBuf buf = openSsl ? channel.alloc().directBuffer(n) : channel.alloc().heapBuffer(n);
+        try {
+            buf.writeBytes(readBuffer, 0, n);
+        } catch (RuntimeException e) {
+            buf.release();
+            throw e;
+        }
         channel.writeInbound(buf);
         return true;
     }

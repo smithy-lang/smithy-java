@@ -15,6 +15,7 @@ import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.Frame;
 import software.amazon.smithy.java.core.serde.event.ProtocolEventStreamWriter;
 import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpRequestFactory;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
 /**
@@ -30,6 +31,7 @@ public final class RequestSerializer {
     private EventEncoderFactory<?> eventStreamEncodingFactory;
     private boolean omitEmptyPayload = false;
     private boolean allowEmptyStructPayload = false;
+    private HttpRequestFactory requestFactory;
 
     RequestSerializer() {}
 
@@ -118,6 +120,19 @@ public final class RequestSerializer {
     }
 
     /**
+     * Sets the transport-supplied factory used to allocate the request's header container, so the
+     * serializer writes headers directly into the transport's native representation. A null factory
+     * (the default) keeps the standard array-backed headers.
+     *
+     * @param requestFactory the transport request factory, or null.
+     * @return Returns the serializer.
+     */
+    public RequestSerializer requestFactory(HttpRequestFactory requestFactory) {
+        this.requestFactory = requestFactory;
+        return this;
+    }
+
+    /**
      * Finishes setting up the serializer and creates an HTTP request.
      *
      * @return Returns the created request.
@@ -140,7 +155,8 @@ public final class RequestSerializer {
                 false,
                 allowEmptyStructPayload,
                 HeaderErrorSerializer.NONE,
-                Context.empty());
+                Context.empty(),
+                requestFactory);
         shapeValue.serialize(serializer);
         serializer.flush();
 

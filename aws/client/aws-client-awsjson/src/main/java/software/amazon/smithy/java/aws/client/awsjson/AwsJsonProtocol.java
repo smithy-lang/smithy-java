@@ -79,7 +79,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
             SmithyUri endpoint
     ) {
         var target = service.getName() + "." + operation.schema().id().getName();
-        var builder = HttpRequest.create();
+        var builder = HttpRequest.create(requestFactory(context));
         builder.setMethod("POST");
         builder.setUri(endpoint);
         if (operation.inputEventBuilderSupplier() != null) {

@@ -54,4 +54,20 @@ public interface HttpRequest extends HttpMessage {
     static ModifiableHttpRequest create() {
         return new ModifiableHttpRequestImpl();
     }
+
+    /**
+     * Create a builder whose headers are allocated from the given factory.
+     *
+     * <p>Used so a transport can have the request serialized directly into its own native header
+     * representation (see {@link HttpRequestFactory}). A {@code null} factory behaves exactly like
+     * {@link #create()}.
+     *
+     * @param factory factory for the backing headers, or null for the default array-backed headers.
+     * @return the created builder.
+     */
+    static ModifiableHttpRequest create(HttpRequestFactory factory) {
+        return factory == null
+                ? new ModifiableHttpRequestImpl()
+                : new ModifiableHttpRequestImpl(factory.newRequestHeaders(16));
+    }
 }
