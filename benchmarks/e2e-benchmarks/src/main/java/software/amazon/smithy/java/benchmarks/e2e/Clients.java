@@ -8,6 +8,7 @@ package software.amazon.smithy.java.benchmarks.e2e;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.IntConsumer;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.client.auth.scheme.s3express.CreateSessionCallback;
@@ -21,10 +22,12 @@ import software.amazon.smithy.java.benchmarks.e2e.s3.client.S3Client;
 import software.amazon.smithy.java.benchmarks.e2e.s3.model.CreateSessionInput;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
-import software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
 import software.amazon.smithy.java.client.http.apache.classic.ApacheClassicHttpClientTransport;
+import software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport;
+import software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig;
 import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
+import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
 import software.amazon.smithy.java.client.http.smithy.SmithyHttpClientTransport;
 import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
@@ -44,7 +47,7 @@ final class Clients {
      * Apply a {@code -D<prop>=<bytes|auto>} system property to a setter that accepts an int
      * (with {@code -1} meaning "kernel autotune").
      */
-    private static void applyBufferProp(String prop, java.util.function.IntConsumer setter) {
+    private static void applyBufferProp(String prop, IntConsumer setter) {
         Integer value = parseBufferProp(prop);
         if (value != null) {
             setter.accept(value);
@@ -63,6 +66,10 @@ final class Clients {
         return "auto".equals(trimmed) ? -1 : Integer.parseInt(trimmed);
     }
 
+    private static int maxConnections() {
+        return Integer.getInteger("e2e.maxconns", Integer.MAX_VALUE);
+    }
+
     /**
      * Returns the alternate transport selected via {@code -De2e.transport=...}, or null for the
      * default JDK HttpClient. Recognized values: {@code netty}, {@code smithy}.
@@ -71,7 +78,11 @@ final class Clients {
         var name = System.getProperty("e2e.transport", "").trim().toLowerCase();
         return switch (name) {
             case "", "jdk" -> null;
-            case "netty" -> new NettyHttpClientTransport();
+            case "netty" -> {
+                var cfg = new NettyHttpTransportConfig()
+                        .maxConnectionsPerHost(maxConnections());
+                yield new NettyHttpClientTransport(cfg);
+            }
             case "apache" -> {
                 var cfg = new ApacheHttpTransportConfig()
                         .maxConnectionsPerHost(512)
@@ -80,7 +91,7 @@ final class Clients {
             }
             case "apache-classic" -> new ApacheClassicHttpClientTransport(512, 512);
             case "crt" -> {
-                var cfg = new software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig()
+                var cfg = new CrtHttpTransportConfig()
                         .maxConnectionsPerHost(512);
                 yield new CrtHttpClientTransport(cfg);
             }
@@ -92,8 +103,9 @@ final class Clients {
                 //
                 // The pool defaults to maxConnectionsPerRoute=20 which throttles us hard at
                 // higher concurrency since the benchmark targets a single bucket (= one route).
-                // Bump both caps to match the benchmark's max in-flight count plus headroom.
-                int maxConns = Integer.getInteger("e2e.smithy.maxconns", 512);
+                // Use the shared -De2e.maxconns cap (default unbounded) so netty and smithy are
+                // compared on equal footing. UNBOUNDED skips the permit semaphore entirely.
+                int maxConns = maxConnections();
                 var poolBuilder = HttpConnectionPool.builder()
                         .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                         .maxTotalConnections(maxConns)
