@@ -94,15 +94,21 @@ final class ChunkedOutputStream extends OutputStream {
         int offset = off;
 
         while (remaining > 0) {
+            if (bufferPos == 0 && remaining >= buffer.length) {
+                writeChunk(b, offset, buffer.length);
+                offset += buffer.length;
+                remaining -= buffer.length;
+                continue;
+            }
+
             int available = buffer.length - bufferPos;
             int toCopy = Math.min(remaining, available);
-
             System.arraycopy(b, offset, buffer, bufferPos, toCopy);
             bufferPos += toCopy;
             offset += toCopy;
             remaining -= toCopy;
 
-            if (bufferPos >= buffer.length) {
+            if (bufferPos == buffer.length) {
                 flushChunk();
             }
         }

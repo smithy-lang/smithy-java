@@ -89,10 +89,18 @@ final class ChannelFrameWriter {
             flushBuffer();
         }
         if (len > buf.capacity()) {
-            // Rare: very long string, write in chunks
-            byte[] tmp = new byte[len];
-            s.getBytes(0, len, tmp, 0);
-            write(tmp, 0, len);
+            // Rare: very long string, write through the existing buffer instead of allocating a byte[].
+            int offset = 0;
+            while (offset < len) {
+                if (!buf.hasRemaining()) {
+                    flushBuffer();
+                }
+                int chunk = Math.min(buf.remaining(), len - offset);
+                for (int i = 0; i < chunk; i++) {
+                    buf.put((byte) s.charAt(offset + i));
+                }
+                offset += chunk;
+            }
             return;
         }
         if (buf.hasArray()) {
