@@ -14,6 +14,22 @@ import software.amazon.smithy.java.core.serde.document.Document;
  */
 public final class NettyHttpTransportConfig extends HttpTransportConfig {
 
+    /**
+     * Selects how HTTP/1.1 requests are executed.
+     */
+    public enum TransportMode {
+        /**
+         * Blocking socket I/O on the calling (virtual) thread, driving Netty's codecs through an
+         * {@code EmbeddedChannel} with no event loop. Lowest CPU/latency for the VT-sync API; the
+         * default. HTTP/2 routes still use the event-loop path.
+         */
+        VT_BLOCKING,
+        /**
+         * The legacy {@code NioEventLoopGroup}-based path. Retained as a rollback valve.
+         */
+        EVENT_LOOP
+    }
+
     private int maxConnectionsPerHost = 20;
     private int h2StreamsPerConnection = 100;
     private Duration maxIdleTime = Duration.ofMinutes(2);
@@ -25,6 +41,45 @@ public final class NettyHttpTransportConfig extends HttpTransportConfig {
     private int maxFrameSize = 64 * 1024; // 64 KB — H2 default is 16 KB, 64 KB is a safe larger default
     private int writeBufferLowWater = 32 * 1024;
     private int writeBufferHighWater = 256 * 1024;
+    private TransportMode transportMode = TransportMode.VT_BLOCKING;
+    private boolean preferOpenSsl = true;
+    private boolean trustAllCertificates = true;
+
+    public TransportMode transportMode() {
+        return transportMode;
+    }
+
+    public NettyHttpTransportConfig transportMode(TransportMode v) {
+        this.transportMode = v;
+        return this;
+    }
+
+    /**
+     * Whether the VT-blocking transport should prefer netty-tcnative (BoringSSL) for TLS, falling
+     * back to the JDK SSLEngine when unavailable. Default true.
+     */
+    public boolean preferOpenSsl() {
+        return preferOpenSsl;
+    }
+
+    public NettyHttpTransportConfig preferOpenSsl(boolean v) {
+        this.preferOpenSsl = v;
+        return this;
+    }
+
+    /**
+     * Whether to trust all server certificates. Defaults to true to match the existing event-loop
+     * transport's behavior (the SDK supplies its own trust configuration upstream). Set false for
+     * strict validation.
+     */
+    public boolean trustAllCertificates() {
+        return trustAllCertificates;
+    }
+
+    public NettyHttpTransportConfig trustAllCertificates(boolean v) {
+        this.trustAllCertificates = v;
+        return this;
+    }
 
     public int maxConnectionsPerHost() {
         return maxConnectionsPerHost;

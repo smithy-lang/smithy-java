@@ -20,9 +20,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.ScatteringByteChannel;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -190,80 +188,91 @@ final class H1Executor {
     }
 
     private static void streamRequestBody(Channel channel, DataStream body) throws IOException {
-        List<ByteBuf> batch = new ArrayList<>(UPLOAD_BATCH_CHUNKS);
-        try (ReadableByteChannel channelBody = body.asChannel()) {
-            if (channelBody instanceof ScatteringByteChannel scattering) {
-                streamRequestBody(channel, scattering, batch);
-                return;
-            }
-        }
-
-        try (InputStream in = body.asInputStream()) {
-            byte[] copyBuffer = new byte[UPLOAD_CHUNK];
-            while (true) {
-                int n = in.read(copyBuffer);
-                if (n < 0) {
-                    flushBatch(channel, batch, true);
-                    return;
-                }
-                if (n == 0) {
-                    continue;
-                }
-
-                awaitWritable(channel, batch);
-
-                ByteBuf out = channel.alloc().buffer(n);
-                out.writeBytes(copyBuffer, 0, n);
-                batch.add(out);
-                if (batch.size() >= UPLOAD_BATCH_CHUNKS) {
-                    flushBatch(channel, batch, false);
-                }
-            }
+        // Stream the body straight through DataStream.writeTo(OutputStream): for in-memory,
+        // replayable bodies (ByteBufferDataStream, AwsChunkedDataStream — the S3 upload body)
+        // this writes the backing array nearly directly with a single pass, rather than the old
+        // path that probed asChannel() (which materialized the entire encoded body into a
+        // ByteArrayOutputStream just to discard it because it is not a ScatteringByteChannel) and
+        // then called asInputStream() to materialize it a SECOND time. The OutputStream adapter
+        // below batches into Netty ByteBufs and applies the same writability backpressure.
+        var sink = new ChannelBatchingOutputStream(channel);
+        try {
+            body.writeTo(sink);
+            sink.finish();
         } catch (IOException | RuntimeException e) {
-            // Release any buffers accumulated but not yet handed to the event loop.
-            releaseAll(batch);
+            sink.discard();
             throw e;
         }
     }
 
-    private static void streamRequestBody(
-            Channel channel,
-            ScatteringByteChannel in,
-            List<ByteBuf> batch
-    ) throws IOException {
-        try {
-            while (true) {
-                ByteBuf out = channel.alloc().buffer(UPLOAD_CHUNK);
-                int n = out.writeBytes(in, UPLOAD_CHUNK);
-                if (n < 0) {
-                    out.release();
-                    flushBatch(channel, batch, true);
-                    return;
-                }
-                if (n == 0) {
-                    out.release();
-                    continue;
-                }
+    /**
+     * An {@link OutputStream} that batches written bytes into {@link ByteBuf} chunks and hands them
+     * to the event loop, applying writability backpressure between batches. Buffers handed to the
+     * event loop are owned by it; buffers still held here are released on {@link #discard()}.
+     */
+    private static final class ChannelBatchingOutputStream extends OutputStream {
+        private final Channel channel;
+        private final List<ByteBuf> batch = new ArrayList<>(UPLOAD_BATCH_CHUNKS);
+        private ByteBuf current;
 
-                try {
-                    awaitWritable(channel, batch);
-                } catch (IOException e) {
-                    out.release();
-                    throw e;
-                }
+        ChannelBatchingOutputStream(Channel channel) {
+            this.channel = channel;
+        }
 
-                if (n < out.capacity()) {
-                    out.writerIndex(n);
-                    out.capacity(n);
-                }
-                batch.add(out);
+        @Override
+        public void write(int b) throws IOException {
+            ensureCurrent(1).writeByte(b);
+            maybeFlushCurrent();
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+            int remaining = len;
+            int pos = off;
+            while (remaining > 0) {
+                int n = Math.min(remaining, UPLOAD_CHUNK);
+                ensureCurrent(n).writeBytes(b, pos, n);
+                pos += n;
+                remaining -= n;
+                maybeFlushCurrent();
+            }
+        }
+
+        private ByteBuf ensureCurrent(int minWritable) throws IOException {
+            if (current == null) {
+                awaitWritable(channel, batch);
+                current = channel.alloc().buffer(Math.max(UPLOAD_CHUNK, minWritable));
+            }
+            return current;
+        }
+
+        private void maybeFlushCurrent() throws IOException {
+            if (current != null && !current.isWritable()) {
+                batch.add(current);
+                current = null;
                 if (batch.size() >= UPLOAD_BATCH_CHUNKS) {
                     flushBatch(channel, batch, false);
                 }
             }
-        } catch (IOException | RuntimeException e) {
+        }
+
+        void finish() throws IOException {
+            if (current != null && current.isReadable()) {
+                batch.add(current);
+                current = null;
+            } else if (current != null) {
+                current.release();
+                current = null;
+            }
+            flushBatch(channel, batch, true);
+        }
+
+        void discard() {
+            if (current != null) {
+                current.release();
+                current = null;
+            }
             releaseAll(batch);
-            throw e;
         }
     }
 

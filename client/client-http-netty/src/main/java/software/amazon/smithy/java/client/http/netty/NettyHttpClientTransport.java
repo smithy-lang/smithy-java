@@ -29,8 +29,16 @@ public final class NettyHttpClientTransport implements ClientTransport<HttpReque
     private static final InternalLogger LOGGER = InternalLogger.getLogger(NettyHttpClientTransport.class);
 
     private final NettyHttpTransportConfig config;
-    private final EventLoopGroup group;
-    private final NettyConnectionPool pool;
+    private final boolean vtBlocking;
+
+    // VT-blocking H1 path (default). Built eagerly when enabled; never allocates an event loop.
+    private final VtH1Transport vtTransport;
+
+    // Event-loop path. For VT_BLOCKING mode these are created lazily and only for routes that the
+    // VT path does not handle (HTTP/2). For EVENT_LOOP mode they are created eagerly.
+    private final Object eventLoopLock = new Object();
+    private volatile EventLoopGroup group;
+    private volatile NettyConnectionPool pool;
 
     public NettyHttpClientTransport() {
         this(new NettyHttpTransportConfig());
@@ -38,11 +46,27 @@ public final class NettyHttpClientTransport implements ClientTransport<HttpReque
 
     public NettyHttpClientTransport(NettyHttpTransportConfig config) {
         this.config = config;
-        int threads = config.eventLoopThreads() > 0
-                ? config.eventLoopThreads()
-                : Runtime.getRuntime().availableProcessors();
-        this.group = new NioEventLoopGroup(threads, new DefaultThreadFactory("smithy-netty-evloop", true));
-        this.pool = new NettyConnectionPool(group, config, null);
+        this.vtBlocking = config.transportMode() == NettyHttpTransportConfig.TransportMode.VT_BLOCKING;
+        if (vtBlocking) {
+            this.vtTransport = new VtH1Transport(config);
+        } else {
+            this.vtTransport = null;
+            initEventLoop();
+        }
+    }
+
+    private void initEventLoop() {
+        synchronized (eventLoopLock) {
+            if (group != null) {
+                return;
+            }
+            int threads = config.eventLoopThreads() > 0
+                    ? config.eventLoopThreads()
+                    : Runtime.getRuntime().availableProcessors();
+            var g = new NioEventLoopGroup(threads, new DefaultThreadFactory("smithy-netty-evloop", true));
+            this.pool = new NettyConnectionPool(g, config, null);
+            this.group = g;
+        }
     }
 
     @Override
@@ -66,6 +90,13 @@ public final class NettyHttpClientTransport implements ClientTransport<HttpReque
                 timeoutMs = timeout.toMillis();
             }
 
+            // VT-blocking path handles HTTP/1.1 routes with no event loop. HTTP/2-forcing policies
+            // fall through to the event-loop path (H2 multiplexing needs it).
+            if (vtBlocking && usesVtPath()) {
+                return vtTransport.send(route, request);
+            }
+
+            ensureEventLoop();
             try {
                 // First attempt may reuse a pooled connection.
                 return attempt(route, request, timeoutMs, /*forceFresh=*/false);
@@ -77,6 +108,21 @@ public final class NettyHttpClientTransport implements ClientTransport<HttpReque
             }
         } catch (Exception e) {
             throw ClientTransport.remapExceptions(e);
+        }
+    }
+
+    /**
+     * Whether the VT-blocking path serves this transport's configured version policy. It speaks
+     * HTTP/1.1 only, so H2-forcing policies route to the event-loop path instead.
+     */
+    private boolean usesVtPath() {
+        var policy = config.httpVersionPolicy();
+        return policy != HttpVersionPolicy.ENFORCE_HTTP_2 && policy != HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE;
+    }
+
+    private void ensureEventLoop() {
+        if (group == null) {
+            initEventLoop();
         }
     }
 
@@ -110,11 +156,24 @@ public final class NettyHttpClientTransport implements ClientTransport<HttpReque
 
     @Override
     public void close() throws IOException {
-        pool.close();
-        try {
-            group.shutdownGracefully(0, 2, TimeUnit.SECONDS).sync();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        if (vtTransport != null) {
+            vtTransport.close();
+        }
+        EventLoopGroup g;
+        NettyConnectionPool p;
+        synchronized (eventLoopLock) {
+            g = group;
+            p = pool;
+        }
+        if (p != null) {
+            p.close();
+        }
+        if (g != null) {
+            try {
+                g.shutdownGracefully(0, 2, TimeUnit.SECONDS).sync();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
