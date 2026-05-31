@@ -96,6 +96,12 @@ public final class BoundedInputStream extends InputStream {
 
         // Drain remaining bytes so connection can be reused
         if (remaining > 0) {
+            if (delegate instanceof UnsyncBufferedInputStream buffered) {
+                buffered.discard(remaining);
+                remaining = 0;
+                return;
+            }
+
             byte[] drain = new byte[(int) Math.min(8192, remaining)];
             while (remaining > 0) {
                 int toRead = (int) Math.min(drain.length, remaining);
