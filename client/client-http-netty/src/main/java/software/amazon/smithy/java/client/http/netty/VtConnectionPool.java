@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.client.http.netty;
 
+import io.netty.util.Timer;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Iterator;
@@ -31,6 +32,7 @@ final class VtConnectionPool implements AutoCloseable {
 
     private final NettyHttpTransportConfig config;
     private final VtTlsContext tlsContext;
+    private final Timer readTimer;
     private final int maxPerHost;
     private final boolean unbounded;
     private final long reuseIdleNanos;
@@ -42,9 +44,10 @@ final class VtConnectionPool implements AutoCloseable {
     private final Map<Route, RoutePool> pools = new ConcurrentHashMap<>();
     private volatile boolean closed;
 
-    VtConnectionPool(NettyHttpTransportConfig config, VtTlsContext tlsContext) {
+    VtConnectionPool(NettyHttpTransportConfig config, VtTlsContext tlsContext, Timer readTimer) {
         this.config = config;
         this.tlsContext = tlsContext;
+        this.readTimer = readTimer;
         this.maxPerHost = config.maxConnectionsPerHost();
         this.unbounded = maxPerHost == Integer.MAX_VALUE;
         this.reuseIdleNanos = config.reuseIdleTimeout().toNanos();
@@ -83,7 +86,7 @@ final class VtConnectionPool implements AutoCloseable {
                     return reused;
                 }
             }
-            VtH1Connection conn = VtH1Connection.open(route, tlsContext, connectTimeoutMs, readTimeoutMs);
+            VtH1Connection conn = VtH1Connection.open(route, tlsContext, connectTimeoutMs, readTimeoutMs, readTimer);
             conn.setFromReuse(false);
             return conn;
         } catch (IOException | RuntimeException e) {
