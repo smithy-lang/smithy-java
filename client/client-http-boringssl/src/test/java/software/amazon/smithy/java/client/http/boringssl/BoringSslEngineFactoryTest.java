@@ -18,11 +18,13 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpRequest;
@@ -88,17 +90,35 @@ class BoringSslEngineFactoryTest {
             exchange.getResponseBody().write(body);
             exchange.close();
         });
+        // Promises a 100-byte body but sends only headers + nothing, then stalls — the client's body
+        // read blocks until the watchdog fires (exercises readWithTimeout's deadline path).
+        server.createContext("/stall", exchange -> {
+            requestCount.incrementAndGet();
+            exchange.getRequestBody().readAllBytes();
+            exchange.sendResponseHeaders(200, 100);
+            try {
+                Thread.sleep(60_000);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+        });
         server.start();
     }
 
     private HttpClient boringSslClient(int maxConns) {
-        var pool = HttpConnectionPool.builder()
+        return boringSslClient(maxConns, null);
+    }
+
+    private HttpClient boringSslClient(int maxConns, Duration readTimeout) {
+        var poolBuilder = HttpConnectionPool.builder()
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .maxTotalConnections(maxConns)
                 .maxConnectionsPerRoute(maxConns)
-                .sslEngineFactory(BoringSslEngineFactory.create(true)) // trustAll: self-signed test cert
-                .build();
-        return HttpClient.builder().connectionPool(pool).build();
+                .sslEngineFactory(BoringSslEngineFactory.create(true)); // trustAll: self-signed test cert
+        if (readTimeout != null) {
+            poolBuilder.readTimeout(readTimeout);
+        }
+        return HttpClient.builder().connectionPool(poolBuilder.build()).build();
     }
 
     private static HttpRequest put(String uri, String body) {
@@ -108,6 +128,39 @@ class BoringSslEngineFactoryTest {
                 .setHttpVersion(HttpVersion.HTTP_1_1)
                 .setBody(DataStream.ofString(body, "text/plain"))
                 .toUnmodifiable();
+    }
+
+    @Test
+    void readTimeoutFiresViaWatchdog() throws Exception {
+        // The server sends response headers then stalls without sending the promised body. The
+        // blocking-channel body read must be aborted by the shared HashedWheelTimer watchdog (not
+        // hang), proving readWithTimeout's deadline path works without a per-read Selector.
+        var requestCount = new AtomicInteger();
+        startTlsEchoServer(requestCount);
+
+        try (var client = boringSslClient(1, Duration.ofMillis(500))) {
+            String uri = "https://127.0.0.1:" + server.getAddress().getPort() + "/stall";
+            long start = System.nanoTime();
+            var ex = Assertions.assertThrows(java.io.IOException.class, () -> {
+                HttpResponse response = client.send(put(uri, "x"));
+                // Force the body read where the stall happens.
+                try (var b = response.body().asInputStream()) {
+                    b.readAllBytes();
+                }
+            });
+            long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+            // Fired promptly (well under the server's 60s stall), not hung.
+            Assertions.assertTrue(elapsedMs < 10_000,
+                    "expected timeout to fire promptly, took " + elapsedMs + "ms");
+            // The cause chain should mention a read timeout somewhere.
+            String msg = String.valueOf(ex);
+            for (Throwable t = ex; t != null; t = t.getCause()) {
+                msg += " | " + t;
+            }
+            Assertions.assertTrue(
+                    msg.toLowerCase().contains("time"),
+                    "expected a timeout-related exception, got: " + msg);
+        }
     }
 
     @Test
