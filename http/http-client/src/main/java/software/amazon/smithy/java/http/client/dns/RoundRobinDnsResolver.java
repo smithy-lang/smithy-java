@@ -7,10 +7,11 @@ package software.amazon.smithy.java.http.client.dns;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.util.ArrayList;
+import java.util.AbstractList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.RandomAccess;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -41,10 +42,7 @@ final class RoundRobinDnsResolver implements DnsResolver {
             return addresses;
         }
 
-        List<InetAddress> rotated = new ArrayList<>(size);
-        rotated.addAll(addresses.subList(offset, size));
-        rotated.addAll(addresses.subList(0, offset));
-        return List.copyOf(rotated);
+        return new RotatedAddresses(addresses, offset);
     }
 
     @Override
@@ -66,6 +64,27 @@ final class RoundRobinDnsResolver implements DnsResolver {
 
     private static String normalize(String hostname) {
         return hostname.toLowerCase(Locale.ROOT);
+    }
+
+    private static final class RotatedAddresses extends AbstractList<InetAddress> implements RandomAccess {
+        private final List<InetAddress> addresses;
+        private final int offset;
+
+        RotatedAddresses(List<InetAddress> addresses, int offset) {
+            this.addresses = addresses;
+            this.offset = offset;
+        }
+
+        @Override
+        public InetAddress get(int index) {
+            Objects.checkIndex(index, addresses.size());
+            return addresses.get((offset + index) % addresses.size());
+        }
+
+        @Override
+        public int size() {
+            return addresses.size();
+        }
     }
 
     @Override
