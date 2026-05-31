@@ -8,6 +8,7 @@ package software.amazon.smithy.java.http.client;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
@@ -208,7 +209,7 @@ final class DefaultHttpClient implements HttpClient {
                 wrappedStream = inner;
                 return new ManagedResponseInputStream(inner, contentLength, ManagedResponseBody.this::close);
             } catch (IOException e) {
-                throw new java.io.UncheckedIOException(e);
+                throw new UncheckedIOException(e);
             }
         }
 
@@ -243,7 +244,7 @@ final class DefaultHttpClient implements HttpClient {
                     }
                 };
             } catch (IOException e) {
-                throw new java.io.UncheckedIOException(e);
+                throw new UncheckedIOException(e);
             }
         }
 

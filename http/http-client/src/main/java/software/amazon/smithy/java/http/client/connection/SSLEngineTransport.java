@@ -41,6 +41,10 @@ final class SSLEngineTransport implements ConnectionTransport {
     private final InputStream socketIn;
     private final OutputStream socketOut;
     private final SSLEngine engine;
+    // Frees any provider-native engine resources (a no-op for the JDK engine, a ref-count release for
+    // a native engine such as BoringSSL/tcnative). Invoked exactly once on close, AFTER the socket is
+    // closed, on every close path including errors.
+    private final Runnable engineReleaser;
     private final ReentrantLock engineLock = new ReentrantLock();
     private final Socket socket;
     private final SocketChannel socketChannel;
@@ -59,11 +63,16 @@ final class SSLEngineTransport implements ConnectionTransport {
     private boolean eof;
 
     SSLEngineTransport(Socket socket, SSLEngine engine) throws IOException {
+        this(socket, engine, () -> {});
+    }
+
+    SSLEngineTransport(Socket socket, SSLEngine engine, Runnable engineReleaser) throws IOException {
         this.socket = socket;
         this.socketIn = socket.getInputStream();
         this.socketOut = socket.getOutputStream();
         this.socketChannel = socket.getChannel();
         this.engine = engine;
+        this.engineReleaser = engineReleaser != null ? engineReleaser : () -> {};
 
         SSLSession session = engine.getSession();
         int packetSize = session.getPacketBufferSize();
@@ -640,7 +649,15 @@ final class SSLEngineTransport implements ConnectionTransport {
         } catch (IOException ignored) {
             // Best-effort close_notify
         } finally {
-            socket.close();
+            try {
+                socket.close();
+            } finally {
+                // Release provider-native engine resources last, on every close path. For a
+                // reference-counted native engine (BoringSSL/tcnative) this frees off-heap memory;
+                // for the JDK engine it is a no-op. Must run even if close_notify or socket.close()
+                // threw, or a native engine leaks per connection.
+                engineReleaser.run();
+            }
         }
     }
 

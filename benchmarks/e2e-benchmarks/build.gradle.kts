@@ -76,6 +76,7 @@ dependencies {
     // Alternate transports — selected at runtime via -De2e.transport=netty|smithy|apache|apache-classic|crt
     implementation(project(":client:client-http-netty"))
     implementation(project(":client:client-http-smithy"))
+    implementation(project(":client:client-http-boringssl"))
     implementation(project(":client:client-http-apache"))
     implementation(project(":client:client-http-apache-classic"))
     implementation(project(":client:client-http-crt"))

@@ -35,16 +35,22 @@ final class WorkloadConfig {
         this.actionConfig = root.expectObjectMember("actionConfig");
 
         var batch = root.expectObjectMember("batch");
-        this.batchActions = batch.expectNumberMember("numberOfActions").getValue().intValue();
+        // Run length is configurable via system properties so a benchmark harness can extend
+        // warmup/measurement (e.g. to let the JIT fully warm up and dilute compiler noise in a
+        // profile) without editing the committed workload JSON. Each falls back to the JSON value.
+        this.batchActions = Integer.getInteger("e2e.batch.actions",
+                batch.expectNumberMember("numberOfActions").getValue().intValue());
         this.sequential = batch.expectBooleanMember("sequentialExecution").getValue();
 
-        this.warmupBatches = root.expectObjectMember("warmup")
-                .expectNumberMember("batches")
-                .getValue()
-                .intValue();
+        this.warmupBatches = Integer.getInteger("e2e.warmup.batches",
+                root.expectObjectMember("warmup")
+                        .expectNumberMember("batches")
+                        .getValue()
+                        .intValue());
 
         var measurement = root.expectObjectMember("measurement");
-        this.measurementBatches = measurement.expectNumberMember("batches").getValue().intValue();
+        this.measurementBatches = Integer.getInteger("e2e.measurement.batches",
+                measurement.expectNumberMember("batches").getValue().intValue());
         this.collectMetrics = measurement.getBooleanMember("collectMetrics")
                 .map(BooleanNode::getValue)
                 .orElse(false);
