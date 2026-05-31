@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.http.client;
 
-import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -176,34 +175,7 @@ final class DefaultHttpClient implements HttpClient {
         public InputStream asInputStream() {
             InputStream inner = delegate.asInputStream();
             wrappedStream = inner;
-            return new FilterInputStream(inner) {
-                @Override
-                public int read() throws IOException {
-                    int b = super.read();
-                    if (b == -1) {
-                        ManagedResponseBody.this.close();
-                    }
-                    return b;
-                }
-
-                @Override
-                public int read(byte[] b, int off, int len) throws IOException {
-                    int n = super.read(b, off, len);
-                    if (n == -1) {
-                        ManagedResponseBody.this.close();
-                    }
-                    return n;
-                }
-
-                @Override
-                public void close() throws IOException {
-                    try {
-                        super.close();
-                    } finally {
-                        ManagedResponseBody.this.close();
-                    }
-                }
-            };
+            return new ManagedResponseInputStream(inner, ManagedResponseBody.this::close);
         }
 
         @Override
@@ -237,12 +209,20 @@ final class DefaultHttpClient implements HttpClient {
 
         @Override
         public void writeTo(OutputStream out) throws IOException {
-            delegate.writeTo(out);
+            try {
+                delegate.writeTo(out);
+            } finally {
+                close();
+            }
         }
 
         @Override
         public void writeTo(WritableByteChannel ch) throws IOException {
-            delegate.writeTo(ch);
+            try {
+                delegate.writeTo(ch);
+            } finally {
+                close();
+            }
         }
 
         @Override
