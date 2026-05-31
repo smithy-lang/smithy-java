@@ -5,9 +5,12 @@
 
 package software.amazon.smithy.java.client.http.netty;
 
+import io.netty.util.HashedWheelTimer;
 import io.netty.util.ResourceLeakDetector;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -36,13 +39,21 @@ final class VtH1Transport implements AutoCloseable {
 
     private final VtConnectionPool pool;
     private final VtTlsContext tlsContext;
+    // Shared single-thread watchdog: enforces read deadlines for blocking SocketChannel reads (which
+    // ignore SO_TIMEOUT). One timer for the whole transport — O(1) arm/cancel per read, far cheaper
+    // than the per-read copies the direct read removes. 100ms tick is plenty for request timeouts.
+    private final HashedWheelTimer readTimer;
 
     VtH1Transport(NettyHttpTransportConfig config) {
         this.tlsContext = VtTlsContext.create(
                 config.preferOpenSsl(),
                 config.trustAllCertificates(),
                 List.of("http/1.1"));
-        this.pool = new VtConnectionPool(config, tlsContext);
+        this.readTimer = new HashedWheelTimer(
+                new DefaultThreadFactory("smithy-netty-vt-read-timeout", true),
+                100,
+                TimeUnit.MILLISECONDS);
+        this.pool = new VtConnectionPool(config, tlsContext, readTimer);
     }
 
     VtTlsContext tlsContext() {
@@ -97,5 +108,6 @@ final class VtH1Transport implements AutoCloseable {
     @Override
     public void close() {
         pool.close();
+        readTimer.stop();
     }
 }

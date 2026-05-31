@@ -11,6 +11,8 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.Timeout;
+import io.netty.util.Timer;
 import io.netty.util.concurrent.Future;
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,6 +20,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -51,8 +54,10 @@ public final class VtH1Connection implements AutoCloseable {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(VtH1Connection.class);
 
-    // Size of the chunk read from the socket per syscall when pumping ciphertext inbound.
-    private static final int SOCKET_READ_CHUNK = 32 * 1024;
+    // Size of the chunk read from the socket per syscall when pumping ciphertext inbound. Larger =
+    // fewer read syscalls and fewer VT park/unpark cycles per response (each blocking read that has
+    // to wait is a park+unpark). 256 KiB drains a full benchmark response in ~1-2 reads vs ~8 at 32K.
+    private static final int SOCKET_READ_CHUNK = 256 * 1024;
 
     private final Socket socket;
     private final InputStream socketIn;
@@ -61,6 +66,8 @@ public final class VtH1Connection implements AutoCloseable {
     private final boolean tls;
     private final boolean openSsl;
     private final Route route;
+    private final Timer readTimer;
+    private final int readTimeoutMs;
 
     private final byte[] readBuffer = new byte[SOCKET_READ_CHUNK];
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -70,8 +77,15 @@ public final class VtH1Connection implements AutoCloseable {
     private boolean fromReuse;
     private long lastUsedNanos;
 
-    private VtH1Connection(Socket socket, EmbeddedChannel channel, boolean tls, boolean openSsl, Route route)
-            throws IOException {
+    private VtH1Connection(
+            Socket socket,
+            EmbeddedChannel channel,
+            boolean tls,
+            boolean openSsl,
+            Route route,
+            Timer readTimer,
+            int readTimeoutMs
+    ) throws IOException {
         this.socket = socket;
         this.socketIn = socket.getInputStream();
         this.socketChannel = socket.getChannel();
@@ -79,6 +93,8 @@ public final class VtH1Connection implements AutoCloseable {
         this.tls = tls;
         this.openSsl = openSsl;
         this.route = route;
+        this.readTimer = readTimer;
+        this.readTimeoutMs = readTimeoutMs;
         this.lastUsedNanos = System.nanoTime();
     }
 
@@ -89,17 +105,20 @@ public final class VtH1Connection implements AutoCloseable {
      * @param tlsContext TLS context (null for cleartext)
      * @param connectTimeoutMs TCP connect timeout
      * @param readTimeoutMs socket read timeout (also bounds the TLS handshake)
+     * @param readTimer shared watchdog enforcing the read deadline for direct channel reads
      */
     public static VtH1Connection open(
             Route route,
             VtTlsContext tlsContext,
             int connectTimeoutMs,
-            int readTimeoutMs
+            int readTimeoutMs,
+            Timer readTimer
     ) throws IOException {
         boolean tls = route.isTls();
-        // SocketChannel-backed socket so a blocking read honours SO_TIMEOUT correctly under the
-        // Java 25 virtual-thread runtime (verified: a plain blocking read with setSoTimeout parks
-        // and unparks the VT without a watchdog selector).
+        // SocketChannel-backed socket: inbound bytes are read directly into a direct ByteBuf via
+        // SocketChannel.read (no JDK socket-adaptor heap bounce). A blocking channel read ignores
+        // SO_TIMEOUT, so the read deadline is enforced by the shared readTimer watchdog (see
+        // readDirect). SO_TIMEOUT is still set for the InputStream paths (handshake, validateForReuse).
         Socket socket = SocketChannel.open().socket();
         try {
             socket.setTcpNoDelay(true);
@@ -116,7 +135,7 @@ public final class VtH1Connection implements AutoCloseable {
             }
             channel.pipeline().addLast(new HttpClientCodec());
 
-            var conn = new VtH1Connection(socket, channel, tls, openSsl, route);
+            var conn = new VtH1Connection(socket, channel, tls, openSsl, route, readTimer, readTimeoutMs);
             if (tls) {
                 conn.handshake();
             }
@@ -271,8 +290,46 @@ public final class VtH1Connection implements AutoCloseable {
      * retrieved by {@link #readInbound()}.
      */
     boolean pumpInboundOnce() throws IOException {
-        // Read via the socket InputStream so the blocking read honours SO_TIMEOUT on the virtual
-        // thread (a blocking SocketChannel.read would ignore it and could hang on a stalled server).
+        return openSsl ? pumpInboundDirect() : pumpInboundHeap();
+    }
+
+    /**
+     * Hot path (tcnative TLS): read ciphertext STRAIGHT into a pooled direct {@link ByteBuf} via
+     * {@link SocketChannel#read(java.nio.ByteBuffer)} — no JDK socket-adaptor heap bounce, no second
+     * copy, and the direct buffer feeds {@code SslHandler}/{@code SSLEngine.unwrap} in place. The
+     * pipeline takes ownership of the buffer ({@code writeInbound}), so it cannot be a reused scratch.
+     *
+     * <p>A blocking {@code SocketChannel.read} ignores {@code SO_TIMEOUT}; the shared {@link #readTimer}
+     * arms a one-shot watchdog that closes the socket if the read outlasts the deadline, converting a
+     * stalled server into an {@link IOException} instead of an indefinite VT park.
+     */
+    private boolean pumpInboundDirect() throws IOException {
+        ByteBuf buf = channel.alloc().directBuffer(SOCKET_READ_CHUNK);
+        int n;
+        try {
+            ByteBuffer nio = buf.internalNioBuffer(buf.writerIndex(), buf.writableBytes());
+            n = readWithDeadline(nio);
+            if (n > 0) {
+                buf.writerIndex(buf.writerIndex() + n);
+            }
+        } catch (IOException | RuntimeException e) {
+            buf.release();
+            throw e;
+        }
+        if (n < 0) {
+            buf.release();
+            return false;
+        }
+        if (n == 0) {
+            buf.release();
+            return true;
+        }
+        channel.writeInbound(buf);
+        return true;
+    }
+
+    /** Cleartext / JDK-engine path: timeout-honoring InputStream read into a heap buffer. */
+    private boolean pumpInboundHeap() throws IOException {
         int n = socketIn.read(readBuffer);
         if (n < 0) {
             return false;
@@ -280,12 +337,7 @@ public final class VtH1Connection implements AutoCloseable {
         if (n == 0) {
             return true;
         }
-        // Copy into a fresh pooled buffer the pipeline takes ownership of (the SslHandler /
-        // HttpClientCodec may cumulate across reads, so the buffer cannot be the reused scratch
-        // array). For tcnative (wantsDirectBuffer + COMPOSITE cumulator) stage into a DIRECT buffer
-        // so unwrap() reads the ciphertext in place — this replaces the heap->direct copy that
-        // unwrap would otherwise do per TLS record with this single copy. Cleartext/JDK stays heap.
-        ByteBuf buf = openSsl ? channel.alloc().directBuffer(n) : channel.alloc().heapBuffer(n);
+        ByteBuf buf = channel.alloc().heapBuffer(n);
         try {
             buf.writeBytes(readBuffer, 0, n);
         } catch (RuntimeException e) {
@@ -294,6 +346,33 @@ public final class VtH1Connection implements AutoCloseable {
         }
         channel.writeInbound(buf);
         return true;
+    }
+
+    /**
+     * Blocking {@link SocketChannel} read with a watchdog-enforced deadline. The read parks the
+     * virtual thread (no carrier pin); if it has not returned within {@code readTimeoutMs} the
+     * watchdog closes the socket, which makes the parked read throw and unparks the VT.
+     */
+    private int readWithDeadline(ByteBuffer dst) throws IOException {
+        if (readTimer == null || readTimeoutMs <= 0) {
+            return socketChannel.read(dst);
+        }
+        Timeout watchdog = readTimer.newTimeout(t -> {
+            // Only fires if the read is still outstanding past the deadline. Closing the channel
+            // wakes the parked read with an AsynchronousCloseException; the connection is discarded.
+            try {
+                socketChannel.close();
+            } catch (IOException ignored) {
+                // best effort
+            }
+        }, readTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        try {
+            return socketChannel.read(dst);
+        } catch (AsynchronousCloseException e) {
+            throw new SocketTimeoutException("Read timed out after " + readTimeoutMs + "ms to " + route);
+        } finally {
+            watchdog.cancel();
+        }
     }
 
     /**
