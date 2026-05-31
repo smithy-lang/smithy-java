@@ -6,8 +6,6 @@
 package software.amazon.smithy.java.http.client.connection;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
-import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -46,35 +44,17 @@ final class H1ConnectionManager {
      * @param maxConnections max pooled connections for this route (used if pool doesn't exist)
      * @return a valid pooled connection, or null if none available
      */
-    PooledConnection tryAcquire(Route route, int maxConnections) {
+    HttpConnection tryAcquire(Route route, int maxConnections) {
         return tryAcquire(route, maxConnections, (connection, reason) -> {});
     }
 
-    PooledConnection tryAcquire(
+    HttpConnection tryAcquire(
             Route route,
             int maxConnections,
             BiConsumer<HttpConnection, CloseReason> onInvalidClose
     ) {
         HostPool hostPool = getOrCreatePool(route, maxConnections);
-
-        PooledConnection pooled;
-        while ((pooled = hostPool.poll()) != null) {
-            CloseReason invalidReason = invalidReason(pooled);
-            if (invalidReason == null) {
-                LOGGER.debug("Reusing pooled connection to {}", route);
-                return pooled;
-            }
-
-            // Connection failed validation - close it and try next
-            LOGGER.debug("Closing invalid pooled connection to {}", route);
-            try {
-                pooled.connection.close();
-            } catch (IOException e) {
-                LOGGER.debug("Error closing invalid connection to {}: {}", route, e.getMessage());
-            }
-            onInvalidClose.accept(pooled.connection, invalidReason);
-        }
-        return null;
+        return hostPool.tryAcquireValid(route, maxIdleTimeNanos, onInvalidClose);
     }
 
     /**
@@ -220,41 +200,39 @@ final class H1ConnectionManager {
         }
     }
 
-    private CloseReason invalidReason(PooledConnection pooled) {
-        long idleNanos = System.nanoTime() - pooled.idleSinceNanos;
+    private static CloseReason invalidReason(HttpConnection connection, long idleSinceNanos, long maxIdleTimeNanos) {
+        long idleNanos = System.nanoTime() - idleSinceNanos;
         if (idleNanos >= maxIdleTimeNanos) {
             return CloseReason.IDLE_TIMEOUT;
         }
 
-        if (!pooled.connection.isActive()) {
+        if (!connection.isActive()) {
             return CloseReason.UNEXPECTED_CLOSE;
         }
 
         if (idleNanos > VALIDATION_THRESHOLD_NANOS) {
-            return pooled.connection.validateForReuse() ? null : CloseReason.UNEXPECTED_CLOSE;
+            return connection.validateForReuse() ? null : CloseReason.UNEXPECTED_CLOSE;
         }
 
         return null;
     }
 
     /**
-     * A pooled connection with idle timestamp.
-     */
-    record PooledConnection(HttpConnection connection, long idleSinceNanos) {}
-
-    /**
      * Per-route connection pool using a lock-protected LIFO stack.
      */
     private static final class HostPool {
-        private final ArrayDeque<PooledConnection> available;
+        private final HttpConnection[] available;
+        private final long[] idleSinceNanos;
         private final ReentrantLock lock = new ReentrantLock();
         private final Condition activeReleased = lock.newCondition();
         private final int maxConnections;
+        private int availableCount;
         private int activeLeases;
 
         HostPool(int maxConnections) {
             this.maxConnections = maxConnections;
-            this.available = new ArrayDeque<>(maxConnections);
+            this.available = new HttpConnection[maxConnections];
+            this.idleSinceNanos = new long[maxConnections];
         }
 
         boolean tryAcquireActive(long acquireTimeoutMs) throws InterruptedException {
@@ -293,18 +271,48 @@ final class H1ConnectionManager {
         boolean isUnused() {
             lock.lock();
             try {
-                return available.isEmpty() && activeLeases == 0;
+                return availableCount == 0 && activeLeases == 0;
             } finally {
                 lock.unlock();
             }
         }
 
-        PooledConnection poll() {
-            lock.lock();
-            try {
-                return available.pollFirst();
-            } finally {
-                lock.unlock();
+        HttpConnection tryAcquireValid(
+                Route route,
+                long maxIdleTimeNanos,
+                BiConsumer<HttpConnection, CloseReason> onInvalidClose
+        ) {
+            for (;;) {
+                HttpConnection connection;
+                long idleSince;
+                lock.lock();
+                try {
+                    if (availableCount == 0) {
+                        return null;
+                    }
+                    int index = --availableCount;
+                    connection = available[index];
+                    idleSince = idleSinceNanos[index];
+                    available[index] = null;
+                    idleSinceNanos[index] = 0;
+                } finally {
+                    lock.unlock();
+                }
+
+                CloseReason invalidReason = invalidReason(connection, idleSince, maxIdleTimeNanos);
+                if (invalidReason == null) {
+                    LOGGER.debug("Reusing pooled connection to {}", route);
+                    return connection;
+                }
+
+                // Connection failed validation - close it and try next
+                LOGGER.debug("Closing invalid pooled connection to {}", route);
+                try {
+                    connection.close();
+                } catch (IOException e) {
+                    LOGGER.debug("Error closing invalid connection to {}: {}", route, e.getMessage());
+                }
+                onInvalidClose.accept(connection, invalidReason);
             }
         }
 
@@ -312,10 +320,12 @@ final class H1ConnectionManager {
             lock.lock();
             try {
                 releaseActiveLocked();
-                if (!connection.isActive() || poolClosed || available.size() >= maxConnections) {
+                if (!connection.isActive() || poolClosed || availableCount >= maxConnections) {
                     return false;
                 }
-                available.offerFirst(new PooledConnection(connection, System.nanoTime()));
+                available[availableCount] = connection;
+                idleSinceNanos[availableCount] = System.nanoTime();
+                availableCount++;
                 activeReleased.signalAll();
                 return true;
             } finally {
@@ -326,10 +336,23 @@ final class H1ConnectionManager {
         void remove(HttpConnection connection) {
             lock.lock();
             try {
-                available.removeIf(pc -> pc.connection == connection);
+                for (int i = 0; i < availableCount; i++) {
+                    if (available[i] == connection) {
+                        removeAt(i);
+                        return;
+                    }
+                }
             } finally {
                 lock.unlock();
             }
+        }
+
+        private void removeAt(int index) {
+            int last = --availableCount;
+            available[index] = available[last];
+            idleSinceNanos[index] = idleSinceNanos[last];
+            available[last] = null;
+            idleSinceNanos[last] = 0;
         }
 
         int removeIdleConnections(long maxIdleNanos, BiConsumer<HttpConnection, CloseReason> onRemove) {
@@ -337,24 +360,25 @@ final class H1ConnectionManager {
             long now = System.nanoTime();
             lock.lock();
             try {
-                Iterator<PooledConnection> iter = available.iterator();
-                while (iter.hasNext()) {
-                    PooledConnection pc = iter.next();
-                    long idleNanos = now - pc.idleSinceNanos;
-                    boolean unhealthy = !pc.connection.isActive();
+                for (int i = 0; i < availableCount;) {
+                    HttpConnection connection = available[i];
+                    long idleNanos = now - idleSinceNanos[i];
+                    boolean unhealthy = !connection.isActive();
                     boolean expired = idleNanos > maxIdleNanos;
                     if (unhealthy || expired) {
                         CloseReason reason = expired && !unhealthy
                                 ? CloseReason.IDLE_TIMEOUT
                                 : CloseReason.UNEXPECTED_CLOSE;
                         try {
-                            pc.connection.close();
+                            connection.close();
                         } catch (IOException ignored) {
                             // ignored
                         }
-                        onRemove.accept(pc.connection, reason);
-                        iter.remove();
+                        onRemove.accept(connection, reason);
+                        removeAt(i);
                         removed++;
+                    } else {
+                        i++;
                     }
                 }
             } finally {
@@ -366,14 +390,17 @@ final class H1ConnectionManager {
         void closeAll(List<IOException> exceptions, Consumer<HttpConnection> onClose) {
             lock.lock();
             try {
-                PooledConnection pc;
-                while ((pc = available.poll()) != null) {
+                while (availableCount > 0) {
+                    int index = --availableCount;
+                    HttpConnection connection = available[index];
+                    available[index] = null;
+                    idleSinceNanos[index] = 0;
                     try {
-                        pc.connection.close();
+                        connection.close();
                     } catch (IOException e) {
                         exceptions.add(e);
                     }
-                    onClose.accept(pc.connection);
+                    onClose.accept(connection);
                 }
             } finally {
                 lock.unlock();
