@@ -41,7 +41,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
 final class DefaultHttpClient implements HttpClient {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(DefaultHttpClient.class);
-    private static final OutputStream NULL_OUTPUT_STREAM = OutputStream.nullOutputStream();
+
     // Reused per-thread drain buffer; allocated once per virtual thread when first body needs
     // draining. Sized to drain a typical 256 KiB response in 4 trips.
     private static final ThreadLocal<byte[]> DRAIN_BUFFER = ThreadLocal.withInitial(() -> new byte[64 * 1024]);
