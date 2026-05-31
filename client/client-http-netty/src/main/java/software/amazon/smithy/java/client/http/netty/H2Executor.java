@@ -19,9 +19,7 @@ import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.Http2StreamFrame;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.ScatteringByteChannel;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -120,62 +118,62 @@ final class H2Executor {
     }
 
     private static void streamRequestBody(Http2StreamChannel stream, DataStream body) throws IOException {
-        List<ByteBuf> batch = new ArrayList<>(UPLOAD_BATCH_CHUNKS);
-        try (ReadableByteChannel channel = body.asChannel()) {
-            if (channel instanceof ScatteringByteChannel scattering) {
-                streamRequestBody(stream, scattering, batch);
-                return;
-            }
-        }
-
-        try (InputStream in = body.asInputStream()) {
-            byte[] copyBuffer = new byte[UPLOAD_CHUNK];
-            while (true) {
-                int n = in.read(copyBuffer);
-                if (n < 0) {
-                    flushBatch(stream, batch, true);
-                    return;
-                }
-                if (n == 0) {
-                    continue;
-                }
-
-                while (!stream.isWritable()) {
-                    flushBatch(stream, batch, false);
-                    LockSupport.parkNanos(100_000);
-                    if (!stream.isOpen()) {
-                        throw new IOException("Stream closed while waiting for writability");
-                    }
-                }
-
-                ByteBuf out = stream.alloc().buffer(n);
-                out.writeBytes(copyBuffer, 0, n);
-                batch.add(out);
-                if (batch.size() >= UPLOAD_BATCH_CHUNKS) {
-                    flushBatch(stream, batch, false);
-                }
-            }
+        // Stream straight through DataStream.writeTo(OutputStream) — one pass, no intermediate
+        // materialization. See H1Executor.streamRequestBody for why the old asChannel()/asInputStream()
+        // probe double-materialized in-memory bodies.
+        var sink = new StreamBatchingOutputStream(stream);
+        try {
+            body.writeTo(sink);
+            sink.finish();
+        } catch (IOException | RuntimeException e) {
+            sink.discard();
+            throw e;
         }
     }
 
-    private static void streamRequestBody(
-            Http2StreamChannel stream,
-            ScatteringByteChannel in,
-            List<ByteBuf> batch
-    ) throws IOException {
-        while (true) {
-            ByteBuf out = stream.alloc().buffer(UPLOAD_CHUNK);
-            int n = out.writeBytes(in, UPLOAD_CHUNK);
-            if (n < 0) {
-                out.release();
-                flushBatch(stream, batch, true);
-                return;
-            }
-            if (n == 0) {
-                out.release();
-                continue;
-            }
+    /**
+     * An {@link OutputStream} that batches written bytes into {@link ByteBuf} chunks, hands them to
+     * the H2 stream's event loop as DATA frames, and applies writability backpressure between
+     * batches. Buffers handed to the event loop are owned by it; buffers still held here are
+     * released on {@link #discard()}.
+     */
+    private static final class StreamBatchingOutputStream extends OutputStream {
+        private final Http2StreamChannel stream;
+        private final List<ByteBuf> batch = new ArrayList<>(UPLOAD_BATCH_CHUNKS);
+        private ByteBuf current;
 
+        StreamBatchingOutputStream(Http2StreamChannel stream) {
+            this.stream = stream;
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+            ensureCurrent(1).writeByte(b);
+            maybeFlushCurrent();
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+            int remaining = len;
+            int pos = off;
+            while (remaining > 0) {
+                int n = Math.min(remaining, UPLOAD_CHUNK);
+                ensureCurrent(n).writeBytes(b, pos, n);
+                pos += n;
+                remaining -= n;
+                maybeFlushCurrent();
+            }
+        }
+
+        private ByteBuf ensureCurrent(int minWritable) throws IOException {
+            if (current == null) {
+                awaitWritable();
+                current = stream.alloc().buffer(Math.max(UPLOAD_CHUNK, minWritable));
+            }
+            return current;
+        }
+
+        private void awaitWritable() throws IOException {
             while (!stream.isWritable()) {
                 flushBatch(stream, batch, false);
                 LockSupport.parkNanos(100_000);
@@ -183,15 +181,38 @@ final class H2Executor {
                     throw new IOException("Stream closed while waiting for writability");
                 }
             }
+        }
 
-            if (n < out.capacity()) {
-                out.writerIndex(n);
-                out.capacity(n);
+        private void maybeFlushCurrent() {
+            if (current != null && !current.isWritable()) {
+                batch.add(current);
+                current = null;
+                if (batch.size() >= UPLOAD_BATCH_CHUNKS) {
+                    flushBatch(stream, batch, false);
+                }
             }
-            batch.add(out);
-            if (batch.size() >= UPLOAD_BATCH_CHUNKS) {
-                flushBatch(stream, batch, false);
+        }
+
+        void finish() {
+            if (current != null && current.isReadable()) {
+                batch.add(current);
+                current = null;
+            } else if (current != null) {
+                current.release();
+                current = null;
             }
+            flushBatch(stream, batch, true);
+        }
+
+        void discard() {
+            if (current != null) {
+                current.release();
+                current = null;
+            }
+            for (ByteBuf b : batch) {
+                b.release();
+            }
+            batch.clear();
         }
     }
 
