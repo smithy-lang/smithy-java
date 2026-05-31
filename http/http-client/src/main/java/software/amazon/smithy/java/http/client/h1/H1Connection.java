@@ -45,6 +45,8 @@ public final class H1Connection implements HttpConnection {
      * This bounds any single response line to 8KB (status line or header line).
      */
     static final int RESPONSE_LINE_BUFFER_SIZE = 8192;
+    private static final int INPUT_BUFFER_SIZE = 64 * 1024;
+    private static final int OUTPUT_BUFFER_SIZE = 8 * 1024;
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(H1Connection.class);
 
@@ -69,8 +71,8 @@ public final class H1Connection implements HttpConnection {
      */
     public H1Connection(ConnectionTransport transport, Route route, Duration readTimeout) throws IOException {
         this.transport = transport;
-        this.socketIn = new UnsyncBufferedInputStream(transport.inputStream(), 16384);
-        this.socketOut = new UnsyncBufferedOutputStream(transport.outputStream(), 8192);
+        this.socketIn = new UnsyncBufferedInputStream(transport.inputStream(), INPUT_BUFFER_SIZE);
+        this.socketOut = new UnsyncBufferedOutputStream(transport.outputStream(), OUTPUT_BUFFER_SIZE);
         this.route = route;
         this.lineBuffer = new byte[RESPONSE_LINE_BUFFER_SIZE];
 
