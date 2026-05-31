@@ -66,26 +66,45 @@ public final class NettyHttpClientTransport implements ClientTransport<HttpReque
                 timeoutMs = timeout.toMillis();
             }
 
-            NettyConnection conn = pool.acquire(route);
             try {
-                HttpResponse response = switch (conn.mode) {
-                    case H1 -> H1Executor.execute(conn.channel, request, timeoutMs);
-                    case H2 -> H2Executor.execute(conn.channel, request, timeoutMs);
-                };
-                // For H2: release back to pool (multiplexed). For H1: release serially.
-                // Note: the response body will be consumed AFTER we return; the caller
-                // eventually closes the InputStream. For H1, the connection is "in use"
-                // until the body is drained. We return it to the pool now anyway — a future
-                // acquire on the same H1 conn would collide with a still-reading response.
-                // TODO: properly defer H1 release until body stream is closed.
-                pool.release(conn);
-                return response;
-            } catch (Throwable t) {
-                pool.dispose(conn);
-                throw t;
+                // First attempt may reuse a pooled connection.
+                return attempt(route, request, timeoutMs, /*forceFresh=*/false);
+            } catch (StaleConnectionException stale) {
+                if (request.body() == null || request.body().isReplayable()) {
+                    return attempt(route, request, timeoutMs, /*forceFresh=*/true);
+                }
+                throw stale;
             }
         } catch (Exception e) {
             throw ClientTransport.remapExceptions(e);
+        }
+    }
+
+    private HttpResponse attempt(Route route, HttpRequest request, long timeoutMs, boolean forceFresh)
+            throws IOException {
+        NettyConnection conn = forceFresh ? pool.acquireFresh(route) : pool.acquire(route);
+        try {
+            switch (conn.mode) {
+                case H1 -> {
+                    // H1 is non-multiplexed: the connection stays exclusively in use until the
+                    // response body InputStream is drained and closed. Release/dispose is
+                    // therefore deferred to the body's onClose callback wired inside execute()
+                    // (mirrors H2 tying cleanup to stream close). On a headers-phase failure,
+                    // execute() throws and we dispose below; the deferred path never runs.
+                    return H1Executor.execute(pool, conn, request, timeoutMs);
+                }
+                case H2 -> {
+                    HttpResponse response = H2Executor.execute(conn.channel, request, timeoutMs);
+                    // H2 is multiplexed: the parent connection can serve other streams
+                    // immediately; the response body rides its own stream channel.
+                    pool.release(conn);
+                    return response;
+                }
+                default -> throw new IllegalStateException("Unknown connection mode: " + conn.mode);
+            }
+        } catch (Throwable t) {
+            pool.dispose(conn);
+            throw t;
         }
     }
 

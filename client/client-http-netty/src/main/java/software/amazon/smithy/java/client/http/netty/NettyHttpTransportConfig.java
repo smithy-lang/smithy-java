@@ -17,6 +17,7 @@ public final class NettyHttpTransportConfig extends HttpTransportConfig {
     private int maxConnectionsPerHost = 20;
     private int h2StreamsPerConnection = 100;
     private Duration maxIdleTime = Duration.ofMinutes(2);
+    private Duration reuseIdleTimeout = Duration.ofSeconds(5);
     private Duration acquireTimeout = Duration.ofSeconds(30);
     private HttpVersionPolicy httpVersionPolicy = HttpVersionPolicy.AUTOMATIC;
     private int eventLoopThreads = 0; // 0 => Runtime.getRuntime().availableProcessors()
@@ -49,6 +50,15 @@ public final class NettyHttpTransportConfig extends HttpTransportConfig {
 
     public NettyHttpTransportConfig maxIdleTime(Duration v) {
         this.maxIdleTime = v;
+        return this;
+    }
+
+    public Duration reuseIdleTimeout() {
+        return reuseIdleTimeout;
+    }
+
+    public NettyHttpTransportConfig reuseIdleTimeout(Duration v) {
+        this.reuseIdleTimeout = v;
         return this;
     }
 

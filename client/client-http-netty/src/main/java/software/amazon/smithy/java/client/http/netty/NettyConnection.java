@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.http.netty;
 
 import io.netty.channel.Channel;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -21,7 +22,11 @@ final class NettyConnection {
     final Route route;
     final AtomicInteger inFlightStreams = new AtomicInteger(0);
     volatile long lastUsedNanos;
-    private volatile boolean closed;
+    // True when this connection was handed out by reuse of a previously-pooled connection rather
+    // than freshly opened. Set by the pool at hand-out time and read once by the caller immediately
+    // after acquire; only reused connections can be stale keep-alives closed server-side.
+    boolean fromReuse;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
 
     NettyConnection(Channel channel, Mode mode, Route route) {
         this.channel = channel;
@@ -31,15 +36,25 @@ final class NettyConnection {
     }
 
     boolean isActive() {
-        return !closed && channel.isActive();
+        return !closed.get() && channel.isActive();
     }
 
     boolean isClosed() {
-        return closed;
+        return closed.get();
     }
 
     void markClosed() {
-        closed = true;
+        closed.set(true);
+    }
+
+    /**
+     * Atomically marks this connection closed, returning {@code true} only for the caller that won
+     * the race. Used to make disposal idempotent so connection-count accounting decrements exactly
+     * once even though {@code dispose} can be triggered both explicitly and by the channel's
+     * close-future listener.
+     */
+    boolean markClosedOnce() {
+        return closed.compareAndSet(false, true);
     }
 
     boolean canAcceptMoreStreams(int h2MaxStreams) {

@@ -29,6 +29,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import software.amazon.smithy.java.http.api.HttpRequest;
@@ -49,20 +50,54 @@ final class H1Executor {
     private H1Executor() {}
 
     static software.amazon.smithy.java.http.api.HttpResponse execute(
-            Channel channel,
+            NettyConnectionPool pool,
+            NettyConnection conn,
             HttpRequest request,
             long requestTimeoutMs
     ) throws IOException {
+        Channel channel = conn.channel;
         var headersFuture = new CompletableFuture<software.amazon.smithy.java.http.api.HttpResponse>();
         var error = new AtomicReference<Throwable>();
+        var responseComplete = new AtomicBoolean(false);
+        var responseStarted = new AtomicBoolean(false);
+        var cleanupDone = new AtomicBoolean(false);
+        var handlerRef = new AtomicReference<ResponseHandler>();
+        Runnable onClose = () -> {
+            if (!cleanupDone.compareAndSet(false, true)) {
+                return;
+            }
+            channel.eventLoop().execute(() -> {
+                ResponseHandler h = handlerRef.get();
+                if (h != null && channel.pipeline().context(h) != null) {
+                    channel.pipeline().remove(h);
+                }
+                // Reuse only a fully-drained, healthy connection; otherwise dispose so no stale
+                // response bytes leak into the next request on a reused channel.
+                if (responseComplete.get() && error.get() == null && conn.isActive()) {
+                    // Restore autoRead before pooling: a large response may have left it paused
+                    // (ResponseBodyChannel pauses at high-water; an early close never resumes it).
+                    // An idle pooled connection with autoRead=false never registers OP_READ, so a
+                    // later server FIN is never observed and the connection rots in the pool stale.
+                    channel.config().setAutoRead(true);
+                    pool.release(conn);
+                } else {
+                    pool.dispose(conn);
+                }
+            });
+        };
         var bodyChannel = new ResponseBodyChannel(
                 error,
                 resume -> channel.eventLoop().execute(() -> channel.config().setAutoRead(resume)),
-                null,
+                onClose,
                 BODY_HIGH_WATER,
                 BODY_LOW_WATER);
-        ResponseHandler handler = new ResponseHandler(headersFuture, bodyChannel, error);
-        channel.pipeline().addLast("h1-response", handler);
+        ResponseHandler handler =
+                new ResponseHandler(headersFuture, bodyChannel, error, responseComplete, responseStarted);
+        handlerRef.set(handler);
+        // Add with an auto-generated name (not a fixed "h1-response"): even if a prior handler were
+        // ever left attached, this cannot throw the duplicate-name IllegalArgumentException that
+        // previously crashed every reused H1 connection.
+        channel.pipeline().addLast(handler);
 
         boolean hasBody = request.body() != null && request.body().contentLength() != 0;
         long contentLength = hasBody ? request.body().contentLength() : 0;
@@ -86,7 +121,10 @@ final class H1Executor {
                 streamRequestBody(channel, request.body());
             } catch (IOException e) {
                 channel.close();
-                throw e;
+                // If the connection was reused from the pool and no response has started, the most
+                // likely cause is a keep-alive the server had already closed: the request never
+                // reached a responding server, so it is safe to retry on a fresh connection.
+                throw maybeStale(conn, responseStarted, e);
             } finally {
                 request.body().close();
             }
@@ -106,6 +144,9 @@ final class H1Executor {
         } catch (ExecutionException e) {
             channel.close();
             Throwable cause = e.getCause();
+            if (conn.fromReuse && !responseStarted.get()) {
+                throw new StaleConnectionException("Reused H1 connection closed before response", cause);
+            }
             if (cause instanceof IOException io)
                 throw io;
             throw new IOException("H1 request failed", cause);
@@ -117,6 +158,24 @@ final class H1Executor {
         return headResponse.toModifiable()
                 .setBody(DataStream.ofInputStream(bodyChannel))
                 .toUnmodifiable();
+    }
+
+    /**
+     * Classify a request-body write failure. If the connection was reused from the pool and no
+     * response byte has been received, treat it as a stale keep-alive that the server had already
+     * closed — safe to retry on a fresh connection. Otherwise propagate the original IOException.
+     */
+    private static IOException maybeStale(
+            NettyConnection conn,
+            AtomicBoolean responseStarted,
+            IOException original
+    ) {
+        if (conn.fromReuse && !responseStarted.get()) {
+            return new StaleConnectionException(
+                    "Reused H1 connection closed while sending request body",
+                    original);
+        }
+        return original;
     }
 
     private static String buildRequestLine(HttpRequest request) {
@@ -151,13 +210,7 @@ final class H1Executor {
                     continue;
                 }
 
-                while (!channel.isWritable()) {
-                    flushBatch(channel, batch, false);
-                    LockSupport.parkNanos(100_000);
-                    if (!channel.isOpen()) {
-                        throw new IOException("Channel closed while waiting for writability");
-                    }
-                }
+                awaitWritable(channel, batch);
 
                 ByteBuf out = channel.alloc().buffer(n);
                 out.writeBytes(copyBuffer, 0, n);
@@ -166,6 +219,10 @@ final class H1Executor {
                     flushBatch(channel, batch, false);
                 }
             }
+        } catch (IOException | RuntimeException e) {
+            // Release any buffers accumulated but not yet handed to the event loop.
+            releaseAll(batch);
+            throw e;
         }
     }
 
@@ -174,36 +231,57 @@ final class H1Executor {
             ScatteringByteChannel in,
             List<ByteBuf> batch
     ) throws IOException {
-        while (true) {
-            ByteBuf out = channel.alloc().buffer(UPLOAD_CHUNK);
-            int n = out.writeBytes(in, UPLOAD_CHUNK);
-            if (n < 0) {
-                out.release();
-                flushBatch(channel, batch, true);
-                return;
-            }
-            if (n == 0) {
-                out.release();
-                continue;
-            }
+        try {
+            while (true) {
+                ByteBuf out = channel.alloc().buffer(UPLOAD_CHUNK);
+                int n = out.writeBytes(in, UPLOAD_CHUNK);
+                if (n < 0) {
+                    out.release();
+                    flushBatch(channel, batch, true);
+                    return;
+                }
+                if (n == 0) {
+                    out.release();
+                    continue;
+                }
 
-            while (!channel.isWritable()) {
-                flushBatch(channel, batch, false);
-                LockSupport.parkNanos(100_000);
-                if (!channel.isOpen()) {
-                    throw new IOException("Channel closed while waiting for writability");
+                try {
+                    awaitWritable(channel, batch);
+                } catch (IOException e) {
+                    out.release();
+                    throw e;
+                }
+
+                if (n < out.capacity()) {
+                    out.writerIndex(n);
+                    out.capacity(n);
+                }
+                batch.add(out);
+                if (batch.size() >= UPLOAD_BATCH_CHUNKS) {
+                    flushBatch(channel, batch, false);
                 }
             }
+        } catch (IOException | RuntimeException e) {
+            releaseAll(batch);
+            throw e;
+        }
+    }
 
-            if (n < out.capacity()) {
-                out.writerIndex(n);
-                out.capacity(n);
-            }
-            batch.add(out);
-            if (batch.size() >= UPLOAD_BATCH_CHUNKS) {
-                flushBatch(channel, batch, false);
+    private static void awaitWritable(Channel channel, List<ByteBuf> batch) throws IOException {
+        while (!channel.isWritable()) {
+            flushBatch(channel, batch, false);
+            LockSupport.parkNanos(100_000);
+            if (!channel.isOpen()) {
+                throw new IOException("Channel closed while waiting for writability");
             }
         }
+    }
+
+    private static void releaseAll(List<ByteBuf> batch) {
+        for (ByteBuf b : batch) {
+            b.release();
+        }
+        batch.clear();
     }
 
     private static void flushBatch(Channel channel, List<ByteBuf> batch, boolean endStream) {
@@ -231,20 +309,28 @@ final class H1Executor {
         private final CompletableFuture<software.amazon.smithy.java.http.api.HttpResponse> headersFuture;
         private final ResponseBodyChannel body;
         private final AtomicReference<Throwable> error;
+        private final AtomicBoolean responseComplete;
+        private final AtomicBoolean responseStarted;
 
         ResponseHandler(
                 CompletableFuture<software.amazon.smithy.java.http.api.HttpResponse> headersFuture,
                 ResponseBodyChannel body,
-                AtomicReference<Throwable> error
+                AtomicReference<Throwable> error,
+                AtomicBoolean responseComplete,
+                AtomicBoolean responseStarted
         ) {
             this.headersFuture = headersFuture;
             this.body = body;
             this.error = error;
+            this.responseComplete = responseComplete;
+            this.responseStarted = responseStarted;
         }
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, HttpObject msg) throws Exception {
             if (msg instanceof HttpResponse nettyResp) {
+                // The server has begun replying: this request is no longer safe to blindly retry.
+                responseStarted.set(true);
                 var response = software.amazon.smithy.java.http.api.HttpResponse.create()
                         .setHttpVersion(software.amazon.smithy.java.http.api.HttpVersion.HTTP_1_1)
                         .setStatusCode(nettyResp.status().code())
@@ -258,6 +344,9 @@ final class H1Executor {
                     body.publish(c.retain());
                 }
                 if (msg instanceof LastHttpContent) {
+                    // Full response received: the connection is now safe to reuse once the caller
+                    // closes the body stream (see the onClose wired in execute()).
+                    responseComplete.set(true);
                     body.publishEos();
                 }
             }
@@ -275,6 +364,13 @@ final class H1Executor {
 
         @Override
         public void channelInactive(ChannelHandlerContext ctx) {
+            if (!headersFuture.isDone()) {
+                var cause = error.get() != null
+                        ? error.get()
+                        : new IOException("Connection closed before response headers");
+                error.compareAndSet(null, cause);
+                headersFuture.completeExceptionally(cause);
+            }
             body.publishEos();
         }
     }

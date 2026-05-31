@@ -11,11 +11,11 @@ dependencies {
     api(project(":client:client-http"))
     implementation(project(":logging"))
 
-    implementation("io.netty:netty-codec-http2:4.2.7.Final")
-    implementation("io.netty:netty-codec-http:4.2.7.Final")
-    implementation("io.netty:netty-handler:4.2.7.Final")
-    implementation("io.netty:netty-buffer:4.2.7.Final")
-    implementation("io.netty:netty-transport:4.2.7.Final")
+    implementation("io.netty:netty-codec-http2:4.2.13.Final")
+    implementation("io.netty:netty-codec-http:4.2.13.Final")
+    implementation("io.netty:netty-handler:4.2.13.Final")
+    implementation("io.netty:netty-buffer:4.2.13.Final")
+    implementation("io.netty:netty-transport:4.2.13.Final")
 
     testImplementation(project(":codecs:json-codec", configuration = "shadow"))
 }
