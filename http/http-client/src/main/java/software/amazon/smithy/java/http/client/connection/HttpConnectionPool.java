@@ -82,9 +82,9 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  * connection permit to become available. This behavior is consistent for both
  * HTTP/1.1 and HTTP/2 connections.
  *
- * <p>The blocking wait is on the global connection semaphore, so any connection
- * release from any route can unblock waiting callers. With virtual threads,
- * this blocking is cheap and provides natural backpressure under load.
+ * <p>The blocking wait is on the global physical-connection semaphore, so callers
+ * unblock when an open connection is closed and releases capacity. With virtual
+ * threads, this blocking is cheap and provides natural backpressure under load.
  *
  * <p>Configure via {@link HttpConnectionPoolBuilder#acquireTimeout(Duration)}:
  * <ul>
@@ -140,7 +140,8 @@ public final class HttpConnectionPool implements ConnectionPool {
     // HTTP/2 connection manager (handles multiplexing)
     private final H2ConnectionManager h2Manager;
 
-    // Semaphore to limit total connections - better contention than AtomicInteger CAS loop
+    // Semaphore to limit total open physical connections - better contention than AtomicInteger CAS loop.
+    // H1 idle sockets hold permits while pooled; H2 sockets hold permits until closed.
     private final Semaphore connectionPermits;
 
     // Cleanup thread
@@ -216,25 +217,21 @@ public final class HttpConnectionPool implements ConnectionPool {
         h1Manager.acquireActive(route, maxConns, acquireTimeoutMs);
 
         try {
-            // Try to get a permit without blocking
-            if (connectionPermits.tryAcquire()) {
-                // Got a permit, so now try to reuse a pooled connection first
-                H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(route, maxConns);
-                if (pooled != null) {
-                    notifyAcquire(pooled.connection(), true);
-                    return pooled.connection();
-                } else {
-                    // No pooled connection, but we have a permit to create one.
-                    return createH1Connection(route);
-                }
+            // Idle H1 connections already hold a global connection permit.
+            H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(route, maxConns, this::releaseIdleH1Permit);
+            if (pooled != null) {
+                notifyAcquire(pooled.connection(), true);
+                return pooled.connection();
             }
 
-            // No permit available immediately. Block on global capacity with timeout.
+            // No pooled connection, so acquire global capacity for a new physical socket.
             acquirePermit();
 
-            // Re-check pool after acquiring the permit, since a connection may have been released while waiting.
-            H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(route, maxConns);
+            // Re-check pool after acquiring the permit, since a connection may have been released while waiting. If we
+            // reuse one, return the newly acquired permit because the idle socket already owns one.
+            pooled = h1Manager.tryAcquire(route, maxConns, this::releaseIdleH1Permit);
             if (pooled != null) {
+                connectionPermits.release();
                 notifyAcquire(pooled.connection(), true);
                 return pooled.connection();
             }
@@ -341,8 +338,6 @@ public final class HttpConnectionPool implements ConnectionPool {
 
         if (!h1Manager.release(route, connection, closed)) {
             closeAndReleasePermit(connection, CloseReason.POOL_FULL);
-        } else {
-            connectionPermits.release();
         }
     }
 
@@ -383,7 +378,10 @@ public final class HttpConnectionPool implements ConnectionPool {
         });
 
         // Close pooled H1 connections
-        h1Manager.closeAll(exceptions, conn -> notifyClosed(conn, CloseReason.POOL_SHUTDOWN));
+        h1Manager.closeAll(exceptions, conn -> {
+            notifyClosed(conn, CloseReason.POOL_SHUTDOWN);
+            connectionPermits.release();
+        });
 
         if (!exceptions.isEmpty()) {
             IOException e = new IOException("Errors closing connections");
@@ -527,6 +525,11 @@ public final class HttpConnectionPool implements ConnectionPool {
         }
     }
 
+    private void releaseIdleH1Permit(HttpConnection connection, CloseReason reason) {
+        notifyClosed(connection, reason);
+        connectionPermits.release();
+    }
+
     /**
      * Background cleanup task that runs every 30 seconds.
      *
@@ -550,7 +553,7 @@ public final class HttpConnectionPool implements ConnectionPool {
                 Thread.sleep(Duration.ofSeconds(30));
 
                 // Clean up HTTP/1.1 connections
-                h1Manager.cleanupIdle(this::notifyClosed);
+                h1Manager.cleanupIdle(this::releaseIdleH1Permit);
 
                 // Clean up unhealthy HTTP/2 connections
                 h2Manager.cleanupAllDead(this::closeAndReleasePermit);

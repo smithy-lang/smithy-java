@@ -15,10 +15,12 @@ import java.io.OutputStream;
 final class ManagedResponseInputStream extends InputStream {
     private final InputStream inner;
     private final Runnable onClose;
+    private long remaining;
 
-    ManagedResponseInputStream(InputStream inner, Runnable onClose) {
+    ManagedResponseInputStream(InputStream inner, long contentLength, Runnable onClose) {
         this.inner = inner;
         this.onClose = onClose;
+        this.remaining = contentLength >= 0 ? contentLength : -1;
     }
 
     @Override
@@ -26,6 +28,8 @@ final class ManagedResponseInputStream extends InputStream {
         int b = inner.read();
         if (b == -1) {
             onClose.run();
+        } else {
+            bytesRead(1);
         }
         return b;
     }
@@ -35,6 +39,8 @@ final class ManagedResponseInputStream extends InputStream {
         int n = inner.read(b, off, len);
         if (n == -1) {
             onClose.run();
+        } else {
+            bytesRead(n);
         }
         return n;
     }
@@ -54,6 +60,7 @@ final class ManagedResponseInputStream extends InputStream {
         if (bytes.length < len) {
             onClose.run();
         }
+        bytesRead(bytes.length);
         return bytes;
     }
 
@@ -63,6 +70,7 @@ final class ManagedResponseInputStream extends InputStream {
         if (n < len) {
             onClose.run();
         }
+        bytesRead(n);
         return n;
     }
 
@@ -77,13 +85,16 @@ final class ManagedResponseInputStream extends InputStream {
 
     @Override
     public long skip(long n) throws IOException {
-        return inner.skip(n);
+        long skipped = inner.skip(n);
+        bytesRead(skipped);
+        return skipped;
     }
 
     @Override
     public void skipNBytes(long n) throws IOException {
         try {
             inner.skipNBytes(n);
+            bytesRead(n);
         } catch (IOException e) {
             onClose.run();
             throw e;
@@ -115,6 +126,16 @@ final class ManagedResponseInputStream extends InputStream {
         try {
             inner.close();
         } finally {
+            onClose.run();
+        }
+    }
+
+    private void bytesRead(long n) {
+        if (remaining < 0 || n <= 0) {
+            return;
+        }
+        remaining -= n;
+        if (remaining <= 0) {
             onClose.run();
         }
     }

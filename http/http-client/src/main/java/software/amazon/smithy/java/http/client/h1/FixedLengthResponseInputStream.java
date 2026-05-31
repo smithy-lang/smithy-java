@@ -101,14 +101,30 @@ final class FixedLengthResponseInputStream extends InputStream {
         }
 
         long transferred = 0;
-        byte[] buffer = new byte[8192];
         while (remaining > 0) {
-            int n = read(buffer, 0, (int) Math.min(buffer.length, remaining));
-            if (n == -1) {
-                break;
+            int buffered = delegate.buffered();
+            if (buffered > 0) {
+                int n = (int) Math.min(buffered, remaining);
+                out.write(delegate.buffer(), delegate.position(), n);
+                delegate.consume(n);
+                remaining -= n;
+                transferred += n;
+                if (remaining == 0) {
+                    complete();
+                }
+                continue;
             }
-            out.write(buffer, 0, n);
+
+            int n = delegate.readDirect(delegate.buffer(), 0, (int) Math.min(delegate.buffer().length, remaining));
+            if (n == -1) {
+                throw prematureEof();
+            }
+            out.write(delegate.buffer(), 0, n);
+            remaining -= n;
             transferred += n;
+            if (remaining == 0) {
+                complete();
+            }
         }
         return transferred;
     }

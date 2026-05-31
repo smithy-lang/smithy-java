@@ -143,6 +143,7 @@ final class DefaultHttpClient implements HttpClient {
         private final boolean isH2;
         private boolean closed;
         private InputStream wrappedStream;
+        private ReadableByteChannel wrappedChannel;
 
         ManagedResponseBody(DataStream delegate, HttpExchange exchange, HttpConnection conn, boolean isH2) {
             this.delegate = delegate;
@@ -175,12 +176,13 @@ final class DefaultHttpClient implements HttpClient {
         public InputStream asInputStream() {
             InputStream inner = delegate.asInputStream();
             wrappedStream = inner;
-            return new ManagedResponseInputStream(inner, ManagedResponseBody.this::close);
+            return new ManagedResponseInputStream(inner, contentLength(), ManagedResponseBody.this::close);
         }
 
         @Override
         public ReadableByteChannel asChannel() {
             ReadableByteChannel inner = delegate.asChannel();
+            wrappedChannel = inner;
             return new ReadableByteChannel() {
                 @Override
                 public int read(ByteBuffer dst) throws IOException {
@@ -236,7 +238,11 @@ final class DefaultHttpClient implements HttpClient {
             try {
                 if (!isH2) {
                     if (wrappedStream == null) {
-                        exchange.discardResponseBody();
+                        if (wrappedChannel == null) {
+                            exchange.discardResponseBody();
+                        } else {
+                            wrappedChannel.close();
+                        }
                     } else {
                         byte[] buf = DRAIN_BUFFER.get();
                         while (wrappedStream.read(buf) != -1) {
@@ -286,7 +292,11 @@ final class DefaultHttpClient implements HttpClient {
             if (!isH2) {
                 try {
                     if (wrappedStream == null) {
-                        exchange.discardResponseBody();
+                        if (wrappedChannel == null) {
+                            exchange.discardResponseBody();
+                        } else {
+                            wrappedChannel.close();
+                        }
                     } else {
                         byte[] buf = DRAIN_BUFFER.get();
                         while (wrappedStream.read(buf) != -1) {
