@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.time.Duration;
@@ -42,9 +43,6 @@ final class DefaultHttpClient implements HttpClient {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(DefaultHttpClient.class);
 
-    // Reused per-thread drain buffer; allocated once per virtual thread when first body needs
-    // draining. Sized to drain a typical 256 KiB response in 4 trips.
-    private static final ThreadLocal<byte[]> DRAIN_BUFFER = ThreadLocal.withInitial(() -> new byte[64 * 1024]);
     private final ConnectionPool connectionPool;
     private final ProxySelector proxySelector;
     private final Duration requestTimeout;
@@ -64,11 +62,38 @@ final class DefaultHttpClient implements HttpClient {
 
     private HttpResponse sendInternal(HttpRequest request, RequestOptions options) throws IOException {
         Context context = options.context();
+        var target = request.uri();
+        List<ProxyConfiguration> proxies = proxySelector.select(target, context);
 
-        // Acquire connection and open stream
-        AcquiredStream acquired = acquireAndOpenStream(request, context);
-        HttpConnection conn = acquired.conn();
-        HttpExchange exchange = acquired.exchange();
+        if (proxies.isEmpty()) {
+            return sendForRoute(request, Route.from(target, null));
+        }
+
+        IOException last = null;
+        for (ProxyConfiguration proxy : proxies) {
+            Route route = Route.from(target, proxy);
+            try {
+                return sendForRoute(request, route);
+            } catch (IOException e) {
+                last = e;
+                proxySelector.connectFailed(target, context, proxy, e);
+            }
+        }
+        throw last;
+    }
+
+    private HttpResponse sendForRoute(HttpRequest request, Route route) throws IOException {
+        HttpConnection conn = connectionPool.acquire(route);
+        HttpExchange exchange;
+        try {
+            exchange = conn.newExchange(request);
+        } catch (Exception e) {
+            connectionPool.evict(conn, true);
+            if (e instanceof IOException ioe) {
+                throw ioe;
+            }
+            throw new IOException("Failed to create exchange", e);
+        }
 
         try {
             // Write request body
@@ -106,14 +131,8 @@ final class DefaultHttpClient implements HttpClient {
             String contentType = exchange.responseContentType();
             long contentLength = exchange.responseContentLength();
 
-            DataStream responseBody = new ResponseBodyDataStream(
-                    exchange::responseBody,
-                    exchange::responseBodyChannel,
-                    contentType,
-                    contentLength);
-
             // Wrap body so close releases connection
-            DataStream managedBody = new ManagedResponseBody(responseBody, exchange, conn, isH2);
+            DataStream managedBody = new ManagedResponseBody(exchange, conn, isH2, contentType, contentLength);
 
             return HttpResponse.create()
                     .setStatusCode(statusCode)
@@ -137,29 +156,38 @@ final class DefaultHttpClient implements HttpClient {
      * Wraps the response body DataStream to handle connection lifecycle on close.
      */
     private final class ManagedResponseBody implements DataStream, TrailerSupport {
-        private final DataStream delegate;
         private final HttpExchange exchange;
         private final HttpConnection conn;
         private final boolean isH2;
+        private final String contentType;
+        private final long contentLength;
+        private boolean consumed;
         private boolean closed;
         private InputStream wrappedStream;
         private ReadableByteChannel wrappedChannel;
 
-        ManagedResponseBody(DataStream delegate, HttpExchange exchange, HttpConnection conn, boolean isH2) {
-            this.delegate = delegate;
+        ManagedResponseBody(
+                HttpExchange exchange,
+                HttpConnection conn,
+                boolean isH2,
+                String contentType,
+                long contentLength
+        ) {
             this.exchange = exchange;
             this.conn = conn;
             this.isH2 = isH2;
+            this.contentType = contentType;
+            this.contentLength = contentLength;
         }
 
         @Override
         public long contentLength() {
-            return delegate.contentLength();
+            return contentLength;
         }
 
         @Override
         public String contentType() {
-            return delegate.contentType();
+            return contentType;
         }
 
         @Override
@@ -169,50 +197,63 @@ final class DefaultHttpClient implements HttpClient {
 
         @Override
         public boolean isAvailable() {
-            return !closed;
+            return !closed && !consumed;
         }
 
         @Override
         public InputStream asInputStream() {
-            InputStream inner = delegate.asInputStream();
-            wrappedStream = inner;
-            return new ManagedResponseInputStream(inner, contentLength(), ManagedResponseBody.this::close);
+            markConsumed();
+            try {
+                InputStream inner = exchange.responseBody();
+                wrappedStream = inner;
+                return new ManagedResponseInputStream(inner, contentLength, ManagedResponseBody.this::close);
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
         }
 
         @Override
         public ReadableByteChannel asChannel() {
-            ReadableByteChannel inner = delegate.asChannel();
-            wrappedChannel = inner;
-            return new ReadableByteChannel() {
-                @Override
-                public int read(ByteBuffer dst) throws IOException {
-                    int n = inner.read(dst);
-                    if (n == -1) {
-                        ManagedResponseBody.this.close();
+            markConsumed();
+            try {
+                ReadableByteChannel inner = exchange.responseBodyChannel();
+                wrappedChannel = inner;
+                return new ReadableByteChannel() {
+                    @Override
+                    public int read(ByteBuffer dst) throws IOException {
+                        int n = inner.read(dst);
+                        if (n == -1) {
+                            ManagedResponseBody.this.close();
+                        }
+                        return n;
                     }
-                    return n;
-                }
 
-                @Override
-                public boolean isOpen() {
-                    return inner.isOpen();
-                }
-
-                @Override
-                public void close() throws IOException {
-                    try {
-                        inner.close();
-                    } finally {
-                        ManagedResponseBody.this.close();
+                    @Override
+                    public boolean isOpen() {
+                        return inner.isOpen();
                     }
-                }
-            };
+
+                    @Override
+                    public void close() throws IOException {
+                        try {
+                            inner.close();
+                        } finally {
+                            ManagedResponseBody.this.close();
+                        }
+                    }
+                };
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
         }
 
         @Override
         public void writeTo(OutputStream out) throws IOException {
+            markConsumed();
+            InputStream inner = exchange.responseBody();
+            wrappedStream = inner;
             try {
-                delegate.writeTo(out);
+                inner.transferTo(out);
             } finally {
                 close();
             }
@@ -220,8 +261,11 @@ final class DefaultHttpClient implements HttpClient {
 
         @Override
         public void writeTo(WritableByteChannel ch) throws IOException {
+            markConsumed();
+            InputStream inner = exchange.responseBody();
+            wrappedStream = inner;
             try {
-                delegate.writeTo(ch);
+                inner.transferTo(Channels.newOutputStream(ch));
             } finally {
                 close();
             }
@@ -244,20 +288,13 @@ final class DefaultHttpClient implements HttpClient {
                             wrappedChannel.close();
                         }
                     } else {
-                        byte[] buf = DRAIN_BUFFER.get();
-                        while (wrappedStream.read(buf) != -1) {
-                            // discard
-                        }
+                        wrappedStream.transferTo(OutputStream.nullOutputStream());
                     }
                 }
             } catch (IOException e) {
                 errored = true;
                 throw e;
             } finally {
-                try {
-                    delegate.close();
-                } catch (Exception ignored) {}
-
                 try {
                     exchange.close();
                 } catch (Exception e) {
@@ -298,19 +335,12 @@ final class DefaultHttpClient implements HttpClient {
                             wrappedChannel.close();
                         }
                     } else {
-                        byte[] buf = DRAIN_BUFFER.get();
-                        while (wrappedStream.read(buf) != -1) {
-                            // discard
-                        }
+                        wrappedStream.transferTo(OutputStream.nullOutputStream());
                     }
                 } catch (IOException ignored) {
                     errored = true;
                 }
             }
-
-            try {
-                delegate.close();
-            } catch (Exception ignored) {}
 
             try {
                 exchange.close();
@@ -329,42 +359,12 @@ final class DefaultHttpClient implements HttpClient {
         public HttpHeaders trailerHeaders() {
             return exchange.responseTrailerHeaders();
         }
-    }
 
-    private record AcquiredStream(HttpConnection conn, HttpExchange exchange) {}
-
-    private AcquiredStream acquireAndOpenStream(HttpRequest request, Context context) throws IOException {
-        var target = request.uri();
-        List<ProxyConfiguration> proxies = proxySelector.select(target, context);
-
-        if (proxies.isEmpty()) {
-            return acquireForRoute(request, Route.from(target, null));
-        }
-
-        IOException last = null;
-        for (ProxyConfiguration proxy : proxies) {
-            Route route = Route.from(target, proxy);
-            try {
-                return acquireForRoute(request, route);
-            } catch (IOException e) {
-                last = e;
-                proxySelector.connectFailed(target, context, proxy, e);
+        private void markConsumed() {
+            if (consumed) {
+                throw new IllegalStateException("DataStream is not replayable and has already been consumed");
             }
-        }
-        throw last;
-    }
-
-    private AcquiredStream acquireForRoute(HttpRequest request, Route route) throws IOException {
-        HttpConnection conn = connectionPool.acquire(route);
-        try {
-            HttpExchange exchange = conn.newExchange(request);
-            return new AcquiredStream(conn, exchange);
-        } catch (Exception e) {
-            connectionPool.evict(conn, true);
-            if (e instanceof IOException ioe) {
-                throw ioe;
-            }
-            throw new IOException("Failed to create exchange", e);
+            consumed = true;
         }
     }
 

@@ -218,10 +218,10 @@ public final class HttpConnectionPool implements ConnectionPool {
 
         try {
             // Idle H1 connections already hold a global connection permit.
-            H1ConnectionManager.PooledConnection pooled = h1Manager.tryAcquire(route, maxConns, this::releaseIdleH1Permit);
+            HttpConnection pooled = h1Manager.tryAcquire(route, maxConns, this::releaseIdleH1Permit);
             if (pooled != null) {
-                notifyAcquire(pooled.connection(), true);
-                return pooled.connection();
+                notifyAcquire(pooled, true);
+                return pooled;
             }
 
             // No pooled connection, so acquire global capacity for a new physical socket.
@@ -232,8 +232,8 @@ public final class HttpConnectionPool implements ConnectionPool {
             pooled = h1Manager.tryAcquire(route, maxConns, this::releaseIdleH1Permit);
             if (pooled != null) {
                 connectionPermits.release();
-                notifyAcquire(pooled.connection(), true);
-                return pooled.connection();
+                notifyAcquire(pooled, true);
+                return pooled;
             }
 
             return createH1Connection(route);
