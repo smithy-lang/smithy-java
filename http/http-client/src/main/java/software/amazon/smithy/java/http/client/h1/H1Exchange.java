@@ -83,6 +83,7 @@ public final class H1Exchange implements HttpExchange {
     private boolean requestWritten = false;
     private boolean expectContinueHandled = false;
     private boolean closed;
+    private byte[] chunkedRequestBuffer;
 
     /**
      * Create a reusable HTTP/1.1 exchange.
@@ -167,7 +168,7 @@ public final class H1Exchange implements HttpExchange {
                     throw new IllegalArgumentException(
                             "Request cannot have both Content-Length and Transfer-Encoding headers");
                 }
-                requestOut = new ChunkedOutputStream(socketOut);
+                requestOut = new ChunkedOutputStream(socketOut, chunkedRequestBuffer());
             } else {
                 requestOut = new NonClosingOutputStream(socketOut);
             }
@@ -502,6 +503,13 @@ public final class H1Exchange implements HttpExchange {
             connection.getOutputStream().flush();
             requestWritten = true;
         }
+    }
+
+    private byte[] chunkedRequestBuffer() {
+        if (chunkedRequestBuffer == null) {
+            chunkedRequestBuffer = new byte[ChunkedOutputStream.DEFAULT_CHUNK_SIZE];
+        }
+        return chunkedRequestBuffer;
     }
 
     private void parseStatusLineAndHeaders() throws IOException {
