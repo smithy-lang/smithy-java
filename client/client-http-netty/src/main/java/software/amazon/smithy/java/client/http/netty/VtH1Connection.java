@@ -59,6 +59,14 @@ public final class VtH1Connection implements AutoCloseable {
     // to wait is a park+unpark). 256 KiB drains a full benchmark response in ~1-2 reads vs ~8 at 32K.
     private static final int SOCKET_READ_CHUNK = 256 * 1024;
 
+    // Max plaintext bytes the HTTP codec emits per HttpContent for a fixed-length/chunked body. Netty's
+    // default is 8 KiB, which frames a 256 KiB response into ~32 DefaultHttpContent objects — each one a
+    // separate allocation, retained slice, ref-count cycle, pipeline dispatch, and inbound-queue
+    // offer/poll. A 256 KiB body decoded in one socket read (SOCKET_READ_CHUNK) should yield ~1 content,
+    // not 32. Decoding emits zero-copy retained *slices* (readRetainedSlice), so a large cap adds no copy
+    // — it only collapses the per-chunk object/dispatch churn. 1 MiB comfortably covers our read chunk.
+    private static final int MAX_HTTP_CHUNK_SIZE = 1024 * 1024;
+
     private final Socket socket;
     private final InputStream socketIn;
     private final SocketChannel socketChannel;
@@ -133,7 +141,9 @@ public final class VtH1Connection implements AutoCloseable {
                 channel.pipeline().addLast(ssl);
                 openSsl = tlsContext.isOpenSsl();
             }
-            channel.pipeline().addLast(new HttpClientCodec());
+            // maxInitialLineLength/maxHeaderSize at Netty defaults (4096/8192); maxChunkSize raised to
+            // collapse per-chunk HttpContent churn on large bodies (see MAX_HTTP_CHUNK_SIZE).
+            channel.pipeline().addLast(new HttpClientCodec(4096, 8192, MAX_HTTP_CHUNK_SIZE));
 
             var conn = new VtH1Connection(socket, channel, tls, openSsl, route, readTimer, readTimeoutMs);
             if (tls) {

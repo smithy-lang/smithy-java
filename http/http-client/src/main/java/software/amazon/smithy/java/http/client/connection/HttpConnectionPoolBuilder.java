@@ -38,6 +38,7 @@ public final class HttpConnectionPoolBuilder {
     Duration writeTimeout = Duration.ofSeconds(30);
     SSLContext sslContext;
     SSLParameters sslParameters;
+    ClientSslEngineFactory sslEngineFactory;
     HttpVersionPolicy versionPolicy = HttpVersionPolicy.AUTOMATIC;
     DnsResolver dnsResolver;
     HttpSocketFactory socketFactory = HttpSocketFactory.DEFAULT;
@@ -336,6 +337,23 @@ public final class HttpConnectionPoolBuilder {
      */
     public HttpConnectionPoolBuilder sslParameters(SSLParameters parameters) {
         this.sslParameters = parameters;
+        return this;
+    }
+
+    /**
+     * Set a custom {@link ClientSslEngineFactory} for HTTPS connections (default: none — the JDK
+     * {@link SSLContext} is used).
+     *
+     * <p>When set, every secure connection — HTTP/1.1 included — is driven through the zero-copy
+     * {@link SSLEngineTransport} using engines minted by this factory, instead of the JDK
+     * {@code SSLSocket}/{@code SSLEngine}. This is the seam an alternate TLS provider (e.g. a native
+     * BoringSSL engine with faster AES-GCM) plugs into without {@code http-client} depending on it.
+     *
+     * @param factory the engine factory, or null to use the JDK provider
+     * @return this builder
+     */
+    public HttpConnectionPoolBuilder sslEngineFactory(ClientSslEngineFactory factory) {
+        this.sslEngineFactory = factory;
         return this;
     }
 

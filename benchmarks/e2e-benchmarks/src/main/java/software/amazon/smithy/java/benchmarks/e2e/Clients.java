@@ -24,6 +24,7 @@ import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
 import software.amazon.smithy.java.client.http.apache.classic.ApacheClassicHttpClientTransport;
+import software.amazon.smithy.java.client.http.boringssl.BoringSslEngineFactory;
 import software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport;
 import software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig;
 import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
@@ -95,32 +96,45 @@ final class Clients {
                         .maxConnectionsPerHost(512);
                 yield new CrtHttpClientTransport(cfg);
             }
-            case "smithy" -> {
-                // Smithy HTTP client defaults to ENFORCE_HTTP_2 which fails on S3 (H1-only).
-                // AUTOMATIC also fails: the pool routes HTTPS routes to the H2 manager, which
-                // refuses an ALPN result of "http/1.1". Force ENFORCE_HTTP_1_1 so the pool
-                // routes to the H1 manager from the start.
-                //
-                // The pool defaults to maxConnectionsPerRoute=20 which throttles us hard at
-                // higher concurrency since the benchmark targets a single bucket (= one route).
-                // Use the shared -De2e.maxconns cap (default unbounded) so netty and smithy are
-                // compared on equal footing. UNBOUNDED skips the permit semaphore entirely.
-                int maxConns = maxConnections();
-                var poolBuilder = HttpConnectionPool.builder()
-                        .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
-                        .maxTotalConnections(maxConns)
-                        .maxConnectionsPerRoute(maxConns);
-                // -De2e.smithy.recvbuf=<bytes|auto>; -De2e.smithy.sendbuf=<bytes|auto>.
-                // "auto" maps to -1 (kernel autotune).
-                applyBufferProp("e2e.smithy.recvbuf", poolBuilder::socketReceiveBufferSize);
-                applyBufferProp("e2e.smithy.sendbuf", poolBuilder::socketSendBufferSize);
-                var http = HttpClient.builder().connectionPool(poolBuilder.build()).build();
-                yield new SmithyHttpClientTransport(http);
-            }
+            case "smithy" -> new SmithyHttpClientTransport(smithyPool(false));
+            // Same smithy native transport, but TLS is driven by the BoringSSL (netty-tcnative)
+            // SSLEngine instead of the JDK engine — keeps the cheaper AES-GCM without the Netty
+            // pipeline. Falls back to the JDK provider if tcnative is unavailable on the host.
+            case "smithy-boringssl" -> new SmithyHttpClientTransport(smithyPool(true));
             default -> throw new IllegalArgumentException(
                     "Unknown e2e.transport: '" + name
-                            + "' (expected one of: jdk, netty, smithy, apache, apache-classic, crt)");
+                            + "' (expected one of: jdk, netty, smithy, smithy-boringssl, apache, apache-classic, crt)");
         };
+    }
+
+    /**
+     * Build the smithy native transport's HTTP client. Shared by the {@code smithy} and
+     * {@code smithy-boringssl} variants; the latter injects the BoringSSL SSLEngine factory.
+     *
+     * <p>Smithy HTTP client defaults to ENFORCE_HTTP_2 which fails on S3 (H1-only); AUTOMATIC also
+     * fails (the pool routes HTTPS to the H2 manager, which refuses an ALPN result of "http/1.1").
+     * Force ENFORCE_HTTP_1_1 so the pool routes to the H1 manager from the start. The pool's default
+     * maxConnectionsPerRoute=20 throttles a single-bucket benchmark hard, so use the shared
+     * -De2e.maxconns cap (default unbounded) for equal footing with netty.
+     */
+    private static HttpClient smithyPool(boolean boringSsl) {
+        int maxConns = maxConnections();
+        var poolBuilder = HttpConnectionPool.builder()
+                .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
+                .maxTotalConnections(maxConns)
+                .maxConnectionsPerRoute(maxConns);
+        // -De2e.smithy.recvbuf=<bytes|auto>; -De2e.smithy.sendbuf=<bytes|auto>. "auto" maps to -1.
+        applyBufferProp("e2e.smithy.recvbuf", poolBuilder::socketReceiveBufferSize);
+        applyBufferProp("e2e.smithy.sendbuf", poolBuilder::socketSendBufferSize);
+        if (boringSsl) {
+            if (BoringSslEngineFactory.isAvailable()) {
+                poolBuilder.sslEngineFactory(BoringSslEngineFactory.create(false));
+            } else {
+                System.err.println("smithy-boringssl requested but netty-tcnative unavailable; "
+                        + "using JDK SSLEngine");
+            }
+        }
+        return HttpClient.builder().connectionPool(poolBuilder.build()).build();
     }
 
     static DynamoDBClient dynamodb(String region) {

@@ -29,8 +29,10 @@ class HttpConnectionPoolTest {
     void h1IdleConnectionsCountTowardMaxTotalConnections() throws IOException {
         var socketCreates = new AtomicInteger();
         var dns = DnsResolver.staticMapping(Map.of(
-                "one.example.com", List.of(InetAddress.getByName("127.0.0.1")),
-                "two.example.com", List.of(InetAddress.getByName("127.0.0.1"))));
+                "one.example.com",
+                List.of(InetAddress.getByName("127.0.0.1")),
+                "two.example.com",
+                List.of(InetAddress.getByName("127.0.0.1"))));
         try (var pool = HttpConnectionPool.builder()
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .maxTotalConnections(1)
