@@ -28,8 +28,6 @@ public final class HttpConnectionPoolBuilder {
     int h2InitialWindowSize = 65535; // RFC 9113 default
     int h2MaxFrameSize = 16384; // RFC 9113 default
     int h2BufferSize = 256 * 1024; // 256KB default
-    boolean useConnectionAgentForH2c;
-    boolean useConnectionAgentForH2;
     boolean usePlatformReaderForH2;
     final Map<String, Integer> perHostLimits = new HashMap<>();
 
@@ -581,28 +579,6 @@ public final class HttpConnectionPoolBuilder {
             throw new IllegalArgumentException("h2BufferSize must be at least 16KB: " + bufferSize);
         }
         this.h2BufferSize = bufferSize;
-        return this;
-    }
-
-    /**
-     * Use the experimental connection-agent transport for cleartext H2C connections.
-     *
-     * <p>This only affects non-TLS H2C connections. TLS HTTP/2 continues to use the
-     * standard {@code H2Connection} path.
-     */
-    public HttpConnectionPoolBuilder useConnectionAgentForH2c(boolean enabled) {
-        this.useConnectionAgentForH2c = enabled;
-        return this;
-    }
-
-    /**
-     * Use the experimental connection-agent transport for TLS HTTP/2 connections.
-     *
-     * <p>This only affects HTTPS routes that negotiate ALPN `h2`. Cleartext H2C
-     * continues to use {@link #useConnectionAgentForH2c(boolean)}.
-     */
-    public HttpConnectionPoolBuilder useConnectionAgentForH2(boolean enabled) {
-        this.useConnectionAgentForH2 = enabled;
         return this;
     }
 

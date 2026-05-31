@@ -67,7 +67,7 @@ final class Clients {
     }
 
     private static int maxConnections() {
-        return Integer.getInteger("e2e.maxconns", Integer.MAX_VALUE);
+        return Integer.getInteger("e2e.maxconns", 1024);
     }
 
     /**

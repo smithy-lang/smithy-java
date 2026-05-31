@@ -19,7 +19,6 @@ import software.amazon.smithy.java.http.client.ProxyConfiguration;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 import software.amazon.smithy.java.http.client.h1.H1Connection;
 import software.amazon.smithy.java.http.client.h1.ProxyTunnel;
-import software.amazon.smithy.java.http.client.h2.ConnectionAgentH2Connection;
 import software.amazon.smithy.java.http.client.h2.H2Connection;
 
 /**
@@ -45,8 +44,6 @@ record HttpConnectionFactory(
         HttpVersionPolicy versionPolicy,
         DnsResolver dnsResolver,
         HttpSocketFactory socketFactory,
-        boolean useConnectionAgentForH2c,
-        boolean useConnectionAgentForH2,
         boolean usePlatformReaderForH2,
         int h2InitialWindowSize,
         int h2MaxFrameSize,
@@ -92,19 +89,6 @@ record HttpConnectionFactory(
         } catch (IOException e) {
             closeQuietly(socket);
             throw e;
-        }
-
-        if (route.isSecure() && useConnectionAgentForH2) {
-            try {
-                SSLEngine engine = createClientEngine(route);
-                return new ConnectionAgentH2Connection(route, socket, engine);
-            } catch (IOException e) {
-                closeQuietly(socket);
-                throw e;
-            } catch (RuntimeException e) {
-                closeQuietly(socket);
-                throw new IOException("TLS connection-agent setup failed for " + route.host(), e);
-            }
         }
 
         ConnectionTransport transport;
@@ -206,9 +190,7 @@ record HttpConnectionFactory(
         }
 
         try {
-            if ("h2c".equals(protocol) && useConnectionAgentForH2c) {
-                return new ConnectionAgentH2Connection(route);
-            } else if ("h2".equals(protocol) || "h2c".equals(protocol)) {
+            if ("h2".equals(protocol) || "h2c".equals(protocol)) {
                 return new H2Connection(transport,
                         route,
                         readTimeout,
