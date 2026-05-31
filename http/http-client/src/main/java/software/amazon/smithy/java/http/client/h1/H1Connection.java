@@ -54,7 +54,7 @@ public final class H1Connection implements HttpConnection {
     private final UnsyncBufferedInputStream socketIn;
     private final UnsyncBufferedOutputStream socketOut;
     private final Route route;
-    private final byte[] lineBuffer; // Reused across exchanges for header parsing
+    private final H1Exchange exchange;
 
     // HTTP/1.1: only one exchange at a time
     private final AtomicBoolean inUse = new AtomicBoolean(false);
@@ -74,7 +74,7 @@ public final class H1Connection implements HttpConnection {
         this.socketIn = new UnsyncBufferedInputStream(transport.inputStream(), INPUT_BUFFER_SIZE);
         this.socketOut = new UnsyncBufferedOutputStream(transport.outputStream(), OUTPUT_BUFFER_SIZE);
         this.route = route;
-        this.lineBuffer = new byte[RESPONSE_LINE_BUFFER_SIZE];
+        this.exchange = new H1Exchange(this, route);
 
         if (readTimeout != null && !readTimeout.isZero()) {
             transport.setReadTimeout((int) readTimeout.toMillis());
@@ -90,7 +90,7 @@ public final class H1Connection implements HttpConnection {
         }
 
         try {
-            return new H1Exchange(this, request, route, lineBuffer);
+            return exchange.init(request);
         } catch (IOException e) {
             releaseExchange();
             throw e;
