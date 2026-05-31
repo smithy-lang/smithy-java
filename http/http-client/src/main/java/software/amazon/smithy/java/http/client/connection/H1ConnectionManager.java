@@ -47,11 +47,20 @@ final class H1ConnectionManager {
      * @return a valid pooled connection, or null if none available
      */
     PooledConnection tryAcquire(Route route, int maxConnections) {
+        return tryAcquire(route, maxConnections, (connection, reason) -> {});
+    }
+
+    PooledConnection tryAcquire(
+            Route route,
+            int maxConnections,
+            BiConsumer<HttpConnection, CloseReason> onInvalidClose
+    ) {
         HostPool hostPool = getOrCreatePool(route, maxConnections);
 
         PooledConnection pooled;
         while ((pooled = hostPool.poll()) != null) {
-            if (validateConnection(pooled)) {
+            CloseReason invalidReason = invalidReason(pooled);
+            if (invalidReason == null) {
                 LOGGER.debug("Reusing pooled connection to {}", route);
                 return pooled;
             }
@@ -63,6 +72,7 @@ final class H1ConnectionManager {
             } catch (IOException e) {
                 LOGGER.debug("Error closing invalid connection to {}: {}", route, e.getMessage());
             }
+            onInvalidClose.accept(pooled.connection, invalidReason);
         }
         return null;
     }
@@ -210,21 +220,21 @@ final class H1ConnectionManager {
         }
     }
 
-    private boolean validateConnection(PooledConnection pooled) {
+    private CloseReason invalidReason(PooledConnection pooled) {
         long idleNanos = System.nanoTime() - pooled.idleSinceNanos;
         if (idleNanos >= maxIdleTimeNanos) {
-            return false;
+            return CloseReason.IDLE_TIMEOUT;
         }
 
         if (!pooled.connection.isActive()) {
-            return false;
+            return CloseReason.UNEXPECTED_CLOSE;
         }
 
         if (idleNanos > VALIDATION_THRESHOLD_NANOS) {
-            return pooled.connection.validateForReuse();
+            return pooled.connection.validateForReuse() ? null : CloseReason.UNEXPECTED_CLOSE;
         }
 
-        return true;
+        return null;
     }
 
     /**

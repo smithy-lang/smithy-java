@@ -133,6 +133,10 @@ public final class H1Exchange implements HttpExchange {
                     requestOut = new FailingOutputStream(e);
                     return requestOut;
                 }
+                if (requestWritten) {
+                    requestOut = OutputStream.nullOutputStream();
+                    return requestOut;
+                }
             }
 
             String transferEncoding = headers.firstValue(HeaderName.TRANSFER_ENCODING);
@@ -206,7 +210,9 @@ public final class H1Exchange implements HttpExchange {
             parseStatusLineAndHeaders();
         }
 
-        if (responseChunked) {
+        if (noBodyResponseStatus(statusCode) || "HEAD".equalsIgnoreCase(request.method())) {
+            close();
+        } else if (responseChunked) {
             responseIn = createResponseStream();
             try {
                 responseIn.transferTo(OutputStream.nullOutputStream());
@@ -215,8 +221,6 @@ public final class H1Exchange implements HttpExchange {
             }
         } else if (responseContentLength >= 0) {
             connection.getInputStream().discard(responseContentLength);
-            close();
-        } else if (noBodyResponseStatus(statusCode) || "HEAD".equalsIgnoreCase(request.method())) {
             close();
         } else {
             responseIn = createResponseStream();
@@ -375,16 +379,11 @@ public final class H1Exchange implements HttpExchange {
                 while (readLine(in) > 0) {
                     // Skip header lines until empty line
                 }
-            } else if (code == 417) {
-                // 417 Expectation Failed - server rejected Expect
-                throw new IOException("Server rejected Expect: 100-continue with 417 Expectation Failed");
             } else {
                 // Server sent final response without 100 Continue
                 // Parse as final response, must not send body
                 parseStatusAndHeaders(code, in);
                 requestWritten = true; // Skip body transmission
-                throw new IOException("Server sent final response " + code
-                        + " before request body; body must not be written");
             }
         } catch (SocketTimeoutException e) {
             // Timeout waiting for 100 Continue - proceed with body anyway
@@ -458,17 +457,21 @@ public final class H1Exchange implements HttpExchange {
             out.write(CRLF);
         }
 
-        // Write all headers
-        headers.forEachEntry(out, (o, name, value) -> {
-            try {
-                o.writeAscii(name);
-                o.write(COLON_SPACE);
-                o.writeAscii(value);
-                o.write(CRLF);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
+        try {
+            // Write all headers
+            headers.forEachEntry(out, (o, name, value) -> {
+                try {
+                    o.writeAscii(name);
+                    o.write(COLON_SPACE);
+                    o.writeAscii(value);
+                    o.write(CRLF);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        } catch (UncheckedIOException e) {
+            throw e.getCause();
+        }
 
         // Blank line to end headers
         out.write(CRLF);
@@ -605,7 +608,12 @@ public final class H1Exchange implements HttpExchange {
     private Boolean captureControlHeader(byte[] line, int valueStart, int valueEnd, String name) throws IOException {
         return switch (name) {
             case "content-length" -> {
-                responseContentLength = parseContentLength(line, valueStart, valueEnd);
+                long length = parseContentLength(line, valueStart, valueEnd);
+                if (responseContentLength >= 0 && responseContentLength != length) {
+                    throw new IOException("Conflicting Content-Length headers: "
+                            + responseContentLength + " and " + length);
+                }
+                responseContentLength = length;
                 yield null;
             }
             case "transfer-encoding" -> {
@@ -658,6 +666,11 @@ public final class H1Exchange implements HttpExchange {
     private InputStream createResponseStream() throws IOException {
         UnsyncBufferedInputStream socketIn = connection.getInputStream();
 
+        // No body for certain status codes or HEAD response, regardless of Content-Length.
+        if (noBodyResponseStatus(statusCode) || "HEAD".equalsIgnoreCase(request.method())) {
+            return new FixedLengthResponseInputStream(this, socketIn, 0);
+        }
+
         if (responseChunked) {
             chunkedResponseIn = new ChunkedInputStream(socketIn, this);
             return chunkedResponseIn;
@@ -665,11 +678,6 @@ public final class H1Exchange implements HttpExchange {
 
         if (responseContentLength >= 0) {
             return new FixedLengthResponseInputStream(this, socketIn, responseContentLength);
-        }
-
-        // No body for certain status codes or HEAD response.
-        if (noBodyResponseStatus(statusCode) || "HEAD".equalsIgnoreCase(request.method())) {
-            return new FixedLengthResponseInputStream(this, socketIn, 0);
         }
 
         // Read until close (HTTP/1.0 style)
