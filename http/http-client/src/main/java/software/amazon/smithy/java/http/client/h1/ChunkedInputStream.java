@@ -29,16 +29,20 @@ final class ChunkedInputStream extends InputStream {
     private long chunkRemaining = -1; // -1 means need to read chunk size
     private boolean eof;
     private boolean closed;
-    private final byte[] lineBuffer = new byte[MAX_LINE_LENGTH];
+    private final byte[] lineBuffer;
     private HttpHeaders trailers; // Trailer headers parsed from final chunk (RFC 7230 Section 4.1.2)
 
     ChunkedInputStream(UnsyncBufferedInputStream delegate) {
-        this(delegate, null);
+        this(delegate, null, new byte[MAX_LINE_LENGTH]);
     }
 
-    ChunkedInputStream(UnsyncBufferedInputStream delegate, H1Exchange exchange) {
+    ChunkedInputStream(UnsyncBufferedInputStream delegate, H1Exchange exchange, byte[] lineBuffer) {
+        if (lineBuffer.length < MAX_LINE_LENGTH) {
+            throw new IllegalArgumentException("lineBuffer must be at least " + MAX_LINE_LENGTH + " bytes");
+        }
         this.delegate = delegate;
         this.exchange = exchange;
+        this.lineBuffer = lineBuffer;
     }
 
     private static long readMaxChunkSize() {
