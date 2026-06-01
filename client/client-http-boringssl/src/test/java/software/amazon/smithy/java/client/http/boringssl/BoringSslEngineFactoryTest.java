@@ -210,4 +210,86 @@ class BoringSslEngineFactoryTest {
             assertEquals(3, requestCount.get());
         }
     }
+
+    @Test
+    void httpsLargeBodyRoundTripWithLargeReadBuffer() throws Exception {
+        // Same 256 KiB round-trip, but with a 256 KiB tlsReadBufferSize so a single socketChannel.read
+        // pulls many TLS records at once and SSLEngineTransport.readAndUnwrap drains them all in one
+        // pass (compacting netIn once, not per record). This is the multi-record batch-drain path the
+        // default 16 KiB buffer never exercises; assert byte-exactness across reuse to prove the
+        // drain-then-compact loop frames every record correctly and leaves no plaintext behind.
+        var requestCount = new AtomicInteger();
+        startTlsEchoServer(requestCount);
+
+        byte[] payload = new byte[256 * 1024];
+        for (int i = 0; i < payload.length; i++) {
+            payload[i] = (byte) (i * 17 + 3);
+        }
+
+        var poolBuilder = HttpConnectionPool.builder()
+                .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
+                .maxTotalConnections(1)
+                .maxConnectionsPerRoute(1)
+                .tlsReadBufferSize(256 * 1024)
+                .socketReceiveBufferSize(512 * 1024)
+                .sslEngineFactory(BoringSslEngineFactory.create(true));
+        try (var client = HttpClient.builder().connectionPool(poolBuilder.build()).build()) {
+            String uri = "https://127.0.0.1:" + server.getAddress().getPort() + "/raw";
+            for (int attempt = 0; attempt < 3; attempt++) {
+                HttpRequest request = HttpRequest.create()
+                        .setMethod("PUT")
+                        .setUri(URI.create(uri))
+                        .setHttpVersion(HttpVersion.HTTP_1_1)
+                        .setBody(DataStream.ofBytes(payload))
+                        .toUnmodifiable();
+                HttpResponse response = client.send(request);
+                assertThat(response.statusCode(), equalTo(200));
+                try (var b = response.body().asInputStream()) {
+                    assertThat(Arrays.equals(b.readAllBytes(), payload), equalTo(true));
+                }
+            }
+            // One connection reused across all three — each response fully drained and released.
+            assertEquals(3, requestCount.get());
+        }
+    }
+
+    @Test
+    void httpsLargeBodyRoundTripWithLargeWriteBuffer() throws Exception {
+        // Drive the coalescing write path: a 256 KiB body wrapped into ~16 TLS records that
+        // accumulate in one 256 KiB netOut before a single writeNetOut, instead of one socket write
+        // per record. The echo server reflects the body, so a byte-exact round-trip proves write()
+        // framed every coalesced record correctly (no dropped/duplicated bytes at flush boundaries).
+        var requestCount = new AtomicInteger();
+        startTlsEchoServer(requestCount);
+
+        byte[] payload = new byte[256 * 1024];
+        for (int i = 0; i < payload.length; i++) {
+            payload[i] = (byte) (i * 13 + 5);
+        }
+
+        var poolBuilder = HttpConnectionPool.builder()
+                .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
+                .maxTotalConnections(1)
+                .maxConnectionsPerRoute(1)
+                .tlsWriteBufferSize(256 * 1024)
+                .socketSendBufferSize(512 * 1024)
+                .sslEngineFactory(BoringSslEngineFactory.create(true));
+        try (var client = HttpClient.builder().connectionPool(poolBuilder.build()).build()) {
+            String uri = "https://127.0.0.1:" + server.getAddress().getPort() + "/raw";
+            for (int attempt = 0; attempt < 3; attempt++) {
+                HttpRequest request = HttpRequest.create()
+                        .setMethod("PUT")
+                        .setUri(URI.create(uri))
+                        .setHttpVersion(HttpVersion.HTTP_1_1)
+                        .setBody(DataStream.ofBytes(payload))
+                        .toUnmodifiable();
+                HttpResponse response = client.send(request);
+                assertThat(response.statusCode(), equalTo(200));
+                try (var b = response.body().asInputStream()) {
+                    assertThat(Arrays.equals(b.readAllBytes(), payload), equalTo(true));
+                }
+            }
+            assertEquals(3, requestCount.get());
+        }
+    }
 }

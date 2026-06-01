@@ -53,6 +53,12 @@ public final class UserAgentPlugin implements AutoClientPlugin {
 
         private static final String UA_VERSION = "2.1";
         private static final String STATIC_SEGMENT;
+        // The User-Agent for the common request: no app-id and no per-call feature IDs. Equal to
+        // STATIC_SEGMENT with its single trailing space trimmed. Precomputed so those requests
+        // skip the StringBuilder + toString churn entirely (createUa profiled as a per-request
+        // byte[]/String allocator), reserving the builder path for requests that actually carry an
+        // app-id or feature IDs.
+        private static final String DEFAULT_UA;
 
         private static final String ENV_APP_ID = "AWS_SDK_UA_APP_ID";
         private static final String SYSTEM_APP_ID = "aws.userAgentAppId";
@@ -73,6 +79,7 @@ public final class UserAgentPlugin implements AutoClientPlugin {
                     + " os/" + getOsFamily() + "#" + sanitizeValue(System.getProperty("os.version"))
                     + " lang/java#" + sanitizeValue(System.getProperty("java.version"))
                     + ' ';
+            DEFAULT_UA = STATIC_SEGMENT.substring(0, STATIC_SEGMENT.length() - 1);
         }
 
         @Override
@@ -90,14 +97,19 @@ public final class UserAgentPlugin implements AutoClientPlugin {
         }
 
         private static String createUa(Context context) {
+            var appId = resolveAppId(context);
+            var features = context.get(CallContext.FEATURE_IDS);
+            // Common case — neither app-id nor feature IDs — is a constant; skip the builder.
+            if (appId == null && (features == null || features.isEmpty())) {
+                return DEFAULT_UA;
+            }
+
             StringBuilder b = new StringBuilder(STATIC_SEGMENT);
 
-            var appId = resolveAppId(context);
             if (appId != null) {
                 b.append("app/").append(sanitizeValue(appId)).append(' ');
             }
 
-            var features = context.get(CallContext.FEATURE_IDS);
             if (features != null && !features.isEmpty()) {
                 b.append("m/");
                 for (var feature : features) {
