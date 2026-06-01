@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.http.client.h1;
+package software.amazon.smithy.java.http.client.connection;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -32,7 +32,7 @@ class ProxyTunnelTest {
     @Test
     void establishSuccessfulTunnel() throws IOException {
         var socket = new FakeSocket("HTTP/1.1 200 Connection Established\r\n\r\n");
-        var result = ProxyTunnel.establish(socket, "example.com", 443, null, TIMEOUT);
+        var result = HttpConnectionFactory.establishTunnel(socket, "example.com", 443, null, TIMEOUT);
 
         assertNotNull(result.socket());
         assertEquals(200, result.statusCode());
@@ -46,7 +46,7 @@ class ProxyTunnelTest {
     @Test
     void tunnelFailsWithForbidden() throws IOException {
         var socket = new FakeSocket("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n");
-        var result = ProxyTunnel.establish(socket, "example.com", 443, null, TIMEOUT);
+        var result = HttpConnectionFactory.establishTunnel(socket, "example.com", 443, null, TIMEOUT);
 
         assertNull(result.socket());
         assertEquals(403, result.statusCode());
@@ -56,7 +56,7 @@ class ProxyTunnelTest {
     void tunnelWithBasicAuth() throws IOException {
         var socket = new FakeSocket("HTTP/1.1 200 Connection Established\r\n\r\n");
         var creds = new HttpCredentials.Basic("user", "pass", true);
-        var result = ProxyTunnel.establish(socket, "example.com", 443, creds, TIMEOUT);
+        var result = HttpConnectionFactory.establishTunnel(socket, "example.com", 443, creds, TIMEOUT);
 
         assertNotNull(result.socket());
         assertEquals(200, result.statusCode());
@@ -69,7 +69,7 @@ class ProxyTunnelTest {
     void tunnelAuthFailsAfter407() throws IOException {
         var socket = new FakeSocket("HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n");
         var creds = new HttpCredentials.Basic("user", "pass", true);
-        var result = ProxyTunnel.establish(socket, "example.com", 443, creds, TIMEOUT);
+        var result = HttpConnectionFactory.establishTunnel(socket, "example.com", 443, creds, TIMEOUT);
 
         assertNull(result.socket());
         assertEquals(407, result.statusCode());
@@ -81,7 +81,7 @@ class ProxyTunnelTest {
                 "HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n" +
                         "HTTP/1.1 200 Connection Established\r\n\r\n");
         var creds = new MultiRoundCredentials();
-        var result = ProxyTunnel.establish(socket, "example.com", 443, creds, TIMEOUT);
+        var result = HttpConnectionFactory.establishTunnel(socket, "example.com", 443, creds, TIMEOUT);
 
         assertNotNull(result.socket());
         assertEquals(200, result.statusCode());
@@ -91,7 +91,7 @@ class ProxyTunnelTest {
     @Test
     void tunnelWithoutCredentialsOn407() throws IOException {
         var socket = new FakeSocket("HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n");
-        var result = ProxyTunnel.establish(socket, "example.com", 443, null, TIMEOUT);
+        var result = HttpConnectionFactory.establishTunnel(socket, "example.com", 443, null, TIMEOUT);
 
         assertNull(result.socket());
         assertEquals(407, result.statusCode());
@@ -100,7 +100,7 @@ class ProxyTunnelTest {
     @Test
     void tunnelIncludesHostHeader() throws IOException {
         var socket = new FakeSocket("HTTP/1.1 200 Connection Established\r\n\r\n");
-        ProxyTunnel.establish(socket, "example.com", 443, null, TIMEOUT);
+        HttpConnectionFactory.establishTunnel(socket, "example.com", 443, null, TIMEOUT);
         var request = socket.getRequest();
 
         // Host header is auto-generated from URI, check for lowercase
@@ -111,7 +111,7 @@ class ProxyTunnelTest {
     @Test
     void tunnelIncludesProxyConnectionHeader() throws IOException {
         var socket = new FakeSocket("HTTP/1.1 200 Connection Established\r\n\r\n");
-        ProxyTunnel.establish(socket, "example.com", 443, null, TIMEOUT);
+        HttpConnectionFactory.establishTunnel(socket, "example.com", 443, null, TIMEOUT);
         var request = socket.getRequest();
 
         // Check for the header (case may vary)
