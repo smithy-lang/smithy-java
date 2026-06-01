@@ -207,8 +207,9 @@ final class JsonReadUtils {
         while (pos < end) {
             byte b = buf[pos];
             if (b == '"') {
-                // No escapes found — fast path
-                deser.parsedString = new String(buf, start, pos - start, StandardCharsets.UTF_8);
+                // No escapes found — fast path. Dedup short strings through the
+                // deserializer's per-document cache (repeated keys/values are common).
+                deser.parsedString = deser.decodeUtf8Cached(buf, start, pos - start);
                 deser.parsedEndPos = pos + 1;
                 return;
             }

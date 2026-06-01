@@ -16,6 +16,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
@@ -50,6 +51,46 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     double parsedDouble;
     String parsedString;
 
+    // Short-string dedup cache (parsed map keys and string values). DynamoDB-style
+    // payloads repeat the same short strings constantly ("item", "amount", "S", "N",
+    // "Italian", numeric values like "20"/"4.8" modeled as strings). For names <= 8
+    // bytes, the raw bytes packed into a long are an exact identity: in the no-escape
+    // fast path every content byte is >= 0x20 (control chars are rejected), so the
+    // packed long is non-zero and collision-free — a hit is a single `long ==`, with
+    // no byte comparison and no length field needed.
+    //
+    // The arrays are reused across documents via a striped pool (allocating ~4 KB per
+    // parse measurably regresses small payloads). Reuse without clearing is safe: the
+    // packed key is the exact bytes, so a stale entry from a prior document is still
+    // byte-identical to any new match — a hit always yields the correct String.
+    private static final int STR_CACHE_SIZE = 256; // power of two
+    private static final int STR_CACHE_MASK = STR_CACHE_SIZE - 1;
+
+    /** Reusable dedup arrays, pooled per the pattern in {@link SmithyJsonSerializer}. */
+    static final class StringCache {
+        final long[] keys = new long[STR_CACHE_SIZE];
+        final String[] vals = new String[STR_CACHE_SIZE];
+    }
+
+    // Striped cache pool (mirrors SmithyJsonSerializer's serializer pool). Shared by
+    // platform and virtual threads alike — see acquireCache for why this is safe and
+    // memory-bounded under high virtual-thread concurrency.
+    private static final int CACHE_POOL_SLOTS;
+    private static final int CACHE_POOL_MASK;
+    private static final AtomicReferenceArray<StringCache> CACHE_POOL;
+    private static final int CACHE_MAX_PROBE = 3;
+
+    static {
+        int raw = Runtime.getRuntime().availableProcessors() * 4;
+        CACHE_POOL_SLOTS = Integer.highestOneBit(raw - 1) << 1;
+        CACHE_POOL_MASK = CACHE_POOL_SLOTS - 1;
+        CACHE_POOL = new AtomicReferenceArray<>(CACHE_POOL_SLOTS);
+    }
+
+    private long[] strCacheKeys; // null until the first short string is decoded
+    private String[] strCacheVals;
+    private StringCache pooledCache; // non-null when the arrays came from the pool
+
     SmithyJsonDeserializer(byte[] buf, int pos, int end, JsonSettings settings) {
         this.buf = buf;
         this.pos = pos;
@@ -63,12 +104,38 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
     @Override
     public void close() {
+        releaseCache();
         // Verify no trailing non-whitespace content
         int p = JsonReadUtils.skipWhitespace(buf, pos, end);
         if (p < end) {
             throw new SerializationException(
                     "Unexpected JSON content: " + JsonReadUtils.describePos(buf, p, end));
         }
+    }
+
+    private static int cachePoolProbe() {
+        long id = Thread.currentThread().threadId();
+        return (int) (id ^ (id >>> 16)) & CACHE_POOL_MASK;
+    }
+
+    /** Returns the pooled cache for reuse by a later parse on this thread group. */
+    private void releaseCache() {
+        StringCache cache = pooledCache;
+        if (cache == null) {
+            return;
+        }
+        pooledCache = null;
+        strCacheKeys = null;
+        strCacheVals = null;
+        int base = cachePoolProbe();
+        for (int i = 0; i < CACHE_MAX_PROBE; i++) {
+            int idx = (base + i) & CACHE_POOL_MASK;
+            if (CACHE_POOL.getPlain(idx) == null
+                    && CACHE_POOL.compareAndExchangeRelease(idx, null, cache) == null) {
+                return;
+            }
+        }
+        // Pool full — let GC collect.
     }
 
     // ---- Primitive readers ----
@@ -237,6 +304,69 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         JsonReadUtils.parseString(buf, pos, end, this);
         pos = parsedEndPos;
         return parsedString;
+    }
+
+    /**
+     * Decodes an unescaped string, deduplicating short (<= 8 byte) strings through a
+     * per-document cache. The packed bytes form an exact identity (see field docs), so a
+     * cache hit returns a shared, immutable String with no byte comparison. On a collision
+     * the existing entry is overwritten (bounded memory), and on a miss the freshly decoded
+     * String is cached. Strings longer than 8 bytes bypass the cache.
+     */
+    String decodeUtf8Cached(byte[] buf, int start, int len) {
+        if (len == 0) {
+            return "";
+        }
+        if (len > 8) {
+            return new String(buf, start, len, StandardCharsets.UTF_8);
+        }
+        // Pack bytes into a long. Every content byte is >= 0x20 here (the no-escape fast
+        // path rejects control bytes), so leading bytes are non-zero and length is encoded
+        // implicitly — distinct (bytes,length) pairs never collide on the packed key.
+        long key = 0;
+        for (int i = 0; i < len; i++) {
+            key = (key << 8) | (buf[start + i] & 0xFFL);
+        }
+        long[] keys = strCacheKeys;
+        String[] vals = strCacheVals;
+        if (keys == null) {
+            StringCache cache = acquireCache();
+            keys = strCacheKeys = cache.keys;
+            vals = strCacheVals = cache.vals;
+        }
+        // Fibonacci hash: mix so short keys that differ only in low bits spread out.
+        int slot = (int) ((key * 0x9E3779B97F4A7C15L) >>> 48) & STR_CACHE_MASK;
+        if (keys[slot] == key) {
+            return vals[slot];
+        }
+        String s = new String(buf, start, len, StandardCharsets.UTF_8);
+        keys[slot] = key;
+        vals[slot] = s;
+        return s;
+    }
+
+    /**
+     * Acquires a dedup cache from the striped pool (or allocates a fresh one). Mirrors
+     * {@link SmithyJsonSerializer#acquire}, including its virtual-thread handling: the
+     * shared pool serves platform and virtual threads alike. The CAS to null gives the
+     * caller exclusive ownership until {@link #releaseCache} (safe across carrier remounts
+     * — deserialization never blocks), and the in-flight count tracks concurrent parses
+     * (≈ carrier count), not the virtual-thread count, so memory stays bounded. Entries
+     * are reused as-is — see field docs for why reusing a populated cache is correct.
+     */
+    private StringCache acquireCache() {
+        int base = cachePoolProbe();
+        for (int i = 0; i < CACHE_MAX_PROBE; i++) {
+            int idx = (base + i) & CACHE_POOL_MASK;
+            StringCache c = CACHE_POOL.getPlain(idx);
+            if (c != null && CACHE_POOL.compareAndExchangeAcquire(idx, c, null) == c) {
+                pooledCache = c;
+                return c;
+            }
+        }
+        StringCache c = new StringCache();
+        pooledCache = c;
+        return c;
     }
 
     @Override

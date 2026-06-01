@@ -106,39 +106,47 @@ final class SmithyJsonSerializer implements ShapeSerializer {
      * semantics ensure we see the serializer's fully-written state). This pays
      * the atomic price only once per acquire - empty slots are skipped with a
      * plain read instead of a full getAndSet.
+     *
+     * <p>This shared striped pool is safe and effective for virtual threads. The CAS to
+     * null gives the caller exclusive ownership until it releases, which holds even if the
+     * virtual thread unmounts and remounts on a different carrier (serialization is pure
+     * CPU work — no blocking, so no carrier pinning). Memory stays bounded because the
+     * number of serializers in flight tracks the number of threads concurrently inside
+     * this section (≈ carrier count), not the number of virtual threads; the pool's fixed
+     * slot count caps idle retained serializers. The {@link #poolProbe()} thread-id base
+     * gives platform threads a stable home slot (near-zero contention) and spreads virtual
+     * threads — which never reuse a slot — across the pool.
      */
     static SmithyJsonSerializer acquire(JsonSettings settings) {
-        //TODO Have a different strat for VTs,
-        // we still some sort of pooling for VTs but the current strategy won't work.
-        if (!Thread.currentThread().isVirtual()) {
-            int base = poolProbe();
-            for (int i = 0; i < MAX_PROBE; i++) {
-                int idx = (base + i) & POOL_MASK;
-                SmithyJsonSerializer s = POOL.getPlain(idx);
-                if (s != null && POOL.compareAndExchangeAcquire(idx, s, null) == s) {
-                    if (s.settings.equals(settings)) {
-                        s.pos = 0;
-                        s.depth = 0;
-                        s.currentFieldNameTable = null;
-                        return s;
-                    }
-                    POOL.setRelease(idx, s); // wrong settings, put back
+        int base = poolProbe();
+        for (int i = 0; i < MAX_PROBE; i++) {
+            int idx = (base + i) & POOL_MASK;
+            SmithyJsonSerializer s = POOL.getPlain(idx);
+            if (s != null && POOL.compareAndExchangeAcquire(idx, s, null) == s) {
+                if (s.settings.equals(settings)) {
+                    s.pos = 0;
+                    s.depth = 0;
+                    s.currentFieldNameTable = null;
+                    return s;
                 }
+                POOL.setRelease(idx, s); // wrong settings, put back
             }
         }
         return new SmithyJsonSerializer(settings);
     }
 
     /**
-     * Returns a serializer to the pool for reuse. If the pool is full, the
-     * buffer is oversized, or we're on a virtual thread, the serializer is discarded.
+     * Returns a serializer to the pool for reuse. If the pool is full or the buffer was
+     * released (closed), the serializer is discarded. Virtual threads participate in the
+     * pool on equal footing with platform threads — see {@link #acquire} for why this is
+     * safe and memory-bounded.
      *
      * <p>Uses getPlain to peek for empty slots, then compareAndExchangeRelease to
      * store the serializer with release semantics (ensures all serializer state is
      * visible to the thread that later acquires it).
      */
     static void release(SmithyJsonSerializer serializer, boolean exception) {
-        if (serializer.buf == null || Thread.currentThread().isVirtual()) {
+        if (serializer.buf == null) {
             return;
         }
         // If an exception occurred, the needsComma array may be in an inconsistent state.
