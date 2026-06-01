@@ -223,7 +223,9 @@ record HttpConnectionFactory(
         return dst;
     }
 
-    enum Protocol { H1, H2 }
+    enum Protocol {
+        H1, H2
+    }
 
     private HttpConnection createProtocolConnection(ConnectionTransport transport, Route route) throws IOException {
         try {
@@ -277,13 +279,13 @@ record HttpConnectionFactory(
 
     private H2Connection createH2Connection(ConnectionTransport transport, Route route) throws IOException {
         return new H2Connection(transport,
-                                route,
-                                readTimeout,
-                                writeTimeout,
-                                usePlatformReaderForH2,
-                                h2InitialWindowSize,
-                                h2MaxFrameSize,
-                                h2BufferSize);
+                route,
+                readTimeout,
+                writeTimeout,
+                usePlatformReaderForH2,
+                h2InitialWindowSize,
+                h2MaxFrameSize,
+                h2BufferSize);
     }
 
     private HttpConnection connectViaProxy(Route route) throws IOException {
