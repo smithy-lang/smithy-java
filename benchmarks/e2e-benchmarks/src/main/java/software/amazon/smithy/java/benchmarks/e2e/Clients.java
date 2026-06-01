@@ -13,7 +13,6 @@ import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.client.auth.scheme.s3express.CreateSessionCallback;
 import software.amazon.smithy.java.aws.client.auth.scheme.s3express.S3ExpressContext;
-import software.amazon.smithy.java.aws.client.auth.scheme.s3express.S3ExpressIdentity;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.imds.ImdsCredentialProvider;
@@ -181,7 +180,7 @@ final class Clients {
             }
             var resp = client.createSession(CreateSessionInput.builder().bucket(bucket).build());
             var c = resp.getCredentials();
-            return S3ExpressIdentity.create(
+            return AwsCredentialsIdentity.create(
                     c.getAccessKeyId(),
                     c.getSecretAccessKey(),
                     c.getSessionToken(),
