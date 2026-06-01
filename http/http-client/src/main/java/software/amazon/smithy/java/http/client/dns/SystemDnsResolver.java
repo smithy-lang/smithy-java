@@ -12,16 +12,6 @@ import java.util.List;
 
 /**
  * DNS resolver using the JVM's default resolution mechanism.
- *
- * <p>This resolver delegates to {@link InetAddress#getAllByName(String)}, which typically uses the operating system's
- * DNS resolution. The JVM maintains its own DNS cache with configurable TTLs via security properties:
- * <ul>
- *   <li>{@code networkaddress.cache.ttl} - seconds to cache successful lookups</li>
- *   <li>{@code networkaddress.cache.negative.ttl} - seconds to cache failed lookups</li>
- * </ul>
- *
- * <p>This resolver is stateless and does not perform any caching beyond what the JVM provides. It returns all
- * addresses from DNS resolution, preserving the order returned by the underlying resolver.
  */
 final class SystemDnsResolver implements DnsResolver {
 

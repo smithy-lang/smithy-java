@@ -73,7 +73,7 @@ final class H2ConnectionManager {
         this.acquireTimeoutMs = acquireTimeoutMs;
         this.listeners = listeners;
         this.connectionFactory = connectionFactory;
-        this.loadBalancer = new WatermarkLoadBalancer(
+        this.loadBalancer = H2LoadBalancer.watermark(
                 Math.max(DEFAULT_SOFT_LIMIT_FLOOR, streamsPerConnection / DEFAULT_SOFT_LIMIT_DIVISOR),
                 streamsPerConnection);
     }
