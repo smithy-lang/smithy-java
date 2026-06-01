@@ -9,6 +9,7 @@ import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.aws.client.auth.scheme.sigv4.SigV4Settings;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.context.Context;
@@ -18,19 +19,13 @@ import software.amazon.smithy.model.shapes.ShapeId;
 /**
  * Auth scheme for S3 Express directory-bucket data-plane requests.
  *
- * <p>The endpoint rules emit this auth scheme with the wire name {@code sigv4-s3express}, but
- * we expose it through smithy-java as {@code aws.auth#sigv4S3express} because Smithy ShapeIds
- * cannot contain hyphens. {@link
- * software.amazon.smithy.java.aws.client.rulesengine.AwsRulesExtension} translates the wire name
- * to this id when reading endpoint properties.
- *
  * <p>The identity is bucket-scoped session credentials returned by S3's {@code CreateSession}
  * API; the signer uses regular SigV4 with the session token sent as
  * {@code x-amz-s3session-token} (instead of {@code x-amz-security-token}).
  */
-public final class S3ExpressAuthScheme implements AuthScheme<HttpRequest, S3ExpressIdentity> {
+final class S3ExpressAuthScheme implements AuthScheme<HttpRequest, AwsCredentialsIdentity> {
 
-    public static final ShapeId SCHEME_ID = ShapeId.from("aws.auth#sigv4S3express");
+    static final ShapeId SCHEME_ID = ShapeId.from("aws.auth#sigv4S3express");
 
     private static final String DEFAULT_SIGNING_NAME = "s3express";
 
@@ -45,11 +40,11 @@ public final class S3ExpressAuthScheme implements AuthScheme<HttpRequest, S3Expr
     /**
      * @param createSession bridge to the user's S3 client's CreateSession operation.
      */
-    public S3ExpressAuthScheme(CreateSessionCallback createSession) {
+    S3ExpressAuthScheme(CreateSessionCallback createSession) {
         this(DEFAULT_SIGNING_NAME, createSession);
     }
 
-    public S3ExpressAuthScheme(String signingName, CreateSessionCallback createSession) {
+    S3ExpressAuthScheme(String signingName, CreateSessionCallback createSession) {
         this.signingName = signingName;
         this.createSession = createSession;
     }
@@ -65,8 +60,8 @@ public final class S3ExpressAuthScheme implements AuthScheme<HttpRequest, S3Expr
     }
 
     @Override
-    public Class<S3ExpressIdentity> identityClass() {
-        return S3ExpressIdentity.class;
+    public Class<AwsCredentialsIdentity> identityClass() {
+        return AwsCredentialsIdentity.class;
     }
 
     @Override
@@ -75,11 +70,12 @@ public final class S3ExpressAuthScheme implements AuthScheme<HttpRequest, S3Expr
         // overrides from the resolved endpoint on top of these. The values stamped here are the
         // defaults the signer falls back to when the endpoint didn't override.
         var ctx = Context.create();
-        ctx.put(software.amazon.smithy.java.aws.client.auth.scheme.sigv4.SigV4Settings.SIGNING_NAME, signingName);
+        ctx.put(SigV4Settings.SIGNING_NAME, signingName);
+        ctx.put(SigV4Settings.OMIT_SECURITY_TOKEN, true);
         ctx.put(RegionSetting.REGION, context.expect(RegionSetting.REGION));
-        var clock = context.get(software.amazon.smithy.java.aws.client.auth.scheme.sigv4.SigV4Settings.CLOCK);
+        var clock = context.get(SigV4Settings.CLOCK);
         if (clock != null) {
-            ctx.put(software.amazon.smithy.java.aws.client.auth.scheme.sigv4.SigV4Settings.CLOCK, clock);
+            ctx.put(SigV4Settings.CLOCK, clock);
         }
         return Context.unmodifiableView(ctx);
     }
@@ -107,25 +103,17 @@ public final class S3ExpressAuthScheme implements AuthScheme<HttpRequest, S3Expr
     }
 
     @Override
-    public Signer<HttpRequest, S3ExpressIdentity> signer() {
+    public Signer<HttpRequest, AwsCredentialsIdentity> signer() {
         return S3ExpressSigner.create(signingName);
     }
 
     @Override
-    public IdentityResolver<S3ExpressIdentity> identityResolver(IdentityResolvers resolvers) {
-        // If the user registered their own S3ExpressIdentity resolver (e.g. via
-        // ClientConfig.Builder#addIdentityResolver), prefer it. This is the override hook the
-        // SEP recommends: customers can supply a custom CreateSession-compatible provider for
-        // alternate caching, observability, or sourcing strategies.
-        IdentityResolver<S3ExpressIdentity> override = resolvers.identityResolver(S3ExpressIdentity.class);
-        if (override != null) {
-            return override;
-        }
-
+    public IdentityResolver<AwsCredentialsIdentity> identityResolver(IdentityResolvers resolvers) {
         IdentityResolver<AwsCredentialsIdentity> base = resolvers.identityResolver(AwsCredentialsIdentity.class);
         if (base == null) {
             return null;
         }
+
         // Lock-free fast path for the common case where the same IdentityResolvers is passed
         // every call. If the base resolver instance changes (rare; it's a property of the
         // client's IdentityResolvers registry which doesn't change after build), rebuild.
@@ -133,6 +121,7 @@ public final class S3ExpressAuthScheme implements AuthScheme<HttpRequest, S3Expr
         if (local != null && providerBase == base) {
             return local;
         }
+
         synchronized (this) {
             if (provider == null || providerBase != base) {
                 providerBase = base;

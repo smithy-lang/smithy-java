@@ -65,6 +65,16 @@ public interface SigV4Settings<B extends ClientSetting<B>> extends ClockSetting<
             Context.key("SigV4 body-hash override (e.g. STREAMING-UNSIGNED-PAYLOAD-TRAILER).");
 
     /**
+     * If true, the signer does not add {@code x-amz-security-token} even when the identity has
+     * a session token.
+     *
+     * <p>This is used by S3 Express, where bucket-scoped session credentials carry their token
+     * in {@code x-amz-s3session-token} instead.
+     */
+    Context.Key<Boolean> OMIT_SECURITY_TOKEN =
+            Context.key("Omit x-amz-security-token when signing.");
+
+    /**
      * Signing name to use for the SigV4 signing process.
      *
      * <p>The signing name is typically the name of the service. For example {@code "lambda"}.

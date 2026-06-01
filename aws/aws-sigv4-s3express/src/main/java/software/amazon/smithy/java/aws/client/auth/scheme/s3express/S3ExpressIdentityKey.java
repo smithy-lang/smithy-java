@@ -30,11 +30,11 @@ final class S3ExpressIdentityKey {
     S3ExpressIdentityKey(String bucket, AwsCredentialsIdentity identity) {
         this.bucket = Objects.requireNonNull(bucket, "bucket");
         this.identity = Objects.requireNonNull(identity, "identity");
-        this.hash = Objects.hash(
-                bucket,
-                identity.accessKeyId(),
-                identity.secretAccessKey(),
-                identity.sessionToken());
+        int h = bucket.hashCode();
+        h = 31 * h + identity.accessKeyId().hashCode();
+        h = 31 * h + identity.secretAccessKey().hashCode();
+        h = 31 * h + Objects.hashCode(identity.sessionToken());
+        this.hash = h;
     }
 
     String bucket() {

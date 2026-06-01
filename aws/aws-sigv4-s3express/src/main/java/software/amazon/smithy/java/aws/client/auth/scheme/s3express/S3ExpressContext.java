@@ -11,7 +11,6 @@ import software.amazon.smithy.java.context.Context;
  * Context keys used by the S3 Express auth scheme to communicate per-call data.
  */
 public final class S3ExpressContext {
-
     /**
      * Bucket name on the in-flight request. Must be set by an interceptor that pulls the value
      * from the input shape before the auth pipeline asks for an identity. The

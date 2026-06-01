@@ -61,6 +61,7 @@ final class S3ExpressChecksumInterceptor implements ClientInterceptor {
         if (hook.context().get(S3ExpressContext.BUCKET) == null) {
             return hook.request();
         }
+
         if (!(hook.request() instanceof HttpRequest req)) {
             return hook.request();
         }
@@ -78,6 +79,7 @@ final class S3ExpressChecksumInterceptor implements ClientInterceptor {
         if (body == null || body.contentLength() == 0) {
             return hook.request();
         }
+
         if (!body.isReplayable() || !body.hasByteBuffer()) {
             // Streaming or non-replayable body — supporting it requires multi-chunk framing,
             // which AwsChunkedDataStream doesn't do yet. Skip the wrapping; SigV4 will fall
@@ -106,12 +108,14 @@ final class S3ExpressChecksumInterceptor implements ClientInterceptor {
         if (req.headers().hasHeader(TRAILER_HEADER)) {
             return true;
         }
+
         var present = new boolean[1];
         req.headers().forEachEntry(present, (state, name, value) -> {
             if (name.startsWith(CHECKSUM_HEADER_PREFIX)) {
                 state[0] = true;
             }
         });
+
         return present[0];
     }
 }

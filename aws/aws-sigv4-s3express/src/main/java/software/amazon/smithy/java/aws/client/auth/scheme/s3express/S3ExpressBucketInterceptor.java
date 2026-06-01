@@ -20,10 +20,9 @@ import software.amazon.smithy.java.client.core.interceptors.InputHook;
  *
  * <p>Runs in {@code readBeforeExecution}, before any auth-resolution stage.
  */
-public final class S3ExpressBucketInterceptor implements ClientInterceptor {
+final class S3ExpressBucketInterceptor implements ClientInterceptor {
 
-    /** Singleton; the interceptor holds no state. */
-    public static final S3ExpressBucketInterceptor INSTANCE = new S3ExpressBucketInterceptor();
+    static final S3ExpressBucketInterceptor INSTANCE = new S3ExpressBucketInterceptor();
 
     private S3ExpressBucketInterceptor() {}
 
@@ -31,12 +30,11 @@ public final class S3ExpressBucketInterceptor implements ClientInterceptor {
     public void readBeforeExecution(InputHook<?, ?> hook) {
         var inputSchema = hook.operation().inputSchema();
         var bucketMember = inputSchema.member("Bucket");
-        if (bucketMember == null) {
-            return;
-        }
-        Object bucket = hook.input().getMemberValue(bucketMember);
-        if (bucket instanceof String s && !s.isEmpty()) {
-            hook.context().put(S3ExpressContext.BUCKET, s);
+        if (bucketMember != null) {
+            Object bucket = hook.input().getMemberValue(bucketMember);
+            if (bucket instanceof String s && !s.isEmpty()) {
+                hook.context().put(S3ExpressContext.BUCKET, s);
+            }
         }
     }
 }

@@ -50,6 +50,22 @@ class S3VirtualHostStyleInterceptorTest {
         assertThat(result.uri().getPath(), equalTo("/"));
     }
 
+    @Test
+    void doesNotStripNonLeadingBucketSegment() {
+        var request = request("/prefix/bucket/key");
+        var result = intercept(request, "bucket");
+
+        assertThat(result, sameInstance(request));
+    }
+
+    @Test
+    void doesNotStripEmptyPath() {
+        var request = request("");
+        var result = intercept(request, "bucket");
+
+        assertThat(result, sameInstance(request));
+    }
+
     private static HttpRequest intercept(HttpRequest request, String bucket) {
         var context = Context.create();
         context.put(S3ExpressContext.BUCKET, bucket);

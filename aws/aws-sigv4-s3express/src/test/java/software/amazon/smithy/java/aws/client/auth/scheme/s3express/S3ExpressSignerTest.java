@@ -15,6 +15,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.client.auth.scheme.sigv4.SigV4Settings;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
 import software.amazon.smithy.java.context.Context;
@@ -24,7 +25,7 @@ import software.amazon.smithy.java.http.api.HttpVersion;
 
 class S3ExpressSignerTest {
 
-    private static final S3ExpressIdentity IDENTITY = S3ExpressIdentity.create(
+    private static final AwsCredentialsIdentity IDENTITY = AwsCredentialsIdentity.create(
             "AKIDEXAMPLE",
             "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
             "session-token-blob",

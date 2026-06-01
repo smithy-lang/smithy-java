@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
+import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 
 /**
  * Bucket-keyed cache of S3 Express identity resolvers.
@@ -44,13 +45,13 @@ final class S3ExpressIdentityCache implements AutoCloseable {
     private final ConcurrentHashMap<S3ExpressIdentityKey, Entry> entries = new ConcurrentHashMap<>();
     private final ReentrantLock writeLock = new ReentrantLock();
     private final AtomicLong tick = new AtomicLong();
-    private final Function<S3ExpressIdentityKey, CachingIdentityResolver<S3ExpressIdentity>> factory;
+    private final Function<S3ExpressIdentityKey, CachingIdentityResolver<AwsCredentialsIdentity>> factory;
 
-    S3ExpressIdentityCache(Function<S3ExpressIdentityKey, CachingIdentityResolver<S3ExpressIdentity>> factory) {
+    S3ExpressIdentityCache(Function<S3ExpressIdentityKey, CachingIdentityResolver<AwsCredentialsIdentity>> factory) {
         this.factory = factory;
     }
 
-    CachingIdentityResolver<S3ExpressIdentity> get(S3ExpressIdentityKey key) {
+    CachingIdentityResolver<AwsCredentialsIdentity> get(S3ExpressIdentityKey key) {
         Entry e = entries.get(key);
         if (e != null) {
             e.lastAccess = tick.incrementAndGet();
@@ -59,7 +60,7 @@ final class S3ExpressIdentityCache implements AutoCloseable {
         return getOrCreate(key);
     }
 
-    private CachingIdentityResolver<S3ExpressIdentity> getOrCreate(S3ExpressIdentityKey key) {
+    private CachingIdentityResolver<AwsCredentialsIdentity> getOrCreate(S3ExpressIdentityKey key) {
         writeLock.lock();
         try {
             Entry e = entries.get(key);
@@ -129,13 +130,13 @@ final class S3ExpressIdentityCache implements AutoCloseable {
     }
 
     private static final class Entry {
-        final CachingIdentityResolver<S3ExpressIdentity> resolver;
+        final CachingIdentityResolver<AwsCredentialsIdentity> resolver;
 
         // Volatile so concurrent readers see updated values; races on simultaneous writes are
         // benign (we only use this for approximate ordering of eviction).
         volatile long lastAccess;
 
-        Entry(CachingIdentityResolver<S3ExpressIdentity> resolver, long lastAccess) {
+        Entry(CachingIdentityResolver<AwsCredentialsIdentity> resolver, long lastAccess) {
             this.resolver = resolver;
             this.lastAccess = lastAccess;
         }

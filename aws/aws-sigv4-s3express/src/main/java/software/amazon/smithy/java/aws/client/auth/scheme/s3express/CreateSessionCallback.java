@@ -16,7 +16,7 @@ import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
  * <pre>{@code
  * (bucket, baseCreds) -> {
  *     var resp = s3Client.createSession(CreateSessionInput.builder().bucket(bucket).build());
- *     return S3ExpressIdentity.create(
+ *     return AwsCredentialsIdentity.create(
  *         resp.credentials().accessKeyId(),
  *         resp.credentials().secretAccessKey(),
  *         resp.credentials().sessionToken(),
@@ -29,5 +29,5 @@ import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
  */
 @FunctionalInterface
 public interface CreateSessionCallback {
-    S3ExpressIdentity createSession(String bucket, AwsCredentialsIdentity baseCredentials);
+    AwsCredentialsIdentity createSession(String bucket, AwsCredentialsIdentity baseCredentials);
 }

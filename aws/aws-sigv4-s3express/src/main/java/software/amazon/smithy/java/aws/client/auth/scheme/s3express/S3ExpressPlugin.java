@@ -44,6 +44,10 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
  */
 public final class S3ExpressPlugin implements AutoClientPlugin {
 
+    private static final int BUCKET_INTERCEPTOR = 1;
+    private static final int CHECKSUM_INTERCEPTOR = 1 << 1;
+    private static final int VIRTUAL_HOST_INTERCEPTOR = 1 << 2;
+
     @Override
     public Phase getPluginPhase() {
         return Phase.DEFAULTS;
@@ -51,13 +55,14 @@ public final class S3ExpressPlugin implements AutoClientPlugin {
 
     @Override
     public void configureClient(ClientConfig.Builder config) {
-        if (!alreadyRegistered(config, S3ExpressBucketInterceptor.INSTANCE)) {
+        int registered = registeredInterceptors(config);
+        if ((registered & BUCKET_INTERCEPTOR) == 0) {
             config.addInterceptor(S3ExpressBucketInterceptor.INSTANCE);
         }
-        if (!alreadyRegistered(config, S3ExpressChecksumInterceptor.INSTANCE)) {
+        if ((registered & CHECKSUM_INTERCEPTOR) == 0) {
             config.addInterceptor(S3ExpressChecksumInterceptor.INSTANCE);
         }
-        if (!alreadyRegistered(config, S3VirtualHostStyleInterceptor.INSTANCE)) {
+        if ((registered & VIRTUAL_HOST_INTERCEPTOR) == 0) {
             config.addInterceptor(S3VirtualHostStyleInterceptor.INSTANCE);
         }
         S3DisableExpressSessionAuthResolver.INSTANCE.configureClient(config);
@@ -68,13 +73,18 @@ public final class S3ExpressPlugin implements AutoClientPlugin {
         }
     }
 
-    private static boolean alreadyRegistered(ClientConfig.Builder config, Object interceptor) {
+    private static int registeredInterceptors(ClientConfig.Builder config) {
+        int result = 0;
         for (var i : config.interceptors()) {
-            if (i == interceptor) {
-                return true;
+            if (i == S3ExpressBucketInterceptor.INSTANCE) {
+                result |= BUCKET_INTERCEPTOR;
+            } else if (i == S3ExpressChecksumInterceptor.INSTANCE) {
+                result |= CHECKSUM_INTERCEPTOR;
+            } else if (i == S3VirtualHostStyleInterceptor.INSTANCE) {
+                result |= VIRTUAL_HOST_INTERCEPTOR;
             }
         }
-        return false;
+        return result;
     }
 
     private static boolean alreadyHasS3ExpressScheme(ClientConfig.Builder config) {

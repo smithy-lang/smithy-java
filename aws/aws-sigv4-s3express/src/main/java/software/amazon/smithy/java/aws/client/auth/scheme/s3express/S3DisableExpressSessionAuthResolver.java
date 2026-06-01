@@ -9,7 +9,6 @@ import software.amazon.smithy.java.aws.client.core.settings.S3EndpointSettings;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientPlugin;
-import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
  * Plugin that resolves the {@code DisableS3ExpressSessionAuth} setting from environment and
@@ -29,13 +28,12 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  *
  * <p>Only {@code true} or {@code false} are accepted; anything else throws.
  */
-@SmithyUnstableApi
-public final class S3DisableExpressSessionAuthResolver implements ClientPlugin {
+final class S3DisableExpressSessionAuthResolver implements ClientPlugin {
 
     private static final String ENV_VAR = "AWS_S3_DISABLE_EXPRESS_SESSION_AUTH";
     private static final String PROFILE_PROPERTY = "s3_disable_express_session_auth";
 
-    public static final S3DisableExpressSessionAuthResolver INSTANCE = new S3DisableExpressSessionAuthResolver();
+    static final S3DisableExpressSessionAuthResolver INSTANCE = new S3DisableExpressSessionAuthResolver();
 
     private S3DisableExpressSessionAuthResolver() {}
 
@@ -90,8 +88,7 @@ public final class S3DisableExpressSessionAuthResolver implements ClientPlugin {
     private static boolean parseBoolean(String value, String source) {
         if ("true".equalsIgnoreCase(value)) {
             return true;
-        }
-        if ("false".equalsIgnoreCase(value)) {
+        } else if ("false".equalsIgnoreCase(value)) {
             return false;
         }
         throw new IllegalArgumentException(
