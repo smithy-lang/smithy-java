@@ -15,37 +15,17 @@ import java.util.Map;
 /**
  * DNS resolver with static hostname-to-IP mappings.
  *
- * <p>This resolver returns pre-configured addresses for known hostnames without
- * performing any network DNS queries. It is useful for:
- * <ul>
- *   <li>Testing without real DNS infrastructure</li>
- *   <li>Local development with custom hostname mappings</li>
- *   <li>Overriding specific hostnames while delegating others</li>
- * </ul>
- *
- * <h2>Example Usage</h2>
- *
- * {@snippet :
+ * <p>{@snippet :
  * var resolver = new StaticDnsResolver(Map.of(
- *     "api.example.com", new InetAddress[] {
+ *     "api.example.com", List.of(
  *         InetAddress.getByName("192.168.1.100"),
  *         InetAddress.getByName("192.168.1.101")
- *     },
- *     "localhost", new InetAddress[] {
- *         InetAddress.getLoopbackAddress()
- *     }
+ *     ),
+ *     "localhost", List.of(InetAddress.getLoopbackAddress())
  * ));
  * }
  */
 record StaticDnsResolver(Map<String, List<InetAddress>> mappings) implements DnsResolver {
-    /**
-     * Creates a static resolver with the given hostname mappings.
-     *
-     * <p>The mappings are defensively copied to prevent external modification.
-     *
-     * @param mappings hostname to address list mappings; empty lists are permitted
-     *                 but will cause {@link #resolve} to throw for that hostname
-     */
     StaticDnsResolver(Map<String, List<InetAddress>> mappings) {
         Map<String, List<InetAddress>> copy = new HashMap<>(mappings.size());
         for (Map.Entry<String, List<InetAddress>> entry : mappings.entrySet()) {
@@ -57,15 +37,6 @@ record StaticDnsResolver(Map<String, List<InetAddress>> mappings) implements Dns
         this.mappings = Map.copyOf(copy);
     }
 
-    /**
-     * Resolves a hostname to its configured addresses.
-     *
-     * <p>Returns the pre-configured address list for the hostname.
-     *
-     * @param hostname the hostname to resolve
-     * @return the configured addresses for this hostname, never empty
-     * @throws IOException if no mapping exists for the hostname or the mapping is empty
-     */
     @Override
     public List<InetAddress> resolve(String hostname) throws IOException {
         List<InetAddress> addresses = mappings.get(hostname.toLowerCase(Locale.ROOT));
