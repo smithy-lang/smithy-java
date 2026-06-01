@@ -12,7 +12,7 @@ package software.amazon.smithy.java.http.client.connection;
  * connection to use, or -1 to signal that a new connection should be created.
  */
 @FunctionalInterface
-public interface H2LoadBalancer {
+interface H2LoadBalancer {
 
     /** Return value indicating a new connection should be created. */
     int CREATE_NEW = -1;
@@ -34,17 +34,4 @@ public interface H2LoadBalancer {
      */
     int select(int[] activeStreams, int connectionCount, int maxConnections);
 
-    /**
-     * Create a watermark-based load balancer.
-     *
-     * <p>Uses a two-tier strategy: prefers connections under the soft limit via round-robin,
-     * expands when all exceed it, and falls back to least-loaded up to the hard limit.
-     *
-     * @param softLimit expand to a new connection when all connections have at least this many streams
-     * @param hardLimit maximum streams per connection (never exceed this)
-     * @return a watermark load balancer
-     */
-    static H2LoadBalancer watermark(int softLimit, int hardLimit) {
-        return new WatermarkLoadBalancer(softLimit, hardLimit);
-    }
 }
