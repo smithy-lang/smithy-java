@@ -123,16 +123,11 @@ record HttpConnectionFactory(
     }
 
     private ConnectionTransport performTlsSocketHandshake(Socket socket, Route route) throws IOException {
+        SSLSocket sslSocket = null;
         try {
-            SSLSocket sslSocket = (SSLSocket) sslContext.getSocketFactory()
+            sslSocket = (SSLSocket) sslContext.getSocketFactory()
                     .createSocket(socket, route.host(), route.port(), true);
-
-            SSLParameters params = sslParameters != null
-                    ? copyParameters(sslParameters)
-                    : sslSocket.getSSLParameters();
-            params.setEndpointIdentificationAlgorithm("HTTPS");
-            params.setApplicationProtocols(versionPolicy.alpnProtocols());
-            sslSocket.setSSLParameters(params);
+            sslSocket.setSSLParameters(socketParameters(sslSocket, versionPolicy.alpnProtocols()));
 
             int originalTimeout = sslSocket.getSoTimeout();
             sslSocket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
@@ -144,7 +139,7 @@ record HttpConnectionFactory(
 
             return ConnectionTransport.of(sslSocket);
         } catch (IOException e) {
-            closeQuietly(socket);
+            closeQuietly(sslSocket != null ? sslSocket : socket);
             throw new IOException("TLS handshake failed for " + route.host(), e);
         }
     }
@@ -160,6 +155,17 @@ record HttpConnectionFactory(
         params.setApplicationProtocols(versionPolicy.alpnProtocols());
         engine.setSSLParameters(params);
         return engine;
+    }
+
+    private SSLParameters socketParameters(SSLSocket sslSocket, String[] applicationProtocols) {
+        SSLParameters params = sslParameters != null
+                ? copyParameters(sslParameters)
+                : sslSocket.getSSLParameters();
+        params.setEndpointIdentificationAlgorithm("HTTPS");
+        if (applicationProtocols != null) {
+            params.setApplicationProtocols(applicationProtocols);
+        }
+        return params;
     }
 
     private static SSLParameters copyParameters(SSLParameters src) {
@@ -179,29 +185,15 @@ record HttpConnectionFactory(
         return dst;
     }
 
+    enum Protocol { H1, H2 }
+
     private HttpConnection createProtocolConnection(ConnectionTransport transport, Route route) throws IOException {
-        String protocol = "http/1.1";
-
-        String negotiated = transport.negotiatedProtocol();
-        if (negotiated != null) {
-            protocol = negotiated;
-        } else if (versionPolicy.usesH2cForCleartext()) {
-            protocol = "h2c";
-        }
-
         try {
-            if ("h2".equals(protocol) || "h2c".equals(protocol)) {
-                return new H2Connection(transport,
-                        route,
-                        readTimeout,
-                        writeTimeout,
-                        usePlatformReaderForH2,
-                        h2InitialWindowSize,
-                        h2MaxFrameSize,
-                        h2BufferSize);
-            } else {
-                return new H1Connection(transport, route, readTimeout);
-            }
+            Protocol protocol = selectProtocol(transport.negotiatedProtocol(), route.isSecure(), versionPolicy);
+            return switch (protocol) {
+                case H2 -> createH2Connection(transport, route);
+                case H1 -> new H1Connection(transport, route, readTimeout);
+            };
         } catch (IOException e) {
             try {
                 transport.close();
@@ -210,6 +202,50 @@ record HttpConnectionFactory(
             }
             throw e;
         }
+    }
+
+    static Protocol selectProtocol(String negotiated, boolean secure, HttpVersionPolicy policy) throws IOException {
+        if (negotiated != null && !negotiated.isEmpty()) {
+            return switch (negotiated) {
+                case "h2" -> {
+                    if (policy == HttpVersionPolicy.ENFORCE_HTTP_1_1) {
+                        throw new IOException("Server negotiated HTTP/2 but client is configured for HTTP/1.1 only");
+                    }
+                    yield Protocol.H2;
+                }
+                case "http/1.1" -> {
+                    if (policy == HttpVersionPolicy.ENFORCE_HTTP_2 || policy == HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE) {
+                        throw new IOException("Server negotiated HTTP/1.1 but client is configured for HTTP/2 only");
+                    }
+                    yield Protocol.H1;
+                }
+                default -> throw new IOException("Unsupported negotiated protocol: " + negotiated);
+            };
+        }
+
+        if (secure) {
+            if (policy == HttpVersionPolicy.ENFORCE_HTTP_2 || policy == HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE) {
+                throw new IOException("No HTTP/2 protocol negotiated by TLS ALPN");
+            }
+            return Protocol.H1;
+        } else if (policy.usesH2cForCleartext()) {
+            return Protocol.H2;
+        } else if (policy == HttpVersionPolicy.ENFORCE_HTTP_2) {
+            throw new IOException("HTTP/2 without TLS requires h2c prior knowledge");
+        } else {
+            return Protocol.H1;
+        }
+    }
+
+    private H2Connection createH2Connection(ConnectionTransport transport, Route route) throws IOException {
+        return new H2Connection(transport,
+                                route,
+                                readTimeout,
+                                writeTimeout,
+                                usePlatformReaderForH2,
+                                h2InitialWindowSize,
+                                h2MaxFrameSize,
+                                h2BufferSize);
     }
 
     private HttpConnection connectViaProxy(Route route) throws IOException {
@@ -288,13 +324,11 @@ record HttpConnectionFactory(
     }
 
     private Socket performTlsHandshakeToProxy(Socket socket, ProxyConfiguration proxy) throws IOException {
+        SSLSocket sslSocket = null;
         try {
-            SSLSocket sslSocket = (SSLSocket) sslContext.getSocketFactory()
+            sslSocket = (SSLSocket) sslContext.getSocketFactory()
                     .createSocket(socket, proxy.hostname(), proxy.port(), true);
-
-            SSLParameters params = sslSocket.getSSLParameters();
-            params.setEndpointIdentificationAlgorithm("HTTPS");
-            sslSocket.setSSLParameters(params);
+            sslSocket.setSSLParameters(socketParameters(sslSocket, null));
 
             int originalTimeout = sslSocket.getSoTimeout();
             sslSocket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
@@ -306,7 +340,7 @@ record HttpConnectionFactory(
 
             return sslSocket;
         } catch (IOException e) {
-            closeQuietly(socket);
+            closeQuietly(sslSocket != null ? sslSocket : socket);
             throw new IOException("TLS handshake to HTTPS proxy " + proxy.hostname() + " failed", e);
         }
     }
