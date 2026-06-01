@@ -56,7 +56,9 @@ record HttpConnectionFactory(
         boolean usePlatformReaderForH2,
         int h2InitialWindowSize,
         int h2MaxFrameSize,
-        int h2BufferSize) {
+        int h2BufferSize,
+        int tlsReadBufferSize,
+        int tlsWriteBufferSize) {
     /**
      * Create a new connection to the given route.
      *
@@ -133,7 +135,13 @@ record HttpConnectionFactory(
             int originalTimeout = socket.getSoTimeout();
             socket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
             try {
-                SSLEngineTransport transport = new SSLEngineTransport(socket, engine, releaser, readTimer);
+                SSLEngineTransport transport = new SSLEngineTransport(
+                        socket,
+                        engine,
+                        releaser,
+                        readTimer,
+                        tlsReadBufferSize,
+                        tlsWriteBufferSize);
                 transport.handshake();
                 return transport;
             } finally {

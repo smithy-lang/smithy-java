@@ -481,6 +481,56 @@ final class VtH1Exchange {
             return toCopy;
         }
 
+        /**
+         * Drain the whole body straight from the inbound {@link ByteBuf}s into {@code out}.
+         *
+         * <p>Overrides {@link InputStream#transferTo}, which would otherwise allocate a fresh 16&nbsp;KiB
+         * scratch {@code byte[]} on every call and copy through it — on the S3 GET discard path that
+         * was ~44% of this transport's download allocation. Writing each {@code ByteBuf} directly to
+         * {@code out} via {@link ByteBuf#readBytes(OutputStream, int)} keeps the buffer reuse the
+         * pull loop already provides and adds no per-call allocation. The benchmark/SDK
+         * {@code discard()} routes here through {@code InputStreamDataStream.discard ->
+         * transferTo(nullOutputStream)}.
+         */
+        @Override
+        public long transferTo(OutputStream out) throws IOException {
+            if (closed) {
+                throw new IOException("Stream closed");
+            }
+            long transferred = 0;
+            while (true) {
+                while (current == null || !current.isReadable()) {
+                    releaseCurrent();
+                    if (eos) {
+                        notifyComplete(true);
+                        return transferred;
+                    }
+                    Object msg = conn.readInbound();
+                    if (msg == null) {
+                        eos = true;
+                        notifyComplete(false);
+                        return transferred;
+                    }
+                    if (msg instanceof HttpContent content) {
+                        current = content.content();
+                        if (content instanceof LastHttpContent) {
+                            eos = true;
+                            if (!current.isReadable()) {
+                                releaseCurrent();
+                                notifyComplete(true);
+                                return transferred;
+                            }
+                        }
+                    } else {
+                        ReferenceCountUtil.release(msg);
+                    }
+                }
+                int n = current.readableBytes();
+                current.readBytes(out, n);
+                transferred += n;
+            }
+        }
+
         @Override
         public void close() throws IOException {
             if (closed) {

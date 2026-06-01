@@ -190,7 +190,9 @@ public final class HttpConnectionPool implements ConnectionPool {
                 builder.usePlatformReaderForH2,
                 builder.h2InitialWindowSize,
                 builder.h2MaxFrameSize,
-                builder.h2BufferSize);
+                builder.h2BufferSize,
+                builder.tlsReadBufferSize,
+                builder.tlsWriteBufferSize);
 
         this.h1Manager = new H1ConnectionManager(this.maxIdleTimeNanos);
         this.connectionPermits = new Semaphore(builder.maxTotalConnections, false);

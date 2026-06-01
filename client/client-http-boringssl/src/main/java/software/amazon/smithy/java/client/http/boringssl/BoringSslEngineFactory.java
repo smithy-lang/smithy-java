@@ -12,6 +12,7 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.ResourceLeakDetector;
 import java.util.List;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
@@ -39,6 +40,20 @@ import software.amazon.smithy.java.logging.InternalLogger;
 public final class BoringSslEngineFactory implements ClientSslEngineFactory {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(BoringSslEngineFactory.class);
+
+    static {
+        // The BoringSSL engine ({@code ReferenceCountedOpenSslEngine}) tracks its pooled off-heap
+        // buffers through Netty's leak detector, which defaults to SIMPLE: a sampled fraction of
+        // every buffer allocate/release captures a Throwable stack trace. On this hot transport path
+        // (driven by SSLEngineTransport, NOT the Netty pipeline) that costs CPU + per-record alloc
+        // churn with no diagnostic value — and unlike the Netty transport's VtH1Transport, nothing
+        // else on the smithy+BoringSSL path disables it. Disable unless the operator has explicitly
+        // chosen a level via either Netty system property.
+        if (System.getProperty("io.netty.leakDetection.level") == null
+                && System.getProperty("io.netty.leakDetectionLevel") == null) {
+            ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.DISABLED);
+        }
+    }
 
     private final SslContext sslContext;
 

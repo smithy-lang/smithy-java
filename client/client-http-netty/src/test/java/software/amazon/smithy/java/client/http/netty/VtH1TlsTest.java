@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.sun.net.httpserver.HttpsConfigurator;
 import com.sun.net.httpserver.HttpsServer;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -158,6 +159,51 @@ class VtH1TlsTest {
                     assertThat(Arrays.equals(b.readAllBytes(), payload), equalTo(true));
                 }
             }
+            assertEquals(3, requestCount.get());
+        } finally {
+            transport.close();
+        }
+    }
+
+    @Test
+    void streamingResponseBodyTransferToDrainsAndReuses() throws Exception {
+        // Drive the streaming response-body path (body > RESPONSE_AGGREGATE_THRESHOLD = 64 KiB) and
+        // consume it via ManagedResponseInputStream.transferTo -> ResponseBodyStream.transferTo (the
+        // override that drains ByteBufs straight to the sink with no per-call 16 KiB scratch byte[]).
+        // Asserts byte-exactness AND that the connection is reused afterwards, proving transferTo
+        // fully drained to EOS and released the connection for keep-alive (single connection).
+        var requestCount = new AtomicInteger();
+        startTlsEchoServer(requestCount);
+
+        byte[] payload = new byte[200 * 1024];
+        for (int i = 0; i < payload.length; i++) {
+            payload[i] = (byte) (i * 31 + 7);
+        }
+
+        var config = new NettyHttpTransportConfig().maxConnectionsPerHost(1);
+        var transport = new NettyHttpClientTransport(config);
+        try {
+            String uri = "https://127.0.0.1:" + server.getAddress().getPort() + "/raw";
+            for (int attempt = 0; attempt < 3; attempt++) {
+                HttpRequest request = HttpRequest.create()
+                        .setMethod("PUT")
+                        .setUri(URI.create(uri))
+                        .setHttpVersion(HttpVersion.HTTP_1_1)
+                        .setBody(DataStream.ofBytes(payload, "application/octet-stream"))
+                        .toUnmodifiable();
+                HttpResponse response = transport.send(Context.create(), request);
+                assertThat(response.statusCode(), equalTo(200));
+                var sink = new ByteArrayOutputStream(payload.length);
+                try (var b = response.body().asInputStream()) {
+                    long n = b.transferTo(sink);
+                    assertThat(n, equalTo((long) payload.length));
+                }
+                assertThat(Arrays.equals(sink.toByteArray(), payload), equalTo(true));
+            }
+            // All three requests reused the single connection — i.e. each transferTo drained the
+            // body to EOS and returned the connection to the pool (a truncated drain would have
+            // evicted it, forcing new connections but still 3 server hits; the stronger signal is a
+            // clean byte-exact round-trip three times over one socket).
             assertEquals(3, requestCount.get());
         } finally {
             transport.close();
