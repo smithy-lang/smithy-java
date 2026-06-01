@@ -22,7 +22,7 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  */
 public final class HttpConnectionPoolBuilder {
     int maxTotalConnections = 256;
-    int maxConnectionsPerRoute = 20;
+    int maxConnectionsPerRoute = 256;
     int h2StreamsPerConnection = 100;
     H2LoadBalancer h2LoadBalancer = null;
     int h2InitialWindowSize = 65535; // RFC 9113 default
