@@ -63,19 +63,46 @@ final class SSLEngineTransport implements ConnectionTransport {
 
     // Application-side read buffer (plaintext from unwrap). Always in "read" mode (position = next byte).
     private ByteBuffer appIn;
+    private final boolean appBufferDirect;
 
     private volatile boolean closed;
     private boolean eof;
 
+    private static final int DEFAULT_BUFFER_SIZE = 16 * 1024;
+
     SSLEngineTransport(Socket socket, SSLEngine engine) throws IOException {
-        this(socket, engine, () -> {}, null);
+        this(socket, engine, () -> {}, null, DEFAULT_BUFFER_SIZE, DEFAULT_BUFFER_SIZE);
     }
 
     SSLEngineTransport(Socket socket, SSLEngine engine, Runnable engineReleaser) throws IOException {
-        this(socket, engine, engineReleaser, null);
+        this(socket, engine, engineReleaser, null, DEFAULT_BUFFER_SIZE, DEFAULT_BUFFER_SIZE);
     }
 
     SSLEngineTransport(Socket socket, SSLEngine engine, Runnable engineReleaser, Timer readTimer)
+            throws IOException {
+        this(socket, engine, engineReleaser, readTimer, DEFAULT_BUFFER_SIZE, DEFAULT_BUFFER_SIZE);
+    }
+
+    /**
+     * @param readBufferSize target capacity (bytes) for the ciphertext-read ({@code netIn}) and
+     *     plaintext-unwrap ({@code appIn}) buffers. Sized up to at least one TLS record. A larger
+     *     value lets one {@code socketChannel.read} pull many records that {@link #readAndUnwrap}
+     *     then drains in a single locked pass (one {@code compact} per socket read, not per record),
+     *     collapsing read syscalls, watchdog arms, epoll registrations, and VT park/unpark cycles
+     *     proportionally to the records-per-read ratio.
+     * @param writeBufferSize target capacity (bytes) for the ciphertext-write ({@code netOut})
+     *     buffer. Sized up to at least one TLS record. A larger value lets {@link #write} accumulate
+     *     several wrapped records before one {@code writeNetOut}, collapsing write syscalls (and the
+     *     attendant VT park/unpark) for bulk uploads.
+     */
+    SSLEngineTransport(
+            Socket socket,
+            SSLEngine engine,
+            Runnable engineReleaser,
+            Timer readTimer,
+            int readBufferSize,
+            int writeBufferSize
+    )
             throws IOException {
         this.socket = socket;
         this.socketIn = socket.getInputStream();
@@ -89,10 +116,20 @@ final class SSLEngineTransport implements ConnectionTransport {
         int packetSize = session.getPacketBufferSize();
         int appSize = session.getApplicationBufferSize();
 
+        // netIn holds buffered ciphertext; appIn holds the plaintext drained from it. Per TLS record
+        // plaintext < ciphertext (record framing + AEAD tag overhead), so sizing appIn >= netIn
+        // guarantees one drain pass empties every whole record netIn can hold without an appIn
+        // overflow mid-pass — keeping the trailing compact to at most one partial record.
+        int netCap = Math.max(readBufferSize, packetSize);
+        int appCap = Math.max(readBufferSize, appSize);
+        // netOut must hold at least one whole packet; larger lets write() coalesce several records.
+        int netOutCap = Math.max(writeBufferSize, packetSize);
+
         boolean direct = socketChannel != null;
-        this.netIn = direct ? ByteBuffer.allocateDirect(packetSize) : ByteBuffer.allocate(packetSize);
-        this.netOut = direct ? ByteBuffer.allocateDirect(packetSize) : ByteBuffer.allocate(packetSize);
-        this.appIn = ByteBuffer.allocate(appSize);
+        this.appBufferDirect = direct;
+        this.netIn = direct ? ByteBuffer.allocateDirect(netCap) : ByteBuffer.allocate(netCap);
+        this.netOut = direct ? ByteBuffer.allocateDirect(netOutCap) : ByteBuffer.allocate(netOutCap);
+        this.appIn = allocateAppBuffer(appCap);
         this.appIn.flip(); // start empty (read mode, nothing to read)
     }
 
@@ -154,7 +191,7 @@ final class SSLEngineTransport implements ConnectionTransport {
 
             Status status = result.getStatus();
             if (status == Status.BUFFER_OVERFLOW) {
-                appIn = ByteBuffer.allocate(engine.getSession().getApplicationBufferSize());
+                appIn = allocateAppBuffer(engine.getSession().getApplicationBufferSize());
                 appIn.flip();
                 continue;
             }
@@ -269,6 +306,13 @@ final class SSLEngineTransport implements ConnectionTransport {
         return socketChannel != null ? ByteBuffer.allocateDirect(size) : ByteBuffer.allocate(size);
     }
 
+    // Allocate the plaintext unwrap-destination buffer, direct when we own a SocketChannel so a native
+    // engine decrypts straight into it (no temp-direct staging copy). Every appIn (re)allocation must
+    // route through here, or a BUFFER_OVERFLOW resize would silently revert appIn to heap.
+    private ByteBuffer allocateAppBuffer(int size) {
+        return appBufferDirect ? ByteBuffer.allocateDirect(size) : ByteBuffer.allocate(size);
+    }
+
     @Override
     public void setReadTimeout(int timeoutMs) throws IOException {
         socket.setSoTimeout(timeoutMs);
@@ -339,25 +383,41 @@ final class SSLEngineTransport implements ConnectionTransport {
 
             netIn.flip();
             appIn.clear();
-            SSLEngineResult result;
-            engineLock.lock();
-            try {
-                result = engine.unwrap(netIn, appIn);
-            } finally {
-                engineLock.unlock();
+            Status status;
+            while (true) {
+                SSLEngineResult result;
+                engineLock.lock();
+                try {
+                    result = engine.unwrap(netIn, appIn);
+                } finally {
+                    engineLock.unlock();
+                }
+                status = result.getStatus();
+                if (status == Status.OK) {
+                    handlePostResult(result);
+                    // No forward progress (defensive against a pathological 0/0 OK) or netIn drained
+                    // of whole records — stop the drain and serve what we have.
+                    if ((result.bytesConsumed() == 0 && result.bytesProduced() == 0) || !netIn.hasRemaining()) {
+                        break;
+                    }
+                    // Another whole record may be buffered; keep draining into appIn.
+                    continue;
+                }
+                // UNDERFLOW (partial trailing record), OVERFLOW (appIn full), or CLOSED.
+                break;
             }
             netIn.compact();
             appIn.flip();
 
-            switch (result.getStatus()) {
-                case OK -> {
-                    handlePostResult(result);
-                    if (appIn.hasRemaining()) {
-                        int toCopy = Math.min(appIn.remaining(), len);
-                        appIn.get(b, off, toCopy);
-                        return toCopy;
-                    }
-                }
+            // Serve whatever plaintext we drained this pass.
+            if (appIn.hasRemaining()) {
+                int toCopy = Math.min(appIn.remaining(), len);
+                appIn.get(b, off, toCopy);
+                return toCopy;
+            }
+
+            // No plaintext produced — act on why the drain stopped.
+            switch (status) {
                 case BUFFER_UNDERFLOW -> {
                     netIn = ensureCapacity(netIn, engine.getSession().getPacketBufferSize());
                     if (!readIntoNetIn()) {
@@ -368,11 +428,15 @@ final class SSLEngineTransport implements ConnectionTransport {
                     }
                 }
                 case BUFFER_OVERFLOW -> {
-                    appIn = ByteBuffer.allocate(engine.getSession().getApplicationBufferSize());
+                    appIn = allocateAppBuffer(engine.getSession().getApplicationBufferSize());
                     appIn.flip();
                 }
                 case CLOSED -> {
                     return -1;
+                }
+                default -> {
+                    // OK but produced 0 bytes (e.g. a post-handshake message consumed no app data);
+                    // loop to read/unwrap again.
                 }
             }
         }
@@ -488,7 +552,7 @@ final class SSLEngineTransport implements ConnectionTransport {
                     }
                 }
                 case BUFFER_OVERFLOW -> {
-                    appIn = ByteBuffer.allocate(appBufSize);
+                    appIn = allocateAppBuffer(appBufSize);
                     appIn.flip();
                 }
                 case CLOSED -> {
@@ -553,8 +617,9 @@ final class SSLEngineTransport implements ConnectionTransport {
             throw new IOException("Transport closed");
         }
         ByteBuffer src = ByteBuffer.wrap(b, off, len);
+        int packetSize = engine.getSession().getPacketBufferSize();
+        netOut.clear();
         while (src.hasRemaining()) {
-            netOut.clear();
             SSLEngineResult result;
             engineLock.lock();
             try {
@@ -564,19 +629,36 @@ final class SSLEngineTransport implements ConnectionTransport {
             }
 
             if (result.getStatus() == Status.BUFFER_OVERFLOW) {
-                netOut = allocateNetBuffer(engine.getSession().getPacketBufferSize());
+                if (netOut.position() > 0) {
+                    flushAccumulatedNetOut();
+                } else {
+                    netOut = allocateNetBuffer(packetSize);
+                }
                 continue;
             }
             if (result.getStatus() == Status.CLOSED) {
                 throw new IOException("SSLEngine closed during write");
             }
 
-            netOut.flip();
-            if (netOut.hasRemaining()) {
-                writeNetOut();
-            }
             handlePostResult(result);
+
+            if (netOut.remaining() < packetSize || !src.hasRemaining()) {
+                flushAccumulatedNetOut();
+            }
         }
+        // Flush any trailing accumulated records.
+        if (netOut.position() > 0) {
+            flushAccumulatedNetOut();
+        }
+    }
+
+    // Flip the accumulated ciphertext in netOut, write it all to the socket, then reset to fill mode.
+    private void flushAccumulatedNetOut() throws IOException {
+        netOut.flip();
+        if (netOut.hasRemaining()) {
+            writeNetOut();
+        }
+        netOut.clear();
     }
 
     void flush() throws IOException {

@@ -45,14 +45,31 @@ final class Clients {
     private Clients() {}
 
     /**
-     * Apply a {@code -D<prop>=<bytes|auto>} system property to a setter that accepts an int
-     * (with {@code -1} meaning "kernel autotune").
+     * Apply a {@code -D<prop>=<bytes|auto>} socket-buffer knob: use the property value when set
+     * (where {@code auto}/{@code -1} means "kernel autotune"), otherwise apply {@code defaultBytes}.
+     * Pass {@code -1} as the default to leave the socket at kernel autotune when the property is unset.
      */
-    private static void applyBufferProp(String prop, IntConsumer setter) {
+    private static void applyBufferProp(String prop, int defaultBytes, IntConsumer setter) {
         Integer value = parseBufferProp(prop);
-        if (value != null) {
-            setter.accept(value);
+        int bytes = value != null ? value : defaultBytes;
+        // -1 == kernel autotune: leave the socket option unset.
+        if (bytes != -1) {
+            setter.accept(bytes);
         }
+    }
+
+    /**
+     * Apply a TLS buffer-size knob: use {@code -D<prop>=<bytes>} when set, else {@code defaultBytes}.
+     * Unlike the socket SO_*BUF knobs there is no "auto"/-1 form — these are concrete buffer
+     * capacities, not a kernel-autotune toggle — so a value of -1 is rejected.
+     */
+    private static void applyTlsBufferProp(String prop, int defaultBytes, IntConsumer setter) {
+        Integer value = parseBufferProp(prop);
+        int bytes = value != null ? value : defaultBytes;
+        if (bytes <= 0) {
+            throw new IllegalArgumentException(prop + " must be a positive byte count: " + bytes);
+        }
+        setter.accept(bytes);
     }
 
     /**
@@ -123,9 +140,10 @@ final class Clients {
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .maxTotalConnections(maxConns)
                 .maxConnectionsPerRoute(maxConns);
-        // -De2e.smithy.recvbuf=<bytes|auto>; -De2e.smithy.sendbuf=<bytes|auto>. "auto" maps to -1.
-        applyBufferProp("e2e.smithy.recvbuf", poolBuilder::socketReceiveBufferSize);
-        applyBufferProp("e2e.smithy.sendbuf", poolBuilder::socketSendBufferSize);
+        applyBufferProp("e2e.smithy.recvbuf", 1024 * 1024, poolBuilder::socketReceiveBufferSize);
+        applyBufferProp("e2e.smithy.sendbuf", 1024 * 1024, poolBuilder::socketSendBufferSize);
+        applyTlsBufferProp("e2e.smithy.tls.readbuf", 256 * 1024, poolBuilder::tlsReadBufferSize);
+        applyTlsBufferProp("e2e.smithy.tls.writebuf", 256 * 1024, poolBuilder::tlsWriteBufferSize);
         if (boringSsl) {
             if (BoringSslEngineFactory.isAvailable()) {
                 poolBuilder.sslEngineFactory(BoringSslEngineFactory.create(false));

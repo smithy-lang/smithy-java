@@ -45,6 +45,17 @@ public final class HttpConnectionPoolBuilder {
     boolean socketFactoryExplicit;
     Integer socketReceiveBufferSize;
     Integer socketSendBufferSize;
+    // Ciphertext-read buffer for the SSLEngineTransport TLS path. One TLS record (~16KB) by default
+    // — one socket read per record. Larger values let one socket read pull many records that the
+    // unwrap loop drains in a single locked pass, collapsing read syscalls / watchdog arms / VT
+    // park-unpark proportionally. Only affects the SSLEngineTransport path (custom sslEngineFactory,
+    // e.g. BoringSSL, or non-ENFORCE_HTTP_1_1 with the JDK engine); the JDK SSLSocket path is unaffected.
+    int tlsReadBufferSize = 16 * 1024;
+    // Ciphertext-write buffer for the SSLEngineTransport TLS path. One TLS record (~16KB) by default
+    // — one socket write per wrapped record. Larger values let write() accumulate several records
+    // before one socket write, collapsing write syscalls for bulk uploads. Same path scoping as
+    // tlsReadBufferSize; the JDK SSLSocket path is unaffected.
+    int tlsWriteBufferSize = 16 * 1024;
     final List<ConnectionPoolListener> listeners = new LinkedList<>();
 
     /**
@@ -456,6 +467,72 @@ public final class HttpConnectionPoolBuilder {
             throw new IllegalArgumentException("socketSendBufferSize must be positive or -1: " + bytes);
         }
         this.socketSendBufferSize = bytes;
+        return this;
+    }
+
+    /**
+     * Set the TLS ciphertext-read buffer size in bytes for the {@link SSLEngineTransport} path
+     * (default: 16384, one TLS record).
+     *
+     * <p>This buffer holds ciphertext read from the socket before it is unwrapped to plaintext. At
+     * the default of one TLS record, each {@code SSLEngineTransport} read performs one socket read
+     * and unwraps one record. A larger value lets a single socket read pull many buffered records,
+     * which the unwrap loop then drains in one locked pass (compacting once, not per record). For
+     * bulk-transfer workloads (e.g. large S3 GETs) this collapses read syscalls, read-deadline
+     * watchdog arms, epoll registrations, and virtual-thread park/unpark cycles roughly in
+     * proportion to the records-per-read ratio.
+     *
+     * <p><b>Only affects the {@code SSLEngineTransport} TLS path</b> — i.e. when a custom
+     * {@link #sslEngineFactory} is set (such as BoringSSL), or for secure routes not forced to
+     * {@code ENFORCE_HTTP_1_1} with the JDK engine. The JDK {@code SSLSocket} fast path is
+     * unaffected. To realize the syscall collapse, pair a large value with a {@code SO_RCVBUF}
+     * (see {@link #socketReceiveBufferSize}) large enough for the kernel to deliver that much in one
+     * read.
+     *
+     * <p><b>Memory note:</b> this buffer is allocated per connection (plus an equal-or-larger
+     * plaintext buffer), so a large value multiplied across many concurrent connections raises
+     * steady-state footprint. Leave at the default unless the workload moves large bodies.
+     *
+     * @param bytes ciphertext-read buffer size in bytes; values below one TLS record are raised to it
+     * @return this builder
+     * @throws IllegalArgumentException if {@code bytes} is not positive
+     */
+    public HttpConnectionPoolBuilder tlsReadBufferSize(int bytes) {
+        if (bytes <= 0) {
+            throw new IllegalArgumentException("tlsReadBufferSize must be positive: " + bytes);
+        }
+        this.tlsReadBufferSize = bytes;
+        return this;
+    }
+
+    /**
+     * Set the TLS ciphertext-write buffer size in bytes for the {@link SSLEngineTransport} path
+     * (default: 16384, one TLS record).
+     *
+     * <p>This buffer holds ciphertext produced by {@code SSLEngine.wrap} before it is written to the
+     * socket. At the default of one TLS record, each wrapped record is written with its own socket
+     * write. A larger value lets the stream write path accumulate several records and flush them in
+     * one socket write, which for bulk uploads (e.g. large S3 PUTs) collapses write syscalls and the
+     * attendant virtual-thread park/unpark cycles roughly in proportion to records-per-flush.
+     *
+     * <p><b>Only affects the {@code SSLEngineTransport} TLS path</b> (custom {@link #sslEngineFactory}
+     * such as BoringSSL, or secure routes not forced to {@code ENFORCE_HTTP_1_1} with the JDK
+     * engine). The JDK {@code SSLSocket} fast path is unaffected. Pair with a {@code SO_SNDBUF}
+     * (see {@link #socketSendBufferSize}) large enough to absorb the coalesced write.
+     *
+     * <p><b>Memory note:</b> allocated per connection; a large value across many concurrent
+     * connections raises steady-state footprint. Leave at the default unless the workload uploads
+     * large bodies.
+     *
+     * @param bytes ciphertext-write buffer size in bytes; values below one TLS record are raised to it
+     * @return this builder
+     * @throws IllegalArgumentException if {@code bytes} is not positive
+     */
+    public HttpConnectionPoolBuilder tlsWriteBufferSize(int bytes) {
+        if (bytes <= 0) {
+            throw new IllegalArgumentException("tlsWriteBufferSize must be positive: " + bytes);
+        }
+        this.tlsWriteBufferSize = bytes;
         return this;
     }
 

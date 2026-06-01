@@ -10,9 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Function;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -329,6 +333,71 @@ class BytecodeEndpointResolverTest {
         Endpoint endpoint = resolver.resolveEndpoint(params);
         assertNotNull(endpoint);
         assertEquals("us-west-2/my-bucket", endpoint.uri().toString());
+    }
+
+    @Test
+    void concurrentResolutionsReuseEvaluatorsWithoutCrossTalk() throws Exception {
+        // Resolve distinct inputs from many threads at once. The evaluator pool recycles evaluators
+        // across calls, so this guards that a recycled evaluator never leaks one call's register
+        // state into another: every result must match its own input.
+        RegisterDefinition[] defs = {
+                new RegisterDefinition("region", false, null, null, false),
+                new RegisterDefinition("bucket", false, null, null, false)
+        };
+        Bytecode bytecode = new Bytecode(
+                new byte[] {
+                        Opcodes.LOAD_REGISTER,
+                        0, // region
+                        Opcodes.LOAD_CONST,
+                        0, // "/"
+                        Opcodes.LOAD_REGISTER,
+                        1, // bucket
+                        Opcodes.RESOLVE_TEMPLATE,
+                        3,
+                        Opcodes.RETURN_ENDPOINT,
+                        0
+                },
+                new int[0],
+                new int[] {0},
+                defs,
+                new Object[] {"/"},
+                new RulesFunction[0],
+                new int[] {-1, 100_000_000, -1},
+                100_000_000);
+
+        BytecodeEndpointResolver resolver = new BytecodeEndpointResolver(bytecode, List.of(), Map.of());
+
+        int threads = 16;
+        int perThread = 500;
+        var pool = Executors.newFixedThreadPool(threads);
+        try {
+            var start = new CountDownLatch(1);
+            var futures = new ArrayList<Future<?>>();
+            for (int t = 0; t < threads; t++) {
+                final int id = t;
+                futures.add(pool.submit(() -> {
+                    String region = "r" + id;
+                    String bucket = "b" + id;
+                    String expected = region + "/" + bucket;
+                    try {
+                        start.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                    }
+                    for (int i = 0; i < perThread; i++) {
+                        Endpoint endpoint = resolver.resolveEndpoint(createParams(region, bucket));
+                        assertEquals(expected, endpoint.uri().toString());
+                    }
+                }));
+            }
+            start.countDown();
+            for (var f : futures) {
+                f.get(); // propagates any assertion failure
+            }
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     // Helper methods
