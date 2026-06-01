@@ -24,7 +24,7 @@ class S3ExpressIdentityProviderTest {
         var sessionCount = new AtomicInteger();
         var provider = new S3ExpressIdentityProvider(
                 staticBaseIdentity(),
-                (bucket, baseCredentials) -> S3ExpressIdentity.create(
+                (bucket, baseCredentials) -> AwsCredentialsIdentity.create(
                         "SESSION-" + sessionCount.incrementAndGet(),
                         "secret",
                         "token",

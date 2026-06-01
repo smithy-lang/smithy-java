@@ -67,6 +67,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         var region = properties.getOrDefault(EndpointAuthSchemeSettings.SIGNING_REGION,
                 properties.expect(RegionSetting.REGION));
         var clock = properties.getOrDefault(SigV4Settings.CLOCK, Clock.systemUTC());
+        boolean omitSecurityToken = properties.getOrDefault(SigV4Settings.OMIT_SECURITY_TOKEN, false);
 
         // TODO: Add support for query signing?
 
@@ -94,7 +95,8 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
                 clock.instant(),
                 identity.accessKeyId(),
                 identity.secretAccessKey(),
-                identity.sessionToken());
+                identity.sessionToken(),
+                omitSecurityToken);
 
         return new SignResult<>(mod, signature);
     }
@@ -128,7 +130,8 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             Instant signingTimestamp,
             String accessKeyId,
             String secretAccessKey,
-            String sessionToken
+            String sessionToken,
+            boolean omitSecurityToken
     ) {
         var uri = request.uri();
         var method = request.method();
@@ -150,7 +153,9 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         var requestTime = formatRfc3339(signingDate, dateStamp, sb);
         signingResources.addHeaderCanonical(HeaderName.X_AMZ_DATE.name(), requestTime);
 
-        if (sessionToken != null && !existingHeaders.hasHeader(HeaderName.X_AMZ_SECURITY_TOKEN)) {
+        if (!omitSecurityToken
+                && sessionToken != null
+                && !existingHeaders.hasHeader(HeaderName.X_AMZ_SECURITY_TOKEN)) {
             signingResources.addHeaderCanonical(HeaderName.X_AMZ_SECURITY_TOKEN.name(), sessionToken);
         }
 
@@ -185,7 +190,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         // Now mutate the actual request. setHeader is a single-key operation per header; no wholesale map replacement.
         var headers = request.headers();
         headers.setHeader(HeaderName.X_AMZ_DATE, requestTime);
-        if (sessionToken != null) {
+        if (!omitSecurityToken && sessionToken != null) {
             headers.setHeader(HeaderName.X_AMZ_SECURITY_TOKEN, sessionToken);
         }
 

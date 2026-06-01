@@ -51,7 +51,7 @@ class S3ExpressIdentityCacheTest {
     void evictsLeastRecentlyUsedWhenFull() {
         // The default MAX_SIZE is 25 (private constant). Insert 26 keys; the oldest should be
         // evicted when we insert the 26th.
-        var seen = new ConcurrentHashMap<S3ExpressIdentityKey, CachingIdentityResolver<S3ExpressIdentity>>();
+        var seen = new ConcurrentHashMap<S3ExpressIdentityKey, CachingIdentityResolver<AwsCredentialsIdentity>>();
         var cache = new S3ExpressIdentityCache(key -> {
             var r = staticResolver();
             seen.put(key, r);
@@ -80,16 +80,16 @@ class S3ExpressIdentityCacheTest {
         return Matchers.not(matcher);
     }
 
-    private static CachingIdentityResolver<S3ExpressIdentity> staticResolver() {
-        IdentityResolver<S3ExpressIdentity> delegate = new IdentityResolver<>() {
+    private static CachingIdentityResolver<AwsCredentialsIdentity> staticResolver() {
+        IdentityResolver<AwsCredentialsIdentity> delegate = new IdentityResolver<>() {
             @Override
-            public IdentityResult<S3ExpressIdentity> resolveIdentity(Context requestProperties) {
-                return IdentityResult.of(S3ExpressIdentity.create("AKID", "secret", "session", null));
+            public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context requestProperties) {
+                return IdentityResult.of(AwsCredentialsIdentity.create("AKID", "secret", "session", null));
             }
 
             @Override
-            public Class<S3ExpressIdentity> identityType() {
-                return S3ExpressIdentity.class;
+            public Class<AwsCredentialsIdentity> identityType() {
+                return AwsCredentialsIdentity.class;
             }
         };
         return CachingIdentityResolver.builder(delegate).build();

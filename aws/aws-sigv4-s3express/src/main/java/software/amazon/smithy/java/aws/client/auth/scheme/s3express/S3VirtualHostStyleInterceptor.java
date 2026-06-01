@@ -42,34 +42,38 @@ final class S3VirtualHostStyleInterceptor implements ClientInterceptor {
         if (bucket == null || bucket.isEmpty()) {
             return hook.request();
         }
+
         if (!(hook.request() instanceof HttpRequest req)) {
             return hook.request();
         }
 
         var uri = req.uri();
         var path = uri.getPath();
-        if (path == null) {
+
+        if (!startsWithBucketSegment(path, bucket)) {
             return hook.request();
         }
 
-        var prefix = "/" + bucket;
-        if (!path.startsWith(prefix)) {
-            return hook.request();
-        }
-        if (path.length() > prefix.length() && path.charAt(prefix.length()) != '/') {
-            return hook.request();
-        }
-        String rest = path.substring(prefix.length());
+        int prefixLength = bucket.length() + 1; // leading '/' plus bucket.
+        String rest = path.substring(prefixLength);
         // "/<bucket>" → "/" (CreateSession-shaped), "/<bucket>/key" → "/key".
         if (rest.isEmpty()) {
             rest = "/";
-        }
-        if (rest.equals(path)) {
-            return hook.request();
         }
 
         var modifiable = req.toModifiable();
         modifiable.setUri(uri.withPath(rest));
         return hook.asRequestType(modifiable);
+    }
+
+    private static boolean startsWithBucketSegment(String path, String bucket) {
+        int bucketLength = bucket.length();
+        if (path.length() < bucketLength + 1 || path.charAt(0) != '/') {
+            return false;
+        }
+        if (!path.regionMatches(1, bucket, 0, bucketLength)) {
+            return false;
+        }
+        return path.length() == bucketLength + 1 || path.charAt(bucketLength + 1) == '/';
     }
 }

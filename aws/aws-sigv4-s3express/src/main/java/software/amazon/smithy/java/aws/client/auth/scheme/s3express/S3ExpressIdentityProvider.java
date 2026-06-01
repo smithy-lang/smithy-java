@@ -16,7 +16,7 @@ import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.context.Context;
 
 /**
- * Resolves {@link S3ExpressIdentity} for the in-flight request.
+ * Resolves S3 Express session credentials for the in-flight request.
  *
  * <p>On each call:
  *
@@ -33,7 +33,7 @@ import software.amazon.smithy.java.context.Context;
  * <p>Confused-deputy is prevented by including the base credentials' access key / secret key /
  * session token in the cache key — different base identities never share a cached session.
  */
-public final class S3ExpressIdentityProvider implements IdentityResolver<S3ExpressIdentity> {
+final class S3ExpressIdentityProvider implements IdentityResolver<AwsCredentialsIdentity> {
 
     private static final AtomicInteger THREAD_COUNTER = new AtomicInteger();
     private static final ScheduledExecutorService REFRESH_EXECUTOR = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -51,7 +51,7 @@ public final class S3ExpressIdentityProvider implements IdentityResolver<S3Expre
      * @param baseIdentityProvider resolves the AWS credentials used to authorize CreateSession.
      * @param createSession        bridge to the user's S3 client's CreateSession operation.
      */
-    public S3ExpressIdentityProvider(
+    S3ExpressIdentityProvider(
             IdentityResolver<AwsCredentialsIdentity> baseIdentityProvider,
             CreateSessionCallback createSession
     ) {
@@ -60,23 +60,23 @@ public final class S3ExpressIdentityProvider implements IdentityResolver<S3Expre
         this.cache = new S3ExpressIdentityCache(key -> buildPerBucketResolver(key, createSession));
     }
 
-    private CachingIdentityResolver<S3ExpressIdentity> buildPerBucketResolver(
+    private CachingIdentityResolver<AwsCredentialsIdentity> buildPerBucketResolver(
             S3ExpressIdentityKey key,
             CreateSessionCallback createSession
     ) {
         // Each per-bucket entry has its own delegate that closes over the bucket + base
         // identity captured at insertion time. The CachingIdentityResolver around it does the
         // refresh-ahead work using its own scheduled executor.
-        IdentityResolver<S3ExpressIdentity> delegate = new IdentityResolver<>() {
+        IdentityResolver<AwsCredentialsIdentity> delegate = new IdentityResolver<>() {
             @Override
-            public IdentityResult<S3ExpressIdentity> resolveIdentity(Context requestProperties) {
-                S3ExpressIdentity identity = createSession.createSession(key.bucket(), key.identity());
+            public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context requestProperties) {
+                AwsCredentialsIdentity identity = createSession.createSession(key.bucket(), key.identity());
                 return IdentityResult.of(identity);
             }
 
             @Override
-            public Class<S3ExpressIdentity> identityType() {
-                return S3ExpressIdentity.class;
+            public Class<AwsCredentialsIdentity> identityType() {
+                return AwsCredentialsIdentity.class;
             }
         };
         return CachingIdentityResolver.builder(delegate)
@@ -85,7 +85,7 @@ public final class S3ExpressIdentityProvider implements IdentityResolver<S3Expre
     }
 
     @Override
-    public IdentityResult<S3ExpressIdentity> resolveIdentity(Context requestProperties) {
+    public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context requestProperties) {
         String bucket = requestProperties.get(S3ExpressContext.BUCKET);
         if (bucket == null) {
             return IdentityResult.ofError(
@@ -111,8 +111,8 @@ public final class S3ExpressIdentityProvider implements IdentityResolver<S3Expre
     }
 
     @Override
-    public Class<S3ExpressIdentity> identityType() {
-        return S3ExpressIdentity.class;
+    public Class<AwsCredentialsIdentity> identityType() {
+        return AwsCredentialsIdentity.class;
     }
 
     @Override

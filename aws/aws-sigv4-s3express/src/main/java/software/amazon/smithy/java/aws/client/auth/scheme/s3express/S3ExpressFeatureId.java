@@ -10,8 +10,7 @@ import software.amazon.smithy.java.client.core.FeatureId;
 /**
  * Business-metric IDs published when this module's auth scheme runs successfully.
  */
-public enum S3ExpressFeatureId implements FeatureId {
-
+enum S3ExpressFeatureId implements FeatureId {
     /**
      * Emitted on every operation call that resolves a bucket-scoped S3 Express identity.
      */
