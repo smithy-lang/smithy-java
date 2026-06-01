@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.http.client.connection;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -15,11 +16,16 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
+import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.http.api.ModifiableHttpRequest;
+import software.amazon.smithy.java.http.client.HttpCredentials;
 import software.amazon.smithy.java.http.client.ProxyConfiguration;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 import software.amazon.smithy.java.http.client.h1.H1Connection;
-import software.amazon.smithy.java.http.client.h1.ProxyTunnel;
 import software.amazon.smithy.java.http.client.h2.H2Connection;
+import software.amazon.smithy.java.io.uri.SmithyUri;
 
 /**
  * Factory for creating HTTP connections.
@@ -295,7 +301,7 @@ record HttpConnectionFactory(
             }
 
             if (route.isSecure()) {
-                var result = ProxyTunnel.establish(
+                var result = establishTunnel(
                         proxySocket,
                         route.host(),
                         route.port(),
@@ -321,6 +327,61 @@ record HttpConnectionFactory(
                             proxy.hostname() + ":" + proxy.port() + " (" + proxyAddress.getHostAddress() + ")",
                     e);
         }
+    }
+
+    record TunnelResult(Socket socket, int statusCode, HttpHeaders headers) {}
+
+    static TunnelResult establishTunnel(
+            Socket proxySocket,
+            String targetHost,
+            int targetPort,
+            HttpCredentials credentials,
+            Duration readTimeout
+    ) throws IOException {
+        Route proxyRoute = Route.direct(
+                "http",
+                proxySocket.getInetAddress().getHostAddress(),
+                proxySocket.getPort());
+        H1Connection conn = new H1Connection(ConnectionTransport.of(proxySocket), proxyRoute, readTimeout);
+
+        HttpResponse priorResponse = null;
+
+        do {
+            String authority = targetHost + ":" + targetPort;
+            ModifiableHttpRequest connectRequest = HttpRequest.create()
+                    .setMethod("CONNECT")
+                    .setUri(SmithyUri.of("http://" + authority))
+                    .addHeader("Host", authority)
+                    .addHeader("Proxy-Connection", "Keep-Alive");
+
+            if (credentials != null) {
+                boolean applied = credentials.authenticate(connectRequest, priorResponse);
+                if (!applied && priorResponse != null) {
+                    break;
+                }
+            }
+
+            var exchange = conn.newExchange(connectRequest);
+            exchange.requestBody().close();
+
+            int status = exchange.responseStatusCode();
+            HttpHeaders headers = exchange.responseHeaders();
+
+            if (status == 200) {
+                return new TunnelResult(proxySocket, status, headers);
+            }
+
+            try (var body = exchange.responseBody()) {
+                body.transferTo(OutputStream.nullOutputStream());
+            }
+
+            priorResponse = HttpResponse.create()
+                    .setStatusCode(status)
+                    .setHeaders(headers);
+
+        } while (priorResponse.statusCode() == 407 && credentials != null);
+
+        return new TunnelResult(null, priorResponse.statusCode(), priorResponse.headers());
     }
 
     private Socket performTlsHandshakeToProxy(Socket socket, ProxyConfiguration proxy) throws IOException {
