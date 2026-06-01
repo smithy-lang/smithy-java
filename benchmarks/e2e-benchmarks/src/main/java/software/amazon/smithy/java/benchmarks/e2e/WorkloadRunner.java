@@ -5,17 +5,17 @@
 
 package software.amazon.smithy.java.benchmarks.e2e;
 
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.AttributeValue;
@@ -29,7 +29,8 @@ public final class WorkloadRunner {
     private final WorkloadConfig workload;
     private final ActionExecutor executor;
     private final int payloadSize;
-    private final List<Long> measuredDurationsNs = Collections.synchronizedList(new ArrayList<>());
+    private final long[] measuredDurationsNs;
+    private final AtomicInteger measuredCount = new AtomicInteger();
     private final ResourceMonitor monitor = new ResourceMonitor();
     // Hoist actionConfig string/int reads out of the per-request hot path. These were resolved
     // anew on every executeAction call before, costing one Optional + ObjectNode lookup each.
@@ -44,6 +45,7 @@ public final class WorkloadRunner {
     private WorkloadRunner(WorkloadConfig workload) {
         this.workload = workload;
         this.payloadSize = maxPayloadSize(workload);
+        this.measuredDurationsNs = new long[workload.measurementBatches * workload.batchActions];
         byte[] payload = new byte[payloadSize];
         new Random(0xC0FFEEL).nextBytes(payload);
 
@@ -63,12 +65,7 @@ public final class WorkloadRunner {
         if (ddb == null && s3 == null) {
             throw new IllegalArgumentException("Unknown service: " + service);
         }
-        // Build the unused client too — the executor stores nullable refs and
-        // the runner only invokes the path matching workload.service.
-        this.executor = new ActionExecutor(
-                ddb == null ? Clients.dynamodb(region) : ddb,
-                s3 == null ? Clients.s3(region) : s3,
-                payload);
+        this.executor = new ActionExecutor(ddb, s3, payload);
 
         System.out.println("Initialized smithy-java WorkloadRunner:");
         System.out.println("  Workload: " + workload.name);
@@ -92,55 +89,57 @@ public final class WorkloadRunner {
     }
 
     private void run() {
-        System.out.println("\n=== WARMUP PHASE ===");
-        System.out.println("Executing " + workload.warmupBatches + " warmup batches to initialize SDK clients...");
-        for (int i = 0; i < workload.warmupBatches; i++) {
-            System.out.println("Warmup batch " + (i + 1) + "/" + workload.warmupBatches);
-            executeBatch(false);
-        }
-        measuredDurationsNs.clear();
+        try (ExecutorService pool = workload.sequential ? null : Executors.newVirtualThreadPerTaskExecutor()) {
+            System.out.println("\n=== WARMUP PHASE ===");
+            System.out.println("Executing " + workload.warmupBatches + " warmup batches to initialize SDK clients...");
+            for (int i = 0; i < workload.warmupBatches; i++) {
+                System.out.println("Warmup batch " + (i + 1) + "/" + workload.warmupBatches);
+                executeBatch(pool, false);
+            }
+            measuredCount.set(0);
 
-        System.out.println("\n=== MEASUREMENT PHASE ===");
-        System.out.println("Executing " + workload.measurementBatches + " measurement batches...");
-
-        if (workload.collectMetrics) {
-            monitor.start(workload.metricsIntervalMs);
-        }
-
-        long startNs = System.nanoTime();
-        int lastSampleCount = 0;
-        for (int i = 0; i < workload.measurementBatches; i++) {
-            System.out.println("\nMeasurement batch " + (i + 1) + "/" + workload.measurementBatches);
-            int operationsBefore = measuredDurationsNs.size();
-            long batchStart = System.nanoTime();
-            executeBatch(true);
-            long batchDuration = System.nanoTime() - batchStart;
-            printBatchResults(operationsBefore, batchDuration);
+            System.out.println("\n=== MEASUREMENT PHASE ===");
+            System.out.println("Executing " + workload.measurementBatches + " measurement batches...");
 
             if (workload.collectMetrics) {
-                int now = monitor.sampleCount();
-                monitor.statsSnapshot(lastSampleCount).printCompact("  Resource Usage: ");
-                lastSampleCount = now;
+                monitor.start(workload.metricsIntervalMs);
             }
-        }
-        long totalDuration = System.nanoTime() - startNs;
 
-        if (workload.collectMetrics) {
-            monitor.stop().print();
-        }
+            long startNs = System.nanoTime();
+            int lastSampleCount = 0;
+            for (int i = 0; i < workload.measurementBatches; i++) {
+                System.out.println("\nMeasurement batch " + (i + 1) + "/" + workload.measurementBatches);
+                int operationsBefore = measuredCount.get();
+                long batchStart = System.nanoTime();
+                executeBatch(pool, true);
+                long batchDuration = System.nanoTime() - batchStart;
+                printBatchResults(operationsBefore, batchDuration);
 
-        System.out.println("\n=== OVERALL RESULTS ===");
-        printOverall(totalDuration);
+                if (workload.collectMetrics) {
+                    int now = monitor.sampleCount();
+                    monitor.statsSnapshot(lastSampleCount).printCompact("  Resource Usage: ");
+                    lastSampleCount = now;
+                }
+            }
+            long totalDuration = System.nanoTime() - startNs;
+
+            if (workload.collectMetrics) {
+                monitor.stop().print();
+            }
+
+            System.out.println("\n=== OVERALL RESULTS ===");
+            printOverall(totalDuration);
+        }
     }
 
-    private void executeBatch(boolean measure) {
+    private void executeBatch(ExecutorService pool, boolean measure) {
         if (workload.sequential) {
             for (int i = 0; i < workload.batchActions; i++) {
                 long s = System.nanoTime();
                 executeAction(i);
                 long d = System.nanoTime() - s;
                 if (measure) {
-                    measuredDurationsNs.add(d);
+                    recordDuration(d);
                 }
             }
         } else {
@@ -151,39 +150,46 @@ public final class WorkloadRunner {
             // Multiplier configurable via -De2e.concurrency.multiplier so we can sweep
             // without rebuilding. Default is 4× cores.
             //
-            // Each task pushes its duration into measuredDurationsNs directly and returns null,
-            // so the future doesn't autobox the long. The futures are kept around solely so the
-            // submitting thread can wait for completion and surface task exceptions.
-            int multiplier = Integer.getInteger("e2e.concurrency.multiplier", 4);
-            int concurrency = Runtime.getRuntime().availableProcessors() * multiplier;
+            // Each task writes its duration into the preallocated long[] directly. The latch lets
+            // the submitting thread wait for completion without retaining one Future per action.
+            int concurrency = Runtime.getRuntime().availableProcessors()
+                    * Integer.getInteger("e2e.concurrency.multiplier", 4);
             var permits = new Semaphore(concurrency);
-            try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
-                List<Future<?>> futures = new ArrayList<>(workload.batchActions);
-                for (int i = 0; i < workload.batchActions; i++) {
-                    permits.acquireUninterruptibly();
-                    final int index = i;
-                    futures.add(pool.submit(() -> {
-                        try {
-                            long s = System.nanoTime();
-                            executeAction(index);
-                            if (measure) {
-                                measuredDurationsNs.add(System.nanoTime() - s);
-                            }
-                        } finally {
-                            permits.release();
-                        }
-                    }));
-                }
-                for (var f : futures) {
+            var done = new CountDownLatch(workload.batchActions);
+            var error = new AtomicReference<Throwable>();
+            for (int i = 0; i < workload.batchActions; i++) {
+                permits.acquireUninterruptibly();
+                final int index = i;
+                pool.execute(() -> {
                     try {
-                        f.get();
-                    } catch (Exception e) {
-                        System.err.println("Task failed: " + e.getMessage());
-                        e.printStackTrace();
+                        long s = System.nanoTime();
+                        executeAction(index);
+                        if (measure) {
+                            recordDuration(System.nanoTime() - s);
+                        }
+                    } catch (Throwable t) {
+                        error.compareAndSet(null, t);
+                    } finally {
+                        permits.release();
+                        done.countDown();
                     }
-                }
+                });
+            }
+            try {
+                done.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted while waiting for benchmark batch", e);
+            }
+            var failure = error.get();
+            if (failure != null) {
+                throw new RuntimeException("Benchmark task failed", failure);
             }
         }
+    }
+
+    private void recordDuration(long durationNs) {
+        measuredDurationsNs[measuredCount.getAndIncrement()] = durationNs;
     }
 
     private void executeAction(int index) {
@@ -242,22 +248,22 @@ public final class WorkloadRunner {
     }
 
     private void printBatchResults(int startIndex, long batchDurationNs) {
-        int endIndex = measuredDurationsNs.size();
+        int endIndex = measuredCount.get();
         if (endIndex <= startIndex) {
             System.out.println("  No operations in this batch");
             return;
         }
-        var batch = new ArrayList<>(measuredDurationsNs.subList(startIndex, endIndex));
-        Collections.sort(batch);
-        int count = batch.size();
+        var batch = Arrays.copyOfRange(measuredDurationsNs, startIndex, endIndex);
+        Arrays.sort(batch);
+        int count = batch.length;
         double batchSec = batchDurationNs / 1e9;
         long totalBytes = (long) count * payloadSize;
         double gbps = (totalBytes * 8.0 / batchSec) / 1e9;
-        long max = batch.get(count - 1);
-        long p50 = batch.get(count / 2);
-        long p90 = batch.get((int) (count * 0.9));
-        long p99 = batch.get((int) (count * 0.99));
-        double avgNs = batch.stream().mapToLong(Long::longValue).average().orElse(0);
+        long max = batch[count - 1];
+        long p50 = batch[count / 2];
+        long p90 = batch[(int) (count * 0.9)];
+        long p99 = batch[(int) (count * 0.99)];
+        double avgNs = average(batch, count);
         System.out.printf("  Operations: %d, Duration: %.2fs, Throughput: %.2f Gbps%n",
                 count,
                 batchSec,
@@ -271,21 +277,21 @@ public final class WorkloadRunner {
     }
 
     private void printOverall(long totalDurationNs) {
-        if (measuredDurationsNs.isEmpty()) {
+        int count = measuredCount.get();
+        if (count == 0) {
             System.out.println("No measurements collected");
             return;
         }
-        Collections.sort(measuredDurationsNs);
-        int count = measuredDurationsNs.size();
+        Arrays.sort(measuredDurationsNs, 0, count);
         double totalSec = totalDurationNs / 1e9;
         long totalBytes = (long) count * payloadSize;
         double gbps = (totalBytes * 8.0 / totalSec) / 1e9;
-        long min = measuredDurationsNs.get(0);
-        long max = measuredDurationsNs.get(count - 1);
-        long p50 = measuredDurationsNs.get(count / 2);
-        long p90 = measuredDurationsNs.get((int) (count * 0.9));
-        long p99 = measuredDurationsNs.get((int) (count * 0.99));
-        double avgNs = measuredDurationsNs.stream().mapToLong(Long::longValue).average().orElse(0);
+        long min = measuredDurationsNs[0];
+        long max = measuredDurationsNs[count - 1];
+        long p50 = measuredDurationsNs[count / 2];
+        long p90 = measuredDurationsNs[(int) (count * 0.9)];
+        long p99 = measuredDurationsNs[(int) (count * 0.99)];
+        double avgNs = average(measuredDurationsNs, count);
         System.out.println("Total operations: " + count);
         System.out.printf("Total data transferred: %.2f MiB%n", totalBytes / 1024.0 / 1024.0);
         System.out.printf("Total duration: %.2f seconds%n", totalSec);
@@ -297,6 +303,14 @@ public final class WorkloadRunner {
         System.out.printf("  P90:     %.2f%n", p90 / 1e6);
         System.out.printf("  P99:     %.2f%n", p99 / 1e6);
         System.out.printf("  Maximum: %.2f%n", max / 1e6);
+    }
+
+    private static double average(long[] values, int count) {
+        long sum = 0;
+        for (int i = 0; i < count; i++) {
+            sum += values[i];
+        }
+        return count == 0 ? 0 : (double) sum / count;
     }
 
     public static void main(String[] args) throws Exception {
