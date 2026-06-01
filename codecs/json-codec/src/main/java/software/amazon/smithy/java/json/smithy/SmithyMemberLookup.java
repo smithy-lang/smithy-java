@@ -28,11 +28,23 @@ final class SmithyMemberLookup implements MemberLookup {
     final Schema[] orderedSchemas;
     final byte[][] orderedNameBytes;
 
+    // Field names of length 1..7 packed into a long as ((len << 56) | big-endian bytes).
+    // The length lives in the top byte and the <=7 name bytes in the low 56 bits, so the
+    // packed value is a collision-free identity (encoding length defends against inputs
+    // with leading 0x00 bytes, which the struct field-name scanner does not reject). This
+    // lets the common short-name lookup replace the FNV byte-loop + Arrays.equals with a
+    // handful of `long ==` comparisons. Entry is 0 for names of length 0 or >= 8 (sentinel);
+    // the packed-path is only entered for input lengths 1..7, whose key has a non-zero top
+    // byte and so never matches the 0 sentinel.
+    static final int PACK_MAX_LEN = 7;
+    final long[] orderedPackedNames;
+
     SmithyMemberLookup(List<Schema> members, boolean useJsonName) {
         int size = members.size();
         this.orderedHashes = new long[size];
         this.orderedSchemas = new Schema[size];
         this.orderedNameBytes = new byte[size][];
+        this.orderedPackedNames = new long[size];
 
         for (int i = 0; i < size; i++) {
             Schema m = members.get(i);
@@ -46,8 +58,22 @@ final class SmithyMemberLookup implements MemberLookup {
             byte[] nameBytes = fieldName.getBytes(StandardCharsets.UTF_8);
             orderedNameBytes[i] = nameBytes;
             orderedHashes[i] = fnvHash(nameBytes, 0, nameBytes.length);
+            int len = nameBytes.length;
+            orderedPackedNames[i] = (len >= 1 && len <= PACK_MAX_LEN) ? packName(nameBytes, 0, len) : 0L;
             orderedSchemas[i] = m;
         }
+    }
+
+    /**
+     * Packs a name of length 1..7 into {@code (len << 56) | big-endian bytes}.
+     * Caller ensures {@code 1 <= len <= 7}.
+     */
+    private static long packName(byte[] buf, int start, int len) {
+        long key = (long) len << 56;
+        for (int i = 0; i < len; i++) {
+            key |= (buf[start + i] & 0xFFL) << ((len - 1 - i) << 3);
+        }
+        return key;
     }
 
     /**
@@ -74,14 +100,27 @@ final class SmithyMemberLookup implements MemberLookup {
     Schema lookup(byte[] buf, int start, int end, int expectedNext) {
         int nameLen = end - start;
 
-        // Speculative fast path: Arrays.equals only, no hash.
-        if (expectedNext >= 0 && expectedNext < orderedNameBytes.length
-                && orderedNameBytes[expectedNext].length == nameLen
-                && Arrays.equals(buf, start, end, orderedNameBytes[expectedNext], 0, nameLen)) {
-            return orderedSchemas[expectedNext];
+        // Short-name fast path: names of length 1..7 pack into a long that is an exact
+        // identity (see orderedPackedNames). A single linear scan of long== handles both
+        // the speculative-miss and out-of-order cases without FNV hashing or Arrays.equals.
+        // This is the union discriminator's hot path (S/N/B/M/L/BOOL/... in AttributeValue),
+        // where the speculative guess always misses for any member after the first.
+        if (nameLen >= 1 && nameLen <= PACK_MAX_LEN) {
+            long key = packName(buf, start, nameLen);
+            long[] packed = orderedPackedNames;
+            // Check the speculative position first to preserve in-order locality.
+            if (expectedNext >= 0 && expectedNext < packed.length && packed[expectedNext] == key) {
+                return orderedSchemas[expectedNext];
+            }
+            for (int i = 0; i < packed.length; i++) {
+                if (packed[i] == key) {
+                    return orderedSchemas[i];
+                }
+            }
+            return null;
         }
 
-        // Slow path: compute hash lazily, then scan with hash + length + equals.
+        // Long-name path: compute hash lazily, then scan with hash + length + equals.
         long hash = fnvHash(buf, start, end);
         for (int i = 0; i < orderedHashes.length; i++) {
             if (orderedHashes[i] == hash
