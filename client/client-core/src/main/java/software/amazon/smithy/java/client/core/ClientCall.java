@@ -7,8 +7,6 @@ package software.amazon.smithy.java.client.core;
 
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
@@ -73,9 +71,7 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
         this.endpointResolver = Objects.requireNonNull(callConfig.endpointResolver(), "endpointResolver is null");
         this.authSchemeResolver = Objects.requireNonNull(callConfig.authSchemeResolver(), "authSchemeResolver is null");
         this.retryScope = Objects.requireNonNullElse(callConfig.retryScope(), "");
-        this.supportedAuthSchemes = callConfig.supportedAuthSchemes()
-                .stream()
-                .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity(), (a, b) -> a));
+        this.supportedAuthSchemes = callConfig.supportedAuthSchemesById();
         this.eventStreamWriter = operation.inputEventBuilderSupplier() != null
                 ? ProtocolEventStreamWriter.of(input.getMemberValue(operation.inputStreamMember()))
                 : null;
