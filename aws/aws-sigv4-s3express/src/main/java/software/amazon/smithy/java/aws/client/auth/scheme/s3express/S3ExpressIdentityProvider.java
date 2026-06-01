@@ -6,6 +6,9 @@
 package software.amazon.smithy.java.aws.client.auth.scheme.s3express;
 
 import java.util.Objects;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
@@ -32,6 +35,13 @@ import software.amazon.smithy.java.context.Context;
  */
 public final class S3ExpressIdentityProvider implements IdentityResolver<S3ExpressIdentity> {
 
+    private static final AtomicInteger THREAD_COUNTER = new AtomicInteger();
+    private static final ScheduledExecutorService REFRESH_EXECUTOR = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "smithy-s3express-session-refresh-" + THREAD_COUNTER.incrementAndGet());
+        t.setDaemon(true);
+        return t;
+    });
+
     private final IdentityResolver<AwsCredentialsIdentity> baseIdentityProvider;
     private final S3ExpressIdentityCache cache;
 
@@ -50,7 +60,7 @@ public final class S3ExpressIdentityProvider implements IdentityResolver<S3Expre
         this.cache = new S3ExpressIdentityCache(key -> buildPerBucketResolver(key, createSession));
     }
 
-    private static CachingIdentityResolver<S3ExpressIdentity> buildPerBucketResolver(
+    private CachingIdentityResolver<S3ExpressIdentity> buildPerBucketResolver(
             S3ExpressIdentityKey key,
             CreateSessionCallback createSession
     ) {
@@ -69,7 +79,9 @@ public final class S3ExpressIdentityProvider implements IdentityResolver<S3Expre
                 return S3ExpressIdentity.class;
             }
         };
-        return CachingIdentityResolver.builder(delegate).build();
+        return CachingIdentityResolver.builder(delegate)
+                .executor(REFRESH_EXECUTOR)
+                .build();
     }
 
     @Override
@@ -85,9 +97,13 @@ public final class S3ExpressIdentityProvider implements IdentityResolver<S3Expre
         IdentityResult<AwsCredentialsIdentity> baseResult = baseIdentityProvider.resolveIdentity(requestProperties);
         AwsCredentialsIdentity base = baseResult.identity();
         if (base == null) {
+            String baseError = baseResult.error();
+            Class<?> resolver = baseResult.resolver() == null ? getClass() : baseResult.resolver();
             return IdentityResult.ofError(
-                    getClass(),
-                    "Could not resolve base AWS credentials for S3 Express CreateSession");
+                    resolver,
+                    baseError == null
+                            ? "Could not resolve base AWS credentials for S3 Express CreateSession"
+                            : "Could not resolve base AWS credentials for S3 Express CreateSession: " + baseError);
         }
 
         var perBucket = cache.get(new S3ExpressIdentityKey(bucket, base));
@@ -101,8 +117,6 @@ public final class S3ExpressIdentityProvider implements IdentityResolver<S3Expre
 
     @Override
     public void invalidate() {
-        // Per-bucket resolvers manage their own validity; punting on global invalidation for now.
-        // If/when an auth-failure interceptor needs to invalidate, we can extend this to clear
-        // the bucket entry for the call's specific (bucket, identity) key.
+        cache.invalidateAll();
     }
 }

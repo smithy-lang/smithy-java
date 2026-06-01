@@ -56,6 +56,9 @@ final class S3VirtualHostStyleInterceptor implements ClientInterceptor {
         if (!path.startsWith(prefix)) {
             return hook.request();
         }
+        if (path.length() > prefix.length() && path.charAt(prefix.length()) != '/') {
+            return hook.request();
+        }
         String rest = path.substring(prefix.length());
         // "/<bucket>" → "/" (CreateSession-shaped), "/<bucket>/key" → "/key".
         if (rest.isEmpty()) {

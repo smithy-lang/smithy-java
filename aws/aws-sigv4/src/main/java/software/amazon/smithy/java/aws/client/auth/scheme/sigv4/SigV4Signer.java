@@ -13,7 +13,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.HexFormat;
 import javax.crypto.ShortBufferException;
 import javax.crypto.spec.SecretKeySpec;
 import software.amazon.smithy.java.auth.api.SignResult;
@@ -115,7 +114,10 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     }
 
     private String hexHash(ByteBuffer bytes) {
-        return HexFormat.of().formatHex(hash(bytes));
+        byte[] hash = hash(bytes, signingResources.hashBytes);
+        byte[] hex = signingResources.signatureHexBytes;
+        writeHex(hash, hex, 0);
+        return new String(hex, 0, hex.length, StandardCharsets.US_ASCII);
     }
 
     private String signInPlace(
@@ -133,30 +135,23 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
         // Collect every header into the reusable strided buffer.
         signingResources.headerCount = 0;
-        request.headers().forEachEntry(signingResources, SigningResources::addHeader);
+        request.headers().forEachEntry(signingResources, SigV4Signer::addExistingHeaderForSigning);
 
         // Append the port only for non-default, explicitly-set ports.
         var existingHeaders = request.headers();
         if (!existingHeaders.hasHeader(HeaderName.HOST)) {
             var hostHeader = uriUsesDefaultPort(uri) ? uri.getHost() : uri.getHost() + ':' + uri.getPort();
-            signingResources.addHeader(HeaderName.HOST.name(), hostHeader);
+            signingResources.addHeaderCanonical(HeaderName.HOST.name(), hostHeader);
         }
 
         var sb = signingResources.sb;
         var signingDate = signingTimestamp.atOffset(ZoneOffset.UTC).toLocalDateTime();
         var dateStamp = formatDate(signingDate, sb);
         var requestTime = formatRfc3339(signingDate, dateStamp, sb);
-        // Use the request's existing X-Amz-Date if present so the canonical-request value
-        // matches what's on the wire. Otherwise add the freshly-computed timestamp.
-        String existingDate = existingHeaders.firstValue(HeaderName.X_AMZ_DATE);
-        if (existingDate != null) {
-            requestTime = existingDate;
-        } else {
-            signingResources.addHeader(HeaderName.X_AMZ_DATE.name(), requestTime);
-        }
+        signingResources.addHeaderCanonical(HeaderName.X_AMZ_DATE.name(), requestTime);
 
         if (sessionToken != null && !existingHeaders.hasHeader(HeaderName.X_AMZ_SECURITY_TOKEN)) {
-            signingResources.addHeader(HeaderName.X_AMZ_SECURITY_TOKEN.name(), sessionToken);
+            signingResources.addHeaderCanonical(HeaderName.X_AMZ_SECURITY_TOKEN.name(), sessionToken);
         }
 
         // S3 requires x-amz-content-sha256 on the wire (and in the signature) but other services don't accept it as
@@ -164,7 +159,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         // canonical request, it must also be on the wire (and vice-versa).
         boolean isS3 = "s3".equals(serviceName) || "s3express".equals(serviceName);
         if (isS3 && !existingHeaders.hasHeader(HeaderName.X_AMZ_CONTENT_SHA256)) {
-            signingResources.addHeader(HeaderName.X_AMZ_CONTENT_SHA256.name(), payloadHash);
+            signingResources.addHeaderCanonical(HeaderName.X_AMZ_CONTENT_SHA256.name(), payloadHash);
         }
 
         signingResources.sortHeadersByName();
@@ -200,6 +195,12 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
         headers.setHeader("authorization", authorizationHeader);
         return signature;
+    }
+
+    private static void addExistingHeaderForSigning(SigningResources r, String name, String value) {
+        if (!HeaderName.X_AMZ_DATE.name().equalsIgnoreCase(name)) {
+            r.addHeader(name, value);
+        }
     }
 
     /**
@@ -635,25 +636,23 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         return offset;
     }
 
-    private byte[] hash(ByteBuffer data) {
-        var sha256Digest = signingResources.sha256Digest;
-        sha256Digest.reset();
-        sha256Digest.update(data);
-        return sha256Digest.digest();
-    }
-
-    private byte[] hash(byte[] data, int offset, int length) {
-        var sha256Digest = signingResources.sha256Digest;
-        sha256Digest.reset();
-        sha256Digest.update(data, offset, length);
-        return sha256Digest.digest();
-    }
-
     private byte[] hash(byte[] data, int offset, int length, byte[] output) {
         try {
             var sha256Digest = signingResources.sha256Digest;
             sha256Digest.reset();
             sha256Digest.update(data, offset, length);
+            sha256Digest.digest(output, 0, output.length);
+            return output;
+        } catch (DigestException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private byte[] hash(ByteBuffer data, byte[] output) {
+        try {
+            var sha256Digest = signingResources.sha256Digest;
+            sha256Digest.reset();
+            sha256Digest.update(data);
             sha256Digest.digest(output, 0, output.length);
             return output;
         } catch (DigestException e) {

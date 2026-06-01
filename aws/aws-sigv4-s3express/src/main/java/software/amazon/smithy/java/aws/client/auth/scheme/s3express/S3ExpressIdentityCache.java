@@ -96,6 +96,17 @@ final class S3ExpressIdentityCache implements AutoCloseable {
         }
     }
 
+    void invalidateAll() {
+        writeLock.lock();
+        try {
+            for (var entry : entries.values()) {
+                entry.resolver.invalidate();
+            }
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
     @Override
     public void close() {
         writeLock.lock();

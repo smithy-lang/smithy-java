@@ -137,6 +137,13 @@ final class SigningResources {
      * lowercased if it contains any uppercase ASCII.
      */
     void addHeader(String name, String value) {
+        addHeaderCanonical(lowercaseIfNeeded(name), value);
+    }
+
+    /**
+     * Append a header entry whose name is already canonical lowercase.
+     */
+    void addHeaderCanonical(String name, String value) {
         int slot = headerCount * 2;
         if (slot >= headers.length) {
             String[] grown = new String[headers.length * 2];
@@ -144,7 +151,7 @@ final class SigningResources {
             headers = grown;
         }
 
-        headers[slot] = lowercaseIfNeeded(name);
+        headers[slot] = name;
         headers[slot + 1] = value;
         headerCount++;
     }
