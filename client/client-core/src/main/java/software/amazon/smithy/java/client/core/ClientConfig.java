@@ -27,6 +27,7 @@ import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.retries.api.RetryStrategy;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * An immutable representation of configurations of a {@link Client}.
@@ -46,6 +47,7 @@ public final class ClientConfig {
     private final List<ClientInterceptor> interceptors;
     private final ClientInterceptor interceptorChain;
     private final List<AuthScheme<?, ?>> supportedAuthSchemes;
+    private final Map<ShapeId, AuthScheme<?, ?>> supportedAuthSchemesById;
     private final AuthSchemeResolver authSchemeResolver;
     private final List<IdentityResolver<?>> identityResolvers;
     private final Context context;
@@ -86,6 +88,11 @@ public final class ClientConfig {
         supportedAuthSchemes.add(NO_AUTH_AUTH_SCHEME);
         supportedAuthSchemes.addAll(builder.supportedAuthSchemes);
         this.supportedAuthSchemes = Collections.unmodifiableList(supportedAuthSchemes);
+        var supportedAuthSchemesById = new LinkedHashMap<ShapeId, AuthScheme<?, ?>>();
+        for (var scheme : supportedAuthSchemes) {
+            supportedAuthSchemesById.putIfAbsent(scheme.schemeId(), scheme);
+        }
+        this.supportedAuthSchemesById = Collections.unmodifiableMap(supportedAuthSchemesById);
 
         this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, AuthSchemeResolver.DEFAULT);
         this.identityResolvers = List.copyOf(builder.identityResolvers);
@@ -192,6 +199,10 @@ public final class ClientConfig {
      */
     public List<AuthScheme<?, ?>> supportedAuthSchemes() {
         return supportedAuthSchemes;
+    }
+
+    Map<ShapeId, AuthScheme<?, ?>> supportedAuthSchemesById() {
+        return supportedAuthSchemesById;
     }
 
     /**
