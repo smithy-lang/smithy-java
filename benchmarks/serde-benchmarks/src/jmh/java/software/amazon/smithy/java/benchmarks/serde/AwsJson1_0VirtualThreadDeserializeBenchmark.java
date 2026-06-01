@@ -68,7 +68,11 @@ public class AwsJson1_0VirtualThreadDeserializeBenchmark {
             List<Future<?>> futures = new ArrayList<>(FANOUT);
             for (int i = 0; i < FANOUT; i++) {
                 futures.add(exec.submit(() -> protocol.deserializeResponse(
-                        op, state.context, state.typeRegistry, state.request, state.response)));
+                        op,
+                        state.context,
+                        state.typeRegistry,
+                        state.request,
+                        state.response)));
             }
             for (Future<?> f : futures) {
                 bh.consume(f.get());

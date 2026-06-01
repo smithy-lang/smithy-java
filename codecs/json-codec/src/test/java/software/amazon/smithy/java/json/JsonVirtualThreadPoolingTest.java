@@ -13,11 +13,13 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.json.bench.model.SimpleStruct;
+import software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider;
 
 /**
  * Stresses the serializer pool and the deserializer string-dedup cache pool from many
@@ -28,7 +30,7 @@ import software.amazon.smithy.java.json.bench.model.SimpleStruct;
 public class JsonVirtualThreadPoolingTest {
 
     private static final JsonCodec CODEC = JsonCodec.builder()
-            .overrideSerdeProvider(new software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider())
+            .overrideSerdeProvider(new SmithyJsonSerdeProvider())
             .useTimestampFormat(true)
             .build();
 
@@ -45,7 +47,7 @@ public class JsonVirtualThreadPoolingTest {
         var completed = new AtomicInteger();
 
         try (ExecutorService exec = Executors.newVirtualThreadPerTaskExecutor()) {
-            List<java.util.concurrent.Future<?>> futures = new ArrayList<>(threads);
+            List<Future<?>> futures = new ArrayList<>(threads);
             for (int t = 0; t < threads; t++) {
                 final int id = t;
                 futures.add(exec.submit(() -> {
