@@ -285,6 +285,17 @@ class H1ConnectionManagerTest {
     }
 
     @Test
+    void largeMaxConnectionsDoesNotPreallocateIdleStorage() {
+        var manager = new H1ConnectionManager(MAX_IDLE_NANOS);
+        var connection = new TestConnection();
+
+        manager.getOrCreatePool(TEST_ROUTE, 1_000_000);
+        assertTrue(manager.release(TEST_ROUTE, connection, false));
+
+        assertEquals(connection, manager.tryAcquire(TEST_ROUTE, 1_000_000));
+    }
+
+    @Test
     void acquireActiveHonorsMaxConnectionsPerRoute() throws Exception {
         var manager = new H1ConnectionManager(MAX_IDLE_NANOS);
 

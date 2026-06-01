@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.http.client.connection;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -221,8 +222,10 @@ final class H1ConnectionManager {
      * Per-route connection pool using a lock-protected LIFO stack.
      */
     private static final class HostPool {
-        private final HttpConnection[] available;
-        private final long[] idleSinceNanos;
+        private static final int INITIAL_IDLE_CAPACITY = 8;
+
+        private HttpConnection[] available;
+        private long[] idleSinceNanos;
         private final ReentrantLock lock = new ReentrantLock();
         private final Condition activeReleased = lock.newCondition();
         private final int maxConnections;
@@ -231,8 +234,9 @@ final class H1ConnectionManager {
 
         HostPool(int maxConnections) {
             this.maxConnections = maxConnections;
-            this.available = new HttpConnection[maxConnections];
-            this.idleSinceNanos = new long[maxConnections];
+            int initialCapacity = Math.min(INITIAL_IDLE_CAPACITY, maxConnections);
+            this.available = new HttpConnection[initialCapacity];
+            this.idleSinceNanos = new long[initialCapacity];
         }
 
         boolean tryAcquireActive(long acquireTimeoutMs) throws InterruptedException {
@@ -323,6 +327,7 @@ final class H1ConnectionManager {
                 if (!connection.isActive() || poolClosed || availableCount >= maxConnections) {
                     return false;
                 }
+                ensureIdleCapacity();
                 available[availableCount] = connection;
                 idleSinceNanos[availableCount] = System.nanoTime();
                 availableCount++;
@@ -331,6 +336,21 @@ final class H1ConnectionManager {
             } finally {
                 lock.unlock();
             }
+        }
+
+        private void ensureIdleCapacity() {
+            if (availableCount < available.length) {
+                return;
+            }
+
+            int nextCapacity;
+            if (available.length == 0) {
+                nextCapacity = 1;
+            } else {
+                nextCapacity = Math.min(maxConnections, available.length * 2);
+            }
+            available = Arrays.copyOf(available, nextCapacity);
+            idleSinceNanos = Arrays.copyOf(idleSinceNanos, nextCapacity);
         }
 
         void remove(HttpConnection connection) {
