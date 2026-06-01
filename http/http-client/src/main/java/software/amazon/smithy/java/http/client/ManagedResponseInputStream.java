@@ -8,11 +8,16 @@ package software.amazon.smithy.java.http.client;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Arrays;
 
 /**
  * InputStream wrapper that preserves optimized bulk operations and releases response lifecycle on EOF or close.
  */
 final class ManagedResponseInputStream extends InputStream {
+    // Cap for the pre-sized readAllBytes path: a (possibly untrusted) Content-Length above this
+    // falls back to the JDK grow-as-you-go path rather than pre-allocating a huge buffer up front.
+    private static final int MAX_PRESIZED_LEN = 64 * 1024 * 1024;
+
     private final InputStream inner;
     private final Runnable onClose;
     private long remaining;
@@ -48,10 +53,27 @@ final class ManagedResponseInputStream extends InputStream {
     @Override
     public byte[] readAllBytes() throws IOException {
         try {
+            long len = remaining;
+            if (len >= 0 && len <= MAX_PRESIZED_LEN) {
+                return readKnownLength((int) len);
+            }
             return inner.readAllBytes();
         } finally {
             onClose.run();
         }
+    }
+
+    private byte[] readKnownLength(int len) throws IOException {
+        byte[] buf = new byte[len];
+        int pos = 0;
+        while (pos < len) {
+            int n = inner.read(buf, pos, len - pos);
+            if (n < 0) {
+                return Arrays.copyOf(buf, pos); // stream ended early; trim to what we read
+            }
+            pos += n;
+        }
+        return buf;
     }
 
     @Override
