@@ -18,7 +18,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * Manages HTTP/2 connections with adaptive load balancing.
  *
  * <h2>Load Balancing Strategy</h2>
- * <p>Uses {@link H2LoadBalancer}, which by default uses a high-watermark strategy.
+ * <p>Uses a high-watermark strategy to distribute streams across connections.
  *
  * <h2>Threading</h2>
  * <p>Uses per-route state with a volatile connection array for lock-free reads in the
@@ -66,7 +66,6 @@ final class H2ConnectionManager {
 
     H2ConnectionManager(
             int streamsPerConnection,
-            H2LoadBalancer loadBalancer,
             long acquireTimeoutMs,
             List<ConnectionPoolListener> listeners,
             ConnectionFactory connectionFactory
@@ -74,14 +73,9 @@ final class H2ConnectionManager {
         this.acquireTimeoutMs = acquireTimeoutMs;
         this.listeners = listeners;
         this.connectionFactory = connectionFactory;
-
-        if (loadBalancer != null) {
-            this.loadBalancer = loadBalancer;
-        } else {
-            this.loadBalancer = H2LoadBalancer.watermark(
-                    Math.max(DEFAULT_SOFT_LIMIT_FLOOR, streamsPerConnection / DEFAULT_SOFT_LIMIT_DIVISOR),
-                    streamsPerConnection);
-        }
+        this.loadBalancer = new WatermarkLoadBalancer(
+                Math.max(DEFAULT_SOFT_LIMIT_FLOOR, streamsPerConnection / DEFAULT_SOFT_LIMIT_DIVISOR),
+                streamsPerConnection);
     }
 
     private RouteState stateFor(Route route) {
