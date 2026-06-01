@@ -17,27 +17,6 @@ import software.amazon.smithy.java.io.uri.SmithyUri;
  *
  * <p><b>Important:</b> Routes are compared by value, not identity. Two Route instances with the same scheme, host,
  * port, and proxy configuration are considered equal and will share connections.
- *
- * <p><b>Example:</b>
- * {@snippet :
- * Route route1 = Route.from(SmithyUri.of("https://api.example.com/users"));
- * Route route2 = Route.from(SmithyUri.of("https://api.example.com/posts"));
- * assert route1.equals(route2);
- *
- * Route route3 = Route.from(SmithyUri.of("https://other.example.com/data"));
- * assert !route1.equals(route3);
- * }
- *
- * <p><b>Proxy routing:</b>
- * {@snippet :
- * ProxyConfiguration proxy = new ProxyConfiguration(SmithyUri.of("http://proxy.corp.com:8080"), ProxyType.HTTP);
- *
- * Route directRoute = Route.from(uri);
- * Route proxiedRoute = Route.from(uri, proxy);
- *
- * // Different routes - proxied connections can't be shared with direct
- * assert !directRoute.equals(proxiedRoute);
- * }
  */
 public final class Route {
     private final String scheme;
@@ -47,28 +26,18 @@ public final class Route {
     private final int cachedHashCode;
     private final String authority;
 
-    /**
-     * Create a new Route.
-     *
-     * @param scheme Scheme: "http" or "https".
-     * @param host Target hostname (case-insensitive, normalized to lowercase).
-     * @param port Target port (always explicit, never -1).
-     * @param proxy Optional proxy configuration. Null if connecting directly without proxy.
-     */
-    public Route(String scheme, String host, int port, ProxyConfiguration proxy) {
-        Objects.requireNonNull(scheme, "scheme cannot be null");
-        Objects.requireNonNull(host, "host cannot be null");
-
-        if (!scheme.equals("http") && !scheme.equals("https")) {
+    private Route(String scheme, String host, int port, ProxyConfiguration proxy) {
+        if (host == null || host.isBlank()) {
+            throw new IllegalArgumentException("host cannot be blank or null");
+        } else if (!"http".equals(scheme) && !"https".equals(scheme)) {
             throw new IllegalArgumentException("Invalid scheme: " + scheme + " (must be 'http' or 'https')");
         }
 
-        if (port <= 0 || port > 65535) {
+        int defaultPort = "https".equals(scheme) ? 443 : 80;
+        if (port == -1) {
+            port = defaultPort;
+        } else if (port <= 0 || port > 65535) {
             throw new IllegalArgumentException("Invalid port: " + port + " (must be 1-65535)");
-        }
-
-        if (host.isBlank()) {
-            throw new IllegalArgumentException("host cannot be blank");
         }
 
         // Normalize host to lowercase for consistent equality
@@ -76,18 +45,14 @@ public final class Route {
         this.host = host.toLowerCase();
         this.port = port;
         this.proxy = proxy;
+        this.authority = (port == defaultPort) ? this.host : this.host + ":" + port;
 
         // Cache hashCode for fast map lookups in connection pool
-        // Manual computation avoids Objects.hash() varargs array allocation
         int h = this.scheme.hashCode();
         h = 31 * h + this.host.hashCode();
         h = 31 * h + this.port;
         h = 31 * h + (this.proxy != null ? this.proxy.hashCode() : 0);
         this.cachedHashCode = h;
-
-        // Pre-compute authority to avoid string allocation in hot path
-        int defaultPort = "https".equals(scheme) ? 443 : 80;
-        this.authority = (port == defaultPort) ? this.host : this.host + ":" + port;
     }
 
     /**
@@ -146,34 +111,6 @@ public final class Route {
     }
 
     /**
-     * Get the effective connection target (where the TCP socket connects).
-     *
-     * <p>If using a proxy, returns the proxy's host:port.
-     * Otherwise, returns the target host:port.
-     *
-     * <p>Note: For HTTP proxies with HTTPS targets, the socket connects to
-     * the proxy, then a CONNECT tunnel is established to the target.
-     *
-     * @return connection target in "host:port" format
-     */
-    public String connectionTarget() {
-        if (usesProxy()) {
-            return proxy.hostname() + ":" + proxy.port();
-        }
-        return host + ":" + port;
-    }
-
-    /**
-     * Get the tunnel target for CONNECT requests.
-     * Only relevant when using a proxy with HTTPS.
-     *
-     * @return tunnel target in "host:port" format
-     */
-    public String tunnelTarget() {
-        return host + ":" + port;
-    }
-
-    /**
      * Create a Route from a URI without proxy.
      *
      * <p>The URI's path, query, and fragment are ignored.
@@ -190,8 +127,7 @@ public final class Route {
     /**
      * Create a Route from a URI with optional proxy configuration.
      *
-     * <p>The URI's path, query, and fragment are ignored.
-     * Only scheme, host, and port are used.
+     * <p>The URI's path, query, and fragment are ignored. Only scheme, host, and port are used.
      *
      * @param uri the URI to extract route from
      * @param proxy optional proxy configuration (null for direct connection)
@@ -199,11 +135,7 @@ public final class Route {
      * @throws IllegalArgumentException if URI is invalid
      */
     public static Route from(SmithyUri uri, ProxyConfiguration proxy) {
-        int port = uri.getPort();
-        if (port == -1) {
-            port = "https".equals(uri.getScheme()) ? 443 : 80;
-        }
-        return new Route(uri.getScheme(), uri.getHost(), port, proxy);
+        return new Route(uri.getScheme(), uri.getHost(), uri.getPort(), proxy);
     }
 
     /**

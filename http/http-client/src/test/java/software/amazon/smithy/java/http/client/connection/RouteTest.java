@@ -54,28 +54,28 @@ class RouteTest {
 
     @Test
     void fromUriThrowsOnMissingScheme() {
-        assertThrows(NullPointerException.class,
+        assertThrows(IllegalArgumentException.class,
                 () -> Route.from(SmithyUri.of("example.com/path")));
     }
 
     @Test
     void fromUriThrowsOnMissingHost() {
-        assertThrows(NullPointerException.class,
+        assertThrows(IllegalArgumentException.class,
                 () -> Route.from(SmithyUri.of("http:///path")));
     }
 
     @Test
-    void constructorThrowsOnInvalidScheme() {
+    void directThrowsOnInvalidScheme() {
         assertThrows(IllegalArgumentException.class,
-                () -> new Route("ftp", "example.com", 21, null));
+                () -> Route.direct("ftp", "example.com", 21));
     }
 
     @Test
-    void constructorThrowsOnInvalidPort() {
+    void directThrowsOnInvalidPort() {
         assertThrows(IllegalArgumentException.class,
-                () -> new Route("http", "example.com", 0, null));
+                () -> Route.direct("http", "example.com", 0));
         assertThrows(IllegalArgumentException.class,
-                () -> new Route("http", "example.com", 70000, null));
+                () -> Route.direct("http", "example.com", 70000));
     }
 
     @Test
@@ -90,29 +90,6 @@ class RouteTest {
         var route = Route.direct("http", "example.com", 80);
 
         assertFalse(route.isSecure());
-    }
-
-    @Test
-    void connectionTargetReturnsProxyWhenProxied() {
-        var proxy = new ProxyConfiguration(SmithyUri.of("http://proxy:8080"), ProxyConfiguration.ProxyType.HTTP);
-        var route = Route.viaProxy("https", "example.com", 443, proxy);
-
-        assertEquals("proxy:8080", route.connectionTarget());
-    }
-
-    @Test
-    void connectionTargetReturnsHostWhenDirect() {
-        var route = Route.direct("https", "example.com", 443);
-
-        assertEquals("example.com:443", route.connectionTarget());
-    }
-
-    @Test
-    void tunnelTargetAlwaysReturnsTargetHost() {
-        var proxy = new ProxyConfiguration(SmithyUri.of("http://proxy:8080"), ProxyConfiguration.ProxyType.HTTP);
-        var route = Route.viaProxy("https", "example.com", 443, proxy);
-
-        assertEquals("example.com:443", route.tunnelTarget());
     }
 
     @Test
