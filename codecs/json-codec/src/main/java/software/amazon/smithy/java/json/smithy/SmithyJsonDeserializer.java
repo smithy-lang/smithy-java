@@ -399,7 +399,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                     fracPos++;
                 }
                 int fracLen = fracPos - fracStart;
-                if (fracLen > 0) {
+                // Skip the precision fast path if an exponent follows — the precision
+                // fast path doesn't apply scientific notation and would leave pos before
+                // the 'e'/'E', corrupting subsequent parsing.
+                boolean hasExponent = fracPos < end && (buf[fracPos] == 'e' || buf[fracPos] == 'E');
+                if (fracLen > 0 && !hasExponent) {
                     int nano = 0;
                     for (int i = 0; i < 9; i++) {
                         nano *= 10;
@@ -422,7 +426,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                         throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
                     }
                 }
-                // No digits after dot — fall through to double parsing
+                // No digits after dot, or exponent present — fall through to double parsing
             } else if (endPos >= end || (buf[endPos] != 'e' && buf[endPos] != 'E')) {
                 // Pure integer — no fractional part
                 pos = endPos;
