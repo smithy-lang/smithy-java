@@ -8,6 +8,7 @@ package software.amazon.smithy.java.benchmarks.e2e;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.function.IntConsumer;
 import software.amazon.smithy.java.benchmarks.e2e.dynamodb.client.DynamoDBClient;
 import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.AttributeDefinition;
 import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.AttributeValue;
@@ -23,8 +24,9 @@ import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.ScalarAttribute
 final class DdbBenchmarks extends BenchmarkSupport {
 
     private static final Duration DEFAULT_DDB_WAITER_TIMEOUT = Duration.ofMinutes(5);
+    private static final int KEY_COUNT = 100;
 
-    private final AttributeValue dataValue;
+    private final String dataPayload;
 
     DdbBenchmarks(BenchmarkConfig config) {
         super(config, switch (config.operation()) {
@@ -32,7 +34,7 @@ final class DdbBenchmarks extends BenchmarkSupport {
             case DDB_GET -> 1024;
             default -> throw new IllegalStateException("Unsupported DynamoDB operation: " + config.operation());
         });
-        this.dataValue = AttributeValue.builder().s("x".repeat(config.dataLength())).build();
+        this.dataPayload = "x".repeat(config.dataLength());
     }
 
     @Override
@@ -48,7 +50,7 @@ final class DdbBenchmarks extends BenchmarkSupport {
         var client = Clients.dynamodb(config.region());
         try (var table = DdbTable.setup(client, config)) {
             var executor = new ActionExecutor(client, null, new byte[0]);
-            runMeasured(index -> executor.putItem(table.name(), buildItem(index)));
+            runMeasured(cyclingAction(keyIndex -> executor.putItem(table.name(), buildItem(keyIndex))));
         }
     }
 
@@ -57,25 +59,45 @@ final class DdbBenchmarks extends BenchmarkSupport {
         try (var table = DdbTable.setup(client, config)) {
             var executor = new ActionExecutor(client, null, new byte[0]);
             if (table.created()) {
-                System.out.println("Seeding DynamoDB GetItem keys: " + config.batchActions());
-                for (int i = 0; i < config.batchActions(); i++) {
+                System.out.println("Seeding DynamoDB GetItem keys: " + KEY_COUNT);
+                for (int i = 0; i < KEY_COUNT; i++) {
                     executor.putItem(table.name(), buildItem(i));
                 }
             }
-            runMeasured(index -> {
-                var pk = AttributeValue.builder().s(ddbKey(index)).build();
-                executor.getItem(table.name(), Map.of("pk", pk));
-            });
+            runMeasured(cyclingAction(keyIndex -> executor.getItem(table.name(), buildKey(keyIndex))));
         }
+    }
+
+    private Action cyclingAction(IntConsumer operation) {
+        return new Action() {
+            private int currentKeyIndex;
+
+            @Override
+            public int prepare(int index) {
+                currentKeyIndex = (currentKeyIndex + 1) % KEY_COUNT;
+                return currentKeyIndex;
+            }
+
+            @Override
+            public void run(int keyIndex) {
+                operation.accept(keyIndex);
+            }
+        };
+    }
+
+    private Map<String, AttributeValue> buildKey(int index) {
+        var pk = AttributeValue.builder().s(ddbKey(index)).build();
+        return Map.of("pk", pk);
     }
 
     private Map<String, AttributeValue> buildItem(int index) {
         var pk = AttributeValue.builder().s(ddbKey(index)).build();
-        return Map.of("pk", pk, "data", dataValue);
+        var data = AttributeValue.builder().s(dataPayload).build();
+        return Map.of("pk", pk, "data", data);
     }
 
     private String ddbKey(int index) {
-        return config.keyPrefix() + (index + 1);
+        return config.keyPrefix() + index;
     }
 
     private record DdbTable(DynamoDBClient client, String name, boolean created, boolean deleteOnClose)
