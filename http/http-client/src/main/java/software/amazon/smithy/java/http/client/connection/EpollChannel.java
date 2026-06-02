@@ -14,6 +14,7 @@ import java.io.InterruptedIOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
@@ -210,6 +211,50 @@ final class EpollChannel {
                 disarmEpollOut();
             }
         }
+    }
+
+    /**
+     * Write all remaining bytes in the provided buffers using {@code writev(2)}. Parks on EPOLLOUT
+     * under back-pressure, matching the blocking semantics of {@link #writeAddress}.
+     *
+     * @return bytes written, equal to the original total remaining byte count unless an exception is
+     *     thrown
+     */
+    long writev(ByteBuffer[] buffers, int offset, int length) throws IOException {
+        long remaining = remaining(buffers, offset, length);
+        long written = 0;
+        boolean armed = false;
+        try {
+            while (remaining > 0) {
+                if (closed.get()) {
+                    throw new IOException("channel closed");
+                }
+                long n = socket.writev(buffers, offset, length, remaining);
+                if (n > 0) {
+                    written += n;
+                    remaining -= n;
+                    continue;
+                }
+                if (!armed) {
+                    armEpollOut();
+                    armed = true;
+                }
+                awaitWritable(0L); // untimed
+            }
+            return written;
+        } finally {
+            if (armed) {
+                disarmEpollOut();
+            }
+        }
+    }
+
+    private static long remaining(ByteBuffer[] buffers, int offset, int length) {
+        long result = 0;
+        for (int i = offset, end = offset + length; i < end; i++) {
+            result += buffers[i].remaining();
+        }
+        return result;
     }
 
     private boolean awaitReadable(long deadline) throws InterruptedIOException {
