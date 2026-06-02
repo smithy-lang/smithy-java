@@ -215,6 +215,103 @@ public class ContextTest {
     }
 
     @Test
+    public void perCallOverlayReadsThroughToParent() {
+        var parent = Context.create();
+        parent.put(FOO, "hi");
+        parent.put(BAR, 1);
+
+        var overlay = Context.perCallOverlay(Context.unmodifiableView(parent));
+
+        assertThat(overlay, instanceOf(OverlayContext.class));
+        // Reads miss the (empty) overlay and fall through to the parent.
+        assertThat(overlay.get(FOO), equalTo("hi"));
+        assertThat(overlay.get(BAR), is(1));
+        assertThat(overlay.get(BAZ), nullValue());
+    }
+
+    @Test
+    public void perCallOverlayWritesShadowParentWithoutMutatingIt() {
+        var parent = Context.create();
+        parent.put(FOO, "hi");
+        parent.put(BAR, 1);
+
+        var overlay = Context.perCallOverlay(Context.unmodifiableView(parent));
+        overlay.put(FOO, "bye"); // shadow an existing parent key
+        overlay.put(BAZ, true); // a key the parent doesn't have
+
+        // Overlay sees its own writes...
+        assertThat(overlay.get(FOO), equalTo("bye"));
+        assertThat(overlay.get(BAZ), equalTo(true));
+        // ...and still reads through for untouched keys.
+        assertThat(overlay.get(BAR), is(1));
+
+        // The parent is never mutated by overlay writes.
+        assertThat(parent.get(FOO), equalTo("hi"));
+        assertThat(parent.get(BAZ), nullValue());
+    }
+
+    @Test
+    public void perCallOverlayPutIfAbsentAndComputeIfAbsentSeeParent() {
+        var parent = Context.create();
+        parent.put(FOO, "hi");
+        var overlay = Context.perCallOverlay(Context.unmodifiableView(parent));
+
+        // putIfAbsent must observe the parent's value through the overlay and not overwrite it.
+        overlay.putIfAbsent(FOO, "bye");
+        assertThat(overlay.get(FOO), equalTo("hi"));
+
+        // computeIfAbsent only computes on a true miss (parent + overlay).
+        assertThat(overlay.computeIfAbsent(FOO, k -> "computed"), equalTo("hi"));
+        assertThat(overlay.computeIfAbsent(BAZ, k -> Boolean.TRUE), equalTo(true));
+        assertThat(overlay.get(BAZ), equalTo(true));
+        assertThat(parent.get(BAZ), nullValue());
+    }
+
+    @Test
+    public void perCallOverlayCopyToFlattensParentThenOverlay() {
+        var parent = Context.create();
+        parent.put(FOO, "hi");
+        parent.put(BAR, 1);
+
+        var overlay = Context.perCallOverlay(Context.unmodifiableView(parent));
+        overlay.put(FOO, "bye"); // overlay shadows FOO
+        overlay.put(BAZ, true);
+
+        var target = Context.create();
+        overlay.copyTo(target);
+
+        // Parent contributes BAR; overlay wins for FOO and adds BAZ.
+        assertThat(target.get(FOO), equalTo("bye"));
+        assertThat(target.get(BAR), is(1));
+        assertThat(target.get(BAZ), equalTo(true));
+    }
+
+    @Test
+    public void perCallOverlayCopyToCopiesMutableValuesForIsolation() {
+        var parent = Context.create();
+        parent.put(HAPPY_SET, new HashSet<>(Set.of("a")));
+
+        var overlay = Context.perCallOverlay(Context.unmodifiableView(parent));
+        // Overlay writes its own mutable set (the pattern the request pipeline uses for FEATURE_IDS).
+        overlay.put(HAPPY_SET, new HashSet<>(Set.of("x")));
+
+        var target = Context.create();
+        overlay.copyTo(target);
+        target.get(HAPPY_SET).add("y");
+
+        // HAPPY_SET uses a copying key, so the target's set is independent of the overlay's.
+        assertThat(overlay.get(HAPPY_SET), containsInAnyOrder("x"));
+        assertThat(target.get(HAPPY_SET), containsInAnyOrder("x", "y"));
+    }
+
+    @Test
+    public void perCallOverlayCopyToRejectsUnmodifiableTarget() {
+        var overlay = Context.perCallOverlay(Context.empty());
+        var unmodifiable = Context.unmodifiableView(Context.create());
+        assertThrows(UnsupportedOperationException.class, () -> overlay.copyTo(unmodifiable));
+    }
+
+    @Test
     public void canCopyKeyValues() {
         var ctx = Context.create();
         ctx.put(SAD_SET, new HashSet<>());
