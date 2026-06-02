@@ -13,7 +13,7 @@ import java.util.function.Function;
 /**
  * A typed context map.
  */
-public sealed interface Context permits ChunkedArrayStorageContext, UnmodifiableContext {
+public sealed interface Context permits ChunkedArrayStorageContext, OverlayContext, UnmodifiableContext {
 
     /**
      * A {@code Key} provides an identity-based, immutable token.
@@ -219,6 +219,27 @@ public sealed interface Context permits ChunkedArrayStorageContext, Unmodifiable
         Context copy = Context.create();
         context.copyTo(copy);
         return copy;
+    }
+
+    /**
+     * Create a modifiable, copy-on-write context that reads through to {@code parent} and writes into a
+     * small lazily-allocated overlay, instead of eagerly deep-copying {@code parent} like
+     * {@link #modifiableCopy(Context)}.
+     *
+     * <p>Intended for short-lived per-request contexts layered over an immutable, shared parent (e.g. a
+     * client's config context): writes shadow the parent for this instance only and never mutate it, so
+     * the parent's entries are read by reference rather than copied. This avoids the per-request chunk
+     * allocation + array copy of an eager copy when the caller writes only a few keys and reads many.
+     *
+     * <p>The parent must be treated as immutable for the lifetime of the returned context (a value
+     * written into the parent after this call would become visible through reads that miss the overlay).
+     * Like {@link #create()}, the returned context is not safe for concurrent writes.
+     *
+     * @param parent the read-through parent context; must not be mutated while the overlay is in use
+     * @return a copy-on-write context layered over {@code parent}
+     */
+    static Context perCallOverlay(Context parent) {
+        return new OverlayContext(parent);
     }
 
     /**
