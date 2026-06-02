@@ -268,7 +268,7 @@ final class H1ConnectionManager {
         private void releaseActiveLocked() {
             if (activeLeases > 0) {
                 activeLeases--;
-                activeReleased.signalAll();
+                activeReleased.signal();
             }
         }
 
@@ -331,7 +331,6 @@ final class H1ConnectionManager {
                 available[availableCount] = connection;
                 idleSinceNanos[availableCount] = System.nanoTime();
                 availableCount++;
-                activeReleased.signalAll();
                 return true;
             } finally {
                 lock.unlock();
