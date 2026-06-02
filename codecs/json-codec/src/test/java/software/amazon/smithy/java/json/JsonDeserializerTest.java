@@ -521,6 +521,35 @@ public class JsonDeserializerTest extends ProviderTestBase {
         }
     }
 
+    @PerProvider
+    public void deserializesEpochSecondsInScientificNotation(JsonSerdeProvider provider) {
+        // Regression: epoch-seconds written in scientific notation, e.g. DynamoDB's
+        // "CreationDateTime":1.780359340803E9. The integer fast path read "1", saw the
+        // ".", took the nanosecond branch, and both misread the value (~1.78s instead of
+        // ~1.78e9s) and left "E9" unconsumed, corrupting the rest of the stream.
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS));
+
+        record Case(String json, Instant expected) {}
+        var cases = List.of(
+                new Case("1.780359340803E9", Instant.ofEpochSecond(1_780_359_340L, 803_000_000)),
+                new Case("1.78E9", Instant.ofEpochSecond(1_780_000_000L)),
+                new Case("17E8", Instant.ofEpochSecond(1_700_000_000L)),
+                new Case("-1.5E0", Instant.ofEpochSecond(-2, 500_000_000)),
+                new Case("1.5e9", Instant.ofEpochSecond(1_500_000_000L)));
+
+        try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+            for (var c : cases) {
+                var de = codec.createDeserializer(c.json().getBytes(StandardCharsets.UTF_8));
+                assertThat(de.readTimestamp(schema), equalTo(c.expected()));
+                // close() asserts the whole input was consumed — catches the original bug
+                // where the exponent ("E9") was left dangling after the fast path.
+                de.close();
+            }
+        }
+    }
+
     public static List<Arguments> deserializesWithTimestampFormatSource() {
         var epochSeconds = Double.toString(((double) Instant.EPOCH.toEpochMilli()) / 1000);
 

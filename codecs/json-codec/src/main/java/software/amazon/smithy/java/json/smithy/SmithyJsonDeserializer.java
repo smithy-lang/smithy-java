@@ -399,7 +399,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                     fracPos++;
                 }
                 int fracLen = fracPos - fracStart;
-                if (fracLen > 0) {
+                // A trailing exponent (e.g. "1.78035934E9") makes the digits after the
+                // dot a mantissa fraction, not nanoseconds — the nano fast path would
+                // misread the value and leave the exponent unconsumed. Defer to double.
+                boolean hasExponent = fracPos < end && (buf[fracPos] == 'e' || buf[fracPos] == 'E');
+                if (fracLen > 0 && !hasExponent) {
                     int nano = 0;
                     for (int i = 0; i < 9; i++) {
                         nano *= 10;
