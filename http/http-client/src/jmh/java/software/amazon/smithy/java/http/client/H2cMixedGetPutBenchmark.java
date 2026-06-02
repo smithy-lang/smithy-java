@@ -101,12 +101,12 @@ public class H2cMixedGetPutBenchmark {
         transportContext = Context.create();
         eventLoopTransports = new ArrayList<>(connections);
         for (int i = 0; i < connections; i++) {
-            eventLoopTransports.add(new EventLoopH2cTransport("localhost", 18081));
+            eventLoopTransports.add(new EventLoopH2cTransport(BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2C_PORT));
         }
         eventLoopIndex = new AtomicInteger();
         agentTransports = new ArrayList<>(connections);
         for (int i = 0; i < connections; i++) {
-            agentTransports.add(new ConnectionAgentH2cTransport("localhost", 18081));
+            agentTransports.add(new ConnectionAgentH2cTransport(BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2C_PORT));
         }
         agentIndex = new AtomicInteger();
 

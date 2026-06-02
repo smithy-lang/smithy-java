@@ -224,11 +224,9 @@ tasks.named("jmh") {
     if (externalBenchHost == null) {
         dependsOn(startBenchmarkServer)
         finalizedBy(stopBenchmarkServer)
-    } else {
-        doFirst {
-            println("Targeting external benchmark host: $externalBenchHost (skipping local server start)")
-        }
     }
+    // Note: when targeting an external host (-Pjmh.bench.host=...), start the BenchmarkServer
+    // yourself on that host — the local start/stop hooks are skipped here.
 }
 
 tasks.test {

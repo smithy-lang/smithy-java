@@ -182,7 +182,7 @@ public class H2ScalingBenchmark {
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) {
-                        ch.pipeline().addLast(nettySslCtx.newHandler(ch.alloc(), "localhost", 18443));
+                        ch.pipeline().addLast(nettySslCtx.newHandler(ch.alloc(), BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2_PORT));
                         ch.pipeline().addLast(h2FrameCodec);
                         ch.pipeline()
                                 .addLast(new Http2MultiplexHandler(new SimpleChannelInboundHandler<Http2StreamFrame>() {
@@ -191,13 +191,13 @@ public class H2ScalingBenchmark {
                                 }));
                     }
                 });
-        nettyChannel = b.connect("localhost", 18443).sync().channel();
+        nettyChannel = b.connect(BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2_PORT).sync().channel();
 
         // Netty-backed Smithy transport prototype
-        nettyTransport = new NettyH2Transport("localhost", 18443);
+        nettyTransport = new NettyH2Transport(BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2_PORT);
 
         // Event-loop prototype (Phase 1+2: non-blocking TLS + single-thread H2)
-        eventLoopTransport = new EventLoopH2Transport("localhost", 18443);
+        eventLoopTransport = new EventLoopH2Transport(BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2_PORT);
 
         // Productionized client-http-netty transport
         var nettyTransportConfig = new NettyHttpTransportConfig()
@@ -337,7 +337,7 @@ public class H2ScalingBenchmark {
                     .method("GET")
                     .path("/get")
                     .scheme("https")
-                    .authority("localhost:18443");
+                    .authority(BenchmarkSupport.H2_AUTHORITY);
             stream.writeAndFlush(new DefaultHttp2HeadersFrame(headers, true));
             future.join();
         }, nettyChannel, counter);
@@ -371,7 +371,7 @@ public class H2ScalingBenchmark {
                     .method("POST")
                     .path("/post")
                     .scheme("https")
-                    .authority("localhost:18443");
+                    .authority(BenchmarkSupport.H2_AUTHORITY);
             stream.write(new DefaultHttp2HeadersFrame(headers, false));
             stream.writeAndFlush(new DefaultHttp2DataFrame(
                     Unpooled.wrappedBuffer(BenchmarkSupport.POST_PAYLOAD),
@@ -408,7 +408,7 @@ public class H2ScalingBenchmark {
                     .method("PUT")
                     .path("/putmb")
                     .scheme("https")
-                    .authority("localhost:18443");
+                    .authority(BenchmarkSupport.H2_AUTHORITY);
             stream.write(new DefaultHttp2HeadersFrame(headers, false));
             stream.writeAndFlush(new DefaultHttp2DataFrame(
                     Unpooled.wrappedBuffer(BenchmarkSupport.MB_PAYLOAD),
@@ -735,7 +735,7 @@ public class H2ScalingBenchmark {
                     .method("GET")
                     .path("/getmb")
                     .scheme("https")
-                    .authority("localhost:18443");
+                    .authority(BenchmarkSupport.H2_AUTHORITY);
             stream.writeAndFlush(new DefaultHttp2HeadersFrame(headers, true));
             future.join();
         }, nettyChannel, counter);
@@ -823,7 +823,7 @@ public class H2ScalingBenchmark {
                     .method("GET")
                     .path("/get10mb")
                     .scheme("https")
-                    .authority("localhost:18443");
+                    .authority(BenchmarkSupport.H2_AUTHORITY);
             stream.writeAndFlush(new DefaultHttp2HeadersFrame(headers, true));
             future.join();
         }, nettyChannel, counter);

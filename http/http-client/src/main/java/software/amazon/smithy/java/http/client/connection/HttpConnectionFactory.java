@@ -94,11 +94,14 @@ record HttpConnectionFactory(
 
     private HttpConnection connectToAddress(InetAddress address, Route route, List<InetAddress> allEndpoints)
             throws IOException {
-        // Experimental persistent-registration epoll backend: secure routes only (the e2e benchmark
-        // is HTTPS). It opens, connects, and TLS-handshakes its own native socket instead of going
-        // through the NIO SocketChannel path below, and always drives TLS via SSLEngineTransport.
-        if (epollConnector != null && route.isSecure()) {
-            return connectEpoll(address, route);
+        // Experimental persistent-registration epoll backend. It opens and connects its own native
+        // socket instead of going through the NIO SocketChannel path below. Secure routes drive TLS
+        // via SSLEngineTransport; cleartext routes use EpollTransport directly, which lets h2c prior
+        // knowledge use the same epoll socket path.
+        if (epollConnector != null) {
+            return route.isSecure()
+                    ? connectEpollTls(address, route)
+                    : connectEpollCleartext(address, route);
         }
 
         Socket socket = socketFactory.newSocket(route, allEndpoints);
@@ -125,13 +128,27 @@ record HttpConnectionFactory(
         return createProtocolConnection(transport, route);
     }
 
-    private HttpConnection connectEpoll(InetAddress address, Route route) throws IOException {
-        EpollChannel channel;
+    private EpollChannel connectEpollChannel(InetAddress address, Route route) throws IOException {
         try {
-            channel = epollConnector.connect(address, route.port(), toIntMillis(connectTimeout));
+            return epollConnector.connect(address, route.port(), toIntMillis(connectTimeout));
         } catch (IOException e) {
             throw new IOException("Failed to connect to " + route.host() + " via epoll transport", e);
         }
+    }
+
+    private HttpConnection connectEpollCleartext(InetAddress address, Route route) throws IOException {
+        EpollChannel channel = connectEpollChannel(address, route);
+        try {
+            return createProtocolConnection(new EpollTransport(channel, toIntMillis(readTimeout)), route);
+        } catch (IOException | RuntimeException e) {
+            channel.close();
+            throw e;
+        }
+    }
+
+    private HttpConnection connectEpollTls(InetAddress address, Route route) throws IOException {
+        EpollChannel channel;
+        channel = connectEpollChannel(address, route);
 
         SSLEngine engine = null;
         Runnable releaser = () -> {};
