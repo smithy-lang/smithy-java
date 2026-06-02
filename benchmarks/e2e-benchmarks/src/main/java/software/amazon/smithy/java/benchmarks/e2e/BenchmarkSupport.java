@@ -75,8 +75,9 @@ abstract class BenchmarkSupport {
     private void executeBatch(ExecutorService pool, Action action, boolean measure) {
         if (config.operation().sequential) {
             for (int i = 0; i < config.batchActions(); i++) {
+                int preparedIndex = action.prepare(i);
                 long start = System.nanoTime();
-                action.run(i);
+                action.run(preparedIndex);
                 if (measure) {
                     recordDuration(System.nanoTime() - start);
                 }
@@ -91,7 +92,7 @@ abstract class BenchmarkSupport {
         var error = new AtomicReference<Throwable>();
         for (int i = 0; i < config.batchActions(); i++) {
             permits.acquireUninterruptibly();
-            final int index = i;
+            final int index = action.prepare(i);
             pool.execute(() -> {
                 try {
                     long start = System.nanoTime();
@@ -205,6 +206,10 @@ abstract class BenchmarkSupport {
 
     @FunctionalInterface
     protected interface Action {
+        default int prepare(int index) {
+            return index;
+        }
+
         void run(int index);
     }
 }
