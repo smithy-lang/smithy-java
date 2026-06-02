@@ -171,16 +171,25 @@ public interface TimestampFormatter {
 
             @Override
             public Instant readFromNumber(Number value) {
-                // The most common types for serialized epoch-seconds, double/integer/long, are checked first.
+                // Smithy timestamps have millisecond resolution. Each case converts
+                // epoch-seconds to epoch-milliseconds; the most common serialized types
+                // (Double/Integer/Long) are checked first and stay on the cheapest path.
+                // Every in-range epoch-millisecond value (|t| < ~2.5e14) is well under 2^53,
+                // so the double conversions below are exact at millisecond resolution.
                 return switch (value) {
-                    case Double f -> Instant.ofEpochMilli((long) (f * 1000f));
+                    case Double f -> Instant.ofEpochMilli((long) (f * 1000.0));
                     case Integer i -> Instant.ofEpochMilli(i * 1000L);
                     case Long l -> Instant.ofEpochMilli(l * 1000L);
                     case Byte b -> Instant.ofEpochMilli(b * 1000L);
                     case Short s -> Instant.ofEpochMilli(s * 1000L);
-                    case Float f -> Instant.ofEpochMilli((long) (f * 1000f));
+                    // Promote to double before scaling so we don't compound the float's
+                    // existing rounding with a second lossy float multiply.
+                    case Float f -> Instant.ofEpochMilli((long) ((double) f * 1000.0));
                     case BigInteger bi -> Instant.ofEpochMilli(bi.longValue() * 1000);
-                    case BigDecimal bd -> Instant.ofEpochMilli(bd.longValue() * 1000);
+                    // Scale to milliseconds *before* truncating: bd.longValue() alone would
+                    // floor to whole seconds and silently drop the sub-second milliseconds
+                    // (e.g. 1780359340.803 -> 1780359340000 instead of ...340803).
+                    case BigDecimal bd -> Instant.ofEpochMilli(bd.movePointRight(3).longValue());
                     case null, default -> throw new TimestampSyntaxError(format(), ExpectedType.NUMBER, value);
                 };
             }
