@@ -33,9 +33,29 @@ import software.amazon.smithy.java.io.uri.SmithyUri;
  */
 public final class BenchmarkSupport {
 
-    public static final String H1_URL = "http://localhost:18080";
-    public static final String H2C_URL = "http://localhost:18081";
-    public static final String H2_URL = "https://localhost:18443";
+    /**
+     * Override the benchmark server host with {@code -Djmh.bench.host=<hostname>} or
+     * {@code BENCH_HOST=<hostname>} env var. Defaults to {@code localhost}. The Gradle
+     * jmh task does NOT auto-start the benchmark server when this is set to anything
+     * other than {@code localhost} — start the server yourself on the remote host.
+     */
+    private static final String BENCH_HOST = resolveHost();
+
+    public static final String H1_URL = "http://" + BENCH_HOST + ":18080";
+    public static final String H2C_URL = "http://" + BENCH_HOST + ":18081";
+    public static final String H2_URL = "https://" + BENCH_HOST + ":18443";
+
+    private static String resolveHost() {
+        String prop = System.getProperty("jmh.bench.host");
+        if (prop != null && !prop.isBlank()) {
+            return prop.trim();
+        }
+        String env = System.getenv("BENCH_HOST");
+        if (env != null && !env.isBlank()) {
+            return env.trim();
+        }
+        return "localhost";
+    }
 
     // Small JSON payload for POST benchmarks
     public static final byte[] POST_PAYLOAD = "{\"id\":12345,\"name\":\"benchmark\"}".getBytes(StandardCharsets.UTF_8);
@@ -48,12 +68,18 @@ public final class BenchmarkSupport {
     public record IoStats(long getMbRequests, long getMbBytesSent, long putMbRequests, long putMbBytesReceived) {}
 
     /**
-     * Create a DNS resolver that maps localhost to loopback, avoiding DNS overhead.
+     * Create a DNS resolver that maps the configured BENCH_HOST to its resolved address,
+     * avoiding repeated DNS lookups in the hot path. Defaults to localhost → loopback.
      */
     public static DnsResolver staticDns() {
-        return DnsResolver.staticMapping(Map.of(
-                "localhost",
-                List.of(InetAddress.getLoopbackAddress())));
+        try {
+            InetAddress[] addrs = "localhost".equals(BENCH_HOST)
+                    ? new InetAddress[] {InetAddress.getLoopbackAddress()}
+                    : InetAddress.getAllByName(BENCH_HOST);
+            return DnsResolver.staticMapping(Map.of(BENCH_HOST, List.of(addrs)));
+        } catch (java.net.UnknownHostException e) {
+            throw new RuntimeException("Cannot resolve benchmark host: " + BENCH_HOST, e);
+        }
     }
 
     /**
