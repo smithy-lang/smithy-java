@@ -53,6 +53,7 @@ record HttpConnectionFactory(
         DnsResolver dnsResolver,
         HttpSocketFactory socketFactory,
         Timer readTimer,
+        EpollConnector epollConnector,
         boolean usePlatformReaderForH2,
         int h2InitialWindowSize,
         int h2MaxFrameSize,
@@ -93,6 +94,13 @@ record HttpConnectionFactory(
 
     private HttpConnection connectToAddress(InetAddress address, Route route, List<InetAddress> allEndpoints)
             throws IOException {
+        // Experimental persistent-registration epoll backend: secure routes only (the e2e benchmark
+        // is HTTPS). It opens, connects, and TLS-handshakes its own native socket instead of going
+        // through the NIO SocketChannel path below, and always drives TLS via SSLEngineTransport.
+        if (epollConnector != null && route.isSecure()) {
+            return connectEpoll(address, route);
+        }
+
         Socket socket = socketFactory.newSocket(route, allEndpoints);
 
         try {
@@ -115,6 +123,51 @@ record HttpConnectionFactory(
         }
 
         return createProtocolConnection(transport, route);
+    }
+
+    private HttpConnection connectEpoll(InetAddress address, Route route) throws IOException {
+        EpollChannel channel;
+        try {
+            channel = epollConnector.connect(address, route.port(), toIntMillis(connectTimeout));
+        } catch (IOException e) {
+            throw new IOException("Failed to connect to " + route.host() + " via epoll transport", e);
+        }
+
+        SSLEngine engine = null;
+        Runnable releaser = () -> {};
+        try {
+            if (sslEngineFactory != null) {
+                var handle = sslEngineFactory.newEngine(
+                        route.host(),
+                        route.port(),
+                        List.of(versionPolicy.alpnProtocols()));
+                engine = handle.engine();
+                releaser = handle.releaser();
+            } else {
+                engine = createClientEngine(route);
+            }
+
+            // The negotiation deadline is honored by SSLEngineTransport's own timed-park read path
+            // (epoll has no SO_TIMEOUT), then reset to the steady-state read timeout for requests.
+            SSLEngineTransport transport = new SSLEngineTransport(
+                    channel,
+                    engine,
+                    releaser,
+                    toIntMillis(tlsNegotiationTimeout),
+                    tlsReadBufferSize,
+                    tlsWriteBufferSize);
+            transport.handshake();
+            transport.setReadTimeout(toIntMillis(readTimeout));
+            return createProtocolConnection(transport, route);
+        } catch (IOException e) {
+            releaser.run();
+            channel.close();
+            throw new IOException("TLS handshake failed for " + route.host(), e);
+        } catch (RuntimeException e) {
+            releaser.run();
+            channel.close();
+            throw e;
+        }
     }
 
     private ConnectionTransport performTlsHandshake(Socket socket, Route route) throws IOException {

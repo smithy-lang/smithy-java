@@ -28,6 +28,7 @@ public final class HttpConnectionPoolBuilder {
     int h2MaxFrameSize = 16384; // RFC 9113 default
     int h2BufferSize = 256 * 1024; // 256KB default
     boolean usePlatformReaderForH2;
+    boolean useEpollTransport;
     final Map<String, Integer> perHostLimits = new HashMap<>();
 
     Duration maxIdleTime = Duration.ofMinutes(2);
@@ -669,6 +670,11 @@ public final class HttpConnectionPoolBuilder {
      */
     public HttpConnectionPoolBuilder usePlatformReaderForH2(boolean enabled) {
         this.usePlatformReaderForH2 = enabled;
+        return this;
+    }
+
+    public HttpConnectionPoolBuilder useEpollTransport(boolean enabled) {
+        this.useEpollTransport = enabled;
         return this;
     }
 

@@ -29,6 +29,15 @@ dependencies {
     // deadline watchdog in SSLEngineTransport (arm/cancel is O(1), no per-read epoll Selector).
     implementation("io.netty:netty-common:4.2.13.Final")
 
+    // Experimental persistent-registration epoll socket backend (opt-in, Linux-only). Provides the
+    // io.netty.channel.unix.Socket / io.netty.channel.epoll.{Native,EpollEventArray,Epoll} types the
+    // EpollChannel/EpollReactor/EpollAccess classes use. The classes (compile) are cross-platform; the
+    // native .so is pulled per-arch at runtime only and gated behind Epoll.isAvailable() so non-Linux
+    // hosts (and the default NIO path) never load it.
+    implementation("io.netty:netty-transport-native-epoll:4.2.13.Final")
+    runtimeOnly("io.netty:netty-transport-native-epoll:4.2.13.Final:linux-x86_64")
+    runtimeOnly("io.netty:netty-transport-native-epoll:4.2.13.Final:linux-aarch_64")
+
     // Netty for HTTP/2 integration tests
     testImplementation("io.netty:netty-all:4.2.7.Final")
     testImplementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
