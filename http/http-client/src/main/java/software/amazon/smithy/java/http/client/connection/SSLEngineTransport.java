@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.http.client.connection;
 
+import io.netty.channel.epoll.EpollAccess;
 import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import java.io.EOFException;
@@ -50,6 +51,15 @@ final class SSLEngineTransport implements ConnectionTransport {
     private final ReentrantLock engineLock = new ReentrantLock();
     private final Socket socket;
     private final SocketChannel socketChannel;
+    // Experimental persistent-registration epoll socket backend. Non-null only when the epoll
+    // transport is enabled (Linux + Epoll.isAvailable()); when set, socket/socketIn/socketOut/
+    // socketChannel/readTimer are all null and the byte-level read/write/flush/timeout/close routes
+    // through this channel instead of the JDK NIO SocketChannel. The TLS wrap/unwrap and all buffer
+    // management above this seam are identical on both backends.
+    private final EpollChannel epollChannel;
+    // Read deadline (ms) for the epoll path, mirroring SO_TIMEOUT on the NIO path. Mutated by
+    // setReadTimeout; 0 means no deadline. Unused on the NIO path (which uses socket.setSoTimeout).
+    private int epollReadTimeoutMs;
     // Shared watchdog enforcing the read deadline on the blocking-channel path. Null => fall back to
     // an untimed blocking read (deadline still bounded by the request-level timeout above the stack).
     private final Timer readTimer;
@@ -108,25 +118,72 @@ final class SSLEngineTransport implements ConnectionTransport {
         this.socketIn = socket.getInputStream();
         this.socketOut = socket.getOutputStream();
         this.socketChannel = socket.getChannel();
+        this.epollChannel = null;
         this.engine = engine;
         this.engineReleaser = engineReleaser != null ? engineReleaser : () -> {};
         this.readTimer = readTimer;
 
+        // Direct buffers when we own a SocketChannel so a native engine works straight off-heap.
+        boolean direct = socketChannel != null;
+        this.appBufferDirect = direct;
+        allocateBuffers(direct, readBufferSize, writeBufferSize);
+    }
+
+    /**
+     * Construct a transport whose ciphertext I/O is backed by the experimental persistent-registration
+     * {@link EpollChannel} instead of a JDK {@link SocketChannel}. The TLS state machine, buffer
+     * management, and every method above the byte-level socket seam are identical to the NIO path; only
+     * {@code readIntoNetIn}/{@code writeNetOut}/{@code flushSocket}/{@code setReadTimeout}/{@code close}
+     * route through the epoll channel. Buffers are always direct (the raw-address recv/send path
+     * requires it).
+     *
+     * @param epollChannel a connected epoll channel (TLS not yet started)
+     * @param engine the SSL engine driving TLS
+     * @param engineReleaser native-engine release callback, invoked once on close
+     * @param readTimeoutMs initial read deadline in milliseconds (0 = none); mirrors SO_TIMEOUT
+     * @param readBufferSize ciphertext-read / plaintext-unwrap buffer target capacity
+     * @param writeBufferSize ciphertext-write buffer target capacity
+     */
+    SSLEngineTransport(
+            EpollChannel epollChannel,
+            SSLEngine engine,
+            Runnable engineReleaser,
+            int readTimeoutMs,
+            int readBufferSize,
+            int writeBufferSize
+    )
+            throws IOException {
+        this.socket = null;
+        this.socketIn = null;
+        this.socketOut = null;
+        this.socketChannel = null;
+        this.epollChannel = epollChannel;
+        this.epollReadTimeoutMs = readTimeoutMs;
+        this.engine = engine;
+        this.engineReleaser = engineReleaser != null ? engineReleaser : () -> {};
+        this.readTimer = null;
+
+        // The raw-address recv/send path operates on the buffer's native memory address, so buffers
+        // must be direct.
+        this.appBufferDirect = true;
+        allocateBuffers(true, readBufferSize, writeBufferSize);
+    }
+
+    // Allocate netIn/netOut/appIn sized to at least one TLS record. netIn holds buffered ciphertext;
+    // appIn holds the plaintext drained from it. Per TLS record plaintext < ciphertext (record framing
+    // + AEAD tag overhead), so sizing appIn >= netIn guarantees one drain pass empties every whole
+    // record netIn can hold without an appIn overflow mid-pass — keeping the trailing compact to at
+    // most one partial record. netOut must hold at least one whole packet; larger lets write() coalesce
+    // several records.
+    private void allocateBuffers(boolean direct, int readBufferSize, int writeBufferSize) {
         SSLSession session = engine.getSession();
         int packetSize = session.getPacketBufferSize();
         int appSize = session.getApplicationBufferSize();
 
-        // netIn holds buffered ciphertext; appIn holds the plaintext drained from it. Per TLS record
-        // plaintext < ciphertext (record framing + AEAD tag overhead), so sizing appIn >= netIn
-        // guarantees one drain pass empties every whole record netIn can hold without an appIn
-        // overflow mid-pass — keeping the trailing compact to at most one partial record.
         int netCap = Math.max(readBufferSize, packetSize);
         int appCap = Math.max(readBufferSize, appSize);
-        // netOut must hold at least one whole packet; larger lets write() coalesce several records.
         int netOutCap = Math.max(writeBufferSize, packetSize);
 
-        boolean direct = socketChannel != null;
-        this.appBufferDirect = direct;
         this.netIn = direct ? ByteBuffer.allocateDirect(netCap) : ByteBuffer.allocate(netCap);
         this.netOut = direct ? ByteBuffer.allocateDirect(netOutCap) : ByteBuffer.allocate(netOutCap);
         this.appIn = allocateAppBuffer(appCap);
@@ -228,7 +285,21 @@ final class SSLEngineTransport implements ConnectionTransport {
             netIn = ensureCapacity(netIn, netIn.capacity() * 2);
         }
         int n;
-        if (socketChannel != null) {
+        if (epollChannel != null) {
+            // Raw-address read straight into netIn's off-heap region: recvAddress on the buffer's
+            // native memory address advances nothing itself, so we bump netIn's position by the
+            // count. The address is recomputed per call because netIn may have been reallocated by
+            // ensureCapacity (the recompute is a cheap Unsafe field read — still cheaper than the
+            // per-op GetDirectBufferAddress the ByteBuffer overload would pay). The read deadline
+            // mirrors SO_TIMEOUT on the NIO path.
+            long base = EpollAccess.memoryAddress(netIn);
+            int pos = netIn.position();
+            int limit = netIn.limit();
+            n = epollChannel.readAddress(base, pos, limit, epollReadTimeoutMs);
+            if (n > 0) {
+                netIn.position(pos + n);
+            }
+        } else if (socketChannel != null) {
             int timeoutMs = socket.getSoTimeout();
             if (timeoutMs > 0 && readTimer != null) {
                 n = readWithTimeout(timeoutMs);
@@ -286,7 +357,14 @@ final class SSLEngineTransport implements ConnectionTransport {
         if (!netOut.hasRemaining()) {
             return;
         }
-        if (socketChannel != null) {
+        if (epollChannel != null) {
+            // writeAddress drains the whole [pos, limit) region (looping internally on partial
+            // sends / back-pressure), so advance netOut to its limit in one step afterward.
+            int pos = netOut.position();
+            int limit = netOut.limit();
+            epollChannel.writeAddress(EpollAccess.memoryAddress(netOut), pos, limit);
+            netOut.position(limit);
+        } else if (socketChannel != null) {
             while (netOut.hasRemaining()) {
                 socketChannel.write(netOut);
             }
@@ -297,13 +375,15 @@ final class SSLEngineTransport implements ConnectionTransport {
     }
 
     private void flushSocket() throws IOException {
-        if (socketChannel == null) {
+        // Only the stream (non-channel) backend buffers writes; both the NIO SocketChannel and the
+        // epoll channel write straight through, so flush is a no-op there.
+        if (socketChannel == null && epollChannel == null) {
             socketOut.flush();
         }
     }
 
     private ByteBuffer allocateNetBuffer(int size) {
-        return socketChannel != null ? ByteBuffer.allocateDirect(size) : ByteBuffer.allocate(size);
+        return appBufferDirect ? ByteBuffer.allocateDirect(size) : ByteBuffer.allocate(size);
     }
 
     // Allocate the plaintext unwrap-destination buffer, direct when we own a SocketChannel so a native
@@ -315,12 +395,17 @@ final class SSLEngineTransport implements ConnectionTransport {
 
     @Override
     public void setReadTimeout(int timeoutMs) throws IOException {
-        socket.setSoTimeout(timeoutMs);
+        if (epollChannel != null) {
+            // Mirrors SO_TIMEOUT: the next readIntoNetIn parks with this deadline (0 == infinite).
+            this.epollReadTimeoutMs = timeoutMs;
+        } else {
+            socket.setSoTimeout(timeoutMs);
+        }
     }
 
     @Override
     public int getReadTimeout() throws IOException {
-        return socket.getSoTimeout();
+        return epollChannel != null ? epollReadTimeoutMs : socket.getSoTimeout();
     }
 
     @Override
@@ -754,7 +839,11 @@ final class SSLEngineTransport implements ConnectionTransport {
             // Best-effort close_notify
         } finally {
             try {
-                socket.close();
+                if (epollChannel != null) {
+                    epollChannel.close();
+                } else {
+                    socket.close();
+                }
             } finally {
                 // Release provider-native engine resources last, on every close path. For a
                 // reference-counted native engine (BoringSSL/tcnative) this frees off-heap memory;
