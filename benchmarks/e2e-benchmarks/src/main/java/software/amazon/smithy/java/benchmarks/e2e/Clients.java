@@ -35,7 +35,7 @@ import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 
 /**
  * Constructs the smithy-java-generated DynamoDB and S3 clients used by the benchmark.
- * Region comes from the workload's actionConfig; credentials come directly from the EC2 IMDSv2 endpoint.
+ * Region comes from the benchmark runner; credentials come directly from the EC2 IMDSv2 endpoint.
  */
 final class Clients {
 
