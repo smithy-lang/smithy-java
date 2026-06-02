@@ -19,6 +19,7 @@ import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.OperationsPerInvocation;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
@@ -35,7 +36,6 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
-import software.amazon.smithy.java.http.client.h2.ConnectionAgentH2cPool;
 import software.amazon.smithy.java.http.client.h2.ConnectionAgentH2cTransport;
 import software.amazon.smithy.java.http.client.h2.EventLoopH2cTransport;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -52,6 +52,9 @@ import software.amazon.smithy.java.io.uri.SmithyUri;
 @State(Scope.Benchmark)
 public class H2cMixedGetPutBenchmark {
 
+    /** Total requests issued per @Benchmark invocation; matched via @OperationsPerInvocation. */
+    private static final int OPS = 1000;
+
     @Param({"1", "10"})
     private int concurrency;
 
@@ -62,7 +65,6 @@ public class H2cMixedGetPutBenchmark {
     private int streamsPerConnection;
 
     private HttpClient smithyClient;
-    private HttpClient connectionAgentClient;
     private NettyHttpClientTransport productionNettyTransport;
     private CrtHttpClientTransport crtTransport;
     private Context transportContext;
@@ -70,7 +72,6 @@ public class H2cMixedGetPutBenchmark {
     private AtomicInteger eventLoopIndex;
     private List<ConnectionAgentH2cTransport> agentTransports;
     private AtomicInteger agentIndex;
-    private ConnectionAgentH2cPool agentCodecPool;
     private MixedRequests mixedRequests;
 
     @Setup(Level.Trial)
@@ -86,19 +87,6 @@ public class H2cMixedGetPutBenchmark {
                         .dnsResolver(BenchmarkSupport.staticDns())
                         .build())
                 .build();
-        connectionAgentClient = HttpClient.builder()
-                .connectionPool(HttpConnectionPool.builder()
-                        .maxConnectionsPerRoute(connections)
-                        .maxTotalConnections(connections)
-                        .h2StreamsPerConnection(streamsPerConnection)
-                        .h2InitialWindowSize(16 * 1024 * 1024)
-                        .maxIdleTime(Duration.ofMinutes(2))
-                        .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
-                        .dnsResolver(BenchmarkSupport.staticDns())
-                        .useConnectionAgentForH2c(true)
-                        .build())
-                .build();
-
         var nettyTransportConfig = new NettyHttpTransportConfig()
                 .maxConnectionsPerHost(connections)
                 .h2StreamsPerConnection(streamsPerConnection)
@@ -121,10 +109,6 @@ public class H2cMixedGetPutBenchmark {
             agentTransports.add(new ConnectionAgentH2cTransport("localhost", 18081));
         }
         agentIndex = new AtomicInteger();
-        agentCodecPool = new ConnectionAgentH2cPool(
-                connections,
-                streamsPerConnection,
-                30_000);
 
         BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H2C_URL);
 
@@ -154,10 +138,6 @@ public class H2cMixedGetPutBenchmark {
                 smithyClient.close();
                 smithyClient = null;
             }
-            if (connectionAgentClient != null) {
-                connectionAgentClient.close();
-                connectionAgentClient = null;
-            }
             if (productionNettyTransport != null) {
                 productionNettyTransport.close();
                 productionNettyTransport = null;
@@ -179,10 +159,6 @@ public class H2cMixedGetPutBenchmark {
                 }
                 agentTransports = null;
                 agentIndex = null;
-            }
-            if (agentCodecPool != null) {
-                agentCodecPool.close();
-                agentCodecPool = null;
             }
         }
     }
@@ -224,11 +200,12 @@ public class H2cMixedGetPutBenchmark {
     }
 
     @Benchmark
+    @OperationsPerInvocation(OPS)
     @Threads(1)
     public void h2cSmithyMixedGetPutMb(Counter counter) throws InterruptedException {
         long startGet = mixedRequests.totalGetRequests.get();
         long startPut = mixedRequests.totalPutRequests.get();
-        BenchmarkSupport.runBenchmark(concurrency, concurrency * 2, (MixedRequests requests) -> {
+        BenchmarkSupport.runBenchmark(concurrency, OPS, (MixedRequests requests) -> {
             var request = requests.next();
             try (var response = smithyClient.send(request)) {
                 response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
@@ -241,11 +218,12 @@ public class H2cMixedGetPutBenchmark {
     }
 
     @Benchmark
+    @OperationsPerInvocation(OPS)
     @Threads(1)
     public void h2cProductionNettyMixedGetPutMb(Counter counter) throws InterruptedException {
         long startGet = mixedRequests.totalGetRequests.get();
         long startPut = mixedRequests.totalPutRequests.get();
-        BenchmarkSupport.runBenchmark(concurrency, concurrency * 2, (MixedRequests requests) -> {
+        BenchmarkSupport.runBenchmark(concurrency, OPS, (MixedRequests requests) -> {
             var request = requests.next();
             try (var response = productionNettyTransport.send(transportContext, request)) {
                 response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
@@ -258,28 +236,12 @@ public class H2cMixedGetPutBenchmark {
     }
 
     @Benchmark
-    @Threads(1)
-    public void h2cConnectionAgentClientMixedGetPutMb(Counter counter) throws InterruptedException {
-        long startGet = mixedRequests.totalGetRequests.get();
-        long startPut = mixedRequests.totalPutRequests.get();
-        BenchmarkSupport.runBenchmark(concurrency, concurrency * 2, (MixedRequests requests) -> {
-            var request = requests.next();
-            try (var response = connectionAgentClient.send(request)) {
-                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
-            }
-        }, mixedRequests, counter);
-        counter.getRequests = mixedRequests.totalGetRequests.get() - startGet;
-        counter.putRequests = mixedRequests.totalPutRequests.get() - startPut;
-
-        counter.logErrors("Connection-agent client H2c mixed GET+PUT");
-    }
-
-    @Benchmark
+    @OperationsPerInvocation(OPS)
     @Threads(1)
     public void h2cCrtMixedGetPutMb(Counter counter) throws InterruptedException {
         long startGet = mixedRequests.totalGetRequests.get();
         long startPut = mixedRequests.totalPutRequests.get();
-        BenchmarkSupport.runBenchmark(concurrency, concurrency * 2, (MixedRequests requests) -> {
+        BenchmarkSupport.runBenchmark(concurrency, OPS, (MixedRequests requests) -> {
             var request = requests.next();
             try (var response = crtTransport.send(transportContext, request)) {
                 response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
@@ -292,11 +254,12 @@ public class H2cMixedGetPutBenchmark {
     }
 
     @Benchmark
+    @OperationsPerInvocation(OPS)
     @Threads(1)
     public void h2cEventLoopMixedGetPutMb(Counter counter) throws InterruptedException {
         long startGet = mixedRequests.totalGetRequests.get();
         long startPut = mixedRequests.totalPutRequests.get();
-        BenchmarkSupport.runBenchmark(concurrency, concurrency * 2, (MixedRequests requests) -> {
+        BenchmarkSupport.runBenchmark(concurrency, OPS, (MixedRequests requests) -> {
             var request = requests.next();
             var transport = eventLoopTransports.get(
                     Math.floorMod(eventLoopIndex.getAndIncrement(), eventLoopTransports.size()));
@@ -311,11 +274,12 @@ public class H2cMixedGetPutBenchmark {
     }
 
     @Benchmark
+    @OperationsPerInvocation(OPS)
     @Threads(1)
     public void h2cConnectionAgentMixedGetPutMb(Counter counter) throws InterruptedException {
         long startGet = mixedRequests.totalGetRequests.get();
         long startPut = mixedRequests.totalPutRequests.get();
-        BenchmarkSupport.runBenchmark(concurrency, concurrency * 2, (MixedRequests requests) -> {
+        BenchmarkSupport.runBenchmark(concurrency, OPS, (MixedRequests requests) -> {
             var request = requests.next();
             var transport = agentTransports.get(Math.floorMod(agentIndex.getAndIncrement(), agentTransports.size()));
             try (var response = transport.send(request)) {
@@ -328,20 +292,4 @@ public class H2cMixedGetPutBenchmark {
         counter.logErrors("ConnectionAgent H2c mixed GET+PUT");
     }
 
-    @Benchmark
-    @Threads(1)
-    public void h2cConnectionAgentCodecMixedGetPutMb(Counter counter) throws InterruptedException {
-        long startGet = mixedRequests.totalGetRequests.get();
-        long startPut = mixedRequests.totalPutRequests.get();
-        BenchmarkSupport.runBenchmark(concurrency, concurrency * 2, (MixedRequests requests) -> {
-            var request = requests.next();
-            try (var response = agentCodecPool.send(request)) {
-                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
-            }
-        }, mixedRequests, counter);
-        counter.getRequests = mixedRequests.totalGetRequests.get() - startGet;
-        counter.putRequests = mixedRequests.totalPutRequests.get() - startPut;
-
-        counter.logErrors("ConnectionAgentCodec H2c mixed GET+PUT");
-    }
 }
