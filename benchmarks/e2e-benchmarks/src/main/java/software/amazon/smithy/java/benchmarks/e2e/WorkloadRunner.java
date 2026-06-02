@@ -5,8 +5,10 @@
 
 package software.amazon.smithy.java.benchmarks.e2e;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
@@ -18,104 +20,137 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
+import software.amazon.smithy.java.benchmarks.e2e.dynamodb.client.DynamoDBClient;
+import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.AttributeDefinition;
 import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.AttributeValue;
+import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.BillingMode;
+import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.CreateTableInput;
+import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.DeleteTableInput;
+import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.DescribeTableInput;
+import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.KeySchemaElement;
+import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.KeyType;
+import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.ProvisionedThroughput;
+import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.ScalarAttributeType;
 
 /**
- * smithy-java implementation of the e2e benchmark workload runner. Reads the
- * shared workload JSON spec and produces results comparable to other SDK runners.
+ * Direct e2e benchmark runner for the four live AWS workloads we actually run.
  */
 public final class WorkloadRunner {
 
-    private final WorkloadConfig workload;
-    private final ActionExecutor executor;
+    private static final String DEFAULT_REGION = "us-east-1";
+    private static final String DEFAULT_BUCKET = "dowling-bench--use1-az4--x-s3";
+    private static final String DEFAULT_TABLE = "benchmark-table";
+    private static final String DEFAULT_KEY_PREFIX = "item-";
+    private static final String DEFAULT_S3_KEY_PREFIX = "objects/256KiB/";
+    private static final int DEFAULT_DDB_ACTIONS = 1000;
+    private static final int DEFAULT_S3_ACTIONS = 10000;
+    private static final int DEFAULT_WARMUP_BATCHES = 2;
+    private static final int DEFAULT_MEASUREMENT_BATCHES = 3;
+    private static final int DEFAULT_OBJECT_SIZE = 256 * 1024;
+    private static final int DEFAULT_DATA_LENGTH = 1024;
+    private static final long DEFAULT_DDB_CAPACITY_UNITS = 5000;
+    private static final Duration DEFAULT_DDB_WAITER_TIMEOUT = Duration.ofMinutes(5);
+
+    private final BenchmarkConfig config;
     private final int payloadSize;
+    private final byte[] payload;
     private final long[] measuredDurationsNs;
     private final AtomicInteger measuredCount = new AtomicInteger();
     private final ResourceMonitor monitor = new ResourceMonitor();
-    // Hoist actionConfig string/int reads out of the per-request hot path. These were resolved
-    // anew on every executeAction call before, costing one Optional + ObjectNode lookup each.
-    private final String service;
-    private final String action;
-    private final String bucketName;
-    private final String tableName;
-    private final String keyPrefix;
-    private final int objectSize;
-    private final int dataLength;
 
-    private WorkloadRunner(WorkloadConfig workload) {
-        this.workload = workload;
-        this.payloadSize = maxPayloadSize(workload);
-        this.measuredDurationsNs = new long[workload.measurementBatches * workload.batchActions];
-        byte[] payload = new byte[payloadSize];
+    private WorkloadRunner(BenchmarkConfig config) {
+        this.config = config;
+        this.payloadSize = switch (config.operation) {
+            case S3_PUT, S3_GET -> config.objectSize;
+            case DDB_PUT -> config.dataLength;
+            case DDB_GET -> 1024;
+        };
+        this.payload = new byte[Math.max(payloadSize, 1)];
         new Random(0xC0FFEEL).nextBytes(payload);
+        this.measuredDurationsNs = new long[config.measurementBatches * config.batchActions];
 
-        var region = workload.stringConfig("region");
-        this.service = workload.service;
-        this.action = workload.action;
-        this.bucketName = "s3".equals(service) ? workload.stringConfig("bucketName") : null;
-        this.tableName = "dynamodb".equals(service) ? workload.stringConfig("tableName") : null;
-        this.keyPrefix = workload.stringConfig("keyPrefix");
-        this.objectSize = "s3".equals(service) ? workload.intConfig("objectSize") : 0;
-        this.dataLength = workload.actionConfig.getMember("dataLength").isPresent()
-                ? workload.intConfig("dataLength")
-                : 0;
-
-        var ddb = "dynamodb".equals(service) ? Clients.dynamodb(region) : null;
-        var s3 = "s3".equals(service) ? Clients.s3(region) : null;
-        if (ddb == null && s3 == null) {
-            throw new IllegalArgumentException("Unknown service: " + service);
+        System.out.println("Initialized smithy-java e2e benchmark:");
+        System.out.println("  Operation: " + config.operation.id);
+        System.out.println("  Region:    " + config.region);
+        if (config.operation.isS3()) {
+            System.out.println("  Bucket:    " + config.bucketName);
+            System.out.println("  Object:    " + config.objectSize + " bytes");
+        } else {
+            System.out.println("  Table:     " + config.tableName);
         }
-        this.executor = new ActionExecutor(ddb, s3, payload);
-
-        System.out.println("Initialized smithy-java WorkloadRunner:");
-        System.out.println("  Workload: " + workload.name);
-        System.out.println("  Service:  " + service);
-        System.out.println("  Action:   " + action);
-        System.out.println("  Region:   " + region);
-        System.out.println("  Sequential:        " + workload.sequential);
-        System.out.println("  Actions per batch: " + workload.batchActions);
-    }
-
-    private static int maxPayloadSize(WorkloadConfig w) {
-        if ("s3".equals(w.service)) {
-            return w.intConfig("objectSize");
-        }
-        // DDB putitem has dataLength; getitem doesn't. Either way 1KiB is
-        // a safe default that won't be hit on getitem.
-        if (w.actionConfig.getMember("dataLength").isPresent()) {
-            return w.intConfig("dataLength");
-        }
-        return 1024;
+        System.out.println("  Sequential:        " + config.operation.sequential);
+        System.out.println("  Actions per batch: " + config.batchActions);
     }
 
     private void run() {
-        try (ExecutorService pool = workload.sequential ? null : Executors.newVirtualThreadPerTaskExecutor()) {
+        switch (config.operation) {
+            case S3_PUT -> runS3Put();
+            case S3_GET -> runS3Get();
+            case DDB_PUT -> runDdbPut();
+            case DDB_GET -> runDdbGet();
+        }
+    }
+
+    private void runS3Put() {
+        var executor = new ActionExecutor(null, Clients.s3(config.region), payload);
+        runMeasured(index -> executor.putObject(config.bucketName, s3Key(index), config.objectSize));
+    }
+
+    private void runS3Get() {
+        var executor = new ActionExecutor(null, Clients.s3(config.region), payload);
+        runMeasured(index -> executor.getObject(config.bucketName, s3Key(index)));
+    }
+
+    private void runDdbPut() {
+        var client = Clients.dynamodb(config.region);
+        try (var table = DdbTable.setup(client, config)) {
+            var executor = new ActionExecutor(client, null, payload);
+            runMeasured(index -> executor.putItem(table.name(), buildItem(index)));
+        }
+    }
+
+    private void runDdbGet() {
+        var client = Clients.dynamodb(config.region);
+        try (var table = DdbTable.setup(client, config)) {
+            var executor = new ActionExecutor(client, null, payload);
+            if (table.created()) {
+                System.out.println("Seeding DynamoDB GetItem keys: " + config.batchActions);
+                for (int i = 0; i < config.batchActions; i++) {
+                    executor.putItem(table.name(), buildItem(i));
+                }
+            }
+            runMeasured(index -> {
+                var pk = AttributeValue.builder().s(ddbKey(index)).build();
+                executor.getItem(table.name(), Map.of("pk", pk));
+            });
+        }
+    }
+
+    private void runMeasured(Action action) {
+        try (ExecutorService pool = config.operation.sequential ? null : Executors.newVirtualThreadPerTaskExecutor()) {
             System.out.println("\n=== WARMUP PHASE ===");
-            System.out.println("Executing " + workload.warmupBatches + " warmup batches to initialize SDK clients...");
-            for (int i = 0; i < workload.warmupBatches; i++) {
-                System.out.println("Warmup batch " + (i + 1) + "/" + workload.warmupBatches);
-                executeBatch(pool, false);
+            for (int i = 0; i < config.warmupBatches; i++) {
+                System.out.println("Warmup batch " + (i + 1) + "/" + config.warmupBatches);
+                executeBatch(pool, action, false);
             }
             measuredCount.set(0);
 
             System.out.println("\n=== MEASUREMENT PHASE ===");
-            System.out.println("Executing " + workload.measurementBatches + " measurement batches...");
-
-            if (workload.collectMetrics) {
-                monitor.start(workload.metricsIntervalMs);
+            if (config.collectMetrics) {
+                monitor.start(config.metricsIntervalMs);
             }
 
             long startNs = System.nanoTime();
             int lastSampleCount = 0;
-            for (int i = 0; i < workload.measurementBatches; i++) {
-                System.out.println("\nMeasurement batch " + (i + 1) + "/" + workload.measurementBatches);
+            for (int i = 0; i < config.measurementBatches; i++) {
+                System.out.println("\nMeasurement batch " + (i + 1) + "/" + config.measurementBatches);
                 int operationsBefore = measuredCount.get();
                 long batchStart = System.nanoTime();
-                executeBatch(pool, true);
+                executeBatch(pool, action, true);
                 long batchDuration = System.nanoTime() - batchStart;
                 printBatchResults(operationsBefore, batchDuration);
 
-                if (workload.collectMetrics) {
+                if (config.collectMetrics) {
                     int now = monitor.sampleCount();
                     monitor.statsSnapshot(lastSampleCount).printCompact("  Resource Usage: ");
                     lastSampleCount = now;
@@ -123,7 +158,7 @@ public final class WorkloadRunner {
             }
             long totalDuration = System.nanoTime() - startNs;
 
-            if (workload.collectMetrics) {
+            if (config.collectMetrics) {
                 monitor.stop().print();
             }
 
@@ -132,59 +167,50 @@ public final class WorkloadRunner {
         }
     }
 
-    private void executeBatch(ExecutorService pool, boolean measure) {
-        if (workload.sequential) {
-            for (int i = 0; i < workload.batchActions; i++) {
-                long s = System.nanoTime();
-                executeAction(i);
-                long d = System.nanoTime() - s;
+    private void executeBatch(ExecutorService pool, Action action, boolean measure) {
+        if (config.operation.sequential) {
+            for (int i = 0; i < config.batchActions; i++) {
+                long start = System.nanoTime();
+                action.run(i);
                 if (measure) {
-                    recordDuration(d);
+                    recordDuration(System.nanoTime() - start);
                 }
             }
-        } else {
-            // smithy-java's blocking client is driven from a virtual-thread executor: each
-            // action task gets its own virtual thread that blocks on the HTTP call, no platform
-            // thread is held while the call is in flight. The submitting thread acquires a
-            // permit before submitting so only `concurrency` tasks are ever in flight at once.
-            // Multiplier configurable via -De2e.concurrency.multiplier so we can sweep
-            // without rebuilding. Default is 4× cores.
-            //
-            // Each task writes its duration into the preallocated long[] directly. The latch lets
-            // the submitting thread wait for completion without retaining one Future per action.
-            int concurrency = Runtime.getRuntime().availableProcessors()
-                    * Integer.getInteger("e2e.concurrency.multiplier", 4);
-            var permits = new Semaphore(concurrency);
-            var done = new CountDownLatch(workload.batchActions);
-            var error = new AtomicReference<Throwable>();
-            for (int i = 0; i < workload.batchActions; i++) {
-                permits.acquireUninterruptibly();
-                final int index = i;
-                pool.execute(() -> {
-                    try {
-                        long s = System.nanoTime();
-                        executeAction(index);
-                        if (measure) {
-                            recordDuration(System.nanoTime() - s);
-                        }
-                    } catch (Throwable t) {
-                        error.compareAndSet(null, t);
-                    } finally {
-                        permits.release();
-                        done.countDown();
+            return;
+        }
+
+        int concurrency = Runtime.getRuntime().availableProcessors()
+                * Integer.getInteger("e2e.concurrency.multiplier", 4);
+        var permits = new Semaphore(concurrency);
+        var done = new CountDownLatch(config.batchActions);
+        var error = new AtomicReference<Throwable>();
+        for (int i = 0; i < config.batchActions; i++) {
+            permits.acquireUninterruptibly();
+            final int index = i;
+            pool.execute(() -> {
+                try {
+                    long start = System.nanoTime();
+                    action.run(index);
+                    if (measure) {
+                        recordDuration(System.nanoTime() - start);
                     }
-                });
-            }
-            try {
-                done.await();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException("Interrupted while waiting for benchmark batch", e);
-            }
-            var failure = error.get();
-            if (failure != null) {
-                throw new RuntimeException("Benchmark task failed", failure);
-            }
+                } catch (Throwable t) {
+                    error.compareAndSet(null, t);
+                } finally {
+                    permits.release();
+                    done.countDown();
+                }
+            });
+        }
+        try {
+            done.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted while waiting for benchmark batch", e);
+        }
+        var failure = error.get();
+        if (failure != null) {
+            throw new RuntimeException("Benchmark task failed", failure);
         }
     }
 
@@ -192,52 +218,21 @@ public final class WorkloadRunner {
         measuredDurationsNs[measuredCount.getAndIncrement()] = durationNs;
     }
 
-    private void executeAction(int index) {
-        try {
-            if ("s3".equals(service)) {
-                var key = generateKey(index);
-                if ("upload".equals(action)) {
-                    executor.putObject(bucketName, key, objectSize);
-                } else if ("download".equals(action)) {
-                    executor.getObject(bucketName, key);
-                } else {
-                    throw new IllegalArgumentException("Unknown S3 action: " + action);
-                }
-            } else if ("dynamodb".equals(service)) {
-                if ("putitem".equals(action)) {
-                    executor.putItem(tableName, buildItem(index));
-                } else if ("getitem".equals(action)) {
-                    var pk = AttributeValue.builder().s(generateKey(index)).build();
-                    executor.getItem(tableName, Map.of("pk", pk));
-                } else {
-                    throw new IllegalArgumentException("Unknown DynamoDB action: " + action);
-                }
-            }
-        } catch (RuntimeException e) {
-            System.err.println("Action failed: service=" + service + ", action=" + action);
-            System.err.println("Error: " + e.getClass().getName() + ": " + e.getMessage());
-            if (e.getCause() != null) {
-                System.err
-                        .println("Caused by: " + e.getCause().getClass().getName() + ": " + e.getCause().getMessage());
-            }
-            throw e;
-        }
-    }
-
     private Map<String, AttributeValue> buildItem(int index) {
-        var pk = AttributeValue.builder().s(generateKey(index)).build();
-        var data = AttributeValue.builder().s(randomString(dataLength)).build();
+        var pk = AttributeValue.builder().s(ddbKey(index)).build();
+        var data = AttributeValue.builder().s(randomString(config.dataLength)).build();
         return Map.of("pk", pk, "data", data);
     }
 
-    private String generateKey(int index) {
-        return keyPrefix + (index + 1);
+    private String ddbKey(int index) {
+        return config.keyPrefix + (index + 1);
+    }
+
+    private String s3Key(int index) {
+        return config.s3KeyPrefix + (index + 1);
     }
 
     private static String randomString(int length) {
-        // Reference runner uses [A-Za-z0-9]; matched here for byte-for-byte compatibility on the
-        // wire. ThreadLocalRandom avoids the per-call Random allocation that a fresh `new Random()`
-        // would require.
         var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         var random = ThreadLocalRandom.current();
         var sb = new StringBuilder(length);
@@ -313,100 +308,35 @@ public final class WorkloadRunner {
         return count == 0 ? 0 : (double) sum / count;
     }
 
-    public static void main(String[] args) throws Exception {
-        // Set JDK HttpClient system properties BEFORE anything (including IMDS) constructs an
-        // HttpClient. The JDK HttpClient reads these in its static initializers and caches the
-        // values; later changes have no effect on already-constructed clients. The benchmark
-        // runner's main() is the only safe place to set them — earlier than the IMDS credential
-        // provider's bootstrap and earlier than JavaHttpClientTransport's class load.
+    public static void main(String[] args) {
+        configureRuntime();
+        printActiveJsonProvider();
+        new WorkloadRunner(BenchmarkConfig.parse(args)).run();
+    }
+
+    private static void configureRuntime() {
         var restricted = System.getProperty("jdk.httpclient.allowRestrictedHeaders");
         if (restricted == null || restricted.isEmpty()) {
             System.setProperty("jdk.httpclient.allowRestrictedHeaders", "host");
         } else if (!restricted.contains("host")) {
             System.setProperty("jdk.httpclient.allowRestrictedHeaders", restricted + ",host");
         }
-        // Buffer + frame sizes — overridable via -Djdk.httpclient.bufsize / -Djdk.httpclient.maxframesize
-        // on the command line. We default to 64 KiB but only set the property if the user didn't.
         if (System.getProperty("jdk.httpclient.bufsize") == null) {
             System.setProperty("jdk.httpclient.bufsize", "65536");
         }
         if (System.getProperty("jdk.httpclient.maxframesize") == null) {
             System.setProperty("jdk.httpclient.maxframesize", "65536");
         }
-        // Force smithy-java's native JSON provider over Jackson. Jackson is
-        // bundled because some smithy-java modules pull it in transitively;
-        // its priority (10) outranks the smithy provider (5), so we'd
-        // silently use Jackson without this. Set before any JsonCodec
-        // initializes — the provider is selected in a static initializer.
         if (System.getProperty("smithy-java.json-provider") == null) {
             System.setProperty("smithy-java.json-provider", "smithy");
         }
-        // Silence per-call INFO logging from the rules engine endpoint
-        // resolver. It logs once per client.build() call, but more
-        // importantly it formats arguments on every emit even if a downstream
-        // handler filters them — extra work on the hot path. Bump JUL's
-        // root level so the System.Logger backend short-circuits. Skip the
-        // reset when -Dsmithy.bench.debug=true so wire logging stays visible.
         if (!"true".equals(System.getProperty("smithy.bench.debug"))) {
             LogManager.getLogManager().reset();
-            var rootLogger = Logger.getLogger("");
-            rootLogger.setLevel(java.util.logging.Level.WARNING);
+            Logger.getLogger("").setLevel(java.util.logging.Level.WARNING);
         }
-        //   java -jar runner.jar [--client sync|async]
-        //                        [--bucket <name>] [--table <name>] [--region <region>]
-        //                        <workload-file>
-        // smithy-java only generates synchronous clients; --client is accepted for parity with
-        // other runners but only "sync" is supported. The --bucket / --table / --region flags
-        // override the corresponding fields in the workload's actionConfig so the same workload
-        // JSON works across environments without editing.
-        String workloadPath = null;
-        Map<String, String> overrides = new LinkedHashMap<>();
-        for (int i = 0; i < args.length; i++) {
-            switch (args[i]) {
-                case "--client" -> {
-                    String mode = requireValue(args, ++i, "--client");
-                    if ("async".equals(mode)) {
-                        System.err.println("WARNING: smithy-java does not generate async clients. "
-                                + "Running with the synchronous client; throughput tests will use a thread pool.");
-                    } else if (!"sync".equals(mode)) {
-                        fail("Error: Invalid client mode '" + mode + "'. Valid values are: sync, async");
-                    }
-                }
-                case "--bucket" -> overrides.put("bucketName", requireValue(args, ++i, "--bucket"));
-                case "--table" -> overrides.put("tableName", requireValue(args, ++i, "--table"));
-                case "--region" -> overrides.put("region", requireValue(args, ++i, "--region"));
-                default -> {
-                    if (args[i].startsWith("--")) {
-                        fail("Error: Unknown flag '" + args[i] + "'");
-                    }
-                    if (workloadPath != null) {
-                        fail("Error: Unexpected positional argument '" + args[i] + "'");
-                    }
-                    workloadPath = args[i];
-                }
-            }
-        }
-        if (workloadPath == null) {
-            fail("Usage: java -jar smithy-java-e2e-benchmark-runner.jar [--client sync|async]"
-                    + " [--bucket <name>] [--table <name>] [--region <region>] <workload-file>");
-        }
-        var workload = WorkloadConfig.load(workloadPath);
-        if (!overrides.isEmpty()) {
-            workload.overrideActionConfig(overrides);
-        }
-        printActiveJsonProvider();
-        new WorkloadRunner(workload).run();
-    }
-
-    private static String requireValue(String[] args, int i, String flag) {
-        if (i >= args.length) {
-            fail("Error: " + flag + " requires a value");
-        }
-        return args[i];
     }
 
     private static void printActiveJsonProvider() {
-        // Reflectively read JsonSettings.PROVIDER so we can confirm which implementation actually got picked
         try {
             var clazz = Class.forName("software.amazon.smithy.java.json.JsonSettings");
             var field = clazz.getDeclaredField("PROVIDER");
@@ -419,8 +349,203 @@ public final class WorkloadRunner {
         }
     }
 
-    private static void fail(String msg) {
-        System.err.println(msg);
-        System.exit(1);
+    private enum Operation {
+        S3_PUT("s3-put", false),
+        S3_GET("s3-get", false),
+        DDB_PUT("ddb-put", true),
+        DDB_GET("ddb-get", true);
+
+        private final String id;
+        private final boolean sequential;
+
+        Operation(String id, boolean sequential) {
+            this.id = id;
+            this.sequential = sequential;
+        }
+
+        private boolean isS3() {
+            return this == S3_PUT || this == S3_GET;
+        }
+
+        private static Operation parse(String value) {
+            var normalized = value.toLowerCase().replace('_', '-');
+            return switch (normalized) {
+                case "s3-put", "s3-upload", "putobject", "upload" -> S3_PUT;
+                case "s3-get", "s3-download", "getobject", "download" -> S3_GET;
+                case "ddb-put", "ddb-putitem", "dynamodb-putitem", "putitem" -> DDB_PUT;
+                case "ddb-get", "ddb-getitem", "dynamodb-getitem", "getitem" -> DDB_GET;
+                default -> inferFromLegacyPath(normalized);
+            };
+        }
+
+        private static Operation inferFromLegacyPath(String value) {
+            if (value.contains("s3-upload")) {
+                return S3_PUT;
+            } else if (value.contains("s3-download")) {
+                return S3_GET;
+            } else if (value.contains("ddb-putitem")) {
+                return DDB_PUT;
+            } else if (value.contains("ddb-getitem")) {
+                return DDB_GET;
+            }
+            throw new IllegalArgumentException("Unknown benchmark operation: " + value);
+        }
+    }
+
+    private record BenchmarkConfig(
+            Operation operation,
+            String region,
+            String bucketName,
+            String tableName,
+            String keyPrefix,
+            String s3KeyPrefix,
+            int objectSize,
+            int dataLength,
+            int batchActions,
+            int warmupBatches,
+            int measurementBatches,
+            boolean collectMetrics,
+            int metricsIntervalMs,
+            boolean ddbCreateTable,
+            boolean ddbDeleteTable,
+            long ddbReadCapacityUnits,
+            long ddbWriteCapacityUnits
+    ) {
+        static BenchmarkConfig parse(String[] args) {
+            String operation = null;
+            Map<String, String> flags = new LinkedHashMap<>();
+            for (int i = 0; i < args.length; i++) {
+                switch (args[i]) {
+                    case "--operation", "--workload" -> operation = requireValue(args, ++i, args[i - 1]);
+                    case "--client" -> validateClientMode(requireValue(args, ++i, "--client"));
+                    case "--bucket" -> flags.put("bucket", requireValue(args, ++i, "--bucket"));
+                    case "--table" -> flags.put("table", requireValue(args, ++i, "--table"));
+                    case "--region" -> flags.put("region", requireValue(args, ++i, "--region"));
+                    case "--key-prefix" -> flags.put("keyPrefix", requireValue(args, ++i, "--key-prefix"));
+                    case "--s3-key-prefix" -> flags.put("s3KeyPrefix", requireValue(args, ++i, "--s3-key-prefix"));
+                    default -> {
+                        if (args[i].startsWith("--")) {
+                            throw new IllegalArgumentException("Unknown flag: " + args[i]);
+                        }
+                        if (operation != null) {
+                            throw new IllegalArgumentException("Unexpected positional argument: " + args[i]);
+                        }
+                        operation = args[i];
+                    }
+                }
+            }
+            if (operation == null) {
+                throw new IllegalArgumentException(
+                        "Usage: java -jar smithy-java-e2e-benchmark-runner.jar "
+                                + "--operation s3-put|s3-get|ddb-put|ddb-get [--bucket <name>] "
+                                + "[--table <name>] [--region <region>]");
+            }
+
+            var op = Operation.parse(operation);
+            int defaultActions = op.isS3() ? DEFAULT_S3_ACTIONS : DEFAULT_DDB_ACTIONS;
+            return new BenchmarkConfig(
+                    op,
+                    flags.getOrDefault("region", System.getProperty("e2e.region", DEFAULT_REGION)),
+                    flags.getOrDefault("bucket", System.getProperty("e2e.bucket", DEFAULT_BUCKET)),
+                    flags.getOrDefault("table", System.getProperty("e2e.table", DEFAULT_TABLE)),
+                    flags.getOrDefault("keyPrefix", System.getProperty("e2e.keyPrefix", DEFAULT_KEY_PREFIX)),
+                    flags.getOrDefault("s3KeyPrefix", System.getProperty("e2e.s3KeyPrefix", DEFAULT_S3_KEY_PREFIX)),
+                    Integer.getInteger("e2e.object.size", DEFAULT_OBJECT_SIZE),
+                    Integer.getInteger("e2e.data.length", DEFAULT_DATA_LENGTH),
+                    Integer.getInteger("e2e.batch.actions", defaultActions),
+                    Integer.getInteger("e2e.warmup.batches", DEFAULT_WARMUP_BATCHES),
+                    Integer.getInteger("e2e.measurement.batches", DEFAULT_MEASUREMENT_BATCHES),
+                    Boolean.parseBoolean(System.getProperty("e2e.collectMetrics", "true")),
+                    Integer.getInteger("e2e.metrics.interval.ms", 100),
+                    Boolean.parseBoolean(System.getProperty("e2e.ddb.createTable", "true")),
+                    Boolean.parseBoolean(System.getProperty("e2e.ddb.deleteTable", "true")),
+                    Long.getLong("e2e.ddb.readCapacityUnits", DEFAULT_DDB_CAPACITY_UNITS),
+                    Long.getLong("e2e.ddb.writeCapacityUnits", DEFAULT_DDB_CAPACITY_UNITS));
+        }
+
+        private static void validateClientMode(String mode) {
+            if ("async".equals(mode)) {
+                System.err.println("WARNING: smithy-java does not generate async clients. Running synchronous client.");
+            } else if (!"sync".equals(mode)) {
+                throw new IllegalArgumentException("Invalid client mode: " + mode);
+            }
+        }
+
+        private static String requireValue(String[] args, int i, String flag) {
+            if (i >= args.length) {
+                throw new IllegalArgumentException(flag + " requires a value");
+            }
+            return args[i];
+        }
+    }
+
+    @FunctionalInterface
+    private interface Action {
+        void run(int index);
+    }
+
+    private record DdbTable(DynamoDBClient client, String name, boolean created, boolean deleteOnClose) implements AutoCloseable {
+
+        private static DdbTable setup(DynamoDBClient client, BenchmarkConfig config) {
+            if (!config.ddbCreateTable) {
+                System.out.println("Using existing DynamoDB table: " + config.tableName);
+                return new DdbTable(client, config.tableName, false, false);
+            }
+
+            var tableName = uniqueTableName(config.tableName, config.operation.id);
+            System.out.println("Creating DynamoDB table: " + tableName
+                    + " (PROVISIONED "
+                    + config.ddbReadCapacityUnits + " RCU / "
+                    + config.ddbWriteCapacityUnits + " WCU)");
+            client.createTable(CreateTableInput.builder()
+                    .tableName(tableName)
+                    .attributeDefinitions(List.of(AttributeDefinition.builder()
+                            .attributeName("pk")
+                            .attributeType(ScalarAttributeType.S)
+                            .build()))
+                    .keySchema(List.of(KeySchemaElement.builder()
+                            .attributeName("pk")
+                            .keyType(KeyType.HASH)
+                            .build()))
+                    .billingMode(BillingMode.PROVISIONED)
+                    .provisionedThroughput(ProvisionedThroughput.builder()
+                            .readCapacityUnits(config.ddbReadCapacityUnits)
+                            .writeCapacityUnits(config.ddbWriteCapacityUnits)
+                            .build())
+                    .build());
+            var describe = describeInput(tableName);
+            client.waiter().tableExists().wait(describe, DEFAULT_DDB_WAITER_TIMEOUT);
+            System.out.println("DynamoDB table active: " + tableName);
+            return new DdbTable(client, tableName, true, config.ddbDeleteTable);
+        }
+
+        @Override
+        public void close() {
+            if (!deleteOnClose) {
+                return;
+            }
+            System.out.println("Deleting DynamoDB table: " + name);
+            try {
+                client.deleteTable(DeleteTableInput.builder()
+                        .tableName(name)
+                        .build());
+                client.waiter().tableNotExists().wait(describeInput(name), DEFAULT_DDB_WAITER_TIMEOUT);
+            } catch (RuntimeException e) {
+                System.err.println("WARNING: failed to delete DynamoDB table " + name + ": " + e);
+            }
+        }
+
+        private static DescribeTableInput describeInput(String tableName) {
+            return DescribeTableInput.builder()
+                    .tableName(tableName)
+                    .build();
+        }
+
+        private static String uniqueTableName(String baseName, String operation) {
+            var suffix = "-" + operation + "-" + Long.toUnsignedString(System.currentTimeMillis(), 36);
+            var maxBaseLength = 255 - suffix.length();
+            var prefix = baseName.length() > maxBaseLength ? baseName.substring(0, maxBaseLength) : baseName;
+            return prefix + suffix;
+        }
     }
 }
