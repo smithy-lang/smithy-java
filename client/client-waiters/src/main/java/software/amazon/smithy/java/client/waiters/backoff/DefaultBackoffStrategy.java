@@ -30,7 +30,11 @@ final class DefaultBackoffStrategy implements BackoffStrategy {
         if (((double) attempt) < attemptCeiling) {
             delay = Math.min(maxDelayMillis, (long) Math.pow(minDelayMillis * 2, attempt));
         }
-        delay = rng.nextLong(minDelayMillis, delay);
+        // Math.pow can return a delay <= minDelayMillis on early attempts (e.g. attempt=0
+        // gives 1 when minDelayMillis=2). Random.nextLong(origin, bound) requires bound > origin,
+        // so floor the upper bound at minDelayMillis + 1.
+        long upper = Math.max(minDelayMillis + 1, delay);
+        delay = rng.nextLong(minDelayMillis, upper);
         if (remainingTime - delay <= minDelayMillis) {
             delay = remainingTime;
         }
