@@ -1238,6 +1238,39 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
+    @ParameterizedTest
+    @MethodSource("epochSecondsWithExponentSource")
+    public void parsesEpochSecondsWithExponent(JsonSerdeProvider provider, String json, Instant expected) {
+        // Regression: a fractional epoch-seconds value that also carries an exponent (e.g. "1.5e3")
+        // used to take the nanosecond-precision fast path, which ignored the exponent — decoding the
+        // fraction as nanos and leaving the cursor before the 'e'. That both produced the wrong Instant
+        // and corrupted subsequent parsing. Such values must fall through to full double parsing.
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS));
+        try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+            var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
+            assertThat(de.readTimestamp(schema), equalTo(expected));
+        }
+    }
+
+    public static List<Arguments> epochSecondsWithExponentSource() {
+        List<Arguments> args = new ArrayList<>();
+        for (var provider : List.of(JACKSON, SMITHY)) {
+            // Fraction + exponent: 1.5e3 == 1500s. The buggy path returned Instant(1, 500_000_000).
+            args.add(Arguments.of(provider, "1.5e3", Instant.ofEpochSecond(1500)));
+            // Uppercase exponent.
+            args.add(Arguments.of(provider, "1.5E3", Instant.ofEpochSecond(1500)));
+            // Fraction that survives into the result: 1.5e1 == 15s.
+            args.add(Arguments.of(provider, "1.5e1", Instant.ofEpochSecond(15)));
+            // Negative exponent keeps a sub-second fraction: 1500e-3 == 1.5s.
+            args.add(Arguments.of(provider, "1500e-3", Instant.ofEpochSecond(1, 500_000_000)));
+            // No fractional part, exponent only: 1e3 == 1000s (already worked; guards against regression).
+            args.add(Arguments.of(provider, "1e3", Instant.ofEpochSecond(1000)));
+        }
+        return args;
+    }
+
     @PerProvider
     public void timestampFallbackForOffsetTimezone(JsonSerdeProvider provider) {
         var schema = Schema.createTimestamp(
