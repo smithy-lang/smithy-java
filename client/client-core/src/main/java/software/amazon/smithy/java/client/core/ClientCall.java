@@ -67,7 +67,9 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
         this.typeRegistry = Objects.requireNonNull(typeRegistry, "typeRegistry is null");
         this.retryStrategy = Objects.requireNonNull(retryStrategy, "retryStrategy is null");
 
-        this.context = Context.modifiableCopy(callConfig.context());
+        // Copy-on-write overlay over the client's immutable config context instead of an eager deep
+        // copy
+        this.context = Context.perCallOverlay(callConfig.context());
         this.endpointResolver = Objects.requireNonNull(callConfig.endpointResolver(), "endpointResolver is null");
         this.authSchemeResolver = Objects.requireNonNull(callConfig.authSchemeResolver(), "authSchemeResolver is null");
         this.retryScope = Objects.requireNonNullElse(callConfig.retryScope(), "");

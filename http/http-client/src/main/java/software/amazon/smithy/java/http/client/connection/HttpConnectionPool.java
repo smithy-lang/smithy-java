@@ -175,6 +175,13 @@ public final class HttpConnectionPool implements ConnectionPool {
                 100,
                 TimeUnit.MILLISECONDS);
 
+        EpollConnector epollConnector = builder.useEpollTransport
+                ? EpollConnector.createIfAvailable(
+                        builder.socketReceiveBufferSize,
+                        builder.socketSendBufferSize,
+                        readTimer)
+                : null;
+
         this.connectionFactory = new HttpConnectionFactory(
                 builder.connectTimeout,
                 builder.tlsNegotiationTimeout,
@@ -187,6 +194,7 @@ public final class HttpConnectionPool implements ConnectionPool {
                 dnsResolver,
                 resolveSocketFactory(builder),
                 readTimer,
+                epollConnector,
                 builder.usePlatformReaderForH2,
                 builder.h2InitialWindowSize,
                 builder.h2MaxFrameSize,

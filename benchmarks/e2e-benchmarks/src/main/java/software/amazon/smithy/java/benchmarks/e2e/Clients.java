@@ -143,6 +143,11 @@ final class Clients {
         applyBufferProp("e2e.smithy.sendbuf", 1024 * 1024, poolBuilder::socketSendBufferSize);
         applyTlsBufferProp("e2e.smithy.tls.readbuf", 256 * 1024, poolBuilder::tlsReadBufferSize);
         applyTlsBufferProp("e2e.smithy.tls.writebuf", 256 * 1024, poolBuilder::tlsWriteBufferSize);
+        var socketBackend = System.getProperty("e2e.smithy.socket", "auto").trim().toLowerCase();
+        switch (socketBackend) {
+            case "epoll" -> poolBuilder.useEpollTransport(true);
+            default -> {}
+        }
         if (boringSsl) {
             if (BoringSslEngineFactory.isAvailable()) {
                 poolBuilder.sslEngineFactory(BoringSslEngineFactory.create(false));
