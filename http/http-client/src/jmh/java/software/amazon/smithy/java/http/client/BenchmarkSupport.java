@@ -39,11 +39,16 @@ public final class BenchmarkSupport {
      * jmh task does NOT auto-start the benchmark server when this is set to anything
      * other than {@code localhost} — start the server yourself on the remote host.
      */
-    private static final String BENCH_HOST = resolveHost();
+    public static final String BENCH_HOST = resolveHost();
+    public static final int H1_PORT = 18080;
+    public static final int H2C_PORT = 18081;
+    public static final int H2_PORT = 18443;
 
-    public static final String H1_URL = "http://" + BENCH_HOST + ":18080";
-    public static final String H2C_URL = "http://" + BENCH_HOST + ":18081";
-    public static final String H2_URL = "https://" + BENCH_HOST + ":18443";
+    public static final String H1_URL = "http://" + BENCH_HOST + ":" + H1_PORT;
+    public static final String H2C_URL = "http://" + BENCH_HOST + ":" + H2C_PORT;
+    public static final String H2_URL = "https://" + BENCH_HOST + ":" + H2_PORT;
+    public static final String H2C_AUTHORITY = BENCH_HOST + ":" + H2C_PORT;
+    public static final String H2_AUTHORITY = BENCH_HOST + ":" + H2_PORT;
 
     private static String resolveHost() {
         String prop = System.getProperty("jmh.bench.host");

@@ -175,7 +175,7 @@ public class H2cScalingBenchmark {
                     }
                 });
         for (int i = 0; i < connections; i++) {
-            Channel ch = bootstrap.connect(new InetSocketAddress("localhost", 18081)).sync().channel();
+            Channel ch = bootstrap.connect(new InetSocketAddress(BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2C_PORT)).sync().channel();
             nettyChannels.add(ch);
             nettyStreamBootstraps.add(new Http2StreamChannelBootstrap(ch));
         }
@@ -324,7 +324,7 @@ public class H2cScalingBenchmark {
         headers.method("GET");
         headers.path("/get");
         headers.scheme("http");
-        headers.authority("localhost:18081");
+        headers.authority(BenchmarkSupport.H2C_AUTHORITY);
 
         var connectionIndex = new AtomicInteger(0);
 
@@ -383,7 +383,7 @@ public class H2cScalingBenchmark {
         headers.method("GET");
         headers.path("/getmb");
         headers.scheme("http");
-        headers.authority("localhost:18081");
+        headers.authority(BenchmarkSupport.H2C_AUTHORITY);
 
         var connectionIndex = new AtomicInteger(0);
 
@@ -449,7 +449,7 @@ public class H2cScalingBenchmark {
         headers.method("POST");
         headers.path("/post");
         headers.scheme("http");
-        headers.authority("localhost:18081");
+        headers.authority(BenchmarkSupport.H2C_AUTHORITY);
         headers.setInt("content-length", BenchmarkSupport.POST_PAYLOAD.length);
 
         var connectionIndex = new AtomicInteger(0);
@@ -514,7 +514,7 @@ public class H2cScalingBenchmark {
         headers.method("PUT");
         headers.path("/putmb");
         headers.scheme("http");
-        headers.authority("localhost:18081");
+        headers.authority(BenchmarkSupport.H2C_AUTHORITY);
         headers.setInt("content-length", BenchmarkSupport.MB_PAYLOAD.length);
 
         var connectionIndex = new AtomicInteger(0);
