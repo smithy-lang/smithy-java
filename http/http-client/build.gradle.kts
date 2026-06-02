@@ -176,8 +176,16 @@ jmh {
     fork = 1
     resultFormat = "CSV"
     resultsFile = project.file("build/reports/jmh/results.csv")
+    val args = mutableListOf<String>()
     if (jvmArgsProp != null) {
-        jvmArgsAppend = jvmArgsProp.split(Regex("\\s*;\\s*")).filter { it.isNotEmpty() }
+        args += jvmArgsProp.split(Regex("\\s*;\\s*")).filter { it.isNotEmpty() }
+    }
+    // Forward -Pjmh.bench.host into the forked JMH JVM so BenchmarkSupport sees it.
+    if (externalBenchHost != null) {
+        args += "-Djmh.bench.host=$externalBenchHost"
+    }
+    if (args.isNotEmpty()) {
+        jvmArgsAppend = args
     }
     if (profilersProp != null) {
         val profilerSpecs =
@@ -206,10 +214,21 @@ jmh {
     // jvmArgsAppend = listOf(...)
 }
 
-// Make jmh task auto-start/stop the benchmark server
+// Make jmh task auto-start/stop the benchmark server, unless an external host is targeted
+// via -Pjmh.bench.host=<host> (or the BENCH_HOST env var). When an external host is used,
+// start the server yourself on that host (java -jar build/libs/.../jmhServer.jar etc.).
+val externalBenchHost = (project.findProperty("jmh.bench.host") as String?)?.takeIf { it.isNotBlank() }
+    ?: System.getenv("BENCH_HOST")?.takeIf { it.isNotBlank() }
+
 tasks.named("jmh") {
-    dependsOn(startBenchmarkServer)
-    finalizedBy(stopBenchmarkServer)
+    if (externalBenchHost == null) {
+        dependsOn(startBenchmarkServer)
+        finalizedBy(stopBenchmarkServer)
+    } else {
+        doFirst {
+            println("Targeting external benchmark host: $externalBenchHost (skipping local server start)")
+        }
+    }
 }
 
 tasks.test {
