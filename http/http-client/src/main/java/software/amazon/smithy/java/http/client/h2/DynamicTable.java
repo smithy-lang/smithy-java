@@ -21,7 +21,7 @@ import java.util.ArrayList;
  * with reverse indexing: new entries append to the end (O(1)), and index 62
  * maps to the last pair. Eviction removes from the front.
  *
- * <p>Header names must be lowercase as required by HTTP/2 (RFC 7540 Section 8.1.2).
+ * <p>Header names must be lowercase as required by HTTP/2 (RFC 9113 Section 8.2.1).
  */
 final class DynamicTable {
 

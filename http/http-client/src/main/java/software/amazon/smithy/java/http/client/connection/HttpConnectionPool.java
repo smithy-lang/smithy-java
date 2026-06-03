@@ -52,7 +52,7 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  *
  * <pre>{@code
  * HttpConnectionPool pool = HttpConnectionPool.builder()
- *     .maxConnectionsPerRoute(20)  // Default for all routes
+ *     .maxConnectionsPerRoute(20)  // Override default for all routes
  *     .maxConnectionsForHost("slow-api.example.com", 2)  // Limit slow API
  *     .maxConnectionsForHost("fast-cdn.example.com", 100)  // Allow more for CDN
  *     .build();
@@ -79,10 +79,10 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  * }</pre>
  *
  * <h2>Pool Exhaustion and Backpressure</h2>
- * <p>When the pool reaches {@code maxTotalConnections}, {@link #acquire(Route)}
- * blocks for up to {@code acquireTimeout} (default: 30 seconds) waiting for a
- * connection permit to become available. This behavior is consistent for both
- * HTTP/1.1 and HTTP/2 connections.
+ * <p>When route capacity, stream capacity, or {@code maxTotalConnections} is exhausted,
+ * {@link #acquire(Route)} blocks for up to {@code acquireTimeout} (default: 30 seconds)
+ * waiting for capacity to become available. This behavior is consistent for both HTTP/1.1
+ * and HTTP/2 connections.
  *
  * <p>The blocking wait is on the global physical-connection semaphore, so callers
  * unblock when an open connection is closed and releases capacity. With virtual

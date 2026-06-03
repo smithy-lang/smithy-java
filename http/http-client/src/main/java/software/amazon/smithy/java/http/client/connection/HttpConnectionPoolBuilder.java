@@ -60,7 +60,7 @@ public final class HttpConnectionPoolBuilder {
     final List<ConnectionPoolListener> listeners = new LinkedList<>();
 
     /**
-     * Set default maximum connections per route (default: 20).
+     * Set default maximum connections per route (default: 256).
      *
      * <p>This is the default limit for all routes unless overridden via
      * {@link #maxConnectionsForHost(String, int)}.
@@ -72,8 +72,8 @@ public final class HttpConnectionPoolBuilder {
      *
      * <p><b>HTTP/2:</b> This limits physical connections. Maximum concurrent streams
      * per route = {@code maxConnectionsPerRoute × h2StreamsPerConnection}. For example,
-     * with default settings (20 connections × 100 streams), a route can handle up to
-     * 2000 concurrent requests.
+     * with default settings (256 connections × 100 streams), a route can handle up to
+     * 25,600 concurrent requests.
      *
      * @param max maximum connections per route, must be positive
      * @return this builder
@@ -99,7 +99,7 @@ public final class HttpConnectionPoolBuilder {
      * <p>Example usage:
      * <pre>{@code
      * builder
-     *     .maxConnectionsPerRoute(20)  // Default for all routes
+     *     .maxConnectionsPerRoute(20)  // Override default for all routes
      *     .maxConnectionsForHost("slow-api.example.com", 2)  // Limit slow API
      *     .maxConnectionsForHost("fast-cdn.example.com", 100)  // Allow more for CDN
      * }</pre>
@@ -159,9 +159,7 @@ public final class HttpConnectionPoolBuilder {
      * <p>Connections that have been idle (in the pool) longer than this duration
      * are closed by the background cleanup thread.
      *
-     * <p><b>Note:</b> This setting currently only applies to HTTP/1.1 connections.
-     * HTTP/2 connections use multiplexing and remain open until they become unhealthy
-     * (e.g., server closes the connection or GOAWAY is received).
+     * <p>For HTTP/2, idle connections are closed only when they have no active streams.
      *
      * <p>Set lower for short-lived applications or high-churn workloads.
      * Set higher for long-running applications with steady traffic.
@@ -179,10 +177,11 @@ public final class HttpConnectionPoolBuilder {
     }
 
     /**
-     * Set acquire timeout for waiting when pool is exhausted (default: 30 seconds).
+     * Set acquire timeout for waiting when connection capacity is exhausted (default: 30 seconds).
      *
-     * <p>When {@link #maxTotalConnections(int)} is reached, {@link HttpConnectionPool#acquire(Route)}
-     * will block for up to this duration waiting for a connection to become available.
+     * <p>When route capacity, stream capacity, or {@link #maxTotalConnections(int)} is exhausted,
+     * {@link HttpConnectionPool#acquire(Route)} will block for up to this duration waiting for capacity
+     * to become available.
      * If no connection becomes available within this time, an {@link IOException} is thrown.
      *
      * <p>This timeout applies uniformly to both HTTP/1.1 and HTTP/2 connections.
@@ -356,7 +355,7 @@ public final class HttpConnectionPoolBuilder {
      * Set a custom {@link ClientSslEngineFactory} for HTTPS connections (default: none — the JDK
      * {@link SSLContext} is used).
      *
-     * <p>When set, every secure connection — HTTP/1.1 included — is driven through the zero-copy
+     * <p>When set, every secure connection — HTTP/1.1 included — is driven through the ByteBuffer-based
      * {@link SSLEngineTransport} using engines minted by this factory, instead of the JDK
      * {@code SSLSocket}/{@code SSLEngine}. This is the seam an alternate TLS provider (e.g. a native
      * BoringSSL engine with faster AES-GCM) plugs into without {@code http-client} depending on it.
@@ -615,7 +614,7 @@ public final class HttpConnectionPoolBuilder {
      * a hard limit enforced by the server. This client-side soft limit helps balance load across
      * multiple connections to reduce lock contention and improve throughput under high concurrency.
      *
-     * <p><a href="https://www.rfc-editor.org/rfc/rfc7540#section-6.5.2">RFC 7540 Section 6.5.2</a>
+     * <p><a href="https://www.rfc-editor.org/rfc/rfc9113#section-6.5.2">RFC 9113 Section 6.5.2</a>
      * recommends servers set {@code SETTINGS_MAX_CONCURRENT_STREAMS} to at least 100 to avoid
      * unnecessarily limiting parallelism. This default aligns with that recommendation and matches
      * <a href="https://go.googlesource.com/net/+/master/http2/transport.go">Go's net/http</a>

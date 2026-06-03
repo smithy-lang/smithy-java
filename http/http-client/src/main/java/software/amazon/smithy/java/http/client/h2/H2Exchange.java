@@ -443,7 +443,13 @@ public final class H2Exchange implements HttpExchange {
         }
 
         if (data != null && length > 0) {
-            int discardedFlowControlBytes = streamBody.offer(data, flowControlBytes, muxer::returnBuffer);
+            // Defer the consumer wake when more frames are already buffered in the codec:
+            // the reader will call enqueueData again in a tight loop. The wake happens at
+            // burst end (moreDataBuffered=false), on stream switch (signalDataAvailable),
+            // or on END_STREAM (streamBody.complete below). This avoids notify/wait churn
+            // for intermediate frames in streaming GET responses.
+            boolean signal = !moreDataBuffered || endStream;
+            int discardedFlowControlBytes = streamBody.offer(data, flowControlBytes, muxer::returnBuffer, signal);
             if (discardedFlowControlBytes > 0) {
                 releaseDataCredit(discardedFlowControlBytes);
             }
@@ -454,13 +460,13 @@ public final class H2Exchange implements HttpExchange {
     }
 
     /**
-     * Signal the consumer that data is available.
-     *
-     * <p>Called by H2Connection only when switching from this stream to a different
-     * stream (to flush pending data before processing another stream's frames).
-     * This is lock-free and can be called without holding any locks.
+     * Signal the consumer that data is available. This flushes a pending burst that was
+     * enqueued with {@code signal=false} via {@link #enqueueData}. Called by
+     * {@link H2Connection} when the reader switches away from this stream or exits.
      */
-    void signalDataAvailable() {}
+    void signalDataAvailable() {
+        streamBody.signal();
+    }
 
     private void signalReadWaiterLocked() {
         if (readWaiterRegistered) {
@@ -718,7 +724,7 @@ public final class H2Exchange implements HttpExchange {
 
         // If response not fully received and stream was started, queue RST_STREAM
         if (!state.isEndStreamReceived() && streamId > 0 && state.getStreamState() != SS_CLOSED) {
-            // Best-effort cleanup - CLQ never blocks or fails
+            // Best-effort cleanup: queue a reset and wake any consumers waiting for data.
             muxer.queueControlFrame(streamId, H2Muxer.ControlFrameType.RST_STREAM, ERROR_CANCEL, 100);
             // Signal end to any waiting consumers
             state.setReadStateDone();

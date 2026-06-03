@@ -24,7 +24,7 @@ final class H1Utils {
      * @param buf byte buffer containing header line
      * @param len length of header line (excluding CRLF)
      * @param headers collection to add the parsed header to
-     * @return the interned header name, or null if line is malformed (no colon)
+     * @return the canonical header name, or null if line is malformed (no colon)
      */
     static String parseHeaderLine(byte[] buf, int len, ModifiableHttpHeaders headers) {
         int colon = findHeaderColon(buf, len);

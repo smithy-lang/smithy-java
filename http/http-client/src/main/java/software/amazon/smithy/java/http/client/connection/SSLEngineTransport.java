@@ -29,11 +29,11 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
 
 /**
- * TLS transport using {@link SSLEngine} for zero-copy encryption/decryption.
+ * TLS transport using {@link SSLEngine} for ByteBuffer-based encryption/decryption.
  *
  * <p>Provides both stream-based and channel-based I/O. The channel API avoids
  * intermediate byte[] copies by operating directly on ByteBuffers through the
- * SSLEngine, achieving near-zero-copy TLS.
+ * SSLEngine, avoiding some intermediate byte[] copies.
  *
  * <p>Thread safety: reads and writes can happen concurrently from different threads.
  * The SSLEngine is protected by a lock for unwrap/wrap, but socket I/O happens
@@ -527,10 +527,10 @@ final class SSLEngineTransport implements ConnectionTransport {
         }
     }
 
-    // ==================== Channel-based I/O (zero-copy ByteBuffer path) ====================
+    // ==================== Channel-based I/O (ByteBuffer path) ====================
 
     /**
-     * Read decrypted data directly into a ByteBuffer. This is the zero-copy read path.
+     * Read decrypted data directly into a ByteBuffer.
      *
      * <p>Unwraps TLS data directly into the destination buffer when possible,
      * avoiding the intermediate appIn buffer entirely. Falls back to appIn for
