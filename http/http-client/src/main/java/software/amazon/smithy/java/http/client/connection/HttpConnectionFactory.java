@@ -466,7 +466,7 @@ record HttpConnectionFactory(
             }
 
             var exchange = conn.newExchange(connectRequest);
-            exchange.requestBody().close();
+            exchange.writeRequestBody(null);
 
             int status = exchange.responseStatusCode();
             HttpHeaders headers = exchange.responseHeaders();

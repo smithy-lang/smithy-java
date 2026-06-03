@@ -35,23 +35,12 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  * <p><b>Usage Pattern with try-with-resources (recommended):</b>
  * {@snippet :
  * try (HttpExchange exchange = client.newExchange(request)) {
- *     try (OutputStream out = exchange.requestBody()) {
- *         out.write(data);
- *     }
+ *     exchange.writeRequestBody();
  *     int status = exchange.responseStatusCode();
  *     try (InputStream in = exchange.responseBody()) {
  *         byte[] body = in.readAllBytes();
  *     }
  * }
- * }
- *
- * <p><b>Usage Pattern for hand-off (streams managed separately):</b>
- * {@snippet :
- * // Exchange auto-closes when BOTH streams are closed
- * HttpExchange exchange = client.newExchange(request);
- * // Hand off to different parts of the application
- * sendToWriter(exchange.requestBody());   // Writer closes when done
- * sendToReader(exchange.responseBody());  // Reader closes when done
  * }
  */
 public interface HttpExchange extends AutoCloseable {
@@ -66,31 +55,7 @@ public interface HttpExchange extends AutoCloseable {
     HttpRequest request();
 
     /**
-     * Where to write the request body. Blocks on flow control.
-     *
-     * <p>Closing this stream signals the end of the request body. For HTTP/2, closing this stream while the response
-     * stream is also closed will automatically close the exchange.
-     *
-     * {@snippet :
-     * try (OutputStream out = exchange.requestBody()) {
-     *     exchange.request().body().asInputStream().transferTo(out);
-     * }
-     * }
-     *
-     * @return request body stream
-     * @see #writeRequestBody()
-     */
-    OutputStream requestBody();
-
-    /**
      * Write the request body from {@link HttpRequest#body()} to the output stream.
-     *
-     * <p>This is a convenience method equivalent to:
-     * {@snippet :
-     * try (OutputStream out = exchange.requestBody()) {
-     *     exchange.request().body().asInputStream().transferTo(out);
-     * }
-     * }
      *
      * @throws IOException if an I/O error occurs
      */
@@ -101,17 +66,10 @@ public interface HttpExchange extends AutoCloseable {
     /**
      * Write the given request body to the exchange.
      *
-     * <p>The default implementation streams through {@link #requestBody()}. Protocol-specific implementations may
-     * override this to use more efficient body transfer paths for certain {@link DataStream} implementations.
-     *
      * @param body the body to write
      * @throws IOException if an I/O error occurs
      */
-    default void writeRequestBody(DataStream body) throws IOException {
-        try (OutputStream out = requestBody()) {
-            body.writeTo(out);
-        }
-    }
+    void writeRequestBody(DataStream body) throws IOException;
 
     /**
      * HTTP version from response. Blocks until received.
@@ -262,10 +220,8 @@ public interface HttpExchange extends AutoCloseable {
      * <p>Example usage:
      * {@snippet :
      * HttpExchange exchange = connection.newExchange(request);
-     * try (OutputStream body = exchange.requestBody()) {
-     *     body.write(data);
-     *     exchange.setRequestTrailers(HttpHeaders.of(Map.of("checksum", List.of("abc123"))));
-     * } // trailers sent on close
+     * exchange.setRequestTrailers(HttpHeaders.of(Map.of("checksum", List.of("abc123"))));
+     * exchange.writeRequestBody(DataStream.ofBytes(data)); // trailers sent after the body
      * }
      *
      * @param trailers the trailer headers to send
