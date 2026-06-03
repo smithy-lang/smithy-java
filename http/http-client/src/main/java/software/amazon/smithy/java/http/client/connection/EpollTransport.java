@@ -102,8 +102,12 @@ final class EpollTransport implements ConnectionTransport {
                 return n;
             }
 
-            ByteBuffer direct = scratchBuffer(dst.remaining());
-            int n = channel.readAddress(EpollAccess.memoryAddress(direct), 0, direct.capacity(), readTimeoutMs);
+            int want = dst.remaining();
+            ByteBuffer direct = scratchBuffer(want);
+            // Cap the read at the destination's remaining bytes so a partially-reused scratch buffer
+            // (sized from an earlier larger read) can't overflow dst.
+            int cap = Math.min(want, direct.capacity());
+            int n = channel.readAddress(EpollAccess.memoryAddress(direct), 0, cap, readTimeoutMs);
             if (n > 0) {
                 direct.limit(n);
                 dst.put(direct);
