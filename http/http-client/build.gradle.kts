@@ -168,8 +168,9 @@ val stopBenchmarkServer by tasks.registering {
 //   * -Djmh.bench.host=$externalBenchHost is forwarded into the forked JMH JVM so
 //     BenchmarkSupport.BENCH_HOST resolves to the remote host
 // Set via -Pjmh.bench.host=<host> or the BENCH_HOST env var.
-val externalBenchHost = (project.findProperty("jmh.bench.host") as String?)?.takeIf { it.isNotBlank() }
-    ?: System.getenv("BENCH_HOST")?.takeIf { it.isNotBlank() }
+val externalBenchHost =
+    (project.findProperty("jmh.bench.host") as String?)?.takeIf { it.isNotBlank() }
+        ?: System.getenv("BENCH_HOST")?.takeIf { it.isNotBlank() }
 
 // Configure JMH
 // Run with: ./gradlew :http:http-client:jmh -Pjmh.includes="H2cScalingBenchmark.smithy"

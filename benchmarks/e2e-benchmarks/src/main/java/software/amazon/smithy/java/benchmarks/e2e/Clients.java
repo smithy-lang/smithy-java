@@ -146,7 +146,8 @@ final class Clients {
         var socketBackend = System.getProperty("e2e.smithy.socket", "auto").trim().toLowerCase();
         switch (socketBackend) {
             case "epoll" -> poolBuilder.useEpollTransport(true);
-            default -> {}
+            default -> {
+            }
         }
         if (boringSsl) {
             if (BoringSslEngineFactory.isAvailable()) {

@@ -175,7 +175,10 @@ public class H2cScalingBenchmark {
                     }
                 });
         for (int i = 0; i < connections; i++) {
-            Channel ch = bootstrap.connect(new InetSocketAddress(BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2C_PORT)).sync().channel();
+            Channel ch =
+                    bootstrap.connect(new InetSocketAddress(BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2C_PORT))
+                            .sync()
+                            .channel();
             nettyChannels.add(ch);
             nettyStreamBootstraps.add(new Http2StreamChannelBootstrap(ch));
         }
@@ -242,7 +245,7 @@ public class H2cScalingBenchmark {
 
         BenchmarkSupport.runBenchmark(concurrency, OPS, (HttpRequest req) -> {
             try (var res = smithyClient.send(req)) {
-                res.body().asInputStream().transferTo(OutputStream.nullOutputStream());
+                res.body().discard();
             }
         }, request, counter);
 
