@@ -314,6 +314,51 @@ class DefaultHttpClientTest {
         }
     }
 
+    @Test
+    void discardDrainsH2ResponseBeforeReleasingConnection() throws IOException {
+        var drained = new AtomicBoolean(false);
+        var closed = new AtomicBoolean(false);
+        var released = new AtomicBoolean(false);
+        var pool = new TestConnectionPool() {
+            @Override
+            protected HttpExchange createExchange() {
+                return new TestHttpExchange() {
+                    @Override
+                    public HttpVersion responseVersion() {
+                        return HttpVersion.HTTP_2;
+                    }
+
+                    @Override
+                    public void discardResponseBody() {
+                        drained.set(true);
+                    }
+
+                    @Override
+                    public void close() {
+                        closed.set(true);
+                    }
+                };
+            }
+
+            @Override
+            public void release(HttpConnection connection) {
+                released.set(true);
+            }
+        };
+        try (var client = HttpClient.builder().connectionPool(pool).build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            var response = client.send(request);
+            response.body().discard();
+
+            assertTrue(drained.get(), "H2 discard should drain the response body instead of immediately closing");
+            assertTrue(closed.get(), "Exchange should still close after the body is drained");
+            assertTrue(released.get(), "Drained H2 exchange should release the connection");
+        }
+    }
+
     // Test fixtures
 
     private static class TestConnectionPool implements ConnectionPool {

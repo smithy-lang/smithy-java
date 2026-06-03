@@ -48,10 +48,9 @@ final class H2ConnectionManager {
 
     private static final MultiplexedHttpConnection[] EMPTY = new MultiplexedHttpConnection[0];
 
-    // Soft limit as a fraction of streamsPerConnection. When all connections exceed this threshold,
-    // we try to create a new connection (if under max).
-    private static final int DEFAULT_SOFT_LIMIT_DIVISOR = 4;
-    private static final int DEFAULT_SOFT_LIMIT_FLOOR = 25;
+    // Prefer opening idle H2 connections before placing a second active stream on an existing connection.
+    // Once maxConnectionsPerRoute is reached, streams are multiplexed up to the configured hard limit.
+    private static final int DEFAULT_SOFT_LIMIT = 1;
 
     private final ConcurrentHashMap<Route, RouteState> routes = new ConcurrentHashMap<>();
     private final H2LoadBalancer loadBalancer;
@@ -73,9 +72,7 @@ final class H2ConnectionManager {
         this.acquireTimeoutMs = acquireTimeoutMs;
         this.listeners = listeners;
         this.connectionFactory = connectionFactory;
-        this.loadBalancer = H2LoadBalancer.watermark(
-                Math.max(DEFAULT_SOFT_LIMIT_FLOOR, streamsPerConnection / DEFAULT_SOFT_LIMIT_DIVISOR),
-                streamsPerConnection);
+        this.loadBalancer = H2LoadBalancer.watermark(DEFAULT_SOFT_LIMIT, streamsPerConnection);
     }
 
     private RouteState stateFor(Route route) {
