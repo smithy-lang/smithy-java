@@ -221,7 +221,8 @@ final class EpollChannel {
      *     thrown
      */
     long writev(ByteBuffer[] buffers, int offset, int length) throws IOException {
-        long remaining = remaining(buffers, offset, length);
+        int end = offset + length;
+        long remaining = remaining(buffers, offset, end);
         long written = 0;
         boolean armed = false;
         try {
@@ -229,8 +230,10 @@ final class EpollChannel {
                 if (closed.get()) {
                     throw new IOException("channel closed");
                 }
-                long n = socket.writev(buffers, offset, length, remaining);
+                int first = firstRemaining(buffers, offset, end);
+                long n = socket.writev(buffers, first, end - first, remaining);
                 if (n > 0) {
+                    advance(buffers, first, end, n);
                     written += n;
                     remaining -= n;
                     continue;
@@ -249,9 +252,31 @@ final class EpollChannel {
         }
     }
 
-    private static long remaining(ByteBuffer[] buffers, int offset, int length) {
+    private static int firstRemaining(ByteBuffer[] buffers, int offset, int end) {
+        for (int i = offset; i < end; i++) {
+            if (buffers[i].hasRemaining()) {
+                return i;
+            }
+        }
+        return end;
+    }
+
+    private static void advance(ByteBuffer[] buffers, int offset, int end, long bytes) {
+        for (int i = offset; i < end && bytes > 0; i++) {
+            ByteBuffer buffer = buffers[i];
+            int remaining = buffer.remaining();
+            if (remaining == 0) {
+                continue;
+            }
+            int consumed = (int) Math.min(bytes, remaining);
+            buffer.position(buffer.position() + consumed);
+            bytes -= consumed;
+        }
+    }
+
+    private static long remaining(ByteBuffer[] buffers, int offset, int end) {
         long result = 0;
-        for (int i = offset, end = offset + length; i < end; i++) {
+        for (int i = offset; i < end; i++) {
             result += buffers[i].remaining();
         }
         return result;
