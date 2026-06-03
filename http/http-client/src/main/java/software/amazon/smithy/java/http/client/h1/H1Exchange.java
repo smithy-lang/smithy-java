@@ -23,6 +23,7 @@ import software.amazon.smithy.java.http.client.NonClosingOutputStream;
 import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
 import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 import software.amazon.smithy.java.http.client.connection.Route;
+import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
  * HTTP/1.1 exchange implementation, handling a single request/response over a connection.
@@ -31,7 +32,7 @@ import software.amazon.smithy.java.http.client.connection.Route;
  * <p>HTTP/1.1 allows one active exchange per connection. This class enforces the client-side ordering:
  * <ol>
  *   <li>Request line and headers are written when the exchange is initialized</li>
- *   <li>Request body is written via {@link #requestBody()}, unless a final Expect response skips it</li>
+ *   <li>Request body is written via {@link #writeRequestBody(DataStream)}, unless a final Expect response skips it</li>
  *   <li>Final response is read via {@link #responseStatusCode()}, {@link #responseHeaders()}, {@link #responseBody()}</li>
  * </ol>
  *
@@ -138,8 +139,7 @@ public final class H1Exchange implements HttpExchange {
         return request;
     }
 
-    @Override
-    public OutputStream requestBody() {
+    OutputStream requestBody() {
         if (requestOut == null) {
             UnsyncBufferedOutputStream socketOut = connection.getOutputStream();
             var headers = request.headers();
@@ -173,6 +173,15 @@ public final class H1Exchange implements HttpExchange {
             }
         }
         return requestOut;
+    }
+
+    @Override
+    public void writeRequestBody(DataStream body) throws IOException {
+        try (OutputStream out = requestBody()) {
+            if (body != null) {
+                body.writeTo(out);
+            }
+        }
     }
 
     @Override

@@ -47,7 +47,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  * <h2>Stream Lifecycle</h2>
  * <ol>
  *   <li>Exchange created via {@link H2Muxer#newExchange}, HEADERS sent via {@link H2Muxer#submitHeaders}</li>
- *   <li>{@link #requestBody()} returns output stream for DATA frames</li>
+ *   <li>{@link #writeRequestBody(DataStream)} writes DATA frames</li>
  *   <li>{@link #responseHeaders()}/{@link #responseStatusCode()} read response HEADERS</li>
  *   <li>{@link #responseBody()} returns input stream for response DATA frames</li>
  *   <li>{@link #close()} sends RST_STREAM if needed and unregisters stream</li>
@@ -599,8 +599,7 @@ public final class H2Exchange implements HttpExchange {
         return request;
     }
 
-    @Override
-    public synchronized OutputStream requestBody() {
+    synchronized OutputStream requestBody() {
         return requestBodyState.outputStream();
     }
 

@@ -121,7 +121,7 @@ final class DefaultHttpClient implements HttpClient {
                 exchange.writeRequestBody(requestBody);
             } else {
                 // No body — close request stream to send END_STREAM
-                exchange.requestBody().close();
+                exchange.writeRequestBody(null);
             }
 
             // Build response
