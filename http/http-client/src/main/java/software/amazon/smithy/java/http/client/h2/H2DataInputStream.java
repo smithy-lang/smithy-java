@@ -18,7 +18,7 @@ import java.util.function.Consumer;
  * <p>Reads directly from per-stream pooled DATA-frame buffers owned by the exchange.
  * Chunks are borrowed {@link ByteBuffer}s that are returned to the pool when retired.
  *
- * <p>Also provides a {@link #channel()} for zero-copy ByteBuffer reads.
+ * <p>Also provides a {@link #channel()} for ByteBuffer reads.
  */
 final class H2DataInputStream extends InputStream {
     private static final int BATCH_SIZE = 128;
@@ -45,8 +45,8 @@ final class H2DataInputStream extends InputStream {
     }
 
     /**
-     * Get a zero-copy readable channel backed by this stream's data chunks.
-     * Reads transfer ByteBuffer data directly without byte[] intermediaries.
+     * Get a readable channel backed by this stream's data chunks.
+     * Reads into ByteBuffer destinations without byte[] intermediaries.
      */
     ReadableByteChannel channel() {
         return new ReadableByteChannel() {
@@ -68,8 +68,7 @@ final class H2DataInputStream extends InputStream {
     }
 
     /**
-     * Zero-copy read into a ByteBuffer. Transfers data directly from pooled
-     * chunk buffers into the destination without going through byte[].
+     * Read into a ByteBuffer from pooled chunk buffers without going through byte[].
      */
     int readChannel(ByteBuffer dst) throws IOException {
         if (closed || eof) {

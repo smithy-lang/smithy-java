@@ -18,7 +18,7 @@ import javax.net.ssl.SSLEngine;
  * sees {@code javax.net.ssl} types.
  *
  * <p>When a factory is configured, every secure connection — HTTP/1.1 included — is driven through
- * {@link SSLEngineTransport} (the zero-copy {@code SSLEngine} driver), rather than the JDK
+ * {@link SSLEngineTransport} (the ByteBuffer-based {@code SSLEngine} driver), rather than the JDK
  * {@code SSLSocket} path. The factory mints a fresh engine per connection and, because some native
  * engines are reference-counted and hold off-heap memory, also hands back a {@linkplain Handle#releaser()
  * releaser} that the transport invokes exactly once when the connection closes.

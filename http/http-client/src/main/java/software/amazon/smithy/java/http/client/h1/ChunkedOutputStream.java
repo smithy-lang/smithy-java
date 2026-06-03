@@ -13,10 +13,9 @@ import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 
 /**
- * OutputStream that writes HTTP/1.1 chunked transfer encoding format (RFC 7230 Section 4.1).
+ * OutputStream that writes HTTP/1.1 chunked transfer encoding format (RFC 9112).
  *
- * <p>This stream does not close the delegate on close, allowing the underlying socket to be reused
- * for subsequent HTTP/1.1 requests. The socket lifecycle is managed by {@link H1Connection}.
+ * <p>This stream does not close the delegate on close. The connection lifecycle is managed by {@link H1Connection}.
  */
 final class ChunkedOutputStream extends OutputStream {
     private final UnsyncBufferedOutputStream delegate;
@@ -153,7 +152,7 @@ final class ChunkedOutputStream extends OutputStream {
 
         // Write final 0-sized chunk
         writeFinalChunk();
-        // Flush underlying stream, and don't close delegate on failure since the connection may be reused
+        // Flush underlying stream; connection lifecycle is handled by the exchange/pool.
         delegate.flush();
     }
 

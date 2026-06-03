@@ -116,8 +116,8 @@ record HttpConnectionFactory(
         ConnectionTransport transport;
         if (route.isSecure()) {
             // With a custom SSLEngine factory (e.g. native BoringSSL), drive every secure connection
-            // — HTTP/1.1 included — through the zero-copy SSLEngineTransport so the native engine is
-            // used uniformly. Without it, keep the JDK SSLSocket fast-path for ENFORCE_HTTP_1_1.
+            // — HTTP/1.1 included — through SSLEngineTransport so the native engine is used uniformly.
+            // Without it, keep the JDK SSLSocket fast path for ENFORCE_HTTP_1_1.
             transport = (versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1 && sslEngineFactory == null)
                     ? performTlsSocketHandshake(socket, route)
                     : performTlsHandshake(socket, route);
@@ -400,7 +400,7 @@ record HttpConnectionFactory(
 
             // Connect to the proxy over TLS if the scheme is https
             if ("https".equalsIgnoreCase(proxy.proxyUri().getScheme())) {
-                // Use SSLSocket for proxy TLS (proxy tunnel doesn't need zero-copy)
+                // Use SSLSocket for proxy TLS; the tunnel itself does not need the SSLEngine path.
                 proxySocket = performTlsHandshakeToProxy(proxySocket, proxy);
             }
 

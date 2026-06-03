@@ -130,7 +130,7 @@ final class H2Muxer implements AutoCloseable {
     private volatile Runnable streamReleaseCallback;
 
     // === WORK QUEUES ===
-    // CLQ + LockSupport for lock-free work submission without DelayScheduler overhead
+    // Queues plus LockSupport keep cross-thread work submission lightweight without DelayScheduler overhead.
     private final ConcurrentLinkedQueue<H2MuxerWorkItem> workQueue = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<H2Exchange> dataWorkQueue = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean dataWorkPending = new AtomicBoolean(false);
@@ -479,7 +479,7 @@ final class H2Muxer implements AutoCloseable {
 
     /**
      * Submit a HEADERS frame for encoding and writing.
-     * Always succeeds (CLQ is unbounded, bounded by stream slots).
+     * Always succeeds; queued work is bounded by stream slots.
      * Timeout is enforced by watchdog sweep checking deadlineTick.
      *
      * <p>After calling this method, the caller should call {@link H2Exchange#awaitWriteCompletion()}

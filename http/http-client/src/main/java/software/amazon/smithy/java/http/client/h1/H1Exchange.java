@@ -28,12 +28,11 @@ import software.amazon.smithy.java.http.client.connection.Route;
  * HTTP/1.1 exchange implementation, handling a single request/response over a connection.
  *
  * <h2>Request/Response Flow</h2>
- * <p>HTTP/1.1 is a sequential protocol: the request must be fully sent before the response can be read. This class
- * enforces this ordering:
+ * <p>HTTP/1.1 allows one active exchange per connection. This class enforces the client-side ordering:
  * <ol>
- *   <li>Request line and headers are written on construction</li>
- *   <li>Request body is written via {@link #requestBody()}</li>
- *   <li>Response is read via {@link #responseStatusCode()}, {@link #responseHeaders()}, {@link #responseBody()}</li>
+ *   <li>Request line and headers are written when the exchange is initialized</li>
+ *   <li>Request body is written via {@link #requestBody()}, unless a final Expect response skips it</li>
+ *   <li>Final response is read via {@link #responseStatusCode()}, {@link #responseHeaders()}, {@link #responseBody()}</li>
  * </ol>
  *
  * <h2>Expect: 100-continue</h2>
@@ -705,7 +704,7 @@ public final class H1Exchange implements HttpExchange {
             return new FixedLengthResponseInputStream(this, socketIn, responseContentLength);
         }
 
-        // Read until close (HTTP/1.0 style)
+        // Read until close for close-delimited responses.
         connection.setKeepAlive(false);
         return new CloseReleasingResponseInputStream(this, socketIn);
     }

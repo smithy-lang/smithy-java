@@ -165,7 +165,7 @@ public interface HttpExchange extends AutoCloseable {
     }
 
     /**
-     * Get a readable byte channel for the response body. Zero-copy path.
+     * Get a readable byte channel for the response body.
      *
      * <p>Default wraps {@link #responseBody()} via Channels.newChannel().
      * H2 exchanges override this to return a native channel that avoids
@@ -213,7 +213,7 @@ public interface HttpExchange extends AutoCloseable {
      *
      * <p>Trailers are headers sent after the message body. They are supported in:
      * <ul>
-     *   <li><b>HTTP/1.1:</b> Via chunked transfer encoding (RFC 7230 Section 4.1.2)</li>
+     *   <li><b>HTTP/1.1:</b> Via chunked transfer encoding (RFC 9112 Section 7.1)</li>
      *   <li><b>HTTP/2:</b> Via HEADERS frame after DATA with END_STREAM (RFC 9113 Section 8.1)</li>
      * </ul>
      *

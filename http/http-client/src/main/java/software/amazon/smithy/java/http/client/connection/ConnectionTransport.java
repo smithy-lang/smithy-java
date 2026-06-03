@@ -21,8 +21,8 @@ import javax.net.ssl.SSLSession;
  * underlying transport mechanism.
  *
  * <p>Provides both stream-based (InputStream/OutputStream) and channel-based
- * (ReadableByteChannel/WritableByteChannel) I/O. The channel API enables
- * zero-copy data paths by operating directly on ByteBuffers.
+ * (ReadableByteChannel/WritableByteChannel) I/O. The channel API lets callers use
+ * ByteBuffers directly and avoid some intermediate byte[] copies.
  */
 public sealed interface ConnectionTransport extends AutoCloseable
         permits EpollTransport, SocketTransport, SSLEngineTransport {
@@ -41,7 +41,7 @@ public sealed interface ConnectionTransport extends AutoCloseable
     OutputStream outputStream() throws IOException;
 
     /**
-     * Get a readable channel for zero-copy reads into ByteBuffers.
+     * Get a readable channel for ByteBuffer reads.
      *
      * <p>For TLS transports, this unwraps data directly into the caller's
      * ByteBuffer, avoiding intermediate byte[] copies. For plain socket
@@ -65,7 +65,7 @@ public sealed interface ConnectionTransport extends AutoCloseable
     }
 
     /**
-     * Get a writable channel for zero-copy writes from ByteBuffers.
+     * Get a writable channel for ByteBuffer writes.
      *
      * <p>For TLS transports, this wraps data directly from the caller's
      * ByteBuffer through SSLEngine, avoiding intermediate copies.

@@ -94,8 +94,8 @@ final class H2FrameCodec {
      * <p>The payload must be read via {@link #readPayloadInto(byte[], int, int)} or
      * {@link #skipBytes(int)} before calling {@code nextFrame()} again.
      *
-     * <p>This method uses zero-copy direct buffer access for frame header parsing,
-     * avoiding intermediate copies when possible.
+     * <p>This method parses from the reader buffer directly, avoiding intermediate
+     * copies when possible.
      *
      * @return frame type (0-255), or -1 on EOF
      * @throws IOException if reading fails or frame is malformed
@@ -109,7 +109,7 @@ final class H2FrameCodec {
             throw new IOException("Incomplete frame header: read " + reader.buffered() + " bytes");
         }
 
-        // Parse header directly from reader's ByteBuffer (zero-copy)
+        // Parse header directly from reader's ByteBuffer.
         ByteBuffer buf = reader.buffer();
 
         currentPayloadLength = ((buf.get() & 0xFF) << 16)
@@ -186,7 +186,7 @@ final class H2FrameCodec {
     /**
      * Check if there is more data buffered in the input stream.
      *
-     * <p>This is used for adaptive signaling: when processing DATA frames in a burst,
+     * <p>This is used for batched signaling: when processing DATA frames in a burst,
      * we can defer waking the consumer thread if more frames are already buffered,
      * reducing thread wakeup overhead.
      *
@@ -286,7 +286,7 @@ final class H2FrameCodec {
     /**
      * Read and parse WINDOW_UPDATE frame payload directly from stream.
      *
-     * <p>Uses zero-copy direct buffer access when possible. Reader thread only.
+     * <p>Parses directly from the reader buffer when possible. Reader thread only.
      *
      * @return window size increment
      * @throws IOException if reading fails
@@ -298,7 +298,7 @@ final class H2FrameCodec {
                     "WINDOW_UPDATE frame must have 4-byte payload, got " + currentPayloadLength);
         }
 
-        // Zero-copy: ensure 4 bytes in buffer, then parse directly
+        // Ensure 4 bytes in buffer, then parse directly.
         if (!reader.ensure(4)) {
             throw new IOException("Unexpected EOF reading WINDOW_UPDATE payload");
         }
@@ -340,7 +340,7 @@ final class H2FrameCodec {
     /**
      * Read and parse RST_STREAM frame payload directly from stream.
      *
-     * <p>Uses zero-copy direct buffer access when possible. Reader thread only.
+     * <p>Parses directly from the reader buffer when possible. Reader thread only.
      *
      * @return error code
      * @throws IOException if reading fails
@@ -835,7 +835,7 @@ final class H2FrameCodec {
      * <p>This method is used by the reader thread to read DATA frame payloads
      * directly into an exchange's buffer, avoiding an intermediate allocation.
      *
-     * <p>Uses zero-copy when the entire payload is already buffered. When partially
+     * <p>Copies directly from buffered data when the entire payload is already buffered. When partially
      * buffered, drains the buffer then reads directly from the underlying stream
      * to avoid redundant buffer fill/copy overhead.
      *
@@ -850,7 +850,7 @@ final class H2FrameCodec {
 
     /**
      * Read DATA frame payload directly into a pooled ByteBuffer.
-     * Zero-copy path: data goes from channel → destination, bypassing internal buffer
+     * Data goes from channel to destination, bypassing the internal buffer
      * when possible.
      *
      * @param dest ByteBuffer in write mode
@@ -882,7 +882,7 @@ final class H2FrameCodec {
      * Read a single byte from the input stream.
      *
      * <p>Used for reading pad length in padded DATA frames without allocating.
-     * Uses zero-copy direct buffer access when possible.
+     * Uses direct reader-buffer access when possible.
      *
      * @return the byte value (0-255)
      * @throws IOException if reading fails or EOF is reached
