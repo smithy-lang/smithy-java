@@ -162,6 +162,15 @@ val stopBenchmarkServer by tasks.registering {
     }
 }
 
+// External benchmark-server host. When non-null:
+//   * the local startBenchmarkServer/stopBenchmarkServer hooks are skipped (you start the
+//     server yourself on the remote host)
+//   * -Djmh.bench.host=$externalBenchHost is forwarded into the forked JMH JVM so
+//     BenchmarkSupport.BENCH_HOST resolves to the remote host
+// Set via -Pjmh.bench.host=<host> or the BENCH_HOST env var.
+val externalBenchHost = (project.findProperty("jmh.bench.host") as String?)?.takeIf { it.isNotBlank() }
+    ?: System.getenv("BENCH_HOST")?.takeIf { it.isNotBlank() }
+
 // Configure JMH
 // Run with: ./gradlew :http:http-client:jmh -Pjmh.includes="H2cScalingBenchmark.smithy"
 // To customize params, edit @Param annotations in benchmark source files
@@ -217,9 +226,6 @@ jmh {
 // Make jmh task auto-start/stop the benchmark server, unless an external host is targeted
 // via -Pjmh.bench.host=<host> (or the BENCH_HOST env var). When an external host is used,
 // start the server yourself on that host (java -jar build/libs/.../jmhServer.jar etc.).
-val externalBenchHost = (project.findProperty("jmh.bench.host") as String?)?.takeIf { it.isNotBlank() }
-    ?: System.getenv("BENCH_HOST")?.takeIf { it.isNotBlank() }
-
 tasks.named("jmh") {
     if (externalBenchHost == null) {
         dependsOn(startBenchmarkServer)
