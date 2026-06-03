@@ -13,7 +13,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -59,20 +58,8 @@ class DefaultHttpClientTest {
             protected HttpExchange createExchange() {
                 return new TestHttpExchange() {
                     @Override
-                    public OutputStream requestBody() {
-                        return new OutputStream() {
-                            private final StringBuilder sb = new StringBuilder();
-
-                            @Override
-                            public void write(int b) {
-                                sb.append((char) b);
-                            }
-
-                            @Override
-                            public void close() {
-                                bodyWritten.set(sb.toString());
-                            }
-                        };
+                    public void writeRequestBody(DataStream body) throws IOException {
+                        bodyWritten.set(body == null ? "" : new String(body.asInputStream().readAllBytes()));
                     }
                 };
             }
@@ -438,9 +425,7 @@ class DefaultHttpClientTest {
         }
 
         @Override
-        public OutputStream requestBody() {
-            return OutputStream.nullOutputStream();
-        }
+        public void writeRequestBody(DataStream body) throws IOException {}
 
         @Override
         public InputStream responseBody() {
