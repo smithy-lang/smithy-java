@@ -7,6 +7,7 @@ package software.amazon.smithy.java.http.client;
 
 import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
@@ -82,7 +83,7 @@ public final class BenchmarkSupport {
                     ? new InetAddress[] {InetAddress.getLoopbackAddress()}
                     : InetAddress.getAllByName(BENCH_HOST);
             return DnsResolver.staticMapping(Map.of(BENCH_HOST, List.of(addrs)));
-        } catch (java.net.UnknownHostException e) {
+        } catch (UnknownHostException e) {
             throw new RuntimeException("Cannot resolve benchmark host: " + BENCH_HOST, e);
         }
     }

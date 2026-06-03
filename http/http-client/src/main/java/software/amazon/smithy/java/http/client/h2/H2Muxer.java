@@ -723,7 +723,7 @@ final class H2Muxer implements AutoCloseable {
     private void processExchangePendingWrites(H2Exchange exchange) {
         int streamId = exchange.getStreamId();
         PendingWrite pw;
-        while ((pw = exchange.pendingWrites.poll()) != null) {
+        while ((pw = exchange.pollPendingWrite()) != null) {
             ByteBuffer buffer = pw.borrowed ? pw.data : null;
             try {
                 frameCodec.writeFrame(FRAME_TYPE_DATA, pw.flags, streamId, pw.data);
@@ -747,7 +747,7 @@ final class H2Muxer implements AutoCloseable {
         // Check if more writes arrived while we were draining. If so, re-enqueue.
         // Note: there's a benign race where VT could also enqueue via CAS, causing
         // a duplicate entry - but processExchangePendingWrites handles empty queues fine.
-        if (!exchange.pendingWrites.isEmpty()) {
+        if (exchange.hasPendingWrites()) {
             exchange.inWorkQueue = true;
             dataWorkQueue.offer(exchange);
         }

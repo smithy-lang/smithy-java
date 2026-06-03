@@ -25,7 +25,6 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayDeque;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -141,9 +140,11 @@ public final class H2Exchange implements HttpExchange {
     private int pendingStreamWindowUpdate;
 
     // === OUTBOUND PATH (VT → Writer) ===
-    // Pending writes queued by VT, drained by writer thread
-    // ConcurrentLinkedQueue is lock-free and safe for concurrent producer/consumer access
-    final ConcurrentLinkedQueue<PendingWrite> pendingWrites = new ConcurrentLinkedQueue<>();
+    // Pending writes queued by the request-writing VT and drained by the muxer writer thread.
+    // SPSC intrusive list: PendingWrite is the node, avoiding ConcurrentLinkedQueue node churn.
+    private final PendingWrite pendingWriteStub = new PendingWrite();
+    private PendingWrite pendingWriteHead = pendingWriteStub;
+    private PendingWrite pendingWriteTail = pendingWriteStub;
     // Flag to prevent duplicate additions to connection's work queue
     volatile boolean inWorkQueue;
 
@@ -1003,7 +1004,7 @@ public final class H2Exchange implements HttpExchange {
                 if (shareBuffers) {
                     int oldLimit = data.limit();
                     data.limit(data.position() + toSend);
-                    pendingWrites.add(new PendingWrite().initDirect(data.slice(), flags));
+                    enqueuePendingWrite(new PendingWrite().initDirect(data.slice(), flags));
                     data.position(data.limit());
                     data.limit(oldLimit);
                 } else {
@@ -1013,7 +1014,7 @@ public final class H2Exchange implements HttpExchange {
                     buf.put(data);
                     data.limit(oldLimit);
                     buf.flip();
-                    pendingWrites.add(new PendingWrite().init(buf, flags));
+                    enqueuePendingWrite(new PendingWrite().init(buf, flags));
                 }
                 batchRemaining -= toSend;
             }
@@ -1041,6 +1042,27 @@ public final class H2Exchange implements HttpExchange {
         }
     }
 
+    void enqueuePendingWrite(PendingWrite write) {
+        write.next = null;
+        pendingWriteTail.next = write;
+        pendingWriteTail = write;
+    }
+
+    PendingWrite pollPendingWrite() {
+        PendingWrite oldHead = pendingWriteHead;
+        PendingWrite next = oldHead.next;
+        if (next == null) {
+            return null;
+        }
+        oldHead.next = null;
+        pendingWriteHead = next;
+        return next;
+    }
+
+    boolean hasPendingWrites() {
+        return pendingWriteHead.next != null;
+    }
+
     void writeChannelData(ReadableByteChannel channel, long contentLength, boolean endStream)
             throws IOException {
         boolean hasTrailers = requestTrailers != null;
@@ -1062,7 +1084,7 @@ public final class H2Exchange implements HttpExchange {
                         buf.limit(toRead);
                         readFully(channel, buf, toRead);
                         buf.flip();
-                        pendingWrites.add(new PendingWrite().init(buf, flags));
+                        enqueuePendingWrite(new PendingWrite().init(buf, flags));
                     } catch (Throwable t) {
                         muxer.returnBuffer(buf);
                         throw t;
@@ -1159,7 +1181,7 @@ public final class H2Exchange implements HttpExchange {
                 muxer.queueTrailers(streamId, requestTrailers);
             } else {
                 // Use pendingWrites queue (same as writeData) to ensure ordering
-                pendingWrites.add(new PendingWrite().initDirect(ByteBuffer.allocate(0), FLAG_END_STREAM));
+                enqueuePendingWrite(new PendingWrite().initDirect(ByteBuffer.allocate(0), FLAG_END_STREAM));
 
                 // Signal writer thread
                 if (IN_WORK_QUEUE_HANDLE.compareAndSet(this, false, true)) {

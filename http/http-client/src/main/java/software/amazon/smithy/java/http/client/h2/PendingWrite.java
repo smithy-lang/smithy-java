@@ -16,6 +16,7 @@ final class PendingWrite {
     ByteBuffer data;
     int flags;
     boolean borrowed; // true if data came from pool and should be returned
+    volatile PendingWrite next;
 
     /**
      * Initialize with a pooled buffer.

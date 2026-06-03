@@ -281,16 +281,14 @@ final class DefaultHttpClient implements HttpClient {
 
             boolean errored = false;
             try {
-                if (!isH2) {
-                    if (wrappedStream == null) {
-                        if (wrappedChannel == null) {
-                            exchange.discardResponseBody();
-                        } else {
-                            wrappedChannel.close();
-                        }
+                if (wrappedStream == null) {
+                    if (wrappedChannel == null) {
+                        exchange.discardResponseBody();
                     } else {
-                        wrappedStream.transferTo(OutputStream.nullOutputStream());
+                        wrappedChannel.close();
                     }
+                } else {
+                    wrappedStream.transferTo(OutputStream.nullOutputStream());
                 }
             } catch (IOException e) {
                 errored = true;

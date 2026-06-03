@@ -106,7 +106,8 @@ public class H2cMixedGetPutBenchmark {
         eventLoopIndex = new AtomicInteger();
         agentTransports = new ArrayList<>(connections);
         for (int i = 0; i < connections; i++) {
-            agentTransports.add(new ConnectionAgentH2cTransport(BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2C_PORT));
+            agentTransports
+                    .add(new ConnectionAgentH2cTransport(BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2C_PORT));
         }
         agentIndex = new AtomicInteger();
 

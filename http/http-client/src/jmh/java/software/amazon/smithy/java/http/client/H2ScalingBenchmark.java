@@ -90,7 +90,6 @@ public class H2ScalingBenchmark {
     /** Total requests issued per @Benchmark invocation; matched on each method via @OperationsPerInvocation. */
     private static final int OPS = 1000;
 
-
     @Param({
             "1",
             "10"
@@ -182,7 +181,9 @@ public class H2ScalingBenchmark {
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) {
-                        ch.pipeline().addLast(nettySslCtx.newHandler(ch.alloc(), BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2_PORT));
+                        ch.pipeline()
+                                .addLast(nettySslCtx
+                                        .newHandler(ch.alloc(), BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2_PORT));
                         ch.pipeline().addLast(h2FrameCodec);
                         ch.pipeline()
                                 .addLast(new Http2MultiplexHandler(new SimpleChannelInboundHandler<Http2StreamFrame>() {
