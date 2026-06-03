@@ -121,9 +121,6 @@ final class H1ConnectionManager {
     /**
      * Release a connection back to the pool.
      *
-     * <p>This method may block if the pool is temporarily full, allowing short-lived contention to resolve and
-     * keeping the pool warm under bursty workloads.
-     *
      * @return true if pooled, false if pool full or closed
      */
     boolean release(Route route, HttpConnection connection, boolean poolClosed) {

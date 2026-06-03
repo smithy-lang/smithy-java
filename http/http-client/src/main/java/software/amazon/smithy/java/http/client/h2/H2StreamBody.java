@@ -52,8 +52,15 @@ final class H2StreamBody {
         this.releaser = releaser;
     }
 
-    synchronized int offer(ByteBuffer data, int chunkFlowControlBytes, Consumer<ByteBuffer> onClosed) {
+    /**
+     * Enqueue a chunk for the consumer. When {@code signal} is true, wake the consumer
+     * (the typical case). When false, the producer is in a burst and a later call (or
+     * {@link #signal()}) will wake the consumer once the burst ends, avoiding notify/wait
+     * churn for intermediate frames.
+     */
+    synchronized int offer(ByteBuffer data, int chunkFlowControlBytes, Consumer<ByteBuffer> onClosed, boolean signal) {
         while (failure == null && !completed && size == buffers.length) {
+            notifyAll();
             try {
                 wait();
             } catch (InterruptedException e) {
@@ -70,8 +77,15 @@ final class H2StreamBody {
         flowControlBytes[tail] = chunkFlowControlBytes;
         tail = (tail + 1) % buffers.length;
         size++;
-        notifyAll();
+        if (signal || size == buffers.length) {
+            notifyAll();
+        }
         return 0;
+    }
+
+    /** Wake any consumer waiting on data — called after a burst of {@link #offer} with {@code signal=false}. */
+    synchronized void signal() {
+        notifyAll();
     }
 
     synchronized boolean take(ChunkSlot dest) throws IOException {

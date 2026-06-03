@@ -27,10 +27,9 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * at a time (no multiplexing like HTTP/2).
  *
  * <h2>Connection Reuse</h2>
- * <p>Supports HTTP/1.1 persistent connections (keep-alive). After each exchange, the connection can be returned to
- * the pool for reuse if:
+ * <p>Supports persistent connections. After each exchange, the connection can be returned to the pool for reuse if:
  * <ul>
- *   <li>The server sent "Connection: keep-alive" (or didn't send "Connection: close")</li>
+ *   <li>The response version and connection headers permit persistent reuse</li>
  *   <li>The response body was fully read</li>
  *   <li>No errors occurred during the exchange</li>
  * </ul>

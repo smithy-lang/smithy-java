@@ -251,12 +251,12 @@ final class HpackDecoder {
     }
 
     /**
-     * Decode a header name string with validation and interning.
+     * Decode a header name string with validation and canonicalization.
      *
-     * <p>Validates that literal names do not contain uppercase characters, then interns via {@link HeaderName}.
+     * <p>Validates that literal names do not contain uppercase characters, then canonicalizes via {@link HeaderName}.
      *
      * @param data buffer containing encoded name
-     * @return interned header name
+     * @return canonical header name
      * @throws IOException if validation fails or decoding fails
      */
     private String decodeHeaderName(byte[] data) throws IOException {

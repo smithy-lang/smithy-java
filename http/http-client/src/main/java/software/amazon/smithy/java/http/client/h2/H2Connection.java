@@ -197,7 +197,6 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
     // ==================== Reader Thread ====================
 
     // Track last stream for batched signaling (stream-switch detection).
-    // With lock-free signaling, flushing the previous stream is cheap (just LockSupport.unpark).
     private H2Exchange lastDataExchange;
 
     private void readerLoop() {
@@ -255,7 +254,7 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
 
         H2Exchange exchange = muxer.getExchange(streamId);
 
-        // Stream switch detection: flush the previous stream if we're switching (lock-free)
+        // Stream switch detection: flush the previous stream if we're switching.
         if (lastDataExchange != null && lastDataExchange != exchange) {
             lastDataExchange.signalDataAvailable();
         }

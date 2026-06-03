@@ -14,10 +14,10 @@ import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
 import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
 
 /**
- * InputStream that reads HTTP/1.1 chunked transfer encoding format (RFC 7230 Section 4.1).
+ * InputStream that reads HTTP/1.1 chunked transfer encoding format (RFC 9112).
  *
- * <p>ChunkedInputStream intentionally doesn't close the delegate stream because it's a view over one response on a
- * potentially long-lived socket. The socket lifecycle is managed by H1Connection, which is managed by the pool.
+ * <p>ChunkedInputStream intentionally doesn't close the delegate stream. The connection lifecycle is managed by
+ * H1Connection, which is managed by the pool.
  */
 final class ChunkedInputStream extends InputStream {
     private static final long MAX_CHUNK_SIZE = readMaxChunkSize();
@@ -30,7 +30,7 @@ final class ChunkedInputStream extends InputStream {
     private boolean eof;
     private boolean closed;
     private final byte[] lineBuffer;
-    private HttpHeaders trailers; // Trailer headers parsed from final chunk (RFC 7230 Section 4.1.2)
+    private HttpHeaders trailers; // Trailer headers parsed from final chunk.
 
     ChunkedInputStream(UnsyncBufferedInputStream delegate) {
         this(delegate, null, new byte[MAX_LINE_LENGTH]);
@@ -195,7 +195,7 @@ final class ChunkedInputStream extends InputStream {
 
         closed = true;
         responseBodyComplete();
-        // Note: we don't close the delegate since the connection may be reused
+        // Do not close the delegate; connection lifecycle is handled by the exchange/pool.
     }
 
     /**
@@ -283,7 +283,7 @@ final class ChunkedInputStream extends InputStream {
     }
 
     /**
-     * Read and parse trailer headers after final chunk (RFC 7230 Section 4.1.2).
+     * Read and parse trailer headers after final chunk.
      *
      * <p>Trailers are formatted like HTTP headers and are read until a blank line.
      * Parsed trailers are stored and can be retrieved via {@link #getTrailers()}.

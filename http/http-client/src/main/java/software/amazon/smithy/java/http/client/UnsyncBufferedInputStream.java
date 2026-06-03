@@ -206,7 +206,7 @@ public final class UnsyncBufferedInputStream extends InputStream {
      * Returns the internal buffer array.
      *
      * <p><b>WARNING:</b> The caller must not modify the buffer contents.
-     * This method is provided for zero-copy read access only.
+     * This method is provided for direct buffered read access only.
      *
      * @return the internal buffer array
      */

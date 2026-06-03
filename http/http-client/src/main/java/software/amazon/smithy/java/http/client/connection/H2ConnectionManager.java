@@ -15,14 +15,14 @@ import java.util.function.BiConsumer;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
- * Manages HTTP/2 connections with adaptive load balancing.
+ * Manages HTTP/2 connections with watermark load balancing.
  *
  * <h2>Load Balancing Strategy</h2>
  * <p>Uses a high-watermark strategy to distribute streams across connections.
  *
  * <h2>Threading</h2>
- * <p>Uses per-route state with a volatile connection array for lock-free reads in the
- * common case. Connection creation and removal synchronize on the per-route state object.
+ * <p>Uses per-route state with a volatile connection array. Acquisition, connection creation,
+ * and removal coordinate through the per-route lock.
  */
 final class H2ConnectionManager {
 
@@ -32,7 +32,7 @@ final class H2ConnectionManager {
      * Per-route connection state.
      */
     private static final class RouteState {
-        /** Connections for this route. Volatile for lock-free reads. */
+        /** Connections for this route. Volatile for safe publication. */
         volatile MultiplexedHttpConnection[] conns = new MultiplexedHttpConnection[0];
 
         /** Connections currently being created (prevents over-creation). Guarded by lock. */
