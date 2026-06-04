@@ -375,17 +375,24 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
             if (streamId == 0) {
                 handleConnectionFrame(type, payload, length);
             } else {
-                // Handle HEADERS with CONTINUATION frames
+                // Always normalize HEADERS through readHeaderBlock so padding, priority, and
+                // PUSH_PROMISE promised-stream-id are stripped before the header block reaches
+                // HPACK — otherwise those bytes corrupt HPACK state and tear the connection.
+                // Also enforces a running cap on accumulated CONTINUATION growth.
                 byte[] headerPayload = payload;
                 int headerLength = length;
-                if (type == FRAME_TYPE_HEADERS && !frameCodec.hasFrameFlag(FLAG_END_HEADERS)) {
-                    headerPayload = frameCodec.readHeaderBlock(streamId, payload, length);
-                    headerLength = frameCodec.headerBlockSize();
-                    // Return original payload, headerPayload is a view into frameCodec's buffer
-                    if (payload != H2Constants.EMPTY_BYTES) {
-                        // payload is a plain byte[] from borrowByteArray, not pooled
-                    }
-                    payload = null; // Mark as already returned
+                if (type == FRAME_TYPE_HEADERS) {
+                    // Capture END_HEADERS before readHeaderBlock, which may consume CONTINUATION frames
+                    // and leave the flag reflecting the final CONTINUATION rather than the initial HEADERS.
+                    boolean initialEndHeaders = frameCodec.hasFrameFlag(FLAG_END_HEADERS);
+                    headerPayload = frameCodec.readHeaderBlock(
+                            streamId, payload, length, H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
+                    // Single-frame path returns an exact-length array; the CONTINUATION path returns the
+                    // accumulation buffer's backing array, whose length is its capacity, not the data size.
+                    headerLength = initialEndHeaders
+                            ? headerPayload.length
+                            : frameCodec.headerBlockSize();
+                    payload = null;
                 }
 
                 H2Exchange exchange = muxer.getExchange(streamId);
@@ -551,13 +558,23 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
             transport.setReadTimeout(50); // Short timeout - don't block long if server doesn't send one
             int type = frameCodec.nextFrame();
             switch (type) {
-                case -1, FRAME_TYPE_SETTINGS:
-                    // EOF or SETTINGS ACK, ignore, we don't wait for it
+                case -1:
+                    break;
+                case FRAME_TYPE_SETTINGS:
+                    if (!frameCodec.hasFrameFlag(FLAG_ACK)) {
+                        throw new H2Exception(ERROR_PROTOCOL_ERROR,
+                                "Unexpected non-ACK SETTINGS during handshake");
+                    }
                     break;
                 case FRAME_TYPE_WINDOW_UPDATE:
                     if (frameCodec.frameStreamId() == 0) {
                         int increment = frameCodec.readAndParseWindowUpdate();
                         muxer.releaseConnectionWindow(increment);
+                    } else {
+                        int sid = frameCodec.frameStreamId();
+                        frameCodec.skipBytes(frameCodec.framePayloadLength());
+                        throw new H2Exception(ERROR_PROTOCOL_ERROR,
+                                "Stream-level WINDOW_UPDATE during handshake (stream " + sid + ")");
                     }
                     break;
                 default:
@@ -582,6 +599,9 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
                     muxer.setMaxTableSize(value);
                     break;
                 case SETTINGS_ENABLE_PUSH:
+                    if (value != 0 && value != 1) {
+                        throw new H2Exception(ERROR_PROTOCOL_ERROR, "Invalid SETTINGS_ENABLE_PUSH: " + value);
+                    }
                     break;
                 case SETTINGS_MAX_CONCURRENT_STREAMS:
                     remoteMaxConcurrentStreams = value;

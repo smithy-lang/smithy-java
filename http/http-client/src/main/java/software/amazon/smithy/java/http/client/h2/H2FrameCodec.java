@@ -382,28 +382,77 @@ final class H2FrameCodec {
      * @return the complete header block payload
      * @throws IOException if reading fails
      */
-    byte[] readHeaderBlock(int initialStreamId, byte[] initialPayload, int initialLength) throws IOException {
-        // For PUSH_PROMISE, strip the 4-byte promised stream ID to get the header block fragment
-        if (currentType == FRAME_TYPE_PUSH_PROMISE && initialPayload != null) {
-            if (initialLength < 4) {
-                throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
-                        "PUSH_PROMISE frame payload too short for promised stream ID");
+    byte[] readHeaderBlock(int initialStreamId, byte[] initialPayload, int initialLength, int maxAccumulatedSize)
+            throws IOException {
+        int initialFlags = currentFlags;
+        int fragmentOffset = 0;
+        int fragmentLength = initialLength;
+
+        // RFC 9113 §6.2 (HEADERS) and §6.6 (PUSH_PROMISE): if PADDED, the first byte is pad-length and that
+        // many trailing bytes are padding. PRIORITY adds a 5-byte priority block right after pad-length (or at
+        // the very start when not padded). PUSH_PROMISE has 4 bytes of promised-stream-id at the start of the
+        // post-pad/-priority region (it never sets PRIORITY). All these bytes must be stripped before HPACK.
+        if (initialPayload != null && initialLength > 0
+                && (currentType == FRAME_TYPE_HEADERS || currentType == FRAME_TYPE_PUSH_PROMISE)) {
+            if ((initialFlags & FLAG_PADDED) != 0) {
+                if (fragmentLength < 1) {
+                    throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
+                            frameTypeName(currentType) + " padded frame missing pad-length byte");
+                }
+                int padLen = initialPayload[fragmentOffset] & 0xFF;
+                fragmentOffset++;
+                fragmentLength--;
+                if (padLen > fragmentLength) {
+                    throw new H2Exception(ERROR_PROTOCOL_ERROR,
+                            "Pad length " + padLen + " exceeds remaining " + frameTypeName(currentType)
+                                    + " payload " + fragmentLength);
+                }
+                fragmentLength -= padLen;
             }
-            int fragmentLength = initialLength - 4;
+            if (currentType == FRAME_TYPE_HEADERS && (initialFlags & FLAG_PRIORITY) != 0) {
+                if (fragmentLength < 5) {
+                    throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
+                            "HEADERS frame with PRIORITY missing 5-byte priority block");
+                }
+                fragmentOffset += 5;
+                fragmentLength -= 5;
+            }
+            if (currentType == FRAME_TYPE_PUSH_PROMISE) {
+                if (fragmentLength < 4) {
+                    throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
+                            "PUSH_PROMISE frame payload too short for promised stream ID");
+                }
+                fragmentOffset += 4;
+                fragmentLength -= 4;
+            }
+        }
+
+        if ((initialFlags & FLAG_END_HEADERS) != 0) {
+            // Single-frame header block. Bound check applies to this frame too.
+            if (fragmentLength > maxAccumulatedSize) {
+                throw new H2Exception(ERROR_PROTOCOL_ERROR,
+                        "Header block size " + fragmentLength + " exceeds limit " + maxAccumulatedSize);
+            }
+            if (initialPayload == null || fragmentLength == 0) {
+                return H2Constants.EMPTY_BYTES;
+            }
+            if (fragmentOffset == 0 && fragmentLength == initialLength) {
+                return initialPayload;
+            }
             byte[] fragment = new byte[fragmentLength];
-            System.arraycopy(initialPayload, 4, fragment, 0, fragmentLength);
-            initialPayload = fragment;
-            initialLength = fragmentLength;
+            System.arraycopy(initialPayload, fragmentOffset, fragment, 0, fragmentLength);
+            return fragment;
         }
 
-        if (hasFrameFlag(FLAG_END_HEADERS)) {
-            return initialPayload != null ? initialPayload : H2Constants.EMPTY_BYTES;
-        }
-
-        // Need to read CONTINUATION frames - use reusable buffer
+        // Need to read CONTINUATION frames - use reusable buffer with running size cap so a peer
+        // can't force unbounded growth before the post-accumulation check fires.
         headerBlockBuffer.reset();
-        if (initialPayload != null) {
-            headerBlockBuffer.write(initialPayload, 0, initialLength);
+        if (initialPayload != null && fragmentLength > 0) {
+            if (fragmentLength > maxAccumulatedSize) {
+                throw new H2Exception(ERROR_PROTOCOL_ERROR,
+                        "Header block size " + fragmentLength + " exceeds limit " + maxAccumulatedSize);
+            }
+            headerBlockBuffer.write(initialPayload, fragmentOffset, fragmentLength);
         }
 
         while (true) {
@@ -428,6 +477,11 @@ final class H2FrameCodec {
 
             int contLength = currentPayloadLength;
             if (contLength > 0) {
+                if ((long) headerBlockBuffer.size() + contLength > maxAccumulatedSize) {
+                    throw new H2Exception(ERROR_PROTOCOL_ERROR,
+                            "Header block size " + ((long) headerBlockBuffer.size() + contLength)
+                                    + " exceeds limit " + maxAccumulatedSize);
+                }
                 // Read directly into headerBlockBuffer to avoid intermediate allocation
                 readPayloadIntoBuffer(contLength);
             }
