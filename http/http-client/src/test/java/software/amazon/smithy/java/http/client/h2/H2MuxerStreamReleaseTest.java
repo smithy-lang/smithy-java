@@ -81,4 +81,20 @@ class H2MuxerStreamReleaseTest {
 
         muxer.releaseStream(streamId); // should not throw
     }
+
+    // Regression: a stream error releases the stream slot, and a racing close/error path that calls
+    // releaseStream again must be a no-op (only the first release counts).
+    @Test
+    void releaseStreamIsIdempotent() {
+        var callCount = new AtomicInteger(0);
+        muxer.setStreamReleaseCallback(callCount::incrementAndGet);
+
+        var exchange = new H2Exchange(muxer, null, 5000, 5000, 65535);
+        int streamId = muxer.allocateAndRegisterStream(exchange);
+
+        muxer.releaseStream(streamId);
+        muxer.releaseStream(streamId); // second call should be a no-op
+
+        assertEquals(1, callCount.get(), "Callback should fire exactly once across repeated releases");
+    }
 }

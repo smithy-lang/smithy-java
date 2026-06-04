@@ -404,6 +404,9 @@ public final class H2Exchange implements HttpExchange {
             dataLock.unlock();
         }
         streamBody.fail(readError);
+        if (streamId != 0) {
+            muxer.releaseStream(streamId);
+        }
     }
 
     /**

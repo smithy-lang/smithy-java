@@ -140,7 +140,7 @@ class H2FrameCodecTest {
         int length = readCodec.framePayloadLength();
         byte[] payload = new byte[length];
         readCodec.readPayloadInto(payload, 0, length);
-        readCodec.readHeaderBlock(streamId, payload, length);
+        readCodec.readHeaderBlock(streamId, payload, length, H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
 
         // Zero-copy: use headerBlockSize() for valid length
         assertEquals(50, readCodec.headerBlockSize());
@@ -193,7 +193,7 @@ class H2FrameCodecTest {
         int length = codec.framePayloadLength();
         byte[] payload = new byte[length];
         codec.readPayloadInto(payload, 0, length);
-        byte[] block = codec.readHeaderBlock(streamId, payload, length);
+        byte[] block = codec.readHeaderBlock(streamId, payload, length, H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
         int blockSize = codec.headerBlockSize();
 
         // Zero-copy: block is a view into internal buffer, use headerBlockSize() for valid length
@@ -213,7 +213,7 @@ class H2FrameCodecTest {
             int length = codec.framePayloadLength();
             byte[] payload = new byte[length];
             codec.readPayloadInto(payload, 0, length);
-            codec.readHeaderBlock(streamId, payload, length);
+            codec.readHeaderBlock(streamId, payload, length, H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
         });
     }
 
@@ -230,7 +230,7 @@ class H2FrameCodecTest {
             int length = codec.framePayloadLength();
             byte[] payload = new byte[length];
             codec.readPayloadInto(payload, 0, length);
-            codec.readHeaderBlock(streamId, payload, length);
+            codec.readHeaderBlock(streamId, payload, length, H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
         });
     }
 
@@ -246,7 +246,7 @@ class H2FrameCodecTest {
             int length = codec.framePayloadLength();
             byte[] payload = new byte[length];
             codec.readPayloadInto(payload, 0, length);
-            codec.readHeaderBlock(streamId, payload, length);
+            codec.readHeaderBlock(streamId, payload, length, H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
         });
     }
 
@@ -262,9 +262,67 @@ class H2FrameCodecTest {
         int length = codec.framePayloadLength();
         byte[] payload = new byte[length];
         codec.readPayloadInto(payload, 0, length);
-        byte[] block = codec.readHeaderBlock(streamId, payload, length);
+        byte[] block = codec.readHeaderBlock(streamId, payload, length, H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
 
         assertArrayEquals(new byte[] {'a', 'b'}, block);
+    }
+
+    // Regression: padding, priority, and PUSH_PROMISE prelude bytes must be stripped from the header
+    // block before HPACK sees them, on the single-frame (END_HEADERS) path too.
+    @Test
+    void headersStripsPadding() throws IOException {
+        // PADDED + END_HEADERS: [padLen=2][h1, h2][pad, pad]
+        byte[] block = readHeaderBlockWithCap(
+                buildFrame(1, H2Constants.FLAG_PADDED | H2Constants.FLAG_END_HEADERS, 1, new byte[] {2, 10, 20, 0, 0}),
+                H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
+        assertArrayEquals(new byte[] {10, 20}, block);
+    }
+
+    @Test
+    void headersStripsPriorityBlock() throws IOException {
+        // PRIORITY + END_HEADERS: [5-byte priority block][h1, h2]
+        byte[] block = readHeaderBlockWithCap(
+                buildFrame(1, H2Constants.FLAG_PRIORITY | H2Constants.FLAG_END_HEADERS, 1,
+                        new byte[] {0, 0, 0, 0, 5, 10, 20}),
+                H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
+        assertArrayEquals(new byte[] {10, 20}, block);
+    }
+
+    @Test
+    void headersStripsPaddingAndPriority() throws IOException {
+        // PADDED + PRIORITY + END_HEADERS: [padLen=1][5-byte priority][h1, h2][pad]
+        byte[] block = readHeaderBlockWithCap(
+                buildFrame(1, H2Constants.FLAG_PADDED | H2Constants.FLAG_PRIORITY | H2Constants.FLAG_END_HEADERS, 1,
+                        new byte[] {1, 0, 0, 0, 0, 5, 10, 20, 99}),
+                H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
+        assertArrayEquals(new byte[] {10, 20}, block);
+    }
+
+    @Test
+    void pushPromiseStripsPaddingAndPromisedStreamId() throws IOException {
+        // PADDED + END_HEADERS: [padLen=1][4-byte promised stream id][h1, h2][pad]
+        byte[] block = readHeaderBlockWithCap(
+                buildFrame(5, H2Constants.FLAG_PADDED | H2Constants.FLAG_END_HEADERS, 1,
+                        new byte[] {1, 0, 0, 0, 2, 10, 20, 99}),
+                H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
+        assertArrayEquals(new byte[] {10, 20}, block);
+    }
+
+    // Regression: the accumulated header block size cap is enforced as a running check, so an
+    // oversized block is rejected without first buffering all of it.
+    @Test
+    void singleFrameHeaderBlockExceedingCapThrows() {
+        assertThrows(H2Exception.class, () -> readHeaderBlockWithCap(
+                buildFrame(1, H2Constants.FLAG_END_HEADERS, 1, new byte[20]), 10));
+    }
+
+    @Test
+    void continuationHeaderBlockExceedingCapThrows() throws IOException {
+        var out = new ByteArrayOutputStream();
+        out.write(buildFrame(1, 0, 1, new byte[8])); // HEADERS, no END_HEADERS
+        out.write(buildFrame(9, H2Constants.FLAG_END_HEADERS, 1, new byte[8])); // CONTINUATION, END_HEADERS
+        // 8 + 8 = 16 bytes accumulated, cap is 10
+        assertThrows(H2Exception.class, () -> readHeaderBlockWithCap(out.toByteArray(), 10));
     }
 
     // Padding validation note: With the stateful API, padding processing is the caller's
@@ -497,6 +555,23 @@ class H2FrameCodecTest {
             codec.readPayloadInto(payload, 0, length);
         }
         return new TestFrame(type, flags, streamId, payload, length, codec);
+    }
+
+    // Decode the first frame of `frame`, read its payload, then run readHeaderBlock with the given cap.
+    // Returns an exact-length copy of the resulting header block so callers can assert on contents.
+    private byte[] readHeaderBlockWithCap(byte[] frame, int maxAccumulatedSize) throws IOException {
+        var codec = new H2FrameCodec(wrapIn(frame), wrapOut(new ByteArrayOutputStream()), 16384);
+        codec.nextFrame();
+        int streamId = codec.frameStreamId();
+        int length = codec.framePayloadLength();
+        byte[] payload = new byte[length];
+        if (length > 0) {
+            codec.readPayloadInto(payload, 0, length);
+        }
+        boolean endHeaders = codec.hasFrameFlag(H2Constants.FLAG_END_HEADERS);
+        byte[] block = codec.readHeaderBlock(streamId, payload, length, maxAccumulatedSize);
+        int blockSize = endHeaders ? block.length : codec.headerBlockSize();
+        return Arrays.copyOf(block, blockSize);
     }
 
     private void decodeAndReadPayload(byte[] frame) throws IOException {
