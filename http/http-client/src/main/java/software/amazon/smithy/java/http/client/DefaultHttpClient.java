@@ -21,6 +21,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -46,33 +48,56 @@ final class DefaultHttpClient implements HttpClient {
     private final ConnectionPool connectionPool;
     private final ProxySelector proxySelector;
     private final Duration requestTimeout;
+    private final List<HttpClientListener> listeners;
+    private final boolean hasListeners;
+    private final AtomicLong nextExchangeId = new AtomicLong();
     private final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
     DefaultHttpClient(Builder builder) {
         this.connectionPool = builder.connectionPool;
         this.proxySelector = builder.proxySelector;
         this.requestTimeout = builder.requestTimeout;
+        this.listeners = List.copyOf(builder.listeners);
+        this.hasListeners = !listeners.isEmpty();
     }
 
     @Override
     public HttpResponse send(HttpRequest request, RequestOptions options) throws IOException {
         Duration timeout = options.requestTimeout() != null ? options.requestTimeout() : requestTimeout;
-        return timeout != null ? sendWithTimeout(request, options, timeout) : sendInternal(request);
+        // The exchange id and the request-ended latch are owned here so the terminal onRequestEnd
+        // fires exactly once regardless of which path completes the request:
+        //   - success  → ManagedResponseBody fires it when the response body is closed
+        //   - failure  → the catch below fires it (single owner of final failure, including a
+        //                timeout observed on this caller thread rather than the worker thread)
+        // A per-route attempt failure inside the proxy loop must NOT end the exchange, since a later
+        // proxy may still succeed; sendForRoute therefore no longer fires onRequestEnd.
+        long exchangeId = nextExchangeId.incrementAndGet();
+        AtomicBoolean requestEnded = new AtomicBoolean();
+        notifyRequestStart(exchangeId, request);
+        try {
+            return timeout != null
+                    ? sendWithTimeout(request, timeout, exchangeId, requestEnded)
+                    : sendInternal(request, exchangeId, requestEnded);
+        } catch (IOException | RuntimeException e) {
+            notifyRequestEnd(exchangeId, requestEnded, e);
+            throw e;
+        }
     }
 
-    private HttpResponse sendInternal(HttpRequest request) throws IOException {
+    private HttpResponse sendInternal(HttpRequest request, long exchangeId, AtomicBoolean requestEnded)
+            throws IOException {
         var target = request.uri();
         List<ProxyConfiguration> proxies = proxySelector.select(target);
 
         if (proxies.isEmpty()) {
-            return sendForRoute(request, Route.from(target, null));
+            return sendForRoute(request, Route.from(target, null), exchangeId, requestEnded);
         }
 
         IOException last = null;
         for (ProxyConfiguration proxy : proxies) {
             Route route = Route.from(target, proxy);
             try {
-                return sendForRoute(request, route);
+                return sendForRoute(request, route, exchangeId, requestEnded);
             } catch (IOException e) {
                 last = e;
                 proxySelector.connectFailed(target, proxy, e);
@@ -81,8 +106,13 @@ final class DefaultHttpClient implements HttpClient {
         throw last;
     }
 
-    private HttpResponse sendForRoute(HttpRequest request, Route route) throws IOException {
-        HttpConnection conn = connectionPool.acquire(route);
+    private HttpResponse sendForRoute(
+            HttpRequest request,
+            Route route,
+            long exchangeId,
+            AtomicBoolean requestEnded
+    ) throws IOException {
+        HttpConnection conn = connectionPool.acquire(route, exchangeId);
         HttpExchange exchange;
         try {
             exchange = conn.newExchange(request);
@@ -118,7 +148,7 @@ final class DefaultHttpClient implements HttpClient {
                 // H1, or replayable bounded H2 bodies: write inline
                 exchange.writeRequestBody(requestBody);
             } else {
-                // No body — close request stream to send END_STREAM
+                // No body, so close request stream to send END_STREAM
                 exchange.writeRequestBody(null);
             }
 
@@ -131,7 +161,14 @@ final class DefaultHttpClient implements HttpClient {
             long contentLength = exchange.responseContentLength();
 
             // Wrap body so close releases connection
-            DataStream managedBody = new ManagedResponseBody(exchange, conn, isH2, contentType, contentLength);
+            DataStream managedBody = new ManagedResponseBody(
+                    exchange,
+                    conn,
+                    isH2,
+                    contentType,
+                    contentLength,
+                    exchangeId,
+                    requestEnded);
 
             return HttpResponse.create()
                     .setStatusCode(statusCode)
@@ -143,6 +180,8 @@ final class DefaultHttpClient implements HttpClient {
                 exchange.close();
             } catch (IOException ignored) {}
             connectionPool.evict(conn, true);
+            // Do not fire onRequestEnd here: a per-route attempt failure may be retried on the next
+            // proxy, and send() owns the single terminal failure event.
             throw e;
         }
     }
@@ -160,23 +199,35 @@ final class DefaultHttpClient implements HttpClient {
         private final boolean isH2;
         private final String contentType;
         private final long contentLength;
+        private final long exchangeId;
+        private final AtomicBoolean requestEnded;
+        // close()/discard() release or evict the pooled connection; the stream/channel wrappers returned to
+        // the caller can be closed from a different thread than the one that built the response, so the
+        // one-shot guard must be atomic to prevent two closers both releasing the same connection.
+        private final AtomicBoolean closed = new AtomicBoolean();
         private boolean consumed;
-        private boolean closed;
-        private InputStream wrappedStream;
-        private ReadableByteChannel wrappedChannel;
+        // Written by the consuming thread (asInputStream/asChannel/writeTo) and read by close()/discard(),
+        // which may run on a different thread; volatile so the drain path sees the correct wrapper rather
+        // than a stale null (which would pick the wrong drain branch and corrupt a reused H1 connection).
+        private volatile InputStream wrappedStream;
+        private volatile ReadableByteChannel wrappedChannel;
 
         ManagedResponseBody(
                 HttpExchange exchange,
                 HttpConnection conn,
                 boolean isH2,
                 String contentType,
-                long contentLength
+                long contentLength,
+                long exchangeId,
+                AtomicBoolean requestEnded
         ) {
             this.exchange = exchange;
             this.conn = conn;
             this.isH2 = isH2;
             this.contentType = contentType;
             this.contentLength = contentLength;
+            this.exchangeId = exchangeId;
+            this.requestEnded = requestEnded;
         }
 
         @Override
@@ -196,7 +247,7 @@ final class DefaultHttpClient implements HttpClient {
 
         @Override
         public boolean isAvailable() {
-            return !closed && !consumed;
+            return !closed.get() && !consumed;
         }
 
         @Override
@@ -207,6 +258,7 @@ final class DefaultHttpClient implements HttpClient {
                 wrappedStream = inner;
                 return new ManagedResponseInputStream(inner, contentLength, ManagedResponseBody.this::close);
             } catch (IOException e) {
+                end(e);
                 throw new UncheckedIOException(e);
             }
         }
@@ -220,11 +272,16 @@ final class DefaultHttpClient implements HttpClient {
                 return new ReadableByteChannel() {
                     @Override
                     public int read(ByteBuffer dst) throws IOException {
-                        int n = inner.read(dst);
-                        if (n == -1) {
-                            ManagedResponseBody.this.close();
+                        try {
+                            int n = inner.read(dst);
+                            if (n == -1) {
+                                ManagedResponseBody.this.close();
+                            }
+                            return n;
+                        } catch (IOException e) {
+                            end(e);
+                            throw e;
                         }
-                        return n;
                     }
 
                     @Override
@@ -242,6 +299,7 @@ final class DefaultHttpClient implements HttpClient {
                     }
                 };
             } catch (IOException e) {
+                end(e);
                 throw new UncheckedIOException(e);
             }
         }
@@ -253,6 +311,9 @@ final class DefaultHttpClient implements HttpClient {
             wrappedStream = inner;
             try {
                 inner.transferTo(out);
+            } catch (IOException e) {
+                end(e);
+                throw e;
             } finally {
                 close();
             }
@@ -265,6 +326,9 @@ final class DefaultHttpClient implements HttpClient {
             wrappedStream = inner;
             try {
                 inner.transferTo(Channels.newOutputStream(ch));
+            } catch (IOException e) {
+                end(e);
+                throw e;
             } finally {
                 close();
             }
@@ -272,77 +336,73 @@ final class DefaultHttpClient implements HttpClient {
 
         @Override
         public void discard() throws IOException {
-            if (closed) {
+            if (!closed.compareAndSet(false, true)) {
                 return;
             }
-            closed = true;
 
             boolean errored = false;
+            Throwable error = null;
             try {
-                if (wrappedStream == null) {
-                    if (wrappedChannel == null) {
-                        exchange.discardResponseBody();
-                    } else {
-                        wrappedChannel.close();
-                    }
-                } else {
-                    wrappedStream.transferTo(OutputStream.nullOutputStream());
-                }
+                drainOrDiscardBody();
             } catch (IOException e) {
                 errored = true;
+                error = e;
                 throw e;
             } finally {
-                try {
-                    exchange.close();
-                } catch (Exception e) {
-                    errored = true;
-                }
-
-                if (errored) {
-                    connectionPool.evict(conn, true);
-                } else {
-                    connectionPool.release(conn);
-                }
+                finishExchange(errored, error);
             }
         }
 
         @Override
         public void close() {
-            if (closed) {
+            if (!closed.compareAndSet(false, true)) {
                 return;
             }
-            closed = true;
 
             boolean errored = false;
+            Throwable error = null;
 
             // H1: drain body for connection reuse. H2: skip — exchange.close() sends RST_STREAM.
             // The body may not have been read at all (wrappedStream == null) — e.g. when the
             // SDK calls discard() without first opening the stream. In that case we still need
             // to drain through the exchange so the H1 keepalive contract is honored; reusing the
             // connection without consuming the response body would corrupt the next exchange.
-            //
-            // Use a 64 KiB drain buffer rather than InputStream.transferTo's 16 KiB default so
-            // a typical 256 KiB body drains in 4 read trips instead of 16.
             if (!isH2) {
                 try {
-                    if (wrappedStream == null) {
-                        if (wrappedChannel == null) {
-                            exchange.discardResponseBody();
-                        } else {
-                            wrappedChannel.close();
-                        }
-                    } else {
-                        wrappedStream.transferTo(OutputStream.nullOutputStream());
-                    }
-                } catch (IOException ignored) {
+                    drainOrDiscardBody();
+                } catch (IOException e) {
                     errored = true;
+                    error = e;
                 }
             }
 
+            finishExchange(errored, error);
+        }
+
+        /**
+         * Release the response body according to how the caller opened it: drain an opened stream (so an
+         * H1 keepalive connection is left clean for reuse), close an opened channel, or — if the body was
+         * never opened — discard it at the exchange level.
+         */
+        private void drainOrDiscardBody() throws IOException {
+            if (wrappedStream != null) {
+                wrappedStream.transferTo(OutputStream.nullOutputStream());
+            } else if (wrappedChannel != null) {
+                wrappedChannel.close();
+            } else {
+                exchange.discardResponseBody();
+            }
+        }
+
+        // Close the exchange, then release the connection to the pool (or evict it on error) and fire the
+        // terminal onRequestEnd. An exception from {@link HttpExchange#close()} marks the exchange errored,
+        // preserving any earlier error as the reported cause.
+        private void finishExchange(boolean errored, Throwable error) {
             try {
                 exchange.close();
             } catch (Exception e) {
                 errored = true;
+                error = error == null ? e : error;
             }
 
             if (errored) {
@@ -350,6 +410,8 @@ final class DefaultHttpClient implements HttpClient {
             } else {
                 connectionPool.release(conn);
             }
+
+            end(error);
         }
 
         @Override
@@ -363,11 +425,19 @@ final class DefaultHttpClient implements HttpClient {
             }
             consumed = true;
         }
+
+        private void end(Throwable error) {
+            notifyRequestEnd(exchangeId, requestEnded, error);
+        }
     }
 
-    private HttpResponse sendWithTimeout(HttpRequest request, RequestOptions options, Duration timeout)
-            throws IOException {
-        Future<HttpResponse> future = executorService.submit(() -> sendInternal(request));
+    private HttpResponse sendWithTimeout(
+            HttpRequest request,
+            Duration timeout,
+            long exchangeId,
+            AtomicBoolean requestEnded
+    ) throws IOException {
+        Future<HttpResponse> future = executorService.submit(() -> sendInternal(request, exchangeId, requestEnded));
 
         try {
             return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -395,6 +465,37 @@ final class DefaultHttpClient implements HttpClient {
             case null -> new IOException("Unexpected exception", e);
             default -> new IOException("Unexpected exception", cause);
         };
+    }
+
+    private void notifyRequestStart(long exchangeId, HttpRequest request) {
+        if (hasListeners) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onRequestStart(exchangeId, request);
+                } catch (Throwable e) {
+                    listenerFailed("onRequestStart", e);
+                }
+            }
+        }
+    }
+
+    private void notifyRequestEnd(long exchangeId, AtomicBoolean requestEnded, Throwable error) {
+        if (hasListeners && requestEnded.compareAndSet(false, true)) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onRequestEnd(exchangeId, error);
+                } catch (Throwable e) {
+                    listenerFailed("onRequestEnd", e);
+                }
+            }
+        }
+    }
+
+    private static void listenerFailed(String event, Throwable error) {
+        if (error instanceof VirtualMachineError) {
+            throw (VirtualMachineError) error;
+        }
+        LOGGER.warn("HTTP client listener failed in {}", event, error);
     }
 
     @Override

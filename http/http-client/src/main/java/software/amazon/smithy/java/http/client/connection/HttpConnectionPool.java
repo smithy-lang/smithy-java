@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import software.amazon.smithy.java.http.client.HttpClientListener;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 
 /**
@@ -75,12 +76,12 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  * <pre>{@code
  * // api.example.com resolves to [203.0.113.1, 203.0.113.2]
  * // If connection to .1 fails, automatically tries .2
- * HttpConnection conn = pool.acquire(route);
+ * HttpConnection conn = pool.acquire(route, exchangeId);
  * }</pre>
  *
  * <h2>Pool Exhaustion and Backpressure</h2>
  * <p>When route capacity, stream capacity, or {@code maxTotalConnections} is exhausted,
- * {@link #acquire(Route)} blocks for up to {@code acquireTimeout} (default: 30 seconds)
+ * {@link #acquire(Route, long)} blocks for up to {@code acquireTimeout} (default: 30 seconds)
  * waiting for capacity to become available. This behavior is consistent for both HTTP/1.1
  * and HTTP/2 connections.
  *
@@ -108,7 +109,7 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  *
  * // Acquire connection
  * Route route = Route.from(SmithyUri.of("https://api.example.com/users"));
- * HttpConnection conn = pool.acquire(route);
+ * HttpConnection conn = pool.acquire(route, exchangeId);
  *
  * try {
  *     // Use connection
@@ -116,7 +117,7 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  *     // ...
  * } finally {
  *     // Return to pool for reuse
- *     pool.release(conn, route);
+ *     pool.release(conn);
  * }
  *
  * // Cleanup
@@ -128,6 +129,7 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  * @see HttpVersionPolicy
  */
 public final class HttpConnectionPool implements ConnectionPool {
+
     private final int defaultMaxConnectionsPerRoute;
     private final Map<String, Integer> perHostLimits;
     private final int maxTotalConnections;
@@ -156,8 +158,8 @@ public final class HttpConnectionPool implements ConnectionPool {
     // if the deadline passes. One wheel for the whole pool — O(1) arm/cancel per read.
     private final HashedWheelTimer readTimer;
 
-    // Listeners for pool lifecycle events
-    private final List<ConnectionPoolListener> listeners;
+    // Listeners for client lifecycle events
+    private final List<HttpClientListener> listeners;
     private final boolean hasListeners;
 
     HttpConnectionPool(HttpConnectionPoolBuilder builder) {
@@ -182,6 +184,9 @@ public final class HttpConnectionPool implements ConnectionPool {
                         readTimer)
                 : null;
 
+        this.listeners = List.copyOf(builder.listeners);
+        this.hasListeners = !listeners.isEmpty();
+
         this.connectionFactory = new HttpConnectionFactory(
                 builder.connectTimeout,
                 builder.tlsNegotiationTimeout,
@@ -192,6 +197,8 @@ public final class HttpConnectionPool implements ConnectionPool {
                 builder.sslEngineFactory,
                 builder.versionPolicy,
                 dnsResolver,
+                listeners,
+                !listeners.isEmpty(),
                 resolveSocketFactory(builder),
                 readTimer,
                 epollConnector,
@@ -204,8 +211,6 @@ public final class HttpConnectionPool implements ConnectionPool {
 
         this.h1Manager = new H1ConnectionManager(this.maxIdleTimeNanos);
         this.connectionPermits = new Semaphore(builder.maxTotalConnections, false);
-        this.listeners = List.copyOf(builder.listeners);
-        this.hasListeners = !listeners.isEmpty();
         this.h2Manager = new H2ConnectionManager(builder.h2StreamsPerConnection,
                 this.acquireTimeoutMs,
                 listeners,
@@ -223,19 +228,19 @@ public final class HttpConnectionPool implements ConnectionPool {
     }
 
     @Override
-    public HttpConnection acquire(Route route) throws IOException {
+    public HttpConnection acquire(Route route, long exchangeId) throws IOException {
         if (closed) {
             throw new IllegalStateException("Connection pool is closed");
         } else if ((route.isSecure() && versionPolicy != HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 || (!route.isSecure() && versionPolicy.usesH2cForCleartext())) {
             int maxConns = getMaxConnectionsForRoute(route);
-            return h2Manager.acquire(route, maxConns);
+            return h2Manager.acquire(route, maxConns, exchangeId);
         } else {
-            return acquireH1(route);
+            return acquireH1(route, exchangeId);
         }
     }
 
-    private HttpConnection acquireH1(Route route) throws IOException {
+    private HttpConnection acquireH1(Route route, long exchangeId) throws IOException {
         int maxConns = getMaxConnectionsForRoute(route);
 
         h1Manager.acquireActive(route, maxConns, acquireTimeoutMs);
@@ -251,8 +256,8 @@ public final class HttpConnectionPool implements ConnectionPool {
             // No pooled connection, so acquire global capacity for a new physical socket.
             acquirePermit();
 
-            // Re-check pool after acquiring the permit, since a connection may have been released while waiting. If we
-            // reuse one, return the newly acquired permit because the idle socket already owns one.
+            // Re-check the pool: a connection may have been released while we waited. If we reuse one,
+            // give back the just-acquired permit since the idle socket already owns one.
             pooled = h1Manager.tryAcquire(route, maxConns, this::releaseIdleH1Permit);
             if (pooled != null) {
                 connectionPermits.release();
@@ -260,29 +265,27 @@ public final class HttpConnectionPool implements ConnectionPool {
                 return pooled;
             }
 
-            return createH1Connection(route);
+            return createH1Connection(route, exchangeId);
         } catch (IOException | RuntimeException e) {
             h1Manager.releaseActive(route);
             throw e;
         }
     }
 
-    private HttpConnection createH1Connection(Route route) throws IOException {
+    private HttpConnection createH1Connection(Route route, long exchangeId) throws IOException {
         HttpConnection conn = null;
         boolean success = false;
         try {
-            conn = connectionFactory.create(route);
+            conn = connectionFactory.create(route, exchangeId);
             notifyConnected(conn);
             notifyAcquire(conn, false);
             success = true;
             return conn;
-        } catch (IOException e) {
-            notifyConnectFailed(route, e);
-            throw e;
         } catch (Exception e) {
-            IOException ioe = new IOException(e);
-            notifyConnectFailed(route, ioe);
-            throw ioe;
+            if (e instanceof IOException ioe) {
+                throw ioe;
+            }
+            throw new IOException(e);
         } finally {
             if (!success) {
                 connectionPermits.release();
@@ -294,17 +297,14 @@ public final class HttpConnectionPool implements ConnectionPool {
     }
 
     // Called by H2ConnectionManager when a new connection is needed.
-    private MultiplexedHttpConnection onNewH2Connection(Route route) throws IOException {
-        // Note: cleanupDead was removed from here - it caused lock contention under load.
-        // Background cleanup thread handles dead connection removal every 30 seconds.
-
-        // Block on global capacity
+    private MultiplexedHttpConnection onNewH2Connection(Route route, long exchangeId) throws IOException {
+        // Dead-connection cleanup is left to the background thread; doing it here caused lock contention.
         acquirePermit();
 
         HttpConnection conn = null;
         boolean success = false;
         try {
-            conn = connectionFactory.create(route);
+            conn = connectionFactory.create(route, exchangeId);
             notifyConnected(conn);
             if (conn instanceof MultiplexedHttpConnection h2conn) {
                 success = true;
@@ -312,13 +312,11 @@ public final class HttpConnectionPool implements ConnectionPool {
             }
             // ALPN negotiated HTTP/1.1 instead of H2 - shouldn't happen with H2C_PRIOR_KNOWLEDGE
             throw new IOException("Expected H2 connection but got " + conn.httpVersion());
-        } catch (IOException e) {
-            notifyConnectFailed(route, e);
-            throw e;
         } catch (Exception e) {
-            IOException ioe = new IOException(e);
-            notifyConnectFailed(route, ioe);
-            throw ioe;
+            if (e instanceof IOException ioe) {
+                throw ioe;
+            }
+            throw new IOException(e);
         } finally {
             if (!success) {
                 connectionPermits.release();
@@ -430,8 +428,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         // Wait for connections to be closed (permits represent physical connections, not streams).
         // For HTTP/2, permits are released when the connection closes, not when streams finish.
         Instant deadline = Instant.now().plus(gracePeriod);
-        while (connectionPermits.availablePermits() < maxTotalConnections
-                && Instant.now().isBefore(deadline)) {
+        while (connectionPermits.availablePermits() < maxTotalConnections && Instant.now().isBefore(deadline)) {
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
@@ -461,7 +458,6 @@ public final class HttpConnectionPool implements ConnectionPool {
      * @return maximum connections for this route
      */
     private int getMaxConnectionsForRoute(Route route) {
-        // common case: no custom per-host limits configured
         if (perHostLimits.isEmpty()) {
             return defaultMaxConnectionsPerRoute;
         }
@@ -471,8 +467,7 @@ public final class HttpConnectionPool implements ConnectionPool {
             return limit;
         }
 
-        // For non-default ports, also check host-only limit as a fallback
-        // (e.g., api.example.com:8080 falls back to api.example.com limit)
+        // For non-default ports, fall back to a host-only limit (api.example.com:8080 → api.example.com).
         if (route.port() != 80 && route.port() != 443) {
             limit = perHostLimits.get(route.host());
             if (limit != null) {
@@ -480,7 +475,6 @@ public final class HttpConnectionPool implements ConnectionPool {
             }
         }
 
-        // Use default
         return defaultMaxConnectionsPerRoute;
     }
 
@@ -493,7 +487,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         try {
             connection.close();
         } catch (IOException ignored) {
-            // ignored
+            // best effort
         }
     }
 
@@ -501,59 +495,70 @@ public final class HttpConnectionPool implements ConnectionPool {
      * Close a connection, notify listeners, and release its permit.
      */
     private void closeAndReleasePermit(HttpConnection connection, CloseReason reason) {
-        closeConnection(connection);
-        notifyClosed(connection, reason);
-        connectionPermits.release();
+        try {
+            closeConnection(connection);
+            notifyClosed(connection, reason);
+        } finally {
+            // Release the permit unconditionally: a listener (or close) failure must never leak a
+            // permit, or the pool slowly exhausts and every acquire eventually blocks.
+            connectionPermits.release();
+        }
     }
 
     private void notifyConnected(HttpConnection connection) {
-        if (!hasListeners) {
-            return;
-        }
-        for (ConnectionPoolListener listener : listeners) {
-            listener.onConnected(connection);
-        }
-    }
-
-    private void notifyConnectFailed(Route route, IOException cause) {
-        if (!hasListeners) {
-            return;
-        }
-        for (ConnectionPoolListener listener : listeners) {
-            listener.onConnectFailed(route, cause);
+        if (hasListeners) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onConnectionCreated(connection);
+                } catch (Throwable e) {
+                    ListenerSupport.listenerFailed("onConnectionCreated", e);
+                }
+            }
         }
     }
 
     private void notifyAcquire(HttpConnection connection, boolean reused) {
-        if (!hasListeners) {
-            return;
-        }
-        for (ConnectionPoolListener listener : listeners) {
-            listener.onAcquire(connection, reused);
+        if (hasListeners) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onConnectionAcquired(connection, reused);
+                } catch (Throwable e) {
+                    ListenerSupport.listenerFailed("onConnectionAcquired", e);
+                }
+            }
         }
     }
 
     private void notifyReturn(HttpConnection connection) {
-        if (!hasListeners) {
-            return;
-        }
-        for (ConnectionPoolListener listener : listeners) {
-            listener.onReturn(connection);
+        if (hasListeners) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onConnectionReturned(connection);
+                } catch (Throwable e) {
+                    ListenerSupport.listenerFailed("onConnectionReturned", e);
+                }
+            }
         }
     }
 
     private void notifyClosed(HttpConnection connection, CloseReason reason) {
-        if (!hasListeners) {
-            return;
-        }
-        for (ConnectionPoolListener listener : listeners) {
-            listener.onClosed(connection, reason);
+        if (hasListeners) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onConnectionClosed(connection, reason);
+                } catch (Throwable e) {
+                    ListenerSupport.listenerFailed("onConnectionClosed", e);
+                }
+            }
         }
     }
 
     private void releaseIdleH1Permit(HttpConnection connection, CloseReason reason) {
-        notifyClosed(connection, reason);
-        connectionPermits.release();
+        try {
+            notifyClosed(connection, reason);
+        } finally {
+            connectionPermits.release();
+        }
     }
 
     /**
@@ -577,17 +582,9 @@ public final class HttpConnectionPool implements ConnectionPool {
         while (!closed) {
             try {
                 Thread.sleep(Duration.ofSeconds(30));
-
-                // Clean up HTTP/1.1 connections
                 h1Manager.cleanupIdle(this::releaseIdleH1Permit);
-
-                // Clean up unhealthy HTTP/2 connections
                 h2Manager.cleanupAllDead(this::closeAndReleasePermit);
-
-                // Clean up idle HTTP/2 connections (no active streams and idle too long)
-                // Note: closeAndReleasePermit already releases the permit
                 h2Manager.cleanupIdle(maxIdleTimeNanos, this::closeAndReleasePermit);
-
             } catch (InterruptedException e) {
                 break;
             }

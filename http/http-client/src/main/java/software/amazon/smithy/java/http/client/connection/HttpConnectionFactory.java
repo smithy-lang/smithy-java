@@ -21,6 +21,7 @@ import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.ModifiableHttpRequest;
+import software.amazon.smithy.java.http.client.HttpClientListener;
 import software.amazon.smithy.java.http.client.HttpCredentials;
 import software.amazon.smithy.java.http.client.ProxyConfiguration;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
@@ -51,6 +52,8 @@ record HttpConnectionFactory(
         ClientSslEngineFactory sslEngineFactory,
         HttpVersionPolicy versionPolicy,
         DnsResolver dnsResolver,
+        List<HttpClientListener> listeners,
+        boolean hasListeners,
         HttpSocketFactory socketFactory,
         Timer readTimer,
         EpollConnector epollConnector,
@@ -60,6 +63,7 @@ record HttpConnectionFactory(
         int h2BufferSize,
         int tlsReadBufferSize,
         int tlsWriteBufferSize) {
+
     /**
      * Create a new connection to the given route.
      *
@@ -67,20 +71,17 @@ record HttpConnectionFactory(
      * @return a new HttpConnection
      * @throws IOException if connection fails
      */
-    HttpConnection create(Route route) throws IOException {
+    HttpConnection create(Route route, long exchangeId) throws IOException {
         if (route.usesProxy()) {
-            return connectViaProxy(route);
+            return connectViaProxy(route, exchangeId);
         }
 
-        List<InetAddress> addresses = dnsResolver.resolve(route.host());
-        if (addresses.isEmpty()) {
-            throw new IOException("DNS resolution failed: no addresses for " + route.host());
-        }
+        List<InetAddress> addresses = resolve(route.host(), exchangeId);
 
         IOException lastException = null;
         for (InetAddress address : addresses) {
             try {
-                return connectToAddress(address, route, addresses);
+                return connectToAddress(address, route, addresses, exchangeId);
             } catch (IOException e) {
                 lastException = e;
                 dnsResolver.reportFailure(address);
@@ -92,52 +93,67 @@ record HttpConnectionFactory(
                 lastException);
     }
 
-    private HttpConnection connectToAddress(InetAddress address, Route route, List<InetAddress> allEndpoints)
-            throws IOException {
-        // Experimental persistent-registration epoll backend. It opens and connects its own native
-        // socket instead of going through the NIO SocketChannel path below. Secure routes drive TLS
-        // via SSLEngineTransport; cleartext routes use EpollTransport directly, which lets h2c prior
-        // knowledge use the same epoll socket path.
+    private HttpConnection connectToAddress(
+            InetAddress address,
+            Route route,
+            List<InetAddress> allEndpoints,
+            long exchangeId
+    ) throws IOException {
         if (epollConnector != null) {
             return route.isSecure()
-                    ? connectEpollTls(address, route)
-                    : connectEpollCleartext(address, route);
+                    ? connectEpollTls(address, route, exchangeId)
+                    : connectEpollCleartext(address, route, exchangeId);
         }
 
         Socket socket = socketFactory.newSocket(route, allEndpoints);
-
-        try {
-            socket.connect(new InetSocketAddress(address, route.port()), toIntMillis(connectTimeout));
-        } catch (IOException e) {
-            closeQuietly(socket);
-            throw e;
-        }
+        connectSocket(address, route, exchangeId, socket, route.port());
 
         ConnectionTransport transport;
-        if (route.isSecure()) {
-            // With a custom SSLEngine factory (e.g. native BoringSSL), drive every secure connection
-            // — HTTP/1.1 included — through SSLEngineTransport so the native engine is used uniformly.
-            // Without it, keep the JDK SSLSocket fast path for ENFORCE_HTTP_1_1.
-            transport = (versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1 && sslEngineFactory == null)
-                    ? performTlsSocketHandshake(socket, route)
-                    : performTlsHandshake(socket, route);
-        } else {
+        if (!route.isSecure()) {
             transport = ConnectionTransport.of(socket);
+        } else if (versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1 && sslEngineFactory == null) {
+            transport = performTlsSocketHandshake(socket, route, exchangeId);
+        } else {
+            transport = performTlsHandshake(socket, route, exchangeId);
         }
 
         return createProtocolConnection(transport, route);
     }
 
-    private EpollChannel connectEpollChannel(InetAddress address, Route route) throws IOException {
+    private void connectSocket(InetAddress address, Route route, long exchangeId, Socket socket, int port)
+            throws IOException {
+        notifyConnectStart(exchangeId, route, address);
         try {
-            return epollConnector.connect(address, route.port(), toIntMillis(connectTimeout));
+            socket.connect(new InetSocketAddress(address, port), toIntMillis(connectTimeout));
+            notifyConnectEnd(exchangeId, route, address, null);
+        } catch (IOException | RuntimeException e) {
+            notifyConnectEnd(exchangeId, route, address, e);
+            // This helper closes the socket on connect failure so the direct path (which has no outer
+            // catch) does not leak it. Callers with an outer catch-all (the proxy path) may close it
+            // again; that is safe since closeQuietly and Socket.close are idempotent.
+            closeQuietly(socket);
+            throw e;
+        }
+    }
+
+    private EpollChannel connectEpollChannel(InetAddress address, Route route, long exchangeId) throws IOException {
+        try {
+            notifyConnectStart(exchangeId, route, address);
+            try {
+                EpollChannel channel = epollConnector.connect(address, route.port(), toIntMillis(connectTimeout));
+                notifyConnectEnd(exchangeId, route, address, null);
+                return channel;
+            } catch (IOException | RuntimeException e) {
+                notifyConnectEnd(exchangeId, route, address, e);
+                throw e;
+            }
         } catch (IOException e) {
             throw new IOException("Failed to connect to " + route.host() + " via epoll transport", e);
         }
     }
 
-    private HttpConnection connectEpollCleartext(InetAddress address, Route route) throws IOException {
-        EpollChannel channel = connectEpollChannel(address, route);
+    private HttpConnection connectEpollCleartext(InetAddress address, Route route, long exchangeId) throws IOException {
+        EpollChannel channel = connectEpollChannel(address, route, exchangeId);
         try {
             return createProtocolConnection(new EpollTransport(channel, toIntMillis(readTimeout)), route);
         } catch (IOException | RuntimeException e) {
@@ -146,9 +162,9 @@ record HttpConnectionFactory(
         }
     }
 
-    private HttpConnection connectEpollTls(InetAddress address, Route route) throws IOException {
+    private HttpConnection connectEpollTls(InetAddress address, Route route, long exchangeId) throws IOException {
         EpollChannel channel;
-        channel = connectEpollChannel(address, route);
+        channel = connectEpollChannel(address, route, exchangeId);
 
         SSLEngine engine = null;
         Runnable releaser = () -> {};
@@ -173,7 +189,14 @@ record HttpConnectionFactory(
                     toIntMillis(tlsNegotiationTimeout),
                     tlsReadBufferSize,
                     tlsWriteBufferSize);
-            transport.handshake();
+            notifyTlsStart(exchangeId, route);
+            try {
+                transport.handshake();
+                notifyTlsEnd(exchangeId, route, transport, null);
+            } catch (IOException | RuntimeException e) {
+                notifyTlsEnd(exchangeId, route, null, e);
+                throw e;
+            }
             transport.setReadTimeout(toIntMillis(readTimeout));
             return createProtocolConnection(transport, route);
         } catch (IOException e) {
@@ -187,7 +210,7 @@ record HttpConnectionFactory(
         }
     }
 
-    private ConnectionTransport performTlsHandshake(Socket socket, Route route) throws IOException {
+    private ConnectionTransport performTlsHandshake(Socket socket, Route route, long exchangeId) throws IOException {
         Runnable releaser = () -> {};
         try {
             SSLEngine engine;
@@ -212,7 +235,14 @@ record HttpConnectionFactory(
                         readTimer,
                         tlsReadBufferSize,
                         tlsWriteBufferSize);
-                transport.handshake();
+                notifyTlsStart(exchangeId, route);
+                try {
+                    transport.handshake();
+                    notifyTlsEnd(exchangeId, route, transport, null);
+                } catch (IOException | RuntimeException e) {
+                    notifyTlsEnd(exchangeId, route, null, e);
+                    throw e;
+                }
                 return transport;
             } finally {
                 socket.setSoTimeout(originalTimeout);
@@ -230,7 +260,8 @@ record HttpConnectionFactory(
         }
     }
 
-    private ConnectionTransport performTlsSocketHandshake(Socket socket, Route route) throws IOException {
+    private ConnectionTransport performTlsSocketHandshake(Socket socket, Route route, long exchangeId)
+            throws IOException {
         SSLSocket sslSocket = null;
         try {
             sslSocket = (SSLSocket) sslContext.getSocketFactory()
@@ -240,7 +271,18 @@ record HttpConnectionFactory(
             int originalTimeout = sslSocket.getSoTimeout();
             sslSocket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
             try {
-                sslSocket.startHandshake();
+                notifyTlsStart(exchangeId, route);
+                try {
+                    sslSocket.startHandshake();
+                    notifyTlsEnd(exchangeId,
+                            route,
+                            sslSocket.getApplicationProtocol(),
+                            sslSocket.getSession().getCipherSuite(),
+                            null);
+                } catch (IOException | RuntimeException e) {
+                    notifyTlsEnd(exchangeId, route, null, null, e);
+                    throw e;
+                }
             } finally {
                 sslSocket.setSoTimeout(originalTimeout);
             }
@@ -358,23 +400,22 @@ record HttpConnectionFactory(
                 h2BufferSize);
     }
 
-    private HttpConnection connectViaProxy(Route route) throws IOException {
+    private HttpConnection connectViaProxy(Route route, long exchangeId) throws IOException {
         ProxyConfiguration proxy = route.proxy();
 
         if (proxy.type() == ProxyConfiguration.ProxyType.SOCKS4
                 || proxy.type() == ProxyConfiguration.ProxyType.SOCKS5) {
-            throw new UnsupportedOperationException("SOCKS proxies not yet supported: " + proxy.type());
+            // IOException (not UnsupportedOperationException) so the caller's per-proxy catch treats this
+            // as a route-attempt failure: ProxySelector.connectFailed runs and the next proxy is tried.
+            throw new IOException("SOCKS proxies not yet supported: " + proxy.type());
         }
 
-        List<InetAddress> proxyAddresses = dnsResolver.resolve(proxy.hostname());
-        if (proxyAddresses.isEmpty()) {
-            throw new IOException("DNS resolution failed for proxy: " + proxy.hostname());
-        }
+        List<InetAddress> proxyAddresses = resolve(proxy.hostname(), exchangeId);
 
         IOException lastException = null;
         for (InetAddress proxyAddress : proxyAddresses) {
             try {
-                return connectToProxy(proxyAddress, route, proxy, proxyAddresses);
+                return connectToProxy(proxyAddress, route, proxy, proxyAddresses, exchangeId);
             } catch (IOException e) {
                 lastException = e;
                 dnsResolver.reportFailure(proxyAddress);
@@ -391,12 +432,13 @@ record HttpConnectionFactory(
             InetAddress proxyAddress,
             Route route,
             ProxyConfiguration proxy,
-            List<InetAddress> allProxyEndpoints
+            List<InetAddress> allProxyEndpoints,
+            long exchangeId
     ) throws IOException {
         Socket proxySocket = socketFactory.newSocket(route, allProxyEndpoints);
 
         try {
-            proxySocket.connect(new InetSocketAddress(proxyAddress, proxy.port()), toIntMillis(connectTimeout));
+            connectSocket(proxyAddress, route, exchangeId, proxySocket, proxy.port());
 
             // Connect to the proxy over TLS if the scheme is https
             if ("https".equalsIgnoreCase(proxy.proxyUri().getScheme())) {
@@ -405,21 +447,33 @@ record HttpConnectionFactory(
             }
 
             if (route.isSecure()) {
-                var result = establishTunnel(
-                        proxySocket,
-                        route.host(),
-                        route.port(),
-                        proxy.credentials(),
-                        readTimeout);
-
-                if (result.statusCode() != 200) {
-                    closeQuietly(proxySocket);
-                    throw new IOException("Proxy CONNECT failed: " + result.statusCode());
+                notifyProxyConnectStart(exchangeId, route, proxy, proxyAddress);
+                TunnelResult result;
+                try {
+                    result = establishTunnel(
+                            proxySocket,
+                            route.host(),
+                            route.port(),
+                            proxy.credentials(),
+                            readTimeout);
+                } catch (IOException | RuntimeException e) {
+                    notifyProxyConnectEnd(exchangeId, route, proxy, proxyAddress, -1, e);
+                    throw e;
                 }
 
+                // A non-200 CONNECT is a tunnel failure, not a success: report it through the terminal
+                // event with an error (consistent with every other *End event) before throwing.
+                if (result.statusCode() != 200) {
+                    var failure = new IOException("Proxy CONNECT failed: " + result.statusCode());
+                    notifyProxyConnectEnd(exchangeId, route, proxy, proxyAddress, result.statusCode(), failure);
+                    closeQuietly(proxySocket);
+                    throw failure;
+                }
+                notifyProxyConnectEnd(exchangeId, route, proxy, proxyAddress, result.statusCode(), null);
+
                 ConnectionTransport transport = versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1
-                        ? performTlsSocketHandshake(proxySocket, route)
-                        : performTlsHandshake(proxySocket, route);
+                        ? performTlsSocketHandshake(proxySocket, route, exchangeId)
+                        : performTlsHandshake(proxySocket, route, exchangeId);
                 return createProtocolConnection(transport, route);
             }
 
@@ -507,6 +561,141 @@ record HttpConnectionFactory(
         } catch (IOException e) {
             closeQuietly(sslSocket != null ? sslSocket : socket);
             throw new IOException("TLS handshake to HTTPS proxy " + proxy.hostname() + " failed", e);
+        }
+    }
+
+    private List<InetAddress> resolve(String host, long exchangeId) throws IOException {
+        notifyDnsStart(exchangeId, host);
+        try {
+            List<InetAddress> addresses = dnsResolver.resolve(host);
+            // An empty result is a DNS failure indistinguishable from a thrown one — both mean no usable
+            // address. Report it as such (onDnsEnd with an error) rather than firing a success event and
+            // letting the caller discover emptiness afterwards.
+            if (addresses.isEmpty()) {
+                throw new IOException("DNS resolution failed: no addresses for " + host);
+            }
+            notifyDnsEnd(exchangeId, host, addresses, null);
+            return addresses;
+        } catch (IOException | RuntimeException e) {
+            notifyDnsEnd(exchangeId, host, List.of(), e);
+            throw e;
+        }
+    }
+
+    private void notifyDnsStart(long exchangeId, String host) {
+        if (hasListeners) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onDnsStart(exchangeId, host);
+                } catch (Throwable e) {
+                    ListenerSupport.listenerFailed("onDnsStart", e);
+                }
+            }
+        }
+    }
+
+    private void notifyDnsEnd(long exchangeId, String host, List<InetAddress> addresses, Throwable error) {
+        if (hasListeners) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onDnsEnd(exchangeId, host, addresses, error);
+                } catch (Throwable e) {
+                    ListenerSupport.listenerFailed("onDnsEnd", e);
+                }
+            }
+        }
+    }
+
+    private void notifyConnectStart(long exchangeId, Route route, InetAddress address) {
+        if (hasListeners) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onConnectStart(exchangeId, route, address);
+                } catch (Throwable e) {
+                    ListenerSupport.listenerFailed("onConnectStart", e);
+                }
+            }
+        }
+    }
+
+    private void notifyConnectEnd(long exchangeId, Route route, InetAddress address, Throwable error) {
+        if (hasListeners) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onConnectEnd(exchangeId, route, address, error);
+                } catch (Throwable e) {
+                    ListenerSupport.listenerFailed("onConnectEnd", e);
+                }
+            }
+        }
+    }
+
+    private void notifyTlsStart(long exchangeId, Route route) {
+        if (hasListeners) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onTlsStart(exchangeId, route);
+                } catch (Throwable e) {
+                    ListenerSupport.listenerFailed("onTlsStart", e);
+                }
+            }
+        }
+    }
+
+    private void notifyTlsEnd(long exchangeId, Route route, ConnectionTransport transport, Throwable error) {
+        String cipherSuite = null;
+        if (transport != null && transport.sslSession() != null) {
+            cipherSuite = transport.sslSession().getCipherSuite();
+        }
+        notifyTlsEnd(exchangeId, route, transport == null ? null : transport.negotiatedProtocol(), cipherSuite, error);
+    }
+
+    private void notifyTlsEnd(
+            long exchangeId,
+            Route route,
+            String protocol,
+            String cipherSuite,
+            Throwable error
+    ) {
+        if (hasListeners) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onTlsEnd(exchangeId, route, protocol, cipherSuite, error);
+                } catch (Throwable e) {
+                    ListenerSupport.listenerFailed("onTlsEnd", e);
+                }
+            }
+        }
+    }
+
+    private void notifyProxyConnectStart(long exchangeId, Route route, ProxyConfiguration proxy, InetAddress address) {
+        if (hasListeners) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onProxyConnectStart(exchangeId, route, proxy, address);
+                } catch (Throwable e) {
+                    ListenerSupport.listenerFailed("onProxyConnectStart", e);
+                }
+            }
+        }
+    }
+
+    private void notifyProxyConnectEnd(
+            long exchangeId,
+            Route route,
+            ProxyConfiguration proxy,
+            InetAddress address,
+            int statusCode,
+            Throwable error
+    ) {
+        if (hasListeners) {
+            for (HttpClientListener listener : listeners) {
+                try {
+                    listener.onProxyConnectEnd(exchangeId, route, proxy, address, statusCode, error);
+                } catch (Throwable e) {
+                    ListenerSupport.listenerFailed("onProxyConnectEnd", e);
+                }
+            }
         }
     }
 
