@@ -180,9 +180,9 @@ jmh {
     val profilersProp = project.findProperty("jmh.profilers")?.toString()
     includes = if (includesProp != null) listOf(includesProp) else listOf(".*")
 
-    warmupIterations = 3
-    iterations = 3
-    fork = 1
+    warmupIterations = (project.findProperty("jmh.warmupIterations") as String?)?.toInt() ?: 3
+    iterations = (project.findProperty("jmh.iterations") as String?)?.toInt() ?: 3
+    fork = (project.findProperty("jmh.fork") as String?)?.toInt() ?: 1
     resultFormat = "CSV"
     resultsFile = project.file("build/reports/jmh/results.csv")
     val args = mutableListOf<String>()

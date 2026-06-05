@@ -7,6 +7,8 @@ package software.amazon.smithy.java.http.client;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -72,6 +74,7 @@ public interface HttpClient extends AutoCloseable {
         ConnectionPool connectionPool;
         Duration requestTimeout;
         ProxySelector proxySelector = DIRECT;
+        final List<HttpClientListener> listeners = new LinkedList<>();
 
         private Builder() {}
 
@@ -141,13 +144,42 @@ public interface HttpClient extends AutoCloseable {
         }
 
         /**
+         * Add a listener for HTTP client lifecycle events.
+         *
+         * <p>Listeners are invoked synchronously on the thread performing the work. Implementations should avoid
+         * blocking and keep allocation low.
+         *
+         * @param listener listener to add
+         * @return this builder
+         */
+        public Builder addListener(HttpClientListener listener) {
+            listeners.add(Objects.requireNonNull(listener, "listener"));
+            return this;
+        }
+
+        /**
+         * Add a listener at the front of the listener list.
+         *
+         * @param listener listener to add
+         * @return this builder
+         */
+        public Builder addListenerFirst(HttpClientListener listener) {
+            listeners.addFirst(Objects.requireNonNull(listener, "listener"));
+            return this;
+        }
+
+        /**
          * Build the HTTP client.
          *
          * @return a new HTTP client instance
          */
         public HttpClient build() {
             if (connectionPool == null) {
-                connectionPool = HttpConnectionPool.builder().build();
+                var builder = HttpConnectionPool.builder();
+                for (HttpClientListener listener : listeners) {
+                    builder.addListener(listener);
+                }
+                connectionPool = builder.build();
             }
             return new DefaultHttpClient(this);
         }

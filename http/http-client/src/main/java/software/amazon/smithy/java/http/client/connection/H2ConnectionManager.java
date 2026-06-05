@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
+import software.amazon.smithy.java.http.client.HttpClientListener;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -55,18 +56,18 @@ final class H2ConnectionManager {
     private final ConcurrentHashMap<Route, RouteState> routes = new ConcurrentHashMap<>();
     private final H2LoadBalancer loadBalancer;
     private final long acquireTimeoutMs;
-    private final List<ConnectionPoolListener> listeners;
+    private final List<HttpClientListener> listeners;
     private final ConnectionFactory connectionFactory;
 
     @FunctionalInterface
     interface ConnectionFactory {
-        MultiplexedHttpConnection create(Route route) throws IOException;
+        MultiplexedHttpConnection create(Route route, long exchangeId) throws IOException;
     }
 
     H2ConnectionManager(
             int streamsPerConnection,
             long acquireTimeoutMs,
-            List<ConnectionPoolListener> listeners,
+            List<HttpClientListener> listeners,
             ConnectionFactory connectionFactory
     ) {
         this.acquireTimeoutMs = acquireTimeoutMs;
@@ -94,7 +95,7 @@ final class H2ConnectionManager {
      * @return an H2 connection ready for use
      * @throws IOException if acquisition times out or is interrupted
      */
-    MultiplexedHttpConnection acquire(Route route, int maxConnectionsForRoute) throws IOException {
+    MultiplexedHttpConnection acquire(Route route, int maxConnectionsForRoute, long exchangeId) throws IOException {
         RouteState state = stateFor(route);
         long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(acquireTimeoutMs);
 
@@ -162,15 +163,16 @@ final class H2ConnectionManager {
             state.lock.unlock();
         }
 
-        return createNewH2Connection(route, state);
+        return createNewH2Connection(route, state, exchangeId);
     }
 
-    private MultiplexedHttpConnection createNewH2Connection(Route route, RouteState state) throws IOException {
+    private MultiplexedHttpConnection createNewH2Connection(Route route, RouteState state, long exchangeId)
+            throws IOException {
         // Create new connection OUTSIDE the lock to avoid deadlock.
         MultiplexedHttpConnection newConn = null;
         IOException createException = null;
         try {
-            newConn = connectionFactory.create(route);
+            newConn = connectionFactory.create(route, exchangeId);
             // Signal waiters when a stream is released so they can re-check capacity
             newConn.setStreamReleaseCallback(() -> {
                 state.lock.lock();
@@ -374,8 +376,12 @@ final class H2ConnectionManager {
     }
 
     private void notifyAcquire(MultiplexedHttpConnection conn, boolean reused) {
-        for (ConnectionPoolListener listener : listeners) {
-            listener.onAcquire(conn, reused);
+        for (HttpClientListener listener : listeners) {
+            try {
+                listener.onConnectionAcquired(conn, reused);
+            } catch (Throwable e) {
+                ListenerSupport.listenerFailed("onConnectionAcquired", e);
+            }
         }
     }
 }

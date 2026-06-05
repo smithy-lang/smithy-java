@@ -55,7 +55,6 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.client.connection.ConnectionPoolListener;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -129,9 +128,9 @@ public class H2cScalingBenchmark {
                         .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
                         .dnsResolver(BenchmarkSupport.staticDns())
                         .useEpollTransport(useEpoll)
-                        .addListener(new ConnectionPoolListener() {
+                        .addListener(new HttpClientListener() {
                             @Override
-                            public void onConnected(HttpConnection conn) {
+                            public void onConnectionCreated(HttpConnection conn) {
                                 int count = smithyConnectionCount.incrementAndGet();
                                 System.out.println("  [Smithy] New connection #" + count + ": " + conn);
                             }

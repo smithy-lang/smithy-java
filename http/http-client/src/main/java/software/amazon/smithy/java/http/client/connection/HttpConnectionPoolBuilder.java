@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Objects;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
+import software.amazon.smithy.java.http.client.HttpClientListener;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 
 /**
@@ -57,7 +58,7 @@ public final class HttpConnectionPoolBuilder {
     // before one socket write, collapsing write syscalls for bulk uploads. Same path scoping as
     // tlsReadBufferSize; the JDK SSLSocket path is unaffected.
     int tlsWriteBufferSize = 16 * 1024;
-    final List<ConnectionPoolListener> listeners = new LinkedList<>();
+    final List<HttpClientListener> listeners = new LinkedList<>();
 
     /**
      * Set default maximum connections per route (default: 256).
@@ -678,17 +679,18 @@ public final class HttpConnectionPoolBuilder {
     }
 
     /**
-     * Add a listener for connection pool lifecycle events.
+     * Add a listener for HTTP client lifecycle events.
      *
-     * <p>Listeners are notified of connection creation, acquisition, release, and eviction events. Multiple
-     * listeners can be added and are called in order. Listeners are called synchronously, so calls should be fast.
+     * <p>Listeners are notified of connection creation, acquisition, release, eviction, and connection setup events.
+     * Multiple listeners can be added and are called in order. Listeners are called synchronously, so calls should be
+     * fast.
      *
      * @param listener the listener to add
      * @return this builder
      * @throws NullPointerException if listener is null
-     * @see ConnectionPoolListener
+     * @see HttpClientListener
      */
-    public HttpConnectionPoolBuilder addListener(ConnectionPoolListener listener) {
+    public HttpConnectionPoolBuilder addListener(HttpClientListener listener) {
         listeners.add(Objects.requireNonNull(listener, "listener"));
         return this;
     }
@@ -702,9 +704,9 @@ public final class HttpConnectionPoolBuilder {
      * @param listener the listener to add
      * @return this builder
      * @throws NullPointerException if listener is null
-     * @see #addListener(ConnectionPoolListener)
+     * @see #addListener(HttpClientListener)
      */
-    public HttpConnectionPoolBuilder addListenerFirst(ConnectionPoolListener listener) {
+    public HttpConnectionPoolBuilder addListenerFirst(HttpClientListener listener) {
         listeners.addFirst(Objects.requireNonNull(listener, "listener"));
         return this;
     }

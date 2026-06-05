@@ -24,11 +24,12 @@ public interface ConnectionPool extends AutoCloseable {
      * Blocks until a connection is available or limits are exceeded.
      *
      * @param route the route to connect to
+     * @param exchangeId opaque client-generated exchange id used to correlate listener events
      * @return a usable connection
      * @throws IOException if connection cannot be established
      * @throws IllegalStateException if pool is closed
      */
-    HttpConnection acquire(Route route) throws IOException;
+    HttpConnection acquire(Route route, long exchangeId) throws IOException;
 
     /**
      * Release a connection back to the pool for reuse.
