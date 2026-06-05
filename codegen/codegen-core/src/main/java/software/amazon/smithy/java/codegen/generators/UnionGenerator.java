@@ -17,6 +17,7 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
+import software.amazon.smithy.java.codegen.sections.GetterSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
@@ -138,11 +139,7 @@ public final class UnionGenerator
                                         ${serializeMember:C};
                                     }
 
-                                    @Override${?hasBoxed}
-                                    @SuppressWarnings("unchecked")${/hasBoxed}
-                                    public ${member:B} getValue() {
-                                        return ${^unit}${memberName:L}${/unit}${?unit}null${/unit};
-                                    }
+                                    ${valueGetter:C|}
 
                                     ${toString:C|}
                                 }
@@ -159,6 +156,17 @@ public final class UnionGenerator
                 writer.putContext("memberSchema", CodegenUtils.toMemberSchemaName(memberName));
                 writer.putContext("schemaClass", Schema.class);
                 writer.putContext("toString", new ToStringGenerator(writer));
+                writer.putContext("valueGetter", writer.consumer((writer) -> {
+                    writer.pushState(new GetterSection(member));
+                    writer.writeInline("""
+                            @Override${?hasBoxed}
+                            @SuppressWarnings("unchecked")${/hasBoxed}
+                            public ${member:B} getValue() {
+                                return ${^unit}${memberName:L}${/unit}${?unit}null${/unit};
+                            }
+                            """);
+                    writer.popState();
+                }));
                 // Use memberName as the field name for serialization
                 writer.putContext(
                         "serializeMember",
