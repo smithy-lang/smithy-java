@@ -78,21 +78,6 @@ final class SSLEngineTransport implements ConnectionTransport {
     private volatile boolean closed;
     private boolean eof;
 
-    private static final int DEFAULT_BUFFER_SIZE = 16 * 1024;
-
-    SSLEngineTransport(Socket socket, SSLEngine engine) throws IOException {
-        this(socket, engine, () -> {}, null, DEFAULT_BUFFER_SIZE, DEFAULT_BUFFER_SIZE);
-    }
-
-    SSLEngineTransport(Socket socket, SSLEngine engine, Runnable engineReleaser) throws IOException {
-        this(socket, engine, engineReleaser, null, DEFAULT_BUFFER_SIZE, DEFAULT_BUFFER_SIZE);
-    }
-
-    SSLEngineTransport(Socket socket, SSLEngine engine, Runnable engineReleaser, Timer readTimer)
-            throws IOException {
-        this(socket, engine, engineReleaser, readTimer, DEFAULT_BUFFER_SIZE, DEFAULT_BUFFER_SIZE);
-    }
-
     /**
      * @param readBufferSize target capacity (bytes) for the ciphertext-read ({@code netIn}) and
      *     plaintext-unwrap ({@code appIn}) buffers. Sized up to at least one TLS record. A larger
