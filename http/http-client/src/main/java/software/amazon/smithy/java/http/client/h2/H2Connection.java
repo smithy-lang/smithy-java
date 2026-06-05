@@ -119,7 +119,6 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
     /**
      * Create an HTTP/2 connection from a connected socket.
      *
-     * @param socket the connected socket
      * @param route the route for this connection
      * @param readTimeout read timeout duration
      * @param writeTimeout write timeout duration
