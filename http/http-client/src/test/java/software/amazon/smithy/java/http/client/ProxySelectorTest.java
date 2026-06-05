@@ -12,18 +12,16 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
 class ProxySelectorTest {
 
     private static final SmithyUri TARGET = SmithyUri.of("https://example.com");
-    private static final Context CTX = Context.create();
 
     @Test
     void directReturnsEmptyList() {
         var selector = ProxySelector.direct();
-        var result = selector.select(TARGET, CTX);
+        var result = selector.select(TARGET);
 
         assertTrue(result.isEmpty());
     }
@@ -32,7 +30,7 @@ class ProxySelectorTest {
     void ofReturnsSingleProxy() {
         var proxy = new ProxyConfiguration(SmithyUri.of("http://proxy:8080"), ProxyConfiguration.ProxyType.HTTP);
         var selector = ProxySelector.of(proxy);
-        var result = selector.select(TARGET, CTX);
+        var result = selector.select(TARGET);
 
         assertEquals(List.of(proxy), result);
     }
@@ -42,7 +40,7 @@ class ProxySelectorTest {
         var proxy1 = new ProxyConfiguration(SmithyUri.of("http://proxy1:8080"), ProxyConfiguration.ProxyType.HTTP);
         var proxy2 = new ProxyConfiguration(SmithyUri.of("http://proxy2:8080"), ProxyConfiguration.ProxyType.HTTP);
         var selector = ProxySelector.of(proxy1, proxy2);
-        var result = selector.select(TARGET, CTX);
+        var result = selector.select(TARGET);
 
         assertEquals(List.of(proxy1, proxy2), result);
     }
@@ -53,7 +51,7 @@ class ProxySelectorTest {
         var proxy2 = new ProxyConfiguration(SmithyUri.of("http://proxy2:8080"), ProxyConfiguration.ProxyType.HTTP);
         var delegate = ProxySelector.of(proxy1, proxy2);
         var selector = ProxySelector.noFailover(delegate);
-        var result = selector.select(TARGET, CTX);
+        var result = selector.select(TARGET);
 
         assertEquals(List.of(proxy1), result);
     }
@@ -62,7 +60,7 @@ class ProxySelectorTest {
     void noFailoverReturnsEmptyWhenDelegateReturnsEmpty() {
         var delegate = ProxySelector.direct();
         var selector = ProxySelector.noFailover(delegate);
-        var result = selector.select(TARGET, CTX);
+        var result = selector.select(TARGET);
 
         assertTrue(result.isEmpty());
     }
@@ -73,18 +71,18 @@ class ProxySelectorTest {
         var proxy = new ProxyConfiguration(SmithyUri.of("http://proxy:8080"), ProxyConfiguration.ProxyType.HTTP);
         var delegate = new ProxySelector() {
             @Override
-            public List<ProxyConfiguration> select(SmithyUri target, Context context) {
+            public List<ProxyConfiguration> select(SmithyUri target) {
                 return List.of(proxy);
             }
 
             @Override
-            public void connectFailed(SmithyUri target, Context context, ProxyConfiguration p, IOException cause) {
+            public void connectFailed(SmithyUri target, ProxyConfiguration p, IOException cause) {
                 failedProxy.set(p);
             }
         };
 
         var selector = ProxySelector.noFailover(delegate);
-        selector.connectFailed(TARGET, CTX, proxy, new IOException("test"));
+        selector.connectFailed(TARGET, proxy, new IOException("test"));
 
         assertEquals(proxy, failedProxy.get());
     }

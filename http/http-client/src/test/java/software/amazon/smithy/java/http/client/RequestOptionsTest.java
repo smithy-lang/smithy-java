@@ -7,29 +7,35 @@ package software.amazon.smithy.java.http.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.context.Context;
 
 class RequestOptionsTest {
 
     @Test
-    void putContextAddsToContext() {
-        var key = Context.<String>key("test");
-        var options = RequestOptions.builder().putContext(key, "value").build();
+    void defaultsUseNullRequestTimeout() {
+        var options = RequestOptions.defaults();
 
-        assertEquals("value", options.context().get(key));
+        assertNull(options.requestTimeout());
     }
 
     @Test
-    void buildClearsRequestTimeout() {
-        var builder = RequestOptions.builder()
-                .requestTimeout(Duration.ofSeconds(5));
-        var first = builder.build();
-        var second = builder.build();
+    void ofTimeoutUsesDefaultsForNull() {
+        assertEquals(new RequestOptions(null), RequestOptions.defaults());
+    }
 
-        assertEquals(Duration.ofSeconds(5), first.requestTimeout());
-        assertNull(second.requestTimeout(), "requestTimeout should be cleared after build");
+    @Test
+    void ofTimeoutSetsRequestTimeout() {
+        var options = new RequestOptions(Duration.ofSeconds(5));
+
+        assertEquals(Duration.ofSeconds(5), options.requestTimeout());
+    }
+
+    @Test
+    void rejectsNonPositiveTimeout() {
+        assertThrows(IllegalArgumentException.class, () -> new RequestOptions(Duration.ZERO));
+        assertThrows(IllegalArgumentException.class, () -> new RequestOptions(Duration.ofMillis(-1)));
     }
 }

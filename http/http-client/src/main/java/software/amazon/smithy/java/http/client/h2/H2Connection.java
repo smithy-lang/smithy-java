@@ -386,7 +386,10 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
                     // and leave the flag reflecting the final CONTINUATION rather than the initial HEADERS.
                     boolean initialEndHeaders = frameCodec.hasFrameFlag(FLAG_END_HEADERS);
                     headerPayload = frameCodec.readHeaderBlock(
-                            streamId, payload, length, H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
+                            streamId,
+                            payload,
+                            length,
+                            H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
                     // Single-frame path returns an exact-length array; the CONTINUATION path returns the
                     // accumulation buffer's backing array, whose length is its capacity, not the data size.
                     headerLength = initialEndHeaders
