@@ -68,9 +68,10 @@ public interface HttpClient extends AutoCloseable {
      * Builder used to create a default HTTP client implementation.
      */
     final class Builder {
+        private static final ProxySelector DIRECT = ProxySelector.direct();
         ConnectionPool connectionPool;
         Duration requestTimeout;
-        ProxySelector proxySelector = ProxySelector.direct();
+        ProxySelector proxySelector = DIRECT;
 
         private Builder() {}
 
@@ -122,7 +123,7 @@ public interface HttpClient extends AutoCloseable {
          * @see ProxyConfiguration
          */
         public Builder proxy(ProxyConfiguration proxy) {
-            return proxySelector(proxy != null ? ProxySelector.of(proxy) : ProxySelector.direct());
+            return proxySelector(proxy != null ? ProxySelector.of(proxy) : DIRECT);
         }
 
         /**

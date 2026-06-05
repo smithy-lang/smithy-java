@@ -282,7 +282,9 @@ class H2FrameCodecTest {
     void headersStripsPriorityBlock() throws IOException {
         // PRIORITY + END_HEADERS: [5-byte priority block][h1, h2]
         byte[] block = readHeaderBlockWithCap(
-                buildFrame(1, H2Constants.FLAG_PRIORITY | H2Constants.FLAG_END_HEADERS, 1,
+                buildFrame(1,
+                        H2Constants.FLAG_PRIORITY | H2Constants.FLAG_END_HEADERS,
+                        1,
                         new byte[] {0, 0, 0, 0, 5, 10, 20}),
                 H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
         assertArrayEquals(new byte[] {10, 20}, block);
@@ -292,7 +294,9 @@ class H2FrameCodecTest {
     void headersStripsPaddingAndPriority() throws IOException {
         // PADDED + PRIORITY + END_HEADERS: [padLen=1][5-byte priority][h1, h2][pad]
         byte[] block = readHeaderBlockWithCap(
-                buildFrame(1, H2Constants.FLAG_PADDED | H2Constants.FLAG_PRIORITY | H2Constants.FLAG_END_HEADERS, 1,
+                buildFrame(1,
+                        H2Constants.FLAG_PADDED | H2Constants.FLAG_PRIORITY | H2Constants.FLAG_END_HEADERS,
+                        1,
                         new byte[] {1, 0, 0, 0, 0, 5, 10, 20, 99}),
                 H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
         assertArrayEquals(new byte[] {10, 20}, block);
@@ -302,7 +306,9 @@ class H2FrameCodecTest {
     void pushPromiseStripsPaddingAndPromisedStreamId() throws IOException {
         // PADDED + END_HEADERS: [padLen=1][4-byte promised stream id][h1, h2][pad]
         byte[] block = readHeaderBlockWithCap(
-                buildFrame(5, H2Constants.FLAG_PADDED | H2Constants.FLAG_END_HEADERS, 1,
+                buildFrame(5,
+                        H2Constants.FLAG_PADDED | H2Constants.FLAG_END_HEADERS,
+                        1,
                         new byte[] {1, 0, 0, 0, 2, 10, 20, 99}),
                 H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
         assertArrayEquals(new byte[] {10, 20}, block);
@@ -312,8 +318,10 @@ class H2FrameCodecTest {
     // oversized block is rejected without first buffering all of it.
     @Test
     void singleFrameHeaderBlockExceedingCapThrows() {
-        assertThrows(H2Exception.class, () -> readHeaderBlockWithCap(
-                buildFrame(1, H2Constants.FLAG_END_HEADERS, 1, new byte[20]), 10));
+        assertThrows(H2Exception.class,
+                () -> readHeaderBlockWithCap(
+                        buildFrame(1, H2Constants.FLAG_END_HEADERS, 1, new byte[20]),
+                        10));
     }
 
     @Test

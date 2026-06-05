@@ -21,7 +21,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -58,13 +57,12 @@ final class DefaultHttpClient implements HttpClient {
     @Override
     public HttpResponse send(HttpRequest request, RequestOptions options) throws IOException {
         Duration timeout = options.requestTimeout() != null ? options.requestTimeout() : requestTimeout;
-        return timeout != null ? sendWithTimeout(request, options, timeout) : sendInternal(request, options);
+        return timeout != null ? sendWithTimeout(request, options, timeout) : sendInternal(request);
     }
 
-    private HttpResponse sendInternal(HttpRequest request, RequestOptions options) throws IOException {
-        Context context = options.context();
+    private HttpResponse sendInternal(HttpRequest request) throws IOException {
         var target = request.uri();
-        List<ProxyConfiguration> proxies = proxySelector.select(target, context);
+        List<ProxyConfiguration> proxies = proxySelector.select(target);
 
         if (proxies.isEmpty()) {
             return sendForRoute(request, Route.from(target, null));
@@ -77,7 +75,7 @@ final class DefaultHttpClient implements HttpClient {
                 return sendForRoute(request, route);
             } catch (IOException e) {
                 last = e;
-                proxySelector.connectFailed(target, context, proxy, e);
+                proxySelector.connectFailed(target, proxy, e);
             }
         }
         throw last;
@@ -369,7 +367,7 @@ final class DefaultHttpClient implements HttpClient {
 
     private HttpResponse sendWithTimeout(HttpRequest request, RequestOptions options, Duration timeout)
             throws IOException {
-        Future<HttpResponse> future = executorService.submit(() -> sendInternal(request, options));
+        Future<HttpResponse> future = executorService.submit(() -> sendInternal(request));
 
         try {
             return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);

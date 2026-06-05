@@ -21,7 +21,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLSession;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -178,12 +177,12 @@ class DefaultHttpClientTest {
         var connectFailedCalled = new AtomicBoolean(false);
         var selector = new ProxySelector() {
             @Override
-            public List<ProxyConfiguration> select(SmithyUri target, Context context) {
+            public List<ProxyConfiguration> select(SmithyUri target) {
                 return List.of(proxy1, proxy2);
             }
 
             @Override
-            public void connectFailed(SmithyUri target, Context context, ProxyConfiguration proxy, IOException cause) {
+            public void connectFailed(SmithyUri target, ProxyConfiguration proxy, IOException cause) {
                 connectFailedCalled.set(true);
             }
         };
