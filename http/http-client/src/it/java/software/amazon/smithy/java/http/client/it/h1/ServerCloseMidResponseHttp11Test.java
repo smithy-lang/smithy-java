@@ -13,8 +13,8 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.http.client.HttpClientListener;
 import software.amazon.smithy.java.http.client.connection.CloseReason;
-import software.amazon.smithy.java.http.client.connection.ConnectionPoolListener;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPoolBuilder;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -41,14 +41,14 @@ public class ServerCloseMidResponseHttp11Test extends BaseHttpClientIntegTest {
     protected HttpConnectionPoolBuilder configurePool(HttpConnectionPoolBuilder builder) {
         return builder
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
-                .addListener(new ConnectionPoolListener() {
+                .addListener(new HttpClientListener() {
                     @Override
-                    public void onConnected(HttpConnection conn) {
+                    public void onConnectionCreated(HttpConnection conn) {
                         connectCount.incrementAndGet();
                     }
 
                     @Override
-                    public void onClosed(HttpConnection conn, CloseReason reason) {
+                    public void onConnectionClosed(HttpConnection conn, CloseReason reason) {
                         closeCount.incrementAndGet();
                     }
                 });

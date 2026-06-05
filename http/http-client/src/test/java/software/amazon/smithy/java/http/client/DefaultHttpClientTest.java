@@ -13,11 +13,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLSession;
 import org.junit.jupiter.api.Test;
@@ -46,6 +51,370 @@ class DefaultHttpClientTest {
             assertEquals("test-body",
                     new String(response.body().asInputStream().readAllBytes()),
                     "Should return body from exchange");
+        }
+    }
+
+    @Test
+    void requestEndFiresWhenResponseBodyIsConsumed() throws IOException {
+        var starts = new AtomicInteger();
+        var ends = new AtomicInteger();
+        var startedExchangeId = new AtomicLong();
+        var endedExchangeId = new AtomicLong();
+        var listener = new HttpClientListener() {
+            @Override
+            public void onRequestStart(long exchangeId, HttpRequest request) {
+                starts.incrementAndGet();
+                startedExchangeId.set(exchangeId);
+            }
+
+            @Override
+            public void onRequestEnd(long exchangeId, Throwable error) {
+                ends.incrementAndGet();
+                endedExchangeId.set(exchangeId);
+            }
+        };
+
+        try (var client = HttpClient.builder()
+                .connectionPool(new TestConnectionPool())
+                .addListener(listener)
+                .build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            var response = client.send(request);
+
+            assertEquals(1, starts.get());
+            assertEquals(0, ends.get(), "Streaming request should not end when headers are returned");
+
+            assertEquals("test-body", new String(response.body().asInputStream().readAllBytes()));
+
+            assertEquals(1, ends.get());
+            assertEquals(startedExchangeId.get(), endedExchangeId.get());
+        }
+    }
+
+    @Test
+    void listenerExceptionDoesNotFailRequest() throws IOException {
+        var listener = new HttpClientListener() {
+            @Override
+            public void onRequestStart(long exchangeId, HttpRequest request) {
+                throw new RuntimeException("boom");
+            }
+
+            @Override
+            public void onRequestEnd(long exchangeId, Throwable error) {
+                throw new RuntimeException("boom");
+            }
+        };
+
+        try (var client = HttpClient.builder()
+                .connectionPool(new TestConnectionPool())
+                .addListener(listener)
+                .build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            var response = client.send(request);
+
+            assertEquals(200, response.statusCode());
+            response.body().discard();
+        }
+    }
+
+    @Test
+    void requestEndFiresOnExchangeCreationFailure() throws IOException {
+        var starts = new AtomicInteger();
+        var ends = new AtomicInteger();
+        var endedError = new AtomicReference<Throwable>();
+        var startedExchangeId = new AtomicLong();
+        var endedExchangeId = new AtomicLong();
+        var listener = new HttpClientListener() {
+            @Override
+            public void onRequestStart(long exchangeId, HttpRequest request) {
+                starts.incrementAndGet();
+                startedExchangeId.set(exchangeId);
+            }
+
+            @Override
+            public void onRequestEnd(long exchangeId, Throwable error) {
+                ends.incrementAndGet();
+                endedExchangeId.set(exchangeId);
+                endedError.set(error);
+            }
+        };
+        var pool = new TestConnectionPool() {
+            @Override
+            public HttpConnection acquire(Route route, long exchangeId) {
+                return new TestConnection() {
+                    @Override
+                    public HttpExchange newExchange(HttpRequest request) throws IOException {
+                        throw new IOException("exchange creation failed");
+                    }
+                };
+            }
+        };
+
+        try (var client = HttpClient.builder()
+                .connectionPool(pool)
+                .addListener(listener)
+                .build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            assertThrows(IOException.class, () -> client.send(request));
+
+            assertEquals(1, starts.get());
+            assertEquals(1, ends.get());
+            assertEquals(startedExchangeId.get(), endedExchangeId.get());
+            assertEquals("exchange creation failed", endedError.get().getMessage());
+        }
+    }
+
+    @Test
+    void proxyFallbackKeepsSingleExchangeId() throws IOException {
+        var startedExchangeId = new AtomicLong();
+        var endedExchangeId = new AtomicLong();
+        var acquiredExchangeIds = new ArrayList<Long>();
+        var listener = new HttpClientListener() {
+            @Override
+            public void onRequestStart(long exchangeId, HttpRequest request) {
+                startedExchangeId.set(exchangeId);
+            }
+
+            @Override
+            public void onRequestEnd(long exchangeId, Throwable error) {
+                endedExchangeId.set(exchangeId);
+            }
+        };
+        var pool = new TestConnectionPool() {
+            @Override
+            public HttpConnection acquire(Route route, long exchangeId) {
+                acquiredExchangeIds.add(exchangeId);
+                if (route.proxy() != null && route.proxy().port() == 8080) {
+                    return new TestConnection() {
+                        @Override
+                        public HttpExchange newExchange(HttpRequest request) throws IOException {
+                            throw new IOException("first proxy failed");
+                        }
+                    };
+                }
+                return super.acquire(route, exchangeId);
+            }
+        };
+        var proxy1 = new ProxyConfiguration(SmithyUri.of("http://proxy1.example.com:8080"),
+                ProxyConfiguration.ProxyType.HTTP);
+        var proxy2 = new ProxyConfiguration(SmithyUri.of("http://proxy2.example.com:9090"),
+                ProxyConfiguration.ProxyType.HTTP);
+
+        try (var client = HttpClient.builder()
+                .connectionPool(pool)
+                .proxySelector(ProxySelector.of(proxy1, proxy2))
+                .addListener(listener)
+                .build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            var response = client.send(request);
+            response.body().discard();
+
+            assertEquals(2, acquiredExchangeIds.size());
+            assertEquals(startedExchangeId.get(), acquiredExchangeIds.get(0));
+            assertEquals(startedExchangeId.get(), acquiredExchangeIds.get(1));
+            assertEquals(startedExchangeId.get(), endedExchangeId.get());
+        }
+    }
+
+    @Test
+    void proxyFallbackDoesNotEndExchangeOnPerRouteFailure() throws IOException {
+        // Regression: the first proxy fails AFTER the exchange is created (mid response-read), then the
+        // second proxy succeeds. onRequestEnd must fire exactly once, with no error, when the successful
+        // response body is closed — not prematurely with the first proxy's failure.
+        var ends = new ArrayList<Throwable>();
+        var listener = new HttpClientListener() {
+            @Override
+            public void onRequestEnd(long exchangeId, Throwable error) {
+                ends.add(error);
+            }
+        };
+        var pool = new TestConnectionPool() {
+            @Override
+            public HttpConnection acquire(Route route, long exchangeId) {
+                if (route.proxy() != null && route.proxy().port() == 8080) {
+                    return new TestConnection() {
+                        @Override
+                        public HttpExchange newExchange(HttpRequest request) {
+                            return new TestHttpExchange() {
+                                @Override
+                                public int responseStatusCode() throws IOException {
+                                    throw new IOException("first proxy failed mid-response");
+                                }
+                            };
+                        }
+                    };
+                }
+                return super.acquire(route, exchangeId);
+            }
+        };
+        var proxy1 = new ProxyConfiguration(SmithyUri.of("http://proxy1.example.com:8080"),
+                ProxyConfiguration.ProxyType.HTTP);
+        var proxy2 = new ProxyConfiguration(SmithyUri.of("http://proxy2.example.com:9090"),
+                ProxyConfiguration.ProxyType.HTTP);
+        try (var client = HttpClient.builder()
+                .connectionPool(pool)
+                .proxySelector(ProxySelector.of(proxy1, proxy2))
+                .addListener(listener)
+                .build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            var response = client.send(request);
+            assertTrue(ends.isEmpty(), "onRequestEnd must not fire while a later proxy may still succeed");
+
+            response.body().discard();
+
+            assertEquals(1, ends.size(), "onRequestEnd must fire exactly once");
+            assertEquals(null, ends.get(0), "Successful request must end with no error");
+        }
+    }
+
+    @Test
+    void requestEndFiresOnceOnTimeout() throws IOException {
+        // Regression: a timeout is observed on the caller thread, not the worker VT. onRequestEnd must
+        // still fire exactly once with the timeout error.
+        var ends = new ArrayList<Throwable>();
+        var listener = new HttpClientListener() {
+            @Override
+            public void onRequestEnd(long exchangeId, Throwable error) {
+                synchronized (ends) {
+                    ends.add(error);
+                }
+            }
+        };
+        var pool = new TestConnectionPool() {
+            @Override
+            protected HttpExchange createExchange() {
+                return new TestHttpExchange() {
+                    @Override
+                    public int responseStatusCode() throws IOException {
+                        try {
+                            Thread.sleep(5000);
+                        } catch (InterruptedException e) {
+                            throw new IOException("interrupted", e);
+                        }
+                        return 200;
+                    }
+                };
+            }
+        };
+        try (var client = HttpClient.builder()
+                .connectionPool(pool)
+                .addListener(listener)
+                .requestTimeout(Duration.ofMillis(50))
+                .build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            var ex = assertThrows(IOException.class, () -> client.send(request));
+            assertTrue(ex.getMessage().contains("exceeded request timeout"), ex.getMessage());
+
+            synchronized (ends) {
+                assertEquals(1, ends.size(), "onRequestEnd must fire exactly once on timeout");
+                assertTrue(ends.get(0) instanceof IOException, "End error should be the timeout IOException");
+            }
+        }
+    }
+
+    @Test
+    void listenerErrorDoesNotLeakOrFailRequest() throws IOException {
+        // Regression: listener isolation must catch Throwable, not just RuntimeException. An Error thrown
+        // from a callback must not propagate to the caller or skip connection cleanup.
+        var released = new AtomicBoolean(false);
+        var listener = new HttpClientListener() {
+            @Override
+            public void onRequestStart(long exchangeId, HttpRequest request) {
+                throw new AssertionError("boom");
+            }
+        };
+        var pool = new TestConnectionPool() {
+            @Override
+            public void release(HttpConnection connection) {
+                released.set(true);
+            }
+        };
+        try (var client = HttpClient.builder()
+                .connectionPool(pool)
+                .addListener(listener)
+                .build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            var response = client.send(request);
+            assertEquals(200, response.statusCode(), "Listener Error must not fail the request");
+            response.body().discard();
+            assertTrue(released.get(), "Connection must still be released despite the listener Error");
+        }
+    }
+
+    @Test
+    void proxyFallbackContinuesPastUnsupportedSocksProxy() throws IOException {
+        // Regression: an unsupported (SOCKS) proxy is a per-route failure surfaced as an IOException, so the
+        // proxy loop must run connectFailed and try the next proxy rather than aborting the whole send.
+        // The real HttpConnectionFactory throws IOException for SOCKS; this models that at the pool boundary.
+        var socksAttempted = new AtomicBoolean(false);
+        var httpAttempted = new AtomicBoolean(false);
+        var pool = new TestConnectionPool() {
+            @Override
+            public HttpConnection acquire(Route route, long exchangeId) {
+                if (route.proxy() != null && route.proxy().type() == ProxyConfiguration.ProxyType.SOCKS5) {
+                    socksAttempted.set(true);
+                    return new TestConnection() {
+                        @Override
+                        public HttpExchange newExchange(HttpRequest request) throws IOException {
+                            throw new IOException("SOCKS proxies not yet supported: SOCKS5");
+                        }
+                    };
+                }
+                httpAttempted.set(true);
+                return super.acquire(route, exchangeId);
+            }
+        };
+        var socks = new ProxyConfiguration(SmithyUri.of("http://socks.example.com:1080"),
+                ProxyConfiguration.ProxyType.SOCKS5);
+        var http = new ProxyConfiguration(SmithyUri.of("http://http.example.com:8080"),
+                ProxyConfiguration.ProxyType.HTTP);
+        var connectFailedFor = new ArrayList<ProxyConfiguration>();
+        var selector = new ProxySelector() {
+            @Override
+            public List<ProxyConfiguration> select(SmithyUri target) {
+                return List.of(socks, http);
+            }
+
+            @Override
+            public void connectFailed(SmithyUri target, ProxyConfiguration proxy, IOException cause) {
+                connectFailedFor.add(proxy);
+            }
+        };
+        try (var client = HttpClient.builder()
+                .connectionPool(pool)
+                .proxySelector(selector)
+                .build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            var response = client.send(request);
+
+            assertEquals(200, response.statusCode(), "Should succeed via the HTTP proxy after SOCKS fails");
+            assertTrue(socksAttempted.get(), "SOCKS proxy should have been attempted first");
+            assertTrue(httpAttempted.get(), "HTTP proxy should be tried after the SOCKS attempt fails");
+            assertEquals(List.of(socks), connectFailedFor, "connectFailed should fire for the SOCKS proxy");
         }
     }
 
@@ -129,11 +498,11 @@ class DefaultHttpClientTest {
         var proxyUsed = new AtomicBoolean(false);
         var pool = new TestConnectionPool() {
             @Override
-            public HttpConnection acquire(Route route) {
+            public HttpConnection acquire(Route route, long exchangeId) {
                 if (route.usesProxy()) {
                     proxyUsed.set(true);
                 }
-                return super.acquire(route);
+                return super.acquire(route, exchangeId);
             }
         };
         var proxy = new ProxyConfiguration(SmithyUri.of("http://proxy.example.com:8080"),
@@ -157,7 +526,7 @@ class DefaultHttpClientTest {
         var attemptedProxies = new AtomicInteger(0);
         var pool = new TestConnectionPool() {
             @Override
-            public HttpConnection acquire(Route route) {
+            public HttpConnection acquire(Route route, long exchangeId) {
                 attemptedProxies.incrementAndGet();
                 if (route.proxy() != null && route.proxy().port() == 8080) {
                     return new TestConnection() {
@@ -167,7 +536,7 @@ class DefaultHttpClientTest {
                         }
                     };
                 }
-                return super.acquire(route);
+                return super.acquire(route, exchangeId);
             }
         };
         var proxy1 = new ProxyConfiguration(SmithyUri.of("http://proxy1.example.com:8080"),
@@ -207,7 +576,7 @@ class DefaultHttpClientTest {
         var attemptedProxies = new AtomicInteger(0);
         var pool = new TestConnectionPool() {
             @Override
-            public HttpConnection acquire(Route route) {
+            public HttpConnection acquire(Route route, long exchangeId) {
                 attemptedProxies.incrementAndGet();
                 return new TestConnection() {
                     @Override
@@ -241,7 +610,7 @@ class DefaultHttpClientTest {
         var evicted = new AtomicBoolean(false);
         var pool = new TestConnectionPool() {
             @Override
-            public HttpConnection acquire(Route route) {
+            public HttpConnection acquire(Route route, long exchangeId) {
                 return new TestConnection() {
                     @Override
                     public HttpExchange newExchange(HttpRequest request) throws IOException {
@@ -349,7 +718,7 @@ class DefaultHttpClientTest {
 
     private static class TestConnectionPool implements ConnectionPool {
         @Override
-        public HttpConnection acquire(Route route) {
+        public HttpConnection acquire(Route route, long exchangeId) {
             return new TestConnection() {
                 @Override
                 public HttpExchange newExchange(HttpRequest request) {
@@ -412,6 +781,97 @@ class DefaultHttpClientTest {
         @Override
         public boolean validateForReuse() {
             return true;
+        }
+    }
+
+    @Test
+    void closingOpenedChannelClosesChannelNotDiscard() throws IOException {
+        // Regression for drainOrDiscardBody: when the caller opened the body as a channel, teardown must
+        // close that channel, NOT call discardResponseBody (the "never opened" branch). Guards the
+        // wrappedChannel != null vs == null distinction.
+        var channelClosed = new AtomicBoolean(false);
+        var discardCalled = new AtomicBoolean(false);
+        var pool = new TestConnectionPool() {
+            @Override
+            protected HttpExchange createExchange() {
+                return new TestHttpExchange() {
+                    @Override
+                    public ReadableByteChannel responseBodyChannel() {
+                        return new ReadableByteChannel() {
+                            private final ReadableByteChannel inner =
+                                    Channels.newChannel(new ByteArrayInputStream("test-body".getBytes()));
+
+                            @Override
+                            public int read(ByteBuffer dst) throws IOException {
+                                return inner.read(dst);
+                            }
+
+                            @Override
+                            public boolean isOpen() {
+                                return inner.isOpen();
+                            }
+
+                            @Override
+                            public void close() throws IOException {
+                                channelClosed.set(true);
+                                inner.close();
+                            }
+                        };
+                    }
+
+                    @Override
+                    public void discardResponseBody() {
+                        discardCalled.set(true);
+                    }
+                };
+            }
+        };
+        try (var client = HttpClient.builder().connectionPool(pool).build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            var response = client.send(request);
+            response.body().asChannel(); // opens the channel, sets wrappedChannel
+            response.body().close();
+
+            assertTrue(channelClosed.get(), "Opened channel must be closed on teardown");
+            assertFalse(discardCalled.get(), "discardResponseBody must not run when a channel was opened");
+        }
+    }
+
+    @Test
+    void discardWithoutOpeningBodyDiscardsAtExchange() throws IOException {
+        // Regression for drainOrDiscardBody: when the body was never opened, teardown must discard at the
+        // exchange level (the final else branch), not touch a stream or channel.
+        var discardCalled = new AtomicBoolean(false);
+        var released = new AtomicBoolean(false);
+        var pool = new TestConnectionPool() {
+            @Override
+            protected HttpExchange createExchange() {
+                return new TestHttpExchange() {
+                    @Override
+                    public void discardResponseBody() {
+                        discardCalled.set(true);
+                    }
+                };
+            }
+
+            @Override
+            public void release(HttpConnection connection) {
+                released.set(true);
+            }
+        };
+        try (var client = HttpClient.builder().connectionPool(pool).build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            var response = client.send(request);
+            response.body().discard(); // never opened the body
+
+            assertTrue(discardCalled.get(), "Unopened body must be discarded at the exchange level");
+            assertTrue(released.get(), "Connection must be released after a clean discard");
         }
     }
 
