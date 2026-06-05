@@ -54,9 +54,7 @@ public final class SmithyHttpClientTransport implements ClientTransport<HttpRequ
     @Override
     public HttpResponse send(Context context, HttpRequest request) {
         try {
-            var options = RequestOptions.builder()
-                    .requestTimeout(context.get(HttpContext.HTTP_REQUEST_TIMEOUT))
-                    .build();
+            var options = new RequestOptions(context.get(HttpContext.HTTP_REQUEST_TIMEOUT));
             return client.send(request, options);
         } catch (Exception e) {
             throw ClientTransport.remapExceptions(e);

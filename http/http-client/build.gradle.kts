@@ -22,7 +22,6 @@ val jmhServerImplementation by configurations.getting
 
 dependencies {
     api(project(":http:http-api"))
-    api(project(":context"))
     api(project(":logging"))
 
     // netty-common provides HashedWheelTimer: a single shared timer wheel backs the per-read
