@@ -31,11 +31,11 @@ import org.openjdk.jmh.annotations.Warmup;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
+import software.amazon.smithy.java.client.http.boringssl.BoringSslEngineFactory;
 import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
 import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
@@ -47,27 +47,29 @@ import software.amazon.smithy.java.io.uri.SmithyUri;
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Warmup(iterations = 2, time = 3)
 @Measurement(iterations = 3, time = 5)
-@Fork(value = 1, jvmArgs = {"-Xms2g", "-Xmx2g"})
+@Fork(value = 1, jvmArgs = {"-Xms16g", "-Xmx16g"})
 @State(Scope.Benchmark)
 public class H2MixedGetPutBenchmark {
 
-    /** Total requests issued per @Benchmark invocation; matched via @OperationsPerInvocation. */
-    private static final int OPS = 1000;
+    /**
+     * Total requests issued per @Benchmark invocation; matched via @OperationsPerInvocation. Must be
+     * >= the largest {@code concurrency} value so every concurrent virtual thread gets work (the harness
+     * shares OPS requests across {@code concurrency} workers).
+     */
+    private static final int OPS = 20_000;
 
     @Param({
-            "1",
-            "10"
+            "5000"
     })
     private int concurrency;
 
-    @Param({"1", "3"})
+    @Param({"50"})
     private int connections;
 
     @Param({"4096"})
     private int streamsPerConnection;
 
     private HttpClient smithyClient;
-    private HttpClient smithyPlatformReaderClient;
     private java.net.http.HttpClient javaClient;
     private ExecutorService javaExecutor;
     private JavaHttpClientTransport javaTransport;
@@ -81,31 +83,19 @@ public class H2MixedGetPutBenchmark {
     public void setup() throws Exception {
         var sslContext = BenchmarkSupport.trustAllSsl();
 
+        if (!BoringSslEngineFactory.isAvailable()) {
+            throw new IllegalStateException("BoringSSL (netty-tcnative) is not available on this host");
+        }
         smithyClient = HttpClient.builder()
-                .connectionPool(HttpConnectionPool.builder()
-                        .maxConnectionsPerRoute(connections)
-                        .maxTotalConnections(connections)
-                        .h2StreamsPerConnection(streamsPerConnection)
-                        .h2InitialWindowSize(16 * 1024 * 1024)
-                        .maxIdleTime(Duration.ofMinutes(2))
-                        .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
-                        .sslContext(sslContext)
-                        .dnsResolver(BenchmarkSupport.staticDns())
-                        .build())
-                .build();
-
-        smithyPlatformReaderClient = HttpClient.builder()
-                .connectionPool(HttpConnectionPool.builder()
-                        .maxConnectionsPerRoute(connections)
-                        .maxTotalConnections(connections)
-                        .h2StreamsPerConnection(streamsPerConnection)
-                        .h2InitialWindowSize(16 * 1024 * 1024)
-                        .maxIdleTime(Duration.ofMinutes(2))
-                        .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
-                        .sslContext(sslContext)
-                        .dnsResolver(BenchmarkSupport.staticDns())
-                        .usePlatformReaderForH2(true)
-                        .build())
+                .maxConnectionsPerRoute(connections)
+                .maxTotalConnections(connections)
+                .h2StreamsPerConnection(streamsPerConnection)
+                .h2InitialWindowSize(16 * 1024 * 1024)
+                .maxIdleTime(Duration.ofMinutes(2))
+                .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
+                .sslContext(sslContext)
+                .sslEngineFactory(BoringSslEngineFactory.create(true))
+                .dnsResolver(BenchmarkSupport.staticDns())
                 .build();
 
         javaExecutor = Executors.newVirtualThreadPerTaskExecutor();
@@ -122,9 +112,13 @@ public class H2MixedGetPutBenchmark {
         apacheConfig.ioThreads(1);
         apacheTransport = new ApacheHttpClientTransport(apacheConfig, sslContext);
 
+        // Thread parity: pin Netty's event-loop group to the core count so it has the same CPU budget
+        // as Smithy's virtual-thread carrier pool (also defaulted to #cores; pin it explicitly in the
+        // fork JVM args via -Djdk.virtualThreadScheduler.parallelism for a controlled comparison).
         var nettyTransportConfig = new NettyHttpTransportConfig()
                 .maxConnectionsPerHost(connections)
                 .h2StreamsPerConnection(streamsPerConnection)
+                .eventLoopThreads(Runtime.getRuntime().availableProcessors())
                 .httpVersionPolicy(software.amazon.smithy.java.client.http.netty.HttpVersionPolicy.ENFORCE_HTTP_2);
         productionNettyTransport =
                 new NettyHttpClientTransport(nettyTransportConfig);
@@ -164,18 +158,10 @@ public class H2MixedGetPutBenchmark {
                         + ", streams=" + streamsPerConnection + "]: " + stats);
                 System.out.println("H2 client stats: " + BenchmarkSupport.getH2ConnectionStats(smithyClient));
             }
-            if (smithyPlatformReaderClient != null) {
-                System.out.println("H2 platform-reader client stats: "
-                        + BenchmarkSupport.getH2ConnectionStats(smithyPlatformReaderClient));
-            }
         } finally {
             if (smithyClient != null) {
                 smithyClient.close();
                 smithyClient = null;
-            }
-            if (smithyPlatformReaderClient != null) {
-                smithyPlatformReaderClient.close();
-                smithyPlatformReaderClient = null;
             }
             if (javaClient != null) {
                 javaClient.close();
@@ -287,26 +273,6 @@ public class H2MixedGetPutBenchmark {
 
         counter.logErrors("Smithy H2 mixed GET+PUT");
         counter.throwIfErrored("Smithy H2 mixed GET+PUT");
-    }
-
-    @Benchmark
-    @OperationsPerInvocation(OPS)
-    @Threads(1)
-    public void h2SmithyPlatformReaderMixedGetPutMb(Counter counter) throws InterruptedException {
-        long startGet = mixedRequests.totalGetRequests.get();
-        long startPut = mixedRequests.totalPutRequests.get();
-        BenchmarkSupport.runBenchmark(concurrency, OPS, (MixedRequests requests) -> {
-            var request = requests.next();
-            try (var response = smithyPlatformReaderClient.send(request.request())) {
-                long responseBytes = response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
-                requests.recordCompletion(request, responseBytes);
-            }
-        }, mixedRequests, counter);
-        counter.getRequests = mixedRequests.totalGetRequests.get() - startGet;
-        counter.putRequests = mixedRequests.totalPutRequests.get() - startPut;
-
-        counter.logErrors("Smithy H2 platform-reader mixed GET+PUT");
-        counter.throwIfErrored("Smithy H2 platform-reader mixed GET+PUT");
     }
 
     @Benchmark

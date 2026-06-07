@@ -19,7 +19,7 @@ import java.util.List;
  *
  * <h2>Example</h2>
  * {@snippet :
- * HttpConnectionPool pool = HttpConnectionPool.builder()
+ * HttpClient client = HttpClient.builder()
  *     .socketFactory((route, endpoints) -> {
  *         Socket socket = new Socket();
  *         socket.setTcpNoDelay(true);
@@ -32,7 +32,7 @@ import java.util.List;
  *     .build();
  * }
  *
- * @see HttpConnectionPoolBuilder#socketFactory(HttpSocketFactory)
+ * @see software.amazon.smithy.java.http.client.HttpClient.Builder#socketFactory(HttpSocketFactory)
  */
 @FunctionalInterface
 public interface HttpSocketFactory {

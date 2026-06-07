@@ -131,7 +131,6 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
             Route route,
             Duration readTimeout,
             Duration writeTimeout,
-            boolean usePlatformReaderThread,
             int initialWindowSize,
             int maxFrameSize,
             int bufferSize
@@ -168,7 +167,7 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
         }
 
         // Start background reader thread
-        this.readerThread = (usePlatformReaderThread ? Thread.ofPlatform() : Thread.ofVirtual())
+        this.readerThread = Thread.ofVirtual()
                 .name("h2-reader-" + route.host())
                 .start(this::readerLoop);
     }

@@ -17,8 +17,6 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpClient;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPoolBuilder;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 import software.amazon.smithy.java.http.client.it.TestUtils;
 import software.amazon.smithy.java.http.client.it.server.NettyTestServer;
@@ -41,9 +39,9 @@ public abstract class BaseHttpClientIntegTest {
     protected abstract NettyTestServer.Builder configureServer(NettyTestServer.Builder builder);
 
     /**
-     * Configure the connection pool.
+     * Configure the HTTP client.
      */
-    protected abstract HttpConnectionPoolBuilder configurePool(HttpConnectionPoolBuilder builder);
+    protected abstract HttpClient.Builder configureClient(HttpClient.Builder builder);
 
     @BeforeEach
     void setUp() throws Exception {
@@ -54,17 +52,13 @@ public abstract class BaseHttpClientIntegTest {
                 "localhost",
                 List.of(InetAddress.getLoopbackAddress())));
 
-        var poolBuilder = HttpConnectionPool.builder()
+        var clientBuilder = HttpClient.builder()
                 .maxConnectionsPerRoute(10)
                 .maxTotalConnections(10)
                 .maxIdleTime(Duration.ofMinutes(1))
                 .dnsResolver(staticDns);
 
-        poolBuilder = configurePool(poolBuilder);
-
-        client = HttpClient.builder()
-                .connectionPool(poolBuilder.build())
-                .build();
+        client = configureClient(clientBuilder).build();
     }
 
     @AfterEach

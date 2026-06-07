@@ -28,7 +28,6 @@ import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.client.HttpClient;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 import software.amazon.smithy.java.http.client.it.server.NettyTestServer;
 import software.amazon.smithy.java.http.client.it.server.TestCertificateGenerator;
@@ -101,7 +100,7 @@ public class RequestResponseTest {
         server = serverBuilder.build();
         server.start();
 
-        var poolBuilder = HttpConnectionPool.builder()
+        var clientBuilder = HttpClient.builder()
                 .maxConnectionsPerRoute(10)
                 .maxTotalConnections(10)
                 .maxIdleTime(Duration.ofMinutes(1))
@@ -109,10 +108,10 @@ public class RequestResponseTest {
                 .httpVersionPolicy(config.versionPolicy());
 
         if (config.useTls()) {
-            poolBuilder.sslContext(clientSslContext);
+            clientBuilder.sslContext(clientSslContext);
         }
 
-        client = HttpClient.builder().connectionPool(poolBuilder.build()).build();
+        client = clientBuilder.build();
     }
 
     private String uri(TransportConfig config) {

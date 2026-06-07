@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.http.boringssl;
 
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -14,6 +15,7 @@ import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ResourceLeakDetector;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLParameters;
@@ -55,10 +57,14 @@ public final class BoringSslEngineFactory implements ClientSslEngineFactory {
         }
     }
 
-    private final SslContext sslContext;
+    private final boolean trustAll;
+    // OpenSSL only negotiates ALPN when the protocol list is configured on the SslContext at build
+    // time, but the list arrives per-engine. Contexts are immutable and reusable, so cache one per
+    // distinct ALPN list (in practice a single client uses one list for its lifetime).
+    private final ConcurrentHashMap<List<String>, SslContext> contextsByAlpn = new ConcurrentHashMap<>();
 
-    private BoringSslEngineFactory(SslContext sslContext) {
-        this.sslContext = sslContext;
+    private BoringSslEngineFactory(boolean trustAll) {
+        this.trustAll = trustAll;
     }
 
     /**
@@ -81,31 +87,46 @@ public final class BoringSslEngineFactory implements ClientSslEngineFactory {
             throw new IllegalStateException(
                     "netty-tcnative (BoringSSL) is unavailable: " + String.valueOf(OpenSsl.unavailabilityCause()));
         }
-        try {
-            var builder = SslContextBuilder.forClient().sslProvider(SslProvider.OPENSSL);
-            if (trustAll) {
-                builder.trustManager(InsecureTrustManagerFactory.INSTANCE);
+        return new BoringSslEngineFactory(trustAll);
+    }
+
+    private SslContext contextFor(List<String> alpnProtocols) {
+        return contextsByAlpn.computeIfAbsent(alpnProtocols, protocols -> {
+            try {
+                var builder = SslContextBuilder.forClient().sslProvider(SslProvider.OPENSSL);
+                if (trustAll) {
+                    builder.trustManager(InsecureTrustManagerFactory.INSTANCE);
+                }
+                // netty-tcnative's OpenSSL engine only negotiates ALPN when the protocol list is configured
+                // on the SslContext at build time; SSLParameters.setApplicationProtocols() on the engine
+                // afterward is ignored by the OpenSSL provider. NO_ADVERTISE/ACCEPT is the standard client
+                // ALPN behavior. An empty list builds a context with no ALPN.
+                if (!protocols.isEmpty()) {
+                    builder.applicationProtocolConfig(new ApplicationProtocolConfig(
+                            ApplicationProtocolConfig.Protocol.ALPN,
+                            ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                            ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                            protocols.toArray(new String[0])));
+                }
+                return builder.build();
+            } catch (SSLException e) {
+                throw new IllegalStateException("Failed to build BoringSSL client context", e);
             }
-            return new BoringSslEngineFactory(builder.build());
-        } catch (SSLException e) {
-            throw new IllegalStateException("Failed to build BoringSSL client context", e);
-        }
+        });
     }
 
     @Override
     public Handle newEngine(String host, int port, List<String> alpnProtocols) {
-        // newEngine(alloc, host, port) returns a standard SSLEngine in jdkCompatibilityMode (one TLS
-        // record per wrap, standard BUFFER_OVERFLOW semantics) — exactly what SSLEngineTransport's
-        // wrap/unwrap loop expects. ALPN/endpoint-identification are set via SSLParameters to mirror
-        // the JDK default path so behavior is identical apart from the provider.
-        SSLEngine engine = sslContext.newEngine(ByteBufAllocator.DEFAULT, host, port);
+        // ALPN must be configured on the SslContext (see contextFor); pick the context matching this
+        // call's protocol list. newEngine(alloc, host, port) returns a standard SSLEngine in
+        // jdkCompatibilityMode (one TLS record per wrap, standard BUFFER_OVERFLOW semantics) — exactly
+        // what SSLEngineTransport's wrap/unwrap loop expects.
+        List<String> protocols = alpnProtocols == null ? List.of() : List.copyOf(alpnProtocols);
+        SSLEngine engine = contextFor(protocols).newEngine(ByteBufAllocator.DEFAULT, host, port);
         engine.setUseClientMode(true);
 
         SSLParameters params = engine.getSSLParameters();
         params.setEndpointIdentificationAlgorithm("HTTPS");
-        if (alpnProtocols != null && !alpnProtocols.isEmpty()) {
-            params.setApplicationProtocols(alpnProtocols.toArray(new String[0]));
-        }
         engine.setSSLParameters(params);
 
         return new Handle(engine, () -> releaseEngine(engine));

@@ -7,13 +7,19 @@ package software.amazon.smithy.java.http.client;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.http.client.connection.ClientSslEngineFactory;
+import software.amazon.smithy.java.http.client.connection.ConnectionConfig;
 import software.amazon.smithy.java.http.client.connection.ConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
+import software.amazon.smithy.java.http.client.connection.HttpSocketFactory;
+import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
+import software.amazon.smithy.java.http.client.dns.DnsResolver;
 
 /**
  * Blocking, virtual-thread-friendly HTTP client.
@@ -71,21 +77,27 @@ public interface HttpClient extends AutoCloseable {
      */
     final class Builder {
         private static final ProxySelector DIRECT = ProxySelector.direct();
-        ConnectionPool connectionPool;
+        private final ConnectionConfig.Builder connectionConfig = ConnectionConfig.builder();
+        Function<ConnectionConfig, ? extends ConnectionPool> connectionPoolFactory = HttpConnectionPool::new;
         Duration requestTimeout;
         ProxySelector proxySelector = DIRECT;
-        final List<HttpClientListener> listeners = new LinkedList<>();
+        ConnectionConfig resolvedConnectionConfig;
+        ConnectionPool connectionPool;
 
         private Builder() {}
 
         /**
-         * Set a custom connection pool.
+         * Set a custom connection pool factory.
          *
-         * @param pool the connection pool to use
+         * <p>The factory receives the final immutable connection configuration, including listeners registered on this
+         * client builder. This keeps request-level and connection-level listener events wired consistently for custom
+         * pools.
+         *
+         * @param factory the connection pool factory to use
          * @return this builder
          */
-        public Builder connectionPool(ConnectionPool pool) {
-            this.connectionPool = pool;
+        public Builder connectionPoolFactory(Function<ConnectionConfig, ? extends ConnectionPool> factory) {
+            this.connectionPoolFactory = Objects.requireNonNull(factory, "connectionPoolFactory");
             return this;
         }
 
@@ -153,7 +165,7 @@ public interface HttpClient extends AutoCloseable {
          * @return this builder
          */
         public Builder addListener(HttpClientListener listener) {
-            listeners.add(Objects.requireNonNull(listener, "listener"));
+            connectionConfig.addListener(listener);
             return this;
         }
 
@@ -164,7 +176,274 @@ public interface HttpClient extends AutoCloseable {
          * @return this builder
          */
         public Builder addListenerFirst(HttpClientListener listener) {
-            listeners.addFirst(Objects.requireNonNull(listener, "listener"));
+            connectionConfig.addListenerFirst(listener);
+            return this;
+        }
+
+        /**
+         * Set the maximum number of connections per route (scheme + host + port + proxy). Default: 256.
+         *
+         * <p>For HTTP/2 this caps the connections opened to a route before streams are multiplexed onto
+         * existing connections; for HTTP/1.1 it caps the pooled connections per route.
+         *
+         * @param max maximum connections per route (must be positive)
+         * @return this builder
+         */
+        public Builder maxConnectionsPerRoute(int max) {
+            connectionConfig.maxConnectionsPerRoute(max);
+            return this;
+        }
+
+        /**
+         * Set the maximum number of open physical connections across all routes. Default: 256.
+         *
+         * <p>When the limit is reached, acquiring a connection blocks for up to {@link #acquireTimeout}.
+         * Must be greater than or equal to {@link #maxConnectionsPerRoute}.
+         *
+         * @param max maximum total connections (must be positive)
+         * @return this builder
+         */
+        public Builder maxTotalConnections(int max) {
+            connectionConfig.maxTotalConnections(max);
+            return this;
+        }
+
+        /**
+         * Set how long an idle pooled connection is kept before the background cleanup closes it.
+         * Default: 2 minutes.
+         *
+         * @param duration maximum idle time (must be positive)
+         * @return this builder
+         */
+        public Builder maxIdleTime(Duration duration) {
+            connectionConfig.maxIdleTime(duration);
+            return this;
+        }
+
+        /**
+         * Set how long {@code acquire} blocks waiting for capacity when the pool is exhausted before
+         * failing with an {@link IOException}. Default: 30 seconds. {@link Duration#ZERO} fails fast.
+         *
+         * @param timeout acquire timeout (must be non-negative)
+         * @return this builder
+         */
+        public Builder acquireTimeout(Duration timeout) {
+            connectionConfig.acquireTimeout(timeout);
+            return this;
+        }
+
+        /**
+         * Set the TCP connect timeout for establishing a new socket. Default: 10 seconds.
+         *
+         * @param timeout connect timeout (must be non-negative)
+         * @return this builder
+         */
+        public Builder connectTimeout(Duration timeout) {
+            connectionConfig.connectTimeout(timeout);
+            return this;
+        }
+
+        /**
+         * Set the timeout for completing the TLS handshake on a new secure connection. Default: 10 seconds.
+         *
+         * @param timeout TLS negotiation timeout (must be non-negative)
+         * @return this builder
+         */
+        public Builder tlsNegotiationTimeout(Duration timeout) {
+            connectionConfig.tlsNegotiationTimeout(timeout);
+            return this;
+        }
+
+        /**
+         * Set the read timeout applied to each socket read while receiving a response. Default: 30 seconds.
+         *
+         * @param timeout read timeout (must be non-negative)
+         * @return this builder
+         */
+        public Builder readTimeout(Duration timeout) {
+            connectionConfig.readTimeout(timeout);
+            return this;
+        }
+
+        /**
+         * Set the write timeout applied while sending a request body. Default: 30 seconds.
+         *
+         * @param timeout write timeout (must be non-negative)
+         * @return this builder
+         */
+        public Builder writeTimeout(Duration timeout) {
+            connectionConfig.writeTimeout(timeout);
+            return this;
+        }
+
+        /**
+         * Set the {@link SSLContext} used for TLS connections. When null, the JDK default context is used.
+         *
+         * <p>Ignored when a {@link #sslEngineFactory(ClientSslEngineFactory)} is supplied, since that
+         * factory provides its own engines.
+         *
+         * @param context the SSL context, or null for the JDK default
+         * @return this builder
+         */
+        public Builder sslContext(SSLContext context) {
+            connectionConfig.sslContext(context);
+            return this;
+        }
+
+        /**
+         * Set custom {@link SSLParameters} (cipher suites, protocols, SNI, etc.) for TLS connections.
+         * When null, parameters derived from the {@link #sslContext(SSLContext)} are used.
+         *
+         * @param parameters the SSL parameters, or null for defaults
+         * @return this builder
+         */
+        public Builder sslParameters(SSLParameters parameters) {
+            connectionConfig.sslParameters(parameters);
+            return this;
+        }
+
+        /**
+         * Set a factory that supplies the {@link javax.net.ssl.SSLEngine} for each secure connection,
+         * replacing the JDK provider (e.g. a native BoringSSL engine). When set, it takes precedence over
+         * {@link #sslContext(SSLContext)} for engine creation.
+         *
+         * @param factory the SSL engine factory, or null to use the JDK provider
+         * @return this builder
+         */
+        public Builder sslEngineFactory(ClientSslEngineFactory factory) {
+            connectionConfig.sslEngineFactory(factory);
+            return this;
+        }
+
+        /**
+         * Set the HTTP version policy (e.g. negotiate via ALPN, enforce HTTP/1.1, enforce HTTP/2,
+         * h2c prior knowledge). Default: {@link HttpVersionPolicy#AUTOMATIC}.
+         *
+         * @param policy the version policy (must not be null)
+         * @return this builder
+         */
+        public Builder httpVersionPolicy(HttpVersionPolicy policy) {
+            connectionConfig.httpVersionPolicy(policy);
+            return this;
+        }
+
+        /**
+         * Set the DNS resolver used to resolve hostnames to addresses. When null, a default round-robin
+         * resolver is used.
+         *
+         * @param resolver the DNS resolver (must not be null)
+         * @return this builder
+         */
+        public Builder dnsResolver(DnsResolver resolver) {
+            connectionConfig.dnsResolver(resolver);
+            return this;
+        }
+
+        /**
+         * Set a custom factory for creating the underlying {@link java.net.Socket}, honored verbatim.
+         * When not set, sockets are created with the library defaults plus any
+         * {@link #socketReceiveBufferSize(int)}/{@link #socketSendBufferSize(int)} knobs.
+         *
+         * @param socketFactory the socket factory (must not be null)
+         * @return this builder
+         */
+        public Builder socketFactory(HttpSocketFactory socketFactory) {
+            connectionConfig.socketFactory(socketFactory);
+            return this;
+        }
+
+        /**
+         * Set the socket receive buffer size ({@code SO_RCVBUF}) in bytes. Unset by default (kernel
+         * default); {@code -1} requests kernel autotuning. Ignored when a custom
+         * {@link #socketFactory(HttpSocketFactory)} is supplied.
+         *
+         * @param bytes receive buffer size in bytes (positive, or -1 for autotune)
+         * @return this builder
+         */
+        public Builder socketReceiveBufferSize(int bytes) {
+            connectionConfig.socketReceiveBufferSize(bytes);
+            return this;
+        }
+
+        /**
+         * Set the socket send buffer size ({@code SO_SNDBUF}) in bytes. Unset by default (kernel
+         * default); {@code -1} requests kernel autotuning. Ignored when a custom
+         * {@link #socketFactory(HttpSocketFactory)} is supplied.
+         *
+         * @param bytes send buffer size in bytes (positive, or -1 for autotune)
+         * @return this builder
+         */
+        public Builder socketSendBufferSize(int bytes) {
+            connectionConfig.socketSendBufferSize(bytes);
+            return this;
+        }
+
+        /**
+         * Set the application-side read buffer size for the TLS engine transport, in bytes. Default: 16 KiB.
+         * Larger buffers reduce read syscalls for bulk downloads.
+         *
+         * @param bytes TLS read buffer size in bytes (must be positive)
+         * @return this builder
+         */
+        public Builder tlsReadBufferSize(int bytes) {
+            connectionConfig.tlsReadBufferSize(bytes);
+            return this;
+        }
+
+        /**
+         * Set the application-side write buffer size for the TLS engine transport, in bytes. Default: 16 KiB.
+         * Larger buffers can coalesce write syscalls for bulk uploads.
+         *
+         * @param bytes TLS write buffer size in bytes (must be positive)
+         * @return this builder
+         */
+        public Builder tlsWriteBufferSize(int bytes) {
+            connectionConfig.tlsWriteBufferSize(bytes);
+            return this;
+        }
+
+        /**
+         * Set the HTTP/2 initial stream flow-control window advertised to the peer, in bytes. Default: 65535.
+         *
+         * @param windowSize initial window size in bytes (must be positive)
+         * @return this builder
+         */
+        public Builder h2InitialWindowSize(int windowSize) {
+            connectionConfig.h2InitialWindowSize(windowSize);
+            return this;
+        }
+
+        /**
+         * Set the HTTP/2 maximum frame size advertised to the peer, in bytes. Default: 16384. Must be
+         * between 16384 and 16777215 inclusive (per RFC 9113).
+         *
+         * @param frameSize maximum frame size in bytes (16384..16777215)
+         * @return this builder
+         */
+        public Builder h2MaxFrameSize(int frameSize) {
+            connectionConfig.h2MaxFrameSize(frameSize);
+            return this;
+        }
+
+        /**
+         * Set the maximum number of concurrent HTTP/2 streams to multiplex per connection. Default: 100.
+         *
+         * @param streams maximum concurrent streams per connection (must be positive)
+         * @return this builder
+         */
+        public Builder h2StreamsPerConnection(int streams) {
+            connectionConfig.h2StreamsPerConnection(streams);
+            return this;
+        }
+
+        /**
+         * Set the HTTP/2 connection I/O buffer size in bytes. Default: 256 KiB. Must be at least 16 KiB.
+         *
+         * @param bufferSize I/O buffer size in bytes (at least 16384)
+         * @return this builder
+         */
+        public Builder h2BufferSize(int bufferSize) {
+            connectionConfig.h2BufferSize(bufferSize);
             return this;
         }
 
@@ -174,13 +453,10 @@ public interface HttpClient extends AutoCloseable {
          * @return a new HTTP client instance
          */
         public HttpClient build() {
-            if (connectionPool == null) {
-                var builder = HttpConnectionPool.builder();
-                for (HttpClientListener listener : listeners) {
-                    builder.addListener(listener);
-                }
-                connectionPool = builder.build();
-            }
+            resolvedConnectionConfig = connectionConfig.build();
+            connectionPool = Objects.requireNonNull(
+                    connectionPoolFactory.apply(resolvedConnectionConfig),
+                    "connectionPoolFactory returned null");
             return new DefaultHttpClient(this);
         }
     }

@@ -170,10 +170,7 @@ final class H2Muxer implements AutoCloseable {
         this.headerEncoder = new H2RequestHeaderEncoder(
                 new HpackEncoder(initialTableSize),
                 new ByteBufferOutputStream(512));
-        // Platform thread (not virtual) because this worker runs a tight I/O loop with
-        // frequent socket writes and is always busy when there's traffic. VTs add
-        // continuation/ForkJoinPool overhead.
-        this.workerThread = Thread.ofPlatform().name(threadName).daemon(true).start(this::workerLoop);
+        this.workerThread = Thread.ofVirtual().name(threadName).start(this::workerLoop);
     }
 
     // ==================== LIFECYCLE ====================

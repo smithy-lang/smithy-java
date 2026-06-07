@@ -13,16 +13,25 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import com.sun.net.httpserver.HttpsConfigurator;
 import com.sun.net.httpserver.HttpsServer;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLSocket;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,7 +40,6 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpClient;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
@@ -110,15 +118,15 @@ class BoringSslEngineFactoryTest {
     }
 
     private HttpClient boringSslClient(int maxConns, Duration readTimeout) {
-        var poolBuilder = HttpConnectionPool.builder()
+        var builder = HttpClient.builder()
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .maxTotalConnections(maxConns)
                 .maxConnectionsPerRoute(maxConns)
                 .sslEngineFactory(BoringSslEngineFactory.create(true)); // trustAll: self-signed test cert
         if (readTimeout != null) {
-            poolBuilder.readTimeout(readTimeout);
+            builder.readTimeout(readTimeout);
         }
-        return HttpClient.builder().connectionPool(poolBuilder.build()).build();
+        return builder.build();
     }
 
     private static HttpRequest put(String uri, String body) {
@@ -226,14 +234,14 @@ class BoringSslEngineFactoryTest {
             payload[i] = (byte) (i * 17 + 3);
         }
 
-        var poolBuilder = HttpConnectionPool.builder()
+        try (var client = HttpClient.builder()
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .maxTotalConnections(1)
                 .maxConnectionsPerRoute(1)
                 .tlsReadBufferSize(256 * 1024)
                 .socketReceiveBufferSize(512 * 1024)
-                .sslEngineFactory(BoringSslEngineFactory.create(true));
-        try (var client = HttpClient.builder().connectionPool(poolBuilder.build()).build()) {
+                .sslEngineFactory(BoringSslEngineFactory.create(true))
+                .build()) {
             String uri = "https://127.0.0.1:" + server.getAddress().getPort() + "/raw";
             for (int attempt = 0; attempt < 3; attempt++) {
                 HttpRequest request = HttpRequest.create()
@@ -267,14 +275,14 @@ class BoringSslEngineFactoryTest {
             payload[i] = (byte) (i * 13 + 5);
         }
 
-        var poolBuilder = HttpConnectionPool.builder()
+        try (var client = HttpClient.builder()
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .maxTotalConnections(1)
                 .maxConnectionsPerRoute(1)
                 .tlsWriteBufferSize(256 * 1024)
                 .socketSendBufferSize(512 * 1024)
-                .sslEngineFactory(BoringSslEngineFactory.create(true));
-        try (var client = HttpClient.builder().connectionPool(poolBuilder.build()).build()) {
+                .sslEngineFactory(BoringSslEngineFactory.create(true))
+                .build()) {
             String uri = "https://127.0.0.1:" + server.getAddress().getPort() + "/raw";
             for (int attempt = 0; attempt < 3; attempt++) {
                 HttpRequest request = HttpRequest.create()
@@ -290,6 +298,136 @@ class BoringSslEngineFactoryTest {
                 }
             }
             assertEquals(3, requestCount.get());
+        }
+    }
+
+    @Test
+    void negotiatesH2ViaAlpn() throws Exception {
+        // Regression: the OpenSSL engine only performs ALPN when the protocol list is configured on the
+        // SslContext at build time. A client offering [h2, http/1.1] against an h2-capable server must
+        // negotiate h2, so SSLEngineTransport.negotiatedProtocol() (engine.getApplicationProtocol()) sees it.
+        assertEquals("h2", negotiatedProtocol(List.of("h2", "http/1.1"), List.of("h2", "http/1.1")));
+    }
+
+    @Test
+    void honorsPerCallAlpnList() throws Exception {
+        // The factory must advertise exactly the protocols passed to newEngine, not a hardcoded list:
+        // an http/1.1-only client must negotiate http/1.1 even against an h2-preferring server.
+        assertEquals("http/1.1", negotiatedProtocol(List.of("http/1.1"), List.of("h2", "http/1.1")));
+    }
+
+    /**
+     * Handshake a BoringSSL client engine (offering {@code clientAlpn}) against a JDK server
+     * {@link javax.net.ssl.SSLSocket} (offering {@code serverAlpn}) over a real loopback socket, and return
+     * the client's negotiated ALPN protocol. Using a real socket lets each side block on its peer's flight,
+     * which is far more robust than an in-memory wrap/unwrap ping-pong.
+     */
+    private static String negotiatedProtocol(List<String> clientAlpn, List<String> serverAlpn) throws Exception {
+        var ssc = new SelfSignedCertificate();
+        var ks = KeyStore.getInstance("PKCS12");
+        ks.load(null, null);
+        ks.setKeyEntry("key", ssc.key(), new char[0], new Certificate[] {ssc.cert()});
+        var kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        kmf.init(ks, new char[0]);
+        var serverSslContext = SSLContext.getInstance("TLS");
+        serverSslContext.init(kmf.getKeyManagers(), null, null);
+
+        try (var listener = (SSLServerSocket) serverSslContext.getServerSocketFactory()
+                .createServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            int port = listener.getLocalPort();
+            var serverParams = listener.getSSLParameters();
+            serverParams.setApplicationProtocols(serverAlpn.toArray(new String[0]));
+            listener.setSSLParameters(serverParams);
+
+            // Server thread: accept and complete the JDK-side handshake (which negotiates ALPN itself).
+            var serverThread = new Thread(() -> {
+                try (var s = (SSLSocket) listener.accept()) {
+                    s.startHandshake();
+                    s.getInputStream().read(); // block until the client closes, keeping the session open
+                } catch (Exception ignored) {
+                    // server side closing is expected once the client has what it needs
+                }
+            });
+            serverThread.setDaemon(true);
+            serverThread.start();
+
+            var clientHandle = BoringSslEngineFactory.create(true).newEngine("localhost", port, clientAlpn);
+            SSLEngine client = clientHandle.engine();
+            try (var socket = new Socket(InetAddress.getLoopbackAddress(), port)) {
+                driveClientHandshake(client, socket);
+                return client.getApplicationProtocol();
+            } finally {
+                clientHandle.releaser().run();
+            }
+        }
+    }
+
+    /** Canonical blocking SSLEngine handshake loop, driving {@code engine} over {@code socket}. */
+    private static void driveClientHandshake(SSLEngine engine, Socket socket)
+            throws Exception {
+        var in = socket.getInputStream();
+        var out = socket.getOutputStream();
+        int pkt = engine.getSession().getPacketBufferSize();
+        ByteBuffer netOut = ByteBuffer.allocate(pkt);
+        ByteBuffer netIn = ByteBuffer.allocate(pkt);
+        ByteBuffer app = ByteBuffer.allocate(engine.getSession().getApplicationBufferSize());
+        byte[] buf = new byte[pkt];
+
+        engine.beginHandshake();
+        var status = engine.getHandshakeStatus();
+        while (status != SSLEngineResult.HandshakeStatus.FINISHED
+                && status != SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING) {
+            switch (status) {
+                case NEED_WRAP -> {
+                    netOut.clear();
+                    var r = engine.wrap(ByteBuffer.allocate(0), netOut);
+                    status = r.getHandshakeStatus();
+                    netOut.flip();
+                    while (netOut.hasRemaining()) {
+                        out.write(buf, 0, copyOut(netOut, buf));
+                    }
+                    out.flush();
+                }
+                case NEED_UNWRAP -> {
+                    int n = in.read(buf);
+                    if (n < 0) {
+                        throw new SSLException("peer closed during handshake");
+                    }
+                    netIn.put(buf, 0, n);
+                    netIn.flip();
+                    var s = SSLEngineResult.Status.OK;
+                    do {
+                        app.clear();
+                        var r = engine.unwrap(netIn, app);
+                        status = r.getHandshakeStatus();
+                        s = r.getStatus();
+                        runTasks(engine);
+                        if (status == SSLEngineResult.HandshakeStatus.NEED_TASK) {
+                            status = engine.getHandshakeStatus();
+                        }
+                    } while (s == SSLEngineResult.Status.OK && netIn.hasRemaining()
+                            && status == SSLEngineResult.HandshakeStatus.NEED_UNWRAP);
+                    netIn.compact();
+                }
+                case NEED_TASK -> {
+                    runTasks(engine);
+                    status = engine.getHandshakeStatus();
+                }
+                default -> throw new IllegalStateException("Unexpected handshake status: " + status);
+            }
+        }
+    }
+
+    private static int copyOut(ByteBuffer src, byte[] buf) {
+        int n = Math.min(src.remaining(), buf.length);
+        src.get(buf, 0, n);
+        return n;
+    }
+
+    private static void runTasks(SSLEngine engine) {
+        Runnable task;
+        while ((task = engine.getDelegatedTask()) != null) {
+            task.run();
         }
     }
 }

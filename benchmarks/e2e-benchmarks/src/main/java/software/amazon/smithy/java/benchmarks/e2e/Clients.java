@@ -30,7 +30,6 @@ import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
 import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
 import software.amazon.smithy.java.client.http.smithy.SmithyHttpClientTransport;
 import software.amazon.smithy.java.http.client.HttpClient;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 
 /**
@@ -135,29 +134,24 @@ final class Clients {
      */
     private static HttpClient smithyPool(boolean boringSsl) {
         int maxConns = maxConnections();
-        var poolBuilder = HttpConnectionPool.builder()
+        var builder = HttpClient.builder()
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .maxTotalConnections(maxConns)
                 .maxConnectionsPerRoute(maxConns);
-        applyBufferProp("e2e.smithy.recvbuf", 1024 * 1024, poolBuilder::socketReceiveBufferSize);
-        applyBufferProp("e2e.smithy.sendbuf", 1024 * 1024, poolBuilder::socketSendBufferSize);
-        applyTlsBufferProp("e2e.smithy.tls.readbuf", 256 * 1024, poolBuilder::tlsReadBufferSize);
-        applyTlsBufferProp("e2e.smithy.tls.writebuf", 256 * 1024, poolBuilder::tlsWriteBufferSize);
-        var socketBackend = System.getProperty("e2e.smithy.socket", "auto").trim().toLowerCase();
-        switch (socketBackend) {
-            case "epoll" -> poolBuilder.useEpollTransport(true);
-            default -> {
-            }
-        }
+        applyBufferProp("e2e.smithy.recvbuf", 1024 * 1024, builder::socketReceiveBufferSize);
+        applyBufferProp("e2e.smithy.sendbuf", 1024 * 1024, builder::socketSendBufferSize);
+        applyTlsBufferProp("e2e.smithy.tls.readbuf", 256 * 1024, builder::tlsReadBufferSize);
+        applyTlsBufferProp("e2e.smithy.tls.writebuf", 256 * 1024, builder::tlsWriteBufferSize);
+        // The epoll transport is selected automatically when the native library is available.
         if (boringSsl) {
             if (BoringSslEngineFactory.isAvailable()) {
-                poolBuilder.sslEngineFactory(BoringSslEngineFactory.create(false));
+                builder.sslEngineFactory(BoringSslEngineFactory.create(false));
             } else {
                 System.err.println("smithy-boringssl requested but netty-tcnative unavailable; "
                         + "using JDK SSLEngine");
             }
         }
-        return HttpClient.builder().connectionPool(poolBuilder.build()).build();
+        return builder.build();
     }
 
     static DynamoDBClient dynamodb(String region) {

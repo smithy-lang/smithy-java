@@ -15,9 +15,8 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * Owns the experimental persistent-registration epoll socket backend for secure connections: the
  * shared {@link EpollRuntime} and the socket options to apply to each new {@link EpollChannel}.
  *
- * <p>This is an opt-in benchmarking alternative to the JDK NIO {@link java.nio.channels.SocketChannel}
- * for the TLS ({@link SSLEngineTransport}) path. It is created by {@link HttpConnectionPool} only when
- * {@link HttpConnectionPoolBuilder#useEpollTransport(boolean) useEpollTransport} is enabled AND
+ * <p>This is an alternative to the JDK NIO {@link java.nio.channels.SocketChannel} for the TLS
+ * ({@link SSLEngineTransport}) path. It is created by {@link HttpConnectionPool} whenever
  * {@link EpollRuntime#isAvailable()} is true (Linux with the native epoll library). On any other host
  * the pool leaves this null and every connection uses the standard NIO path.
  *

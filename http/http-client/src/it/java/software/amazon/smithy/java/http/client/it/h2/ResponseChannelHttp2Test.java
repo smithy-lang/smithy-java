@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPoolBuilder;
+import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.http.client.it.TestUtils;
 import software.amazon.smithy.java.http.client.it.server.NettyTestServer;
@@ -49,7 +49,7 @@ public class ResponseChannelHttp2Test extends BaseHttpClientIntegTest {
     }
 
     @Override
-    protected HttpConnectionPoolBuilder configurePool(HttpConnectionPoolBuilder builder) {
+    protected HttpClient.Builder configureClient(HttpClient.Builder builder) {
         return builder
                 .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
                 .maxConnectionsPerRoute(1);
