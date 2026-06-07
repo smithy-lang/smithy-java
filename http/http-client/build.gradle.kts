@@ -2,7 +2,7 @@ import java.net.Socket
 
 plugins {
     java
-    id("me.champeau.jmh") version "0.7.3"
+    id("smithy-java.jmh-conventions")
 }
 
 repositories {
@@ -89,31 +89,17 @@ val stopBenchmarkServer by tasks.registering {
 }
 
 jmh {
-    val includesProp = project.findProperty("jmh.includes")?.toString()
-    val jvmArgsProp = project.findProperty("jmh.jvmArgsAppend")?.toString()
-    val profilersProp = project.findProperty("jmh.profilers")?.toString()
-    val defaultJvmArgs = listOf("-Djdk.httpclient.allowRestrictedHeaders=host")
-
-    includes = if (includesProp != null) listOf(includesProp) else listOf(".*")
-    warmupIterations = 3
     iterations = 3
-    fork = 1
+    includes.set(
+        providers.gradleProperty("jmh.includes")
+            .map { listOf(it) }
+            .orElse(listOf(".*")),
+    )
     resultFormat = "CSV"
     resultsFile = project.file("build/reports/jmh/results.csv")
-
-    if (jvmArgsProp != null) {
-        jvmArgsAppend = defaultJvmArgs + jvmArgsProp.split(Regex("\\s*;\\s*")).filter { it.isNotEmpty() }
-    } else {
-        jvmArgsAppend = defaultJvmArgs
-    }
-    if (profilersProp != null) {
-        val profilerSpecs =
-            if (profilersProp.contains(";;")) {
-                profilersProp.split(Regex("\\s*;;\\s*")).filter { it.isNotEmpty() }
-            } else {
-                listOf(profilersProp)
-            }
-        profilers.addAll(profilerSpecs)
+    jvmArgsAppend.addAll("-Djdk.httpclient.allowRestrictedHeaders=host")
+    providers.gradleProperty("jmh.jvmArgsAppend").orNull?.let { args ->
+        jvmArgsAppend.addAll(args.split(Regex("\\s*;\\s*")).filter { it.isNotEmpty() })
     }
 }
 

@@ -13,6 +13,7 @@ import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import software.amazon.smithy.java.core.serde.Codec;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.io.ByteBufferUtils;
@@ -25,22 +26,34 @@ import software.amazon.smithy.model.traits.XmlNamespaceTrait;
  */
 public final class XmlCodec implements Codec {
 
-    private final XMLInputFactory xmlInputFactory;
-    private final XMLOutputFactory xmlOutputFactory;
+    private static final boolean USE_SMITHY_NATIVE =
+            "smithy".equals(System.getProperty("smithy-java.xml-provider"));
+
+    private volatile XMLInputFactory xmlInputFactory;
+    private volatile XMLOutputFactory xmlOutputFactory;
+    private volatile XMLEventFactory eventFactory;
     private final XmlInfo xmlInfo = new XmlInfo();
-    private final XMLEventFactory eventFactory = XMLEventFactory.newInstance();
     private final List<String> wrapperElements;
     private final XmlNamespaceTrait defaultNamespace;
+    private final boolean useNative;
 
     private XmlCodec(Builder builder) {
+        this.wrapperElements = builder.wrapperElements;
+        this.defaultNamespace = builder.defaultNamespace;
+        this.useNative = builder.useNative != null ? builder.useNative : USE_SMITHY_NATIVE;
+        if (!useNative) {
+            initStax();
+        }
+    }
+
+    private void initStax() {
         xmlInputFactory = XMLInputFactory.newInstance();
         xmlInputFactory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
         xmlInputFactory.setProperty("javax.xml.stream.isSupportingExternalEntities", false);
         xmlInputFactory.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
         xmlInputFactory.setProperty(XMLInputFactory.IS_COALESCING, false);
         xmlOutputFactory = XMLOutputFactory.newInstance();
-        this.wrapperElements = builder.wrapperElements;
-        this.defaultNamespace = builder.defaultNamespace;
+        eventFactory = XMLEventFactory.newInstance();
     }
 
     /**
@@ -54,6 +67,9 @@ public final class XmlCodec implements Codec {
 
     @Override
     public ShapeSerializer createSerializer(OutputStream sink) {
+        if (useNative) {
+            return new LazyXmlSerializer(defaultNamespace, xmlInfo, sink);
+        }
         try {
             return new XmlSerializer(xmlOutputFactory.createXMLStreamWriter(sink), xmlInfo, defaultNamespace);
         } catch (XMLStreamException e) {
@@ -67,6 +83,20 @@ public final class XmlCodec implements Codec {
             return EmptyXmlDeserializer.INSTANCE;
         }
 
+        if (useNative) {
+            byte[] bytes;
+            int offset;
+            int length = source.remaining();
+            if (source.hasArray()) {
+                bytes = source.array();
+                offset = source.arrayOffset() + source.position();
+            } else {
+                bytes = ByteBufferUtils.getBytes(source);
+                offset = 0;
+            }
+            return new SmithyXmlDeserializer(bytes, offset, length, xmlInfo, true, wrapperElements);
+        }
+
         try {
             var reader = xmlInputFactory.createXMLStreamReader(ByteBufferUtils.byteBufferInputStream(source));
             return XmlDeserializer.topLevel(
@@ -75,7 +105,7 @@ public final class XmlCodec implements Codec {
                     new XmlReader.StreamReader(reader, xmlInputFactory),
                     wrapperElements);
         } catch (XMLStreamException e) {
-            throw new RuntimeException(e);
+            throw new SerializationException(e);
         }
     }
 
@@ -85,6 +115,7 @@ public final class XmlCodec implements Codec {
     public static final class Builder {
         private List<String> wrapperElements = List.of();
         private XmlNamespaceTrait defaultNamespace;
+        private Boolean useNative;
 
         private Builder() {}
 
@@ -115,6 +146,16 @@ public final class XmlCodec implements Codec {
          */
         public Builder defaultNamespace(XmlNamespaceTrait defaultNamespace) {
             this.defaultNamespace = defaultNamespace;
+            return this;
+        }
+
+        /**
+         * Override the native provider selection for testing. When set to true, the native
+         * (high-performance) implementation is used regardless of system property. When false,
+         * the StAX implementation is used.
+         */
+        Builder useNative(boolean useNative) {
+            this.useNative = useNative;
             return this;
         }
 

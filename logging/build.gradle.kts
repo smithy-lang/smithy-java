@@ -2,7 +2,7 @@ import org.gradle.language.base.plugins.LifecycleBasePlugin.VERIFICATION_GROUP
 
 plugins {
     id("smithy-java.module-conventions")
-    alias(libs.plugins.jmh)
+    id("smithy-java.jmh-conventions")
 }
 
 description = "This module provides the Logging functionality for Smithy java"

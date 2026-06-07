@@ -8,11 +8,14 @@ package software.amazon.smithy.java.xml;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -25,9 +28,10 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
-public class XmlCodecTest {
-    @Test
-    public void deserializesXml() {
+public class XmlCodecTest extends ProviderTestBase {
+
+    @PerProvider
+    public void deserializesXml(boolean useNative) {
         var xml = """
                 <Foo>
                     <date>2006-03-01T00:00:00Z</date>
@@ -40,7 +44,7 @@ public class XmlCodecTest {
                 </Foo>
                 """;
 
-        try (var codec = XmlCodec.builder().build()) {
+        try (var codec = XmlCodec.builder().useNative(useNative).build()) {
             var pojo = codec.deserializeShape(xml, new TestPojo.Builder());
             assertThat(pojo.name, equalTo("Hello"));
             assertThat(pojo.date, equalTo(Instant.parse("2006-03-01T00:00:00Z")));
@@ -48,10 +52,9 @@ public class XmlCodecTest {
         }
     }
 
-    @Test
-    public void deserializesEmptyBody() {
-        try (var codec = XmlCodec.builder().build()) {
-            // Empty ByteBuffer: top-level readStruct should be a no-op
+    @PerProvider
+    public void deserializesEmptyBody(boolean useNative) {
+        try (var codec = XmlCodec.builder().useNative(useNative).build()) {
             var pojo = codec.deserializeShape(ByteBuffer.allocate(0), new TestPojo.Builder());
             assertThat(pojo.name, equalTo(null));
             assertThat(pojo.date, equalTo(null));
@@ -59,9 +62,9 @@ public class XmlCodecTest {
         }
     }
 
-    @Test
-    public void serializesXml() {
-        try (var codec = XmlCodec.builder().build()) {
+    @PerProvider
+    public void serializesXml(boolean useNative) {
+        try (var codec = XmlCodec.builder().useNative(useNative).build()) {
             var builder = new TestPojo.Builder();
             builder.name = "Hello";
             builder.date = Instant.parse("2006-03-01T00:00:00Z");
@@ -73,6 +76,115 @@ public class XmlCodecTest {
                     xml,
                     equalTo(
                             "<Foo><name>Hello</name><date>2006-03-01T00:00:00Z</date><numbers><member>1</member><member>2</member><member>3</member></numbers></Foo>"));
+        }
+    }
+
+    @PerProvider
+    public void deserializesMapWithEmptyBlobValue(boolean useNative) {
+        var xml = "<MapPojo><value><entry><key>k1</key><value></value></entry>"
+                + "<entry><key>k2</key><value>AQID</value></entry></value></MapPojo>";
+
+        try (var codec = XmlCodec.builder().useNative(useNative).build()) {
+            var pojo = codec.deserializeShape(xml, new MapPojo.Builder());
+            assertThat(pojo.value.size(), equalTo(2));
+            assertThat(pojo.value.get("k1"), equalTo(ByteBuffer.wrap(new byte[0])));
+            assertThat(pojo.value.get("k2"), equalTo(ByteBuffer.wrap(new byte[] {1, 2, 3})));
+        }
+    }
+
+    @Test
+    public void nativeAndStaxProduceSameResultForBlobMap() {
+        var xml = "<MapPojo><value>"
+                + "<entry><key>k1</key><value></value></entry>"
+                + "<entry><key>k2</key><value>AQID</value></entry>"
+                + "<entry><key>k3</key><value>BAUG</value></entry>"
+                + "<entry><key>k4</key><value>BwgJ</value></entry>"
+                + "</value></MapPojo>";
+
+        try (var stax = XmlCodec.builder().useNative(false).build();
+                var native_ = XmlCodec.builder().useNative(true).build()) {
+            var staxResult = stax.deserializeShape(xml, new MapPojo.Builder());
+            var nativeResult = native_.deserializeShape(xml, new MapPojo.Builder());
+            assertEquals(staxResult.value.size(),
+                    nativeResult.value.size(),
+                    "Map sizes differ: stax=" + staxResult.value + " native=" + nativeResult.value);
+            for (var entry : staxResult.value.entrySet()) {
+                assertEquals(entry.getValue(),
+                        nativeResult.value.get(entry.getKey()),
+                        "Mismatch for key=" + entry.getKey());
+            }
+        }
+    }
+
+    private static final class MapPojo implements SerializableStruct {
+
+        private static final ShapeId ID = ShapeId.from("smithy.example#MapPojo");
+
+        private static final Schema BLOB_MAP = Schema.mapBuilder(ShapeId.from("smithy.example#BlobMap"))
+                .putMember("key", PreludeSchemas.STRING)
+                .putMember("value", PreludeSchemas.BLOB)
+                .build();
+
+        private static final Schema SCHEMA = Schema.structureBuilder(ID)
+                .putMember("value", BLOB_MAP)
+                .build();
+
+        private static final Schema VALUE = SCHEMA.member("value");
+
+        private final Map<String, ByteBuffer> value;
+
+        MapPojo(Builder builder) {
+            this.value = builder.value;
+        }
+
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {
+            if (value != null) {
+                serializer.writeMap(VALUE, value, value.size(), (map, ms) -> {
+                    for (var e : map.entrySet()) {
+                        ms.writeEntry(BLOB_MAP.mapKeyMember(),
+                                e.getKey(),
+                                e.getValue(),
+                                (v, s) -> s.writeBlob(BLOB_MAP.mapValueMember(), v));
+                    }
+                });
+            }
+        }
+
+        @Override
+        public <T> T getMemberValue(Schema member) {
+            throw new UnsupportedOperationException();
+        }
+
+        private static final class Builder implements ShapeBuilder<MapPojo> {
+            private Map<String, ByteBuffer> value = new LinkedHashMap<>();
+
+            @Override
+            public Schema schema() {
+                return SCHEMA;
+            }
+
+            @Override
+            public Builder deserialize(ShapeDeserializer decoder) {
+                decoder.readStruct(SCHEMA, this, (pojo, member, deser) -> {
+                    if (member.memberName().equals("value")) {
+                        deser.readStringMap(VALUE, pojo.value, (map, key, de) -> {
+                            map.put(key, de.readBlob(BLOB_MAP.mapValueMember()));
+                        });
+                    }
+                });
+                return this;
+            }
+
+            @Override
+            public MapPojo build() {
+                return new MapPojo(this);
+            }
         }
     }
 

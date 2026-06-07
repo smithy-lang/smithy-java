@@ -3,7 +3,7 @@ import java.io.Serializable
 plugins {
     id("smithy-java.codegen-plugin-conventions")
     id("smithy-java.publishing-conventions")
-    alias(libs.plugins.jmh)
+    id("smithy-java.jmh-conventions")
 }
 
 description = "Smithy Java code generation plugin"
@@ -81,8 +81,6 @@ sourceSets.named("jmh") {
 tasks.named("compileJmhJava") {
     dependsOn("compileItJava")
 }
-
-jmh {}
 
 // Ensure generate tasks that use it source set resources depend on base generateSources
 listOf("generateSourcesClient", "generateSourcesServer", "generateSourcesTypes").forEach { taskName ->

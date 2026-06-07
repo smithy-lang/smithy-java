@@ -82,7 +82,7 @@ ssh "$SSH_HOST" "mkdir -p $REMOTE_DIR"
 scp -q "$JAR" "$SSH_HOST:$REMOTE_DIR/$JAR_NAME"
 
 # --- Build JMH CLI args ---
-JVM_ARGS="-Xms1g -Xmx1g -XX:+UseG1GC -XX:+AlwaysPreTouch -Dsmithy-java.json-provider=smithy"
+JVM_ARGS="-Xms1g -Xmx1g -XX:+UseG1GC -XX:+AlwaysPreTouch -Dsmithy-java.json-provider=smithy -Dsmithy-java.xml-provider=smithy"
 
 JMH_ARGS="-bm sample -tu ns -f 1 -rf json -rff $REMOTE_DIR/results.json"
 JMH_ARGS="$JMH_ARGS -jvmArgs \"$JVM_ARGS\""

@@ -5,14 +5,16 @@
 
 package software.amazon.smithy.java.json.smithy;
 
-import ch.randelshofer.fastdoubleparser.JavaDoubleParser;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
+import software.amazon.smithy.java.codecs.commons.NumberCodec;
+import software.amazon.smithy.java.codecs.commons.TimestampCodec;
 import software.amazon.smithy.java.core.serde.SerializationException;
 
 /**
@@ -24,6 +26,8 @@ import software.amazon.smithy.java.core.serde.SerializationException;
 final class JsonReadUtils {
 
     private JsonReadUtils() {}
+
+    private static final Base64.Decoder BASE64_DECODER = Base64.getDecoder();
 
     // VarHandle for reading 8 bytes at a time from byte arrays (SWAR technique)
     private static final VarHandle LONG_HANDLE =
@@ -109,7 +113,6 @@ final class JsonReadUtils {
     static void parseDouble(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
         int start = pos;
 
-        // Optional minus sign
         if (pos < end && buf[pos] == '-') {
             pos++;
         }
@@ -118,7 +121,6 @@ final class JsonReadUtils {
             throw new SerializationException("Unexpected end of input while parsing number");
         }
 
-        // Integer part — no leading zeros
         byte first = buf[pos];
         if (first < '0' || first > '9') {
             throw new SerializationException("Expected digit, found: " + describeChar(first));
@@ -135,7 +137,6 @@ final class JsonReadUtils {
             }
         }
 
-        // Optional fractional part
         if (pos < end && buf[pos] == '.') {
             pos++;
             if (pos >= end || buf[pos] < '0' || buf[pos] > '9') {
@@ -146,7 +147,6 @@ final class JsonReadUtils {
             }
         }
 
-        // Optional exponent
         if (pos < end && (buf[pos] == 'e' || buf[pos] == 'E')) {
             pos++;
             if (pos < end && (buf[pos] == '+' || buf[pos] == '-')) {
@@ -160,8 +160,7 @@ final class JsonReadUtils {
             }
         }
 
-        // Parse directly from byte array — no String allocation.
-        deser.parsedDouble = JavaDoubleParser.parseDouble(buf, start, pos - start);
+        deser.parsedDouble = NumberCodec.parseDouble(buf, start, pos - start);
         deser.parsedEndPos = pos;
     }
 
@@ -207,13 +206,13 @@ final class JsonReadUtils {
         while (pos < end) {
             byte b = buf[pos];
             if (b == '"') {
-                // No escapes found — fast path
+                // No escapes found -- fast path
                 deser.parsedString = new String(buf, start, pos - start, StandardCharsets.UTF_8);
                 deser.parsedEndPos = pos + 1;
                 return;
             }
             if (b == '\\') {
-                // Has escapes — slow path
+                // Has escapes -- slow path
                 parseStringWithEscapes(buf, start, pos, end, deser);
                 return;
             }
@@ -254,9 +253,7 @@ final class JsonReadUtils {
             int end,
             SmithyJsonDeserializer deser
     ) {
-        // Build a StringBuilder from what we've read so far + escaped content
         StringBuilder sb = new StringBuilder(escapePos - start + 16);
-        // Append everything before the first escape as UTF-8
         sb.append(new String(buf, start, escapePos - start, StandardCharsets.UTF_8));
 
         int pos = escapePos;
@@ -295,7 +292,6 @@ final class JsonReadUtils {
                         char c = parseHex4(buf, pos);
                         pos += 4;
                         if (Character.isHighSurrogate(c)) {
-                            // Expect low surrogate escape
                             if (pos + 6 > end || buf[pos] != '\\' || buf[pos + 1] != 'u') {
                                 throw new SerializationException("Expected low surrogate after high surrogate");
                             }
@@ -319,7 +315,6 @@ final class JsonReadUtils {
                             "Invalid escape character: \\" + (char) escaped);
                 }
             } else {
-                // Regular UTF-8 byte — decode
                 if ((b & 0x80) == 0) {
                     sb.append((char) b);
                     pos++;
@@ -337,7 +332,7 @@ final class JsonReadUtils {
         int value = 0;
         for (int i = 0; i < 4; i++) {
             byte b = buf[pos + i];
-            if (b < 0 || b >= HEX_VALUES.length || HEX_VALUES[b] == -1) {
+            if (b < 0 || HEX_VALUES[b] == -1) {
                 throw new SerializationException(
                         "Invalid hex digit in \\u escape: " + (char) (b & 0xFF));
             }
@@ -357,7 +352,6 @@ final class JsonReadUtils {
         if ((b & 0x80) == 0) {
             return new int[] {b, pos + 1};
         } else if ((b & 0xE0) == 0xC0) {
-            // 2-byte
             if (pos + 2 > end) {
                 throw new SerializationException("Truncated UTF-8 sequence");
             }
@@ -368,7 +362,6 @@ final class JsonReadUtils {
             }
             return new int[] {cp, pos + 2};
         } else if ((b & 0xF0) == 0xE0) {
-            // 3-byte
             if (pos + 3 > end) {
                 throw new SerializationException("Truncated UTF-8 sequence");
             }
@@ -384,7 +377,6 @@ final class JsonReadUtils {
             }
             return new int[] {cp, pos + 3};
         } else if ((b & 0xF8) == 0xF0) {
-            // 4-byte
             if (pos + 4 > end) {
                 throw new SerializationException("Truncated UTF-8 sequence");
             }
@@ -415,11 +407,9 @@ final class JsonReadUtils {
      * The fast check at the top covers the common case (next byte is not whitespace).
      */
     static int skipWhitespace(byte[] buf, int pos, int end) {
-        // Fast check: most common case is next byte is not whitespace
         if (pos < end && buf[pos] > ' ') {
             return pos;
         }
-        // Scalar loop for remaining bytes
         while (pos < end) {
             byte b = buf[pos];
             if (b != ' ' && b != '\n' && b != '\r' && b != '\t') {
@@ -430,307 +420,66 @@ final class JsonReadUtils {
         return pos;
     }
 
-    // Month lookup: index by first two bytes of 3-letter month abbreviation
-    // Jan=1, Feb=2, ..., Dec=12. Used by parseHttpDate.
-    private static final int[] MONTH_LOOKUP = new int[128 * 128];
-
-    static {
-        // Populate month lookup: key = first_char * 128 + second_char
-        MONTH_LOOKUP['J' * 128 + 'a'] = 1; // Jan
-        MONTH_LOOKUP['F' * 128 + 'e'] = 2; // Feb
-        MONTH_LOOKUP['M' * 128 + 'a'] = 3; // Mar (also May — disambiguate with 3rd char)
-        MONTH_LOOKUP['A' * 128 + 'p'] = 4; // Apr
-        MONTH_LOOKUP['J' * 128 + 'u'] = 6; // Jun (also Jul — disambiguate with 3rd char)
-        MONTH_LOOKUP['A' * 128 + 'u'] = 8; // Aug
-        MONTH_LOOKUP['S' * 128 + 'e'] = 9; // Sep
-        MONTH_LOOKUP['O' * 128 + 'c'] = 10; // Oct
-        MONTH_LOOKUP['N' * 128 + 'o'] = 11; // Nov
-        MONTH_LOOKUP['D' * 128 + 'e'] = 12; // Dec
-    }
-
-    // Full 3-letter month name validation table: third character for each month
-    private static final byte[] MONTH_THIRD_CHAR = {
-            0,
-            'n',
-            'b',
-            'r',
-            'r',
-            'y',
-            'n',
-            'l',
-            'g',
-            'p',
-            't',
-            'v',
-            'c'
-    };
-    //  Jan  Feb  Mar  Apr  May  Jun  Jul  Aug  Sep  Oct  Nov  Dec
-
-    /**
-     * Looks up month number (1-12) from a 3-letter abbreviation at buf[pos..pos+3).
-     * Validates all three characters: uses a two-char lookup table for the first two,
-     * then disambiguates Mar/May and Jun/Jul with the third character, and validates
-     * the third character for all other months.
-     */
-    private static int lookupMonth(byte[] buf, int pos) {
-        int key = (buf[pos] & 0x7F) * 128 + (buf[pos + 1] & 0x7F);
-        int month = key < MONTH_LOOKUP.length ? MONTH_LOOKUP[key] : 0;
-        if (month == 3) {
-            // Mar or May — disambiguate on third char
-            if (buf[pos + 2] == 'y') {
-                return 5; // May
-            }
-            if (buf[pos + 2] != 'r') {
-                throw new SerializationException("Invalid month: "
-                        + (char) buf[pos] + (char) buf[pos + 1] + (char) buf[pos + 2]);
-            }
-            return 3; // Mar
-        }
-        if (month == 6) {
-            // Jun or Jul — disambiguate on third char
-            if (buf[pos + 2] == 'l') {
-                return 7; // Jul
-            }
-            if (buf[pos + 2] != 'n') {
-                throw new SerializationException("Invalid month: "
-                        + (char) buf[pos] + (char) buf[pos + 1] + (char) buf[pos + 2]);
-            }
-            return 6; // Jun
-        }
-        if (month == 0 || buf[pos + 2] != MONTH_THIRD_CHAR[month]) {
-            throw new SerializationException("Invalid month: "
-                    + (char) buf[pos] + (char) buf[pos + 1] + (char) buf[pos + 2]);
-        }
-        return month;
-    }
-
-    /**
-     * Computes epoch day (days since 1970-01-01) from year/month/day using the
-     * proleptic Gregorian calendar algorithm. Pure integer arithmetic — no java.time overhead.
-     */
-    private static long computeEpochDay(int year, int month, int day) {
-        long y = year;
-        long m = month;
-        // Shift March=0..Feb=11 so Feb (the leap-day month) is at the end
-        if (m <= 2) {
-            y--;
-            m += 9;
-        } else {
-            m -= 3;
-        }
-        long era = (y >= 0 ? y : y - 399) / 400;
-        long yoe = y - era * 400;
-        long doy = (153 * m + 2) / 5 + day - 1;
-        long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-        return era * 146097 + doe - 719468;
-    }
-
-    private static int digit(byte b) {
-        int d = b - '0';
-        if (d < 0 || d > 9) {
-            throw new SerializationException("Expected digit, found: " + describeChar(b));
-        }
-        return d;
-    }
-
     /**
      * Parses an ISO-8601 timestamp directly from a JSON quoted string in the byte buffer.
-     * Expects pos to be at the opening quote. Avoids String allocation and DateTimeFormatter.
-     *
-     * <p>On success, stores result in deser.parsedEndPos (position after closing quote)
-     * and returns the Instant. On failure (non-standard format), returns null and
-     * deser state is unchanged caller should fall back to DateTimeFormatter.
+     * Expects pos to be at the opening quote.
      */
     static Instant parseIso8601(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
-        // Minimum: "YYYY-MM-DDThh:mm:ssZ" = 22 bytes (including quotes)
         if (pos >= end || buf[pos] != '"' || pos + 22 > end) {
             return null;
         }
-        pos++; // skip opening quote
-
-        // Parse YYYY-MM-DD
-        int year = digit(buf[pos]) * 1000 + digit(buf[pos + 1]) * 100
-                + digit(buf[pos + 2]) * 10
-                + digit(buf[pos + 3]);
-        pos += 4;
-        if (buf[pos++] != '-') {
+        int contentStart = pos + 1;
+        int closeQuote = contentStart;
+        while (closeQuote < end && buf[closeQuote] != '"') {
+            closeQuote++;
+        }
+        if (closeQuote >= end) {
             return null;
         }
-        int month = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
-        pos += 2;
-        if (month < 1 || month > 12) {
-            throw new SerializationException("Invalid ISO-8601 month: " + month);
-        }
-        if (buf[pos++] != '-') {
+        Instant result = TimestampCodec.parseIso8601(buf, contentStart, closeQuote);
+        if (result == null) {
             return null;
         }
-        int day = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
-        pos += 2;
-        if (day < 1 || day > 31) {
-            throw new SerializationException("Invalid ISO-8601 day: " + day);
-        }
-
-        if (buf[pos] != 'T' && buf[pos] != 't') {
-            return null;
-        }
-        pos++;
-
-        // Parse hh:mm:ss
-        int hour = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
-        pos += 2;
-        if (buf[pos++] != ':') {
-            return null;
-        }
-        int minute = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
-        pos += 2;
-        if (buf[pos++] != ':') {
-            return null;
-        }
-        int second = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
-        pos += 2;
-        if (hour > 23 || minute > 59 || second > 59) {
-            throw new SerializationException(
-                    "Invalid ISO-8601 time: " + hour + ":" + minute + ":" + second);
-        }
-
-        // Optional fractional seconds
-        int nano = 0;
-        if (pos < end && buf[pos] == '.') {
-            pos++;
-            int fracStart = pos;
-            while (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
-                pos++;
-            }
-            int fracLen = pos - fracStart;
-            if (fracLen == 0) {
-                return null;
-            }
-            // Parse up to 9 fractional digits, zero-padding on the right
-            for (int i = 0; i < 9; i++) {
-                nano *= 10;
-                if (i < fracLen) {
-                    nano += buf[fracStart + i] - '0';
-                }
-            }
-        }
-
-        // Must end with 'Z' for UTC fast path
-        if (pos >= end || buf[pos] != 'Z') {
-            return null; // timezone offset — fall back to DateTimeFormatter
-        }
-        pos++; // skip Z
-
-        // Expect closing quote
-        if (pos >= end || buf[pos] != '"') {
-            return null;
-        }
-        pos++; // skip closing quote
-
-        deser.parsedEndPos = pos;
-        long epochDay = computeEpochDay(year, month, day);
-        long epochSecond = epochDay * 86400 + hour * 3600 + minute * 60 + second;
-        return Instant.ofEpochSecond(epochSecond, nano);
+        deser.parsedEndPos = closeQuote + 1;
+        return result;
     }
 
     /**
-     * Parses an HTTP-date ("EEE, dd MMM yyyy HH:mm:ss GMT") directly from a JSON
-     * quoted string. Expects pos to be at the opening quote.
-     *
-     * <p>On success, stores deser.parsedEndPos (after closing quote) and returns Instant.
-     * On failure, returns null — caller should fall back to DateTimeFormatter.
+     * Parses an HTTP-date directly from a JSON quoted string in the byte buffer.
+     * Expects pos to be at the opening quote.
      */
     static Instant parseHttpDate(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
-        // Minimum: "Thu, 01 Jan 2026 00:00:00 GMT" = 31 bytes (including quotes)
         if (pos >= end || buf[pos] != '"' || pos + 31 > end) {
             return null;
         }
-        pos++; // skip opening quote
-
-        // Skip day name — find comma
-        while (pos < end && buf[pos] != ',') {
-            pos++;
+        int contentStart = pos + 1;
+        int closeQuote = contentStart;
+        while (closeQuote < end && buf[closeQuote] != '"') {
+            closeQuote++;
         }
-        if (pos >= end) {
+        if (closeQuote >= end) {
             return null;
         }
-        pos++; // skip comma
-        if (pos >= end || buf[pos] != ' ') {
+        Instant result = TimestampCodec.parseHttpDate(buf, contentStart, closeQuote);
+        if (result == null) {
             return null;
         }
-        pos++; // skip space
-
-        // Parse dd
-        int day = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
-        pos += 2;
-        if (buf[pos++] != ' ') {
-            return null;
-        }
-
-        // Parse MMM
-        int month = lookupMonth(buf, pos);
-        pos += 3;
-        if (buf[pos++] != ' ') {
-            return null;
-        }
-
-        // Parse yyyy
-        int year = digit(buf[pos]) * 1000 + digit(buf[pos + 1]) * 100
-                + digit(buf[pos + 2]) * 10
-                + digit(buf[pos + 3]);
-        pos += 4;
-        if (buf[pos++] != ' ') {
-            return null;
-        }
-
-        // Parse HH:mm:ss
-        int hour = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
-        pos += 2;
-        if (buf[pos++] != ':') {
-            return null;
-        }
-        int minute = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
-        pos += 2;
-        if (buf[pos++] != ':') {
-            return null;
-        }
-        int second = digit(buf[pos]) * 10 + digit(buf[pos + 1]);
-        pos += 2;
-
-        // Expect " GMT"
-        if (pos + 4 > end || buf[pos] != ' '
-                || buf[pos + 1] != 'G'
-                || buf[pos + 2] != 'M'
-                || buf[pos + 3] != 'T') {
-            return null;
-        }
-        pos += 4; // skip " GMT"
-
-        // Expect closing quote
-        if (pos >= end || buf[pos] != '"') {
-            return null;
-        }
-        pos++; // skip closing quote
-
-        deser.parsedEndPos = pos;
-        long epochDay = computeEpochDay(year, month, day);
-        long epochSecond = epochDay * 86400 + hour * 3600 + minute * 60 + second;
-        return Instant.ofEpochSecond(epochSecond);
+        deser.parsedEndPos = closeQuote + 1;
+        return result;
     }
-
-    private static final Base64.Decoder BASE64_DECODER = Base64.getDecoder();
 
     /**
      * Decodes a base64-encoded JSON string from the byte buffer, bypassing String allocation.
-     * Scans for the closing quote to find the base64 content boundaries, then uses the JDK
-     * Base64 decoder which is backed by @IntrinsicCandidate SIMD on HotSpot.
+     * Scans for the closing quote to find the base64 content boundaries, then decodes
+     * directly from the span via ByteBuffer.wrap (zero-copy input, JDK SIMD intrinsic).
      *
      * <p>Expects {@code pos} at the opening quote. Stores the position after the closing
      * quote in {@code deser.parsedEndPos}.
      *
-     * @return the decoded bytes
+     * @return the decoded ByteBuffer
      * @throws SerializationException on unterminated string or invalid base64
      */
-    static byte[] decodeBase64String(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
+    static ByteBuffer decodeBase64String(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
         if (pos >= end || buf[pos] != '"') {
             throw new SerializationException("Expected '\"', found: " + describePos(buf, pos, end));
         }
@@ -757,12 +506,11 @@ final class JsonReadUtils {
         deser.parsedEndPos = pos + 1; // after closing quote
 
         if (contentStart == contentEnd) {
-            return new byte[0];
+            return ByteBuffer.allocate(0);
         }
 
-        byte[] base64Bytes = Arrays.copyOfRange(buf, contentStart, contentEnd);
         try {
-            return BASE64_DECODER.decode(base64Bytes);
+            return BASE64_DECODER.decode(ByteBuffer.wrap(buf, contentStart, contentEnd - contentStart));
         } catch (IllegalArgumentException e) {
             throw new SerializationException("Invalid base64 in blob value", e);
         }

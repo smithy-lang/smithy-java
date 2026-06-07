@@ -8,6 +8,7 @@ plugins {
     id("com.github.spotbugs")
     id("com.diffplug.spotless")
     id("com.autonomousapps.dependency-analysis")
+    id("info.solidsoft.pitest")
     id("smithy-java.utilities")
 }
 
@@ -48,6 +49,7 @@ dependencies {
     testImplementation(libs.assertj.core)
     compileOnly("com.github.spotbugs:spotbugs-annotations:${spotbugs.toolVersion.get()}")
     testCompileOnly("com.github.spotbugs:spotbugs-annotations:${spotbugs.toolVersion.get()}")
+    "pitest"(libs.pitest.junit5.plugin)
 }
 
 tasks.withType<Test> {
@@ -119,6 +121,26 @@ spotbugs {
 // We don't need to lint tests.
 tasks.named("spotbugsTest") {
     enabled = false
+}
+
+pitest {
+    targetClasses.set(setOf("software.amazon.smithy.*"))
+    targetTests.set(setOf("software.amazon.smithy.*"))
+    excludedClasses.set(setOf("*.GeneratedVersionProvider"))
+    threads.set(Runtime.getRuntime().availableProcessors())
+    outputFormats.set(setOf("HTML", "XML"))
+    timestampedReports.set(false)
+    mutationThreshold.set(0)
+    failWhenNoMutations.set(false)
+}
+
+tasks.named("pitest") {
+    val reportDir = project.layout.buildDirectory.dir("reports/pitest").map { it.asFile.absolutePath }
+    doLast {
+        val dir = reportDir.get()
+        logger.lifecycle("Pitest HTML report: file://${dir}/index.html")
+        logger.lifecycle("Pitest XML report: file://${dir}/mutations.xml")
+    }
 }
 
 /*

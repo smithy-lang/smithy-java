@@ -61,6 +61,7 @@ final class XmlInfo {
         final Map<String, Schema> attributes;
         final Map<String, Schema> elements;
         final boolean hasFlattened;
+        final XmlMemberLookup memberLookup;
 
         private StructInfo(Schema schema) {
             if (schema.type() != ShapeType.STRUCTURE && schema.type() != ShapeType.UNION) {
@@ -96,6 +97,7 @@ final class XmlInfo {
             this.hasFlattened = hasFlattened;
             this.attributes = attributes == null ? Collections.emptyMap() : attributes;
             this.elements = elements == null ? Collections.emptyMap() : elements;
+            this.memberLookup = elements != null ? new XmlMemberLookup(this.elements) : null;
         }
 
         // If the shape has flattened members, then prepare a map to store buffered state.

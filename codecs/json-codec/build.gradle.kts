@@ -2,7 +2,7 @@ plugins {
     id("smithy-java.module-conventions")
     id("smithy-java.fuzz-test")
     id("software.amazon.smithy.gradle.smithy-base")
-    alias(libs.plugins.shadow)
+    id("com.gradleup.shadow")
 }
 
 description = "This module provides json functionality"
@@ -12,10 +12,9 @@ extra["moduleName"] = "software.amazon.smithy.java.json"
 
 dependencies {
     api(project(":core"))
+    implementation(project(":codecs:codec-commons", configuration = "shadow"))
     compileOnly(libs.jackson.core)
-    compileOnly(libs.fastdoubleparser)
     testRuntimeOnly(libs.jackson.core)
-    testRuntimeOnly(libs.fastdoubleparser)
     smithyBuild(project(":codegen:codegen-plugin"))
 }
 
@@ -32,15 +31,7 @@ tasks {
                         .toString(),
                 ),
             )
-            include(
-                dependency(
-                    libs.fastdoubleparser
-                        .get()
-                        .toString(),
-                ),
-            )
             relocate("tools.jackson.core", "software.amazon.smithy.java.internal.shaded.tools.jackson.core")
-            relocate("ch.randelshofer", "software.amazon.smithy.java.internal.shaded.ch.randelshofer")
         }
     }
     jar {

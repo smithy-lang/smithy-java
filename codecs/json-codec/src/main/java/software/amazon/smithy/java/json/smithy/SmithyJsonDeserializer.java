@@ -16,6 +16,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import software.amazon.smithy.java.codecs.commons.NumberCodec;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
@@ -70,8 +71,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                     "Unexpected JSON content: " + JsonReadUtils.describePos(buf, p, end));
         }
     }
-
-    // ---- Primitive readers ----
 
     @Override
     public boolean readBoolean(Schema schema) {
@@ -242,9 +241,9 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public ByteBuffer readBlob(Schema schema) {
         skipWhitespace();
-        byte[] decoded = JsonReadUtils.decodeBase64String(buf, pos, end, this);
+        ByteBuffer decoded = JsonReadUtils.decodeBase64String(buf, pos, end, this);
         pos = parsedEndPos;
-        return ByteBuffer.wrap(decoded);
+        return decoded;
     }
 
     @Override
@@ -292,9 +291,9 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                         throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
                     }
                 }
-                // No digits after dot — fall through to double parsing
+                // No digits after dot -- fall through to double parsing
             } else if (endPos >= end || (buf[endPos] != 'e' && buf[endPos] != 'E')) {
-                // Pure integer — no fractional part
+                // Pure integer -- no fractional part
                 pos = endPos;
                 try {
                     return Instant.ofEpochSecond(parsedLong);
@@ -302,7 +301,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                     throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
                 }
             }
-            // Has exponent or unparseable fraction — fall through to double parsing
+            // Has exponent or unparseable fraction -- fall through to double parsing
             JsonReadUtils.parseDouble(buf, pos, end, this);
             pos = parsedEndPos;
             return format.readFromNumber(parsedDouble);
@@ -354,8 +353,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         };
     }
 
-    // ---- Struct deserialization ----
-
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         // Localize hot fields to registers. The JIT cannot promote instance fields across
@@ -379,14 +376,12 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
         p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
 
-        // Empty object
         if (p < localEnd && localBuf[p] == '}') {
             this.pos = p + 1;
             depth--;
             return;
         }
 
-        // Get the member lookup for this struct.
         Schema structSchema = schema.isMember() ? schema.memberTarget() : schema;
         var ext = structSchema.getExtension(SmithyJsonSchemaExtensions.KEY);
         SmithyMemberLookup lookup = null;
@@ -419,7 +414,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
             p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
 
-            // Parse field name
             if (p >= localEnd || localBuf[p] != '"') {
                 this.pos = p;
                 throw new SerializationException(
@@ -463,7 +457,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                 p++; // skip closing quote
             }
 
-            // Skip colon
             p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
             if (p >= localEnd || localBuf[p] != ':') {
                 this.pos = p;
@@ -498,7 +491,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                     p = this.pos;
                 }
             } else {
-                // Unknown field — validate field name bytes per RFC 8259
+                // Unknown field -- validate field name bytes per RFC 8259
                 // (control chars, escape sequences). This is the cold path only.
                 validateSkippedString(localBuf, nameStart, nameEnd);
                 this.pos = p;
@@ -520,8 +513,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         }
     }
 
-    // ---- List deserialization ----
-
     @Override
     public <T> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
         final byte[] buf = this.buf;
@@ -542,7 +533,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
         p = JsonReadUtils.skipWhitespace(buf, p, end);
 
-        // Empty array
         if (p < end && buf[p] == ']') {
             this.pos = p + 1;
             depth--;
@@ -573,8 +563,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         }
     }
 
-    // ---- Map deserialization ----
-
     @Override
     public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
         final byte[] buf = this.buf;
@@ -595,7 +583,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
         p = JsonReadUtils.skipWhitespace(buf, p, end);
 
-        // Empty object
         if (p < end && buf[p] == '}') {
             this.pos = p + 1;
             depth--;
@@ -621,7 +608,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             }
             first = false;
 
-            // Parse key — need to write pos back for readStringValue
+            // Parse key -- need to write pos back for readStringValue
             this.pos = p;
             String key = readStringValue();
             p = JsonReadUtils.skipWhitespace(buf, this.pos, end);
@@ -638,8 +625,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             p = this.pos;
         }
     }
-
-    // ---- Document deserialization ----
 
     @Override
     public Document readDocument() {
@@ -740,28 +725,41 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             }
         }
 
-        String numStr = new String(buf, pos, newPos - pos, StandardCharsets.US_ASCII);
-        pos = newPos;
-
         Number number;
         if (isFloat) {
             number = parsedDouble;
+            pos = newPos;
         } else {
-            try {
-                long lv = Long.parseLong(numStr);
+            int len = newPos - pos;
+            int digitStart = pos;
+            if (buf[pos] == '-') {
+                digitStart++;
+            }
+            int digitLen = newPos - digitStart;
+            if (digitLen <= 18) {
+                long lv = NumberCodec.parseLong(buf, pos, len);
                 if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE) {
                     number = (int) lv;
                 } else {
                     number = lv;
                 }
-            } catch (NumberFormatException e) {
-                number = new BigInteger(numStr);
+            } else {
+                String numStr = new String(buf, pos, len, StandardCharsets.US_ASCII);
+                try {
+                    long lv = Long.parseLong(numStr);
+                    if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE) {
+                        number = (int) lv;
+                    } else {
+                        number = lv;
+                    }
+                } catch (NumberFormatException e) {
+                    number = new BigInteger(numStr);
+                }
             }
+            pos = newPos;
         }
         return JsonDocuments.of(number, settings);
     }
-
-    // ---- Null handling ----
 
     @Override
     public boolean isNull() {
@@ -775,8 +773,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         expectLiteral("null");
         return null;
     }
-
-    // ---- Validation for skipped content ----
 
     /**
      * Validates string bytes (between quotes) for RFC 8259 compliance without building a String.
@@ -811,8 +807,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             p++;
         }
     }
-
-    // ---- Value skipping for unknown fields ----
 
     private void skipValue() {
         skipWhitespace();
@@ -871,7 +865,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                     case '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> {
                     }
                     case 'u' -> {
-                        // \\uXXXX — skip 4 hex digits
+                        // \\uXXXX -- skip 4 hex digits
                         if (p + 4 >= end) {
                             throw new SerializationException("Unterminated \\u escape");
                         }
@@ -959,8 +953,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             skipValue();
         }
     }
-
-    // ---- Utility methods ----
 
     private void skipWhitespace() {
         pos = JsonReadUtils.skipWhitespace(buf, pos, end);

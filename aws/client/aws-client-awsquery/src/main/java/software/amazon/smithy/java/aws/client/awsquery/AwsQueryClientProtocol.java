@@ -69,7 +69,7 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
             SmithyUri endpoint
     ) {
         String operationName = operation.schema().id().getName();
-        QueryFormSerializer serializer = new QueryFormSerializer(
+        QueryFormSerializer serializer = QueryFormSerializer.acquire(
                 QueryFormSerializer.QueryVariant.AWS_QUERY,
                 operationName,
                 version);

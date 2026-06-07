@@ -119,10 +119,10 @@
 
     <!-- Vendored Schubfach algorithm (from Jackson/OpenJDK) — not our code to fix. -->
     <Match>
-        <Class name="software.amazon.smithy.java.json.smithy.Schubfach$DoubleToDecimal" />
+        <Class name="software.amazon.smithy.java.codecs.commons.Schubfach$DoubleToDecimal" />
     </Match>
     <Match>
-        <Class name="software.amazon.smithy.java.json.smithy.Schubfach$FloatToDecimal" />
+        <Class name="software.amazon.smithy.java.codecs.commons.Schubfach$FloatToDecimal" />
     </Match>
 
 </FindBugsFilter>

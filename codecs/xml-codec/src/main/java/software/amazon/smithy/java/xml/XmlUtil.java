@@ -18,8 +18,10 @@ public final class XmlUtil {
      * @return String value of the Code element if found
      */
     public static String parseErrorCodeName(ShapeDeserializer deserializer) {
-        try (var xmlDeserializer = (XmlDeserializer) deserializer) {
-            return xmlDeserializer.parseErrorCodeName();
+        try {
+            return ((XmlErrorCodeParser) deserializer).parseErrorCodeName();
+        } finally {
+            deserializer.close();
         }
     }
 }
