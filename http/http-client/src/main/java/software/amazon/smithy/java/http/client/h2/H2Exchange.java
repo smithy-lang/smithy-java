@@ -132,7 +132,8 @@ public final class H2Exchange implements HttpExchange {
     private final AtomicInteger closedStreamCount = new AtomicInteger(0);
 
     // === Flow control ===
-    // sendWindow: monitor-based (synchronized + wait/notifyAll), VT blocks when exhausted
+    // sendWindow: backed by FlowControlWindow (ReentrantLock + Condition, not a monitor, to avoid
+    //   pinning the carrier when a VT blocks on an exhausted window)
     // streamRecvWindow: tracks receive window, accessed under dataLock
     private final FlowControlWindow sendWindow;
     private final int initialWindowSize;
@@ -602,7 +603,9 @@ public final class H2Exchange implements HttpExchange {
         return request;
     }
 
-    synchronized OutputStream requestBody() {
+    OutputStream requestBody() {
+        // Delegates to requestBodyState.outputStream(), which is itself synchronized; an outer monitor
+        // here is redundant double-locking.
         return requestBodyState.outputStream();
     }
 
@@ -612,7 +615,10 @@ public final class H2Exchange implements HttpExchange {
     }
 
     @Override
-    public synchronized InputStream responseBody() throws IOException {
+    public InputStream responseBody() throws IOException {
+        // Not synchronized: the response body is read by the single VT that owns this exchange, and
+        // readResponseHeaders() blocks on a Condition. Holding a monitor across that wait would pin the
+        // carrier thread on JDK 21-23 (fixed by JEP 491 in 24). responseIn/responseDataStream are volatile.
         // Ensure we have response headers first
         if (!state.isResponseHeadersReceived()) {
             readResponseHeaders();
