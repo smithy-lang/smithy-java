@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.http.client.h2;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
 
@@ -94,7 +95,7 @@ final class H2StreamBody {
                 wait();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new IOException("Interrupted waiting for response data", e);
+                throw interrupted(e);
             }
         }
         if (failure != null) {
@@ -118,7 +119,7 @@ final class H2StreamBody {
                 wait();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new IOException("Interrupted waiting for response data", e);
+                throw interrupted(e);
             }
         }
         if (failure != null) {
@@ -169,5 +170,17 @@ final class H2StreamBody {
         }
         notifyAll();
         return released;
+    }
+
+    /**
+     * Build the exception thrown when a consumer is interrupted waiting for response data. Uses
+     * {@link InterruptedIOException} (not a plain {@link IOException}) so callers — e.g. those composing
+     * under structured concurrency — can distinguish cancellation from a transport/server failure. The
+     * interrupt status is restored by the caller before this is thrown.
+     */
+    private static InterruptedIOException interrupted(InterruptedException cause) {
+        var e = new InterruptedIOException("Interrupted waiting for response data");
+        e.initCause(cause);
+        return e;
     }
 }
