@@ -69,7 +69,7 @@ public final class Ec2QueryClientProtocol extends HttpClientProtocol {
             SmithyUri endpoint
     ) {
         String operationName = operation.schema().id().getName();
-        QueryFormSerializer serializer = new QueryFormSerializer(
+        QueryFormSerializer serializer = QueryFormSerializer.acquire(
                 QueryFormSerializer.QueryVariant.EC2_QUERY,
                 operationName,
                 version);

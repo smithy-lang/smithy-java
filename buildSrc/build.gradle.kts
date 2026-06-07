@@ -15,6 +15,9 @@ dependencies {
     implementation(libs.spotless)
     implementation(libs.smithy.gradle.base)
     implementation(libs.dependency.analysis)
+    implementation(libs.pitest.gradle.plugin)
+    implementation(libs.jmh.gradle.plugin)
+    implementation(libs.shadow.gradle.plugin)
 
     // https://github.com/gradle/gradle/issues/15383
     implementation(files(libs.javaClass.superclass.protectionDomain.codeSource.location))

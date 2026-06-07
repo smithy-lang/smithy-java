@@ -37,6 +37,7 @@ include(":retries-api")
 include(":retries")
 
 // Codecs
+include(":codecs:codec-commons")
 include(":codecs:cbor-codec")
 include(":codecs:json-codec")
 include(":codecs:xml-codec")

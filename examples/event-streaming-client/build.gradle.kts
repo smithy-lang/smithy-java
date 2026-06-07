@@ -1,7 +1,7 @@
 plugins {
     `java-library`
     id("software.amazon.smithy.gradle.smithy-base")
-    id("me.champeau.jmh") version "0.7.3"
+    id("smithy-java.jmh-conventions")
 }
 
 dependencies {
@@ -49,10 +49,6 @@ tasks {
 
 jmh {
     warmupIterations = 2
-    iterations = 5
-    fork = 1
-    // profilers.add("async:output=flamegraph")
-    // profilers.add("gc")
 }
 
 // Helps Intellij IDE's discover smithy models

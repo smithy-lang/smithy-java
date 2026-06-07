@@ -3,6 +3,7 @@ junit5 = "6.1.0"
 hamcrest = "3.0"
 smithy = "1.71.0"
 jmh = "0.7.3"
+jmhCore = "1.37"
 test-logger-plugin = "4.0.0"
 spotbugs = "6.0.22"
 spotless = "8.6.0"
@@ -20,6 +21,8 @@ picocli = "4.7.7"
 graalvm-native = "1.1.1"
 shadow = "8.3.11"
 jazzer = "0.30.0"
+pitest-junit5 = "1.2.3"
+pitest-gradle = "1.19.0"
 json-schema-validator = "3.0.0"
 opentelemetry = "1.62.0"
 jspecify = "1.0.0"
@@ -88,6 +91,10 @@ spotbugs = { module = "com.github.spotbugs.snom:spotbugs-gradle-plugin", version
 spotless = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
 smithy-gradle-base = { module = "software.amazon.smithy.gradle:smithy-base", version.ref = "smithy-gradle-plugins" }
 dependency-analysis = { module = "com.autonomousapps:dependency-analysis-gradle-plugin", version.ref = "dep-analysis" }
+pitest-gradle-plugin = { module = "info.solidsoft.gradle.pitest:gradle-pitest-plugin", version.ref = "pitest-gradle" }
+pitest-junit5-plugin = { module = "org.pitest:pitest-junit5-plugin", version.ref = "pitest-junit5" }
+jmh-gradle-plugin = { module = "me.champeau.jmh:jmh-gradle-plugin", version.ref = "jmh" }
+shadow-gradle-plugin = { module = "com.gradleup.shadow:shadow-gradle-plugin", version.ref = "shadow" }
 
 [plugins]
 jmh = { id = "me.champeau.jmh", version.ref = "jmh" }

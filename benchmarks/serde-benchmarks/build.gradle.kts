@@ -1,7 +1,7 @@
 plugins {
     id("smithy-java.java-conventions")
-    alias(libs.plugins.shadow)
-    alias(libs.plugins.jmh)
+    id("com.gradleup.shadow")
+    id("smithy-java.jmh-conventions")
     id("software.amazon.smithy.gradle.smithy-base")
 }
 
@@ -150,40 +150,22 @@ tasks.named("compileJmhJava") {
     dependsOn("smithyBuild")
 }
 
-// All JMH parameters are configured here (single source of truth).
-// Per-class annotations (@Warmup, @Measurement, @Fork, etc.) are not used.
-//
-// Fast mode:  -Pjmh.fast       (1 warmup, 3 measurement, 1 fork, 5s each)
-// Profilers:  -Pjmh.profilers=gc,stack   (comma-separated JMH profiler names)
-// Filter:     -Pjmh.includes=RpcV2CborSerializeBenchmark.serialize
 // Test case:  -Pjmh.testCaseId=rpcv2Cbor_PutItemRequest_BinaryData_S
 val fast = providers.gradleProperty("jmh.fast").isPresent
 jmh {
-    benchmarkMode.addAll("sample")
-    timeUnit = "ns"
-    warmupIterations = if (fast) 1 else 5
-    warmup = if (fast) "5s" else "2s"
-    iterations = if (fast) 3 else 10
-    timeOnIteration = if (fast) "5s" else "5s"
-    fork = 1
+    benchmarkMode.set(listOf("sample"))
+    if (!fast) {
+        warmupIterations = 5
+        iterations = 10
+    }
+    timeOnIteration = "5s"
     jvmArgs.addAll(
         "-Xms1g",
         "-Xmx1g",
         "-XX:+UseG1GC",
         "-XX:+AlwaysPreTouch",
         "-Dsmithy-java.json-provider=smithy",
-    )
-    includes.addAll(
-        providers
-            .gradleProperty("jmh.includes")
-            .map { listOf(it) }
-            .orElse(emptyList()),
-    )
-    profilers.addAll(
-        providers
-            .gradleProperty("jmh.profilers")
-            .map { it.split(",") }
-            .orElse(emptyList()),
+        "-Dsmithy-java.xml-provider=smithy",
     )
     providers.gradleProperty("jmh.testCaseId").orNull?.let { id ->
         val prop = objects.listProperty(String::class.java)

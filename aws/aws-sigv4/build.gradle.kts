@@ -2,7 +2,7 @@ import com.google.gradle.osdetector.OsDetector
 
 plugins {
     id("smithy-java.module-conventions")
-    alias(libs.plugins.jmh)
+    id("smithy-java.jmh-conventions")
     alias(libs.plugins.osdetector)
 }
 
@@ -31,9 +31,6 @@ afterEvaluate {
 }
 
 jmh {
-    iterations = 3
     warmupIterations = 2
-    fork = 1
-    // profilers.add("async:output=flamegraph")
-    // profilers.add("gc")
+    iterations = 3
 }

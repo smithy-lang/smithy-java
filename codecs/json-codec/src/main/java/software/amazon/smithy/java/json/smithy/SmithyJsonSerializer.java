@@ -11,8 +11,9 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.BiConsumer;
+import software.amazon.smithy.java.codecs.commons.NumberCodec;
+import software.amazon.smithy.java.codecs.commons.StripedPool;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.MapSerializer;
@@ -21,7 +22,6 @@ import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonFieldMapper;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -38,19 +38,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     private static final int DEFAULT_BUF_SIZE = 8192;
     private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 4;
 
-    // Striped serializer pool.
-    private static final int POOL_SLOTS;
-    private static final int POOL_MASK;
-    private static final AtomicReferenceArray<SmithyJsonSerializer> POOL;
-    private static final int MAX_PROBE = 3;
-
-    static {
-        int processors = Runtime.getRuntime().availableProcessors();
-        int raw = processors * 4;
-        POOL_SLOTS = Integer.highestOneBit(raw - 1) << 1;
-        POOL_MASK = POOL_SLOTS - 1;
-        POOL = new AtomicReferenceArray<>(POOL_SLOTS);
-    }
+    private static final StripedPool<SmithyJsonSerializer, JsonSettings> POOL = new JsonStripedPool();
 
     private byte[] buf;
     private int pos;
@@ -65,10 +53,6 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     // Cached field name table for the current struct being serialized.
     // Resolved once per writeStruct call, then used for all member writes.
     private byte[][] currentFieldNameTable;
-
-    // Reusable Schubfach instances for double/float write
-    private final Schubfach.DoubleToDecimal doubleToDecimal = Schubfach.createDoubleToDecimal();
-    private final Schubfach.FloatToDecimal floatToDecimal = Schubfach.createFloatToDecimal();
 
     private final ShapeSerializer structSerializer = new StructSerializer();
     private final ShapeSerializer listElementSerializer = new ListElementSerializer();
@@ -97,81 +81,19 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         this.depth = 0;
     }
 
-    /**
-     * Acquires a serializer from the pool, or creates a new one.
-     * The returned serializer is ready for use with a fresh buffer.
-     *
-     * <p>Uses getPlain to peek at slots cheaply (plain read, no ordering), then
-     * compareAndExchangeAcquire to atomically claim a non-null entry (acquire
-     * semantics ensure we see the serializer's fully-written state). This pays
-     * the atomic price only once per acquire - empty slots are skipped with a
-     * plain read instead of a full getAndSet.
-     */
     static SmithyJsonSerializer acquire(JsonSettings settings) {
-        //TODO Have a different strat for VTs,
-        // we still some sort of pooling for VTs but the current strategy won't work.
-        if (!Thread.currentThread().isVirtual()) {
-            int base = poolProbe();
-            for (int i = 0; i < MAX_PROBE; i++) {
-                int idx = (base + i) & POOL_MASK;
-                SmithyJsonSerializer s = POOL.getPlain(idx);
-                if (s != null && POOL.compareAndExchangeAcquire(idx, s, null) == s) {
-                    if (s.settings.equals(settings)) {
-                        s.pos = 0;
-                        s.depth = 0;
-                        s.currentFieldNameTable = null;
-                        return s;
-                    }
-                    POOL.setRelease(idx, s); // wrong settings, put back
-                }
-            }
-        }
-        return new SmithyJsonSerializer(settings);
+        return POOL.acquire(settings);
     }
 
-    /**
-     * Returns a serializer to the pool for reuse. If the pool is full, the
-     * buffer is oversized, or we're on a virtual thread, the serializer is discarded.
-     *
-     * <p>Uses getPlain to peek for empty slots, then compareAndExchangeRelease to
-     * store the serializer with release semantics (ensures all serializer state is
-     * visible to the thread that later acquires it).
-     */
     static void release(SmithyJsonSerializer serializer, boolean exception) {
-        if (serializer.buf == null || Thread.currentThread().isVirtual()) {
-            return;
-        }
-        // If an exception occurred, the needsComma array may be in an inconsistent state.
-        // Clear it before pooling so the next acquire gets a clean serializer.
         if (exception) {
             Arrays.fill(serializer.needsComma, false);
         }
-        // Downsize oversized buffers before pooling to bound memory
-        if (serializer.buf.length > MAX_CACHEABLE_BUF) {
-            serializer.buf = new byte[DEFAULT_BUF_SIZE];
-        }
-        int base = poolProbe();
-        for (int i = 0; i < MAX_PROBE; i++) {
-            int idx = (base + i) & POOL_MASK;
-            if (POOL.getPlain(idx) == null
-                    && POOL.compareAndExchangeRelease(idx, null, serializer) == null) {
-                return;
-            }
-        }
-        // Pool full — let GC collect
+        POOL.release(serializer);
     }
 
-    /**
-     * Extracts the serialized JSON as a ByteBuffer without releasing the internal
-     * buffer. Used with {@link #acquire}/{@link #release} for pooled serializers.
-     */
     ByteBuffer extractResult() {
         return ByteBuffer.wrap(Arrays.copyOf(buf, pos));
-    }
-
-    private static int poolProbe() {
-        long id = Thread.currentThread().threadId();
-        return (int) (id ^ (id >>> 16)) & POOL_MASK;
     }
 
     private void ensureCapacity(int needed) {
@@ -211,14 +133,10 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         }
     }
 
-    // ---- Value writers (no field name prefix) ----
-
     @Override
     public void writeBoolean(Schema schema, boolean value) {
-        byte[] bytes = value ? JsonWriteUtils.TRUE_BYTES : JsonWriteUtils.FALSE_BYTES;
-        ensureCapacity(bytes.length);
-        System.arraycopy(bytes, 0, buf, pos, bytes.length);
-        pos += bytes.length;
+        ensureCapacity(5);
+        pos = NumberCodec.writeBoolean(buf, pos, value);
     }
 
     @Override
@@ -247,81 +165,38 @@ final class SmithyJsonSerializer implements ShapeSerializer {
 
     @Override
     public void writeFloat(Schema schema, float value) {
-        if (Float.isFinite(value)) {
-            ensureCapacity(24);
-            pos = JsonWriteUtils.writeFloat(buf, pos, value, floatToDecimal);
-        } else if (Float.isNaN(value)) {
-            ensureCapacity(JsonWriteUtils.NAN_BYTES.length);
-            System.arraycopy(JsonWriteUtils.NAN_BYTES, 0, buf, pos, JsonWriteUtils.NAN_BYTES.length);
-            pos += JsonWriteUtils.NAN_BYTES.length;
-        } else {
-            byte[] bytes = value > 0 ? JsonWriteUtils.INF_BYTES : JsonWriteUtils.NEG_INF_BYTES;
-            ensureCapacity(bytes.length);
-            System.arraycopy(bytes, 0, buf, pos, bytes.length);
-            pos += bytes.length;
-        }
+        ensureCapacity(24);
+        pos = NumberCodec.writeFloatFullQuoted(buf, pos, value);
     }
 
     @Override
     public void writeDouble(Schema schema, double value) {
-        if (Double.isFinite(value)) {
-            ensureCapacity(24);
-            pos = JsonWriteUtils.writeDouble(buf, pos, value, doubleToDecimal);
-        } else if (Double.isNaN(value)) {
-            ensureCapacity(JsonWriteUtils.NAN_BYTES.length);
-            System.arraycopy(JsonWriteUtils.NAN_BYTES, 0, buf, pos, JsonWriteUtils.NAN_BYTES.length);
-            pos += JsonWriteUtils.NAN_BYTES.length;
-        } else {
-            byte[] bytes = value > 0 ? JsonWriteUtils.INF_BYTES : JsonWriteUtils.NEG_INF_BYTES;
-            ensureCapacity(bytes.length);
-            System.arraycopy(bytes, 0, buf, pos, bytes.length);
-            pos += bytes.length;
-        }
+        ensureCapacity(24);
+        pos = NumberCodec.writeDoubleFullQuoted(buf, pos, value);
     }
 
     @Override
     public void writeBigInteger(Schema schema, BigInteger value) {
+        int maxLen = value.bitLength() / 3 + 2;
+        ensureCapacity(maxLen + 2);
         if (settings.useStringForArbitraryPrecision()) {
-            String s = value.toString();
-            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(s));
-            pos = JsonWriteUtils.writeQuotedString(buf, pos, s);
-            return;
+            buf[pos++] = '"';
+            pos = NumberCodec.writeBigInteger(buf, pos, value);
+            buf[pos++] = '"';
+        } else {
+            pos = NumberCodec.writeBigInteger(buf, pos, value);
         }
-        if (value.bitLength() < 64) {
-            ensureCapacity(20);
-            pos = JsonWriteUtils.writeLong(buf, pos, value.longValue());
-            return;
-        }
-        ensureCapacity(value.bitLength() / 3 + 2);
-        pos = JsonWriteUtils.writeBigInteger(buf, pos, value);
     }
 
     @Override
     public void writeBigDecimal(Schema schema, BigDecimal value) {
-        int scale = value.scale();
-        if (value.unscaledValue().bitLength() < 64) {
-            if (scale == 0) {
-                ensureCapacity(20);
-                pos = JsonWriteUtils.writeLong(buf, pos, value.longValueExact());
-                return;
-            }
-            if (scale > 0) {
-                // Fast path: write "integerPart.fractionalPart" directly.
-                // E.g., BigDecimal("99999.99999") -> unscaled=9999999999, scale=5
-                long unscaled = value.unscaledValue().longValue();
-                ensureCapacity(22 + scale); // sign + 20 digits + dot + scale digits
-                pos = JsonWriteUtils.writeBigDecimalFromLong(buf, pos, unscaled, scale);
-                return;
-            }
-        }
-        String s = value.toString();
-        // Preempt the quotes wrapping, as a BigDecimal write will almost
-        // always have at least 1 additional character after it.
-        ensureCapacity(s.length() + 2);
+        ensureCapacity(NumberCodec.maxBigDecimalLength(value) + 2);
         if (settings.useStringForArbitraryPrecision()) {
-            pos = JsonWriteUtils.writeQuotedString(buf, pos, s);
+            buf[pos++] = '"';
+            pos = NumberCodec.writeBigDecimal(buf, pos, value);
+            buf[pos++] = '"';
         } else {
-            pos = JsonWriteUtils.writeAsciiString(buf, pos, s);
+            pos = NumberCodec.writeBigDecimal(buf, pos, value);
         }
     }
 
@@ -339,18 +214,8 @@ final class SmithyJsonSerializer implements ShapeSerializer {
 
     @Override
     public void writeBlob(Schema schema, ByteBuffer value) {
-        int len = value.remaining();
-        byte[] data;
-        int off;
-        if (value.hasArray()) {
-            data = value.array();
-            off = value.arrayOffset() + value.position();
-        } else {
-            data = ByteBufferUtils.getBytes(value.duplicate());
-            off = 0;
-        }
-        ensureCapacity(JsonWriteUtils.maxBase64Bytes(len));
-        pos = JsonWriteUtils.writeBase64String(buf, pos, data, off, len);
+        ensureCapacity(JsonWriteUtils.maxBase64Bytes(value.remaining()));
+        pos = JsonWriteUtils.writeBase64String(buf, pos, value);
     }
 
     @Override
@@ -453,8 +318,6 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         pos += JsonWriteUtils.NULL_BYTES.length;
     }
 
-    // ---- Comma management ----
-
     private void writeCommaIfNeeded() {
         if (needsComma[depth]) {
             if (pos >= buf.length) {
@@ -465,8 +328,6 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             needsComma[depth] = true;
         }
     }
-
-    // ---- Field name writing ----
 
     /**
      * Resolves the pre-computed field name bytes for a schema member.
@@ -508,7 +369,35 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         writeFieldNameBytesUnchecked(nameBytes);
     }
 
-    // ---- Inner struct serializer: writes field name + value ----
+    private static class JsonStripedPool extends StripedPool<SmithyJsonSerializer, JsonSettings> {
+        @Override
+        protected SmithyJsonSerializer create(JsonSettings settings) {
+            return new SmithyJsonSerializer(settings);
+        }
+
+        @Override
+        protected boolean canPool(SmithyJsonSerializer s) {
+            return s.buf != null;
+        }
+
+        @Override
+        protected void prepareForPool(SmithyJsonSerializer s) {
+            if (s.buf.length > MAX_CACHEABLE_BUF) {
+                s.buf = new byte[DEFAULT_BUF_SIZE];
+            }
+        }
+
+        @Override
+        protected boolean reset(SmithyJsonSerializer s, JsonSettings settings) {
+            if (!s.settings.equals(settings)) {
+                return false;
+            }
+            s.pos = 0;
+            s.depth = 0;
+            s.currentFieldNameTable = null;
+            return true;
+        }
+    }
 
     private final class StructSerializer implements ShapeSerializer {
 
@@ -518,11 +407,9 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         @Override
         public void writeBoolean(Schema schema, boolean value) {
             byte[] nameBytes = resolveFieldNameBytes(schema);
-            ensureCapacity(nameBytes.length + 1 + 5); // +5 for "false"
+            ensureCapacity(nameBytes.length + 1 + 5);
             writeFieldNameBytesUnchecked(nameBytes);
-            byte[] bytes = value ? JsonWriteUtils.TRUE_BYTES : JsonWriteUtils.FALSE_BYTES;
-            System.arraycopy(bytes, 0, buf, pos, bytes.length);
-            pos += bytes.length;
+            pos = NumberCodec.writeBoolean(buf, pos, value);
         }
 
         @Override
@@ -562,16 +449,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             byte[] nameBytes = resolveFieldNameBytes(schema);
             ensureCapacity(nameBytes.length + 1 + 24);
             writeFieldNameBytesUnchecked(nameBytes);
-            if (Float.isFinite(value)) {
-                pos = JsonWriteUtils.writeFloat(buf, pos, value, floatToDecimal);
-            } else if (Float.isNaN(value)) {
-                System.arraycopy(JsonWriteUtils.NAN_BYTES, 0, buf, pos, JsonWriteUtils.NAN_BYTES.length);
-                pos += JsonWriteUtils.NAN_BYTES.length;
-            } else {
-                byte[] bytes = value > 0 ? JsonWriteUtils.INF_BYTES : JsonWriteUtils.NEG_INF_BYTES;
-                System.arraycopy(bytes, 0, buf, pos, bytes.length);
-                pos += bytes.length;
-            }
+            pos = NumberCodec.writeFloatFullQuoted(buf, pos, value);
         }
 
         @Override
@@ -579,16 +457,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             byte[] nameBytes = resolveFieldNameBytes(schema);
             ensureCapacity(nameBytes.length + 1 + 24);
             writeFieldNameBytesUnchecked(nameBytes);
-            if (Double.isFinite(value)) {
-                pos = JsonWriteUtils.writeDouble(buf, pos, value, doubleToDecimal);
-            } else if (Double.isNaN(value)) {
-                System.arraycopy(JsonWriteUtils.NAN_BYTES, 0, buf, pos, JsonWriteUtils.NAN_BYTES.length);
-                pos += JsonWriteUtils.NAN_BYTES.length;
-            } else {
-                byte[] bytes = value > 0 ? JsonWriteUtils.INF_BYTES : JsonWriteUtils.NEG_INF_BYTES;
-                System.arraycopy(bytes, 0, buf, pos, bytes.length);
-                pos += bytes.length;
-            }
+            pos = NumberCodec.writeDoubleFullQuoted(buf, pos, value);
         }
 
         @Override
@@ -658,8 +527,6 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             SmithyJsonSerializer.this.writeDocument(schema, value);
         }
     }
-
-    // ---- List element serializer: handles comma separation between elements ----
 
     private final class ListElementSerializer implements ShapeSerializer {
         private void beforeElement() {
@@ -769,8 +636,6 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         }
     }
 
-    // ---- Map serializer ----
-
     private final class SmithyMapSerializer implements MapSerializer {
         @Override
         public <T> void writeEntry(
@@ -786,8 +651,6 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             valueSerializer.accept(state, SmithyJsonSerializer.this);
         }
     }
-
-    // ---- Document struct serializer (writes __type) ----
 
     private static final class SerializeDocumentContents extends SpecificShapeSerializer {
         private final SmithyJsonSerializer parent;

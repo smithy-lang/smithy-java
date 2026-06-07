@@ -1,6 +1,6 @@
 plugins {
     id("smithy-java.module-conventions")
-    id("me.champeau.jmh") version "0.7.3"
+    id("smithy-java.jmh-conventions")
 }
 
 description = "This module provides AWS-Specific client rules engine functionality"
@@ -34,18 +34,7 @@ configurations["jmhImplementation"].extendsFrom(lambdaModel)
 jmh {
     warmupIterations = 2
     iterations = 3
-    fork = 1
-    // Allow filtering for specific benchmarks, e.g. -Pjmh.includes=S3EndpointBenchmark
-    includes.addAll(
-        providers
-            .gradleProperty("jmh.includes")
-            .map { listOf(it) }
-            .orElse(emptyList()),
-    )
-    // profilers.add("async:output=flamegraph;dir=build/jmh-profiler")
     profilers.add("async:output=collapsed;dir=build/jmh-profiler")
-    // profilers.add("gc")
-    duplicateClassesStrategy = DuplicatesStrategy.EXCLUDE // don't dump a bunch of warnings.
 }
 
 // Clean cached bytecode before running benchmarks so stale compilations aren't reused.

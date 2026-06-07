@@ -36,8 +36,8 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.BiConsumer;
+import software.amazon.smithy.java.codecs.commons.StripedPool;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.MapSerializer;
@@ -59,18 +59,7 @@ final class CborSerializer implements ShapeSerializer {
     private static final int DEFAULT_BUF_SIZE = 4096;
     private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 4;
 
-    private static final int POOL_SLOTS;
-    private static final int POOL_MASK;
-    private static final AtomicReferenceArray<CborSerializer> POOL;
-    private static final int MAX_PROBE = 3;
-
-    static {
-        int processors = Runtime.getRuntime().availableProcessors();
-        int raw = processors * 4;
-        POOL_SLOTS = Integer.highestOneBit(raw - 1) << 1;
-        POOL_MASK = POOL_SLOTS - 1;
-        POOL = new AtomicReferenceArray<>(POOL_SLOTS);
-    }
+    private static final StripedPool<CborSerializer, Void> POOL = new CborStripedPool();
 
     byte[] buf;
     int pos;
@@ -101,48 +90,15 @@ final class CborSerializer implements ShapeSerializer {
     }
 
     static CborSerializer acquire() {
-        if (!Thread.currentThread().isVirtual()) {
-            int base = poolProbe();
-            for (int i = 0; i < MAX_PROBE; i++) {
-                int idx = (base + i) & POOL_MASK;
-                CborSerializer s = POOL.getPlain(idx);
-                if (s != null && POOL.compareAndExchangeAcquire(idx, s, null) == s) {
-                    s.pos = 0;
-                    s.collectionMask = 0L;
-                    s.collectionDepth = 0;
-                    s.currentFieldNameTable = null;
-                    return s;
-                }
-            }
-        }
-        return new CborSerializer();
+        return POOL.acquire(null);
     }
 
     static void release(CborSerializer serializer, boolean exception) {
-        if (serializer.buf == null || serializer.sink != null || Thread.currentThread().isVirtual()) {
-            return;
-        }
-        if (serializer.buf.length > MAX_CACHEABLE_BUF) {
-            serializer.buf = new byte[DEFAULT_BUF_SIZE];
-        }
-        int base = poolProbe();
-        for (int i = 0; i < MAX_PROBE; i++) {
-            int idx = (base + i) & POOL_MASK;
-            if (POOL.getPlain(idx) == null
-                    && POOL.compareAndExchangeRelease(idx, null, serializer) == null) {
-                return;
-            }
-        }
-        // Pool full, let GC collect
+        POOL.release(serializer);
     }
 
     ByteBuffer extractResult() {
         return ByteBuffer.wrap(Arrays.copyOf(buf, pos));
-    }
-
-    private static int poolProbe() {
-        long id = Thread.currentThread().threadId();
-        return (int) (id ^ (id >>> 16)) & POOL_MASK;
     }
 
     private void ensureCapacity(int needed) {
@@ -627,6 +583,34 @@ final class CborSerializer implements ShapeSerializer {
         // Smithy member names are always ASCII
         name.getBytes(0, len, result, p);
         return result;
+    }
+
+    private static class CborStripedPool extends StripedPool<CborSerializer, Void> {
+        @Override
+        protected CborSerializer create(Void ctx) {
+            return new CborSerializer();
+        }
+
+        @Override
+        protected boolean canPool(CborSerializer s) {
+            return s.buf != null && s.sink == null;
+        }
+
+        @Override
+        protected void prepareForPool(CborSerializer s) {
+            if (s.buf.length > MAX_CACHEABLE_BUF) {
+                s.buf = new byte[DEFAULT_BUF_SIZE];
+            }
+        }
+
+        @Override
+        protected boolean reset(CborSerializer s, Void ctx) {
+            s.pos = 0;
+            s.collectionMask = 0L;
+            s.collectionDepth = 0;
+            s.currentFieldNameTable = null;
+            return true;
+        }
     }
 
     private final class CborStructSerializer implements ShapeSerializer {

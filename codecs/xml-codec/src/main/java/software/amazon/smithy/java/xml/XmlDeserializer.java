@@ -23,7 +23,7 @@ import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
-final class XmlDeserializer implements ShapeDeserializer {
+final class XmlDeserializer implements ShapeDeserializer, XmlErrorCodeParser {
 
     private final XmlInfo xmlInfo;
     private final XmlReader reader;
@@ -173,7 +173,7 @@ final class XmlDeserializer implements ShapeDeserializer {
         }
     }
 
-    String parseErrorCodeName() {
+    public String parseErrorCodeName() {
         try {
             var element = reader.nextMemberElement();
             if (element == null

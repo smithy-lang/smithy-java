@@ -17,14 +17,12 @@ public final class ByteBufferUtils {
     private ByteBufferUtils() {}
 
     public static String base64Encode(ByteBuffer buffer) {
-        byte[] bytes;
-        if (isExact(buffer)) {
-            bytes = buffer.array();
-        } else {
-            bytes = new byte[buffer.remaining()];
-            buffer.asReadOnlyBuffer().get(bytes);
-        }
-        return Base64.getEncoder().encodeToString(bytes);
+        byte[] encoded = base64EncodeToBytes(buffer);
+        return new String(encoded, StandardCharsets.ISO_8859_1);
+    }
+
+    public static byte[] base64EncodeToBytes(ByteBuffer buffer) {
+        return Base64.getEncoder().encode(buffer.duplicate()).array();
     }
 
     public static String getUTF8String(ByteBuffer buffer) {

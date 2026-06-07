@@ -12,6 +12,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
+import software.amazon.smithy.java.codecs.commons.NumberCodec;
+import software.amazon.smithy.java.codecs.commons.StripedPool;
+import software.amazon.smithy.java.codecs.commons.TimestampCodec;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -26,18 +29,13 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
 /**
  * Form-urlencoded serializer for both {@code awsQuery} and {@code ec2Query} protocols.
  *
- * <p>The two protocols share the same wire format but differ in member name resolution,
- * list serialization, and map support. The {@link QueryVariant} flag controls these differences.
+ * <p>Writes directly to an internal byte array buffer. Instances are pooled via a striped
+ * lock-free pool to avoid per-request allocation of both the serializer and its buffer.
  */
 final class QueryFormSerializer implements ShapeSerializer {
 
-    /**
-     * Selects the protocol-specific serialization behavior.
-     */
     enum QueryVariant {
-        /** Standard AWS Query protocol. */
         AWS_QUERY,
-        /** EC2 Query protocol. */
         EC2_QUERY
     }
 
@@ -48,96 +46,295 @@ final class QueryFormSerializer implements ShapeSerializer {
     private static final byte[] KEY = "key".getBytes(StandardCharsets.UTF_8);
     private static final byte[] VALUE = "value".getBytes(StandardCharsets.UTF_8);
 
-    private final FormUrlEncodedSink sink;
-    private final QueryVariant variant;
+    static final boolean[] UNRESERVED = new boolean[128];
+    static final byte[] PERCENT_ENCODED = new byte[256 * 3];
 
-    private byte[][] prefixCache = new byte[8][];
+    static {
+        for (int c = 'A'; c <= 'Z'; c++)
+            UNRESERVED[c] = true;
+        for (int c = 'a'; c <= 'z'; c++)
+            UNRESERVED[c] = true;
+        for (int c = '0'; c <= '9'; c++)
+            UNRESERVED[c] = true;
+        UNRESERVED['-'] = true;
+        UNRESERVED['.'] = true;
+        UNRESERVED['_'] = true;
+        UNRESERVED['~'] = true;
+
+        byte[] HEX = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+        for (int b = 0; b < 256; b++) {
+            int off = b * 3;
+            PERCENT_ENCODED[off] = '%';
+            PERCENT_ENCODED[off + 1] = HEX[(b >> 4) & 0xF];
+            PERCENT_ENCODED[off + 2] = HEX[b & 0xF];
+        }
+    }
+
+    private static final int DEFAULT_BUF_SIZE = 1024;
+    private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 4;
+
+    record AcquireContext(QueryVariant variant, String action, String version) {}
+
+    private static final StripedPool<QueryFormSerializer, AcquireContext> POOL =
+            new StripedPool<>() {
+                @Override
+                protected QueryFormSerializer create(AcquireContext ctx) {
+                    return new QueryFormSerializer();
+                }
+
+                @Override
+                protected boolean canPool(QueryFormSerializer s) {
+                    return true;
+                }
+
+                @Override
+                protected void prepareForPool(QueryFormSerializer s) {
+                    if (s.buf.length > MAX_CACHEABLE_BUF) {
+                        s.buf = new byte[DEFAULT_BUF_SIZE];
+                    }
+                }
+
+                @Override
+                protected boolean reset(QueryFormSerializer s, AcquireContext ctx) {
+                    s.prefixLen = 0;
+                    s.prefixDepth = 0;
+                    s.pos = 0;
+                    return true;
+                }
+            };
+
+    private byte[] buf;
+    private int pos;
+    private QueryVariant variant;
+
+    private byte[] prefixBuf = new byte[128];
+    private int prefixLen = 0;
+    private int[] prefixStack = new int[8];
     private int prefixDepth = 0;
 
     private final ListItemSerializer listSerializer = new ListItemSerializer();
     private final QueryMapSerializer mapSerializer = new QueryMapSerializer();
+    private final MapValueSerializer mapValueSerializer = new MapValueSerializer();
 
-    QueryFormSerializer(QueryVariant variant, String action, String version) {
-        this.variant = variant;
-        this.sink = new FormUrlEncodedSink();
-        sink.writeBytes(ACTION_PREFIX, 0, ACTION_PREFIX.length);
-        sink.writeAscii(action);
-        sink.writeBytes(VERSION_PREFIX, 0, VERSION_PREFIX.length);
-        sink.writeAscii(version);
+    private QueryFormSerializer() {
+        this.buf = new byte[DEFAULT_BUF_SIZE];
+    }
+
+    @SuppressWarnings("deprecation")
+    static QueryFormSerializer acquire(QueryVariant variant, String action, String version) {
+        QueryFormSerializer s = POOL.acquire(new AcquireContext(variant, action, version));
+        s.variant = variant;
+
+        int headerLen = ACTION_PREFIX.length + action.length() + VERSION_PREFIX.length + version.length();
+        s.ensureCapacity(headerLen);
+        System.arraycopy(ACTION_PREFIX, 0, s.buf, 0, ACTION_PREFIX.length);
+        s.pos = ACTION_PREFIX.length;
+        action.getBytes(0, action.length(), s.buf, s.pos);
+        s.pos += action.length();
+        System.arraycopy(VERSION_PREFIX, 0, s.buf, s.pos, VERSION_PREFIX.length);
+        s.pos += VERSION_PREFIX.length;
+        version.getBytes(0, version.length(), s.buf, s.pos);
+        s.pos += version.length();
+        return s;
     }
 
     ByteBuffer finish() {
-        return sink.finish();
+        ByteBuffer result = ByteBuffer.wrap(buf, 0, pos);
+        POOL.release(this);
+        return result;
     }
 
-    private void writeParam(byte[] key, String value) {
-        sink.writeByte('&');
-        writeCurrentPrefix();
-        if (prefixDepth > 0) {
-            sink.writeByte('.');
-        }
-        sink.writeBytes(key, 0, key.length);
-        sink.writeByte('=');
-        sink.writeUrlEncoded(value);
-    }
-
-    private void writeCurrentPrefix() {
-        for (int i = 0; i < prefixDepth; i++) {
-            if (i > 0) {
-                sink.writeByte('.');
-            }
-            sink.writeBytes(prefixCache[i], 0, prefixCache[i].length);
+    private void ensureCapacity(int needed) {
+        int required = pos + needed;
+        if (required > buf.length) {
+            buf = Arrays.copyOf(buf, Math.max(required, buf.length + (buf.length >> 1)));
         }
     }
 
-    private void pushPrefix(byte[] prefix) {
-        ensurePrefixCacheCapacity();
-        prefixCache[prefixDepth++] = prefix;
+    private void pushPrefix(byte[] name) {
+        if (prefixDepth >= prefixStack.length) {
+            prefixStack = Arrays.copyOf(prefixStack, prefixStack.length * 2);
+        }
+        prefixStack[prefixDepth++] = prefixLen;
+        int needed = name.length + (prefixLen > 0 ? 1 : 0);
+        if (prefixLen + needed > prefixBuf.length) {
+            prefixBuf = Arrays.copyOf(prefixBuf, Math.max(prefixLen + needed, prefixBuf.length * 2));
+        }
+        if (prefixLen > 0) {
+            prefixBuf[prefixLen++] = '.';
+        }
+        System.arraycopy(name, 0, prefixBuf, prefixLen, name.length);
+        prefixLen += name.length;
     }
 
-    private void pushIndexedPrefix(byte[] base, int index) {
-        ensurePrefixCacheCapacity();
-        prefixCache[prefixDepth++] = encodeIndexedPrefix(base, index);
+    private void pushPrefixWithIndex(byte[] name, int index) {
+        if (prefixDepth >= prefixStack.length) {
+            prefixStack = Arrays.copyOf(prefixStack, prefixStack.length * 2);
+        }
+        prefixStack[prefixDepth++] = prefixLen;
+        int indexLen = NumberCodec.digitCount(index);
+        int needed = (prefixLen > 0 ? 1 : 0) + name.length + 1 + indexLen;
+        if (prefixLen + needed > prefixBuf.length) {
+            prefixBuf = Arrays.copyOf(prefixBuf, Math.max(prefixLen + needed, prefixBuf.length * 2));
+        }
+        if (prefixLen > 0) {
+            prefixBuf[prefixLen++] = '.';
+        }
+        System.arraycopy(name, 0, prefixBuf, prefixLen, name.length);
+        prefixLen += name.length;
+        prefixBuf[prefixLen++] = '.';
+        prefixLen = NumberCodec.writeInt(prefixBuf, prefixLen, index);
     }
 
     private void pushIndexPrefix(int index) {
-        ensurePrefixCacheCapacity();
-        prefixCache[prefixDepth++] = encodeIndex(index);
-    }
-
-    private void ensurePrefixCacheCapacity() {
-        if (prefixDepth >= prefixCache.length) {
-            prefixCache = Arrays.copyOf(prefixCache, prefixCache.length * 2);
+        if (prefixDepth >= prefixStack.length) {
+            prefixStack = Arrays.copyOf(prefixStack, prefixStack.length * 2);
         }
+        prefixStack[prefixDepth++] = prefixLen;
+        int indexLen = NumberCodec.digitCount(index);
+        int needed = (prefixLen > 0 ? 1 : 0) + indexLen;
+        if (prefixLen + needed > prefixBuf.length) {
+            prefixBuf = Arrays.copyOf(prefixBuf, Math.max(prefixLen + needed, prefixBuf.length * 2));
+        }
+        if (prefixLen > 0) {
+            prefixBuf[prefixLen++] = '.';
+        }
+        prefixLen = NumberCodec.writeInt(prefixBuf, prefixLen, index);
     }
 
     private void popPrefix() {
-        prefixDepth--;
+        prefixLen = prefixStack[--prefixDepth];
     }
 
-    @SuppressWarnings("deprecation")
-    private byte[] encodeIndexedPrefix(byte[] base, int index) {
-        String indexStr = Integer.toString(index);
-        byte[] result = new byte[base.length + 1 + indexStr.length()];
-        System.arraycopy(base, 0, result, 0, base.length);
-        result[base.length] = '.';
-        indexStr.getBytes(0, indexStr.length(), result, base.length + 1);
-        return result;
+    private void writeUrlEncodedAsciiBytes(byte[] data, int dataLen) {
+        for (int i = 0; i < dataLen; i++) {
+            int b = data[i] & 0xFF;
+            if (b < 128 && UNRESERVED[b]) {
+                buf[pos++] = data[i];
+            } else {
+                int off = b * 3;
+                buf[pos] = PERCENT_ENCODED[off];
+                buf[pos + 1] = PERCENT_ENCODED[off + 1];
+                buf[pos + 2] = PERCENT_ENCODED[off + 2];
+                pos += 3;
+            }
+        }
     }
 
-    @SuppressWarnings("deprecation")
-    private byte[] encodeIndex(int index) {
-        String indexStr = Integer.toString(index);
-        byte[] result = new byte[indexStr.length()];
-        indexStr.getBytes(0, indexStr.length(), result, 0);
-        return result;
+    private void writeUrlEncoded(String s) {
+        int len = s.length();
+        for (int i = 0; i < len; i++) {
+            char c = s.charAt(i);
+            if (c < 0x80) {
+                if (UNRESERVED[c]) {
+                    buf[pos++] = (byte) c;
+                } else {
+                    int off = c * 3;
+                    buf[pos] = PERCENT_ENCODED[off];
+                    buf[pos + 1] = PERCENT_ENCODED[off + 1];
+                    buf[pos + 2] = PERCENT_ENCODED[off + 2];
+                    pos += 3;
+                }
+            } else if (c < 0x800) {
+                int b0 = 0xC0 | (c >> 6);
+                int b1 = 0x80 | (c & 0x3F);
+                System.arraycopy(PERCENT_ENCODED, b0 * 3, buf, pos, 3);
+                pos += 3;
+                System.arraycopy(PERCENT_ENCODED, b1 * 3, buf, pos, 3);
+                pos += 3;
+            } else if (Character.isHighSurrogate(c) && i + 1 < len && Character.isLowSurrogate(s.charAt(i + 1))) {
+                char low = s.charAt(++i);
+                int cp = Character.toCodePoint(c, low);
+                int b0 = 0xF0 | (cp >> 18);
+                int b1 = 0x80 | ((cp >> 12) & 0x3F);
+                int b2 = 0x80 | ((cp >> 6) & 0x3F);
+                int b3 = 0x80 | (cp & 0x3F);
+                System.arraycopy(PERCENT_ENCODED, b0 * 3, buf, pos, 3);
+                pos += 3;
+                System.arraycopy(PERCENT_ENCODED, b1 * 3, buf, pos, 3);
+                pos += 3;
+                System.arraycopy(PERCENT_ENCODED, b2 * 3, buf, pos, 3);
+                pos += 3;
+                System.arraycopy(PERCENT_ENCODED, b3 * 3, buf, pos, 3);
+                pos += 3;
+            } else {
+                int b0 = 0xE0 | (c >> 12);
+                int b1 = 0x80 | ((c >> 6) & 0x3F);
+                int b2 = 0x80 | (c & 0x3F);
+                System.arraycopy(PERCENT_ENCODED, b0 * 3, buf, pos, 3);
+                pos += 3;
+                System.arraycopy(PERCENT_ENCODED, b1 * 3, buf, pos, 3);
+                pos += 3;
+                System.arraycopy(PERCENT_ENCODED, b2 * 3, buf, pos, 3);
+                pos += 3;
+            }
+        }
     }
-
-    // --- Member name resolution (protocol-specific) ---
 
     /**
-     * Read the pre-computed URL-encoded member-name bytes from the schema extension.
+     * Writes "&prefix.key=" to the buffer. Used by top-level member serialization.
      */
+    private void writeKeyPrefix(byte[] key, int maxValueSize) {
+        ensureCapacity(1 + prefixLen + 1 + key.length + 1 + maxValueSize);
+        buf[pos++] = '&';
+        if (prefixLen > 0) {
+            System.arraycopy(prefixBuf, 0, buf, pos, prefixLen);
+            pos += prefixLen;
+            buf[pos++] = '.';
+        }
+        System.arraycopy(key, 0, buf, pos, key.length);
+        pos += key.length;
+        buf[pos++] = '=';
+    }
+
+    /**
+     * Writes "&prefix=" to the buffer (no key/dot). Used by map value serialization.
+     */
+    private void writePrefixEquals(int maxValueSize) {
+        ensureCapacity(1 + prefixLen + 1 + maxValueSize);
+        buf[pos++] = '&';
+        if (prefixLen > 0) {
+            System.arraycopy(prefixBuf, 0, buf, pos, prefixLen);
+            pos += prefixLen;
+        }
+        buf[pos++] = '=';
+    }
+
+    private void writeParam(byte[] key, String value) {
+        writeKeyPrefix(key, value.length() * 3);
+        writeUrlEncoded(value);
+    }
+
+    private void writeParamBoolean(byte[] key, boolean value) {
+        writeKeyPrefix(key, 5);
+        pos = NumberCodec.writeBoolean(buf, pos, value);
+    }
+
+    private void writeParamInt(byte[] key, int value) {
+        writeKeyPrefix(key, 11);
+        pos = NumberCodec.writeInt(buf, pos, value);
+    }
+
+    private void writeParamLong(byte[] key, long value) {
+        writeKeyPrefix(key, 20);
+        pos = NumberCodec.writeLong(buf, pos, value);
+    }
+
+    private void writeParamDouble(byte[] key, double value) {
+        writeKeyPrefix(key, 25);
+        pos = NumberCodec.writeDouble(buf, pos, value);
+    }
+
+    private void writeParamFloat(byte[] key, float value) {
+        writeKeyPrefix(key, 15);
+        pos = NumberCodec.writeFloat(buf, pos, value);
+    }
+
+    private void writeParamTimestampDirect(byte[] key, Instant value) {
+        writeKeyPrefix(key, 30);
+        pos = TimestampCodec.writeIso8601(buf, pos, value);
+    }
+
     private byte[] getMemberNameBytes(Schema schema) {
         var ext = schema.getExtension(AwsQuerySchemaExtensions.KEY);
         if (ext == null) {
@@ -146,12 +343,9 @@ final class QueryFormSerializer implements ShapeSerializer {
         return variant == QueryVariant.AWS_QUERY ? ext.awsQueryNameBytes() : ext.ec2QueryNameBytes();
     }
 
-    // --- Struct ---
-
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
         if (schema.isMember()) {
-            // Member schemas always have a non-null QueryMemberBinding (see provider).
             pushPrefix(getMemberNameBytes(schema));
             struct.serializeMembers(this);
             popPrefix();
@@ -159,8 +353,6 @@ final class QueryFormSerializer implements ShapeSerializer {
             struct.serializeMembers(this);
         }
     }
-
-    // --- List (protocol-specific) ---
 
     @Override
     public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
@@ -177,9 +369,6 @@ final class QueryFormSerializer implements ShapeSerializer {
             int size,
             BiConsumer<T, ShapeSerializer> consumer
     ) {
-        boolean flattened = schema.hasTrait(TraitKey.XML_FLATTENED_TRAIT);
-        Schema memberSchema = schema.listMember();
-
         if (schema.isMember()) {
             pushPrefix(getMemberNameBytes(schema));
         }
@@ -192,12 +381,24 @@ final class QueryFormSerializer implements ShapeSerializer {
             return;
         }
 
+        var ext = schema.getExtension(AwsQuerySchemaExtensions.KEY);
+        boolean flattened;
         byte[] memberNameBytes;
-        if (flattened) {
+        if (ext != null && ext.listMemberNameBytes() != null) {
+            flattened = ext.listFlattened();
+            memberNameBytes = ext.listMemberNameBytes();
+        } else if (ext != null && ext.listFlattened()) {
+            flattened = true;
             memberNameBytes = null;
         } else {
-            var xmlName = memberSchema.getTrait(TraitKey.XML_NAME_TRAIT);
-            memberNameBytes = xmlName != null ? xmlName.getValue().getBytes(StandardCharsets.UTF_8) : MEMBER;
+            flattened = schema.hasTrait(TraitKey.XML_FLATTENED_TRAIT);
+            if (flattened) {
+                memberNameBytes = null;
+            } else {
+                Schema memberSchema = schema.listMember();
+                var xmlName = memberSchema.getTrait(TraitKey.XML_NAME_TRAIT);
+                memberNameBytes = xmlName != null ? xmlName.getValue().getBytes(StandardCharsets.UTF_8) : MEMBER;
+            }
         }
 
         listSerializer.reset(memberNameBytes, flattened);
@@ -209,7 +410,6 @@ final class QueryFormSerializer implements ShapeSerializer {
     }
 
     private <T> void writeEc2List(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
-        // EC2 Query lists are always flattened - no .member. segment
         if (schema.isMember()) {
             pushPrefix(getMemberNameBytes(schema));
         }
@@ -230,9 +430,13 @@ final class QueryFormSerializer implements ShapeSerializer {
     }
 
     private void writeEmptyValue() {
-        sink.writeByte('&');
-        writeCurrentPrefix();
-        sink.writeByte('=');
+        ensureCapacity(1 + prefixLen + 1);
+        buf[pos++] = '&';
+        if (prefixLen > 0) {
+            System.arraycopy(prefixBuf, 0, buf, pos, prefixLen);
+            pos += prefixLen;
+        }
+        buf[pos++] = '=';
     }
 
     private final class ListItemSerializer implements ShapeSerializer {
@@ -250,8 +454,32 @@ final class QueryFormSerializer implements ShapeSerializer {
             if (flattened) {
                 pushIndexPrefix(index);
             } else {
-                pushIndexedPrefix(memberNameBytes, index);
+                pushPrefixWithIndex(memberNameBytes, index);
             }
+        }
+
+        /**
+         * Writes "&prefix.memberName.index=" (or "&prefix.index=" if flattened) to the buffer.
+         */
+        private void writeIndexedKeyPrefix(int maxValueSize) {
+            int indexLen = NumberCodec.digitCount(index);
+            int memberPartLen = flattened ? indexLen : (memberNameBytes.length + 1 + indexLen);
+            ensureCapacity(1 + prefixLen + (prefixLen > 0 ? 1 : 0) + memberPartLen + 1 + maxValueSize);
+            buf[pos++] = '&';
+            if (prefixLen > 0) {
+                System.arraycopy(prefixBuf, 0, buf, pos, prefixLen);
+                pos += prefixLen;
+                buf[pos++] = '.';
+            }
+            if (flattened) {
+                pos = NumberCodec.writeInt(buf, pos, index);
+            } else {
+                System.arraycopy(memberNameBytes, 0, buf, pos, memberNameBytes.length);
+                pos += memberNameBytes.length;
+                buf[pos++] = '.';
+                pos = NumberCodec.writeInt(buf, pos, index);
+            }
+            buf[pos++] = '=';
         }
 
         @Override
@@ -280,75 +508,108 @@ final class QueryFormSerializer implements ShapeSerializer {
 
         @Override
         public void writeBoolean(Schema schema, boolean value) {
-            writeIndexedParam(value ? "true" : "false");
+            writeIndexedKeyPrefix(5);
+            pos = NumberCodec.writeBoolean(buf, pos, value);
+            index++;
         }
 
         @Override
         public void writeByte(Schema schema, byte value) {
-            writeIndexedParam(Byte.toString(value));
+            writeIndexedParamInt(value);
         }
 
         @Override
         public void writeShort(Schema schema, short value) {
-            writeIndexedParam(Short.toString(value));
+            writeIndexedParamInt(value);
         }
 
         @Override
         public void writeInteger(Schema schema, int value) {
-            writeIndexedParam(Integer.toString(value));
+            writeIndexedParamInt(value);
         }
 
         @Override
         public void writeLong(Schema schema, long value) {
-            writeIndexedParam(Long.toString(value));
+            writeIndexedKeyPrefix(20);
+            pos = NumberCodec.writeLong(buf, pos, value);
+            index++;
         }
 
         @Override
         public void writeFloat(Schema schema, float value) {
-            if (Float.isNaN(value)) {
-                writeIndexedParam("NaN");
-            } else if (Float.isInfinite(value)) {
-                writeIndexedParam(value > 0 ? "Infinity" : "-Infinity");
+            if (!Float.isFinite(value)) {
+                writeIndexedKeyPrefix(9);
+                pos = NumberCodec.writeNonFiniteFloat(buf, pos, value);
             } else {
-                writeIndexedParam(Float.toString(value));
+                writeIndexedKeyPrefix(15);
+                pos = NumberCodec.writeFloat(buf, pos, value);
             }
+            index++;
         }
 
         @Override
         public void writeDouble(Schema schema, double value) {
-            if (Double.isNaN(value)) {
-                writeIndexedParam("NaN");
-            } else if (Double.isInfinite(value)) {
-                writeIndexedParam(value > 0 ? "Infinity" : "-Infinity");
+            if (!Double.isFinite(value)) {
+                writeIndexedKeyPrefix(9);
+                pos = NumberCodec.writeNonFiniteDouble(buf, pos, value);
             } else {
-                writeIndexedParam(Double.toString(value));
+                writeIndexedKeyPrefix(25);
+                pos = NumberCodec.writeDouble(buf, pos, value);
             }
+            index++;
         }
 
         @Override
         public void writeBigInteger(Schema schema, BigInteger value) {
-            writeIndexedParam(value.toString());
+            writeIndexedKeyPrefix(64);
+            pos = NumberCodec.writeBigInteger(buf, pos, value);
+            index++;
         }
 
         @Override
         public void writeBigDecimal(Schema schema, BigDecimal value) {
-            writeIndexedParam(value.toPlainString());
+            writeIndexedKeyPrefix(NumberCodec.maxBigDecimalLength(value));
+            pos = NumberCodec.writeBigDecimal(buf, pos, value);
+            index++;
         }
 
         @Override
         public void writeString(Schema schema, String value) {
-            writeIndexedParam(value);
+            writeIndexedKeyPrefix(value.length() * 3);
+            writeUrlEncoded(value);
+            index++;
         }
 
         @Override
         public void writeBlob(Schema schema, ByteBuffer value) {
-            writeIndexedParam(ByteBufferUtils.base64Encode(value));
+            byte[] encoded = ByteBufferUtils.base64EncodeToBytes(value);
+            writeIndexedKeyPrefix(encoded.length * 3);
+            writeUrlEncodedAsciiBytes(encoded, encoded.length);
+            index++;
         }
 
         @Override
         public void writeTimestamp(Schema schema, Instant value) {
-            TimestampFormatter formatter = TimestampFormatter.of(schema, TimestampFormatTrait.Format.DATE_TIME);
-            writeIndexedParam(formatter.writeString(value));
+            TimestampFormatTrait.Format fmt = resolveTimestampFormat(schema);
+            if (fmt == TimestampFormatTrait.Format.DATE_TIME) {
+                writeIndexedKeyPrefix(30);
+                pos = TimestampCodec.writeIso8601(buf, pos, value);
+                index++;
+            } else if (fmt == TimestampFormatTrait.Format.EPOCH_SECONDS) {
+                writeIndexedKeyPrefix(30);
+                pos = TimestampCodec.writeEpochSeconds(buf, pos, value.getEpochSecond(), value.getNano());
+                index++;
+            } else if (fmt == TimestampFormatTrait.Format.HTTP_DATE) {
+                writeIndexedKeyPrefix(90);
+                writeHttpDateUrlEncoded(value);
+                index++;
+            } else {
+                TimestampFormatter formatter = TimestampFormatter.of(schema, TimestampFormatTrait.Format.DATE_TIME);
+                String formatted = formatter.writeString(value);
+                writeIndexedKeyPrefix(formatted.length() * 3);
+                writeUrlEncoded(formatted);
+                index++;
+            }
         }
 
         @Override
@@ -361,26 +622,12 @@ final class QueryFormSerializer implements ShapeSerializer {
             index++;
         }
 
-        private void writeIndexedParam(String value) {
-            sink.writeByte('&');
-            writeCurrentPrefix();
-            if (prefixDepth > 0) {
-                sink.writeByte('.');
-            }
-            if (flattened) {
-                sink.writeInt(index);
-            } else {
-                sink.writeBytes(memberNameBytes, 0, memberNameBytes.length);
-                sink.writeByte('.');
-                sink.writeInt(index);
-            }
-            sink.writeByte('=');
-            sink.writeUrlEncoded(value);
+        private void writeIndexedParamInt(int value) {
+            writeIndexedKeyPrefix(11);
+            pos = NumberCodec.writeInt(buf, pos, value);
             index++;
         }
     }
-
-    // --- Map (awsQuery only) ---
 
     @Override
     public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
@@ -436,7 +683,7 @@ final class QueryFormSerializer implements ShapeSerializer {
             if (flattened) {
                 pushIndexPrefix(index);
             } else {
-                pushIndexedPrefix(entryNameBytes, index);
+                pushPrefixWithIndex(entryNameBytes, index);
             }
 
             writeParam(keyNameBytes, key);
@@ -449,8 +696,6 @@ final class QueryFormSerializer implements ShapeSerializer {
             index++;
         }
     }
-
-    private final MapValueSerializer mapValueSerializer = new MapValueSerializer();
 
     private final class MapValueSerializer implements ShapeSerializer {
         @Override
@@ -500,75 +745,96 @@ final class QueryFormSerializer implements ShapeSerializer {
 
         @Override
         public void writeBoolean(Schema schema, boolean value) {
-            writeValueParam(value ? "true" : "false");
+            writePrefixEquals(5);
+            pos = NumberCodec.writeBoolean(buf, pos, value);
         }
 
         @Override
         public void writeByte(Schema schema, byte value) {
-            writeValueParam(Byte.toString(value));
+            writeValueParamInt(value);
         }
 
         @Override
         public void writeShort(Schema schema, short value) {
-            writeValueParam(Short.toString(value));
+            writeValueParamInt(value);
         }
 
         @Override
         public void writeInteger(Schema schema, int value) {
-            writeValueParam(Integer.toString(value));
+            writeValueParamInt(value);
         }
 
         @Override
         public void writeLong(Schema schema, long value) {
-            writeValueParam(Long.toString(value));
+            writePrefixEquals(20);
+            pos = NumberCodec.writeLong(buf, pos, value);
         }
 
         @Override
         public void writeFloat(Schema schema, float value) {
-            if (Float.isNaN(value)) {
-                writeValueParam("NaN");
-            } else if (Float.isInfinite(value)) {
-                writeValueParam(value > 0 ? "Infinity" : "-Infinity");
+            if (!Float.isFinite(value)) {
+                writePrefixEquals(9);
+                pos = NumberCodec.writeNonFiniteFloat(buf, pos, value);
             } else {
-                writeValueParam(Float.toString(value));
+                writePrefixEquals(15);
+                pos = NumberCodec.writeFloat(buf, pos, value);
             }
         }
 
         @Override
         public void writeDouble(Schema schema, double value) {
-            if (Double.isNaN(value)) {
-                writeValueParam("NaN");
-            } else if (Double.isInfinite(value)) {
-                writeValueParam(value > 0 ? "Infinity" : "-Infinity");
+            if (!Double.isFinite(value)) {
+                writePrefixEquals(9);
+                pos = NumberCodec.writeNonFiniteDouble(buf, pos, value);
             } else {
-                writeValueParam(Double.toString(value));
+                writePrefixEquals(25);
+                pos = NumberCodec.writeDouble(buf, pos, value);
             }
         }
 
         @Override
         public void writeBigInteger(Schema schema, BigInteger value) {
-            writeValueParam(value.toString());
+            writePrefixEquals(64);
+            pos = NumberCodec.writeBigInteger(buf, pos, value);
         }
 
         @Override
         public void writeBigDecimal(Schema schema, BigDecimal value) {
-            writeValueParam(value.toPlainString());
+            writePrefixEquals(NumberCodec.maxBigDecimalLength(value));
+            pos = NumberCodec.writeBigDecimal(buf, pos, value);
         }
 
         @Override
         public void writeString(Schema schema, String value) {
-            writeValueParam(value);
+            writePrefixEquals(value.length() * 3);
+            writeUrlEncoded(value);
         }
 
         @Override
         public void writeBlob(Schema schema, ByteBuffer value) {
-            writeValueParam(ByteBufferUtils.base64Encode(value));
+            byte[] encoded = ByteBufferUtils.base64EncodeToBytes(value);
+            writePrefixEquals(encoded.length * 3);
+            writeUrlEncodedAsciiBytes(encoded, encoded.length);
         }
 
         @Override
         public void writeTimestamp(Schema schema, Instant value) {
-            TimestampFormatter formatter = TimestampFormatter.of(schema, TimestampFormatTrait.Format.DATE_TIME);
-            writeValueParam(formatter.writeString(value));
+            TimestampFormatTrait.Format fmt = resolveTimestampFormat(schema);
+            if (fmt == TimestampFormatTrait.Format.DATE_TIME) {
+                writePrefixEquals(30);
+                pos = TimestampCodec.writeIso8601(buf, pos, value);
+            } else if (fmt == TimestampFormatTrait.Format.EPOCH_SECONDS) {
+                writePrefixEquals(30);
+                pos = TimestampCodec.writeEpochSeconds(buf, pos, value.getEpochSecond(), value.getNano());
+            } else if (fmt == TimestampFormatTrait.Format.HTTP_DATE) {
+                writePrefixEquals(90);
+                writeHttpDateUrlEncoded(value);
+            } else {
+                TimestampFormatter formatter = TimestampFormatter.of(schema, TimestampFormatTrait.Format.DATE_TIME);
+                String formatted = formatter.writeString(value);
+                writePrefixEquals(formatted.length() * 3);
+                writeUrlEncoded(formatted);
+            }
         }
 
         @Override
@@ -579,73 +845,71 @@ final class QueryFormSerializer implements ShapeSerializer {
         @Override
         public void writeNull(Schema schema) {}
 
-        private void writeValueParam(String value) {
-            sink.writeByte('&');
-            writeCurrentPrefix();
-            sink.writeByte('=');
-            sink.writeUrlEncoded(value);
+        private void writeValueParamInt(int value) {
+            writePrefixEquals(11);
+            pos = NumberCodec.writeInt(buf, pos, value);
         }
     }
 
-    // --- Scalar writes ---
-
     @Override
     public void writeBoolean(Schema schema, boolean value) {
-        writeParam(getMemberNameBytes(schema), value ? "true" : "false");
+        writeParamBoolean(getMemberNameBytes(schema), value);
     }
 
     @Override
     public void writeByte(Schema schema, byte value) {
-        writeParam(getMemberNameBytes(schema), Byte.toString(value));
+        writeParamInt(getMemberNameBytes(schema), value);
     }
 
     @Override
     public void writeShort(Schema schema, short value) {
-        writeParam(getMemberNameBytes(schema), Short.toString(value));
+        writeParamInt(getMemberNameBytes(schema), value);
     }
 
     @Override
     public void writeInteger(Schema schema, int value) {
-        writeParam(getMemberNameBytes(schema), Integer.toString(value));
+        writeParamInt(getMemberNameBytes(schema), value);
     }
 
     @Override
     public void writeLong(Schema schema, long value) {
-        writeParam(getMemberNameBytes(schema), Long.toString(value));
+        writeParamLong(getMemberNameBytes(schema), value);
     }
 
     @Override
     public void writeFloat(Schema schema, float value) {
-        byte[] memberNameBytes = getMemberNameBytes(schema);
-        if (Float.isNaN(value)) {
-            writeParam(memberNameBytes, "NaN");
-        } else if (Float.isInfinite(value)) {
-            writeParam(memberNameBytes, value > 0 ? "Infinity" : "-Infinity");
+        byte[] key = getMemberNameBytes(schema);
+        if (!Float.isFinite(value)) {
+            writeKeyPrefix(key, 9);
+            pos = NumberCodec.writeNonFiniteFloat(buf, pos, value);
         } else {
-            writeParam(memberNameBytes, Float.toString(value));
+            writeParamFloat(key, value);
         }
     }
 
     @Override
     public void writeDouble(Schema schema, double value) {
-        byte[] memberNameBytes = getMemberNameBytes(schema);
-        if (Double.isNaN(value)) {
-            writeParam(memberNameBytes, "NaN");
-        } else if (Double.isInfinite(value)) {
-            writeParam(memberNameBytes, value > 0 ? "Infinity" : "-Infinity");
+        byte[] key = getMemberNameBytes(schema);
+        if (!Double.isFinite(value)) {
+            writeKeyPrefix(key, 9);
+            pos = NumberCodec.writeNonFiniteDouble(buf, pos, value);
         } else {
-            writeParam(memberNameBytes, Double.toString(value));
+            writeParamDouble(key, value);
         }
     }
 
     @Override
     public void writeBigInteger(Schema schema, BigInteger value) {
-        writeParam(getMemberNameBytes(schema), value.toString());
+        byte[] key = getMemberNameBytes(schema);
+        writeKeyPrefix(key, 64);
+        pos = NumberCodec.writeBigInteger(buf, pos, value);
     }
 
     @Override
     public void writeBigDecimal(Schema schema, BigDecimal value) {
-        writeParam(getMemberNameBytes(schema), value.toPlainString());
+        byte[] key = getMemberNameBytes(schema);
+        writeKeyPrefix(key, NumberCodec.maxBigDecimalLength(value));
+        pos = NumberCodec.writeBigDecimal(buf, pos, value);
     }
 
     @Override
@@ -655,13 +919,28 @@ final class QueryFormSerializer implements ShapeSerializer {
 
     @Override
     public void writeBlob(Schema schema, ByteBuffer value) {
-        writeParam(getMemberNameBytes(schema), ByteBufferUtils.base64Encode(value));
+        byte[] key = getMemberNameBytes(schema);
+        byte[] encoded = ByteBufferUtils.base64EncodeToBytes(value);
+        writeKeyPrefix(key, encoded.length * 3);
+        writeUrlEncodedAsciiBytes(encoded, encoded.length);
     }
 
     @Override
     public void writeTimestamp(Schema schema, Instant value) {
-        TimestampFormatter formatter = TimestampFormatter.of(schema, TimestampFormatTrait.Format.DATE_TIME);
-        writeParam(getMemberNameBytes(schema), formatter.writeString(value));
+        TimestampFormatTrait.Format fmt = resolveTimestampFormat(schema);
+        byte[] key = getMemberNameBytes(schema);
+        if (fmt == TimestampFormatTrait.Format.DATE_TIME) {
+            writeParamTimestampDirect(key, value);
+        } else if (fmt == TimestampFormatTrait.Format.EPOCH_SECONDS) {
+            writeKeyPrefix(key, 30);
+            pos = TimestampCodec.writeEpochSeconds(buf, pos, value.getEpochSecond(), value.getNano());
+        } else if (fmt == TimestampFormatTrait.Format.HTTP_DATE) {
+            writeKeyPrefix(key, 90);
+            writeHttpDateUrlEncoded(value);
+        } else {
+            TimestampFormatter formatter = TimestampFormatter.of(schema, TimestampFormatTrait.Format.DATE_TIME);
+            writeParam(key, formatter.writeString(value));
+        }
     }
 
     @Override
@@ -671,4 +950,20 @@ final class QueryFormSerializer implements ShapeSerializer {
 
     @Override
     public void writeNull(Schema schema) {}
+
+    private final byte[] httpDateTmp = new byte[40];
+
+    private void writeHttpDateUrlEncoded(Instant value) {
+        int len = TimestampCodec.writeHttpDate(httpDateTmp, 0, value);
+        writeUrlEncodedAsciiBytes(httpDateTmp, len);
+    }
+
+    private static TimestampFormatTrait.Format resolveTimestampFormat(Schema schema) {
+        var ext = schema.getExtension(AwsQuerySchemaExtensions.KEY);
+        if (ext != null && ext.timestampFormat() != null) {
+            return ext.timestampFormat();
+        }
+        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
+        return trait != null ? trait.getFormat() : TimestampFormatTrait.Format.DATE_TIME;
+    }
 }

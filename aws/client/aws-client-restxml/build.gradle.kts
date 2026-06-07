@@ -19,6 +19,10 @@ dependencies {
     testImplementation(libs.smithy.aws.protocol.tests)
 }
 
+tasks.named<Test>("integ") {
+    systemProperty("smithy-java.xml-provider", "smithy")
+}
+
 val generator = "software.amazon.smithy.java.protocoltests.generators.ProtocolTestGenerator"
 addGenerateSrcsTask(generator, "restXml", "aws.protocoltests.restxml#RestXml")
 addGenerateSrcsTask(generator, "restXmlWithNamespace", "aws.protocoltests.restxml.xmlns#RestXmlWithNamespace")

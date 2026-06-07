@@ -3,7 +3,7 @@ import com.github.jengelman.gradle.plugins.shadow.transformers.AppendingTransfor
 plugins {
     `java-library`
     id("software.amazon.smithy.gradle.smithy-base")
-    id("com.gradleup.shadow").version("8.3.5")
+    id("com.gradleup.shadow")
 }
 
 dependencies {

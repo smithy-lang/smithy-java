@@ -2,7 +2,7 @@ import org.apache.tools.ant.filters.ReplaceTokens
 
 plugins {
     id("smithy-java.module-conventions")
-    alias(libs.plugins.jmh)
+    id("smithy-java.jmh-conventions")
 }
 
 description = "This module provides the core functionality for Smithy java"
@@ -16,15 +16,6 @@ dependencies {
     api(project(":retries-api"))
     api(libs.smithy.model)
     implementation(project(":logging"))
-}
-
-jmh {
-    includes.addAll(
-        providers
-            .gradleProperty("jmh.includes")
-            .map { listOf(it) }
-            .orElse(emptyList()),
-    )
 }
 
 // Run all tests with a different locale to ensure we are not doing anything locale specific.

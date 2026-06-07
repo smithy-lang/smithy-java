@@ -2,7 +2,7 @@ plugins {
     `java-library`
     application
     id("software.amazon.smithy.gradle.smithy-base")
-    id("me.champeau.jmh") version "0.7.3"
+    id("smithy-java.jmh-conventions")
 }
 
 dependencies {
@@ -58,15 +58,6 @@ tasks {
 
 jmh {
     warmupIterations = 4
-    iterations = 5
-    fork = 1
-    // Allow filtering for specific benchmarks
-    includes.addAll(providers.gradleProperty("jmh.includes")
-        .map { listOf(it) }
-        .orElse(emptyList()))
-    // profilers.add("async:output=flamegraph;direction=forward")
-    // profilers.add("async:output=collapsed;dir=build/jmh-profiler")
-    // profilers.add("gc")
 }
 
 repositories {

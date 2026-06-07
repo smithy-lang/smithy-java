@@ -3,18 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.json.smithy;
+package software.amazon.smithy.java.codecs.commons;
 
 import static java.lang.Double.doubleToRawLongBits;
 import static java.lang.Float.floatToRawIntBits;
 import static java.lang.Integer.numberOfLeadingZeros;
-import static software.amazon.smithy.java.json.smithy.Schubfach.DoubleToDecimal.NON_SPECIAL;
-import static software.amazon.smithy.java.json.smithy.Schubfach.MathUtils.flog10pow2;
-import static software.amazon.smithy.java.json.smithy.Schubfach.MathUtils.flog10threeQuartersPow2;
-import static software.amazon.smithy.java.json.smithy.Schubfach.MathUtils.flog2pow10;
-import static software.amazon.smithy.java.json.smithy.Schubfach.MathUtils.g0;
-import static software.amazon.smithy.java.json.smithy.Schubfach.MathUtils.g1;
-import static software.amazon.smithy.java.json.smithy.Schubfach.MathUtils.multiplyHigh;
+import static java.lang.Math.multiplyHigh;
+import static software.amazon.smithy.java.codecs.commons.Schubfach.MathUtils.flog10pow2;
+import static software.amazon.smithy.java.codecs.commons.Schubfach.MathUtils.flog10threeQuartersPow2;
+import static software.amazon.smithy.java.codecs.commons.Schubfach.MathUtils.flog2pow10;
+import static software.amazon.smithy.java.codecs.commons.Schubfach.MathUtils.g0;
+import static software.amazon.smithy.java.codecs.commons.Schubfach.MathUtils.g1;
 
 final class Schubfach {
 
@@ -22,74 +21,70 @@ final class Schubfach {
 
     }
 
-    /** Creates a reusable DoubleToDecimal instance for hot-path serialization. */
-    static DoubleToDecimal createDoubleToDecimal() {
-        return new DoubleToDecimal();
-    }
-
-    /** Creates a reusable FloatToDecimal instance for hot-path serialization. */
-    static FloatToDecimal createFloatToDecimal() {
-        return new FloatToDecimal();
-    }
-
-    public static int writeDouble(byte[] buf, int pos, double v) {
-        return writeDouble(buf, pos, v, new DoubleToDecimal());
-    }
-
-    /**
-     * Writes the decimal representation of {@code v} using a reusable {@link DoubleToDecimal}
-     * instance to avoid per-call allocation on hot paths.
-     */
-    public static int writeDouble(byte[] buf, int pos, double v, DoubleToDecimal dtd) {
-        dtd.bytes = buf;
-        dtd.index = pos - 1; // pre-increment convention: first ++index writes to buf[pos]
-        return switch (dtd.toDecimal(v)) {
-            case DoubleToDecimal.NON_SPECIAL -> dtd.index + 1;
-            case DoubleToDecimal.PLUS_ZERO -> {
-                buf[pos] = '0';
-                buf[pos + 1] = '.';
-                buf[pos + 2] = '0';
-                yield pos + 3;
+    static int writeDouble(byte[] buf, int pos, double v) {
+        long bits = doubleToRawLongBits(v);
+        long t = bits & DoubleToDecimal.T_MASK;
+        int bq = (int) (bits >>> DoubleToDecimal.P - 1) & DoubleToDecimal.BQ_MASK;
+        if (bq < DoubleToDecimal.BQ_MASK) {
+            if (bits < 0) {
+                buf[pos++] = '-';
             }
-            case DoubleToDecimal.MINUS_ZERO -> {
-                buf[pos] = '-';
-                buf[pos + 1] = '0';
-                buf[pos + 2] = '.';
-                buf[pos + 3] = '0';
-                yield pos + 4;
+            if (bq != 0) {
+                int mq = -DoubleToDecimal.Q_MIN + 1 - bq;
+                long c = DoubleToDecimal.C_MIN | t;
+                if (0 < mq & mq < DoubleToDecimal.P) {
+                    long f = c >> mq;
+                    if (f << mq == c) {
+                        return DoubleToDecimal.toChars(buf, pos, f, 0);
+                    }
+                }
+                return DoubleToDecimal.toDecimal(buf, pos, -mq, c, 0);
             }
-            default -> throw new AssertionError("Infinity/NaN should be handled by caller");
-        };
+            if (t != 0) {
+                return t < DoubleToDecimal.C_TINY
+                        ? DoubleToDecimal.toDecimal(buf, pos, DoubleToDecimal.Q_MIN, 10 * t, -1)
+                        : DoubleToDecimal.toDecimal(buf, pos, DoubleToDecimal.Q_MIN, t, 0);
+            }
+            // +0.0 or -0.0 (sign already written if negative)
+            buf[pos++] = '0';
+            buf[pos++] = '.';
+            buf[pos++] = '0';
+            return pos;
+        }
+        throw new AssertionError("Infinity/NaN should be handled by caller");
     }
 
-    public static int writeFloat(byte[] buf, int pos, float v) {
-        return writeFloat(buf, pos, v, new FloatToDecimal());
-    }
-
-    /**
-     * Writes the decimal representation of {@code v} using a reusable {@link FloatToDecimal}
-     * instance to avoid per-call allocation on hot paths.
-     */
-    public static int writeFloat(byte[] buf, int pos, float v, FloatToDecimal ftd) {
-        ftd.bytes = buf;
-        ftd.index = pos - 1;
-        return switch (ftd.toDecimal(v)) {
-            case FloatToDecimal.NON_SPECIAL -> ftd.index + 1;
-            case FloatToDecimal.PLUS_ZERO -> {
-                buf[pos] = '0';
-                buf[pos + 1] = '.';
-                buf[pos + 2] = '0';
-                yield pos + 3;
+    static int writeFloat(byte[] buf, int pos, float v) {
+        int bits = floatToRawIntBits(v);
+        int t = bits & FloatToDecimal.T_MASK;
+        int bq = (bits >>> FloatToDecimal.P - 1) & FloatToDecimal.BQ_MASK;
+        if (bq < FloatToDecimal.BQ_MASK) {
+            if (bits < 0) {
+                buf[pos++] = '-';
             }
-            case FloatToDecimal.MINUS_ZERO -> {
-                buf[pos] = '-';
-                buf[pos + 1] = '0';
-                buf[pos + 2] = '.';
-                buf[pos + 3] = '0';
-                yield pos + 4;
+            if (bq != 0) {
+                int mq = -FloatToDecimal.Q_MIN + 1 - bq;
+                int c = FloatToDecimal.C_MIN | t;
+                if (0 < mq & mq < FloatToDecimal.P) {
+                    int f = c >> mq;
+                    if (f << mq == c) {
+                        return FloatToDecimal.toChars(buf, pos, f, 0);
+                    }
+                }
+                return FloatToDecimal.toDecimal(buf, pos, -mq, c, 0);
             }
-            default -> throw new AssertionError("Infinity/NaN should be handled by caller");
-        };
+            if (t != 0) {
+                return t < FloatToDecimal.C_TINY
+                        ? FloatToDecimal.toDecimal(buf, pos, FloatToDecimal.Q_MIN, 10 * t, -1)
+                        : FloatToDecimal.toDecimal(buf, pos, FloatToDecimal.Q_MIN, t, 0);
+            }
+            // +0.0 or -0.0 (sign already written if negative)
+            buf[pos++] = '0';
+            buf[pos++] = '.';
+            buf[pos++] = '0';
+            return pos;
+        }
+        throw new AssertionError("Infinity/NaN should be handled by caller");
     }
 
     /**
@@ -118,7 +113,7 @@ final class Schubfach {
      * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
      * THE SOFTWARE.
      */
-    public static final class FloatToDecimal {
+    static final class FloatToDecimal {
         /*
         For full details about this code see the following references:
         
@@ -145,33 +140,20 @@ final class Schubfach {
         // Minimum value of the exponent: -(2^(W-1)) - P + 3.
         static final int Q_MIN = (-1 << W - 1) - P + 3;
 
-        // Maximum value of the exponent: 2^(W-1) - P.
-        static final int Q_MAX = (1 << W - 1) - P;
-
-        // 10^(E_MIN - 1) <= MIN_VALUE < 10^E_MIN
-        static final int E_MIN = -44;
-
-        // 10^(E_MAX - 1) <= MAX_VALUE < 10^E_MAX
-        static final int E_MAX = 39;
-
         // Threshold to detect tiny values, as in section 8.1.1 of [1]
         static final int C_TINY = 8;
-
-        // The minimum and maximum k, as in section 8 of [1]
-        static final int K_MIN = -45;
-        static final int K_MAX = 31;
 
         // H is as in section 8 of [1].
         static final int H = 9;
 
         // Minimum value of the significand of a normal value: 2^(P-1).
-        private static final int C_MIN = 1 << P - 1;
+        static final int C_MIN = 1 << P - 1;
 
         // Mask to extract the biased exponent.
-        private static final int BQ_MASK = (1 << W) - 1;
+        static final int BQ_MASK = (1 << W) - 1;
 
         // Mask to extract the fraction bits.
-        private static final int T_MASK = (1 << P - 1) - 1;
+        static final int T_MASK = (1 << P - 1) - 1;
 
         // Used in rop().
         private static final long MASK_32 = (1L << 32) - 1;
@@ -179,218 +161,9 @@ final class Schubfach {
         // Used for left-to-tight digit extraction.
         private static final int MASK_28 = (1 << 28) - 1;
 
-        private static final int NON_SPECIAL = 0;
-        private static final int PLUS_ZERO = 1;
-        private static final int MINUS_ZERO = 2;
-        private static final int PLUS_INF = 3;
-        private static final int MINUS_INF = 4;
-        private static final int NAN = 5;
-
-        /*
-        Room for the longer of the forms
-            -ddddd.dddd         H + 2 characters
-            -0.00ddddddddd      H + 5 characters
-            -d.ddddddddE-ee     H + 6 characters
-        where there are H digits d
-         */
-        public final int MAX_CHARS = H + 6;
-
-        // Writes directly to the caller's buffer — set by writeFloat before calling toDecimal.
-        private byte[] bytes;
-
-        // Index into bytes. Set to (pos - 1) by writeFloat; toDecimal uses pre-increment (++index).
-        private int index;
-
         private FloatToDecimal() {}
 
-        /**
-         * Returns a string rendering of the {@code float} argument.
-         *
-         * <p>The characters of the result are all drawn from the ASCII set.
-         * <ul>
-         * <li> Any NaN, whether quiet or signaling, is rendered as
-         * {@code "NaN"}, regardless of the sign bit.
-         * <li> The infinities +&infin; and -&infin; are rendered as
-         * {@code "Infinity"} and {@code "-Infinity"}, respectively.
-         * <li> The positive and negative zeroes are rendered as
-         * {@code "0.0"} and {@code "-0.0"}, respectively.
-         * <li> A finite negative {@code v} is rendered as the sign
-         * '{@code -}' followed by the rendering of the magnitude -{@code v}.
-         * <li> A finite positive {@code v} is rendered in two stages:
-         * <ul>
-         * <li> <em>Selection of a decimal</em>: A well-defined
-         * decimal <i>d</i><sub><code>v</code></sub> is selected
-         * to represent {@code v}.
-         * <li> <em>Formatting as a string</em>: The decimal
-         * <i>d</i><sub><code>v</code></sub> is formatted as a string,
-         * either in plain or in computerized scientific notation,
-         * depending on its value.
-         * </ul>
-         * </ul>
-         *
-         * <p>A <em>decimal</em> is a number of the form
-         * <i>d</i>&times;10<sup><i>i</i></sup>
-         * for some (unique) integers <i>d</i> &gt; 0 and <i>i</i> such that
-         * <i>d</i> is not a multiple of 10.
-         * These integers are the <em>significand</em> and
-         * the <em>exponent</em>, respectively, of the decimal.
-         * The <em>length</em> of the decimal is the (unique)
-         * integer <i>n</i> meeting
-         * 10<sup><i>n</i>-1</sup> &le; <i>d</i> &lt; 10<sup><i>n</i></sup>.
-         *
-         * <p>The decimal <i>d</i><sub><code>v</code></sub>
-         * for a finite positive {@code v} is defined as follows:
-         * <ul>
-         * <li>Let <i>R</i> be the set of all decimals that round to {@code v}
-         * according to the usual round-to-closest rule of
-         * IEEE 754 floating-point arithmetic.
-         * <li>Let <i>m</i> be the minimal length over all decimals in <i>R</i>.
-         * <li>When <i>m</i> &ge; 2, let <i>T</i> be the set of all decimals
-         * in <i>R</i> with length <i>m</i>.
-         * Otherwise, let <i>T</i> be the set of all decimals
-         * in <i>R</i> with length 1 or 2.
-         * <li>Define <i>d</i><sub><code>v</code></sub> as
-         * the decimal in <i>T</i> that is closest to {@code v}.
-         * Or if there are two such decimals in <i>T</i>,
-         * select the one with the even significand (there is exactly one).
-         * </ul>
-         *
-         * <p>The (uniquely) selected decimal <i>d</i><sub><code>v</code></sub>
-         * is then formatted.
-         *
-         * <p>Let <i>d</i>, <i>i</i> and <i>n</i> be the significand, exponent and
-         * length of <i>d</i><sub><code>v</code></sub>, respectively.
-         * Further, let <i>e</i> = <i>n</i> + <i>i</i> - 1 and let
-         * <i>d</i><sub>1</sub>&hellip;<i>d</i><sub><i>n</i></sub>
-         * be the usual decimal expansion of the significand.
-         * Note that <i>d</i><sub>1</sub> &ne; 0 &ne; <i>d</i><sub><i>n</i></sub>.
-         * <ul>
-         * <li>Case -3 &le; <i>e</i> &lt; 0:
-         * <i>d</i><sub><code>v</code></sub> is formatted as
-         * <code>0.0</code>&hellip;<code>0</code><!--
-         * --><i>d</i><sub>1</sub>&hellip;<i>d</i><sub><i>n</i></sub>,
-         * where there are exactly -(<i>n</i> + <i>i</i>) zeroes between
-         * the decimal point and <i>d</i><sub>1</sub>.
-         * For example, 123 &times; 10<sup>-4</sup> is formatted as
-         * {@code 0.0123}.
-         * <li>Case 0 &le; <i>e</i> &lt; 7:
-         * <ul>
-         * <li>Subcase <i>i</i> &ge; 0:
-         * <i>d</i><sub><code>v</code></sub> is formatted as
-         * <i>d</i><sub>1</sub>&hellip;<i>d</i><sub><i>n</i></sub><!--
-         * --><code>0</code>&hellip;<code>0.0</code>,
-         * where there are exactly <i>i</i> zeroes
-         * between <i>d</i><sub><i>n</i></sub> and the decimal point.
-         * For example, 123 &times; 10<sup>2</sup> is formatted as
-         * {@code 12300.0}.
-         * <li>Subcase <i>i</i> &lt; 0:
-         * <i>d</i><sub><code>v</code></sub> is formatted as
-         * <i>d</i><sub>1</sub>&hellip;<!--
-         * --><i>d</i><sub><i>n</i>+<i>i</i></sub>.<!--
-         * --><i>d</i><sub><i>n</i>+<i>i</i>+1</sub>&hellip;<!--
-         * --><i>d</i><sub><i>n</i></sub>.
-         * There are exactly -<i>i</i> digits to the right of
-         * the decimal point.
-         * For example, 123 &times; 10<sup>-1</sup> is formatted as
-         * {@code 12.3}.
-         * </ul>
-         * <li>Case <i>e</i> &lt; -3 or <i>e</i> &ge; 7:
-         * computerized scientific notation is used to format
-         * <i>d</i><sub><code>v</code></sub>.
-         * Here <i>e</i> is formatted as by {@link Integer#toString(int)}.
-         * <ul>
-         * <li>Subcase <i>n</i> = 1:
-         * <i>d</i><sub><code>v</code></sub> is formatted as
-         * <i>d</i><sub>1</sub><code>.0E</code><i>e</i>.
-         * For example, 1 &times; 10<sup>23</sup> is formatted as
-         * {@code 1.0E23}.
-         * <li>Subcase <i>n</i> &gt; 1:
-         * <i>d</i><sub><code>v</code></sub> is formatted as
-         * <i>d</i><sub>1</sub><code>.</code><i>d</i><sub>2</sub><!--
-         * -->&hellip;<i>d</i><sub><i>n</i></sub><code>E</code><i>e</i>.
-         * For example, 123 &times; 10<sup>-21</sup> is formatted as
-         * {@code 1.23E-19}.
-         * </ul>
-         * </ul>
-         *
-         * @param  v the {@code float} to be rendered.
-         * @return a string rendering of the argument.
-         */
-        public static String toString(float v) {
-            return new FloatToDecimal().toDecimalString(v);
-        }
-
-        private String toDecimalString(float v) {
-            switch (toDecimal(v)) {
-                case NON_SPECIAL:
-                    return charsToString();
-                case PLUS_ZERO:
-                    return "0.0";
-                case MINUS_ZERO:
-                    return "-0.0";
-                case PLUS_INF:
-                    return "Infinity";
-                case MINUS_INF:
-                    return "-Infinity";
-                default:
-                    return "NaN";
-            }
-        }
-
-        /*
-        Returns
-            PLUS_ZERO       iff v is 0.0
-            MINUS_ZERO      iff v is -0.0
-            PLUS_INF        iff v is POSITIVE_INFINITY
-            MINUS_INF       iff v is NEGATIVE_INFINITY
-            NAN             iff v is NaN
-         */
-        private int toDecimal(float v) {
-            /*
-            For full details see references [2] and [1].
-            
-            For finite v != 0, determine integers c and q such that
-                |v| = c 2^q    and
-                Q_MIN <= q <= Q_MAX    and
-                    either    2^(P-1) <= c < 2^P                 (normal)
-                    or        0 < c < 2^(P-1)  and  q = Q_MIN    (subnormal)
-             */
-            int bits = floatToRawIntBits(v);
-            int t = bits & T_MASK;
-            int bq = (bits >>> P - 1) & BQ_MASK;
-            if (bq < BQ_MASK) {
-                // index is set by writeFloat (to pos - 1) before this method is called.
-                if (bits < 0) {
-                    append('-');
-                }
-                if (bq != 0) {
-                    // normal value. Here mq = -q
-                    int mq = -Q_MIN + 1 - bq;
-                    int c = C_MIN | t;
-                    // The fast path discussed in section 8.2 of [1].
-                    if (0 < mq & mq < P) {
-                        int f = c >> mq;
-                        if (f << mq == c) {
-                            return toChars(f, 0);
-                        }
-                    }
-                    return toDecimal(-mq, c, 0);
-                }
-                if (t != 0) {
-                    // subnormal value
-                    return t < C_TINY
-                            ? toDecimal(Q_MIN, 10 * t, -1)
-                            : toDecimal(Q_MIN, t, 0);
-                }
-                return bits == 0 ? PLUS_ZERO : MINUS_ZERO;
-            }
-            if (t != 0) {
-                return NAN;
-            }
-            return bits > 0 ? PLUS_INF : MINUS_INF;
-        }
-
-        private int toDecimal(int q, int c, int dk) {
+        static int toDecimal(byte[] buf, int pos, int q, int c, int dk) {
             /*
             The skeleton corresponds to figure 4 of [1].
             The efficient computations are those summarized in figure 7.
@@ -410,7 +183,7 @@ final class Schubfach {
             rop:    r_o'        "r-o-prime"
              */
             int out = c & 0x1;
-            long cb = c << 2;
+            long cb = (long) c << 2;
             long cbr = cb + 2;
             long cbl;
             int k;
@@ -424,7 +197,7 @@ final class Schubfach {
                 cbl = cb - 2;
                 k = flog10pow2(q);
             } else {
-                // irregular spacing0
+                // irregular spacing
                 cbl = cb - 1;
                 k = flog10threeQuartersPow2(q);
             }
@@ -454,7 +227,7 @@ final class Schubfach {
                 boolean upin = vbl + out <= sp10 << 2;
                 boolean wpin = (tp10 << 2) + out <= vbr;
                 if (upin != wpin) {
-                    return toChars(upin ? sp10 : tp10, k);
+                    return toChars(buf, pos, upin ? sp10 : tp10, k);
                 }
             }
 
@@ -469,14 +242,14 @@ final class Schubfach {
             boolean win = (t << 2) + out <= vbr;
             if (uin != win) {
                 // Exactly one of u or w lies in Rv.
-                return toChars(uin ? s : t, k + dk);
+                return toChars(buf, pos, uin ? s : t, k + dk);
             }
             /*
             Both u and w lie in Rv: determine the one closest to v.
             See section 9.4 of [1].
              */
             int cmp = vb - (s + t << 1);
-            return toChars(cmp < 0 || cmp == 0 && (s & 0x1) == 0 ? s : t, k + dk);
+            return toChars(buf, pos, cmp < 0 || cmp == 0 && (s & 0x1) == 0 ? s : t, k + dk);
         }
 
         /*
@@ -492,7 +265,7 @@ final class Schubfach {
         /*
         Formats the decimal f 10^e.
          */
-        private int toChars(int f, int e) {
+        static int toChars(byte[] buf, int pos, int f, int e) {
             /*
             For details not discussed here see section 10 of [1].
             
@@ -510,7 +283,7 @@ final class Schubfach {
                 10^(H-1) <= f < 10^H
                 fp 10^ep = f 10^(e-H) = 0.f 10^e
              */
-            f *= MathUtils.pow10(H - len);
+            f *= (int) MathUtils.pow10(H - len);
             e += len;
 
             /*
@@ -527,63 +300,60 @@ final class Schubfach {
             int l = f - 100_000_000 * h;
 
             if (0 < e && e <= 7) {
-                return toChars1(h, l, e);
+                return toChars1(buf, pos, h, l, e);
             }
             if (-3 < e && e <= 0) {
-                return toChars2(h, l, e);
+                return toChars2(buf, pos, h, l, e);
             }
-            return toChars3(h, l, e);
+            return toChars3(buf, pos, h, l, e);
         }
 
-        private int toChars1(int h, int l, int e) {
+        private static int toChars1(byte[] buf, int pos, int h, int l, int e) {
             /*
             0 < e <= 7: plain format without leading zeroes.
             Left-to-right digits extraction:
             algorithm 1 in [3], with b = 10, k = 8, n = 28.
              */
-            appendDigit(h);
+            buf[pos++] = (byte) ('0' + h);
             int y = y(l);
             int t;
             int i = 1;
             for (; i < e; ++i) {
                 t = 10 * y;
-                appendDigit(t >>> 28);
+                buf[pos++] = (byte) ('0' + (t >>> 28));
                 y = t & MASK_28;
             }
-            append('.');
+            buf[pos++] = '.';
             for (; i <= 8; ++i) {
                 t = 10 * y;
-                appendDigit(t >>> 28);
+                buf[pos++] = (byte) ('0' + (t >>> 28));
                 y = t & MASK_28;
             }
-            removeTrailingZeroes();
-            return NON_SPECIAL;
+            return removeTrailingZeroes(buf, pos);
         }
 
-        private int toChars2(int h, int l, int e) {
+        private static int toChars2(byte[] buf, int pos, int h, int l, int e) {
             // -3 < e <= 0: plain format with leading zeroes.
-            appendDigit(0);
-            append('.');
+            buf[pos++] = '0';
+            buf[pos++] = '.';
             for (; e < 0; ++e) {
-                appendDigit(0);
+                buf[pos++] = '0';
             }
-            appendDigit(h);
-            append8Digits(l);
-            removeTrailingZeroes();
-            return NON_SPECIAL;
+            buf[pos++] = (byte) ('0' + h);
+            pos = append8Digits(buf, pos, l);
+            return removeTrailingZeroes(buf, pos);
         }
 
-        private int toChars3(int h, int l, int e) {
+        private static int toChars3(byte[] buf, int pos, int h, int l, int e) {
             // -3 >= e | e > 7: computerized scientific notation
-            appendDigit(h);
-            append('.');
-            append8Digits(l);
-            removeTrailingZeroes();
-            exponent(e - 1);
-            return NON_SPECIAL;
+            buf[pos++] = (byte) ('0' + h);
+            buf[pos++] = '.';
+            pos = append8Digits(buf, pos, l);
+            pos = removeTrailingZeroes(buf, pos);
+            return exponent(buf, pos, e - 1);
         }
 
-        private void append8Digits(int m) {
+        private static int append8Digits(byte[] buf, int pos, int m) {
             /*
             Left-to-right digits extraction:
             algorithm 1 in [3], with b = 10, k = 8, n = 28.
@@ -591,22 +361,24 @@ final class Schubfach {
             int y = y(m);
             for (int i = 0; i < 8; ++i) {
                 int t = 10 * y;
-                appendDigit(t >>> 28);
+                buf[pos++] = (byte) ('0' + (t >>> 28));
                 y = t & MASK_28;
             }
+            return pos;
         }
 
-        private void removeTrailingZeroes() {
-            while (bytes[index] == '0') {
-                --index;
+        private static int removeTrailingZeroes(byte[] buf, int pos) {
+            while (buf[pos - 1] == '0') {
+                --pos;
             }
             // ... but do not remove the one directly to the right of '.'
-            if (bytes[index] == '.') {
-                ++index;
+            if (buf[pos - 1] == '.') {
+                ++pos;
             }
+            return pos;
         }
 
-        private int y(int a) {
+        private static int y(int a) {
             /*
             Algorithm 1 in [3] needs computation of
                 floor((a + 1) 2^n / b^k) - 1
@@ -620,37 +392,24 @@ final class Schubfach {
                     193_428_131_138_340_668L) >>> 20) - 1;
         }
 
-        private void exponent(int e) {
-            append('E');
+        private static int exponent(byte[] buf, int pos, int e) {
+            buf[pos++] = 'E';
             if (e < 0) {
-                append('-');
+                buf[pos++] = '-';
                 e = -e;
             }
             if (e < 10) {
-                appendDigit(e);
-                return;
+                buf[pos++] = (byte) ('0' + e);
+                return pos;
             }
             /*
             For n = 2, m = 1 the table in section 10 of [1] shows
                 floor(e / 10) = floor(103 e / 2^10)
              */
             int d = e * 103 >>> 10;
-            appendDigit(d);
-            appendDigit(e - 10 * d);
-        }
-
-        private void append(int c) {
-            bytes[++index] = (byte) c;
-        }
-
-        private void appendDigit(int d) {
-            bytes[++index] = (byte) ('0' + d);
-        }
-
-        // Using the deprecated constructor enhances performance.
-        @SuppressWarnings("deprecation")
-        private String charsToString() {
-            return new String(bytes, 0, 0, index + 1);
+            buf[pos++] = (byte) ('0' + d);
+            buf[pos++] = (byte) ('0' + e - 10 * d);
+            return pos;
         }
 
     }
@@ -835,18 +594,6 @@ final class Schubfach {
          */
         static long g0(int k) {
             return g[k - K_MIN << 1 | 1];
-        }
-
-        //a Java port of https://github.com/plokhotnyuk/jsoniter-scala/blob/c70a293ac802dc2eb44165471d76d7df2d4657b6/jsoniter-scala-core/native/src/main/scala/com/github/plokhotnyuk/jsoniter_scala/core/JsonWriter.scala#L2027
-        static long multiplyHigh(long x, long y) {
-            // Karatsuba technique for two positive ints
-            long x2 = x & 0xFFFFFFFFL;
-            long y2 = y & 0xFFFFFFFFL;
-            long b = x2 * y2;
-            long x1 = x >>> 32;
-            long y1 = y >>> 32;
-            long a = x1 * y1;
-            return (((b >>> 32) + (x1 + x2) * (y1 + y2) - b - a) >>> 32) + a;
         }
 
         /*
@@ -2144,33 +1891,20 @@ final class Schubfach {
         // Minimum value of the exponent: -(2^(W-1)) - P + 3.
         static final int Q_MIN = (-1 << W - 1) - P + 3;
 
-        // Maximum value of the exponent: 2^(W-1) - P.
-        static final int Q_MAX = (1 << W - 1) - P;
-
-        // 10^(E_MIN - 1) <= MIN_VALUE < 10^E_MIN
-        static final int E_MIN = -323;
-
-        // 10^(E_MAX - 1) <= MAX_VALUE < 10^E_MAX
-        static final int E_MAX = 309;
-
         // Threshold to detect tiny values, as in section 8.1.1 of [1]
         static final long C_TINY = 3;
-
-        // The minimum and maximum k, as in section 8 of [1]
-        static final int K_MIN = -324;
-        static final int K_MAX = 292;
 
         // H is as in section 8 of [1].
         static final int H = 17;
 
         // Minimum value of the significand of a normal value: 2^(P-1).
-        private static final long C_MIN = 1L << P - 1;
+        static final long C_MIN = 1L << P - 1;
 
         // Mask to extract the biased exponent.
-        private static final int BQ_MASK = (1 << W) - 1;
+        static final int BQ_MASK = (1 << W) - 1;
 
         // Mask to extract the fraction bits.
-        private static final long T_MASK = (1L << P - 1) - 1;
+        static final long T_MASK = (1L << P - 1) - 1;
 
         // Used in rop().
         private static final long MASK_63 = (1L << 63) - 1;
@@ -2178,218 +1912,9 @@ final class Schubfach {
         // Used for left-to-tight digit extraction.
         private static final int MASK_28 = (1 << 28) - 1;
 
-        static final int NON_SPECIAL = 0;
-        static final int PLUS_ZERO = 1;
-        static final int MINUS_ZERO = 2;
-        static final int PLUS_INF = 3;
-        static final int MINUS_INF = 4;
-        static final int NAN = 5;
-
-        /*
-        Room for the longer of the forms
-            -ddddd.dddddddddddd         H + 2 characters
-            -0.00ddddddddddddddddd      H + 5 characters
-            -d.ddddddddddddddddE-eee    H + 7 characters
-        where there are H digits d
-         */
-        public final int MAX_CHARS = H + 7;
-
-        // Writes directly to the caller's buffer — set by writeDouble before calling toDecimal.
-        private byte[] bytes;
-
-        // Index into bytes. Set to (pos - 1) by writeDouble; toDecimal uses pre-increment (++index).
-        private int index;
-
         private DoubleToDecimal() {}
 
-        /**
-         * Returns a string rendering of the {@code double} argument.
-         *
-         * <p>The characters of the result are all drawn from the ASCII set.
-         * <ul>
-         * <li> Any NaN, whether quiet or signaling, is rendered as
-         * {@code "NaN"}, regardless of the sign bit.
-         * <li> The infinities +&infin; and -&infin; are rendered as
-         * {@code "Infinity"} and {@code "-Infinity"}, respectively.
-         * <li> The positive and negative zeroes are rendered as
-         * {@code "0.0"} and {@code "-0.0"}, respectively.
-         * <li> A finite negative {@code v} is rendered as the sign
-         * '{@code -}' followed by the rendering of the magnitude -{@code v}.
-         * <li> A finite positive {@code v} is rendered in two stages:
-         * <ul>
-         * <li> <em>Selection of a decimal</em>: A well-defined
-         * decimal <i>d</i><sub><code>v</code></sub> is selected
-         * to represent {@code v}.
-         * <li> <em>Formatting as a string</em>: The decimal
-         * <i>d</i><sub><code>v</code></sub> is formatted as a string,
-         * either in plain or in computerized scientific notation,
-         * depending on its value.
-         * </ul>
-         * </ul>
-         *
-         * <p>A <em>decimal</em> is a number of the form
-         * <i>d</i>&times;10<sup><i>i</i></sup>
-         * for some (unique) integers <i>d</i> &gt; 0 and <i>i</i> such that
-         * <i>d</i> is not a multiple of 10.
-         * These integers are the <em>significand</em> and
-         * the <em>exponent</em>, respectively, of the decimal.
-         * The <em>length</em> of the decimal is the (unique)
-         * integer <i>n</i> meeting
-         * 10<sup><i>n</i>-1</sup> &le; <i>d</i> &lt; 10<sup><i>n</i></sup>.
-         *
-         * <p>The decimal <i>d</i><sub><code>v</code></sub>
-         * for a finite positive {@code v} is defined as follows:
-         * <ul>
-         * <li>Let <i>R</i> be the set of all decimals that round to {@code v}
-         * according to the usual round-to-closest rule of
-         * IEEE 754 floating-point arithmetic.
-         * <li>Let <i>m</i> be the minimal length over all decimals in <i>R</i>.
-         * <li>When <i>m</i> &ge; 2, let <i>T</i> be the set of all decimals
-         * in <i>R</i> with length <i>m</i>.
-         * Otherwise, let <i>T</i> be the set of all decimals
-         * in <i>R</i> with length 1 or 2.
-         * <li>Define <i>d</i><sub><code>v</code></sub> as
-         * the decimal in <i>T</i> that is closest to {@code v}.
-         * Or if there are two such decimals in <i>T</i>,
-         * select the one with the even significand (there is exactly one).
-         * </ul>
-         *
-         * <p>The (uniquely) selected decimal <i>d</i><sub><code>v</code></sub>
-         * is then formatted.
-         *
-         * <p>Let <i>d</i>, <i>i</i> and <i>n</i> be the significand, exponent and
-         * length of <i>d</i><sub><code>v</code></sub>, respectively.
-         * Further, let <i>e</i> = <i>n</i> + <i>i</i> - 1 and let
-         * <i>d</i><sub>1</sub>&hellip;<i>d</i><sub><i>n</i></sub>
-         * be the usual decimal expansion of the significand.
-         * Note that <i>d</i><sub>1</sub> &ne; 0 &ne; <i>d</i><sub><i>n</i></sub>.
-         * <ul>
-         * <li>Case -3 &le; <i>e</i> &lt; 0:
-         * <i>d</i><sub><code>v</code></sub> is formatted as
-         * <code>0.0</code>&hellip;<code>0</code><!--
-         * --><i>d</i><sub>1</sub>&hellip;<i>d</i><sub><i>n</i></sub>,
-         * where there are exactly -(<i>n</i> + <i>i</i>) zeroes between
-         * the decimal point and <i>d</i><sub>1</sub>.
-         * For example, 123 &times; 10<sup>-4</sup> is formatted as
-         * {@code 0.0123}.
-         * <li>Case 0 &le; <i>e</i> &lt; 7:
-         * <ul>
-         * <li>Subcase <i>i</i> &ge; 0:
-         * <i>d</i><sub><code>v</code></sub> is formatted as
-         * <i>d</i><sub>1</sub>&hellip;<i>d</i><sub><i>n</i></sub><!--
-         * --><code>0</code>&hellip;<code>0.0</code>,
-         * where there are exactly <i>i</i> zeroes
-         * between <i>d</i><sub><i>n</i></sub> and the decimal point.
-         * For example, 123 &times; 10<sup>2</sup> is formatted as
-         * {@code 12300.0}.
-         * <li>Subcase <i>i</i> &lt; 0:
-         * <i>d</i><sub><code>v</code></sub> is formatted as
-         * <i>d</i><sub>1</sub>&hellip;<!--
-         * --><i>d</i><sub><i>n</i>+<i>i</i></sub>.<!--
-         * --><i>d</i><sub><i>n</i>+<i>i</i>+1</sub>&hellip;<!--
-         * --><i>d</i><sub><i>n</i></sub>.
-         * There are exactly -<i>i</i> digits to the right of
-         * the decimal point.
-         * For example, 123 &times; 10<sup>-1</sup> is formatted as
-         * {@code 12.3}.
-         * </ul>
-         * <li>Case <i>e</i> &lt; -3 or <i>e</i> &ge; 7:
-         * computerized scientific notation is used to format
-         * <i>d</i><sub><code>v</code></sub>.
-         * Here <i>e</i> is formatted as by {@link Integer#toString(int)}.
-         * <ul>
-         * <li>Subcase <i>n</i> = 1:
-         * <i>d</i><sub><code>v</code></sub> is formatted as
-         * <i>d</i><sub>1</sub><code>.0E</code><i>e</i>.
-         * For example, 1 &times; 10<sup>23</sup> is formatted as
-         * {@code 1.0E23}.
-         * <li>Subcase <i>n</i> &gt; 1:
-         * <i>d</i><sub><code>v</code></sub> is formatted as
-         * <i>d</i><sub>1</sub><code>.</code><i>d</i><sub>2</sub><!--
-         * -->&hellip;<i>d</i><sub><i>n</i></sub><code>E</code><i>e</i>.
-         * For example, 123 &times; 10<sup>-21</sup> is formatted as
-         * {@code 1.23E-19}.
-         * </ul>
-         * </ul>
-         *
-         * @param v the {@code double} to be rendered.
-         * @return a string rendering of the argument.
-         */
-        public static String toString(double v) {
-            return new DoubleToDecimal().toDecimalString(v);
-        }
-
-        private String toDecimalString(double v) {
-            switch (toDecimal(v)) {
-                case NON_SPECIAL:
-                    return charsToString();
-                case PLUS_ZERO:
-                    return "0.0";
-                case MINUS_ZERO:
-                    return "-0.0";
-                case PLUS_INF:
-                    return "Infinity";
-                case MINUS_INF:
-                    return "-Infinity";
-                default:
-                    return "NaN";
-            }
-        }
-
-        /*
-        Returns
-            PLUS_ZERO       iff v is 0.0
-            MINUS_ZERO      iff v is -0.0
-            PLUS_INF        iff v is POSITIVE_INFINITY
-            MINUS_INF       iff v is NEGATIVE_INFINITY
-            NAN             iff v is NaN
-         */
-        private int toDecimal(double v) {
-            /*
-            For full details see references [2] and [1].
-            
-            For finite v != 0, determine integers c and q such that
-                |v| = c 2^q    and
-                Q_MIN <= q <= Q_MAX    and
-                    either    2^(P-1) <= c < 2^P                 (normal)
-                    or        0 < c < 2^(P-1)  and  q = Q_MIN    (subnormal)
-             */
-            long bits = doubleToRawLongBits(v);
-            long t = bits & T_MASK;
-            int bq = (int) (bits >>> P - 1) & BQ_MASK;
-            if (bq < BQ_MASK) {
-                // index is set by writeDouble (to pos - 1) before this method is called.
-                if (bits < 0) {
-                    append('-');
-                }
-                if (bq != 0) {
-                    // normal value. Here mq = -q
-                    int mq = -Q_MIN + 1 - bq;
-                    long c = C_MIN | t;
-                    // The fast path discussed in section 8.2 of [1].
-                    if (0 < mq & mq < P) {
-                        long f = c >> mq;
-                        if (f << mq == c) {
-                            return toChars(f, 0);
-                        }
-                    }
-                    return toDecimal(-mq, c, 0);
-                }
-                if (t != 0) {
-                    // subnormal value
-                    return t < C_TINY
-                            ? toDecimal(Q_MIN, 10 * t, -1)
-                            : toDecimal(Q_MIN, t, 0);
-                }
-                return bits == 0 ? PLUS_ZERO : MINUS_ZERO;
-            }
-            if (t != 0) {
-                return NAN;
-            }
-            return bits > 0 ? PLUS_INF : MINUS_INF;
-        }
-
-        private int toDecimal(int q, long c, int dk) {
+        static int toDecimal(byte[] buf, int pos, int q, long c, int dk) {
             /*
             The skeleton corresponds to figure 4 of [1].
             The efficient computations are those summarized in figure 7.
@@ -2454,7 +1979,7 @@ final class Schubfach {
                 boolean upin = vbl + out <= sp10 << 2;
                 boolean wpin = (tp10 << 2) + out <= vbr;
                 if (upin != wpin) {
-                    return toChars(upin ? sp10 : tp10, k);
+                    return toChars(buf, pos, upin ? sp10 : tp10, k);
                 }
             }
 
@@ -2469,14 +1994,14 @@ final class Schubfach {
             boolean win = (t << 2) + out <= vbr;
             if (uin != win) {
                 // Exactly one of u or w lies in Rv.
-                return toChars(uin ? s : t, k + dk);
+                return toChars(buf, pos, uin ? s : t, k + dk);
             }
             /*
             Both u and w lie in Rv: determine the one closest to v.
             See section 9.4 of [1].
              */
             long cmp = vb - (s + t << 1);
-            return toChars(cmp < 0 || cmp == 0 && (s & 0x1) == 0 ? s : t, k + dk);
+            return toChars(buf, pos, cmp < 0 || cmp == 0 && (s & 0x1) == 0 ? s : t, k + dk);
         }
 
         /*
@@ -2495,7 +2020,7 @@ final class Schubfach {
         /*
         Formats the decimal f 10^e.
          */
-        private int toChars(long f, int e) {
+        static int toChars(byte[] buf, int pos, long f, int e) {
             /*
             For details not discussed here see section 10 of [1].
             
@@ -2536,70 +2061,70 @@ final class Schubfach {
             int m = (int) (hm - 100_000_000 * h);
 
             if (0 < e && e <= 7) {
-                return toChars1(h, m, l, e);
+                return toChars1(buf, pos, h, m, l, e);
             }
             if (-3 < e && e <= 0) {
-                return toChars2(h, m, l, e);
+                return toChars2(buf, pos, h, m, l, e);
             }
-            return toChars3(h, m, l, e);
+            return toChars3(buf, pos, h, m, l, e);
         }
 
-        private int toChars1(int h, int m, int l, int e) {
+        private static int toChars1(byte[] buf, int pos, int h, int m, int l, int e) {
             /*
             0 < e <= 7: plain format without leading zeroes.
             Left-to-right digits extraction:
             algorithm 1 in [3], with b = 10, k = 8, n = 28.
              */
-            appendDigit(h);
+            buf[pos++] = (byte) ('0' + h);
             int y = y(m);
             int t;
             int i = 1;
             for (; i < e; ++i) {
                 t = 10 * y;
-                appendDigit(t >>> 28);
+                buf[pos++] = (byte) ('0' + (t >>> 28));
                 y = t & MASK_28;
             }
-            append('.');
+            buf[pos++] = '.';
             for (; i <= 8; ++i) {
                 t = 10 * y;
-                appendDigit(t >>> 28);
+                buf[pos++] = (byte) ('0' + (t >>> 28));
                 y = t & MASK_28;
             }
-            lowDigits(l);
-            return NON_SPECIAL;
+            pos = lowDigits(buf, pos, l);
+            return pos;
         }
 
-        private int toChars2(int h, int m, int l, int e) {
+        private static int toChars2(byte[] buf, int pos, int h, int m, int l, int e) {
             // -3 < e <= 0: plain format with leading zeroes.
-            appendDigit(0);
-            append('.');
+            buf[pos++] = '0';
+            buf[pos++] = '.';
             for (; e < 0; ++e) {
-                appendDigit(0);
+                buf[pos++] = '0';
             }
-            appendDigit(h);
-            append8Digits(m);
-            lowDigits(l);
-            return NON_SPECIAL;
+            buf[pos++] = (byte) ('0' + h);
+            pos = append8Digits(buf, pos, m);
+            pos = lowDigits(buf, pos, l);
+            return pos;
         }
 
-        private int toChars3(int h, int m, int l, int e) {
+        private static int toChars3(byte[] buf, int pos, int h, int m, int l, int e) {
             // -3 >= e | e > 7: computerized scientific notation
-            appendDigit(h);
-            append('.');
-            append8Digits(m);
-            lowDigits(l);
-            exponent(e - 1);
-            return NON_SPECIAL;
+            buf[pos++] = (byte) ('0' + h);
+            buf[pos++] = '.';
+            pos = append8Digits(buf, pos, m);
+            pos = lowDigits(buf, pos, l);
+            pos = exponent(buf, pos, e - 1);
+            return pos;
         }
 
-        private void lowDigits(int l) {
+        private static int lowDigits(byte[] buf, int pos, int l) {
             if (l != 0) {
-                append8Digits(l);
+                pos = append8Digits(buf, pos, l);
             }
-            removeTrailingZeroes();
+            return removeTrailingZeroes(buf, pos);
         }
 
-        private void append8Digits(int m) {
+        private static int append8Digits(byte[] buf, int pos, int m) {
             /*
             Left-to-right digits extraction:
             algorithm 1 in [3], with b = 10, k = 8, n = 28.
@@ -2607,22 +2132,24 @@ final class Schubfach {
             int y = y(m);
             for (int i = 0; i < 8; ++i) {
                 int t = 10 * y;
-                appendDigit(t >>> 28);
+                buf[pos++] = (byte) ('0' + (t >>> 28));
                 y = t & MASK_28;
             }
+            return pos;
         }
 
-        private void removeTrailingZeroes() {
-            while (bytes[index] == '0') {
-                --index;
+        private static int removeTrailingZeroes(byte[] buf, int pos) {
+            while (buf[pos - 1] == '0') {
+                --pos;
             }
             // ... but do not remove the one directly to the right of '.'
-            if (bytes[index] == '.') {
-                ++index;
+            if (buf[pos - 1] == '.') {
+                ++pos;
             }
+            return pos;
         }
 
-        private int y(int a) {
+        private static int y(int a) {
             /*
             Algorithm 1 in [3] needs computation of
                 floor((a + 1) 2^n / b^k) - 1
@@ -2636,15 +2163,15 @@ final class Schubfach {
                     193_428_131_138_340_668L) >>> 20) - 1;
         }
 
-        private void exponent(int e) {
-            append('E');
+        private static int exponent(byte[] buf, int pos, int e) {
+            buf[pos++] = 'E';
             if (e < 0) {
-                append('-');
+                buf[pos++] = '-';
                 e = -e;
             }
             if (e < 10) {
-                appendDigit(e);
-                return;
+                buf[pos++] = (byte) ('0' + e);
+                return pos;
             }
             int d;
             if (e >= 100) {
@@ -2653,7 +2180,7 @@ final class Schubfach {
                     floor(e / 100) = floor(1_311 e / 2^17)
                  */
                 d = e * 1_311 >>> 17;
-                appendDigit(d);
+                buf[pos++] = (byte) ('0' + d);
                 e -= 100 * d;
             }
             /*
@@ -2661,22 +2188,9 @@ final class Schubfach {
                 floor(e / 10) = floor(103 e / 2^10)
              */
             d = e * 103 >>> 10;
-            appendDigit(d);
-            appendDigit(e - 10 * d);
-        }
-
-        private void append(int c) {
-            bytes[++index] = (byte) c;
-        }
-
-        private void appendDigit(int d) {
-            bytes[++index] = (byte) ('0' + d);
-        }
-
-        // Using the deprecated constructor enhances performance.
-        @SuppressWarnings("deprecation")
-        private String charsToString() {
-            return new String(bytes, 0, 0, index + 1);
+            buf[pos++] = (byte) ('0' + d);
+            buf[pos++] = (byte) ('0' + e - 10 * d);
+            return pos;
         }
 
     }
