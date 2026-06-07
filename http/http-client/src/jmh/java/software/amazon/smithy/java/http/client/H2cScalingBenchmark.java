@@ -56,7 +56,6 @@ import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
@@ -115,27 +114,23 @@ public class H2cScalingBenchmark {
 
         smithyConnectionCount = new AtomicInteger(0);
 
-        // Smithy H2c client. Pass -Djmh.smithy.epoll=true to switch to the tcnative epoll
-        // transport for Linux runs.
-        boolean useEpoll = Boolean.getBoolean("jmh.smithy.epoll");
+        // Smithy H2c client. The epoll transport is used automatically when the native library is
+        // available (Linux); otherwise the NIO socket path is used.
         smithyClient = HttpClient.builder()
-                .connectionPool(HttpConnectionPool.builder()
-                        .maxConnectionsPerRoute(connections)
-                        .maxTotalConnections(connections)
-                        .h2StreamsPerConnection(streamsPerConnection)
-                        .h2InitialWindowSize(1024 * 1024)
-                        .maxIdleTime(Duration.ofMinutes(2))
-                        .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
-                        .dnsResolver(BenchmarkSupport.staticDns())
-                        .useEpollTransport(useEpoll)
-                        .addListener(new HttpClientListener() {
-                            @Override
-                            public void onConnectionCreated(HttpConnection conn) {
-                                int count = smithyConnectionCount.incrementAndGet();
-                                System.out.println("  [Smithy] New connection #" + count + ": " + conn);
-                            }
-                        })
-                        .build())
+                .maxConnectionsPerRoute(connections)
+                .maxTotalConnections(connections)
+                .h2StreamsPerConnection(streamsPerConnection)
+                .h2InitialWindowSize(1024 * 1024)
+                .maxIdleTime(Duration.ofMinutes(2))
+                .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
+                .dnsResolver(BenchmarkSupport.staticDns())
+                .addListener(new HttpClientListener() {
+                    @Override
+                    public void onConnectionCreated(HttpConnection conn) {
+                        int count = smithyConnectionCount.incrementAndGet();
+                        System.out.println("  [Smithy] New connection #" + count + ": " + conn);
+                    }
+                })
                 .build();
 
         // Helidon H2c client

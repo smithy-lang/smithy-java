@@ -40,7 +40,7 @@ class DefaultHttpClientTest {
     @Test
     void sendReturnsResponse() throws IOException {
         var pool = new TestConnectionPool();
-        try (var client = HttpClient.builder().connectionPool(pool).build()) {
+        try (var client = HttpClient.builder().connectionPoolFactory(config -> pool).build()) {
             var request = HttpRequest.create()
                     .setMethod("GET")
                     .setUri(SmithyUri.of("http://example.com/test"));
@@ -75,7 +75,7 @@ class DefaultHttpClientTest {
         };
 
         try (var client = HttpClient.builder()
-                .connectionPool(new TestConnectionPool())
+                .connectionPoolFactory(config -> new TestConnectionPool())
                 .addListener(listener)
                 .build()) {
             var request = HttpRequest.create()
@@ -109,7 +109,7 @@ class DefaultHttpClientTest {
         };
 
         try (var client = HttpClient.builder()
-                .connectionPool(new TestConnectionPool())
+                .connectionPoolFactory(config -> new TestConnectionPool())
                 .addListener(listener)
                 .build()) {
             var request = HttpRequest.create()
@@ -120,6 +120,29 @@ class DefaultHttpClientTest {
 
             assertEquals(200, response.statusCode());
             response.body().discard();
+        }
+    }
+
+    @Test
+    void connectionPoolFactoryReceivesClientListeners() throws IOException {
+        var listener = new HttpClientListener() {};
+        var sawListener = new AtomicBoolean();
+        var pool = new TestConnectionPool();
+
+        try (var client = HttpClient.builder()
+                .addListener(listener)
+                .connectionPoolFactory(config -> {
+                    sawListener.set(config.listeners().contains(listener));
+                    return pool;
+                })
+                .build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            client.send(request).body().discard();
+
+            assertTrue(sawListener.get(), "Custom pool factory must receive the client listener config");
         }
     }
 
@@ -157,7 +180,7 @@ class DefaultHttpClientTest {
         };
 
         try (var client = HttpClient.builder()
-                .connectionPool(pool)
+                .connectionPoolFactory(config -> pool)
                 .addListener(listener)
                 .build()) {
             var request = HttpRequest.create()
@@ -210,7 +233,7 @@ class DefaultHttpClientTest {
                 ProxyConfiguration.ProxyType.HTTP);
 
         try (var client = HttpClient.builder()
-                .connectionPool(pool)
+                .connectionPoolFactory(config -> pool)
                 .proxySelector(ProxySelector.of(proxy1, proxy2))
                 .addListener(listener)
                 .build()) {
@@ -264,7 +287,7 @@ class DefaultHttpClientTest {
         var proxy2 = new ProxyConfiguration(SmithyUri.of("http://proxy2.example.com:9090"),
                 ProxyConfiguration.ProxyType.HTTP);
         try (var client = HttpClient.builder()
-                .connectionPool(pool)
+                .connectionPoolFactory(config -> pool)
                 .proxySelector(ProxySelector.of(proxy1, proxy2))
                 .addListener(listener)
                 .build()) {
@@ -312,7 +335,7 @@ class DefaultHttpClientTest {
             }
         };
         try (var client = HttpClient.builder()
-                .connectionPool(pool)
+                .connectionPoolFactory(config -> pool)
                 .addListener(listener)
                 .requestTimeout(Duration.ofMillis(50))
                 .build()) {
@@ -348,7 +371,7 @@ class DefaultHttpClientTest {
             }
         };
         try (var client = HttpClient.builder()
-                .connectionPool(pool)
+                .connectionPoolFactory(config -> pool)
                 .addListener(listener)
                 .build()) {
             var request = HttpRequest.create()
@@ -402,7 +425,7 @@ class DefaultHttpClientTest {
             }
         };
         try (var client = HttpClient.builder()
-                .connectionPool(pool)
+                .connectionPoolFactory(config -> pool)
                 .proxySelector(selector)
                 .build()) {
             var request = HttpRequest.create()
@@ -432,7 +455,7 @@ class DefaultHttpClientTest {
                 };
             }
         };
-        try (var client = HttpClient.builder().connectionPool(pool).build()) {
+        try (var client = HttpClient.builder().connectionPoolFactory(config -> pool).build()) {
             var request = HttpRequest.create()
                     .setMethod("POST")
                     .setUri(SmithyUri.of("http://example.com/test"))
@@ -463,7 +486,7 @@ class DefaultHttpClientTest {
             }
         };
         try (var client = HttpClient.builder()
-                .connectionPool(pool)
+                .connectionPoolFactory(config -> pool)
                 .requestTimeout(Duration.ofMillis(50))
                 .build()) {
             var request = HttpRequest.create()
@@ -480,7 +503,7 @@ class DefaultHttpClientTest {
     void requestTimeoutSucceedsWhenFastEnough() throws IOException {
         var pool = new TestConnectionPool();
         try (var client = HttpClient.builder()
-                .connectionPool(pool)
+                .connectionPoolFactory(config -> pool)
                 .requestTimeout(Duration.ofSeconds(5))
                 .build()) {
             var request = HttpRequest.create()
@@ -508,7 +531,7 @@ class DefaultHttpClientTest {
         var proxy = new ProxyConfiguration(SmithyUri.of("http://proxy.example.com:8080"),
                 ProxyConfiguration.ProxyType.HTTP);
         try (var client = HttpClient.builder()
-                .connectionPool(pool)
+                .connectionPoolFactory(config -> pool)
                 .proxy(proxy)
                 .build()) {
             var request = HttpRequest.create()
@@ -556,7 +579,7 @@ class DefaultHttpClientTest {
             }
         };
         try (var client = HttpClient.builder()
-                .connectionPool(pool)
+                .connectionPoolFactory(config -> pool)
                 .proxySelector(selector)
                 .build()) {
             var request = HttpRequest.create()
@@ -592,7 +615,7 @@ class DefaultHttpClientTest {
                 ProxyConfiguration.ProxyType.HTTP);
         var selector = ProxySelector.of(proxy1, proxy2);
         try (var client = HttpClient.builder()
-                .connectionPool(pool)
+                .connectionPoolFactory(config -> pool)
                 .proxySelector(selector)
                 .build()) {
             var request = HttpRequest.create()
@@ -624,7 +647,7 @@ class DefaultHttpClientTest {
                 evicted.set(true);
             }
         };
-        try (var client = HttpClient.builder().connectionPool(pool).build()) {
+        try (var client = HttpClient.builder().connectionPoolFactory(config -> pool).build()) {
             var request = HttpRequest.create()
                     .setMethod("GET")
                     .setUri(SmithyUri.of("http://example.com/test"));
@@ -653,7 +676,7 @@ class DefaultHttpClientTest {
                 released.set(true);
             }
         };
-        try (var client = HttpClient.builder().connectionPool(pool).build()) {
+        try (var client = HttpClient.builder().connectionPoolFactory(config -> pool).build()) {
             var request = HttpRequest.create()
                     .setMethod("GET")
                     .setUri(SmithyUri.of("http://example.com/test"));
@@ -700,7 +723,7 @@ class DefaultHttpClientTest {
                 released.set(true);
             }
         };
-        try (var client = HttpClient.builder().connectionPool(pool).build()) {
+        try (var client = HttpClient.builder().connectionPoolFactory(config -> pool).build()) {
             var request = HttpRequest.create()
                     .setMethod("GET")
                     .setUri(SmithyUri.of("http://example.com/test"));
@@ -826,7 +849,7 @@ class DefaultHttpClientTest {
                 };
             }
         };
-        try (var client = HttpClient.builder().connectionPool(pool).build()) {
+        try (var client = HttpClient.builder().connectionPoolFactory(config -> pool).build()) {
             var request = HttpRequest.create()
                     .setMethod("GET")
                     .setUri(SmithyUri.of("http://example.com/test"));
@@ -862,7 +885,7 @@ class DefaultHttpClientTest {
                 released.set(true);
             }
         };
-        try (var client = HttpClient.builder().connectionPool(pool).build()) {
+        try (var client = HttpClient.builder().connectionPoolFactory(config -> pool).build()) {
             var request = HttpRequest.create()
                     .setMethod("GET")
                     .setUri(SmithyUri.of("http://example.com/test"));

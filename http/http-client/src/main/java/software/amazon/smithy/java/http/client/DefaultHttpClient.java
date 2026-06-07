@@ -57,7 +57,7 @@ final class DefaultHttpClient implements HttpClient {
         this.connectionPool = builder.connectionPool;
         this.proxySelector = builder.proxySelector;
         this.requestTimeout = builder.requestTimeout;
-        this.listeners = List.copyOf(builder.listeners);
+        this.listeners = builder.resolvedConnectionConfig.listeners();
         this.hasListeners = !listeners.isEmpty();
     }
 

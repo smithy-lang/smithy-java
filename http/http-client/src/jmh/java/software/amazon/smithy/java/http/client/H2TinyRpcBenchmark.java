@@ -33,7 +33,6 @@ import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
 import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
@@ -78,16 +77,14 @@ public class H2TinyRpcBenchmark {
         var sslContext = BenchmarkSupport.trustAllSsl();
 
         smithyClient = HttpClient.builder()
-                .connectionPool(HttpConnectionPool.builder()
-                        .maxConnectionsPerRoute(connections)
-                        .maxTotalConnections(connections)
-                        .h2StreamsPerConnection(streamsPerConnection)
-                        .h2InitialWindowSize(16 * 1024 * 1024)
-                        .maxIdleTime(Duration.ofMinutes(2))
-                        .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
-                        .sslContext(sslContext)
-                        .dnsResolver(BenchmarkSupport.staticDns())
-                        .build())
+                .maxConnectionsPerRoute(connections)
+                .maxTotalConnections(connections)
+                .h2StreamsPerConnection(streamsPerConnection)
+                .h2InitialWindowSize(16 * 1024 * 1024)
+                .maxIdleTime(Duration.ofMinutes(2))
+                .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
+                .sslContext(sslContext)
+                .dnsResolver(BenchmarkSupport.staticDns())
                 .build();
 
         javaExecutor = Executors.newVirtualThreadPerTaskExecutor();

@@ -46,7 +46,6 @@ import software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport;
 import software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
@@ -101,13 +100,11 @@ public class H1ScalingBenchmark {
 
         // Smithy client
         smithyClient = HttpClient.builder()
-                .connectionPool(HttpConnectionPool.builder()
-                        .maxConnectionsPerRoute(maxConnections)
-                        .maxTotalConnections(maxConnections)
-                        .maxIdleTime(Duration.ofMinutes(2))
-                        .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
-                        .dnsResolver(BenchmarkSupport.staticDns())
-                        .build())
+                .maxConnectionsPerRoute(maxConnections)
+                .maxTotalConnections(maxConnections)
+                .maxIdleTime(Duration.ofMinutes(2))
+                .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
+                .dnsResolver(BenchmarkSupport.staticDns())
                 .build();
 
         // Apache client

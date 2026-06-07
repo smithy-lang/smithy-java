@@ -34,7 +34,6 @@ import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
 import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.http.client.h2.ConnectionAgentH2cTransport;
 import software.amazon.smithy.java.http.client.h2.EventLoopH2cTransport;
@@ -77,15 +76,13 @@ public class H2cMixedGetPutBenchmark {
     @Setup(Level.Trial)
     public void setup() throws Exception {
         smithyClient = HttpClient.builder()
-                .connectionPool(HttpConnectionPool.builder()
-                        .maxConnectionsPerRoute(connections)
-                        .maxTotalConnections(connections)
-                        .h2StreamsPerConnection(streamsPerConnection)
-                        .h2InitialWindowSize(16 * 1024 * 1024)
-                        .maxIdleTime(Duration.ofMinutes(2))
-                        .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
-                        .dnsResolver(BenchmarkSupport.staticDns())
-                        .build())
+                .maxConnectionsPerRoute(connections)
+                .maxTotalConnections(connections)
+                .h2StreamsPerConnection(streamsPerConnection)
+                .h2InitialWindowSize(16 * 1024 * 1024)
+                .maxIdleTime(Duration.ofMinutes(2))
+                .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
+                .dnsResolver(BenchmarkSupport.staticDns())
                 .build();
         var nettyTransportConfig = new NettyHttpTransportConfig()
                 .maxConnectionsPerHost(connections)

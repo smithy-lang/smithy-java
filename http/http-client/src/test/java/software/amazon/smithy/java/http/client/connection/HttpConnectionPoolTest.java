@@ -35,7 +35,7 @@ class HttpConnectionPoolTest {
                 List.of(InetAddress.getByName("127.0.0.1")),
                 "two.example.com",
                 List.of(InetAddress.getByName("127.0.0.1"))));
-        try (var pool = HttpConnectionPool.builder()
+        try (var pool = new HttpConnectionPool(ConnectionConfig.builder()
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .maxTotalConnections(1)
                 .maxConnectionsPerRoute(1)
@@ -45,7 +45,7 @@ class HttpConnectionPoolTest {
                     socketCreates.incrementAndGet();
                     return new FakeSocket();
                 })
-                .build()) {
+                .build())) {
 
             var first = pool.acquire(Route.direct("http", "one.example.com", 80), 1);
             pool.release(first);
@@ -95,12 +95,12 @@ class HttpConnectionPoolTest {
             }
         };
 
-        try (var pool = HttpConnectionPool.builder()
+        try (var pool = new HttpConnectionPool(ConnectionConfig.builder()
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .dnsResolver(dns)
                 .socketFactory((route, endpoints) -> new FakeSocket())
                 .addListener(listener)
-                .build()) {
+                .build())) {
             pool.acquire(Route.direct("http", "example.com", 80), 123);
         }
 
@@ -127,7 +127,7 @@ class HttpConnectionPoolTest {
             }
         };
 
-        try (var pool = HttpConnectionPool.builder()
+        try (var pool = new HttpConnectionPool(ConnectionConfig.builder()
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .maxTotalConnections(1)
                 .maxConnectionsPerRoute(1)
@@ -135,7 +135,7 @@ class HttpConnectionPoolTest {
                 .dnsResolver(dns)
                 .socketFactory((route, endpoints) -> new FakeSocket())
                 .addListener(listener)
-                .build()) {
+                .build())) {
             var first = pool.acquire(Route.direct("http", "one.example.com", 80), 1);
             pool.evict(first, false);
 

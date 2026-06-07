@@ -13,10 +13,10 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.HttpClientListener;
 import software.amazon.smithy.java.http.client.connection.CloseReason;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPoolBuilder;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.http.client.it.server.NettyTestServer;
 import software.amazon.smithy.java.http.client.it.server.h1.PartialResponseHttp11ClientHandler;
@@ -38,7 +38,7 @@ public class ServerCloseMidResponseHttp11Test extends BaseHttpClientIntegTest {
     }
 
     @Override
-    protected HttpConnectionPoolBuilder configurePool(HttpConnectionPoolBuilder builder) {
+    protected HttpClient.Builder configureClient(HttpClient.Builder builder) {
         return builder
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .addListener(new HttpClientListener() {

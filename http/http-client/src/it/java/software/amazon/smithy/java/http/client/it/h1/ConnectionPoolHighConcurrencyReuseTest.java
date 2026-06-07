@@ -13,7 +13,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpVersion;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPoolBuilder;
+import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.http.client.it.server.NettyTestServer;
 import software.amazon.smithy.java.http.client.it.server.h1.ConnectionTrackingHttp11ClientHandler;
@@ -44,7 +44,7 @@ public class ConnectionPoolHighConcurrencyReuseTest extends BaseHttpClientIntegT
     }
 
     @Override
-    protected HttpConnectionPoolBuilder configurePool(HttpConnectionPoolBuilder builder) {
+    protected HttpClient.Builder configureClient(HttpClient.Builder builder) {
         return builder
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .maxConnectionsPerRoute(MAX_CONNECTIONS)
