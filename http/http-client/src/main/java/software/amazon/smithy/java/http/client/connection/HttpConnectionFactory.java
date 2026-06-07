@@ -57,7 +57,6 @@ record HttpConnectionFactory(
         HttpSocketFactory socketFactory,
         Timer readTimer,
         EpollConnector epollConnector,
-        boolean usePlatformReaderForH2,
         int h2InitialWindowSize,
         int h2MaxFrameSize,
         int h2BufferSize,
@@ -394,7 +393,6 @@ record HttpConnectionFactory(
                 route,
                 readTimeout,
                 writeTimeout,
-                usePlatformReaderForH2,
                 h2InitialWindowSize,
                 h2MaxFrameSize,
                 h2BufferSize);

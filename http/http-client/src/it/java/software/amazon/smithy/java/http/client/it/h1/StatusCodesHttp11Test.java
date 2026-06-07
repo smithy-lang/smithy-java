@@ -17,7 +17,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpClient;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 import software.amazon.smithy.java.http.client.it.TestUtils;
@@ -35,15 +34,13 @@ public class StatusCodesHttp11Test {
     @BeforeEach
     void setUp() {
         client = HttpClient.builder()
-                .connectionPool(HttpConnectionPool.builder()
-                        .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
-                        .maxConnectionsPerRoute(10)
-                        .maxTotalConnections(10)
-                        .maxIdleTime(Duration.ofMinutes(1))
-                        .dnsResolver(DnsResolver.staticMapping(Map.of(
-                                "localhost",
-                                List.of(InetAddress.getLoopbackAddress()))))
-                        .build())
+                .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
+                .maxConnectionsPerRoute(10)
+                .maxTotalConnections(10)
+                .maxIdleTime(Duration.ofMinutes(1))
+                .dnsResolver(DnsResolver.staticMapping(Map.of(
+                        "localhost",
+                        List.of(InetAddress.getLoopbackAddress()))))
                 .build();
     }
 

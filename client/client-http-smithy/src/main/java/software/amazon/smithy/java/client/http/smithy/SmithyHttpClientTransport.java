@@ -17,7 +17,6 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.RequestOptions;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 
 /**
  * A client transport using Smithy's native blocking HTTP client with full HTTP/2 bidirectional streaming.
@@ -79,45 +78,42 @@ public final class SmithyHttpClientTransport implements ClientTransport<HttpRequ
             config.fromDocument(node);
 
             var builder = HttpClient.builder();
-            var poolBuilder = HttpConnectionPool.builder();
 
             if (config.requestTimeout() != null) {
                 builder.requestTimeout(config.requestTimeout());
             }
             if (config.maxConnections() != null) {
-                poolBuilder.maxTotalConnections(config.maxConnections());
+                builder.maxTotalConnections(config.maxConnections());
                 // If maxConnectionsPerRoute is not explicitly set, default it to maxConnections
                 // for back-compat with prior behavior.
                 if (config.maxConnectionsPerRoute() == null) {
-                    poolBuilder.maxConnectionsPerRoute(config.maxConnections());
+                    builder.maxConnectionsPerRoute(config.maxConnections());
                 }
             }
             if (config.maxConnectionsPerRoute() != null) {
-                poolBuilder.maxConnectionsPerRoute(config.maxConnectionsPerRoute());
+                builder.maxConnectionsPerRoute(config.maxConnectionsPerRoute());
             }
             if (config.socketReceiveBufferSize() != null) {
-                poolBuilder.socketReceiveBufferSize(config.socketReceiveBufferSize());
+                builder.socketReceiveBufferSize(config.socketReceiveBufferSize());
             }
             if (config.socketSendBufferSize() != null) {
-                poolBuilder.socketSendBufferSize(config.socketSendBufferSize());
+                builder.socketSendBufferSize(config.socketSendBufferSize());
             }
             if (config.h2StreamsPerConnection() != null) {
-                poolBuilder.h2StreamsPerConnection(config.h2StreamsPerConnection());
+                builder.h2StreamsPerConnection(config.h2StreamsPerConnection());
             }
             if (config.h2InitialWindowSize() != null) {
-                poolBuilder.h2InitialWindowSize(config.h2InitialWindowSize());
+                builder.h2InitialWindowSize(config.h2InitialWindowSize());
             }
             if (config.connectTimeout() != null) {
-                poolBuilder.connectTimeout(config.connectTimeout());
+                builder.connectTimeout(config.connectTimeout());
             }
             if (config.maxIdleTime() != null) {
-                poolBuilder.maxIdleTime(config.maxIdleTime());
+                builder.maxIdleTime(config.maxIdleTime());
             }
             if (config.httpVersionPolicy() != null) {
-                poolBuilder.httpVersionPolicy(config.httpVersionPolicy());
+                builder.httpVersionPolicy(config.httpVersionPolicy());
             }
-
-            builder.connectionPool(poolBuilder.build());
 
             return new SmithyHttpClientTransport(builder.build());
         }

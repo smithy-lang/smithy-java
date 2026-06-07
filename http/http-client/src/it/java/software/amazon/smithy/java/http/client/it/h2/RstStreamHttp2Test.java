@@ -11,7 +11,7 @@ import io.netty.handler.codec.http2.Http2Error;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpVersion;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPoolBuilder;
+import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.http.client.it.server.NettyTestServer;
 import software.amazon.smithy.java.http.client.it.server.h2.RstStreamHttp2ClientHandler;
@@ -30,7 +30,7 @@ public class RstStreamHttp2Test extends BaseHttpClientIntegTest {
     }
 
     @Override
-    protected HttpConnectionPoolBuilder configurePool(HttpConnectionPoolBuilder builder) {
+    protected HttpClient.Builder configureClient(HttpClient.Builder builder) {
         return builder.httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE);
     }
 

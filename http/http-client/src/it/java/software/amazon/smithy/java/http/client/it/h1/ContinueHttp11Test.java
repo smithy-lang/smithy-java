@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
-import software.amazon.smithy.java.http.client.connection.HttpConnectionPoolBuilder;
+import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.http.client.it.server.NettyTestServer;
 import software.amazon.smithy.java.http.client.it.server.h1.ContinueHttp11ClientHandler;
@@ -35,7 +35,7 @@ public class ContinueHttp11Test extends BaseHttpClientIntegTest {
     }
 
     @Override
-    protected HttpConnectionPoolBuilder configurePool(HttpConnectionPoolBuilder builder) {
+    protected HttpClient.Builder configureClient(HttpClient.Builder builder) {
         return builder.httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1);
     }
 

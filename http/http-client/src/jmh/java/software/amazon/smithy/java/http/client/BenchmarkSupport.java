@@ -204,7 +204,9 @@ public final class BenchmarkSupport {
                 });
             }
 
-            if (!latch.await(10, TimeUnit.SECONDS)) {
+            // Safety net only; normal completion releases the latch immediately. Generous enough that a
+            // high-concurrency invocation (thousands of 1 MB transfers) never false-times-out.
+            if (!latch.await(120, TimeUnit.SECONDS)) {
                 Throwable err = firstError.get();
                 System.err.println("BENCHMARK TIMEOUT: " + (concurrency - (int) latch.getCount())
                         + "/" + concurrency + " threads completed, errors=" + errors.get()

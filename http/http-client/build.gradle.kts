@@ -62,6 +62,7 @@ dependencies {
     jmh(project(":client:client-http-apache"))
     jmh(project(":client:client-http-netty"))
     jmh(project(":client:client-http-crt"))
+    jmh(project(":client:client-http-boringssl"))
     jmh(project(":client:client-core"))
 
     // Benchmark server dependencies (Netty runs in separate process)

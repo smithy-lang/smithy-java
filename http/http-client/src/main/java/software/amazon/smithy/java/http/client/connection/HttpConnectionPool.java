@@ -14,7 +14,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -51,13 +50,8 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  * <h2>Per-Route Connection Limits</h2>
  * <p>You can set different connection limits for different hosts:
  *
- * <pre>{@code
- * HttpConnectionPool pool = HttpConnectionPool.builder()
- *     .maxConnectionsPerRoute(20)  // Override default for all routes
- *     .maxConnectionsForHost("slow-api.example.com", 2)  // Limit slow API
- *     .maxConnectionsForHost("fast-cdn.example.com", 100)  // Allow more for CDN
- *     .build();
- * }</pre>
+ * <p>Connection limits are configured through {@link ConnectionConfig}. Most callers should set them on
+ * {@link software.amazon.smithy.java.http.client.HttpClient.Builder}, which creates the config and default pool.
  *
  * <h2>Health Monitoring</h2>
  * <p>A background virtual thread runs every 30 seconds to remove idle and
@@ -89,7 +83,7 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  * unblock when an open connection is closed and releases capacity. With virtual
  * threads, this blocking is cheap and provides natural backpressure under load.
  *
- * <p>Configure via {@link HttpConnectionPoolBuilder#acquireTimeout(Duration)}:
+ * <p>Configure via {@link software.amazon.smithy.java.http.client.HttpClient.Builder#acquireTimeout(Duration)}:
  * <ul>
  *   <li>Default (30s): Good backpressure for load spikes, requests queue briefly</li>
  *   <li>{@link Duration#ZERO}: Fail-fast behavior, immediate failure when exhausted</li>
@@ -98,14 +92,15 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  *
  * <h2>Example Usage</h2>
  * <pre>{@code
- * // Create pool
- * HttpConnectionPool pool = HttpConnectionPool.builder()
+ * // Create pool directly when implementing a custom client/pool factory.
+ * ConnectionConfig config = ConnectionConfig.builder()
  *     .maxConnectionsPerRoute(20)
  *     .maxTotalConnections(200)
  *     .maxIdleTime(Duration.ofMinutes(2))
  *     .sslContext(customSSLContext)
  *     .httpVersionPolicy(HttpVersionPolicy.AUTOMATIC)
  *     .build();
+ * HttpConnectionPool pool = new HttpConnectionPool(config);
  *
  * // Acquire connection
  * Route route = Route.from(SmithyUri.of("https://api.example.com/users"));
@@ -130,8 +125,7 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  */
 public final class HttpConnectionPool implements ConnectionPool {
 
-    private final int defaultMaxConnectionsPerRoute;
-    private final Map<String, Integer> perHostLimits;
+    private final int maxConnectionsPerRoute;
     private final int maxTotalConnections;
     private final long acquireTimeoutMs; // Timeout for acquiring a connection when pool is exhausted
     private final long maxIdleTimeNanos; // Max idle time before closing connections
@@ -162,69 +156,58 @@ public final class HttpConnectionPool implements ConnectionPool {
     private final List<HttpClientListener> listeners;
     private final boolean hasListeners;
 
-    HttpConnectionPool(HttpConnectionPoolBuilder builder) {
-        this.defaultMaxConnectionsPerRoute = builder.maxConnectionsPerRoute;
-        this.perHostLimits = Map.copyOf(builder.perHostLimits);
-        this.maxTotalConnections = builder.maxTotalConnections;
+    public HttpConnectionPool(ConnectionConfig config) {
+        this.maxConnectionsPerRoute = config.maxConnectionsPerRoute();
+        this.maxTotalConnections = config.maxTotalConnections();
         // Cached to avoid Duration.toNanos() in hot path
-        this.maxIdleTimeNanos = builder.maxIdleTime.toNanos();
-        this.acquireTimeoutMs = builder.acquireTimeout.toMillis();
-        this.versionPolicy = builder.versionPolicy;
-        DnsResolver dnsResolver = builder.dnsResolver != null ? builder.dnsResolver : DnsResolver.roundRobin();
+        this.maxIdleTimeNanos = config.maxIdleTime().toNanos();
+        this.acquireTimeoutMs = config.acquireTimeout().toMillis();
+        this.versionPolicy = config.versionPolicy();
+        DnsResolver dnsResolver = config.dnsResolver() != null ? config.dnsResolver() : DnsResolver.roundRobin();
 
         this.readTimer = new HashedWheelTimer(
                 new DefaultThreadFactory("smithy-http-read-timeout", true),
                 100,
                 TimeUnit.MILLISECONDS);
 
-        EpollConnector epollConnector = builder.useEpollTransport
-                ? EpollConnector.createIfAvailable(
-                        builder.socketReceiveBufferSize,
-                        builder.socketSendBufferSize,
-                        readTimer)
-                : null;
+        // Always use the epoll backend when the native library is available; createIfAvailable returns
+        // null on any non-Linux / no-native-epoll host, falling back to the NIO socket path.
+        EpollConnector epollConnector = EpollConnector.createIfAvailable(
+                config.socketReceiveBufferSize(),
+                config.socketSendBufferSize(),
+                readTimer);
 
-        this.listeners = List.copyOf(builder.listeners);
+        this.listeners = config.listeners();
         this.hasListeners = !listeners.isEmpty();
 
         this.connectionFactory = new HttpConnectionFactory(
-                builder.connectTimeout,
-                builder.tlsNegotiationTimeout,
-                builder.readTimeout,
-                builder.writeTimeout,
-                builder.sslContext,
-                builder.sslParameters,
-                builder.sslEngineFactory,
-                builder.versionPolicy,
+                config.connectTimeout(),
+                config.tlsNegotiationTimeout(),
+                config.readTimeout(),
+                config.writeTimeout(),
+                config.sslContext(),
+                config.sslParameters(),
+                config.sslEngineFactory(),
+                config.versionPolicy(),
                 dnsResolver,
                 listeners,
                 !listeners.isEmpty(),
-                resolveSocketFactory(builder),
+                resolveSocketFactory(config),
                 readTimer,
                 epollConnector,
-                builder.usePlatformReaderForH2,
-                builder.h2InitialWindowSize,
-                builder.h2MaxFrameSize,
-                builder.h2BufferSize,
-                builder.tlsReadBufferSize,
-                builder.tlsWriteBufferSize);
+                config.h2InitialWindowSize(),
+                config.h2MaxFrameSize(),
+                config.h2BufferSize(),
+                config.tlsReadBufferSize(),
+                config.tlsWriteBufferSize());
 
         this.h1Manager = new H1ConnectionManager(this.maxIdleTimeNanos);
-        this.connectionPermits = new Semaphore(builder.maxTotalConnections, false);
-        this.h2Manager = new H2ConnectionManager(builder.h2StreamsPerConnection,
+        this.connectionPermits = new Semaphore(config.maxTotalConnections(), false);
+        this.h2Manager = new H2ConnectionManager(config.h2StreamsPerConnection(),
                 this.acquireTimeoutMs,
                 listeners,
                 this::onNewH2Connection);
         this.cleanupThread = Thread.ofVirtual().name("http-pool-cleanup").start(this::cleanupIdleConnections);
-    }
-
-    /**
-     * Create a new builder for HttpConnectionPool.
-     *
-     * @return a new builder instance
-     */
-    public static HttpConnectionPoolBuilder builder() {
-        return new HttpConnectionPoolBuilder();
     }
 
     @Override
@@ -233,15 +216,14 @@ public final class HttpConnectionPool implements ConnectionPool {
             throw new IllegalStateException("Connection pool is closed");
         } else if ((route.isSecure() && versionPolicy != HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 || (!route.isSecure() && versionPolicy.usesH2cForCleartext())) {
-            int maxConns = getMaxConnectionsForRoute(route);
-            return h2Manager.acquire(route, maxConns, exchangeId);
+            return h2Manager.acquire(route, maxConnectionsPerRoute, exchangeId);
         } else {
             return acquireH1(route, exchangeId);
         }
     }
 
     private HttpConnection acquireH1(Route route, long exchangeId) throws IOException {
-        int maxConns = getMaxConnectionsForRoute(route);
+        int maxConns = maxConnectionsPerRoute;
 
         h1Manager.acquireActive(route, maxConns, acquireTimeoutMs);
 
@@ -442,43 +424,6 @@ public final class HttpConnectionPool implements ConnectionPool {
     }
 
     /**
-     * Get max connections for a specific route.
-     *
-     * <p>Checks host-specific limits configured via
-     * {@link HttpConnectionPoolBuilder#maxConnectionsForHost(String, int)}, falling back to
-     * the default limit if no specific limit is configured.
-     *
-     * <p>Host matching is case-insensitive and supports:
-     * <ul>
-     *   <li>Hostname only: "api.example.com" (matches default ports 80/443)</li>
-     *   <li>Hostname with port: "api.example.com:8080" (matches only port 8080)</li>
-     * </ul>
-     *
-     * @param route the route to get limit for
-     * @return maximum connections for this route
-     */
-    private int getMaxConnectionsForRoute(Route route) {
-        if (perHostLimits.isEmpty()) {
-            return defaultMaxConnectionsPerRoute;
-        }
-
-        Integer limit = perHostLimits.get(route.authority());
-        if (limit != null) {
-            return limit;
-        }
-
-        // For non-default ports, fall back to a host-only limit (api.example.com:8080 → api.example.com).
-        if (route.port() != 80 && route.port() != 443) {
-            limit = perHostLimits.get(route.host());
-            if (limit != null) {
-                return limit;
-            }
-        }
-
-        return defaultMaxConnectionsPerRoute;
-    }
-
-    /**
      * Close a connection, ignoring any IOException.
      *
      * @param connection the connection to close
@@ -598,14 +543,15 @@ public final class HttpConnectionPool implements ConnectionPool {
      * the supplied buffer knobs. {@code -1} means "kernel autotune" — that direction is omitted
      * from the socket configuration entirely.
      */
-    private static HttpSocketFactory resolveSocketFactory(HttpConnectionPoolBuilder builder) {
-        if (builder.socketFactoryExplicit) {
-            return builder.socketFactory;
+    private static HttpSocketFactory resolveSocketFactory(ConnectionConfig config) {
+        // A user-supplied factory is honored verbatim.
+        if (config.socketFactory() != null) {
+            return config.socketFactory();
         }
-        Integer recv = builder.socketReceiveBufferSize;
-        Integer send = builder.socketSendBufferSize;
+        Integer recv = config.socketReceiveBufferSize();
+        Integer send = config.socketSendBufferSize();
         if (recv == null && send == null) {
-            return builder.socketFactory;
+            return HttpSocketFactory.DEFAULT;
         }
         return (route, endpoints) -> {
             Socket socket = SocketChannel.open().socket();
