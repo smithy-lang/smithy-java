@@ -61,7 +61,8 @@ public interface SigV4Settings<B extends ClientSetting<B>> extends ClockSetting<
      * adjusting {@code Content-Length} / {@code Content-Encoding} accordingly. The signer just
      * stamps the override string and trusts the caller's framing.
      */
-    Context.Key<String> PAYLOAD_HASH_OVERRIDE = Context.key("SigV4 body-hash override (e.g. STREAMING-UNSIGNED-PAYLOAD-TRAILER).");
+    Context.Key<String> PAYLOAD_HASH_OVERRIDE =
+            Context.key("SigV4 body-hash override (e.g. STREAMING-UNSIGNED-PAYLOAD-TRAILER).");
 
     /**
      * If true, the signer does not add {@code x-amz-security-token} even when the identity has

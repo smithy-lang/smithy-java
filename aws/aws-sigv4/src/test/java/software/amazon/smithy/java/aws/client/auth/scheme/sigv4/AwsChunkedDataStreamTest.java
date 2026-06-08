@@ -11,11 +11,13 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicReference;
@@ -137,7 +139,7 @@ class AwsChunkedDataStreamTest {
 
     @Test
     void rejectsNonReplayableInput() {
-        var nonReplayable = DataStream.ofInputStream(new java.io.ByteArrayInputStream("x".getBytes()));
+        var nonReplayable = DataStream.ofInputStream(new ByteArrayInputStream("x".getBytes()));
         assertThrows(IllegalArgumentException.class, () -> new AwsChunkedDataStream(nonReplayable));
     }
 
@@ -190,6 +192,6 @@ class AwsChunkedDataStreamTest {
             }
         });
         // Frames: header + body + footer + complete = 3 onNext + 1 onComplete.
-        assertThat(calls.get(), equalTo(java.util.List.of("next", "next", "next", "complete")));
+        assertThat(calls.get(), equalTo(List.of("next", "next", "next", "complete")));
     }
 }

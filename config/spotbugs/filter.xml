@@ -117,6 +117,12 @@
         <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ" />
     </Match>
 
+    <!-- JMH reads @AuxCounters fields reflectively to report them as auxiliary counters. -->
+    <Match>
+        <Class name="software.amazon.smithy.java.aws.client.rulesengine.S3EndpointBenchmark$BytecodeMetrics" />
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+    </Match>
+
     <!-- Vendored Schubfach algorithm (from Jackson/OpenJDK) — not our code to fix. -->
     <Match>
         <Class name="software.amazon.smithy.java.json.smithy.Schubfach$DoubleToDecimal" />

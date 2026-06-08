@@ -621,7 +621,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             return output;
         } catch (InvalidKeyException e) {
             throw new RuntimeException(e);
-        } catch (javax.crypto.ShortBufferException e) {
+        } catch (ShortBufferException e) {
             throw new RuntimeException(e);
         }
     }

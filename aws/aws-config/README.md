@@ -1,5 +1,8 @@
 # AWS Config
 
+> [!WARNING]
+> This is a developer-preview module and may contain bugs. No guarantee is made about API stability.
+
 Provides credential resolution from AWS shared configuration files (`~/.aws/config` and `~/.aws/credentials`). Ships handlers for static keys, session keys, and credential_process.
 
 ## Dependency
