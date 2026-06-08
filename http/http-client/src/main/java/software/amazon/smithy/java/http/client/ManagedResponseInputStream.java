@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
+import java.util.function.Consumer;
 
 /**
  * InputStream wrapper that preserves optimized bulk operations and releases response lifecycle on EOF or close.
@@ -20,17 +21,34 @@ final class ManagedResponseInputStream extends InputStream {
 
     private final InputStream inner;
     private final Runnable onClose;
+    private final Consumer<Throwable> onError;
     private long remaining;
 
     ManagedResponseInputStream(InputStream inner, long contentLength, Runnable onClose) {
+        this(inner, contentLength, onClose, ignored -> {});
+    }
+
+    ManagedResponseInputStream(InputStream inner, long contentLength, Runnable onClose, Consumer<Throwable> onError) {
         this.inner = inner;
         this.onClose = onClose;
+        this.onError = onError;
         this.remaining = contentLength >= 0 ? contentLength : -1;
+    }
+
+    /** Run the error terminal for a read that threw, then rethrow. */
+    private <T extends Throwable> T failed(T e) {
+        onError.accept(e);
+        return e;
     }
 
     @Override
     public int read() throws IOException {
-        int b = inner.read();
+        int b;
+        try {
+            b = inner.read();
+        } catch (IOException e) {
+            throw failed(e);
+        }
         if (b == -1) {
             onClose.run();
         } else {
@@ -41,7 +59,12 @@ final class ManagedResponseInputStream extends InputStream {
 
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
-        int n = inner.read(b, off, len);
+        int n;
+        try {
+            n = inner.read(b, off, len);
+        } catch (IOException e) {
+            throw failed(e);
+        }
         if (n == -1) {
             onClose.run();
         } else {
@@ -52,17 +75,20 @@ final class ManagedResponseInputStream extends InputStream {
 
     @Override
     public byte[] readAllBytes() throws IOException {
+        byte[] result;
         try {
             long len = remaining;
-            if (len >= 0 && len <= MAX_PRESIZED_LEN) {
-                return readKnownLength((int) len);
-            }
-            return inner.readAllBytes();
-        } finally {
-            onClose.run();
+            result = (len >= 0 && len <= MAX_PRESIZED_LEN) ? readKnownLength((int) len) : inner.readAllBytes();
+        } catch (IOException e) {
+            // A failed (e.g. interrupted) read must NOT fire the success terminal — that would report a
+            // clean completion (onRequestEnd(null)) for a torn read and pool a broken connection.
+            throw failed(e);
         }
+        onClose.run();
+        return result;
     }
 
+    // Caller (readAllBytes) routes a thrown read through failed(); no terminal here.
     private byte[] readKnownLength(int len) throws IOException {
         byte[] buf = new byte[len];
         int pos = 0;
@@ -78,7 +104,12 @@ final class ManagedResponseInputStream extends InputStream {
 
     @Override
     public byte[] readNBytes(int len) throws IOException {
-        byte[] bytes = inner.readNBytes(len);
+        byte[] bytes;
+        try {
+            bytes = inner.readNBytes(len);
+        } catch (IOException e) {
+            throw failed(e);
+        }
         if (bytes.length < len) {
             onClose.run();
         }
@@ -88,7 +119,12 @@ final class ManagedResponseInputStream extends InputStream {
 
     @Override
     public int readNBytes(byte[] b, int off, int len) throws IOException {
-        int n = inner.readNBytes(b, off, len);
+        int n;
+        try {
+            n = inner.readNBytes(b, off, len);
+        } catch (IOException e) {
+            throw failed(e);
+        }
         if (n < len) {
             onClose.run();
         }
@@ -98,16 +134,24 @@ final class ManagedResponseInputStream extends InputStream {
 
     @Override
     public long transferTo(OutputStream out) throws IOException {
+        long n;
         try {
-            return inner.transferTo(out);
-        } finally {
-            onClose.run();
+            n = inner.transferTo(out);
+        } catch (IOException e) {
+            throw failed(e);
         }
+        onClose.run();
+        return n;
     }
 
     @Override
     public long skip(long n) throws IOException {
-        long skipped = inner.skip(n);
+        long skipped;
+        try {
+            skipped = inner.skip(n);
+        } catch (IOException e) {
+            throw failed(e);
+        }
         bytesRead(skipped);
         return skipped;
     }
@@ -118,14 +162,17 @@ final class ManagedResponseInputStream extends InputStream {
             inner.skipNBytes(n);
             bytesRead(n);
         } catch (IOException e) {
-            onClose.run();
-            throw e;
+            throw failed(e);
         }
     }
 
     @Override
     public int available() throws IOException {
-        return inner.available();
+        try {
+            return inner.available();
+        } catch (IOException e) {
+            throw failed(e);
+        }
     }
 
     @Override
@@ -140,16 +187,24 @@ final class ManagedResponseInputStream extends InputStream {
 
     @Override
     public synchronized void reset() throws IOException {
-        inner.reset();
+        try {
+            inner.reset();
+        } catch (IOException e) {
+            throw failed(e);
+        }
     }
 
     @Override
     public void close() throws IOException {
         try {
             inner.close();
-        } finally {
-            onClose.run();
+        } catch (IOException e) {
+            // A close that errors leaves the connection suspect — route to the error terminal (evict)
+            // rather than reporting a clean close. One-shot latches make this a no-op if the body was
+            // already fully read and a terminal ran.
+            throw failed(e);
         }
+        onClose.run();
     }
 
     private void bytesRead(long n) {

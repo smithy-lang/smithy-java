@@ -26,7 +26,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * A {@link ClientSslEngineFactory} backed by netty-tcnative's BoringSSL {@link SSLEngine}
  * ({@code ReferenceCountedOpenSslEngine}), whose AES-GCM (VAES/AVX-512 on modern x86-64) is markedly
  * cheaper than the JDK {@code SSLEngine}. The engine is a standard {@code javax.net.ssl.SSLEngine},
- * so the {@code http-client} {@link software.amazon.smithy.java.http.client.connection.SSLEngineTransport}
+ * so the {@code http-client} {@code software.amazon.smithy.java.http.client.connection.SSLEngineTransport}
  * drives it with no Netty pipeline, event loop, or {@code SslHandler} — keeping the crypto win
  * without the per-connection pipeline overhead.
  *
