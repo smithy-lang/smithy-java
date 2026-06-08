@@ -256,9 +256,13 @@ final class DefaultHttpClient implements HttpClient {
             try {
                 InputStream inner = exchange.responseBody();
                 wrappedStream = inner;
-                return new ManagedResponseInputStream(inner, contentLength, ManagedResponseBody.this::close);
+                return new ManagedResponseInputStream(
+                        inner,
+                        contentLength,
+                        ManagedResponseBody.this::close,
+                        ManagedResponseBody.this::fail);
             } catch (IOException e) {
-                end(e);
+                fail(e);
                 throw new UncheckedIOException(e);
             }
         }
@@ -279,7 +283,7 @@ final class DefaultHttpClient implements HttpClient {
                             }
                             return n;
                         } catch (IOException e) {
-                            end(e);
+                            ManagedResponseBody.this.fail(e);
                             throw e;
                         }
                     }
@@ -299,7 +303,7 @@ final class DefaultHttpClient implements HttpClient {
                     }
                 };
             } catch (IOException e) {
-                end(e);
+                fail(e);
                 throw new UncheckedIOException(e);
             }
         }
@@ -312,7 +316,7 @@ final class DefaultHttpClient implements HttpClient {
             try {
                 inner.transferTo(out);
             } catch (IOException e) {
-                end(e);
+                fail(e);
                 throw e;
             } finally {
                 close();
@@ -327,7 +331,7 @@ final class DefaultHttpClient implements HttpClient {
             try {
                 inner.transferTo(Channels.newOutputStream(ch));
             } catch (IOException e) {
-                end(e);
+                fail(e);
                 throw e;
             } finally {
                 close();
@@ -428,6 +432,29 @@ final class DefaultHttpClient implements HttpClient {
 
         private void end(Throwable error) {
             notifyRequestEnd(exchangeId, requestEnded, error);
+        }
+
+        /**
+         * Terminal for a failed body read (e.g. an interrupted or errored stream read): close the exchange
+         * and fire {@code onRequestEnd} with the failure rather than reporting a clean close.
+         *
+         * <p>This evicts the physical connection for both H1 and H2. For H1 that is required — a connection
+         * abandoned mid-response can't be reused. For H2 it is conservative: a single failed stream only
+         * strictly needs a RST_STREAM with the connection kept for other/future streams, but we currently
+         * evict the whole connection rather than implement stream-only recovery. One-shot via the same
+         * {@code closed} latch as {@link #close()}.
+         */
+        private void fail(Throwable error) {
+            if (!closed.compareAndSet(false, true)) {
+                return;
+            }
+            try {
+                exchange.close();
+            } catch (Exception ignored) {
+                // already failing; the original error is the one worth reporting
+            }
+            connectionPool.evict(conn, true);
+            end(error);
         }
     }
 

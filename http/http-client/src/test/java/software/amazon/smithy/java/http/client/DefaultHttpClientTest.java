@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
@@ -24,8 +25,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 import javax.net.ssl.SSLSession;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -895,6 +900,111 @@ class DefaultHttpClientTest {
 
             assertTrue(discardCalled.get(), "Unopened body must be discarded at the exchange level");
             assertTrue(released.get(), "Connection must be released after a clean discard");
+        }
+    }
+
+    /** The body-consumption methods whose read failure must route through the error terminal. */
+    static Stream<Arguments> failingBodyConsumers() {
+        return Stream.of(
+                Arguments.of("asInputStream.readAllBytes",
+                        (BodyConsumer) body -> body.asInputStream().readAllBytes()),
+                Arguments.of("asInputStream.read",
+                        (BodyConsumer) body -> body.asInputStream().read()),
+                Arguments.of("asChannel.read",
+                        (BodyConsumer) body -> body.asChannel().read(ByteBuffer.allocate(16))),
+                Arguments.of("writeTo.outputStream",
+                        (BodyConsumer) body -> body.writeTo(OutputStream.nullOutputStream())),
+                Arguments.of("writeTo.channel",
+                        (BodyConsumer) body -> body.writeTo(Channels.newChannel(OutputStream.nullOutputStream()))));
+    }
+
+    @FunctionalInterface
+    interface BodyConsumer {
+        void consume(DataStream body) throws IOException;
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("failingBodyConsumers")
+    void bodyReadFailureEndsWithErrorAndEvicts(String name, BodyConsumer consumer) throws IOException {
+        // Regression for the error-terminal routing across every consumption path (input stream, channel,
+        // and both writeTo variants): a body read that throws must fire onRequestEnd WITH the error and
+        // evict the torn connection — not report a clean close (onRequestEnd(null)) and pool it.
+        var endedError = new AtomicReference<Throwable>();
+        var ends = new AtomicInteger();
+        var evicted = new AtomicBoolean(false);
+        var released = new AtomicBoolean(false);
+        var boom = new IOException("read blew up");
+        var listener = new HttpClientListener() {
+            @Override
+            public void onRequestEnd(long exchangeId, Throwable error) {
+                ends.incrementAndGet();
+                endedError.set(error);
+            }
+        };
+        var pool = new TestConnectionPool() {
+            @Override
+            protected HttpExchange createExchange() {
+                return new TestHttpExchange() {
+                    @Override
+                    public InputStream responseBody() {
+                        return new InputStream() {
+                            @Override
+                            public int read() throws IOException {
+                                throw boom;
+                            }
+
+                            @Override
+                            public int read(byte[] b, int off, int len) throws IOException {
+                                throw boom;
+                            }
+                        };
+                    }
+
+                    @Override
+                    public ReadableByteChannel responseBodyChannel() {
+                        return new ReadableByteChannel() {
+                            @Override
+                            public int read(ByteBuffer dst) throws IOException {
+                                throw boom;
+                            }
+
+                            @Override
+                            public boolean isOpen() {
+                                return true;
+                            }
+
+                            @Override
+                            public void close() {}
+                        };
+                    }
+                };
+            }
+
+            @Override
+            public void evict(HttpConnection connection, boolean isError) {
+                evicted.set(true);
+            }
+
+            @Override
+            public void release(HttpConnection connection) {
+                released.set(true);
+            }
+        };
+        try (var client = HttpClient.builder()
+                .connectionPoolFactory(config -> pool)
+                .addListener(listener)
+                .build()) {
+            var request = HttpRequest.create()
+                    .setMethod("GET")
+                    .setUri(SmithyUri.of("http://example.com/test"));
+
+            var response = client.send(request);
+            assertThrows(IOException.class, () -> consumer.consume(response.body()));
+
+            assertEquals(1, ends.get(), name + ": onRequestEnd must fire exactly once");
+            assertEquals(boom, endedError.get(), name + ": onRequestEnd must carry the read failure, not null");
+            assertTrue(evicted.get(), name + ": a torn connection must be evicted");
+            assertFalse(released.get(), name + ": a torn connection must NOT be released to the pool");
         }
     }
 
