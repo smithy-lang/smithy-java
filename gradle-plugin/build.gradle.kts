@@ -36,7 +36,7 @@ repositories {
 // and cannot access the parent project's version catalog. Update these when bumping smithy versions.
 dependencies {
     implementation("software.amazon.smithy.gradle:smithy-base:1.4.0")
-    implementation("software.amazon.smithy:smithy-model:1.68.0")
+    implementation("software.amazon.smithy:smithy-model:1.71.0")
 }
 
 gradlePlugin {

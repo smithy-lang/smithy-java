@@ -20,6 +20,7 @@ import org.gradle.api.artifacts.dsl.DependencyHandler;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.plugins.JavaLibraryPlugin;
 import org.gradle.api.provider.Provider;
+import org.gradle.api.tasks.Delete;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
 import org.gradle.api.tasks.TaskProvider;
@@ -46,6 +47,7 @@ public class SmithyJavaPlugin implements Plugin<Project> {
     private static final String SMITHY_JAVA_GROUP = "software.amazon.smithy.java";
     private static final String JAVA_CODEGEN_PLUGIN_NAME = "java-codegen";
     private static final String SMITHY_BUILD_TASK_NAME = "smithyBuild";
+    private static final String CLEAN_SMITHY_OUTPUT_TASK_NAME = "cleanSmithyOutput";
     private static final String MERGE_SERVICE_FILES_TASK_NAME = "mergeSmithyServiceFiles";
 
     @Override
@@ -61,6 +63,7 @@ public class SmithyJavaPlugin implements Plugin<Project> {
 
         configureDependencies(project, smithyExt, ext);
         wireGeneratedSources(project, smithyExt, ext);
+        configureCleanOutput(project, smithyExt);
         configureTaskDependencies(project);
         configureServiceFileMerging(project, smithyExt, ext);
     }
@@ -146,6 +149,16 @@ public class SmithyJavaPlugin implements Plugin<Project> {
             // trait-codegen mixes .java and resource files in the same output directory
             sourceSet.getResources().exclude("**/*.java");
         });
+    }
+
+    private void configureCleanOutput(Project project, SmithyExtension smithyExt) {
+        project.getTasks().register(CLEAN_SMITHY_OUTPUT_TASK_NAME, Delete.class, task -> {
+            task.setGroup("smithy");
+            task.setDescription("Cleans the Smithy output directory before code generation");
+            task.delete(smithyExt.getOutputDirectory());
+        });
+        project.getTasks().named(SMITHY_BUILD_TASK_NAME, task ->
+                task.dependsOn(CLEAN_SMITHY_OUTPUT_TASK_NAME));
     }
 
     private void configureTaskDependencies(Project project) {
