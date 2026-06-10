@@ -362,7 +362,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         final int localEnd = this.end;
         int p = JsonReadUtils.skipWhitespace(localBuf, this.pos, localEnd);
 
-        if (p >= localEnd || localBuf[p] != '{') {
+        if (p >= localEnd) {
+            this.pos = p;
+            return;
+        }
+        if (localBuf[p] != '{') {
             this.pos = p;
             throw new SerializationException(
                     "Expected '{', found: " + JsonReadUtils.describePos(localBuf, p, localEnd));

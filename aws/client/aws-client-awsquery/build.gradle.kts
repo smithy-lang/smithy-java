@@ -19,8 +19,9 @@ dependencies {
     testImplementation(libs.smithy.aws.protocol.tests)
 }
 
-tasks.named<Test>("integ") {
-    systemProperty("smithy-java.xml-provider", "smithy")
+protocolTestRuns {
+    run("native") { systemProperty("smithy-java.xml-provider", "smithy") }
+    run("stax") { }
 }
 
 val generator = "software.amazon.smithy.java.protocoltests.generators.ProtocolTestGenerator"

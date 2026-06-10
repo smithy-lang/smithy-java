@@ -19,5 +19,10 @@ dependencies {
     testImplementation(libs.smithy.protocol.tests)
 }
 
+protocolTestRuns {
+    run("native") { systemProperty("smithy-java.json-provider", "smithy") }
+    run("jackson") { systemProperty("smithy-java.json-provider", "jackson") }
+}
+
 val generator = "software.amazon.smithy.java.protocoltests.generators.ProtocolTestGenerator"
 addGenerateSrcsTask(generator, "rpcv2Json", "smithy.protocoltests.rpcv2Json#RpcV2JsonProtocol")

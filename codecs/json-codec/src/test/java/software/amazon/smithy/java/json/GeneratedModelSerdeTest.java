@@ -506,6 +506,13 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
         assertThat(roundtrip(ser, de, original, NumericStruct.builder())).isEqualTo(original);
     }
 
+    @PerProvider
+    void emptyBodyDeserializesToDefaultStruct(JsonSerdeProvider provider) {
+        var codec = codec(provider);
+        var result = codec.deserializeShape(new byte[0], NumericStruct.builder());
+        assertThat(result).isEqualTo(NumericStruct.builder().build());
+    }
+
     // --- Fields in non-schema order (exercises hash lookup slow path) ---
 
     @PerProvider
