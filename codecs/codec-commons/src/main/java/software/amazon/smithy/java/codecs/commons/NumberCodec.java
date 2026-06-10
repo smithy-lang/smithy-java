@@ -76,12 +76,14 @@ public final class NumberCodec {
         if (buf[i] == '-') {
             negative = true;
             i++;
-            if (i == end)
+            if (i == end) {
                 throw new NumberFormatException("Just a minus sign");
+            }
         } else if (buf[i] == '+') {
             i++;
-            if (i == end)
+            if (i == end) {
                 throw new NumberFormatException("Just a plus sign");
+            }
         }
 
         while (i < end - 1 && buf[i] == '0') {
@@ -97,10 +99,12 @@ public final class NumberCodec {
             byte[] limit = negative ? INT_MIN_DIGITS : INT_MAX_DIGITS;
             for (int j = 0; j < 10; j++) {
                 int cmp = (buf[i + j] & 0xFF) - (limit[j] & 0xFF);
-                if (cmp < 0)
+                if (cmp < 0) {
                     break;
-                if (cmp > 0)
+                }
+                if (cmp > 0) {
                     throw new NumberFormatException("Integer overflow");
+                }
             }
         }
 
@@ -108,8 +112,9 @@ public final class NumberCodec {
 
         while (i + 4 <= end) {
             int v = parse4Digits(buf, i);
-            if (v < 0)
+            if (v < 0) {
                 break;
+            }
             result = result * 10000 - v;
             i += 4;
         }
@@ -140,12 +145,14 @@ public final class NumberCodec {
         if (buf[i] == '-') {
             negative = true;
             i++;
-            if (i == end)
+            if (i == end) {
                 throw new NumberFormatException("Just a minus sign");
+            }
         } else if (buf[i] == '+') {
             i++;
-            if (i == end)
+            if (i == end) {
                 throw new NumberFormatException("Just a plus sign");
+            }
         }
 
         while (i < end - 1 && buf[i] == '0') {
@@ -161,16 +168,18 @@ public final class NumberCodec {
 
         while (i + 8 <= end) {
             long v = parse8Digits(buf, i);
-            if (v < 0)
+            if (v < 0) {
                 break;
+            }
             result = result * 100000000L - v;
             i += 8;
         }
 
         while (i + 4 <= end) {
             int v = parse4Digits(buf, i);
-            if (v < 0)
+            if (v < 0) {
                 break;
+            }
             result = result * 10000 - v;
             i += 4;
         }
@@ -564,24 +573,33 @@ public final class NumberCodec {
     }
 
     public static int digitCount(int value) {
-        if (value < 10)
+        if (value < 10) {
             return 1;
-        if (value < 100)
+        }
+        if (value < 100) {
             return 2;
-        if (value < 1000)
+        }
+        if (value < 1000) {
             return 3;
-        if (value < 10000)
+        }
+        if (value < 10000) {
             return 4;
-        if (value < 100000)
+        }
+        if (value < 100000) {
             return 5;
-        if (value < 1000000)
+        }
+        if (value < 1000000) {
             return 6;
-        if (value < 10000000)
+        }
+        if (value < 10000000) {
             return 7;
-        if (value < 100000000)
+        }
+        if (value < 100000000) {
             return 8;
-        if (value < 1000000000)
+        }
+        if (value < 1000000000) {
             return 9;
+        }
         return 10;
     }
 
