@@ -10,7 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.SmithyEnum;
+import software.amazon.smithy.java.core.schema.SmithyIntEnum;
 import software.amazon.smithy.java.core.serde.SerializationException;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.uri.URLEncoding;
 import software.amazon.smithy.model.traits.HttpTrait;
 
@@ -138,28 +141,51 @@ final class PathSerializer {
             throw emptyLabel(labelSchema);
         }
 
+        // HTTP labels support string, enum, intEnum, boolean, byte/short/integer/long/float/double/bigInteger/
+        // bigDecimal, and timestamp. The value can arrive in three shapes depending on the source struct:
+        //   - a raw Java value (String, Integer, Instant, ...) for generated shapes,
+        //   - a SmithyEnum/SmithyIntEnum for enum and intEnum members,
+        //   - a Document for any type when the value comes from a document-backed struct (e.g. DynamicClient).
+        // Normalize all three down to the formatting below.
         return switch (labelSchema.type()) {
             case STRING, ENUM -> {
-                var s = (String) value;
+                var s = switch (value) {
+                    case String str -> str;
+                    case SmithyEnum e -> e.getValue();
+                    case Document d -> d.asString();
+                    default -> throw unsupportedLabelValue(labelSchema, value);
+                };
                 if (s.isEmpty()) {
                     throw emptyLabel(labelSchema);
                 }
                 yield s;
             }
-            case BOOLEAN -> Boolean.toString((boolean) value);
-            case BYTE -> Byte.toString((byte) value);
-            case SHORT -> Short.toString((short) value);
-            case INTEGER, INT_ENUM -> Integer.toString((int) value);
-            case LONG -> Long.toString((long) value);
-            case FLOAT -> Float.toString((float) value);
-            case DOUBLE -> Double.toString((double) value);
-            case BIG_INTEGER, BIG_DECIMAL -> value.toString();
+            case BOOLEAN -> Boolean.toString(value instanceof Document d ? d.asBoolean() : (boolean) value);
+            case BYTE -> Byte.toString(value instanceof Document d ? d.asByte() : (byte) value);
+            case SHORT -> Short.toString(value instanceof Document d ? d.asShort() : (short) value);
+            case INTEGER -> Integer.toString(value instanceof Document d ? d.asInteger() : (int) value);
+            case INT_ENUM -> Integer.toString(switch (value) {
+                case Integer i -> i;
+                case SmithyIntEnum e -> e.getValue();
+                case Document d -> d.asInteger();
+                default -> throw unsupportedLabelValue(labelSchema, value);
+            });
+            case LONG -> Long.toString(value instanceof Document d ? d.asLong() : (long) value);
+            case FLOAT -> Float.toString(value instanceof Document d ? d.asFloat() : (float) value);
+            case DOUBLE -> Double.toString(value instanceof Document d ? d.asDouble() : (double) value);
+            case BIG_INTEGER -> (value instanceof Document d ? d.asBigInteger() : value).toString();
+            case BIG_DECIMAL -> (value instanceof Document d ? d.asBigDecimal() : value).toString();
             case TIMESTAMP -> HttpBindingSchemaExtensions.memberBindingOf(labelSchema)
                     .timestampFormatter()
-                    .writeString((Instant) value);
+                    .writeString(value instanceof Document d ? d.asTimestamp() : (Instant) value);
             default -> throw new SerializationException(
                     "Unsupported HTTP label type " + labelSchema.type() + " for `" + labelSchema.id() + "`");
         };
+    }
+
+    private static SerializationException unsupportedLabelValue(Schema labelSchema, Object value) {
+        return new SerializationException(
+                "Unsupported HTTP label value " + value.getClass() + " for `" + labelSchema.id() + "`");
     }
 
     private static SerializationException emptyLabel(Schema labelSchema) {
