@@ -75,58 +75,72 @@ public final class TimestampCodec {
         }
 
         int d0 = digit(buf[pos]), d1 = digit(buf[pos + 1]), d2 = digit(buf[pos + 2]), d3 = digit(buf[pos + 3]);
-        if ((d0 | d1 | d2 | d3) < 0)
+        if ((d0 | d1 | d2 | d3) < 0) {
             return null;
+        }
         int year = d0 * 1000 + d1 * 100 + d2 * 10 + d3;
         pos += 4;
-        if (buf[pos++] != '-')
+        if (buf[pos++] != '-') {
             return null;
+        }
 
         int m0 = digit(buf[pos]), m1 = digit(buf[pos + 1]);
-        if ((m0 | m1) < 0)
+        if ((m0 | m1) < 0) {
             return null;
+        }
         int month = m0 * 10 + m1;
         pos += 2;
-        if (month < 1 || month > 12)
+        if (month < 1 || month > 12) {
             return null;
-        if (buf[pos++] != '-')
+        }
+        if (buf[pos++] != '-') {
             return null;
+        }
 
         int dy0 = digit(buf[pos]), dy1 = digit(buf[pos + 1]);
-        if ((dy0 | dy1) < 0)
+        if ((dy0 | dy1) < 0) {
             return null;
+        }
         int day = dy0 * 10 + dy1;
         pos += 2;
-        if (day < 1 || day > maxDayOfMonth(year, month))
+        if (day < 1 || day > maxDayOfMonth(year, month)) {
             return null;
+        }
 
-        if (buf[pos] != 'T')
+        if (buf[pos] != 'T') {
             return null;
+        }
         pos++;
 
         int h0 = digit(buf[pos]), h1 = digit(buf[pos + 1]);
-        if ((h0 | h1) < 0)
+        if ((h0 | h1) < 0) {
             return null;
+        }
         int hour = h0 * 10 + h1;
         pos += 2;
-        if (buf[pos++] != ':')
+        if (buf[pos++] != ':') {
             return null;
+        }
 
         int mn0 = digit(buf[pos]), mn1 = digit(buf[pos + 1]);
-        if ((mn0 | mn1) < 0)
+        if ((mn0 | mn1) < 0) {
             return null;
+        }
         int minute = mn0 * 10 + mn1;
         pos += 2;
-        if (buf[pos++] != ':')
+        if (buf[pos++] != ':') {
             return null;
+        }
 
         int s0 = digit(buf[pos]), s1 = digit(buf[pos + 1]);
-        if ((s0 | s1) < 0)
+        if ((s0 | s1) < 0) {
             return null;
+        }
         int second = s0 * 10 + s1;
         pos += 2;
-        if (hour > 23 || minute > 59 || second > 59)
+        if (hour > 23 || minute > 59 || second > 59) {
             return null;
+        }
 
         int nano = 0;
         if (pos < end && buf[pos] == '.') {
@@ -134,16 +148,18 @@ public final class TimestampCodec {
             int fracLen = 0;
             while (pos < end) {
                 int d = buf[pos] - '0';
-                if (d < 0 || d > 9)
+                if (d < 0 || d > 9) {
                     break;
+                }
                 if (fracLen < 9) {
                     nano = nano * 10 + d;
                 }
                 fracLen++;
                 pos++;
             }
-            if (fracLen == 0 || fracLen > 9)
+            if (fracLen == 0 || fracLen > 9) {
                 return null;
+            }
             nano *= NANO_SCALE[fracLen];
         }
 
@@ -170,67 +186,84 @@ public final class TimestampCodec {
         }
 
         pos += 3;
-        if (buf[pos] != ',' || buf[pos + 1] != ' ')
+        if (buf[pos] != ',' || buf[pos + 1] != ' ') {
             return null;
+        }
         pos += 2;
 
         int dy0 = digit(buf[pos]), dy1 = digit(buf[pos + 1]);
-        if ((dy0 | dy1) < 0)
+        if ((dy0 | dy1) < 0) {
             return null;
+        }
         int day = dy0 * 10 + dy1;
         pos += 2;
-        if (day < 1)
+        if (day < 1) {
             return null;
-        if (buf[pos++] != ' ')
+        }
+        if (buf[pos++] != ' ') {
             return null;
+        }
 
         int month = parseMonthName(buf[pos], buf[pos + 1], buf[pos + 2]);
-        if (month == -1)
+        if (month == -1) {
             return null;
+        }
         pos += 3;
-        if (buf[pos++] != ' ')
+        if (buf[pos++] != ' ') {
             return null;
+        }
 
         int y0 = digit(buf[pos]), y1 = digit(buf[pos + 1]), y2 = digit(buf[pos + 2]), y3 = digit(buf[pos + 3]);
-        if ((y0 | y1 | y2 | y3) < 0)
+        if ((y0 | y1 | y2 | y3) < 0) {
             return null;
+        }
         int year = y0 * 1000 + y1 * 100 + y2 * 10 + y3;
         pos += 4;
-        if (day > maxDayOfMonth(year, month))
+        if (day > maxDayOfMonth(year, month)) {
             return null;
-        if (buf[pos++] != ' ')
+        }
+        if (buf[pos++] != ' ') {
             return null;
+        }
 
         int h0 = digit(buf[pos]), h1 = digit(buf[pos + 1]);
-        if ((h0 | h1) < 0)
+        if ((h0 | h1) < 0) {
             return null;
+        }
         int hour = h0 * 10 + h1;
         pos += 2;
-        if (buf[pos++] != ':')
+        if (buf[pos++] != ':') {
             return null;
+        }
 
         int mn0 = digit(buf[pos]), mn1 = digit(buf[pos + 1]);
-        if ((mn0 | mn1) < 0)
+        if ((mn0 | mn1) < 0) {
             return null;
+        }
         int minute = mn0 * 10 + mn1;
         pos += 2;
-        if (buf[pos++] != ':')
+        if (buf[pos++] != ':') {
             return null;
+        }
 
         int s0 = digit(buf[pos]), s1 = digit(buf[pos + 1]);
-        if ((s0 | s1) < 0)
+        if ((s0 | s1) < 0) {
             return null;
+        }
         int second = s0 * 10 + s1;
         pos += 2;
 
-        if (hour > 23 || minute > 59 || second > 59)
+        if (hour > 23 || minute > 59 || second > 59) {
             return null;
+        }
 
-        if (buf[pos] != ' ')
+        if (buf[pos] != ' ') {
             return null;
+        }
         pos++;
-        if (pos + 3 > end || buf[pos] != 'G' || buf[pos + 1] != 'M' || buf[pos + 2] != 'T')
+        if (pos + 3 > end || buf[pos] != 'G' || buf[pos + 1] != 'M' || buf[pos + 2] != 'T') {
             return null;
+        }
 
         long epochDay = computeEpochDay(year, month, day);
         long epochSecond = epochDay * 86400 + hour * 3600 + minute * 60 + second;
@@ -251,8 +284,9 @@ public final class TimestampCodec {
         if (buf[pos] == '-') {
             negative = true;
             pos++;
-            if (pos >= end)
+            if (pos >= end) {
                 return null;
+            }
         }
 
         long seconds = 0;
@@ -260,12 +294,14 @@ public final class TimestampCodec {
         while (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
             long prev = seconds;
             seconds = seconds * 10 + (buf[pos] - '0');
-            if (seconds < prev)
+            if (seconds < prev) {
                 return null; // overflow
+            }
             pos++;
         }
-        if (pos == intStart)
+        if (pos == intStart) {
             return null;
+        }
 
         int nano = 0;
         boolean hasExponent = false;
@@ -279,8 +315,9 @@ public final class TimestampCodec {
 
             hasExponent = pos < end && (buf[pos] == 'e' || buf[pos] == 'E');
             if (!hasExponent) {
-                if (fracLen > 9)
+                if (fracLen > 9) {
                     return null;
+                }
                 for (int i = fracStart; i < pos; i++) {
                     nano = nano * 10 + (buf[i] - '0');
                 }
@@ -294,30 +331,35 @@ public final class TimestampCodec {
             return parseEpochSecondsBigDecimal(buf, intStart - (negative ? 1 : 0), end);
         }
 
-        if (pos != end)
+        if (pos != end) {
             return null;
+        }
 
         if (negative) {
             if (nano == 0) {
-                if (-seconds < Instant.MIN.getEpochSecond())
+                if (-seconds < Instant.MIN.getEpochSecond()) {
                     return null;
+                }
                 return Instant.ofEpochSecond(-seconds);
             }
             long es = -seconds - 1;
-            if (es < Instant.MIN.getEpochSecond())
+            if (es < Instant.MIN.getEpochSecond()) {
                 return null;
+            }
             return Instant.ofEpochSecond(es, 1_000_000_000 - nano);
         }
-        if (seconds > Instant.MAX.getEpochSecond())
+        if (seconds > Instant.MAX.getEpochSecond()) {
             return null;
+        }
         return Instant.ofEpochSecond(seconds, nano);
     }
 
     private static Instant parseEpochSecondsBigDecimal(byte[] buf, int start, int end) {
         int pos = start;
         boolean negative = pos < end && buf[pos] == '-';
-        if (negative)
+        if (negative) {
             pos++;
+        }
 
         long mantissa = 0;
         int mantissaDigits = 0;
@@ -343,8 +385,9 @@ public final class TimestampCodec {
             }
         }
 
-        if (pos >= end || (buf[pos] != 'e' && buf[pos] != 'E'))
+        if (pos >= end || (buf[pos] != 'e' && buf[pos] != 'E')) {
             return null;
+        }
         pos++;
 
         boolean expNegative = false;
@@ -352,20 +395,24 @@ public final class TimestampCodec {
             expNegative = buf[pos] == '-';
             pos++;
         }
-        if (pos >= end)
+        if (pos >= end) {
             return null;
+        }
 
         int exponent = 0;
         while (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
             exponent = exponent * 10 + (buf[pos] - '0');
-            if (exponent > 20)
+            if (exponent > 20) {
                 return null; // way outside long range
+            }
             pos++;
         }
-        if (pos != end)
+        if (pos != end) {
             return null;
-        if (expNegative)
+        }
+        if (expNegative) {
             exponent = -exponent;
+        }
 
         int shift = exponent - (pointOffset >= 0 ? pointOffset : 0);
 
@@ -376,83 +423,103 @@ public final class TimestampCodec {
             seconds = mantissa;
             for (int i = 0; i < shift; i++) {
                 seconds *= 10;
-                if (seconds < 0)
+                if (seconds < 0) {
                     return null; // overflow
+                }
             }
         } else {
             int fracDigits = -shift;
-            if (fracDigits > 9)
+            if (fracDigits > 9) {
                 return null;
+            }
             long divisor = 1;
-            for (int i = 0; i < fracDigits; i++)
+            for (int i = 0; i < fracDigits; i++) {
                 divisor *= 10;
+            }
             seconds = mantissa / divisor;
             long fracPart = mantissa % divisor;
-            for (int i = fracDigits; i < 9; i++)
+            for (int i = fracDigits; i < 9; i++) {
                 fracPart *= 10;
+            }
             nano = (int) fracPart;
         }
 
         if (negative) {
             if (nano == 0) {
                 seconds = -seconds;
-                if (seconds > 0)
+                if (seconds > 0) {
                     return null; // overflow
-                if (seconds < Instant.MIN.getEpochSecond())
+                }
+                if (seconds < Instant.MIN.getEpochSecond()) {
                     return null;
+                }
                 return Instant.ofEpochSecond(seconds);
             }
             long es = -seconds - 1;
-            if (es < Instant.MIN.getEpochSecond())
+            if (es < Instant.MIN.getEpochSecond()) {
                 return null;
+            }
             return Instant.ofEpochSecond(es, 1_000_000_000 - nano);
         }
-        if (seconds > Instant.MAX.getEpochSecond())
+        if (seconds > Instant.MAX.getEpochSecond()) {
             return null;
+        }
         return Instant.ofEpochSecond(seconds, nano);
     }
 
     private static int parseMonthName(byte c0, byte c1, byte c2) {
         switch (c0) {
             case 'J':
-                if (c1 == 'a' && c2 == 'n')
+                if (c1 == 'a' && c2 == 'n') {
                     return 1;
-                if (c1 == 'u' && c2 == 'n')
+                }
+                if (c1 == 'u' && c2 == 'n') {
                     return 6;
-                if (c1 == 'u' && c2 == 'l')
+                }
+                if (c1 == 'u' && c2 == 'l') {
                     return 7;
+                }
                 return -1;
             case 'F':
-                if (c1 == 'e' && c2 == 'b')
+                if (c1 == 'e' && c2 == 'b') {
                     return 2;
+                }
                 return -1;
             case 'M':
-                if (c1 == 'a' && c2 == 'r')
+                if (c1 == 'a' && c2 == 'r') {
                     return 3;
-                if (c1 == 'a' && c2 == 'y')
+                }
+                if (c1 == 'a' && c2 == 'y') {
                     return 5;
+                }
                 return -1;
             case 'A':
-                if (c1 == 'p' && c2 == 'r')
+                if (c1 == 'p' && c2 == 'r') {
                     return 4;
-                if (c1 == 'u' && c2 == 'g')
+                }
+                if (c1 == 'u' && c2 == 'g') {
                     return 8;
+                }
                 return -1;
             case 'S':
-                if (c1 == 'e' && c2 == 'p')
+                if (c1 == 'e' && c2 == 'p') {
                     return 9;
+                }
                 return -1;
             case 'O':
-                if (c1 == 'c' && c2 == 't')
+                if (c1 == 'c' && c2 == 't') {
                     return 10;
+                }
                 return -1;
             case 'N':
-                if (c1 == 'o' && c2 == 'v')
+                if (c1 == 'o' && c2 == 'v') {
                     return 11;
+                }
                 return -1;
             case 'D':
-                if (c1 == 'e' && c2 == 'c')
+                if (c1 == 'e' && c2 == 'c') {
                     return 12;
+                }
                 return -1;
             default:
                 return -1;
@@ -697,8 +764,9 @@ public final class TimestampCodec {
 
     private static int digit(byte b) {
         int d = b - '0';
-        if (d < 0 || d > 9)
+        if (d < 0 || d > 9) {
             return -1;
+        }
         return d;
     }
 }

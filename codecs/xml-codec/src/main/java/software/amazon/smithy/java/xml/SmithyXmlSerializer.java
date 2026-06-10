@@ -10,6 +10,7 @@ import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
@@ -213,7 +214,7 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
             return me.nameBytes();
         }
         String name = schema.memberName();
-        return name.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return name.getBytes(StandardCharsets.UTF_8);
     }
 
     private void closePendingTag() {

@@ -42,15 +42,22 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
     private static final int CHARACTERS = 3;
     private static final int EOF = -1;
 
+    private static final byte[] ERROR_RESPONSE_BYTES = "ErrorResponse".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] ERROR_BYTES = "Error".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] RESPONSE_BYTES = "Response".getBytes(StandardCharsets.UTF_8);
+
     private static final boolean[] NAME_CHAR = new boolean[256];
 
     static {
-        for (int i = 'a'; i <= 'z'; i++)
+        for (int i = 'a'; i <= 'z'; i++) {
             NAME_CHAR[i] = true;
-        for (int i = 'A'; i <= 'Z'; i++)
+        }
+        for (int i = 'A'; i <= 'Z'; i++) {
             NAME_CHAR[i] = true;
-        for (int i = '0'; i <= '9'; i++)
+        }
+        for (int i = '0'; i <= '9'; i++) {
             NAME_CHAR[i] = true;
+        }
         NAME_CHAR['-'] = true;
         NAME_CHAR['_'] = true;
         NAME_CHAR['.'] = true;
@@ -210,8 +217,9 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
         int colonPos = 0;
         while (pos < limit) {
             byte b = buf[pos];
-            if (!NAME_CHAR[b & 0xFF])
+            if (!NAME_CHAR[b & 0xFF]) {
                 break;
+            }
             if (b == ':') {
                 hasColon = true;
                 colonPos = pos;
@@ -256,10 +264,12 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
         int localStart = pos;
         while (pos < limit) {
             byte b = buf[pos];
-            if (!NAME_CHAR[b & 0xFF])
+            if (!NAME_CHAR[b & 0xFF]) {
                 break;
-            if (b == ':')
+            }
+            if (b == ':') {
                 localStart = pos + 1;
+            }
             pos++;
         }
         endNameStart = localStart;
@@ -528,13 +538,15 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                 continue;
             }
             if (b != '<') {
-                while (pos < limit && buf[pos] != '<')
+                while (pos < limit && buf[pos] != '<') {
                     pos++;
+                }
                 continue;
             }
             pos++;
-            if (pos >= limit)
+            if (pos >= limit) {
                 return false;
+            }
             b = buf[pos];
             if (b == '/') {
                 pos++;
@@ -767,12 +779,14 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                             expectedStart,
                             expectedStart + expectedLen)) {
                 int p = tagNamePos + expectedLen;
-                while (p < limit && buf[p] != '>')
+                while (p < limit && buf[p] != '>') {
                     p++;
+                }
                 if (p < limit) {
                     pos = p + 1;
-                    if (textLen == 0)
+                    if (textLen == 0) {
                         return "";
+                    }
                     boolean clean = true;
                     for (int i = start; i < textEnd; i++) {
                         int b = buf[i] & 0xFF;
@@ -992,10 +1006,6 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
         }
         return null;
     }
-
-    private static final byte[] ERROR_RESPONSE_BYTES = "ErrorResponse".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] ERROR_BYTES = "Error".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] RESPONSE_BYTES = "Response".getBytes(StandardCharsets.UTF_8);
 
     private void enter(Schema schema) {
         if (!isTopLevel) {
