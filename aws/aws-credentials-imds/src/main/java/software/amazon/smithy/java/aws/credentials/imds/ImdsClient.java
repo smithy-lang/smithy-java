@@ -16,6 +16,12 @@ import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * Minimal IMDSv2 client. Handles token acquisition, caching, and retries with exponential backoff.
+ *
+ * <p>Intended for use behind {@link software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver},
+ * which serializes refreshes so a given instance is never re-entered concurrently. All mutable state is
+ * {@code volatile} and the cached token/profile/path flags only ever advance monotonically, so sharing an
+ * instance across threads is still safe — concurrent callers will at worst issue redundant token or profile
+ * fetches, never return incorrect results.
  */
 final class ImdsClient {
 

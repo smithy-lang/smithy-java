@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.aws.credentials.sts;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -144,13 +145,13 @@ final class StsAssumeRoleResolver implements IdentityResolver<AwsCredentialsIden
         var sourceResolver = createSourceResolver(sourceCredentials);
 
         try (DynamicClient client = StsClientFactory.create(sourceResolver, endpoint)) {
-            Map<String, Object> input = Map.of(
-                    "RoleArn",
-                    roleArn,
-                    "RoleSessionName",
-                    "smithy-java-" + System.currentTimeMillis(),
-                    "ExternalId",
-                    externalId);
+            // ExternalId is optional; Map.of rejects null values, so only include it when present.
+            Map<String, Object> input = new HashMap<>();
+            input.put("RoleArn", roleArn);
+            input.put("RoleSessionName", "smithy-java-" + System.currentTimeMillis());
+            if (externalId != null) {
+                input.put("ExternalId", externalId);
+            }
             return StsWebIdentityResolver.parseCredentials(client.call("AssumeRole", input));
         }
     }

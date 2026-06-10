@@ -12,8 +12,7 @@ import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 
 /**
- * In-memory representation of a workload JSON file as defined in
- * {@code https://github.com/aws/e2e-benchmark-framework/blob/main/workloads/WORKLOAD-SPEC.md}.
+ * In-memory representation of a workload JSON file.
  *
  * <p>Only the v1 fields used by smithy-java's runner are exposed. Unknown
  * fields are ignored so that newer workload files do not break older runners.

@@ -7,9 +7,8 @@ plugins {
 
 description = "End-to-end SDK benchmarks against live AWS services (DynamoDB GetItem/PutItem latency, S3 GetObject/PutObject throughput)."
 
-// Not published. Mirrors the Java SDK v2 reference runner at
-// https://github.com/aws/e2e-benchmark-framework/tree/main/runners/java-workload-runner.
-// Reads the same workload JSON files so results are directly comparable.
+// Not published. Mirrors the Java SDK v2 reference runner and reads the same
+// workload JSON files so results are directly comparable.
 
 application {
     mainClass.set("software.amazon.smithy.java.benchmarks.e2e.WorkloadRunner")
@@ -104,8 +103,7 @@ tasks.named<Copy>("processResources") {
     dependsOn("smithyBuild")
 }
 
-// The shaded jar is what users invoke from run-benchmark.py, mirroring
-// `java -jar runners/java-workload-runner/target/workload-runner-1.0.0.jar`.
+// The shaded jar is the self-contained artifact users invoke to run a workload.
 tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
     archiveBaseName.set("smithy-java-e2e-benchmark-runner")
     archiveClassifier.set("")

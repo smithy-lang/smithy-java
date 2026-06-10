@@ -2,9 +2,7 @@
 
 A workload-driven runner that exercises the smithy-java SDK against live AWS
 services. It implements the same workload spec as the Java SDK v2 reference
-runner at
-[aws/e2e-benchmark-framework](https://github.com/aws/e2e-benchmark-framework/tree/main/runners/java-workload-runner)
-so results are directly comparable across SDKs.
+runner so results are directly comparable across SDKs.
 
 ## Scope
 
@@ -43,22 +41,9 @@ java -jar build/libs/smithy-java-e2e-benchmark-runner.jar \
 ```
 
 Region passed on the command line is ignored — the workload JSON is the
-source of truth, matching the format expected by the framework's
-`run-benchmark.py`.
+source of truth.
 
-The four workload files included here are byte-identical copies of the
-specification's defaults; you can also point the runner at any v1 workload
-JSON.
-
-## Drive from the framework
-
-```bash
-python3 ../../path/to/e2e-benchmark-framework/scripts/run-benchmark.py \
-  --runner "java -jar $(pwd)/build/libs/smithy-java-e2e-benchmark-runner.jar" \
-  --region us-east-1 \
-  --table benchmark-table \
-  --bucket my-benchmark-bucket--use1-az4--x-s3
-```
+You can point the runner at any v1 workload JSON.
 
 ## Credentials
 

@@ -23,7 +23,6 @@ import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
 import software.amazon.smithy.java.aws.credentials.chain.StandardProvider;
-import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -187,17 +186,5 @@ public final class ImdsCredentialProvider implements ChainIdentityProvider {
 
         AwsProfile profile = profileFile.profile(profileName);
         return profile != null ? profile.property(key) : null;
-    }
-
-    /** Resolver returned when IMDS is disabled via configuration. */
-    private static final class DisabledResolver implements AwsCredentialsResolver {
-        private static final IdentityResult<AwsCredentialsIdentity> DISABLED = IdentityResult.ofError(
-                ImdsCredentialProvider.class,
-                "IMDS credential fetching is disabled");
-
-        @Override
-        public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context requestProperties) {
-            return DISABLED;
-        }
     }
 }

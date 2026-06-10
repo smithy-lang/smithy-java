@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.aws.client.auth.scheme.s3express;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -35,6 +37,7 @@ import software.amazon.smithy.java.context.Context;
  */
 final class S3ExpressIdentityProvider implements IdentityResolver<AwsCredentialsIdentity> {
 
+    private static final Duration IDLE_TIMEOUT = Duration.ofMinutes(5);
     private static final AtomicInteger THREAD_COUNTER = new AtomicInteger();
     private static final ScheduledExecutorService REFRESH_EXECUTOR = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "smithy-s3express-session-refresh-" + THREAD_COUNTER.incrementAndGet());
@@ -57,7 +60,12 @@ final class S3ExpressIdentityProvider implements IdentityResolver<AwsCredentials
     ) {
         this.baseIdentityProvider = Objects.requireNonNull(baseIdentityProvider, "baseIdentityProvider");
         Objects.requireNonNull(createSession, "createSession");
-        this.cache = new S3ExpressIdentityCache(key -> buildPerBucketResolver(key, createSession));
+        // Reuse the shared refresh executor to also drive periodic idle-entry eviction.
+        this.cache = new S3ExpressIdentityCache(
+                key -> buildPerBucketResolver(key, createSession),
+                REFRESH_EXECUTOR,
+                IDLE_TIMEOUT,
+                Clock.systemUTC());
     }
 
     private CachingIdentityResolver<AwsCredentialsIdentity> buildPerBucketResolver(

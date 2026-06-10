@@ -21,9 +21,8 @@ import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.AttributeValue;
 
 /**
  * smithy-java implementation of the e2e benchmark workload runner. Reads the
- * shared workload JSON spec
- * ({@code https://github.com/aws/e2e-benchmark-framework}) and produces
- * results comparable to the reference Java SDK v2 runner.
+ * workload JSON spec and produces results comparable to the reference Java SDK
+ * v2 runner.
  *
  * <p>Limitations:
  *
@@ -350,8 +349,7 @@ public final class WorkloadRunner {
         }
         var workloadPath = args[idx];
         // args[idx + 1] is the region from the orchestration script; we
-        // intentionally ignore it (the workload JSON is the source of truth)
-        // to match the format expected by run-benchmark.py.
+        // intentionally ignore it (the workload JSON is the source of truth).
         var workload = WorkloadConfig.load(workloadPath);
         printActiveJsonProvider();
         new WorkloadRunner(workload).run();
