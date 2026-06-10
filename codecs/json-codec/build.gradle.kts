@@ -12,7 +12,7 @@ extra["moduleName"] = "software.amazon.smithy.java.json"
 
 dependencies {
     api(project(":core"))
-    implementation(project(":codecs:codec-commons", configuration = "shadow"))
+    api(project(":codecs:codec-commons", configuration = "shadow"))
     compileOnly(libs.jackson.core)
     testRuntimeOnly(libs.jackson.core)
     smithyBuild(project(":codegen:codegen-plugin"))
