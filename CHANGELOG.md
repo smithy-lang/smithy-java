@@ -1,5 +1,31 @@
 # Change Log
 
+## 1.4.0 (6/10/2026)
+> [!IMPORTANT]
+> All client modules are considered stable.  Some modules, including
+> server, CLI, and MCP, are still in developer-preview and may contain
+> bugs.  No guarantee is made about their API stability. Unstable
+> modules are marked with a warning in their `README.md` and with the
+> `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Features
+
+- Added support for getter sections in union codegen, allowing codegen integrations to customize the generated union value getters. ([#1229](https://github.com/smithy-lang/smithy-java/pull/1229))
+- Added call interceptors that can intercept and control the full lifecycle of a client call, enabling middleware-style behaviors such as caching and hedging. Interceptors can also override the operation input. ([#1218](https://github.com/smithy-lang/smithy-java/pull/1218))
+- Added a `discard()` method to `DataStream` to drain unconsumed streams when needed. ([#1224](https://github.com/smithy-lang/smithy-java/pull/1224))
+- Added `x-amz-content-sha256` handling for S3 and S3 Express requests. ([#1217](https://github.com/smithy-lang/smithy-java/pull/1217))
+
+### Bug Fixes
+
+- Fixed several `DynamicClient` serialization and deserialization issues, including comparing document-typed values by content, serializing renamed input/output shapes under their original wire name, and preserving null entries in `@sparse` maps and lists. ([#1233](https://github.com/smithy-lang/smithy-java/pull/1233))
+- Fixed `PathSerializer` to support non-string types in HTTP label bindings. ([#1232](https://github.com/smithy-lang/smithy-java/pull/1232))
+- Added a maximum depth limit to CBOR deserialization to guard against stack exhaustion from deeply nested input. ([#1226](https://github.com/smithy-lang/smithy-java/pull/1226))
+
+### Improvements
+
+- Optimized the `writeTo` implementation for multi-buffer data streams. ([#1224](https://github.com/smithy-lang/smithy-java/pull/1224))
+- Reduced allocations during SigV4 request signing by switching to in-place buffer encoding on the signing hot path. ([#1217](https://github.com/smithy-lang/smithy-java/pull/1217))
+
 ## 1.3.0 (5/26/2026)
 > [!IMPORTANT]
 > All client modules are considered stable.  Some modules, including
