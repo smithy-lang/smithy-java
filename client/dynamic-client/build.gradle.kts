@@ -16,4 +16,6 @@ dependencies {
     testImplementation(project(":aws:client:aws-client-restjson"))
     testImplementation(project(":aws:client:aws-client-awsjson"))
     testImplementation(project(":aws:aws-sigv4"))
+    // Registers the aws.partition endpoint function used by real AWS service models (e.g. Connect's endpointBdd).
+    testImplementation(libs.smithy.aws.endpoints)
 }
