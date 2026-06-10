@@ -98,8 +98,17 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
         ServiceShape service = BASE_MODEL.expectShape(serviceId).asServiceShape().orElseThrow();
         Model serviceModel = applyServiceTransformations(service);
 
+        // For client tests, also build document-backed (DynamicClient) models so each test runs through both the
+        // codegen path and the dynamic path. Not applicable to server tests. Both paths use the same transformed
+        // model; the dynamic SchemaConverter honors the OriginalShapeIdTrait left by createDedicatedInputAndOutput,
+        // so renamed IO shapes (e.g. XmlBlobsInput) still serialize under their original wire name (XmlBlobsRequest),
+        // matching codegen.
+        var dynamicModels = testType == TestType.CLIENT
+                ? new DynamicTestModels(serviceModel, service)
+                : null;
+
         // Discover all protocols and operations applicable for the service under test.
-        List<HttpTestOperation> testOperations = getTestOperations(serviceModel, service, testType);
+        List<HttpTestOperation> testOperations = getTestOperations(serviceModel, service, testType, dynamicModels);
         Map<ShapeId, AuthScheme<?, ?>> authSchemes = getAuthSchemes(serviceModel, service);
         var protocols = getClientProtocols(serviceModel, service);
 
@@ -295,7 +304,8 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
     private static List<HttpTestOperation> getTestOperations(
             Model serviceModel,
             ServiceShape service,
-            TestType testType
+            TestType testType,
+            DynamicTestModels dynamicModels
     ) {
         List<HttpTestOperation> result = new ArrayList<>();
 
@@ -318,6 +328,9 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
             if (operationShape.isPresent() && operationShape.get().isOperationShape()) {
                 var operation = operationShape.get().asOperationShape().get();
                 var apiOperation = getApiOperation(symbolProvider, operation);
+                var dynamicApiOperation = dynamicModels == null
+                        ? null
+                        : dynamicModels.createOperation(operation.getId());
                 List<HttpRequestTestCase> requestTestsCases = new ArrayList<>();
                 List<HttpResponseProtocolTestCase> responseTestsCases = new ArrayList<>();
                 List<HttpMalformedRequestTestCase> malformedRequestTestCases = new ArrayList<>();
@@ -330,7 +343,11 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                     for (var testCase : httpResponseTestsTrait.getTestCases()) {
                         if (testTypeFiler.test(testCase)) {
                             responseTestsCases.add(
-                                    new HttpResponseProtocolTestCase(testCase, false, apiOperation::outputBuilder));
+                                    new HttpResponseProtocolTestCase(
+                                            testCase,
+                                            false,
+                                            apiOperation::outputBuilder,
+                                            dynamicApiOperation == null ? null : dynamicApiOperation::outputBuilder));
                         }
                     }
                 });
@@ -338,6 +355,9 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                     var error = serviceModel.getShape(errorId);
                     if (error.isPresent() && error.get().isStructureShape()) {
                         var errorShape = error.get().asStructureShape().get();
+                        var dynamicErrorBuilder = dynamicModels == null
+                                ? null
+                                : dynamicModels.createErrorBuilder(errorId);
                         errorShape.getTrait(HttpResponseTestsTrait.class).ifPresent(httpResponseTestsTrait -> {
                             for (var testCase : httpResponseTestsTrait.getTestCases()) {
                                 if (testTypeFiler.test(testCase)) {
@@ -345,7 +365,8 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                                             new HttpResponseProtocolTestCase(
                                                     testCase,
                                                     true,
-                                                    getApiExceptionBuilder(symbolProvider, errorShape)));
+                                                    getApiExceptionBuilder(symbolProvider, errorShape),
+                                                    dynamicErrorBuilder));
                                 }
                             }
                         });
@@ -364,6 +385,7 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                                 operationId.toShapeId(),
                                 service.getId(),
                                 apiOperation,
+                                dynamicApiOperation,
                                 requestTestsCases,
                                 responseTestsCases,
                                 malformedRequestTestCases,

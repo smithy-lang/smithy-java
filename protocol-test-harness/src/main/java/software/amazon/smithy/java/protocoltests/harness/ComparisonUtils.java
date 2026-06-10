@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import org.assertj.core.api.recursive.comparison.RecursiveComparisonConfiguration;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.document.DocumentEqualsFlags;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.retries.api.RetrySafety;
@@ -30,7 +31,11 @@ final class ComparisonUtils {
                 // Compare doubles and floats as longs so NaN's will be equatable
                 .withComparatorForType(nanPermittingDoubleComparator(), Double.class)
                 .withComparatorForType(nanPermittingFloatComparator(), Float.class)
-                .withComparatorForType((a, b) -> Document.equals(a, b) ? 0 : 1, Document.class)
+                // Dynamic-path shapes are compared as Documents. Use NUMBER_PROMOTION so float/double values compare
+                // with NaN/Infinity tolerance (mirroring the typed nanPermitting* comparators used for codegen shapes).
+                .withComparatorForType(
+                        (a, b) -> Document.equals(a, b, DocumentEqualsFlags.NUMBER_PROMOTION) ? 0 : 1,
+                        Document.class)
                 .withIgnoredFieldsOfTypes(RetrySafety.class)
                 .build();
     }

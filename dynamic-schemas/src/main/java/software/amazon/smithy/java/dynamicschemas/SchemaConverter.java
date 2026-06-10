@@ -22,6 +22,8 @@ import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.Trait;
+import software.amazon.smithy.model.traits.UnitTypeTrait;
+import software.amazon.smithy.model.traits.synthetic.OriginalShapeIdTrait;
 
 /**
  * Converts {@link Shape}s to {@link Schema}s.
@@ -98,30 +100,31 @@ public final class SchemaConverter {
     }
 
     private Schema createNonRecursiveSchema(Shape shape) {
+        var id = schemaId(shape);
         return switch (shape.getType()) {
-            case BLOB -> Schema.createBlob(shape.getId(), convertTraits(shape));
-            case BOOLEAN -> Schema.createBoolean(shape.getId(), convertTraits(shape));
-            case STRING -> Schema.createString(shape.getId(), convertTraits(shape));
-            case TIMESTAMP -> Schema.createTimestamp(shape.getId(), convertTraits(shape));
-            case BYTE -> Schema.createByte(shape.getId(), convertTraits(shape));
-            case SHORT -> Schema.createShort(shape.getId(), convertTraits(shape));
-            case INTEGER -> Schema.createInteger(shape.getId(), convertTraits(shape));
-            case LONG -> Schema.createLong(shape.getId(), convertTraits(shape));
-            case FLOAT -> Schema.createFloat(shape.getId(), convertTraits(shape));
-            case DOCUMENT -> Schema.createDocument(shape.getId(), convertTraits(shape));
-            case DOUBLE -> Schema.createDouble(shape.getId(), convertTraits(shape));
-            case BIG_DECIMAL -> Schema.createBigDecimal(shape.getId(), convertTraits(shape));
-            case BIG_INTEGER -> Schema.createBigInteger(shape.getId(), convertTraits(shape));
+            case BLOB -> Schema.createBlob(id, convertTraits(shape));
+            case BOOLEAN -> Schema.createBoolean(id, convertTraits(shape));
+            case STRING -> Schema.createString(id, convertTraits(shape));
+            case TIMESTAMP -> Schema.createTimestamp(id, convertTraits(shape));
+            case BYTE -> Schema.createByte(id, convertTraits(shape));
+            case SHORT -> Schema.createShort(id, convertTraits(shape));
+            case INTEGER -> Schema.createInteger(id, convertTraits(shape));
+            case LONG -> Schema.createLong(id, convertTraits(shape));
+            case FLOAT -> Schema.createFloat(id, convertTraits(shape));
+            case DOCUMENT -> Schema.createDocument(id, convertTraits(shape));
+            case DOUBLE -> Schema.createDouble(id, convertTraits(shape));
+            case BIG_DECIMAL -> Schema.createBigDecimal(id, convertTraits(shape));
+            case BIG_INTEGER -> Schema.createBigInteger(id, convertTraits(shape));
             case ENUM -> Schema.createEnum(
-                    shape.getId(),
+                    id,
                     new HashSet<>(shape.asEnumShape().orElseThrow().getEnumValues().values()),
                     convertTraits(shape));
             case INT_ENUM -> Schema.createIntEnum(
-                    shape.getId(),
+                    id,
                     new HashSet<>(shape.asIntEnumShape().orElseThrow().getEnumValues().values()),
                     convertTraits(shape));
-            case OPERATION -> Schema.createOperation(shape.getId(), convertTraits(shape));
-            case SERVICE -> Schema.createService(shape.getId(), convertTraits(shape));
+            case OPERATION -> Schema.createOperation(id, convertTraits(shape));
+            case SERVICE -> Schema.createService(id, convertTraits(shape));
             default -> throw new UnsupportedOperationException("Unexpected shape: " + shape);
         };
     }
@@ -132,16 +135,33 @@ public final class SchemaConverter {
         return traits;
     }
 
+    /**
+     * Resolve the shape ID to use for a schema, honoring the {@link OriginalShapeIdTrait} left behind when model
+     * transforms (e.g. {@code createDedicatedInputAndOutput}) rename a shape. Wire-facing behavior — such as the
+     * restXml root element name, which derives from the schema's shape ID — must use the original modeled name, not
+     * the transformed one. Mirrors the codegen schema generator. The {@code Unit} original ID is the exception:
+     * synthesized dedicated inputs keep their generated ID rather than collapsing onto {@code smithy.api#Unit}.
+     */
+    private static ShapeId schemaId(Shape shape) {
+        var original = shape.getTrait(OriginalShapeIdTrait.class)
+                .map(OriginalShapeIdTrait::getOriginalId)
+                .orElse(null);
+        if (original == null || UnitTypeTrait.UNIT.equals(original)) {
+            return shape.getId();
+        }
+        return original;
+    }
+
     private SchemaBuilder getOrCreateRecursiveSchemaBuilder(Shape shape, Set<Shape> building) {
         SchemaBuilder builder;
         builder = recursiveBuilders.get(shape);
 
         if (builder == null) {
             builder = switch (shape.getType()) {
-                case LIST, SET -> Schema.listBuilder(shape.getId(), convertTraits(shape));
-                case MAP -> Schema.mapBuilder(shape.getId(), convertTraits(shape));
-                case STRUCTURE -> Schema.structureBuilder(shape.getId(), convertTraits(shape));
-                case UNION -> Schema.unionBuilder(shape.getId(), convertTraits(shape));
+                case LIST, SET -> Schema.listBuilder(schemaId(shape), convertTraits(shape));
+                case MAP -> Schema.mapBuilder(schemaId(shape), convertTraits(shape));
+                case STRUCTURE -> Schema.structureBuilder(schemaId(shape), convertTraits(shape));
+                case UNION -> Schema.unionBuilder(schemaId(shape), convertTraits(shape));
                 default -> throw new UnsupportedOperationException("Expected aggregate shape: " + shape);
             };
             SchemaBuilder previous = recursiveBuilders.putIfAbsent(shape, builder);

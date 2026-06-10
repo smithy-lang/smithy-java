@@ -62,4 +62,14 @@ public @interface ProtocolTest {
     String service();
 
     TestType testType();
+
+    /**
+     * Client test modes to run for this service.
+     *
+     * <p>Client protocol tests run once per mode so both the codegen (generated, strongly-typed) and dynamic
+     * (document-backed {@code DynamicClient}) paths are validated. Defaults to both. Narrow this (e.g. to
+     * {@code {TestMode.CODEGEN}}) for a service whose dynamic-path support is not yet complete, rather than listing a
+     * mode-suffixed skip for every test case. Ignored for {@link TestType#SERVER} tests, which are always codegen.
+     */
+    TestMode[] modes() default {TestMode.CODEGEN, TestMode.DYNAMIC};
 }

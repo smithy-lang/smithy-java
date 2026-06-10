@@ -7,7 +7,6 @@ package software.amazon.smithy.java.protocoltests.harness;
 
 import java.util.Base64;
 import java.util.List;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -60,65 +59,82 @@ final class HttpClientRequestProtocolTestProvider extends
                 .flatMap(
                         operation -> operation.requestTestCases()
                                 .stream()
-                                .map(testCase -> {
+                                .flatMap(testCase -> {
                                     if (filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)) {
-                                        return new IgnoredTestCase(testCase.getId());
+                                        return Stream.of(new IgnoredTestCase(testCase.getId()));
                                     }
-                                    var testProtocol = store.getProtocol(testCase.getProtocol());
-                                    var testResolver = testCase.getAuthScheme().isEmpty()
-                                            ? AuthSchemeResolver.NO_AUTH
-                                            : (AuthSchemeResolver) p -> List
-                                                    .of(new AuthSchemeOption(testCase.getAuthScheme().get()));
-                                    var testTransport = new TestTransport();
-
-                                    var placeholderTransport =
-                                            (MockClient.PlaceHolderTransport<HttpRequest, HttpResponse>) store
-                                                    .mockClient()
-                                                    .config()
-                                                    .transport();
-                                    placeholderTransport.setTransport(testTransport);
-
-                                    var overrideBuilder = RequestOverrideConfig.builder()
-                                            .protocol(testProtocol)
-                                            .authSchemeResolver(testResolver);
-                                    if (testCase.getHost().isPresent()) {
-                                        overrideBuilder.endpointResolver(
-                                                EndpointResolver.staticEndpoint("https://" + testCase.getHost().get()));
-                                    }
-
-                                    var inputBuilder = operation.operationModel().inputBuilder();
-                                    new ProtocolTestDocument(testCase.getParams(),
-                                            testCase.getBodyMediaType().orElse(null))
-                                            .deserializeInto(inputBuilder);
-
-                                    // Add fixed idempotency token provider for protocol tests.
-                                    if (operation.operationModel().idempotencyTokenMember() != null) {
-                                        overrideBuilder.putConfig(
-                                                InjectIdempotencyTokenPlugin.IDEMPOTENCY_TOKEN_PROVIDER,
-                                                "00000000-0000-4000-8000-000000000000");
-                                    }
-
-                                    return new RequestTestInvocationContext(
-                                            testCase,
-                                            store.mockClient(),
-                                            operation.operationModel(),
-                                            inputBuilder.build(),
-                                            overrideBuilder.build(),
-                                            testTransport::getCapturedRequest);
+                                    // Run each request test through the codegen model and (when available) the
+                                    // document-backed dynamic model.
+                                    return TestModes.available(operation)
+                                            .map(mode -> {
+                                                var name = testCase.getId() + " [" + mode.label() + "]";
+                                                if (filter.skipTestCase(testCase, mode)) {
+                                                    return new IgnoredTestCase(name);
+                                                }
+                                                try {
+                                                    return buildContext(store, operation, testCase, mode);
+                                                } catch (RuntimeException e) {
+                                                    return new FailedGenerationTestCase(name, e);
+                                                }
+                                            });
                                 }));
+    }
+
+    @SuppressWarnings("unchecked")
+    private TestTemplateInvocationContext buildContext(
+            ProtocolTestExtension.SharedClientTestData store,
+            HttpTestOperation operation,
+            HttpRequestTestCase testCase,
+            TestMode mode
+    ) {
+        var apiOperation = operation.operationModel(mode);
+        var testProtocol = store.getProtocol(testCase.getProtocol());
+        var testResolver = testCase.getAuthScheme().isEmpty()
+                ? AuthSchemeResolver.NO_AUTH
+                : (AuthSchemeResolver) p -> List.of(new AuthSchemeOption(testCase.getAuthScheme().get()));
+        var testTransport = new TestTransport();
+
+        var overrideBuilder = RequestOverrideConfig.builder()
+                .protocol(testProtocol)
+                .authSchemeResolver(testResolver);
+        if (testCase.getHost().isPresent()) {
+            overrideBuilder.endpointResolver(
+                    EndpointResolver.staticEndpoint("https://" + testCase.getHost().get()));
+        }
+
+        var inputBuilder = apiOperation.inputBuilder();
+        new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
+                .deserializeInto(inputBuilder);
+
+        // Add fixed idempotency token provider for protocol tests.
+        if (apiOperation.idempotencyTokenMember() != null) {
+            overrideBuilder.putConfig(
+                    InjectIdempotencyTokenPlugin.IDEMPOTENCY_TOKEN_PROVIDER,
+                    "00000000-0000-4000-8000-000000000000");
+        }
+
+        return new RequestTestInvocationContext(
+                testCase,
+                mode,
+                store.mockClient(),
+                apiOperation,
+                inputBuilder.build(),
+                overrideBuilder.build(),
+                testTransport);
     }
 
     record RequestTestInvocationContext(
             HttpRequestTestCase testCase,
+            TestMode mode,
             MockClient mockClient,
             ApiOperation apiOperation,
             SerializableStruct input,
             RequestOverrideConfig overrideConfig,
-            Supplier<HttpRequest> requestSupplier) implements TestTemplateInvocationContext {
+            TestTransport testTransport) implements TestTemplateInvocationContext {
 
         @Override
         public String getDisplayName(int invocationIndex) {
-            return testCase.getId();
+            return testCase.getId() + " [" + mode.label() + "]";
         }
 
         @Override
@@ -165,8 +181,18 @@ final class HttpClientRequestProtocolTestProvider extends
                                 ParameterContext parameterContext,
                                 ExtensionContext extensionContext
                         ) throws ParameterResolutionException {
+                            // Bind this test's transport just before sending. This must happen at execution time, not
+                            // when the invocation context is built: contexts for every test/mode are generated up
+                            // front, so binding during generation would let the last one win and every test would
+                            // capture the same request.
+                            @SuppressWarnings("unchecked")
+                            var placeholderTransport =
+                                    (MockClient.PlaceHolderTransport<HttpRequest, HttpResponse>) mockClient
+                                            .config()
+                                            .transport();
+                            placeholderTransport.setTransport(testTransport);
                             mockClient.clientRequest(input, apiOperation, overrideConfig);
-                            var request = requestSupplier.get();
+                            var request = testTransport.getCapturedRequest();
                             Assertions.assertUriEquals(testCase, request.uri());
                             testCase.getResolvedHost()
                                     .ifPresent(resolvedHost -> Assertions.assertHostEquals(request, resolvedHost));

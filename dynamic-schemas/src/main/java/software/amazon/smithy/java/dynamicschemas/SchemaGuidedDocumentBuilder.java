@@ -103,16 +103,28 @@ final class SchemaGuidedDocumentBuilder implements ShapeBuilder<StructDocument> 
             case BIG_DECIMAL -> new ContentDocument(Document.ofNumber(decoder.readBigDecimal(schema)), schema);
             case BIG_INTEGER -> new ContentDocument(Document.ofNumber(decoder.readBigInteger(schema)), schema);
             case LIST -> {
+                var sparse = schema.hasTrait(TraitKey.SPARSE_TRAIT);
                 var items = new SchemaList(schema.listMember());
                 decoder.readList(schema, items, (it, memberDeserializer) -> {
-                    it.add(deserialize(memberDeserializer, it.schema));
+                    // A null element (only valid in @sparse lists) is retained as null; otherwise read the value.
+                    if (sparse && memberDeserializer.isNull()) {
+                        it.add(memberDeserializer.readNull());
+                    } else {
+                        it.add(deserialize(memberDeserializer, it.schema));
+                    }
                 });
                 yield new ContentDocument(Document.of(items), schema);
             }
             case MAP -> {
+                var sparse = schema.hasTrait(TraitKey.SPARSE_TRAIT);
                 var map = new SchemaMap(schema);
                 decoder.readStringMap(schema, map, (state, mapKey, memberDeserializer) -> {
-                    state.put(mapKey, deserialize(memberDeserializer, state.schema.mapValueMember()));
+                    // A null value (only valid in @sparse maps) is retained as null; otherwise read the value.
+                    if (sparse && memberDeserializer.isNull()) {
+                        state.put(mapKey, memberDeserializer.readNull());
+                    } else {
+                        state.put(mapKey, deserialize(memberDeserializer, state.schema.mapValueMember()));
+                    }
                 });
                 yield new ContentDocument(Document.of(map), schema);
             }

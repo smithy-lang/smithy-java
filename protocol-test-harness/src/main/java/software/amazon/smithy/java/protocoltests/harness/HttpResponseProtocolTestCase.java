@@ -15,8 +15,19 @@ import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
  * @param responseTestCase The smithy {@link HttpResponseTestCase}
  * @param isErrorTest Does this test an error response
  * @param outputBuilder {@link Supplier} to a {@link ShapeBuilder} of the operation output, which can also be an error.
+ * @param dynamicOutputBuilder {@link Supplier} to a document-backed {@link ShapeBuilder} of the operation output (or
+ *     error), used when running response tests through the {@code DynamicClient} path. Null when unavailable.
  */
 record HttpResponseProtocolTestCase(
         HttpResponseTestCase responseTestCase,
         boolean isErrorTest,
-        Supplier<ShapeBuilder<? extends SerializableStruct>> outputBuilder) {}
+        Supplier<ShapeBuilder<? extends SerializableStruct>> outputBuilder,
+        Supplier<ShapeBuilder<? extends SerializableStruct>> dynamicOutputBuilder) {
+
+    /**
+     * Get the output builder supplier for a given {@link TestMode}, or null if that mode is unavailable.
+     */
+    Supplier<ShapeBuilder<? extends SerializableStruct>> outputBuilder(TestMode mode) {
+        return mode == TestMode.DYNAMIC ? dynamicOutputBuilder : outputBuilder;
+    }
+}

@@ -836,7 +836,16 @@ public interface Document extends SerializableShape {
                     }
                     yield true;
                 }
-                default -> false; // unexpected type (DOCUMENT, MEMBER, OPERATION, SERVICE).
+                case DOCUMENT -> {
+                    // An untyped document carries no schema-driven type of its own; compare the underlying values.
+                    // This also lets a typed-but-document-targeted value (e.g. a struct member whose shape is a
+                    // document) compare equal to an equivalent untyped document.
+                    if (r.type() != ShapeType.DOCUMENT) {
+                        yield false;
+                    }
+                    yield Objects.equals(l.asObject(), r.asObject());
+                }
+                default -> false; // unexpected type (MEMBER, OPERATION, SERVICE).
             };
         }
         return false;

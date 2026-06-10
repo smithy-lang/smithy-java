@@ -335,6 +335,40 @@ public class DocumentTest {
                         Document.of(Map.of("a", Document.of("b")))));
     }
 
+    @Test
+    public void documentTypedValuesCompareByContent() {
+        // A document whose own type() is DOCUMENT (an untyped wrapper) must compare by its underlying contents,
+        // not be treated as never-equal. This is what happens for a struct member modeled as a `document`.
+        var a = new DocumentTypedWrapper(Document.of(Map.of("foo", Document.of("bar"))));
+        var b = new DocumentTypedWrapper(Document.of(Map.of("foo", Document.of("bar"))));
+        var c = new DocumentTypedWrapper(Document.of(Map.of("foo", Document.of("baz"))));
+
+        assertThat(a.type(), is(ShapeType.DOCUMENT));
+        assertThat(Document.equals(a, b), is(true));
+        assertThat(Document.equals(a, c), is(false));
+        // A document-typed value is not equal to a non-document of the same content.
+        assertThat(Document.equals(a, Document.of(Map.of("foo", Document.of("bar")))), is(false));
+    }
+
+    // A document that reports its type as DOCUMENT but delegates content access, mimicking an untyped/document-target
+    // value such as a struct member modeled as `document`.
+    record DocumentTypedWrapper(Document delegate) implements Document {
+        @Override
+        public ShapeType type() {
+            return ShapeType.DOCUMENT;
+        }
+
+        @Override
+        public Object asObject() {
+            return delegate.asObject();
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+            delegate.serializeContents(serializer);
+        }
+    }
+
     static final class DifferentDocument implements Document {
 
         private final Document delegate;

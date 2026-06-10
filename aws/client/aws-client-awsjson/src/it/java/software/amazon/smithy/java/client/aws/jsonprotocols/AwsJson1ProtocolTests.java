@@ -28,6 +28,11 @@ public class AwsJson1ProtocolTests {
 
                     // Like above, but in smithy-java we populate the defaults but don't change the nullability.
                     "AwsJson10ClientIgnoresNonTopLevelDefaultsOnMembersWithClientOptional",
+
+                    // Skipped only for the [dynamic] path; codegen still runs. The document-backed builder does not
+                    // populate modeled (nested) default values during error correction
+                    // (SchemaGuidedDocumentBuilder.errorCorrection is a no-op).
+                    "AwsJson10ClientPopulatesNestedDefaultValuesWhenMissing [dynamic]",
             },
             skipOperations = "aws.protocoltests.json10#OperationWithRequiredMembersWithDefaults")
     public void requestTest(DataStream expected, DataStream actual) {
@@ -48,6 +53,13 @@ public class AwsJson1ProtocolTests {
             skipTests = {
                     "AwsJson10ClientPopulatesDefaultsValuesWhenMissingInResponse",
                     "AwsJson10ClientIgnoresDefaultValuesIfMemberValuesArePresentInResponse",
+
+                    // Skipped only for the [dynamic] (document-backed) path; codegen still runs. These rely on the
+                    // dynamic builder populating modeled defaults during error correction, which it does not yet do
+                    // (SchemaGuidedDocumentBuilder.errorCorrection is a no-op).
+                    "AwsJson10ClientPopulatesNestedDefaultsWhenMissingInResponseBody [dynamic]",
+                    "AwsJson10ClientPopulatesNestedDefaultValuesWhenMissing [dynamic]",
+                    "AwsJson10ClientErrorCorrectsWhenServerFailsToSerializeRequiredValues [dynamic]",
             },
             skipOperations = "aws.protocoltests.json10#OperationWithRequiredMembersWithDefaults")
     public void responseTest(Runnable test) {

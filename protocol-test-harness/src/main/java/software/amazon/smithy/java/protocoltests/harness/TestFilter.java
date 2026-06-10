@@ -6,7 +6,9 @@
 package software.amazon.smithy.java.protocoltests.harness;
 
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -25,9 +27,15 @@ sealed interface TestFilter {
     boolean skipOperation(ShapeId operationId);
 
     /**
-     * Filters test cases
+     * Filters test cases regardless of mode (i.e. an unsuffixed skip/run entry).
      */
     boolean skipTestCase(HttpMessageTestCase testCase);
+
+    /**
+     * Filters a test case for a specific {@link TestMode}, honoring mode-suffixed skip/run entries
+     * (e.g. {@code "SomeTest [dynamic]"}).
+     */
+    boolean skipTestCase(HttpMessageTestCase testCase, TestMode mode);
 
     /**
      * Filters event stream test cases.
@@ -48,8 +56,12 @@ sealed interface TestFilter {
     final class FilterImpl implements TestFilter {
         private final Set<ShapeId> operations = new HashSet<>();
         private final Set<ShapeId> skippedOperations = new HashSet<>();
+        // "tests"/"skipped" entries that apply to every mode (no [mode] suffix).
         private final Set<String> tests = new HashSet<>();
         private final Set<String> skippedTests = new HashSet<>();
+        // Mode-suffixed entries, keyed by mode, e.g. "SomeTest [dynamic]" -> DYNAMIC: {"SomeTest"}.
+        private final Map<TestMode, Set<String>> testsByMode = new EnumMap<>(TestMode.class);
+        private final Map<TestMode, Set<String>> skippedTestsByMode = new EnumMap<>(TestMode.class);
 
         public FilterImpl(ProtocolTestFilter filter) {
             skippedOperations.addAll(
@@ -61,13 +73,35 @@ sealed interface TestFilter {
                 }
                 operations.add(operationId);
             }
-            skippedTests.addAll(Arrays.asList(filter.skipTests()));
-            for (var test : filter.tests()) {
-                if (skippedTests.contains(test)) {
-                    throw new IllegalArgumentException("Test: " + test + " is skipped and cannot be run.");
-                }
-                tests.add(test);
+            for (var entry : filter.skipTests()) {
+                addEntry(entry, skippedTests, skippedTestsByMode);
             }
+            for (var entry : filter.tests()) {
+                addEntry(entry, tests, testsByMode);
+            }
+        }
+
+        // Parse an entry into either the unsuffixed set or the per-mode set, depending on a trailing "[mode]".
+        private static void addEntry(String entry, Set<String> all, Map<TestMode, Set<String>> byMode) {
+            var mode = parseMode(entry);
+            if (mode == null) {
+                all.add(entry);
+            } else {
+                byMode.computeIfAbsent(mode, k -> new HashSet<>()).add(stripModeSuffix(entry));
+            }
+        }
+
+        private static TestMode parseMode(String entry) {
+            for (var mode : TestMode.values()) {
+                if (entry.endsWith(" [" + mode.label() + "]")) {
+                    return mode;
+                }
+            }
+            return null;
+        }
+
+        private static String stripModeSuffix(String entry) {
+            return entry.substring(0, entry.lastIndexOf(" [")).trim();
         }
 
         @Override
@@ -78,14 +112,28 @@ sealed interface TestFilter {
 
         @Override
         public boolean skipTestCase(HttpMessageTestCase testCase) {
-            return skippedTests.contains(testCase.getId())
-                    || (!tests.isEmpty() && !tests.contains(testCase.getId()));
+            return skip(testCase.getId(), skippedTests, tests);
+        }
+
+        @Override
+        public boolean skipTestCase(HttpMessageTestCase testCase, TestMode mode) {
+            if (skip(testCase.getId(), skippedTests, tests)) {
+                return true;
+            }
+            // Mode-specific skip, or a mode-specific "only run these" allow-list that excludes this id.
+            var skippedForMode = skippedTestsByMode.getOrDefault(mode, Set.of());
+            var allowedForMode = testsByMode.getOrDefault(mode, Set.of());
+            return skippedForMode.contains(testCase.getId())
+                    || (!allowedForMode.isEmpty() && !allowedForMode.contains(testCase.getId()));
         }
 
         @Override
         public boolean skipTestCase(EventStreamTestCase testCase) {
-            return skippedTests.contains(testCase.getId())
-                    || (!tests.isEmpty() && !tests.contains(testCase.getId()));
+            return skip(testCase.getId(), skippedTests, tests);
+        }
+
+        private static boolean skip(String id, Set<String> skipped, Set<String> only) {
+            return skipped.contains(id) || (!only.isEmpty() && !only.contains(id));
         }
     }
 
@@ -98,6 +146,11 @@ sealed interface TestFilter {
 
         @Override
         public boolean skipTestCase(HttpMessageTestCase testCase) {
+            return false;
+        }
+
+        @Override
+        public boolean skipTestCase(HttpMessageTestCase testCase, TestMode mode) {
             return false;
         }
 
@@ -125,6 +178,11 @@ sealed interface TestFilter {
         @Override
         public boolean skipTestCase(HttpMessageTestCase testCase) {
             return first.skipTestCase(testCase) || second.skipTestCase(testCase);
+        }
+
+        @Override
+        public boolean skipTestCase(HttpMessageTestCase testCase, TestMode mode) {
+            return first.skipTestCase(testCase, mode) || second.skipTestCase(testCase, mode);
         }
 
         @Override

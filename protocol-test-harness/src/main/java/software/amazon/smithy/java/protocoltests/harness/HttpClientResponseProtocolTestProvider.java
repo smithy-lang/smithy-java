@@ -61,63 +61,90 @@ final class HttpClientResponseProtocolTestProvider extends
                 .flatMap(
                         operation -> operation.responseTestCases()
                                 .stream()
-                                .map(protocolTestCase -> {
+                                .flatMap(protocolTestCase -> {
                                     var testCase = protocolTestCase.responseTestCase();
                                     if (filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)) {
-                                        return new IgnoredTestCase(testCase.getId());
+                                        return Stream.of(new IgnoredTestCase(testCase.getId()));
                                     }
-                                    boolean isErrorTestCase = protocolTestCase.isErrorTest();
-                                    // Get specific values to use for this test case's context
-                                    var testProtocol = store.getProtocol(testCase.getProtocol());
-                                    var testResolver = testCase.getAuthScheme().isEmpty()
-                                            ? AuthSchemeResolver.NO_AUTH
-                                            : (AuthSchemeResolver) p -> List
-                                                    .of(new AuthSchemeOption(testCase.getAuthScheme().get()));
-                                    var testTransport = new TestTransport(testCase);
-
-                                    var placeholderTransport =
-                                            (MockClient.PlaceHolderTransport<HttpRequest, HttpResponse>) store
-                                                    .mockClient()
-                                                    .config()
-                                                    .transport();
-                                    placeholderTransport.setTransport(testTransport);
-
-                                    var overrideBuilder = RequestOverrideConfig.builder()
-                                            .protocol(testProtocol)
-                                            .authSchemeResolver(testResolver);
-                                    var input = operation.operationModel().inputBuilder().errorCorrection().build();
-                                    var outputBuilder = protocolTestCase.outputBuilder().get();
-                                    new ProtocolTestDocument(testCase.getParams(),
-                                            testCase.getBodyMediaType().orElse(null))
-                                            .deserializeInto(outputBuilder);
-                                    return new ResponseTestInvocationContext(
-                                            testCase,
-                                            store.mockClient(),
-                                            operation.operationModel(),
-                                            input,
-                                            outputBuilder.build(),
-                                            overrideBuilder.build(),
-                                            isErrorTestCase);
+                                    // Run each response test through the codegen model and (when available) the
+                                    // document-backed dynamic model.
+                                    return TestModes.available(operation)
+                                            .map(mode -> {
+                                                var name = testCase.getId() + " [" + mode.label() + "]";
+                                                if (filter.skipTestCase(testCase, mode)) {
+                                                    return new IgnoredTestCase(name);
+                                                }
+                                                try {
+                                                    return buildContext(store, operation, protocolTestCase, mode);
+                                                } catch (RuntimeException e) {
+                                                    return new FailedGenerationTestCase(name, e);
+                                                }
+                                            });
                                 }));
+    }
+
+    @SuppressWarnings("unchecked")
+    private TestTemplateInvocationContext buildContext(
+            ProtocolTestExtension.SharedClientTestData store,
+            HttpTestOperation operation,
+            HttpResponseProtocolTestCase protocolTestCase,
+            TestMode mode
+    ) {
+        var testCase = protocolTestCase.responseTestCase();
+        boolean isErrorTestCase = protocolTestCase.isErrorTest();
+        var apiOperation = operation.operationModel(mode);
+        var testProtocol = store.getProtocol(testCase.getProtocol());
+        var testResolver = testCase.getAuthScheme().isEmpty()
+                ? AuthSchemeResolver.NO_AUTH
+                : (AuthSchemeResolver) p -> List.of(new AuthSchemeOption(testCase.getAuthScheme().get()));
+        var testTransport = new TestTransport(testCase);
+
+        var overrideBuilder = RequestOverrideConfig.builder()
+                .protocol(testProtocol)
+                .authSchemeResolver(testResolver);
+        var input = apiOperation.inputBuilder().errorCorrection().build();
+        var outputBuilder = protocolTestCase.outputBuilder(mode).get();
+        new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
+                .deserializeInto(outputBuilder);
+        return new ResponseTestInvocationContext(
+                testCase,
+                mode,
+                store.mockClient(),
+                apiOperation,
+                input,
+                outputBuilder.build(),
+                overrideBuilder.build(),
+                isErrorTestCase,
+                testTransport);
     }
 
     record ResponseTestInvocationContext(
             HttpResponseTestCase testCase,
+            TestMode mode,
             MockClient mockClient,
             ApiOperation apiOperation,
             SerializableStruct input,
             SerializableStruct expectedOutput,
             RequestOverrideConfig overrideConfig,
-            boolean isErrorTestCase) implements TestTemplateInvocationContext {
+            boolean isErrorTestCase,
+            TestTransport testTransport) implements TestTemplateInvocationContext {
 
         @Override
         public String getDisplayName(int invocationIndex) {
-            return testCase.getId();
+            return testCase.getId() + " [" + mode.label() + "]";
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public List<Extension> getAdditionalExtensions() {
             return List.of((ProtocolTestParameterResolver) () -> {
+                // Bind this test's transport just before sending (see the request provider for why this must happen
+                // at execution time rather than when the invocation context is built).
+                var placeholderTransport =
+                        (MockClient.PlaceHolderTransport<HttpRequest, HttpResponse>) mockClient
+                                .config()
+                                .transport();
+                placeholderTransport.setTransport(testTransport);
                 SerializableStruct actualOutput;
                 try {
                     actualOutput = mockClient.clientRequest(input, apiOperation, overrideConfig);

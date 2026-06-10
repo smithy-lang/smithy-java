@@ -12,6 +12,9 @@ dependencies {
     implementation(project(":codegen:codegen-plugin"))
     implementation(libs.smithy.codegen)
     implementation(project(":client:client-core"))
+    // Document-backed client models so protocol tests also exercise the DynamicClient path.
+    implementation(project(":client:dynamic-client"))
+    implementation(project(":dynamic-schemas"))
     implementation(libs.smithy.protocol.test.traits)
     implementation(project(":http:http-api"))
     implementation(project(":server:server-api"))

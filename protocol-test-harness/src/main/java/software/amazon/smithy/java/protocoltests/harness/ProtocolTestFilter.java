@@ -24,6 +24,15 @@ import org.junit.platform.commons.annotation.Testable;
 public @interface ProtocolTestFilter {
     /**
      * List of test case IDs to exclude from executed tests.
+     *
+     * <p>Client protocol tests run in two modes: {@code codegen} (generated, strongly-typed shapes) and
+     * {@code dynamic} (document-backed {@code DynamicClient} shapes). By default an entry skips a test in <em>all</em>
+     * modes. To skip a test in only one mode, append the mode in brackets, matching the test's display name:
+     * <pre>{@code
+     *   "SomeTestId"             // skipped in every mode
+     *   "SomeTestId [dynamic]"   // skipped only for the dynamic path; codegen still runs
+     *   "SomeTestId [codegen]"   // skipped only for the codegen path; dynamic still runs
+     * }</pre>
      */
     String[] skipTests() default {};
 
