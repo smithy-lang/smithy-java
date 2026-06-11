@@ -10,18 +10,12 @@ extra["displayName"] = "Smithy :: Java :: MCP Schemas"
 extra["moduleName"] = "software.amazon.smithy.mcp.schemas"
 
 smithyJava {
-    autoAddDependencies = false
     generatedPluginOutputs.add("trait-codegen")
 }
 
 dependencies {
-    api(project(":core"))
     api(libs.smithy.model)
-    api(project(":server:server-api"))
-    api(project(":framework-errors"))
     api(project(":smithy-ai-traits"))
-    smithyBuild(project(":codegen:codegen-plugin"))
-    smithyBuild(project(":server:server-api"))
     smithyBuild(libs.smithy.traitcodegen)
 }
 

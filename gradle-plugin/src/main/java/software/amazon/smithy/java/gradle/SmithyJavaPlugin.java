@@ -6,11 +6,12 @@
 package software.amazon.smithy.java.gradle;
 
 import java.io.File;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
+
+import javax.inject.Inject;
 
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
@@ -19,6 +20,7 @@ import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.DependencySet;
 import org.gradle.api.artifacts.dsl.DependencyHandler;
 import org.gradle.api.file.FileCollection;
+import org.gradle.api.file.FileSystemOperations;
 import org.gradle.api.plugins.JavaLibraryPlugin;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.provider.Provider;
@@ -34,32 +36,38 @@ import software.amazon.smithy.java.gradle.tasks.MergeServiceFilesTask;
 /**
  * Gradle plugin that simplifies Java code generation from Smithy models.
  *
- * <p>This plugin requires a Java plugin ({@code java}, {@code java-library}, or {@code application})
- * to be applied by the user, then applies {@code software.amazon.smithy.gradle.smithy-base} and
+ * <p>This plugin requires the user to apply a Java plugin ({@code java}, {@code java-library}, or
+ * {@code application}) and then applies {@code software.amazon.smithy.gradle.smithy-base}. It
  * automatically:
  * <ul>
- *     <li>Parses {@code smithy-build.json} to determine codegen modes</li>
- *     <li>Adds required dependencies based on detected modes</li>
+ *     <li>Parses {@code smithy-build.json} to determine codegen modes (client, server, types)</li>
+ *     <li>Adds required runtime and codegen dependencies based on detected modes</li>
  *     <li>Wires generated source and resource directories into the main source set</li>
  *     <li>Sets up task dependencies (compileJava, processResources, sourcesJar)</li>
- *     <li>Optionally merges META-INF/services files from multiple plugin outputs</li>
+ *     <li>Merges META-INF/services files when multiple projections or plugin outputs are used</li>
  * </ul>
  *
- * <p>When {@code java-library} is applied, types/client dependencies are added to the {@code api}
- * configuration so they are transitively visible to consumers, while server dependencies use
- * {@code implementation}. When only {@code java} or {@code application} is applied, all
- * dependencies are added to {@code implementation}.
+ * <p>Dependency configuration selection:
+ * <ul>
+ *     <li>{@code java-library}: uses {@code api} unless mode is server-only</li>
+ *     <li>{@code java} or {@code application}: uses {@code implementation}</li>
+ * </ul>
  *
  * <p>Users who need full control over dependency configurations can set
- * {@code smithyJava.autoAddDependencies = false} and manage dependencies manually.
+ * {@code smithyJava.autoAddDependencies = false}.
+ *
+ * @see SmithyJavaExtension
  */
-public class SmithyJavaPlugin implements Plugin<Project> {
+public abstract class SmithyJavaPlugin implements Plugin<Project> {
 
     private static final String SMITHY_JAVA_GROUP = "software.amazon.smithy.java";
     private static final String JAVA_CODEGEN_PLUGIN_NAME = "java-codegen";
     private static final String SMITHY_BUILD_TASK_NAME = "smithyBuild";
     private static final String CLEAN_SMITHY_OUTPUT_TASK_NAME = "cleanSmithyOutput";
     private static final String MERGE_SERVICE_FILES_TASK_NAME = "mergeSmithyServiceFiles";
+
+    @Inject
+    protected abstract FileSystemOperations getFileSystemOperations();
 
     @Override
     public void apply(Project project) {
@@ -73,10 +81,13 @@ public class SmithyJavaPlugin implements Plugin<Project> {
                     .getByType(SmithyExtension.class);
 
             configureDependencies(project, smithyExt, ext);
-            wireGeneratedSources(project, smithyExt, ext);
             configureCleanOutput(project, smithyExt);
-            configureTaskDependencies(project);
-            configureServiceFileMerging(project, smithyExt, ext);
+
+            project.afterEvaluate(p -> {
+                wireGeneratedSources(p, smithyExt, ext);
+                configureTaskDependencies(p);
+                configureServiceFileMerging(p, smithyExt, ext);
+            });
         });
 
         project.afterEvaluate(p -> {
@@ -92,11 +103,6 @@ public class SmithyJavaPlugin implements Plugin<Project> {
             SmithyExtension smithyExt,
             SmithyJavaExtension ext
     ) {
-        Configuration smithyBuild = project.getConfigurations().getByName("smithyBuild");
-
-        // Resolve modes via ValueSource for configuration cache compatibility.
-        // If explicit modes are set in the DSL, use those directly; otherwise
-        // read smithy-build.json through a tracked ValueSource.
         Provider<Set<File>> configFiles = smithyExt.getSmithyBuildConfigs()
                 .map(FileCollection::getFiles);
         Provider<Set<String>> inferredModes = project.getProviders().of(
@@ -105,38 +111,45 @@ public class SmithyJavaPlugin implements Plugin<Project> {
         Provider<Set<String>> modes = ext.getModes().map(declared ->
                 declared.isEmpty() ? inferredModes.get() : declared);
 
+        Configuration smithyBuild = project.getConfigurations().getByName("smithyBuild");
         smithyBuild.withDependencies(deps -> {
             if (!ext.getAutoAddDependencies().getOrElse(true)) {
                 return;
             }
-            addIfAbsent(deps, project.getDependencies(), "codegen-plugin", SmithyJavaVersion.VERSION);
-        });
-
-        // Wire runtime deps to implementation by default. The withDependencies callback
-        // checks at resolution time whether java-library has been applied (api exists)
-        // and skips deps that belong on api instead.
-        Configuration implementation = project.getConfigurations().getByName("implementation");
-        implementation.withDependencies(deps -> {
-            if (!ext.getAutoAddDependencies().getOrElse(true)) {
-                return;
-            }
-            boolean hasApi = project.getPlugins().hasPlugin(JavaLibraryPlugin.class);
             String version = SmithyJavaVersion.VERSION;
             Set<String> resolved = modes.get();
-            if (!hasApi) {
-                addIfAbsent(deps, project.getDependencies(), "core", version);
-                addIfAbsent(deps, project.getDependencies(), "framework-errors", version);
-                if (resolved.contains("client")) {
-                    addIfAbsent(deps, project.getDependencies(), "client-core", version);
-                }
+            addIfAbsent(deps, project.getDependencies(), "codegen-plugin", version);
+            if (resolved.contains("client")) {
+                addIfAbsent(deps, project.getDependencies(), "client-core", version);
             }
             if (resolved.contains("server")) {
                 addIfAbsent(deps, project.getDependencies(), "server-api", version);
             }
         });
 
-        // When java-library is applied, types/client deps go to api.
-        // Use withType to react regardless of plugin application order.
+        Configuration implementation = project.getConfigurations().getByName("implementation");
+        implementation.withDependencies(deps -> {
+            if (!ext.getAutoAddDependencies().getOrElse(true)) {
+                return;
+            }
+            String version = SmithyJavaVersion.VERSION;
+            Set<String> resolved = modes.get();
+            boolean hasApi = project.getPlugins().hasPlugin(JavaLibraryPlugin.class);
+            boolean serverOnly = resolved.contains("server")
+                    && !resolved.contains("client") && !resolved.contains("types");
+            if (hasApi && !serverOnly) {
+                return;
+            }
+            addIfAbsent(deps, project.getDependencies(), "core", version);
+            addIfAbsent(deps, project.getDependencies(), "framework-errors", version);
+            if (resolved.contains("client")) {
+                addIfAbsent(deps, project.getDependencies(), "client-core", version);
+            }
+            if (resolved.contains("server")) {
+                addIfAbsent(deps, project.getDependencies(), "server-api", version);
+            }
+        });
+
         project.getPlugins().withType(JavaLibraryPlugin.class, plugin -> {
             Configuration api = project.getConfigurations().getByName("api");
             api.withDependencies(deps -> {
@@ -145,10 +158,18 @@ public class SmithyJavaPlugin implements Plugin<Project> {
                 }
                 String version = SmithyJavaVersion.VERSION;
                 Set<String> resolved = modes.get();
+                boolean serverOnly = resolved.contains("server")
+                        && !resolved.contains("client") && !resolved.contains("types");
+                if (serverOnly) {
+                    return;
+                }
                 addIfAbsent(deps, project.getDependencies(), "core", version);
                 addIfAbsent(deps, project.getDependencies(), "framework-errors", version);
                 if (resolved.contains("client")) {
                     addIfAbsent(deps, project.getDependencies(), "client-core", version);
+                }
+                if (resolved.contains("server")) {
+                    addIfAbsent(deps, project.getDependencies(), "server-api", version);
                 }
             });
         });
@@ -161,14 +182,13 @@ public class SmithyJavaPlugin implements Plugin<Project> {
     ) {
         SourceSetContainer sourceSets = project.getExtensions().getByType(SourceSetContainer.class);
         sourceSets.named(SourceSet.MAIN_SOURCE_SET_NAME, sourceSet -> {
+            sourceSet.getJava().srcDir(project.files((Callable<Object>) () ->
+                    resolveCodegenPaths(smithyExt, ext, "java")));
+
+            sourceSet.getResources().srcDir(project.files((Callable<Object>) () ->
+                    resolveCodegenPaths(smithyExt, ext, "resources")));
+
             Provider<String> projection = smithyExt.getSourceProjection();
-
-            Provider<Path> codegenPath = projection.flatMap(
-                    p -> smithyExt.getPluginProjectionPath(p, JAVA_CODEGEN_PLUGIN_NAME));
-            sourceSet.getJava().srcDir(codegenPath.map(p -> p.resolve("java").toFile()));
-            sourceSet.getResources().srcDir(codegenPath.map(p -> p.resolve("resources").toFile()));
-
-            // Callable defers evaluation until the source set is resolved, so generatedPluginOutputs is finalized
             sourceSet.getJava().srcDir(project.files((Callable<Object>) () ->
                     ext.getGeneratedPluginOutputs().get().stream()
                             .map(name -> smithyExt.getPluginProjectionPath(
@@ -187,13 +207,16 @@ public class SmithyJavaPlugin implements Plugin<Project> {
     }
 
     private void configureCleanOutput(Project project, SmithyExtension smithyExt) {
+        Provider<File> outputDirectory = smithyExt.getOutputDirectory().getAsFile();
         project.getTasks().register(CLEAN_SMITHY_OUTPUT_TASK_NAME, Delete.class, task -> {
             task.setGroup("smithy");
-            task.setDescription("Cleans the Smithy output directory before code generation");
-            task.delete(smithyExt.getOutputDirectory());
+            task.setDescription("Cleans the Smithy output directory");
+            task.delete(outputDirectory);
         });
+        FileSystemOperations fs = getFileSystemOperations();
         project.getTasks().named(SMITHY_BUILD_TASK_NAME, task ->
-                task.dependsOn(CLEAN_SMITHY_OUTPUT_TASK_NAME));
+                task.doFirst(CLEAN_SMITHY_OUTPUT_TASK_NAME, ignored ->
+                        fs.delete(spec -> spec.delete(outputDirectory))));
     }
 
     private void configureTaskDependencies(Project project) {
@@ -215,16 +238,13 @@ public class SmithyJavaPlugin implements Plugin<Project> {
     ) {
         Provider<String> projection = smithyExt.getSourceProjection();
 
-        Provider<Path> codegenPath = projection.flatMap(
-                p -> smithyExt.getPluginProjectionPath(p, JAVA_CODEGEN_PLUGIN_NAME));
-        Provider<File> codegenServicesDir = codegenPath.map(
-                p -> p.resolve("resources/META-INF/services").toFile());
-
         TaskProvider<MergeServiceFilesTask> mergeTask = project.getTasks()
                 .register(MERGE_SERVICE_FILES_TASK_NAME, MergeServiceFilesTask.class, task -> {
                     task.dependsOn(SMITHY_BUILD_TASK_NAME);
                     task.setGroup("smithy");
-                    task.getServiceDirectories().from(codegenServicesDir);
+
+                    task.getServiceDirectories().from(project.files((Callable<Object>) () ->
+                            resolveCodegenPaths(smithyExt, ext, "resources/META-INF/services")));
 
                     task.getServiceDirectories().from(project.files((Callable<Object>) () ->
                             ext.getGeneratedPluginOutputs().get().stream()
@@ -235,9 +255,13 @@ public class SmithyJavaPlugin implements Plugin<Project> {
                                             .toFile())
                                     .collect(Collectors.toList())));
 
-                    task.onlyIf(t -> !ext.getGeneratedPluginOutputs()
-                            .getOrElse(List.of()).isEmpty()
-                            && ext.getMergeServiceFiles().getOrElse(true));
+                    task.onlyIf(t -> {
+                        if (!ext.getMergeServiceFiles().getOrElse(true)) {
+                            return false;
+                        }
+                        return ext.getProjections().get().size() > 1
+                                || !ext.getGeneratedPluginOutputs().getOrElse(List.of()).isEmpty();
+                    });
                 });
 
         Provider<File> mergedServicesDir = project.getLayout().getBuildDirectory()
@@ -252,7 +276,6 @@ public class SmithyJavaPlugin implements Plugin<Project> {
                 }
                 return List.of();
             }), spec -> spec.into("."));
-            // Files added via from() above bypass eachFile, so only originals are excluded
             task.eachFile(details -> {
                 if (isMergingActive(ext)
                         && details.getRelativePath().getPathString().startsWith("META-INF/services/")
@@ -283,8 +306,24 @@ public class SmithyJavaPlugin implements Plugin<Project> {
     }
 
     private static boolean isMergingActive(SmithyJavaExtension ext) {
-        return !ext.getGeneratedPluginOutputs().getOrElse(List.of()).isEmpty()
-                && ext.getMergeServiceFiles().getOrElse(true);
+        if (!ext.getMergeServiceFiles().getOrElse(true)) {
+            return false;
+        }
+        return ext.getProjections().get().size() > 1
+                || !ext.getGeneratedPluginOutputs().getOrElse(List.of()).isEmpty();
+    }
+
+    private static List<File> resolveCodegenPaths(SmithyExtension smithyExt, SmithyJavaExtension ext, String subpath) {
+        List<String> explicitProjections = ext.getProjections().get();
+        if (explicitProjections.isEmpty()) {
+            return List.of(smithyExt.getPluginProjectionPath(
+                    smithyExt.getSourceProjection().get(), JAVA_CODEGEN_PLUGIN_NAME)
+                    .get().resolve(subpath).toFile());
+        }
+        return explicitProjections.stream()
+                .map(name -> smithyExt.getPluginProjectionPath(name, JAVA_CODEGEN_PLUGIN_NAME)
+                        .get().resolve(subpath).toFile())
+                .collect(Collectors.toList());
     }
 
     private static void addIfAbsent(

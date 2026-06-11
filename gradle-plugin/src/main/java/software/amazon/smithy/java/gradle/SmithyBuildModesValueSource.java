@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 import org.gradle.api.provider.SetProperty;
 import org.gradle.api.provider.ValueSource;
@@ -35,6 +36,7 @@ public abstract class SmithyBuildModesValueSource implements ValueSource<Set<Str
 
     @Override
     public Set<String> obtain() {
+        Set<String> allModes = new HashSet<>();
         for (File config : getParameters().getSmithyBuildConfigs().get()) {
             if (!config.exists()) {
                 continue;
@@ -42,21 +44,34 @@ public abstract class SmithyBuildModesValueSource implements ValueSource<Set<Str
             try {
                 String content = Files.readString(config.toPath());
                 ObjectNode root = Node.parseJsonWithComments(content).expectObjectNode();
-                return root.getObjectMember("plugins")
+
+                root.getObjectMember("plugins")
                         .flatMap(plugins -> plugins.getObjectMember(JAVA_CODEGEN_PLUGIN_NAME))
                         .flatMap(codegen -> codegen.getArrayMember("modes"))
                         .map(SmithyBuildModesValueSource::extractModes)
-                        .orElse(Set.of("types"));
+                        .ifPresent(allModes::addAll);
+                root.getObjectMember("projections").ifPresent(projections -> {
+                    for (Node value : projections.getMembers().values()) {
+                        value.expectObjectNode()
+                                .getObjectMember("plugins")
+                                .flatMap(plugins -> plugins.getObjectMember(JAVA_CODEGEN_PLUGIN_NAME))
+                                .flatMap(codegen -> codegen.getArrayMember("modes"))
+                                .map(SmithyBuildModesValueSource::extractModes)
+                                .ifPresent(allModes::addAll);
+                    }
+                });
             } catch (IOException ignored) {
             }
         }
-        return Set.of("types");
+        return allModes.isEmpty() ? Set.of("types") : allModes;
     }
 
     private static Set<String> extractModes(ArrayNode modesArray) {
         Set<String> modes = new HashSet<>();
         for (Node element : modesArray.getElements()) {
-            element.asStringNode().map(StringNode::getValue).ifPresent(modes::add);
+            element.asStringNode()
+                    .map(s -> s.getValue().toLowerCase(Locale.ENGLISH))
+                    .ifPresent(modes::add);
         }
         return modes;
     }
