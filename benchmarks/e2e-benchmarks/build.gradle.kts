@@ -1,6 +1,6 @@
 plugins {
     id("smithy-java.java-conventions")
-    alias(libs.plugins.shadow)
+    id("com.gradleup.shadow")
     application
     id("software.amazon.smithy.gradle.smithy-base")
 }
