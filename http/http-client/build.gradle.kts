@@ -3,7 +3,7 @@ import java.util.Properties
 
 plugins {
     id("smithy-java.module-conventions")
-    id("me.champeau.jmh") version "0.7.3"
+    id("smithy-java.jmh-conventions")
 }
 
 description = "Smithy's generic blocking HTTP client with bidirectional streaming"
