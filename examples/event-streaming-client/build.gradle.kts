@@ -1,6 +1,6 @@
 plugins {
+    `java-library`
     id("software.amazon.smithy.java.gradle.smithy-java")
-    id("smithy-java.jmh-conventions")
 }
 
 dependencies {
@@ -9,7 +9,7 @@ dependencies {
     implementation("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:client-core:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:client-rpcv2-cbor:${smithyJavaVersion}")
-    implementation(project(":framework-errors"))
+    implementation("software.amazon.smithy.java:framework-errors:$smithyJavaVersion")
 
     // Test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.3")
@@ -29,10 +29,6 @@ tasks {
         testClassesDirs = sourceSets["it"].output.classesDirs
         classpath = sourceSets["it"].runtimeClasspath
     }
-}
-
-jmh {
-    warmupIterations = 2
 }
 
 // Helps Intellij IDE's discover smithy models

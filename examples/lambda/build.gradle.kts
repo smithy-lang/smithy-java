@@ -1,4 +1,5 @@
 plugins {
+    java
     id("software.amazon.smithy.java.gradle.smithy-java")
 }
 

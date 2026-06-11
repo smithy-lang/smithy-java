@@ -1,7 +1,8 @@
 plugins {
+    `java-library`
     id("software.amazon.smithy.java.gradle.smithy-java")
     application
-    id("smithy-java.jmh-conventions")
+    id("me.champeau.jmh")
 }
 
 dependencies {
@@ -17,7 +18,7 @@ dependencies {
     // Test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testImplementation(libs.assertj.core)
+    testImplementation("org.assertj:assertj-core:3.27.7")
 }
 
 application {
