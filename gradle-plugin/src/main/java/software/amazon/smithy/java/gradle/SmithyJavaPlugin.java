@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
+import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
@@ -19,6 +20,7 @@ import org.gradle.api.artifacts.DependencySet;
 import org.gradle.api.artifacts.dsl.DependencyHandler;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.plugins.JavaLibraryPlugin;
+import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.Delete;
 import org.gradle.api.tasks.SourceSet;
@@ -32,8 +34,9 @@ import software.amazon.smithy.java.gradle.tasks.MergeServiceFilesTask;
 /**
  * Gradle plugin that simplifies Java code generation from Smithy models.
  *
- * <p>This plugin applies {@code java-library} and
- * {@code software.amazon.smithy.gradle.smithy-base}, then automatically:
+ * <p>This plugin requires a Java plugin ({@code java}, {@code java-library}, or {@code application})
+ * to be applied by the user, then applies {@code software.amazon.smithy.gradle.smithy-base} and
+ * automatically:
  * <ul>
  *     <li>Parses {@code smithy-build.json} to determine codegen modes</li>
  *     <li>Adds required dependencies based on detected modes</li>
@@ -41,6 +44,14 @@ import software.amazon.smithy.java.gradle.tasks.MergeServiceFilesTask;
  *     <li>Sets up task dependencies (compileJava, processResources, sourcesJar)</li>
  *     <li>Optionally merges META-INF/services files from multiple plugin outputs</li>
  * </ul>
+ *
+ * <p>When {@code java-library} is applied, types/client dependencies are added to the {@code api}
+ * configuration so they are transitively visible to consumers, while server dependencies use
+ * {@code implementation}. When only {@code java} or {@code application} is applied, all
+ * dependencies are added to {@code implementation}.
+ *
+ * <p>Users who need full control over dependency configurations can set
+ * {@code smithyJava.autoAddDependencies = false} and manage dependencies manually.
  */
 public class SmithyJavaPlugin implements Plugin<Project> {
 
@@ -52,20 +63,28 @@ public class SmithyJavaPlugin implements Plugin<Project> {
 
     @Override
     public void apply(Project project) {
-        project.getPlugins().apply(JavaLibraryPlugin.class);
         project.getPlugins().apply("software.amazon.smithy.gradle.smithy-base");
 
         SmithyJavaExtension ext = project.getExtensions()
                 .create("smithyJava", SmithyJavaExtension.class);
 
-        SmithyExtension smithyExt = project.getExtensions()
-                .getByType(SmithyExtension.class);
+        project.getPlugins().withType(JavaPlugin.class, javaPlugin -> {
+            SmithyExtension smithyExt = project.getExtensions()
+                    .getByType(SmithyExtension.class);
 
-        configureDependencies(project, smithyExt, ext);
-        wireGeneratedSources(project, smithyExt, ext);
-        configureCleanOutput(project, smithyExt);
-        configureTaskDependencies(project);
-        configureServiceFileMerging(project, smithyExt, ext);
+            configureDependencies(project, smithyExt, ext);
+            wireGeneratedSources(project, smithyExt, ext);
+            configureCleanOutput(project, smithyExt);
+            configureTaskDependencies(project);
+            configureServiceFileMerging(project, smithyExt, ext);
+        });
+
+        project.afterEvaluate(p -> {
+            if (!p.getPlugins().hasPlugin(JavaPlugin.class)) {
+                throw new GradleException(
+                        "The smithy-java plugin requires a Java plugin (java, java-library, or application) to be applied.");
+            }
+        });
     }
 
     private void configureDependencies(
@@ -74,7 +93,6 @@ public class SmithyJavaPlugin implements Plugin<Project> {
             SmithyJavaExtension ext
     ) {
         Configuration smithyBuild = project.getConfigurations().getByName("smithyBuild");
-        Configuration api = project.getConfigurations().getByName("api");
 
         // Resolve modes via ValueSource for configuration cache compatibility.
         // If explicit modes are set in the DSL, use those directly; otherwise
@@ -91,31 +109,48 @@ public class SmithyJavaPlugin implements Plugin<Project> {
             if (!ext.getAutoAddDependencies().getOrElse(true)) {
                 return;
             }
+            addIfAbsent(deps, project.getDependencies(), "codegen-plugin", SmithyJavaVersion.VERSION);
+        });
+
+        // Wire runtime deps to implementation by default. The withDependencies callback
+        // checks at resolution time whether java-library has been applied (api exists)
+        // and skips deps that belong on api instead.
+        Configuration implementation = project.getConfigurations().getByName("implementation");
+        implementation.withDependencies(deps -> {
+            if (!ext.getAutoAddDependencies().getOrElse(true)) {
+                return;
+            }
+            boolean hasApi = project.getPlugins().hasPlugin(JavaLibraryPlugin.class);
             String version = SmithyJavaVersion.VERSION;
             Set<String> resolved = modes.get();
-            addIfAbsent(deps, project.getDependencies(), "codegen-plugin", version);
-            if (resolved.contains("client")) {
-                addIfAbsent(deps, project.getDependencies(), "client-core", version);
+            if (!hasApi) {
+                addIfAbsent(deps, project.getDependencies(), "core", version);
+                addIfAbsent(deps, project.getDependencies(), "framework-errors", version);
+                if (resolved.contains("client")) {
+                    addIfAbsent(deps, project.getDependencies(), "client-core", version);
+                }
             }
             if (resolved.contains("server")) {
                 addIfAbsent(deps, project.getDependencies(), "server-api", version);
             }
         });
 
-        api.withDependencies(deps -> {
-            if (!ext.getAutoAddDependencies().getOrElse(true)) {
-                return;
-            }
-            String version = SmithyJavaVersion.VERSION;
-            Set<String> resolved = modes.get();
-            addIfAbsent(deps, project.getDependencies(), "core", version);
-            addIfAbsent(deps, project.getDependencies(), "framework-errors", version);
-            if (resolved.contains("client")) {
-                addIfAbsent(deps, project.getDependencies(), "client-core", version);
-            }
-            if (resolved.contains("server")) {
-                addIfAbsent(deps, project.getDependencies(), "server-api", version);
-            }
+        // When java-library is applied, types/client deps go to api.
+        // Use withType to react regardless of plugin application order.
+        project.getPlugins().withType(JavaLibraryPlugin.class, plugin -> {
+            Configuration api = project.getConfigurations().getByName("api");
+            api.withDependencies(deps -> {
+                if (!ext.getAutoAddDependencies().getOrElse(true)) {
+                    return;
+                }
+                String version = SmithyJavaVersion.VERSION;
+                Set<String> resolved = modes.get();
+                addIfAbsent(deps, project.getDependencies(), "core", version);
+                addIfAbsent(deps, project.getDependencies(), "framework-errors", version);
+                if (resolved.contains("client")) {
+                    addIfAbsent(deps, project.getDependencies(), "client-core", version);
+                }
+            });
         });
     }
 
