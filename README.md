@@ -42,14 +42,48 @@ and building services. These examples can be used as a template for a new projec
 
 ### Codegen (Gradle)
 
-To use the Smithy Java code generators with Gradle, first create a Smithy Gradle project. 
+The recommended way to use Smithy Java code generation with Gradle is the 
+[**Smithy Java Plugin**](./gradle-plugin/README.md), which handles dependency management, 
+source set wiring, and task ordering automatically:
+
+```kotlin
+// build.gradle.kts
+plugins {
+    `java-library` // or `java` / `application` for leaf projects
+    id("software.amazon.smithy.java.gradle.smithy-java") version "<smithy-java-version>"
+}
+```
+
+Configure your [`smithy-build.json`](https://smithy.io/2.0/guides/smithy-build-json.html) with the 
+`java-codegen` plugin:
+
+```json
+{
+    "version": "1.0",
+    "plugins": {
+        "java-codegen": {
+            "service": "com.example#CoffeeShop",
+            "namespace": "software.amazon.smithy.java.examples",
+            "headerFile": "license.txt",
+            "modes": ["client"]
+        }
+    }
+}
+```
+
+That's it, run `./gradlew build` and the plugin takes care of the rest. See the 
+[gradle-plugin README](./gradle-plugin/README.md) for full configuration options, 
+examples (types-only, client, server), and escape hatches.
+
+<details>
+<summary>Manual setup (without the Gradle plugin)</summary>
+
+If you prefer manual control, apply [`smithy-base`](https://smithy.io/2.0/guides/gradle-plugin/index.html#smithy-gradle-plugins) 
+directly:
 
 > [!NOTE]
 > You can use the `smithy init` [CLI](https://smithy.io/2.0/guides/smithy-cli/index.html) command to create a new
 > Smithy Gradle project. The command `smithy init --template quickstart-gradle`  will create a new basic Smithy Gradle project.
-
-Then apply the [`smithy-base`](https://smithy.io/2.0/guides/gradle-plugin/index.html#smithy-gradle-plugins) gradle plugin to 
-your project.
 
 ```diff
 // build.gradle.kts
@@ -67,28 +101,8 @@ dependencies {
 }
 ```
 
-Now, configure your [`smithy-build`](https://smithy.io/2.0/guides/smithy-build-json.html) to use one of the 
-Smithy Java codegen plugins. For example, to generate a client for a `CoffeeShop` service we would 
-add the following to our `smithy-build.json`:
-
-```diff
-// smithy-build.json
-{
-    ...
-    "plugins": {
-+       "java-codegen": {
-+            "service": "com.example#CoffeeShop",
-+            "namespace": "software.amazon.smithy.java.examples",
-+            "headerFile": "license.txt",
-+            "modes": ["client"]
-+       }
-    }
-}
-```
-
-Your project is now configured to generate Java code from our model. To execute a build run the 
-gradle `build` task for your project. To compile the generated code as part of your project, 
-add the generated package to your `main` sourceSet. For example:
+To compile the generated code as part of your project, 
+add the generated package to your `main` sourceSet:
 
 ```kotlin
 // build.gradle.kts
@@ -113,6 +127,8 @@ tasks.named("compileJava") {
     dependsOn("smithyBuild")
 }
 ```
+
+</details>
 
 ### Stability
 

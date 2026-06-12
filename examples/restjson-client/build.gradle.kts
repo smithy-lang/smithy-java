@@ -1,15 +1,13 @@
 plugins {
     `java-library`
+    id("software.amazon.smithy.java.gradle.smithy-java")
     application
-    id("software.amazon.smithy.gradle.smithy-base")
-    id("smithy-java.jmh-conventions")
+    id("me.champeau.jmh")
 }
 
 dependencies {
     val smithyJavaVersion: String by project
 
-    smithyBuild("software.amazon.smithy.java:codegen-plugin:$smithyJavaVersion")
-    smithyBuild("software.amazon.smithy.java:client-core:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:client-core:$smithyJavaVersion")
     api("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
 
@@ -20,35 +18,21 @@ dependencies {
     // Test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testImplementation(libs.assertj.core)
+    testImplementation("org.assertj:assertj-core:3.27.7")
 }
 
 application {
     mainClass = "software.amazon.smithy.java.example.ClientExample"
 }
 
-// Add generated Java sources to the main sourceset
-afterEvaluate {
-    val clientPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
-    sourceSets {
-        main {
-            java {
-                srcDir("$clientPath/java")
-            }
-        }
-        create("it") {
-            compileClasspath += main.get().output + configurations["testRuntimeClasspath"] + configurations["testCompileClasspath"]
-            runtimeClasspath += output + compileClasspath + test.get().runtimeClasspath + test.get().output
-        }
+sourceSets {
+    create("it") {
+        compileClasspath += main.get().output + configurations["testRuntimeClasspath"] + configurations["testCompileClasspath"]
+        runtimeClasspath += output + compileClasspath + test.get().runtimeClasspath + test.get().output
     }
 }
 
 tasks {
-    val smithyBuild by getting
-    compileJava {
-        dependsOn(smithyBuild)
-    }
-
     val integ by registering(Test::class) {
         useJUnitPlatform()
         testClassesDirs = sourceSets["it"].output.classesDirs
