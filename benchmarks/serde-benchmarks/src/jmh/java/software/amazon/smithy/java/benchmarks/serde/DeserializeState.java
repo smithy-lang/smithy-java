@@ -21,6 +21,7 @@ import software.amazon.smithy.java.http.api.ModifiableHttpResponse;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.shapes.OperationShape;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * Reusable per-trial state for a deserialization benchmark.
@@ -84,6 +85,7 @@ final class DeserializeState {
     static DeserializeState forTestCase(
             String testCaseId,
             String generatedPackage,
+            ShapeId serviceId,
             byte[] emptyBody,
             String contentType,
             boolean base64DecodeBody
@@ -92,7 +94,7 @@ final class DeserializeState {
         OperationShape opShape = entry.operation();
 
         ApiOperation<? extends SerializableStruct, ? extends SerializableStruct> operation =
-                SerializeState.resolveOperation(generatedPackage, opShape.getId().getName());
+                BenchmarkOperations.resolve(opShape, generatedPackage, serviceId);
 
         byte[] resolvedEmpty = emptyBody;
         if (resolvedEmpty == null) {

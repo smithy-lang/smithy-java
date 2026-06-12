@@ -48,7 +48,8 @@ public class RestJson1DeserializeBenchmark {
     @Setup
     public void setup() {
         protocol = new RestJsonClientProtocol(SERVICE_ID);
-        state = DeserializeState.forTestCase(testCaseId, GENERATED_PACKAGE, EMPTY_JSON_BODY, CONTENT_TYPE, false);
+        state = DeserializeState
+                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_JSON_BODY, CONTENT_TYPE, false);
     }
 
     @Benchmark

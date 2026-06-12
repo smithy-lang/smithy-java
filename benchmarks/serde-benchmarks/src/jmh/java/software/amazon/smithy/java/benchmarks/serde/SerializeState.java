@@ -14,6 +14,7 @@ import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.protocoltests.harness.ProtocolTestDocument;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.OperationShape;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * Reusable per-trial state for a serialization benchmark.
@@ -56,11 +57,11 @@ final class SerializeState {
      *                         projection (e.g.,
      *                         {@code "software.amazon.smithy.java.benchmarks.serde.generated.awsjson10.model"})
      */
-    static SerializeState forTestCase(String testCaseId, String generatedPackage) {
+    static SerializeState forTestCase(String testCaseId, String generatedPackage, ShapeId serviceId) {
         RequestEntry entry = BenchmarkTestCases.request(testCaseId);
         OperationShape opShape = entry.operation();
 
-        var operation = resolveOperation(generatedPackage, opShape.getId().getName());
+        var operation = BenchmarkOperations.resolve(opShape, generatedPackage, serviceId);
 
         Node params = entry.testCase().getParams();
         var inputBuilder = operation.inputBuilder();
@@ -87,6 +88,7 @@ final class SerializeState {
 
     static void main() {
         SerializeState.forTestCase("rpcv2Cbor_PutItemRequest_BinaryData_M",
-                "software.amazon.smithy.java.benchmarks.serde.generated.rpcv2cbor.model");
+                "software.amazon.smithy.java.benchmarks.serde.generated.rpcv2cbor.model",
+                ShapeId.from("com.amazonaws.sdk.benchmark#SmithyRpcV2CborDataPlane"));
     }
 }

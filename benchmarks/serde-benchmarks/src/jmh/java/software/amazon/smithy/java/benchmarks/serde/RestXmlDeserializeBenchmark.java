@@ -51,7 +51,8 @@ public class RestXmlDeserializeBenchmark {
     @Setup
     public void setup() {
         protocol = new RestXmlClientProtocol(SERVICE_ID);
-        state = DeserializeState.forTestCase(testCaseId, GENERATED_PACKAGE, EMPTY_XML_BODY, CONTENT_TYPE, false);
+        state = DeserializeState
+                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_XML_BODY, CONTENT_TYPE, false);
     }
 
     @Benchmark

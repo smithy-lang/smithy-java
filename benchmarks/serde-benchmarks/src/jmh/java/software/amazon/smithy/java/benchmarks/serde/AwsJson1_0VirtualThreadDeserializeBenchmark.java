@@ -7,6 +7,7 @@ package software.amazon.smithy.java.benchmarks.serde;
 
 import java.nio.charset.StandardCharsets;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
@@ -18,12 +19,19 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
- * JMH benchmarks for AWS JSON 1.0 response deserialization. Drives
- * {@link AwsJson1Protocol#deserializeResponse} to consume a full HTTP
- * response and produce a typed output.
+ * AWS JSON 1.0 deserialization measured on virtual carrier threads.
+ *
+ * <p>Companion to {@link AwsJson1_0DeserializeBenchmark} (platform-threaded). The benchmark
+ * body is a single {@code deserializeResponse} call; {@code @Fork(jvmArgsAppend =
+ * "-Djmh.executor=VIRTUAL")} runs JMH's measurement threads as virtual threads. This
+ * isolates how the shared serializer / string-cache pools behave under virtual-thread
+ * carriers, keeping virtual-thread creation cost out of the per-op measurement.
+ *
+ * <p>Run with {@code -prof gc} to compare per-op allocation against the platform-threaded run.
  */
 @State(Scope.Benchmark)
-public class AwsJson1_0DeserializeBenchmark {
+@Fork(jvmArgsAppend = "-Djmh.executor=VIRTUAL")
+public class AwsJson1_0VirtualThreadDeserializeBenchmark {
 
     private static final String GENERATED_PACKAGE =
             "software.amazon.smithy.java.benchmarks.serde.generated.awsjson10.model";
@@ -33,15 +41,9 @@ public class AwsJson1_0DeserializeBenchmark {
     private static final String CONTENT_TYPE = "application/x-amz-json-1.0";
 
     @Param({
-            "awsJson1_0_GetItemOutput_Baseline",
             "awsJson1_0_GetItemOutput_S",
             "awsJson1_0_GetItemOutput_M",
             "awsJson1_0_GetItemOutput_L",
-            "awsJson1_0_GetItemOutput_OutOfOrder",
-            "awsJson1_0_GetItemOutputBinary_S",
-            "awsJson1_0_GetItemOutputBinary_M",
-            "awsJson1_0_GetItemOutputBinary_L",
-            "awsJson1_0_HealthcheckResponse_Example",
     })
     public String testCaseId;
 

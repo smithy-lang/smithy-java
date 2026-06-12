@@ -47,7 +47,7 @@ public class AwsQuerySerializeBenchmark {
     @Setup
     public void setup() {
         protocol = new AwsQueryClientProtocol(SERVICE_ID, VERSION);
-        state = SerializeState.forTestCase(testCaseId, GENERATED_PACKAGE);
+        state = SerializeState.forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID);
     }
 
     @Benchmark

@@ -44,7 +44,7 @@ public class RestJson1SerializeBenchmark {
     @Setup
     public void setup() {
         protocol = new RestJsonClientProtocol(SERVICE_ID);
-        state = SerializeState.forTestCase(testCaseId, GENERATED_PACKAGE);
+        state = SerializeState.forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID);
     }
 
     @Benchmark

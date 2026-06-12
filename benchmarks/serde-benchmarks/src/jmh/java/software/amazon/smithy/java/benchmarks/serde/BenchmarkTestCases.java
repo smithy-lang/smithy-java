@@ -38,6 +38,11 @@ final class BenchmarkTestCases {
 
     private BenchmarkTestCases() {}
 
+    /** The assembled benchmark model, shared by the dynamic-client path. */
+    static Model model() {
+        return MODEL;
+    }
+
     static RequestEntry request(String testCaseId) {
         RequestEntry entry = REQUESTS.get(testCaseId);
         if (entry == null) {

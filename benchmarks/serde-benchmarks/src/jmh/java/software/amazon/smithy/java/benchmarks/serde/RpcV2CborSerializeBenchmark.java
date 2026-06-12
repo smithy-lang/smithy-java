@@ -50,7 +50,7 @@ public class RpcV2CborSerializeBenchmark {
     @Setup
     public void setup() {
         protocol = new RpcV2CborProtocol(SERVICE_ID);
-        state = SerializeState.forTestCase(testCaseId, GENERATED_PACKAGE);
+        state = SerializeState.forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID);
     }
 
     @Benchmark

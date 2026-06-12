@@ -62,6 +62,11 @@ dependencies {
 
     // Protocol test document for converting test case params into typed shapes.
     jmh(project(":protocol-test-harness"))
+
+    // Dynamic-client path: build the ApiOperation + input from the runtime
+    // model instead of codegen, selected via -Dsmithy-java.benchmark.client=dynamic.
+    jmh(project(":client:dynamic-client"))
+    jmh(project(":dynamic-schemas"))
 }
 
 // Smithy benchmark model files (tagged @httpRequestTests / @httpResponseTests

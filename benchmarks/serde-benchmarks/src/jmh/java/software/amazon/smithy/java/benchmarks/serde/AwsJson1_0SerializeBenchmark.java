@@ -55,7 +55,7 @@ public class AwsJson1_0SerializeBenchmark {
     @Setup
     public void setup() {
         protocol = new AwsJson1Protocol(SERVICE_ID);
-        state = SerializeState.forTestCase(testCaseId, GENERATED_PACKAGE);
+        state = SerializeState.forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID);
     }
 
     @Benchmark

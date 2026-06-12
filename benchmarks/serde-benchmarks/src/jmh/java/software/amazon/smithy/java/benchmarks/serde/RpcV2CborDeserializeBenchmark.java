@@ -54,7 +54,8 @@ public class RpcV2CborDeserializeBenchmark {
     @Setup
     public void setup() {
         protocol = new RpcV2CborProtocol(SERVICE_ID);
-        state = DeserializeState.forTestCase(testCaseId, GENERATED_PACKAGE, EMPTY_CBOR_BODY, CONTENT_TYPE, true);
+        state = DeserializeState
+                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_CBOR_BODY, CONTENT_TYPE, true);
     }
 
     @Benchmark

@@ -44,7 +44,7 @@ public class RestXmlSerializeBenchmark {
     @Setup
     public void setup() {
         protocol = new RestXmlClientProtocol(SERVICE_ID);
-        state = SerializeState.forTestCase(testCaseId, GENERATED_PACKAGE);
+        state = SerializeState.forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID);
     }
 
     @Benchmark
