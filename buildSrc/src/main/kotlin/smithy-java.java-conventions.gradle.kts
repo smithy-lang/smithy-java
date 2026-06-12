@@ -86,7 +86,7 @@ spotless {
         leadingTabsToSpaces()
         endWithNewline()
 
-        eclipse().configFile("${project.rootDir}/config/spotless/formatting.xml")
+        eclipse("4.40").configFile("${project.rootDir}/config/spotless/formatting.xml")
 
         addStep(ShortenFullyQualifiedNames.createStep())
 
