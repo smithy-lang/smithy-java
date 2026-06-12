@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
@@ -25,19 +26,35 @@ import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
+/**
+ * Buffers the single {@code @httpPayload}-bound member into a {@link ByteBuffer}.
+ *
+ * <p>Because a payload binds exactly one member, this serializer receives exactly one top-level
+ * write call.
+ *
+ * <ul>
+ *   <li>blob / data stream / event stream payloads hand the body off by reference via
+ *       {@link HttpBindingSerializer#setHttpPayload};</li>
+ *   <li>scalar payloads (string, number, boolean, timestamp) write their bytes directly into a
+ *       lazily-allocated {@link ByteBufferOutputStream};</li>
+ *   <li>structured payloads (struct, document, list, map) are serialized through the pooled
+ *       {@link Codec#serialize(SerializableShape)} path, which for JSON borrows a serializer from a
+ *       striped pool instead of allocating one.</li>
+ * </ul>
+ */
 final class PayloadSerializer implements ShapeSerializer {
     private static final byte[] NULL_BYTES = "null".getBytes(StandardCharsets.UTF_8);
     private static final byte[] TRUE_BYTES = "true".getBytes(StandardCharsets.UTF_8);
     private static final byte[] FALSE_BYTES = "false".getBytes(StandardCharsets.UTF_8);
     private final HttpBindingSerializer serializer;
-    private final ShapeSerializer structSerializer;
-    private final ByteBufferOutputStream outputStream;
+    private final Codec codec;
     private boolean payloadWritten = false;
+    private ByteBuffer codecResult;
+    private ByteBufferOutputStream scalarStream;
 
     PayloadSerializer(HttpBindingSerializer serializer, Codec codec) {
         this.serializer = serializer;
-        this.outputStream = new ByteBufferOutputStream();
-        this.structSerializer = codec.createSerializer(outputStream);
+        this.codec = codec;
     }
 
     @Override
@@ -47,17 +64,21 @@ final class PayloadSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeEventStream(
-            Schema schema,
-            EventStream<? extends SerializableStruct> value
-    ) {
+    public void writeEventStream(Schema schema, EventStream<? extends SerializableStruct> value) {
         payloadWritten = true;
         serializer.setEventStream(value.asWriter());
     }
 
+    private ByteBufferOutputStream scalarStream() {
+        if (scalarStream == null) {
+            scalarStream = new ByteBufferOutputStream();
+        }
+        return scalarStream;
+    }
+
     private void write(byte[] bytes) {
         try {
-            outputStream.write(bytes);
+            scalarStream().write(bytes);
         } catch (IOException e) {
             throw new SerializationException(e);
         }
@@ -78,7 +99,7 @@ final class PayloadSerializer implements ShapeSerializer {
     @Override
     public void writeDocument(Schema schema, Document value) {
         serializer.writePayloadContentType();
-        structSerializer.writeDocument(schema, value);
+        codecResult = codec.serialize(ser -> ser.writeDocument(schema, value));
     }
 
     @Override
@@ -89,18 +110,18 @@ final class PayloadSerializer implements ShapeSerializer {
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
         serializer.writePayloadContentType();
-        structSerializer.writeStruct(schema, struct);
+        codecResult = codec.serialize(ser -> ser.writeStruct(schema, struct));
     }
 
     @Override
     public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
         serializer.writePayloadContentType();
-        structSerializer.writeList(schema, listState, size, consumer);
+        codecResult = codec.serialize(ser -> ser.writeList(schema, listState, size, consumer));
     }
 
     @Override
     public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
-        structSerializer.writeMap(schema, mapState, size, consumer);
+        codecResult = codec.serialize(ser -> ser.writeMap(schema, mapState, size, consumer));
     }
 
     @Override
@@ -110,7 +131,7 @@ final class PayloadSerializer implements ShapeSerializer {
 
     @Override
     public void writeByte(Schema schema, byte value) {
-        outputStream.write(value);
+        scalarStream().write(value);
     }
 
     @Override
@@ -165,31 +186,17 @@ final class PayloadSerializer implements ShapeSerializer {
         serializer.setHttpPayload(schema, DataStream.ofByteBuffer(value));
     }
 
-    @Override
-    public void flush() {
-        structSerializer.flush();
-        try {
-            outputStream.flush();
-        } catch (IOException e) {
-            throw new SerializationException(e);
-        }
-    }
-
-    @Override
-    public void close() {
-        structSerializer.close();
-        try {
-            outputStream.close();
-        } catch (IOException e) {
-            throw new SerializationException(e);
-        }
-    }
-
     public boolean isPayloadWritten() {
         return payloadWritten;
     }
 
     ByteBuffer toByteBuffer() {
-        return outputStream.toByteBuffer();
+        if (codecResult != null) {
+            return codecResult;
+        } else if (scalarStream != null) {
+            return scalarStream.toByteBuffer();
+        } else {
+            return ByteBuffer.allocate(0);
+        }
     }
 }
