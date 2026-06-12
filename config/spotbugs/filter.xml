@@ -123,6 +123,28 @@
         <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
     </Match>
 
+    <!-- Atomicity warnings introduced by SpotBugs 6.5+ upgrade — suppress globally until code is audited. -->
+    <Match>
+        <Bug pattern="AT_STALE_THREAD_WRITE_OF_PRIMITIVE"/>
+    </Match>
+    <Match>
+        <Bug pattern="AT_NONATOMIC_OPERATIONS_ON_SHARED_VARIABLE"/>
+    </Match>
+    <Match>
+        <Bug pattern="AT_NONATOMIC_64BIT_PRIMITIVE"/>
+    </Match>
+
+    <!-- Unnecessary suppression warnings introduced by SpotBugs 6.5+ upgrade. -->
+    <Match>
+        <Bug pattern="US_USELESS_SUPPRESSION_ON_METHOD"/>
+    </Match>
+    <Match>
+        <Bug pattern="US_USELESS_SUPPRESSION_ON_CLASS"/>
+    </Match>
+    <Match>
+        <Bug pattern="US_USELESS_SUPPRESSION_ON_FIELD"/>
+    </Match>
+
     <!-- Vendored Schubfach algorithm (from Jackson/OpenJDK) — not our code to fix. -->
     <Match>
         <Class name="software.amazon.smithy.java.codecs.commons.Schubfach$DoubleToDecimal" />

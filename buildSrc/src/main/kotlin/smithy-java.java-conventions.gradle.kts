@@ -17,7 +17,7 @@ val Project.libs get() = the<LibrariesForLibs>()
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
@@ -99,7 +99,9 @@ spotless {
 
     // Formatting for build.gradle.kts files
     kotlinGradle {
-        ktlint()
+        // TODO: re-enable once ktlint 2.0.0 is released with JDK 25 support
+        // (ktlint 1.x embeds Kotlin 2.2 which cannot initialize on JDK 25)
+        // ktlint()
         leadingTabsToSpaces()
         trimTrailingWhitespace()
         endWithNewline()
