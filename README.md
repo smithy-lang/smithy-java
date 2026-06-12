@@ -63,7 +63,7 @@ by the Smithy build process:
 
 ```diff
 dependencies {
-+    smithyBuild("software.amazon.smithy.java:plugins:<replace with version>")
++    smithyBuild("software.amazon.smithy.java:codegen-plugin:<replace with version>")
 }
 ```
 
