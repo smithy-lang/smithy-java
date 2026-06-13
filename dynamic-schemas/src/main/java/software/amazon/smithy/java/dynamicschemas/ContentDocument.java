@@ -33,7 +33,6 @@ record ContentDocument(Document document, Schema schema) implements Document {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        // If it is literally a document, then don't unwrap it.
         if (type() == ShapeType.DOCUMENT) {
             serializer.writeDocument(schema, this);
         } else {
@@ -43,25 +42,27 @@ record ContentDocument(Document document, Schema schema) implements Document {
 
     @Override
     public void serializeContents(ShapeSerializer serializer) {
-        switch (type()) {
-            case BOOLEAN -> serializer.writeBoolean(schema, asBoolean());
-            case BYTE -> serializer.writeByte(schema, asByte());
-            case SHORT -> serializer.writeShort(schema, asShort());
-            case INTEGER, INT_ENUM -> serializer.writeInteger(schema, asInteger());
-            case LONG -> serializer.writeLong(schema, asLong());
-            case FLOAT -> serializer.writeFloat(schema, asFloat());
-            case DOUBLE -> serializer.writeDouble(schema, asDouble());
-            case BIG_INTEGER -> serializer.writeBigInteger(schema, asBigInteger());
-            case BIG_DECIMAL -> serializer.writeBigDecimal(schema, asBigDecimal());
-            case STRING, ENUM -> serializer.writeString(schema, asString());
-            case TIMESTAMP -> serializer.writeTimestamp(schema, asTimestamp());
-            case BLOB -> serializer.writeBlob(schema, asBlob());
-            case DOCUMENT -> document.serializeContents(serializer);
+        var s = schema;
+        var d = document;
+        switch (s.type()) {
+            case STRING, ENUM -> serializer.writeString(s, d.asString());
+            case BOOLEAN -> serializer.writeBoolean(s, d.asBoolean());
+            case INTEGER, INT_ENUM -> serializer.writeInteger(s, d.asInteger());
+            case LONG -> serializer.writeLong(s, d.asLong());
+            case DOUBLE -> serializer.writeDouble(s, d.asDouble());
+            case FLOAT -> serializer.writeFloat(s, d.asFloat());
+            case BYTE -> serializer.writeByte(s, d.asByte());
+            case SHORT -> serializer.writeShort(s, d.asShort());
+            case BIG_INTEGER -> serializer.writeBigInteger(s, d.asBigInteger());
+            case BIG_DECIMAL -> serializer.writeBigDecimal(s, d.asBigDecimal());
+            case TIMESTAMP -> serializer.writeTimestamp(s, d.asTimestamp());
+            case BLOB -> serializer.writeBlob(s, d.asBlob());
+            case DOCUMENT -> d.serializeContents(serializer);
             case LIST, SET -> {
-                serializer.writeList(schema, asList(), size(), (values, ser) -> {
+                serializer.writeList(s, d.asList(), d.size(), (values, ser) -> {
                     for (var element : values) {
                         if (element == null) {
-                            ser.writeNull(schema.listMember());
+                            ser.writeNull(s.listMember());
                         } else {
                             element.serialize(ser);
                         }
@@ -69,19 +70,18 @@ record ContentDocument(Document document, Schema schema) implements Document {
                 });
             }
             case MAP -> {
-                serializer.writeMap(schema, asStringMap(), size(), (members, s) -> {
-                    var key = schema.mapKeyMember();
+                serializer.writeMap(s, d.asStringMap(), d.size(), (members, ms) -> {
+                    var key = s.mapKeyMember();
                     for (var entry : members.entrySet()) {
                         if (entry.getValue() == null) {
-                            s.writeEntry(key, entry.getKey(), null, (t, v) -> v.writeNull(schema.mapValueMember()));
+                            ms.writeEntry(key, entry.getKey(), null, (t, v) -> v.writeNull(s.mapValueMember()));
                         } else {
-                            s.writeEntry(key, entry.getKey(), entry.getValue(), Document::serialize);
+                            ms.writeEntry(key, entry.getKey(), entry.getValue(), Document::serialize);
                         }
                     }
                 });
             }
-            // Note that Structure and Union are always going to be a StructDocument and appear here.
-            default -> throw new UnsupportedOperationException("Unsupported type: " + type());
+            default -> throw new UnsupportedOperationException("Unsupported type: " + s.type());
         }
     }
 

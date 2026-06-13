@@ -6,16 +6,17 @@
 package software.amazon.smithy.java.dynamicschemas;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.java.core.serde.document.DocumentUtils;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -30,12 +31,31 @@ public final class StructDocument implements Document, SerializableStruct {
 
     private final Schema schema;
     private final ShapeId service;
-    private final Map<String, Document> members;
+    private final Document[] values;
+    private final int setMemberIndex;
+    private Map<String, Document> mapView;
 
-    StructDocument(Schema schema, Map<String, Document> members, ShapeId service) {
+    StructDocument(Schema schema, Document[] values, ShapeId service) {
         this.service = service;
         this.schema = schema;
-        this.members = members;
+        this.values = values;
+        this.setMemberIndex = schema.type() == ShapeType.UNION ? findSetMember(values) : -1;
+    }
+
+    StructDocument(Schema schema, Document unionValue, int unionMemberIndex, ShapeId service) {
+        this.service = service;
+        this.schema = schema;
+        this.values = new Document[]{unionValue};
+        this.setMemberIndex = unionMemberIndex;
+    }
+
+    private static int findSetMember(Document[] values) {
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] != null) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /**
@@ -76,11 +96,24 @@ public final class StructDocument implements Document, SerializableStruct {
     }
 
     private static Document convertStructureDocument(Schema schema, Document delegate, ShapeId service) {
-        Map<String, Document> result = new LinkedHashMap<>();
-        for (var member : schema.members()) {
+        List<Schema> schemaMembers = schema.members();
+        if (schema.type() == ShapeType.UNION) {
+            for (int i = 0, n = schemaMembers.size(); i < n; i++) {
+                Schema member = schemaMembers.get(i);
+                var value = delegate.getMember(member.memberName());
+                if (value != null) {
+                    return new StructDocument(schema, convertDocument(member, value, service),
+                            member.memberIndex(), service);
+                }
+            }
+            return new StructDocument(schema, new Document[0], service);
+        }
+        Document[] result = new Document[schemaMembers.size()];
+        for (int i = 0, n = schemaMembers.size(); i < n; i++) {
+            Schema member = schemaMembers.get(i);
             var value = delegate.getMember(member.memberName());
             if (value != null) {
-                result.put(member.memberName(), convertDocument(member, value, service));
+                result[member.memberIndex()] = convertDocument(member, value, service);
             }
         }
         return new StructDocument(schema, result, service);
@@ -153,11 +186,13 @@ public final class StructDocument implements Document, SerializableStruct {
 
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
-        for (var name : getMemberNames()) {
-            var value = getMember(name);
-            if (value != null) {
-                var member = schema.member(name);
-                if (member != null) {
+        int idx = setMemberIndex;
+        if (idx >= 0) {
+            values[0].serialize(serializer);
+        } else {
+            for (int i = 0; i < values.length; i++) {
+                Document value = values[i];
+                if (value != null) {
                     value.serialize(serializer);
                 }
             }
@@ -165,8 +200,26 @@ public final class StructDocument implements Document, SerializableStruct {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
-        return DocumentUtils.getMemberValue(this, schema, member);
+        SchemaUtils.validateMemberInSchema(schema, member, null);
+        Document value;
+        if (setMemberIndex >= 0) {
+            value = member.memberIndex() == setMemberIndex ? values[0] : null;
+        } else {
+            int idx = member.memberIndex();
+            value = idx < values.length ? values[idx] : null;
+        }
+        if (value == null) {
+            return null;
+        }
+        try {
+            return (T) value.asObject();
+        } catch (ClassCastException e) {
+            throw new ClassCastException(
+                    "Unable to cast document member `" + member.id() + "` from document with schema `" + schema
+                            .id() + "`: " + e.getMessage());
+        }
     }
 
     @Override
@@ -181,30 +234,71 @@ public final class StructDocument implements Document, SerializableStruct {
 
     @Override
     public int size() {
-        return members.size();
+        if (setMemberIndex >= 0) {
+            return 1;
+        }
+        int count = 0;
+        for (Document v : values) {
+            if (v != null) {
+                count++;
+            }
+        }
+        return count;
     }
 
     @Override
     public Map<String, Document> asStringMap() {
-        return members;
+        Map<String, Document> result = mapView;
+        if (result == null) {
+            if (setMemberIndex >= 0) {
+                result = Map.of(schema.members().get(setMemberIndex).memberName(), values[0]);
+            } else {
+                result = new LinkedHashMap<>();
+                List<Schema> schemaMembers = schema.members();
+                for (int i = 0, n = schemaMembers.size(); i < n; i++) {
+                    Document value = i < values.length ? values[i] : null;
+                    if (value != null) {
+                        result.put(schemaMembers.get(i).memberName(), value);
+                    }
+                }
+                result = Collections.unmodifiableMap(result);
+            }
+            mapView = result;
+        }
+        return result;
     }
 
     @Override
     public Object asObject() {
+        if (setMemberIndex >= 0) {
+            return Map.of(schema.members().get(setMemberIndex).memberName(), values[0].asObject());
+        }
         Map<String, Object> result = new LinkedHashMap<>();
-        for (var entry : members.entrySet()) {
-            result.put(entry.getKey(), entry.getValue().asObject());
+        List<Schema> schemaMembers = schema.members();
+        for (int i = 0, n = schemaMembers.size(); i < n; i++) {
+            Document value = i < values.length ? values[i] : null;
+            if (value != null) {
+                result.put(schemaMembers.get(i).memberName(), value.asObject());
+            }
         }
         return result;
     }
 
     @Override
     public Document getMember(String memberName) {
-        return members.get(memberName);
+        Schema memberSchema = schema.member(memberName);
+        if (memberSchema == null) {
+            return null;
+        }
+        int idx = memberSchema.memberIndex();
+        if (setMemberIndex >= 0) {
+            return idx == setMemberIndex ? values[0] : null;
+        }
+        return idx < values.length ? values[idx] : null;
     }
 
     @Override
     public Set<String> getMemberNames() {
-        return members.keySet();
+        return asStringMap().keySet();
     }
 }
