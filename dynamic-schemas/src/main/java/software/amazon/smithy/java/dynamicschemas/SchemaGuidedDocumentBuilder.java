@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.dynamicschemas;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
@@ -25,9 +25,15 @@ import software.amazon.smithy.model.shapes.ShapeType;
  */
 final class SchemaGuidedDocumentBuilder implements ShapeBuilder<StructDocument> {
 
+    private static final int DEFAULT_COLLECTION_CAPACITY = 16;
+
     private final ShapeId service;
     private final Schema target;
-    private final Map<String, Document> map = new LinkedHashMap<>();
+    private final Document[] values;
+    private final StructConsumer structConsumer = new StructConsumer();
+    private final UnionConsumer unionConsumer = new UnionConsumer();
+    private final ListConsumer listConsumer = new ListConsumer();
+    private final MapConsumer mapConsumer = new MapConsumer();
 
     SchemaGuidedDocumentBuilder(Schema target, ShapeId service) {
         if (target.type() != ShapeType.STRUCTURE && target.type() != ShapeType.UNION) {
@@ -37,6 +43,7 @@ final class SchemaGuidedDocumentBuilder implements ShapeBuilder<StructDocument> 
 
         this.target = target;
         this.service = service;
+        this.values = new Document[target.members().size()];
     }
 
     @Override
@@ -46,12 +53,19 @@ final class SchemaGuidedDocumentBuilder implements ShapeBuilder<StructDocument> 
 
     @Override
     public StructDocument build() {
-        if (map.isEmpty() && target.type() == ShapeType.UNION) {
-            throw new IllegalArgumentException("No value set for union document: " + schema().id());
-        } else {
-            // Use "new" here since the document is already properly wrapped throughout.
-            return new StructDocument(target, map, service);
+        if (target.type() == ShapeType.UNION) {
+            boolean hasValue = false;
+            for (Document v : values) {
+                if (v != null) {
+                    hasValue = true;
+                    break;
+                }
+            }
+            if (!hasValue) {
+                throw new IllegalArgumentException("No value set for union document: " + schema().id());
+            }
         }
+        return new StructDocument(target, values);
     }
 
     @Override
@@ -59,75 +73,114 @@ final class SchemaGuidedDocumentBuilder implements ShapeBuilder<StructDocument> 
         SchemaUtils.validateMemberInSchema(target, member, value);
 
         Document convertedValue = switch (value) {
-            // Convert the given document so it matches the required schema.
             case Document d -> StructDocument.convertDocument(member, d, service);
             case DataStream ds -> Document.of(member, ds);
             case EventStream<?> es -> Document.of(member, es);
-            // Convert the object to a document and then wrap it with the correct schema.
             case null, default -> StructDocument.convertDocument(member, Document.ofObject(value), service);
         };
 
-        map.put(member.memberName(), convertedValue);
+        values[member.memberIndex()] = convertedValue;
     }
 
     @Override
     public ShapeBuilder<StructDocument> deserialize(ShapeDeserializer decoder) {
-        map.putAll(deserialize(decoder, target).asStringMap());
+        populateFromDecoder(decoder, target);
         return this;
     }
 
     @Override
     public ShapeBuilder<StructDocument> deserializeMember(ShapeDeserializer decoder, Schema schema) {
-        map.putAll(deserialize(decoder, schema.assertMemberTargetIs(target)).asStringMap());
+        populateFromDecoder(decoder, schema.assertMemberTargetIs(target));
         return this;
     }
 
-    private Document deserialize(ShapeDeserializer decoder, Schema schema) {
+    private void populateFromDecoder(ShapeDeserializer decoder, Schema schema) {
+        decoder.readStruct(schema, values, structConsumer);
+    }
+
+    /**
+     * Reads a single value into a Document. Kept deliberately small — only the common scalar leaves (string/enum,
+     * boolean, the int/long/double numerics) plus the aggregate delegation — so it stays under C2's FreqInlineSize
+     * and inlines into the per-member consumer call sites. The bytecode-heavier rare scalars (float/byte/short,
+     * timestamp, big numbers, blob, document) live in {@link #deserializeRareScalar}, and aggregates in
+     * {@link #deserializeAggregate}, so neither bloats this hot method past the inline budget. Verified via
+     * {@code -XX:+PrintInlining}; mirrors the same split on the serialize side in {@link ContentDocument}.
+     */
+    private Document deserializeValue(ShapeDeserializer decoder, Schema schema) {
         return switch (schema.type()) {
+            case STRING, ENUM -> new ContentDocument(schema, decoder.readString(schema));
+            case BOOLEAN -> new ContentDocument(schema, decoder.readBoolean(schema));
+            case INTEGER, INT_ENUM -> new ContentDocument(schema, decoder.readInteger(schema));
+            case LONG -> new ContentDocument(schema, decoder.readLong(schema));
+            case DOUBLE -> new ContentDocument(schema, decoder.readDouble(schema));
+            case LIST, MAP, STRUCTURE, UNION -> deserializeAggregate(decoder, schema);
+            default -> deserializeRareScalar(decoder, schema);
+        };
+    }
+
+    /**
+     * Reads a single union member value, storing scalars raw (as the boxed Java value) and aggregates as a
+     * {@link Document}. This skips the per-union {@link ContentDocument} wrapper that {@link #deserializeValue}
+     * would otherwise allocate for the (very common) scalar case — the dominant allocation for union-dense payloads
+     * like DynamoDB's {@code AttributeValue}. {@link StructDocument} discriminates the two with {@code instanceof
+     * Document}. Mirrors the leaf split in {@link #deserializeValue}: common scalars first, then aggregates, then
+     * the bytecode-heavier rare scalars in {@link #deserializeRareUnionScalar}.
+     */
+    private Object deserializeUnionValue(ShapeDeserializer decoder, Schema schema) {
+        return switch (schema.type()) {
+            case STRING, ENUM -> decoder.readString(schema);
+            case BOOLEAN -> decoder.readBoolean(schema);
+            case INTEGER, INT_ENUM -> decoder.readInteger(schema);
+            case LONG -> decoder.readLong(schema);
+            case DOUBLE -> decoder.readDouble(schema);
+            case LIST, MAP, STRUCTURE, UNION -> deserializeAggregate(decoder, schema);
+            default -> deserializeRareUnionScalar(decoder, schema);
+        };
+    }
+
+    private Object deserializeRareUnionScalar(ShapeDeserializer decoder, Schema schema) {
+        return switch (schema.type()) {
+            case FLOAT -> decoder.readFloat(schema);
+            case BYTE -> decoder.readByte(schema);
+            case SHORT -> decoder.readShort(schema);
+            case TIMESTAMP -> decoder.readTimestamp(schema);
+            case BIG_DECIMAL -> decoder.readBigDecimal(schema);
+            case BIG_INTEGER -> decoder.readBigInteger(schema);
             case BLOB -> {
                 if (schema.hasTrait(TraitKey.STREAMING_TRAIT)) {
                     yield Document.of(schema, decoder.readDataStream(schema));
                 }
-                yield new ContentDocument(Document.of(decoder.readBlob(schema)), schema);
+                yield decoder.readBlob(schema);
             }
-            case BOOLEAN -> new ContentDocument(Document.of(decoder.readBoolean(schema)), schema);
-            case STRING, ENUM -> new ContentDocument(Document.of(decoder.readString(schema)), schema);
-            case TIMESTAMP -> new ContentDocument(Document.of(decoder.readTimestamp(schema)), schema);
-            case BYTE -> new ContentDocument(Document.ofNumber(decoder.readByte(schema)), schema);
-            case SHORT -> new ContentDocument(Document.ofNumber(decoder.readShort(schema)), schema);
-            case INTEGER, INT_ENUM -> new ContentDocument(Document.ofNumber(decoder.readInteger(schema)), schema);
-            case LONG -> new ContentDocument(Document.ofNumber(decoder.readLong(schema)), schema);
-            case FLOAT -> new ContentDocument(Document.ofNumber(decoder.readFloat(schema)), schema);
-            case DOCUMENT -> new ContentDocument(decoder.readDocument(), schema);
-            case DOUBLE -> new ContentDocument(Document.ofNumber(decoder.readDouble(schema)), schema);
-            case BIG_DECIMAL -> new ContentDocument(Document.ofNumber(decoder.readBigDecimal(schema)), schema);
-            case BIG_INTEGER -> new ContentDocument(Document.ofNumber(decoder.readBigInteger(schema)), schema);
-            case LIST -> {
-                var sparse = schema.hasTrait(TraitKey.SPARSE_TRAIT);
-                var items = new SchemaList(schema.listMember());
-                decoder.readList(schema, items, (it, memberDeserializer) -> {
-                    // A null element (only valid in @sparse lists) is retained as null; otherwise read the value.
-                    if (sparse && memberDeserializer.isNull()) {
-                        it.add(memberDeserializer.readNull());
-                    } else {
-                        it.add(deserialize(memberDeserializer, it.schema));
-                    }
-                });
-                yield new ContentDocument(Document.of(items), schema);
+            // DOCUMENT members keep their Document wrapper (SchemaDocument); they're not scalars.
+            case DOCUMENT -> new SchemaDocument(schema, decoder.readDocument());
+            default -> throw new UnsupportedOperationException("Unsupported target type: " + schema.type());
+        };
+    }
+
+    private Document deserializeRareScalar(ShapeDeserializer decoder, Schema schema) {
+        return switch (schema.type()) {
+            case FLOAT -> new ContentDocument(schema, decoder.readFloat(schema));
+            case BYTE -> new ContentDocument(schema, decoder.readByte(schema));
+            case SHORT -> new ContentDocument(schema, decoder.readShort(schema));
+            case TIMESTAMP -> new ContentDocument(schema, decoder.readTimestamp(schema));
+            case BIG_DECIMAL -> new ContentDocument(schema, decoder.readBigDecimal(schema));
+            case BIG_INTEGER -> new ContentDocument(schema, decoder.readBigInteger(schema));
+            case DOCUMENT -> new SchemaDocument(schema, decoder.readDocument());
+            case BLOB -> {
+                if (schema.hasTrait(TraitKey.STREAMING_TRAIT)) {
+                    yield Document.of(schema, decoder.readDataStream(schema));
+                }
+                yield new ContentDocument(schema, decoder.readBlob(schema));
             }
-            case MAP -> {
-                var sparse = schema.hasTrait(TraitKey.SPARSE_TRAIT);
-                var map = new SchemaMap(schema);
-                decoder.readStringMap(schema, map, (state, mapKey, memberDeserializer) -> {
-                    // A null value (only valid in @sparse maps) is retained as null; otherwise read the value.
-                    if (sparse && memberDeserializer.isNull()) {
-                        state.put(mapKey, memberDeserializer.readNull());
-                    } else {
-                        state.put(mapKey, deserialize(memberDeserializer, state.schema.mapValueMember()));
-                    }
-                });
-                yield new ContentDocument(Document.of(map), schema);
-            }
+            default -> throw new UnsupportedOperationException("Unsupported target type: " + schema.type());
+        };
+    }
+
+    private Document deserializeAggregate(ShapeDeserializer decoder, Schema schema) {
+        return switch (schema.type()) {
+            case LIST -> deserializeList(decoder, schema);
+            case MAP -> deserializeMap(decoder, schema);
             case STRUCTURE -> createStructDocument(decoder, schema);
             case UNION -> {
                 if (schema.hasTrait(TraitKey.STREAMING_TRAIT)) {
@@ -139,12 +192,58 @@ final class SchemaGuidedDocumentBuilder implements ShapeBuilder<StructDocument> 
         };
     }
 
+    private Document deserializeList(ShapeDeserializer decoder, Schema schema) {
+        Schema savedSchema = listConsumer.schema;
+        boolean savedSparse = listConsumer.sparse;
+        listConsumer.schema = schema.listMember();
+        listConsumer.sparse = schema.hasTrait(TraitKey.SPARSE_TRAIT);
+        int size = decoder.containerSize();
+        var items = size >= 0 && size <= decoder.containerPreAllocationLimit()
+                ? new ArrayList<Document>(size)
+                : new ArrayList<Document>(DEFAULT_COLLECTION_CAPACITY);
+        decoder.readList(schema, items, listConsumer);
+        listConsumer.schema = savedSchema;
+        listConsumer.sparse = savedSparse;
+        return new ContentDocument(schema, items);
+    }
+
+    private Document deserializeMap(ShapeDeserializer decoder, Schema schema) {
+        Schema savedSchema = mapConsumer.schema;
+        boolean savedSparse = mapConsumer.sparse;
+        mapConsumer.schema = schema.mapValueMember();
+        mapConsumer.sparse = schema.hasTrait(TraitKey.SPARSE_TRAIT);
+        int size = decoder.containerSize();
+        // LinkedHashMap, not HashMap: this map is built once on deserialize but iterated on every serialize, and a
+        // LinkedHashMap walks a clean insertion-ordered linked list (exactly N node visits) whereas a HashMap iterator
+        // scans the whole bucket array including empty slots — which showed up as ~4% of serialize CPU on map-heavy
+        // payloads. This also matches codegen's typed map deserializers (which use LinkedHashMap) and preserves
+        // insertion order, so re-serialized output keeps the wire order it was read in.
+        var map = size >= 0 && size <= decoder.containerPreAllocationLimit()
+                ? LinkedHashMap.<String, Document>newLinkedHashMap(size)
+                : new LinkedHashMap<String, Document>(DEFAULT_COLLECTION_CAPACITY);
+        decoder.readStringMap(schema, map, mapConsumer);
+        mapConsumer.schema = savedSchema;
+        mapConsumer.sparse = savedSparse;
+        return new ContentDocument(schema, map);
+    }
+
     private StructDocument createStructDocument(ShapeDeserializer decoder, Schema schema) {
-        var map = new LinkedHashMap<String, Document>();
-        decoder.readStruct(schema, map, (state, memberSchema, memberDeserializer) -> {
-            state.put(memberSchema.memberName(), deserialize(memberDeserializer, memberSchema));
-        });
-        return new StructDocument(schema, map, service);
+        if (schema.type() == ShapeType.UNION) {
+            return createUnionDocument(decoder, schema);
+        }
+        Document[] nestedValues = new Document[schema.members().size()];
+        decoder.readStruct(schema, nestedValues, structConsumer);
+        return new StructDocument(schema, nestedValues);
+    }
+
+    private StructDocument createUnionDocument(ShapeDeserializer decoder, Schema schema) {
+        unionConsumer.value = null;
+        unionConsumer.memberSchema = null;
+        decoder.readStruct(schema, null, unionConsumer);
+        // Both the set and empty cases route through the (schema, Object, Schema) constructor (no per-member array for
+        // unions). For a scalar member the consumer already stored the raw value (no ContentDocument wrapper); for an
+        // aggregate/struct/document member it stored the Document.
+        return new StructDocument(schema, unionConsumer.value, unionConsumer.memberSchema);
     }
 
     @Override
@@ -153,21 +252,50 @@ final class SchemaGuidedDocumentBuilder implements ShapeBuilder<StructDocument> 
         return this;
     }
 
-    // Captures the schema of a list to pass to a closure.
-    private static final class SchemaList extends ArrayList<Document> {
-        private final Schema schema;
-
-        SchemaList(Schema schema) {
-            this.schema = schema;
+    private final class StructConsumer implements ShapeDeserializer.StructMemberConsumer<Document[]> {
+        @Override
+        public void accept(Document[] state, Schema memberSchema, ShapeDeserializer memberDeserializer) {
+            state[memberSchema.memberIndex()] = deserializeValue(memberDeserializer, memberSchema);
         }
     }
 
-    // Captures the schema of a map to pass to a closure.
-    private static final class SchemaMap extends HashMap<String, Document> {
-        private final Schema schema;
+    private final class UnionConsumer implements ShapeDeserializer.StructMemberConsumer<Object> {
+        // Object, not Document: scalar members are stored raw (no ContentDocument wrapper); aggregates as Document.
+        Object value;
+        Schema memberSchema;
 
-        SchemaMap(Schema schema) {
-            this.schema = schema;
+        @Override
+        public void accept(Object state, Schema memberSchema, ShapeDeserializer memberDeserializer) {
+            value = deserializeUnionValue(memberDeserializer, memberSchema);
+            this.memberSchema = memberSchema;
+        }
+    }
+
+    private final class ListConsumer implements ShapeDeserializer.ListMemberConsumer<List<Document>> {
+        Schema schema;
+        boolean sparse;
+
+        @Override
+        public void accept(List<Document> state, ShapeDeserializer memberDeserializer) {
+            if (sparse && memberDeserializer.isNull()) {
+                state.add(memberDeserializer.readNull());
+            } else {
+                state.add(deserializeValue(memberDeserializer, schema));
+            }
+        }
+    }
+
+    private final class MapConsumer implements ShapeDeserializer.MapMemberConsumer<String, Map<String, Document>> {
+        Schema schema;
+        boolean sparse;
+
+        @Override
+        public void accept(Map<String, Document> state, String key, ShapeDeserializer memberDeserializer) {
+            if (sparse && memberDeserializer.isNull()) {
+                state.put(key, memberDeserializer.readNull());
+            } else {
+                state.put(key, deserializeValue(memberDeserializer, schema));
+            }
         }
     }
 }
