@@ -401,8 +401,18 @@ final class QueryFormSerializer implements ShapeSerializer {
             }
         }
 
+        // Save/restore: a nested collection re-enters and reset()s this shared instance, which would
+        // otherwise clobber the outer index mid-iteration.
+        var savedMemberNameBytes = listSerializer.memberNameBytes;
+        var savedFlattened = listSerializer.flattened;
+        var savedIndex = listSerializer.index;
+
         listSerializer.reset(memberNameBytes, flattened);
         consumer.accept(listState, listSerializer);
+
+        listSerializer.memberNameBytes = savedMemberNameBytes;
+        listSerializer.flattened = savedFlattened;
+        listSerializer.index = savedIndex;
 
         if (schema.isMember()) {
             popPrefix();
@@ -650,8 +660,21 @@ final class QueryFormSerializer implements ShapeSerializer {
         byte[] valueNameBytes = valueXmlName != null ? valueXmlName.getValue().getBytes(StandardCharsets.UTF_8) : VALUE;
         byte[] entryNameBytes = flattened ? null : ENTRY;
 
+        // Save/restore: a nested collection re-enters and reset()s this shared instance (see writeList).
+        var savedEntry = mapSerializer.entryNameBytes;
+        var savedKey = mapSerializer.keyNameBytes;
+        var savedValue = mapSerializer.valueNameBytes;
+        var savedFlattened = mapSerializer.flattened;
+        var savedIndex = mapSerializer.index;
+
         mapSerializer.reset(entryNameBytes, keyNameBytes, valueNameBytes, flattened);
         consumer.accept(mapState, mapSerializer);
+
+        mapSerializer.entryNameBytes = savedEntry;
+        mapSerializer.keyNameBytes = savedKey;
+        mapSerializer.valueNameBytes = savedValue;
+        mapSerializer.flattened = savedFlattened;
+        mapSerializer.index = savedIndex;
 
         if (schema.isMember()) {
             popPrefix();
