@@ -559,10 +559,27 @@ final class CborDeserializer implements ShapeDeserializer {
     }
 
     private double readDouble(String type, byte token) {
-        if (token != Token.FLOAT) {
+        if (token == Token.FLOAT) {
+            return readDouble(token);
+        } else if (token == Token.POS_INT) {
+            // Tolerate an integer-encoded value for a floating-point member: a whole-valued double (e.g. 1.0)
+            // is commonly written as a CBOR integer by other encoders, so coerce instead of rejecting.
+            long val = CborReadUtil.readLong(payload, token, idx, itemLength);
+            // Lengths below 8 are zero-extended, so only a value above Long.MAX_VALUE can wrap to negative.
+            if (val < 0) {
+                throw new SerializationException("Cannot read a bignum-sized integer as a " + type);
+            }
+            return val;
+        } else if (token == Token.NEG_INT) {
+            long val = CborReadUtil.readLong(payload, token, idx, itemLength);
+            // Likewise, only a value below Long.MIN_VALUE can wrap to >= 0.
+            if (val >= 0) {
+                throw new SerializationException("Cannot read a bignum-sized integer as a " + type);
+            }
+            return val;
+        } else {
             throw badType(type, token);
         }
-        return readDouble(token);
     }
 
     private double readDouble(byte token) {

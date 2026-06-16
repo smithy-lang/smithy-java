@@ -424,6 +424,89 @@ class CborCodecTest {
         }
     }
 
+    // Regression: readDouble rejected any non-FLOAT token, so a whole-valued double/float written as a
+    // CBOR integer (e.g. 1.0 -> major-type-0 int 1) threw instead of coercing. Other encoders commonly
+    // emit whole doubles as integers; the fix coerces an integer token to the floating-point value.
+    @Nested
+    class IntegerEncodedFloatingPointTest {
+        // CBOR major type 0 (unsigned int) value 1 -> 0x01.
+        private static final byte[] POS_INT_ONE = new byte[] {0x01};
+        // CBOR major type 0 value 0 -> 0x00.
+        private static final byte[] POS_INT_ZERO = new byte[] {0x00};
+        // CBOR major type 1 (negative int) value -1 -> 0x20.
+        private static final byte[] NEG_INT_ONE = new byte[] {0x20};
+        // CBOR uint8 value 42 -> 0x18 0x2A.
+        private static final byte[] POS_INT_FORTY_TWO = new byte[] {0x18, 0x2A};
+        // CBOR uint64 Long.MAX_VALUE -> 0x1B 7FFFFFFFFFFFFFFF (largest value that still fits a long).
+        private static final byte[] POS_INT_LONG_MAX =
+                new byte[] {0x1B, 0x7F, -1, -1, -1, -1, -1, -1, -1};
+        // CBOR uint64 2^64-1 -> 0x1B FFFFFFFFFFFFFFFF (overflows long: reads back as -1).
+        private static final byte[] POS_INT_OVERFLOW =
+                new byte[] {0x1B, -1, -1, -1, -1, -1, -1, -1, -1};
+        // CBOR negint64 -2^64 -> 0x3B FFFFFFFFFFFFFFFF (overflows long: -val-1 reads back positive).
+        private static final byte[] NEG_INT_OVERFLOW =
+                new byte[] {0x3B, -1, -1, -1, -1, -1, -1, -1, -1};
+
+        @Test
+        void doubleFromPositiveInteger() {
+            ShapeDeserializer de = CODEC.newDeserializer(POS_INT_ONE, SETTINGS);
+            assertEquals(1.0d, de.readDouble(PreludeSchemas.DOUBLE));
+        }
+
+        @Test
+        void doubleFromZeroInteger() {
+            ShapeDeserializer de = CODEC.newDeserializer(POS_INT_ZERO, SETTINGS);
+            assertEquals(0.0d, de.readDouble(PreludeSchemas.DOUBLE));
+        }
+
+        @Test
+        void doubleFromNegativeInteger() {
+            ShapeDeserializer de = CODEC.newDeserializer(NEG_INT_ONE, SETTINGS);
+            assertEquals(-1.0d, de.readDouble(PreludeSchemas.DOUBLE));
+        }
+
+        @Test
+        void doubleFromMultiByteInteger() {
+            ShapeDeserializer de = CODEC.newDeserializer(POS_INT_FORTY_TWO, SETTINGS);
+            assertEquals(42.0d, de.readDouble(PreludeSchemas.DOUBLE));
+        }
+
+        @Test
+        void floatFromInteger() {
+            ShapeDeserializer de = CODEC.newDeserializer(POS_INT_FORTY_TWO, SETTINGS);
+            assertEquals(42.0f, de.readFloat(PreludeSchemas.FLOAT));
+        }
+
+        @Test
+        void doubleFromLongMaxInteger() {
+            ShapeDeserializer de = CODEC.newDeserializer(POS_INT_LONG_MAX, SETTINGS);
+            assertEquals((double) Long.MAX_VALUE, de.readDouble(PreludeSchemas.DOUBLE));
+        }
+
+        // A 64-bit magnitude that overflows long must throw rather than silently saturate: coercion is
+        // only valid for values that round-trip through long.
+        @Test
+        void doubleFromOverflowingPositiveIntegerThrows() {
+            ShapeDeserializer de = CODEC.newDeserializer(POS_INT_OVERFLOW, SETTINGS);
+            assertThrows(SerializationException.class, () -> de.readDouble(PreludeSchemas.DOUBLE));
+        }
+
+        @Test
+        void doubleFromOverflowingNegativeIntegerThrows() {
+            ShapeDeserializer de = CODEC.newDeserializer(NEG_INT_OVERFLOW, SETTINGS);
+            assertThrows(SerializationException.class, () -> de.readDouble(PreludeSchemas.DOUBLE));
+        }
+
+        // A genuinely non-numeric token (here a text string) must still be rejected — the coercion is
+        // limited to the integer-token set, it does not make readDouble accept anything.
+        @Test
+        void doubleFromStringStillThrows() {
+            byte[] textHi = new byte[] {0x62, 'h', 'i'}; // CBOR text string "hi"
+            ShapeDeserializer de = CODEC.newDeserializer(textHi, SETTINGS);
+            assertThrows(SerializationException.class, () -> de.readDouble(PreludeSchemas.DOUBLE));
+        }
+    }
+
     @Nested
     class BigIntegerEdgeCaseTest {
         @ParameterizedTest
