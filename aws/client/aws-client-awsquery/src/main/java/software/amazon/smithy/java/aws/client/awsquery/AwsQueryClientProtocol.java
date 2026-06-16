@@ -42,7 +42,7 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
     private final ShapeId service;
     private final String version;
     private final HttpErrorDeserializer errorDeserializer;
-    private final XmlCodec codec = XmlCodec.builder().build();
+    private final XmlCodec codec = XmlCodec.builder().strictRootElement(false).build();
 
     public AwsQueryClientProtocol(ShapeId service, String version) {
         super(AwsQueryTrait.ID);
@@ -109,6 +109,7 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
         var operationName = operation.schema().id().getName();
         try (var codec = XmlCodec.builder()
                 .wrapperElements(List.of(operationName + "Response", operationName + "Result"))
+                .strictRootElement(false)
                 .build()) {
             return codec.deserializeShape(response.body().asByteBuffer(), builder);
         }

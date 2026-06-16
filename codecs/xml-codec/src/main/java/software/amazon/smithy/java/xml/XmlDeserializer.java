@@ -31,22 +31,24 @@ final class XmlDeserializer implements ShapeDeserializer, XmlErrorCodeParser {
     private final InnerDeserializer innerDeserializer;
     private final boolean isTopLevel;
     private final List<String> wrapperElements;
+    private final boolean strictRootElement;
 
     static XmlDeserializer topLevel(
             XmlInfo xmlInfo,
             XMLEventFactory eventFactory,
             XmlReader reader
     ) throws XMLStreamException {
-        return new XmlDeserializer(xmlInfo, eventFactory, reader, true, List.of());
+        return new XmlDeserializer(xmlInfo, eventFactory, reader, true, List.of(), true);
     }
 
     static XmlDeserializer topLevel(
             XmlInfo xmlInfo,
             XMLEventFactory eventFactory,
             XmlReader reader,
-            List<String> wrapperElements
+            List<String> wrapperElements,
+            boolean strictRootElement
     ) throws XMLStreamException {
-        return new XmlDeserializer(xmlInfo, eventFactory, reader, true, wrapperElements);
+        return new XmlDeserializer(xmlInfo, eventFactory, reader, true, wrapperElements, strictRootElement);
     }
 
     static XmlDeserializer flattened(
@@ -54,7 +56,7 @@ final class XmlDeserializer implements ShapeDeserializer, XmlErrorCodeParser {
             XMLEventFactory eventFactory,
             XmlReader reader
     ) throws XMLStreamException {
-        return new XmlDeserializer(xmlInfo, eventFactory, reader, false, List.of());
+        return new XmlDeserializer(xmlInfo, eventFactory, reader, false, List.of(), true);
     }
 
     private XmlDeserializer(
@@ -62,12 +64,14 @@ final class XmlDeserializer implements ShapeDeserializer, XmlErrorCodeParser {
             XMLEventFactory eventFactory,
             XmlReader reader,
             boolean isTopLevel,
-            List<String> wrapperElements
+            List<String> wrapperElements,
+            boolean strictRootElement
     ) throws XMLStreamException {
         this.xmlInfo = xmlInfo;
         this.reader = reader;
         this.isTopLevel = isTopLevel;
         this.wrapperElements = wrapperElements;
+        this.strictRootElement = strictRootElement;
         this.eventFactory = eventFactory;
         this.innerDeserializer = new InnerDeserializer();
     }
@@ -121,7 +125,9 @@ final class XmlDeserializer implements ShapeDeserializer, XmlErrorCodeParser {
                 expected = schema.id().getName();
             }
 
-            if (!expected.equals(name)) {
+            // In lenient mode (clients) a mismatched root element name is tolerated and the children are
+            // read regardless (e.g. S3's <CopyObjectResult> for CopyObjectOutput).
+            if (!expected.equals(name) && strictRootElement) {
                 throw new SerializationException("Expected XML element named '" + expected + "', found " + name);
             }
         } catch (XMLStreamException e) {

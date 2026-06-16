@@ -36,10 +36,12 @@ public final class XmlCodec implements Codec {
     private final List<String> wrapperElements;
     private final XmlNamespaceTrait defaultNamespace;
     private final boolean useNative;
+    private final boolean strictRootElement;
 
     private XmlCodec(Builder builder) {
         this.wrapperElements = builder.wrapperElements;
         this.defaultNamespace = builder.defaultNamespace;
+        this.strictRootElement = builder.strictRootElement;
         this.useNative = builder.useNative != null ? builder.useNative : USE_SMITHY_NATIVE;
         if (!useNative) {
             initStax();
@@ -94,7 +96,13 @@ public final class XmlCodec implements Codec {
                 bytes = ByteBufferUtils.getBytes(source);
                 offset = 0;
             }
-            return new SmithyXmlDeserializer(bytes, offset, length, xmlInfo, true, wrapperElements);
+            return new SmithyXmlDeserializer(bytes,
+                    offset,
+                    length,
+                    xmlInfo,
+                    true,
+                    wrapperElements,
+                    strictRootElement);
         }
 
         try {
@@ -103,7 +111,8 @@ public final class XmlCodec implements Codec {
                     xmlInfo,
                     eventFactory,
                     new XmlReader.StreamReader(reader, xmlInputFactory),
-                    wrapperElements);
+                    wrapperElements,
+                    strictRootElement);
         } catch (XMLStreamException e) {
             throw new SerializationException(e);
         }
@@ -116,6 +125,7 @@ public final class XmlCodec implements Codec {
         private List<String> wrapperElements = List.of();
         private XmlNamespaceTrait defaultNamespace;
         private Boolean useNative;
+        private boolean strictRootElement = true;
 
         private Builder() {}
 
@@ -146,6 +156,22 @@ public final class XmlCodec implements Codec {
          */
         public Builder defaultNamespace(XmlNamespaceTrait defaultNamespace) {
             this.defaultNamespace = defaultNamespace;
+            return this;
+        }
+
+        /**
+         * Whether the root element name must match the deserialized shape's expected name.
+         *
+         * <p>When {@code true} (default), a mismatched root element throws; use this for servers. When
+         * {@code false}, the mismatch is tolerated and the children are read regardless; use this for
+         * clients, where a service may return a wrapper name that differs from the modeled output shape
+         * (e.g. S3's {@code <CopyObjectResult>} for {@code CopyObjectOutput}).
+         *
+         * @param strictRootElement true to require an exact root element name, false to tolerate a mismatch
+         * @return the builder
+         */
+        public Builder strictRootElement(boolean strictRootElement) {
+            this.strictRootElement = strictRootElement;
             return this;
         }
 

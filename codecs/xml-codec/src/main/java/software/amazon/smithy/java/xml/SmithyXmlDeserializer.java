@@ -92,6 +92,7 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
     private final XmlInfo xmlInfo;
     private final boolean isTopLevel;
     private final List<String> wrapperElements;
+    private final boolean strictRootElement;
 
     SmithyXmlDeserializer(
             byte[] buf,
@@ -99,7 +100,8 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
             int length,
             XmlInfo xmlInfo,
             boolean isTopLevel,
-            List<String> wrapperElements
+            List<String> wrapperElements,
+            boolean strictRootElement
     ) {
         this.buf = buf;
         this.pos = offset;
@@ -107,6 +109,7 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
         this.xmlInfo = xmlInfo;
         this.isTopLevel = isTopLevel;
         this.wrapperElements = wrapperElements;
+        this.strictRootElement = strictRootElement;
         skipProlog();
     }
 
@@ -1048,8 +1051,14 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
 
         if (!nameEqualsString(expected)) {
             if (!nameEquals(ERROR_BYTES)) {
-                throw new SerializationException(
-                        "Expected XML element named '" + expected + "', found '" + elementName() + "'");
+                if (strictRootElement) {
+                    throw new SerializationException(
+                            "Expected XML element named '" + expected + "', found '" + elementName() + "'");
+                }
+                // Lenient mode: the root element name doesn't match the shape (e.g. S3's
+                // <CopyObjectResult> for CopyObjectOutput). The start element is already consumed, so
+                // read the children regardless.
+                return;
             }
         }
     }
@@ -1925,7 +1934,8 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                         spanLen,
                         xmlInfo,
                         false,
-                        List.of());
+                        List.of(),
+                        strictRootElement);
                 if (sub.nextStartElement()) {
                     MemberDeserializer memberDeser = sub.new MemberDeserializer();
                     consumer.accept(state, memberDeser);
@@ -1948,7 +1958,8 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                         spanLen,
                         xmlInfo,
                         false,
-                        List.of());
+                        List.of(),
+                        strictRootElement);
                 if (sub.nextStartElement()) {
                     if (!sub.nextStartElement()) {
                         throw new SerializationException("Expected map key in flattened entry");

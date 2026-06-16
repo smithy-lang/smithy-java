@@ -9,6 +9,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.ByteBuffer;
 import java.time.Instant;
@@ -21,6 +22,7 @@ import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.ToStringSerializer;
@@ -49,6 +51,48 @@ public class XmlCodecTest extends ProviderTestBase {
             assertThat(pojo.name, equalTo("Hello"));
             assertThat(pojo.date, equalTo(Instant.parse("2006-03-01T00:00:00Z")));
             assertThat(pojo.numbers, contains(1, 2, 3));
+        }
+    }
+
+    // The shape's root element is <Foo>; this document wraps the same members in a different root name.
+    private static final String WRONG_ROOT = """
+            <CopyObjectResult>
+                <name>Hello</name>
+                <numbers>
+                    <member>1</member>
+                    <member>2</member>
+                </numbers>
+            </CopyObjectResult>
+            """;
+
+    @PerProvider
+    public void strictRootElementRejectsMismatchedRoot(boolean useNative) {
+        // Default (strict) — a root name that doesn't match the shape is rejected. Server behavior.
+        try (var codec = XmlCodec.builder().useNative(useNative).build()) {
+            assertThrows(SerializationException.class,
+                    () -> codec.deserializeShape(WRONG_ROOT, new TestPojo.Builder()));
+        }
+    }
+
+    @PerProvider
+    public void lenientRootElementToleratesMismatchedRoot(boolean useNative) {
+        // strictRootElement(false) — the mismatched root is ignored and the children are read. Client
+        // behavior, e.g. S3's <CopyObjectResult> for a CopyObjectOutput shape.
+        try (var codec = XmlCodec.builder().useNative(useNative).strictRootElement(false).build()) {
+            var pojo = codec.deserializeShape(WRONG_ROOT, new TestPojo.Builder());
+            assertThat(pojo.name, equalTo("Hello"));
+            assertThat(pojo.numbers, contains(1, 2));
+        }
+    }
+
+    @PerProvider
+    public void matchingRootStillWorksInBothModes(boolean useNative) {
+        // A correct root name (<Foo>) deserializes regardless of the strict setting.
+        var xml = "<Foo><name>Hi</name></Foo>";
+        try (var strict = XmlCodec.builder().useNative(useNative).build();
+                var lenient = XmlCodec.builder().useNative(useNative).strictRootElement(false).build()) {
+            assertThat(strict.deserializeShape(xml, new TestPojo.Builder()).name, equalTo("Hi"));
+            assertThat(lenient.deserializeShape(xml, new TestPojo.Builder()).name, equalTo("Hi"));
         }
     }
 

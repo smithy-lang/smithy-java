@@ -42,7 +42,7 @@ public final class Ec2QueryClientProtocol extends HttpClientProtocol {
 
     private final String version;
     private final HttpErrorDeserializer errorDeserializer;
-    private final XmlCodec codec = XmlCodec.builder().build();
+    private final XmlCodec codec = XmlCodec.builder().strictRootElement(false).build();
 
     public Ec2QueryClientProtocol(ShapeId service, String version) {
         super(Ec2QueryTrait.ID);
@@ -110,6 +110,7 @@ public final class Ec2QueryClientProtocol extends HttpClientProtocol {
         var operationName = operation.schema().id().getName();
         try (var codec = XmlCodec.builder()
                 .wrapperElements(List.of(operationName + "Response"))
+                .strictRootElement(false)
                 .build()) {
             return codec.deserializeShape(response.body().asByteBuffer(), builder);
         }

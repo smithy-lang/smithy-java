@@ -58,7 +58,12 @@ public final class RestXmlClientProtocol extends HttpBindingClientProtocol<AwsEv
         super(RestXmlTrait.ID);
 
         var xmlNamespace = serviceSchema != null ? serviceSchema.getTrait(TraitKey.XML_NAMESPACE_TRAIT) : null;
-        this.codec = XmlCodec.builder().defaultNamespace(xmlNamespace).build();
+        // Client: tolerate a root element name that differs from the output shape (e.g. S3's
+        // <CopyObjectResult> for CopyObjectOutput).
+        this.codec = XmlCodec.builder()
+                .defaultNamespace(xmlNamespace)
+                .strictRootElement(false)
+                .build();
         this.errorDeserializer = HttpErrorDeserializer.builder()
                 .codec(codec)
                 .serviceId(service)
