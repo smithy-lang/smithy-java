@@ -25,8 +25,8 @@ dependencies {
     // for the source projection, so these go on `implementation`. The codegen
     // plugin (and the runtime stack) read shape definitions through these
     // JARs at build time and at runtime.
-    implementation("software.amazon.api.models:dynamodb:1.0.11")
-    implementation("software.amazon.api.models:s3:1.0.17")
+    implementation("software.amazon.api.models:dynamodb:1.0.12")
+    implementation("software.amazon.api.models:s3:1.0.20")
 
     // Runtime stack the generated clients depend on.
     implementation(project(":core"))
