@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -51,6 +52,13 @@ public final class JavaCodegenSettings {
     private static final String RUNTIME_TRAITS = "runtimeTraits";
     private static final String RUNTIME_TRAITS_SELECTOR = "runtimeTraitsSelector";
     private static final String MODES = "modes";
+    private static final String CLOSURE = "closure";
+
+    // Legacy default name for types-only generation. Before types generation was driven by a shape
+    // closure, it relied on a synthetic service named "TypesGenService", so the generated name
+    // defaulted to that when none was configured. The name is unused by types-only output, but this
+    // value is preserved so existing configs without a 'name' keep behaving as they did.
+    private static final String LEGACY_TYPES_NAME = "TypesGenService";
     private static final List<String> PROPERTIES = List.of(
             SERVICE,
             NAME,
@@ -67,9 +75,11 @@ public final class JavaCodegenSettings {
             EDITION,
             RUNTIME_TRAITS,
             RUNTIME_TRAITS_SELECTOR,
-            MODES);
+            MODES,
+            CLOSURE);
 
     private final ShapeId service;
+    private final String closure;
     private final String name;
     private final String packageNamespace;
     private final String header;
@@ -88,8 +98,9 @@ public final class JavaCodegenSettings {
     private final Map<String, Set<Symbol>> generatedSymbols = new HashMap<>();
 
     private JavaCodegenSettings(Builder builder) {
-        this.service = Objects.requireNonNull(builder.service);
-        this.name = StringUtils.capitalize(Objects.requireNonNullElse(builder.name, service.getName()));
+        this.service = builder.service;
+        this.closure = builder.closure;
+        this.name = StringUtils.capitalize(resolveName(builder.name, service));
         this.packageNamespace = Objects.requireNonNull(builder.packageNamespace);
         this.header = getHeader(builder.headerFilePath, builder.sourceLocation);
         this.addNullnessAnnotations = builder.addNullnessAnnotations;
@@ -106,6 +117,20 @@ public final class JavaCodegenSettings {
         this.httpConfig = builder.httpConfig;
     }
 
+    // Resolves the generated name: an explicit name wins, otherwise the service name when a service
+    // is set, otherwise the legacy types-only default (with a warning nudging callers to set one).
+    private static String resolveName(String configuredName, ShapeId service) {
+        if (configuredName != null) {
+            return configuredName;
+        }
+        if (service != null) {
+            return service.getName();
+        }
+        LOGGER.warn("No 'name' configured for types-only generation; defaulting to '{}'. Set the "
+                + "'name' setting explicitly to silence this warning.", LEGACY_TYPES_NAME);
+        return LEGACY_TYPES_NAME;
+    }
+
     /**
      * Creates a settings object from a plugin settings node
      *
@@ -115,7 +140,8 @@ public final class JavaCodegenSettings {
     public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
         var builder = new Builder();
         settingsNode.warnIfAdditionalProperties(PROPERTIES)
-                .expectStringMember(SERVICE, builder::service)
+                .getStringMember(SERVICE, builder::service)
+                .getStringMember(CLOSURE, builder::closure)
                 .getStringMember(NAME, builder::name)
                 .expectStringMember(NAMESPACE, builder::packageNamespace)
                 .getStringMember(HEADER_FILE, builder::headerFilePath)
@@ -136,8 +162,43 @@ public final class JavaCodegenSettings {
         return builder.build();
     }
 
+    /**
+     * Gets the primary service to generate.
+     *
+     * @return the configured service id.
+     * @see #getService() for a non-throwing variant.
+     */
     public ShapeId service() {
+        if (service == null) {
+            throw new CodegenException(
+                    "No service is configured for this code generation because types-only generation "
+                            + "has no primary service.");
+        }
         return service;
+    }
+
+    /**
+     * Gets the primary service to generate, if one is configured.
+     *
+     * <p>Types-only generation is driven by a shape closure and has no primary service, so this
+     * returns an empty optional in that case.
+     *
+     * @return the configured service id, or empty if none is set.
+     */
+    public Optional<ShapeId> getService() {
+        return Optional.ofNullable(service);
+    }
+
+    /**
+     * Gets the id of a pre-authored shape closure to generate, if one was configured.
+     *
+     * <p>When set, generation is driven by the {@code shapeClosures} metadata entry with this id in
+     * the model, rather than by an inline {@code selector}/{@code shapes} configuration.
+     *
+     * @return the configured shape closure id, or empty if none is set.
+     */
+    public Optional<String> getClosure() {
+        return Optional.ofNullable(closure);
     }
 
     public String name() {
@@ -279,6 +340,7 @@ public final class JavaCodegenSettings {
 
     public static final class Builder {
         private ShapeId service;
+        private String closure;
         private String name;
         private String packageNamespace;
         private String headerFilePath;
@@ -298,6 +360,11 @@ public final class JavaCodegenSettings {
 
         public Builder service(String string) {
             this.service = ShapeId.from(string);
+            return this;
+        }
+
+        public Builder closure(String closure) {
+            this.closure = closure;
             return this;
         }
 

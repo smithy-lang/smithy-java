@@ -5,14 +5,15 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.Map;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.ErrorTrait;
 
 record StructureDeserializerGenerator(
@@ -20,7 +21,7 @@ record StructureDeserializerGenerator(
         Shape shape,
         SymbolProvider symbolProvider,
         Model model,
-        ServiceShape service) implements Runnable {
+        Map<ShapeId, String> renames) implements Runnable {
 
     @Override
     public void run() {
@@ -78,7 +79,7 @@ record StructureDeserializerGenerator(
             writer.write(
                     "case $L -> builder.${memberName:L}($C);",
                     idx,
-                    new DeserializerGenerator(writer, member, symbolProvider, model, service, "de", "member"));
+                    new DeserializerGenerator(writer, member, symbolProvider, model, renames, "de", "member"));
             writer.popState();
         }
     }

@@ -17,7 +17,6 @@ import software.amazon.smithy.framework.knowledge.ImplicitErrorIndex;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.ServerSymbolProperties;
-import software.amazon.smithy.java.codegen.SyntheticServiceTransform;
 import software.amazon.smithy.java.codegen.generators.IdStringGenerator;
 import software.amazon.smithy.java.codegen.generators.SchemaFieldGenerator;
 import software.amazon.smithy.java.codegen.generators.TypeRegistryGenerator;
@@ -50,7 +49,6 @@ public final class ServiceGenerator implements
         TopDownIndex index = TopDownIndex.of(directive.model());
         List<OperationInfo> operationsInfo = index.getContainedOperations(shape)
                 .stream()
-                .filter(o -> !o.getId().getNamespace().equals(SyntheticServiceTransform.SYNTHETIC_NAMESPACE))
                 .map(o -> {
                     var inputSymbol =
                             directive.symbolProvider().toSymbol(directive.model().expectShape(o.getInputShape()));
@@ -138,7 +136,7 @@ public final class ServiceGenerator implements
                             var errorSymbols = getImplicitErrorSymbols(
                                     directive.symbolProvider(),
                                     directive.model(),
-                                    directive.service());
+                                    directive.expectService());
                             writer.putContext(
                                     "typeRegistry",
                                     new TypeRegistryGenerator(writer, errorSymbols));

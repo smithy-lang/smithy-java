@@ -35,7 +35,7 @@ public final class ListGenerator
                         CodegenUtils.getSerdeFileName(directive.settings()),
                         CodegenUtils.getModelNamespace(directive.settings()),
                         writer -> writer.onSection("sharedSerde", t -> {
-                            var name = CodegenUtils.getDefaultName(directive.shape(), directive.service());
+                            var name = CodegenUtils.getDefaultName(directive.shape(), directive.getRenames());
                             var target = directive.model().expectShape(directive.shape().getMember().getTarget());
                             var valueSchema = writer.format(
                                     "$L.listMember()",
@@ -121,7 +121,7 @@ public final class ListGenerator
                                             target,
                                             directive.symbolProvider(),
                                             directive.model(),
-                                            directive.service(),
+                                            directive.getRenames(),
                                             "deserializer",
                                             valueSchema));
                             writer.write(template);

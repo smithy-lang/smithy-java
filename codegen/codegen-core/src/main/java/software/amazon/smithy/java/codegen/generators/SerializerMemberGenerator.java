@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.Map;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.ContextualDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -28,8 +29,8 @@ import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.LongShape;
 import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
-import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeVisitor;
 import software.amazon.smithy.model.shapes.ShortShape;
 import software.amazon.smithy.model.shapes.StringShape;
@@ -45,7 +46,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     private final JavaWriter writer;
     private final SymbolProvider provider;
     private final Model model;
-    private final ServiceShape service;
+    private final Map<ShapeId, String> renames;
     private final Shape shape;
     private final String state;
     private final ContextualDirective<CodeGenerationContext, ?> directive;
@@ -71,7 +72,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
         this.writer = writer;
         this.provider = directive.symbolProvider();
         this.model = directive.model();
-        this.service = directive.service();
+        this.renames = directive.getRenames();
         this.shape = shape;
         this.state = state;
         this.schemaNameOverride = schemaNameOverride;
@@ -107,7 +108,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     public Void listShape(ListShape listShape) {
         writer.write(
                 "serializer.writeList(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
-                CodegenUtils.getDefaultName(listShape, service));
+                CodegenUtils.getDefaultName(listShape, renames));
         return null;
     }
 
@@ -115,7 +116,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     public Void mapShape(MapShape mapShape) {
         writer.write(
                 "serializer.writeMap(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
-                CodegenUtils.getDefaultName(mapShape, service));
+                CodegenUtils.getDefaultName(mapShape, renames));
         return null;
     }
 

@@ -78,8 +78,6 @@ public final class TypeCodegenSettings {
 
         // Remove unused properties
         PROPERTIES.forEach(nodeBuilder::withoutMember);
-        // Add the synthetic service
-        nodeBuilder.withMember("service", SyntheticServiceTransform.SYNTHETIC_SERVICE_ID.toString());
         return JavaCodegenSettings.fromNode(nodeBuilder.build());
     }
 

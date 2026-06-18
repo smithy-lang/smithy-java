@@ -202,7 +202,7 @@ public final class OperationGenerator
                     writer.putContext(
                             "schemes",
                             serviceIndex.getEffectiveAuthSchemes(
-                                    directive.service(),
+                                    directive.expectService(),
                                     shape,
                                     ServiceIndex.AuthSchemeMode.NO_AUTH_AWARE));
 
@@ -250,7 +250,8 @@ public final class OperationGenerator
                     }
 
                     var bottomUpIndex = BottomUpIndex.of(directive.model());
-                    var resourceOptional = bottomUpIndex.getResourceBinding(directive.service(), shape);
+                    var resourceOptional =
+                            bottomUpIndex.getResourceBinding(directive.expectService(), shape);
                     writer.putContext("hasResource", resourceOptional.isPresent());
                     writer.putContext("resourceType", ApiResource.class);
                     resourceOptional.ifPresent(
@@ -276,7 +277,7 @@ public final class OperationGenerator
             GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive
     ) {
         List<Symbol> symbols = new ArrayList<>();
-        for (var errorId : operation.getErrors(directive.service())) {
+        for (var errorId : operation.getErrors(directive.expectService())) {
             var shape = directive.model().expectShape(errorId);
             symbols.add(directive.symbolProvider().toSymbol(shape));
         }

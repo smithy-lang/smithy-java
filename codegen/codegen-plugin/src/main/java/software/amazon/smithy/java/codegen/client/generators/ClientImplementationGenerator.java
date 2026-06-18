@@ -20,7 +20,6 @@ import software.amazon.smithy.java.codegen.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
-import software.amazon.smithy.java.codegen.SyntheticServiceTransform;
 import software.amazon.smithy.java.codegen.client.sections.ClientImplAdditionalMethodsSection;
 import software.amazon.smithy.java.codegen.client.waiters.WaiterCodegenUtils;
 import software.amazon.smithy.java.codegen.generators.TypeRegistryGenerator;
@@ -92,7 +91,7 @@ public final class ClientImplementationGenerator
             var errorSymbols = getImplicitErrorSymbols(
                     directive.symbolProvider(),
                     directive.model(),
-                    directive.service());
+                    directive.expectService());
             writer.putContext("implicitErrors", !errorSymbols.isEmpty());
             writer.putContext(
                     "typeRegistry",
@@ -134,9 +133,6 @@ public final class ClientImplementationGenerator
             writer.putContext("overrideConfig", RequestOverrideConfig.class);
             var opIndex = OperationIndex.of(model);
             for (var operation : TopDownIndex.of(model).getContainedOperations(service)) {
-                if (operation.getId().getNamespace().equals(SyntheticServiceTransform.SYNTHETIC_NAMESPACE)) {
-                    continue;
-                }
                 writer.pushState();
                 writer.putContext("name", StringUtils.uncapitalize(CodegenUtils.getDefaultName(operation, service)));
                 writer.putContext("operation", symbolProvider.toSymbol(operation));

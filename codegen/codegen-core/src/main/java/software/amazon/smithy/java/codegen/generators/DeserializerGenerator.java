@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.Map;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
@@ -27,8 +28,8 @@ import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.LongShape;
 import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
-import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeVisitor;
 import software.amazon.smithy.model.shapes.ShortShape;
 import software.amazon.smithy.model.shapes.StringShape;
@@ -43,7 +44,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     private final Shape shape;
     private final SymbolProvider symbolProvider;
     private final Model model;
-    private final ServiceShape service;
+    private final Map<ShapeId, String> renames;
     private final String deserializer;
     private final String schemaName;
 
@@ -52,7 +53,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
             Shape shape,
             SymbolProvider symbolProvider,
             Model model,
-            ServiceShape service,
+            Map<ShapeId, String> renames,
             String deserializer,
             String schemaName
     ) {
@@ -60,7 +61,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
         this.shape = shape;
         this.symbolProvider = symbolProvider;
         this.model = model;
-        this.service = service;
+        this.renames = renames;
         this.deserializer = deserializer;
         this.schemaName = schemaName;
     }
@@ -94,7 +95,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     public Void listShape(ListShape listShape) {
         writer.write(
                 "SharedSerde.deserialize$L(${schemaName:L}, ${deserializer:L})",
-                CodegenUtils.getDefaultName(listShape, service));
+                CodegenUtils.getDefaultName(listShape, renames));
         return null;
     }
 
@@ -102,7 +103,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     public Void mapShape(MapShape mapShape) {
         writer.write(
                 "SharedSerde.deserialize$L(${schemaName:L}, ${deserializer:L})",
-                CodegenUtils.getDefaultName(mapShape, service));
+                CodegenUtils.getDefaultName(mapShape, renames));
         return null;
     }
 

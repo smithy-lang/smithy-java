@@ -24,8 +24,9 @@ public final class BddFileGenerator
         implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
     @Override
     public void accept(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        var serviceName = directive.service().toShapeId().getName();
-        var bytecode = compileBytecode(directive.service());
+        var service = directive.expectService();
+        var serviceName = service.toShapeId().getName();
+        var bytecode = compileBytecode(service);
         directive.fileManifest()
                 .writeFile(
                         format("./resources/META-INF/endpoints/%s.bdd", serviceName),

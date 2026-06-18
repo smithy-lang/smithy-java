@@ -14,7 +14,6 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.traits.ErrorTrait;
 
@@ -28,8 +27,7 @@ record StructureSerializerGenerator(
         JavaWriter writer,
         StructureShape shape,
         SymbolProvider symbolProvider,
-        Model model,
-        ServiceShape service) implements Runnable {
+        Model model) implements Runnable {
 
     @Override
     public void run() {

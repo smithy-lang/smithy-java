@@ -135,6 +135,7 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                 var symbolProvider = SymbolProvider.cache(
                         new JavaSymbolProvider(serviceModel,
                                 service,
+                                service.getRename(),
                                 serviceId.getNamespace(),
                                 serviceId.getName(),
                                 Set.of(CodegenMode.SERVER)));
@@ -320,6 +321,7 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
         var symbolProvider = new JavaSymbolProvider(
                 serviceModel,
                 service,
+                service.getRename(),
                 service.toShapeId().getNamespace(),
                 service.toShapeId().getName(),
                 Set.of());

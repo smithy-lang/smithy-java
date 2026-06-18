@@ -48,7 +48,7 @@ public final class MapGenerator
                                     directive.context()
                                             .schemaFieldOrder()
                                             .getSchemaFieldName(directive.shape(), writer);
-                            var name = CodegenUtils.getDefaultName(directive.shape(), directive.service());
+                            var name = CodegenUtils.getDefaultName(directive.shape(), directive.getRenames());
 
                             writer.pushState();
                             var template =
@@ -135,7 +135,7 @@ public final class MapGenerator
                                             value,
                                             directive.symbolProvider(),
                                             directive.model(),
-                                            directive.service(),
+                                            directive.getRenames(),
                                             "deserializer",
                                             valueSchema));
                             writer.putContext(

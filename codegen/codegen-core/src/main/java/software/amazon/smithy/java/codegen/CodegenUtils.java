@@ -9,6 +9,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -111,10 +112,24 @@ public final class CodegenUtils {
      * Gets the default class name to use for a given Smithy {@link Shape}.
      *
      * @param shape Shape to get name for.
+     * @param service Service whose renames provide contextual names, or null if none.
      * @return Default name.
      */
     public static String getDefaultName(Shape shape, ServiceShape service) {
-        String baseName = shape.getId().getName(service);
+        return getDefaultName(shape, service == null ? Map.of() : service.getRename());
+    }
+
+    /**
+     * Gets the default class name to use for a given Smithy {@link Shape}.
+     *
+     * @param shape Shape to get name for.
+     * @param renames Renames applied to the generated shapes (a shape id maps to its
+     *     contextual name). Used instead of a service so the closure-driven types path
+     *     can apply renames without a service.
+     * @return Default name.
+     */
+    public static String getDefaultName(Shape shape, Map<ShapeId, String> renames) {
+        String baseName = renames.getOrDefault(shape.getId(), shape.getId().getName());
 
         // If the name contains any problematic delimiters, use PascalCase converter,
         // otherwise, just capitalize first letter to avoid messing with user-defined
@@ -423,7 +438,7 @@ public final class CodegenUtils {
      * @return the property if found, or null.
      */
     public static <T> T tryGetServiceProperty(ShapeDirective<?, ?, ?> directive, Property<T> prop) {
-        var service = directive.service();
+        var service = directive.getService().orElse(null);
         if (service != null) {
             var symbol = directive.symbolProvider().toSymbol(service);
             if (symbol != null) {

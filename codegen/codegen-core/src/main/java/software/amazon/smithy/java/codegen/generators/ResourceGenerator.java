@@ -113,7 +113,8 @@ public final class ResourceGenerator
                                     shape));
 
                     var bottomUpIndex = BottomUpIndex.of(directive.model());
-                    var resourceOptional = bottomUpIndex.getResourceBinding(directive.service(), shape);
+                    var resourceOptional =
+                            bottomUpIndex.getResourceBinding(directive.expectService(), shape);
                     writer.putContext("hasResource", resourceOptional.isPresent());
                     resourceOptional.ifPresent(
                             resourceShape -> writer.putContext("resource",

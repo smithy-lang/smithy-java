@@ -5,17 +5,14 @@
 
 package software.amazon.smithy.java.codegen;
 
-import java.util.HashSet;
 import java.util.Set;
+import java.util.StringJoiner;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.build.SmithyBuildPlugin;
-import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.directed.CodegenDirector;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
-import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.loader.Prelude;
-import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.metadata.ShapeClosure;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
@@ -42,6 +39,10 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 public final class JavaTypesCodegenPlugin implements SmithyBuildPlugin {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaTypesCodegenPlugin.class);
 
+    // Id of the shape closure that drives types-only generation. Namespaced so it cannot collide
+    // with a model shape id or a model-authored closure.
+    private static final String CLOSURE_ID = "software.amazon.smithy.java.codegen#types";
+
     @Override
     public String getName() {
         return "internal-types-only";
@@ -60,35 +61,40 @@ public final class JavaTypesCodegenPlugin implements SmithyBuildPlugin {
         runner.settings(codegenSettings);
         runner.directedCodegen(new TypesDirectedJavaCodegen(modes));
         runner.fileManifest(context.getFileManifest());
-        runner.service(codegenSettings.service());
 
-        // Compute closure and create synthetic service
-        var closure = getClosure(context.getModel(), settings);
-        LOGGER.info("Found {} shapes in generation closure", closure.size());
-        var model = SyntheticServiceTransform.transform(context.getModel(), closure, settings.renames());
-        runner.model(model);
+        // Generate the data shapes selected by the settings as a shape closure, with no
+        // primary service. The director resolves the closure's transitive data shapes.
+        runner.shapeClosure(typesClosure(settings));
+        runner.generateDataShapesOnly();
+        runner.model(context.getModel());
         runner.integrationClass(JavaCodegenIntegration.class);
         DefaultTransforms.apply(runner, codegenSettings);
         runner.run();
         LOGGER.info("Successfully generated Java class files.");
     }
 
-    private static Set<Shape> getClosure(Model model, TypeCodegenSettings settings) {
-        Set<Shape> closure = new HashSet<>();
-        for (var shapeId : settings.shapes()) {
-            closure.add(model.expectShape(shapeId));
+    /**
+     * Builds the shape closure to generate from the configured selector, explicitly listed shapes,
+     * and renames. Explicit shapes are folded into the selector as id-equality clauses and trait
+     * definitions are excluded so only data shapes are generated.
+     */
+    private static ShapeClosure typesClosure(TypeCodegenSettings settings) {
+        // Fold the explicit shapes into the configured selector as id-equality alternatives,
+        // e.g. :is(<selector>, [id='ns#A'], [id='ns#B']).
+        String base = settings.selector().toString();
+        if (!settings.shapes().isEmpty()) {
+            var joiner = new StringJoiner(", ", ":is(", ")");
+            joiner.add(base);
+            for (var shape : settings.shapes()) {
+                joiner.add("[id='" + shape + "']");
+            }
+            base = joiner.toString();
         }
-        settings.selector()
-                .shapes(model)
-                .filter(s -> !s.isMemberShape())
-                .filter(s -> !Prelude.isPreludeShape(s))
-                .forEach(closure::add);
-
-        if (closure.isEmpty()) {
-            throw new CodegenException("Could not generate types. No shapes found in closure");
-        }
-        LOGGER.info("Found {} shapes in generation closure.", closure.size());
-
-        return closure;
+        return ShapeClosure.builder()
+                .id(CLOSURE_ID)
+                // Exclude trait definitions so only data shapes are generated.
+                .includeBySelector(base + " :not([trait|trait])")
+                .rename(settings.renames())
+                .build();
     }
 }

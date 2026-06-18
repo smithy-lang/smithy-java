@@ -30,7 +30,6 @@ import software.amazon.smithy.java.codegen.generators.SchemasGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.java.codegen.generators.UnionGenerator;
-import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
@@ -53,7 +52,8 @@ final class TypesDirectedJavaCodegen
     ) {
         return new JavaSymbolProvider(
                 directive.model(),
-                directive.service(),
+                directive.getService().orElse(null),
+                directive.getRenames(),
                 directive.settings().packageNamespace(),
                 directive.settings().name(),
                 modes);
@@ -68,9 +68,7 @@ final class TypesDirectedJavaCodegen
 
     @Override
     public void generateStructure(GenerateStructureDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        if (!isSynthetic(directive.shape())) {
-            new StructureGenerator<>().accept(directive);
-        }
+        new StructureGenerator<>().accept(directive);
     }
 
     @Override
@@ -128,9 +126,5 @@ final class TypesDirectedJavaCodegen
     @Override
     public void customizeAfterIntegrations(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         // No-op for types-only mode
-    }
-
-    private static boolean isSynthetic(Shape shape) {
-        return shape.getId().getNamespace().equals(SyntheticServiceTransform.SYNTHETIC_NAMESPACE);
     }
 }

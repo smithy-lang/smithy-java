@@ -69,8 +69,7 @@ public final class SchemaIndexGenerator
         }
         for (var shape : directive.connectedShapes().values()) {
             if ((shape.getType() == ShapeType.ENUM || shape.getType() == ShapeType.INT_ENUM)
-                    && !Prelude.isPreludeShape(shape)
-                    && !shape.hasTrait(SyntheticTrait.class)) {
+                    && !Prelude.isPreludeShape(shape)) {
                 var symbol = directive.symbolProvider().toSymbol(shape);
                 if (!symbol.getProperty(SymbolProperties.EXTERNAL_TYPE).orElse(false)) {
                     totalCount++;
@@ -138,8 +137,7 @@ public final class SchemaIndexGenerator
                     .values()
                     .stream()
                     .anyMatch(shape -> (shape.getType() == ShapeType.ENUM || shape.getType() == ShapeType.INT_ENUM)
-                            && !Prelude.isPreludeShape(shape)
-                            && !shape.hasTrait(SyntheticTrait.class));
+                            && !Prelude.isPreludeShape(shape));
             if (hasEnums) {
                 writer.write("_initEnums();");
             }
@@ -180,8 +178,7 @@ public final class SchemaIndexGenerator
             boolean hasEnums = false;
             for (var shape : directive.connectedShapes().values()) {
                 if ((shape.getType() == ShapeType.ENUM || shape.getType() == ShapeType.INT_ENUM)
-                        && !Prelude.isPreludeShape(shape)
-                        && !shape.hasTrait(SyntheticTrait.class)) {
+                        && !Prelude.isPreludeShape(shape)) {
                     hasEnums = true;
                     break;
                 }
@@ -190,8 +187,7 @@ public final class SchemaIndexGenerator
                 writer.openBlock("private static void _initEnums() {");
                 for (var shape : directive.connectedShapes().values()) {
                     if ((shape.getType() == ShapeType.ENUM || shape.getType() == ShapeType.INT_ENUM)
-                            && !Prelude.isPreludeShape(shape)
-                            && !shape.hasTrait(SyntheticTrait.class)) {
+                            && !Prelude.isPreludeShape(shape)) {
                         var symbol = directive.symbolProvider().toSymbol(shape);
                         if (symbol.getProperty(SymbolProperties.EXTERNAL_TYPE).orElse(false)) {
                             continue;

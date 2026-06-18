@@ -7,6 +7,7 @@ package software.amazon.smithy.java.codegen.generators;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.SymbolProvider;
@@ -25,8 +26,8 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.MemberShape;
-import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -89,8 +90,7 @@ public final class UnionGenerator
                             writer,
                             shape,
                             directive.symbolProvider(),
-                            directive.model(),
-                            directive.service()));
+                            directive.model()));
             writer.putContext(
                     "builder",
                     new UnionBuilderGenerator(
@@ -98,7 +98,7 @@ public final class UnionGenerator
                             shape,
                             directive.symbolProvider(),
                             directive.model(),
-                            directive.service()));
+                            directive.getRenames()));
             writer.writeNullMarkedAnnotation();
             writer.write(template);
             writer.popState();
@@ -110,8 +110,7 @@ public final class UnionGenerator
             JavaWriter writer,
             UnionShape shape,
             SymbolProvider symbolProvider,
-            Model model,
-            ServiceShape service) implements Runnable {
+            Model model) implements Runnable {
 
         @Override
         public void run() {
@@ -229,9 +228,9 @@ public final class UnionGenerator
                 Shape shape,
                 SymbolProvider symbolProvider,
                 Model model,
-                ServiceShape service
+                Map<ShapeId, String> renames
         ) {
-            super(writer, shape, symbolProvider, model, service);
+            super(writer, shape, symbolProvider, model, renames);
         }
 
         @Override

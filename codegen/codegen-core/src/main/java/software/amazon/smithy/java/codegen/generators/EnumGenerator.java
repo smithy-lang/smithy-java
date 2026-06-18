@@ -27,8 +27,8 @@ import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.EnumShape;
 import software.amazon.smithy.model.shapes.IntEnumShape;
-import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -97,7 +97,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                             shape,
                             directive.symbolProvider(),
                             directive.model(),
-                            directive.service()));
+                            directive.getRenames()));
             writer.writeNullMarkedAnnotation();
             writer.write(template);
             writer.popState();
@@ -250,9 +250,9 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                 Shape shape,
                 SymbolProvider symbolProvider,
                 Model model,
-                ServiceShape service
+                Map<ShapeId, String> renames
         ) {
-            super(writer, shape, symbolProvider, model, service);
+            super(writer, shape, symbolProvider, model, renames);
         }
 
         @Override

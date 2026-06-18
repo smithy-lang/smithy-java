@@ -64,6 +64,8 @@ addGenerateSrcsTask("software.amazon.smithy.java.codegen.client.TestServerJavaCl
 addGenerateSrcsTask("software.amazon.smithy.java.codegen.server.TestServerJavaCodegenRunner", "Server", null)
 // Types codegen test runner
 addGenerateSrcsTask("software.amazon.smithy.java.codegen.types.TestJavaTypeCodegenRunner", "Types", null)
+// Combined client + types codegen test runner
+addGenerateSrcsTask("software.amazon.smithy.java.codegen.combined.TestCombinedModeCodegenRunner", "Combined", null)
 
 sourceSets {
     it {
@@ -83,11 +85,12 @@ tasks.named("compileJmhJava") {
 }
 
 // Ensure generate tasks that use it source set resources depend on base generateSources
-listOf("generateSourcesClient", "generateSourcesServer", "generateSourcesTypes").forEach { taskName ->
-    tasks.named(taskName) {
-        dependsOn("generateSources")
+listOf("generateSourcesClient", "generateSourcesServer", "generateSourcesTypes", "generateSourcesCombined")
+    .forEach { taskName ->
+        tasks.named(taskName) {
+            dependsOn("generateSources")
+        }
     }
-}
 
 tasks.test {
     failOnNoDiscoveredTests = false

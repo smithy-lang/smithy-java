@@ -39,7 +39,6 @@ import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.java.codegen.generators.UnionGenerator;
 import software.amazon.smithy.java.codegen.server.generators.OperationInterfaceGenerator;
 import software.amazon.smithy.java.codegen.server.generators.ServiceGenerator;
-import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.SmithyUnstableApi;
@@ -66,7 +65,8 @@ final class DirectedJavaCodegen
     ) {
         return new JavaSymbolProvider(
                 directive.model(),
-                directive.service(),
+                directive.getService().orElse(null),
+                directive.getRenames(),
                 directive.settings().packageNamespace(),
                 directive.settings().name(),
                 modes);
@@ -99,9 +99,7 @@ final class DirectedJavaCodegen
 
     @Override
     public void generateStructure(GenerateStructureDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        if (!isSynthetic(directive.shape())) {
-            new StructureGenerator<>().accept(directive);
-        }
+        new StructureGenerator<>().accept(directive);
     }
 
     @Override
@@ -136,9 +134,6 @@ final class DirectedJavaCodegen
 
     @Override
     public void generateOperation(GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        if (isSynthetic(directive.shape())) {
-            return;
-        }
         if (isTypesOnly()) {
             return;
         }
@@ -150,7 +145,8 @@ final class DirectedJavaCodegen
 
     @Override
     public void generateService(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        // In TYPES-only mode, generateService is a no-op (the synthetic service has no real service shape)
+        // In types-only mode there is no service to generate. The director also skips this call when
+        // generating data shapes only, but it can't hurt to double check.
         if (isTypesOnly()) {
             return;
         }
@@ -168,7 +164,7 @@ final class DirectedJavaCodegen
         new ServiceExceptionGenerator<>().accept(directive);
 
         if (modes.contains(CodegenMode.CLIENT)) {
-            var service = directive.service();
+            var service = directive.expectService();
             if (service.hasTrait(ShapeId.from("smithy.rules#endpointBdd"))
                     || service.hasTrait(ShapeId.from("smithy.rules#endpointRuleSet"))) {
                 new BddFileGenerator().accept(directive);
@@ -194,10 +190,6 @@ final class DirectedJavaCodegen
                 && !directive.model().getShapesWithTrait(ShapeId.from("smithy.waiters#waitable")).isEmpty()) {
             new WaiterContainerGenerator().accept(directive.context());
         }
-    }
-
-    private static boolean isSynthetic(Shape shape) {
-        return shape.getId().getNamespace().equals(SyntheticServiceTransform.SYNTHETIC_NAMESPACE);
     }
 
     private boolean isTypesOnly() {

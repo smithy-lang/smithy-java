@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -62,8 +63,8 @@ import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.LongShape;
 import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
-import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.shapes.ShapeVisitor;
 import software.amazon.smithy.model.shapes.ShortShape;
@@ -173,8 +174,7 @@ public final class StructureGenerator<
                             writer,
                             shape,
                             directive.symbolProvider(),
-                            directive.model(),
-                            directive.service()));
+                            directive.model()));
             writer.putContext(
                     "builder",
                     new StructureBuilderGenerator(
@@ -182,7 +182,7 @@ public final class StructureGenerator<
                             shape,
                             directive.symbolProvider(),
                             directive.model(),
-                            directive.service()));
+                            directive.getRenames()));
             writer.putContext("getMemberValue", new GetMemberValueGenerator(writer, directive.symbolProvider(), shape));
             writer.putContext("toBuilder", new ToBuilderGenerator(writer, shape, directive.symbolProvider()));
             writer.writeNullMarkedAnnotation();
@@ -658,9 +658,9 @@ public final class StructureGenerator<
                 Shape shape,
                 SymbolProvider symbolProvider,
                 Model model,
-                ServiceShape service
+                Map<ShapeId, String> renames
         ) {
-            super(writer, shape, symbolProvider, model, service);
+            super(writer, shape, symbolProvider, model, renames);
         }
 
         // Required shapes marked with clientOptional should not be required to create the type. For these shapes,

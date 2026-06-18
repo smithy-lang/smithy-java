@@ -14,7 +14,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.codegen.core.CodegenContext;
-import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.WriterDelegator;
 import software.amazon.smithy.codegen.core.directed.CreateContextDirective;
@@ -123,7 +122,7 @@ public class CodeGenerationContext
                 fileManifest,
                 this.symbolProvider,
                 new JavaWriter.Factory(settings));
-        this.runtimeTraits = collectRuntimeTraits();
+        this.runtimeTraits = collectRuntimeTraits(directive.getService().orElse(null));
         this.traitInitializers = collectTraitInitializers();
         this.plugin = plugin;
         this.schemaFieldOrder = new SchemaFieldOrder(directive, this);
@@ -186,32 +185,30 @@ public class CodeGenerationContext
      *
      * @return Set of trait ShapeId's to include in generated Schemas.
      */
-    private Set<ShapeId> collectRuntimeTraits() {
-        ServiceShape shape = model.expectShape(settings.service())
-                .asServiceShape()
-                .orElseThrow(
-                        () -> new CodegenException(
-                                "Expected shapeId: "
-                                        + settings.service() + " to be a service shape."));
-
+    private Set<ShapeId> collectRuntimeTraits(ServiceShape service) {
         // Add all default runtime traits from the prelude
         Set<ShapeId> traits = new HashSet<>(PRELUDE_RUNTIME_TRAITS);
-        for (var entry : shape.getAllTraits().entrySet()) {
-            Optional<Shape> traitShapeOptional = model.getShape(entry.getKey());
-            if (traitShapeOptional.isEmpty()) {
-                LOGGER.debug("Skipping unknown trait: {}", entry.getKey());
-                continue;
-            }
-            var traitShape = traitShapeOptional.get();
-            // Add all traits supported by a protocol the service supports
-            if (traitShape.hasTrait(ProtocolDefinitionTrait.class)) {
-                var protocolDef = traitShape.expectTrait(ProtocolDefinitionTrait.class);
-                traits.addAll(protocolDef.getTraits());
-            }
-            // Add all traits supported by auth schemes the service supports
-            if (traitShape.hasTrait(AuthDefinitionTrait.class)) {
-                var authDef = traitShape.expectTrait(AuthDefinitionTrait.class);
-                traits.addAll(authDef.getTraits());
+
+        // Protocol- and auth-scheme-supported traits are rooted in the primary service. Pure types
+        // mode has no service, so only the prelude and customer-configured traits apply.
+        if (service != null) {
+            for (var entry : service.getAllTraits().entrySet()) {
+                Optional<Shape> traitShapeOptional = model.getShape(entry.getKey());
+                if (traitShapeOptional.isEmpty()) {
+                    LOGGER.debug("Skipping unknown trait: {}", entry.getKey());
+                    continue;
+                }
+                var traitShape = traitShapeOptional.get();
+                // Add all traits supported by a protocol the service supports
+                if (traitShape.hasTrait(ProtocolDefinitionTrait.class)) {
+                    var protocolDef = traitShape.expectTrait(ProtocolDefinitionTrait.class);
+                    traits.addAll(protocolDef.getTraits());
+                }
+                // Add all traits supported by auth schemes the service supports
+                if (traitShape.hasTrait(AuthDefinitionTrait.class)) {
+                    var authDef = traitShape.expectTrait(AuthDefinitionTrait.class);
+                    traits.addAll(authDef.getTraits());
+                }
             }
         }
 

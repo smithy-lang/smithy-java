@@ -60,7 +60,6 @@ public final class SchemaFieldOrder {
         var index = TopologicalIndex.of(directive.model());
         var allShapes = Stream.concat(index.getOrderedShapes().stream(), index.getRecursiveShapes().stream())
                 .filter(connectedShapes::contains)
-                .filter(s -> !s.hasTrait(SyntheticTrait.class))
                 .filter(s -> !EXCLUDED_TYPES.contains(s.getType()))
                 .filter(not(Prelude::isPreludeShape))
                 .collect(Collectors.toCollection(LinkedHashSet::new));

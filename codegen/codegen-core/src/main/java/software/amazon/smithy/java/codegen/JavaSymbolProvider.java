@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -71,6 +72,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
 
     private final Model model;
     private final ServiceShape service;
+    private final Map<ShapeId, String> renames;
     private final String packageNamespace;
     private final String serviceName;
     private final Set<CodegenMode> modes;
@@ -79,16 +81,36 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
     public JavaSymbolProvider(
             Model model,
             ServiceShape service,
+            Map<ShapeId, String> renames,
             String packageNamespace,
             String serviceName,
             Set<CodegenMode> modes
     ) {
         this.model = model;
         this.service = service;
+        this.renames = renames;
         this.packageNamespace = packageNamespace;
         this.serviceName = serviceName;
         this.modes = modes;
         this.externalTypes = buildExternalTypes();
+    }
+
+    /**
+     * Backwards-compatible constructor that derives renames from the service.
+     *
+     * @deprecated Use {@link #JavaSymbolProvider(Model, ServiceShape, Map, String, String, Set)} and
+     *     pass renames explicitly (e.g. {@code directive.getRenames()}), which also supports
+     *     closure-driven generation.
+     */
+    @Deprecated
+    public JavaSymbolProvider(
+            Model model,
+            ServiceShape service,
+            String packageNamespace,
+            String serviceName,
+            Set<CodegenMode> modes
+    ) {
+        this(model, service, service.getRename(), packageNamespace, serviceName, modes);
     }
 
     private static Map<ShapeId, Symbol> buildExternalTypes() {
@@ -284,7 +306,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
             // name conflicts with the enum class name the suffix value is added after "Type".
             var memberName = CodegenUtils.toMemberName(memberShape, model);
             var className = CaseUtils.toPascalCase(memberName) + "Type";
-            var targetName = CodegenUtils.getDefaultName(container, service);
+            var targetName = CodegenUtils.getDefaultName(container, renames);
             if (targetName.equals(className)) {
                 className = className + "Value";
             }
@@ -391,8 +413,20 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
         return getJavaClassSymbol(unionShape);
     }
 
+    /**
+     * @deprecated The service shape is now optional, use {@link #serviceShape()} instead.
+     */
+    @Deprecated
     protected ServiceShape service() {
         return service;
+    }
+
+    protected Optional<ServiceShape> serviceShape() {
+        return Optional.ofNullable(service);
+    }
+
+    protected Map<ShapeId, String> renames() {
+        return renames;
     }
 
     protected String packageNamespace() {
@@ -400,7 +434,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
     }
 
     private Symbol getJavaClassSymbol(Shape shape) {
-        String name = CodegenUtils.getDefaultName(shape, service);
+        String name = CodegenUtils.getDefaultName(shape, renames);
         return Symbol.builder()
                 .name(name)
                 .putProperty(SymbolProperties.IS_PRIMITIVE, false)

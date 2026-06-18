@@ -34,7 +34,6 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
-import software.amazon.smithy.java.codegen.SyntheticServiceTransform;
 import software.amazon.smithy.java.codegen.client.sections.ClientInterfaceAdditionalMethodsSection;
 import software.amazon.smithy.java.codegen.client.waiters.WaiterCodegenUtils;
 import software.amazon.smithy.java.codegen.integrations.core.GenericTraitInitializer;
@@ -171,12 +170,13 @@ public final class ClientInterfaceGenerator
                     writer.putContext("hasDefaultProtocol", defaultProtocolTrait != null);
                     writer.putContext("protocolFactory",
                             new FactoryGenerator(writer, getFactory(defaultProtocolTrait)));
+                    var service = directive.expectService();
                     writer.putContext(
                             "defaultProtocol",
                             new DefaultProtocolGenerator(
                                     writer,
                                     settings.service(),
-                                    directive.service().getVersion(),
+                                    service.getVersion(),
                                     defaultProtocolTrait,
                                     directive.context()));
                     writer.putContext("clientPlugin", ClientPlugin.class);
@@ -187,10 +187,10 @@ public final class ClientInterfaceGenerator
                     writer.putContext("impl", symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL));
                     writer.putContext("hasDefaultTransport", settings.transport() != null);
                     writer.putContext("hasBdd",
-                            directive.service().hasTrait(ENDPOINT_BDD_TRAIT)
-                                    || directive.service().hasTrait(ENDPOINT_RULESET_TRAIT));
+                            service.hasTrait(ENDPOINT_BDD_TRAIT)
+                                    || service.hasTrait(ENDPOINT_RULESET_TRAIT));
                     writer.putContext("loadBddInfo",
-                            new LoadBddInfoGenerator(writer, directive.service().toShapeId().getName()));
+                            new LoadBddInfoGenerator(writer, service.toShapeId().getName()));
                     var hasTransportSettings = settings.transportSettings() != null && !settings.transportSettings()
                             .isEmpty();
                     writer.putContext("hasTransportSettings", hasTransportSettings);
@@ -213,7 +213,7 @@ public final class ClientInterfaceGenerator
                                     symbol,
                                     directive.model(),
                                     directive.settings()));
-                    var defaultAuth = getAuthFactoryMapping(directive.model(), directive.service());
+                    var defaultAuth = getAuthFactoryMapping(directive.model(), service);
                     writer.putContext(
                             "defaultAuth",
                             new AuthInitializerGenerator(writer, directive.context(), defaultAuth));
@@ -224,7 +224,7 @@ public final class ClientInterfaceGenerator
                     writer.putContext("defaultPlugins", new PluginPropertyWriter(writer, defaultPlugins));
                     writer.putContext("settings", getBuilderSettings(directive.settings()));
 
-                    var serviceSymbol = directive.symbolProvider().toSymbol(directive.service());
+                    var serviceSymbol = directive.symbolProvider().toSymbol(service);
                     writer.putContext("serviceApi", serviceSymbol.expectProperty(SymbolProperties.SERVICE_API_SERVICE));
                     writer.write(template);
                     writer.popState();
@@ -370,9 +370,6 @@ public final class ClientInterfaceGenerator
 
             var opIndex = OperationIndex.of(model);
             for (var operation : TopDownIndex.of(model).getContainedOperations(service)) {
-                if (operation.getId().getNamespace().equals(SyntheticServiceTransform.SYNTHETIC_NAMESPACE)) {
-                    continue;
-                }
                 writer.pushState();
                 writer.putContext("name", StringUtils.uncapitalize(CodegenUtils.getDefaultName(operation, service)));
                 writer.putContext("input", symbolProvider.toSymbol(opIndex.expectInputShape(operation)));

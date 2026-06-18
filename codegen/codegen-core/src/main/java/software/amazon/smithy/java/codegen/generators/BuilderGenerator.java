@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.List;
+import java.util.Map;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -14,8 +15,8 @@ import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.MemberShape;
-import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
@@ -26,20 +27,20 @@ abstract class BuilderGenerator implements Runnable {
     protected final Shape shape;
     protected final SymbolProvider symbolProvider;
     protected final Model model;
-    protected final ServiceShape service;
+    protected final Map<ShapeId, String> renames;
 
     protected BuilderGenerator(
             JavaWriter writer,
             Shape shape,
             SymbolProvider symbolProvider,
             Model model,
-            ServiceShape service
+            Map<ShapeId, String> renames
     ) {
         this.writer = writer;
         this.shape = shape;
         this.symbolProvider = symbolProvider;
         this.model = model;
-        this.service = service;
+        this.renames = renames;
     }
 
     @Override
@@ -111,7 +112,7 @@ abstract class BuilderGenerator implements Runnable {
     }
 
     protected void generateDeserialization(JavaWriter writer) {
-        writer.writeInline("${C|}", new StructureDeserializerGenerator(writer, shape, symbolProvider, model, service));
+        writer.writeInline("${C|}", new StructureDeserializerGenerator(writer, shape, symbolProvider, model, renames));
     }
 
     protected abstract void generateProperties(JavaWriter writer);
