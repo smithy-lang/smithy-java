@@ -21,7 +21,7 @@ dependencies {
     implementation(project(":aws:client:aws-client-awsquery"))
     implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(project(":logging"))
-    implementation("software.amazon.api.models:sts:1.0.5")
+    implementation("software.amazon.api.models:sts:1.0.7")
     testImplementation(project(":client:client-mock-plugin"))
     testImplementation(project(":http:http-api"))
 }
