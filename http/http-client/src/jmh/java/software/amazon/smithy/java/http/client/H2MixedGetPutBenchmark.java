@@ -31,7 +31,7 @@ import org.openjdk.jmh.annotations.Warmup;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
-import software.amazon.smithy.java.client.http.boringssl.BoringSslEngineFactory;
+import software.amazon.smithy.java.client.http.boringssl.BoringSslTlsProvider;
 import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
 import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
 import software.amazon.smithy.java.context.Context;
@@ -83,7 +83,7 @@ public class H2MixedGetPutBenchmark {
     public void setup() throws Exception {
         var sslContext = BenchmarkSupport.trustAllSsl();
 
-        if (!BoringSslEngineFactory.isAvailable()) {
+        if (!BoringSslTlsProvider.available()) {
             throw new IllegalStateException("BoringSSL (netty-tcnative) is not available on this host");
         }
         smithyClient = HttpClient.builder()
@@ -94,7 +94,7 @@ public class H2MixedGetPutBenchmark {
                 .maxIdleTime(Duration.ofMinutes(2))
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_2)
                 .sslContext(sslContext)
-                .sslEngineFactory(BoringSslEngineFactory.create(true))
+                .tlsProvider(BoringSslTlsProvider.create(true))
                 .dnsResolver(BenchmarkSupport.staticDns())
                 .build();
 

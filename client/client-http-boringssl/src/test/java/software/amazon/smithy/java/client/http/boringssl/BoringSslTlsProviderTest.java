@@ -51,13 +51,13 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  * <p>Skipped (not failed) when netty-tcnative is unavailable on the host, so the build stays green
  * on platforms without the native library.
  */
-class BoringSslEngineFactoryTest {
+class BoringSslTlsProviderTest {
 
     private HttpsServer server;
 
     @BeforeEach
     void requireTcnative() {
-        assumeTrue(BoringSslEngineFactory.isAvailable(),
+        assumeTrue(BoringSslTlsProvider.available(),
                 "netty-tcnative (BoringSSL) not available on this host");
     }
 
@@ -122,7 +122,7 @@ class BoringSslEngineFactoryTest {
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .maxTotalConnections(maxConns)
                 .maxConnectionsPerRoute(maxConns)
-                .sslEngineFactory(BoringSslEngineFactory.create(true)); // trustAll: self-signed test cert
+                .tlsProvider(BoringSslTlsProvider.create(true)); // trustAll: self-signed test cert
         if (readTimeout != null) {
             builder.readTimeout(readTimeout);
         }
@@ -240,7 +240,7 @@ class BoringSslEngineFactoryTest {
                 .maxConnectionsPerRoute(1)
                 .tlsReadBufferSize(256 * 1024)
                 .socketReceiveBufferSize(512 * 1024)
-                .sslEngineFactory(BoringSslEngineFactory.create(true))
+                .tlsProvider(BoringSslTlsProvider.create(true))
                 .build()) {
             String uri = "https://127.0.0.1:" + server.getAddress().getPort() + "/raw";
             for (int attempt = 0; attempt < 3; attempt++) {
@@ -281,7 +281,7 @@ class BoringSslEngineFactoryTest {
                 .maxConnectionsPerRoute(1)
                 .tlsWriteBufferSize(256 * 1024)
                 .socketSendBufferSize(512 * 1024)
-                .sslEngineFactory(BoringSslEngineFactory.create(true))
+                .tlsProvider(BoringSslTlsProvider.create(true))
                 .build()) {
             String uri = "https://127.0.0.1:" + server.getAddress().getPort() + "/raw";
             for (int attempt = 0; attempt < 3; attempt++) {
@@ -351,13 +351,12 @@ class BoringSslEngineFactoryTest {
             serverThread.setDaemon(true);
             serverThread.start();
 
-            var clientHandle = BoringSslEngineFactory.create(true).newEngine("localhost", port, clientAlpn);
-            SSLEngine client = clientHandle.engine();
+            SSLEngine client = BoringSslTlsProvider.create(true).newEngine("localhost", port, clientAlpn);
             try (var socket = new Socket(InetAddress.getLoopbackAddress(), port)) {
                 driveClientHandshake(client, socket);
                 return client.getApplicationProtocol();
             } finally {
-                clientHandle.releaser().run();
+                BoringSslTlsProvider.releaser(client).run();
             }
         }
     }

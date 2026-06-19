@@ -23,7 +23,7 @@ import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
 import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
 import software.amazon.smithy.java.client.http.apache.classic.ApacheClassicHttpClientTransport;
-import software.amazon.smithy.java.client.http.boringssl.BoringSslEngineFactory;
+import software.amazon.smithy.java.client.http.boringssl.BoringSslTlsProvider;
 import software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport;
 import software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig;
 import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
@@ -144,8 +144,8 @@ final class Clients {
         applyTlsBufferProp("e2e.smithy.tls.writebuf", 256 * 1024, builder::tlsWriteBufferSize);
         // The epoll transport is selected automatically when the native library is available.
         if (boringSsl) {
-            if (BoringSslEngineFactory.isAvailable()) {
-                builder.sslEngineFactory(BoringSslEngineFactory.create(false));
+            if (BoringSslTlsProvider.available()) {
+                builder.tlsProvider(BoringSslTlsProvider.create(false));
             } else {
                 System.err.println("smithy-boringssl requested but netty-tcnative unavailable; "
                         + "using JDK SSLEngine");

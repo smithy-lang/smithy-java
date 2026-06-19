@@ -14,7 +14,6 @@ import java.net.Socket;
 import java.time.Duration;
 import java.util.List;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
 import software.amazon.smithy.java.http.api.HttpHeaders;
@@ -49,7 +48,11 @@ record HttpConnectionFactory(
         Duration writeTimeout,
         SSLContext sslContext,
         SSLParameters sslParameters,
-        ClientSslEngineFactory sslEngineFactory,
+        TlsProvider tlsProvider,
+        // True when tlsProvider is the built-in JDK provider derived from the config's sslContext/
+        // sslParameters (no explicit or discovered provider). Gates the HTTP/1.1-only SSLSocket fast
+        // path, which is a JDK-only optimization using those same config-level settings.
+        boolean defaultJdkTls,
         HttpVersionPolicy versionPolicy,
         DnsResolver dnsResolver,
         List<HttpClientListener> listeners,
@@ -110,7 +113,10 @@ record HttpConnectionFactory(
         ConnectionTransport transport;
         if (!route.isSecure()) {
             transport = ConnectionTransport.of(socket);
-        } else if (versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1 && sslEngineFactory == null) {
+        } else if (versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1 && defaultJdkTls) {
+            // HTTP/1.1-only on the default JDK provider: the SSLSocket path is cheaper than the
+            // SSLEngine wrap/unwrap loop and uses the same config sslContext/sslParameters. A custom or
+            // discovered provider must own the handshake, so it takes the provider path instead.
             transport = performTlsSocketHandshake(socket, route, exchangeId);
         } else {
             transport = performTlsHandshake(socket, route, exchangeId);
@@ -162,101 +168,57 @@ record HttpConnectionFactory(
     }
 
     private HttpConnection connectEpollTls(InetAddress address, Route route, long exchangeId) throws IOException {
-        EpollChannel channel;
-        channel = connectEpollChannel(address, route, exchangeId);
+        EpollChannel channel = connectEpollChannel(address, route, exchangeId);
 
-        SSLEngine engine = null;
-        Runnable releaser = () -> {};
+        TlsConnectionContext connection = tlsConnection(route)
+                .epollChannel(channel)
+                // The negotiation deadline is honored by SSLEngineTransport's own timed-park read path
+                // (epoll has no SO_TIMEOUT); readTimeoutMillis is applied as the steady-state deadline.
+                .readTimeoutMillis(toIntMillis(readTimeout))
+                .build();
+
+        notifyTlsStart(exchangeId, route);
+        ConnectionTransport transport;
         try {
-            if (sslEngineFactory != null) {
-                var handle = sslEngineFactory.newEngine(
-                        route.host(),
-                        route.port(),
-                        List.of(versionPolicy.alpnProtocols()));
-                engine = handle.engine();
-                releaser = handle.releaser();
-            } else {
-                engine = createClientEngine(route);
-            }
-
-            // The negotiation deadline is honored by SSLEngineTransport's own timed-park read path
-            // (epoll has no SO_TIMEOUT), then reset to the steady-state read timeout for requests.
-            SSLEngineTransport transport = new SSLEngineTransport(
-                    channel,
-                    engine,
-                    releaser,
-                    toIntMillis(tlsNegotiationTimeout),
-                    tlsReadBufferSize,
-                    tlsWriteBufferSize);
-            notifyTlsStart(exchangeId, route);
-            try {
-                transport.handshake();
-                notifyTlsEnd(exchangeId, route, transport, null);
-            } catch (IOException | RuntimeException e) {
-                notifyTlsEnd(exchangeId, route, null, e);
-                throw e;
-            }
-            transport.setReadTimeout(toIntMillis(readTimeout));
-            return createProtocolConnection(transport, route);
-        } catch (IOException e) {
-            releaser.run();
-            channel.close();
-            throw new IOException("TLS handshake failed for " + route.host(), e);
-        } catch (RuntimeException e) {
-            releaser.run();
-            channel.close();
+            transport = tlsProvider.connect(connection);
+        } catch (IOException | RuntimeException e) {
+            // connect() already released the engine and closed the channel on failure.
+            notifyTlsEnd(exchangeId, route, null, e);
             throw e;
         }
+        notifyTlsEnd(exchangeId, route, transport, null);
+        return createProtocolConnection(transport, route);
     }
 
     private ConnectionTransport performTlsHandshake(Socket socket, Route route, long exchangeId) throws IOException {
-        Runnable releaser = () -> {};
-        try {
-            SSLEngine engine;
-            if (sslEngineFactory != null) {
-                var handle = sslEngineFactory.newEngine(
-                        route.host(),
-                        route.port(),
-                        List.of(versionPolicy.alpnProtocols()));
-                engine = handle.engine();
-                releaser = handle.releaser();
-            } else {
-                engine = createClientEngine(route);
-            }
+        TlsConnectionContext connection = tlsConnection(route)
+                .socket(socket)
+                .readTimer(readTimer)
+                .build();
 
-            int originalTimeout = socket.getSoTimeout();
-            socket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
-            try {
-                SSLEngineTransport transport = new SSLEngineTransport(
-                        socket,
-                        engine,
-                        releaser,
-                        readTimer,
-                        tlsReadBufferSize,
-                        tlsWriteBufferSize);
-                notifyTlsStart(exchangeId, route);
-                try {
-                    transport.handshake();
-                    notifyTlsEnd(exchangeId, route, transport, null);
-                } catch (IOException | RuntimeException e) {
-                    notifyTlsEnd(exchangeId, route, null, e);
-                    throw e;
-                }
-                return transport;
-            } finally {
-                socket.setSoTimeout(originalTimeout);
-            }
-        } catch (IOException e) {
-            // Handshake/setup failed before SSLEngineTransport took ownership of the engine; release
-            // any native engine resources here so they don't leak on the error path.
-            releaser.run();
-            closeQuietly(socket);
-            throw new IOException("TLS handshake failed for " + route.host(), e);
-        } catch (RuntimeException e) {
-            releaser.run();
-            closeQuietly(socket);
+        notifyTlsStart(exchangeId, route);
+        ConnectionTransport transport;
+        try {
+            transport = tlsProvider.connect(connection);
+        } catch (IOException | RuntimeException e) {
+            // connect() already released the engine and closed the socket on failure.
+            notifyTlsEnd(exchangeId, route, null, e);
             throw e;
         }
+        notifyTlsEnd(exchangeId, route, transport, null);
+        return transport;
+    }
+
+    // Shared TlsConnectionContext skeleton (host/port/ALPN/negotiation deadline/buffer sizes); the caller
+    // adds the transport substrate (socket or epoll channel).
+    private TlsConnectionContext.Builder tlsConnection(Route route) {
+        return TlsConnectionContext.builder()
+                .host(route.host())
+                .port(route.port())
+                .alpnProtocols(List.of(versionPolicy.alpnProtocols()))
+                .negotiationTimeoutMillis(toIntMillis(tlsNegotiationTimeout))
+                .tlsReadBufferSize(tlsReadBufferSize)
+                .tlsWriteBufferSize(tlsWriteBufferSize);
     }
 
     private ConnectionTransport performTlsSocketHandshake(Socket socket, Route route, long exchangeId)
@@ -293,45 +255,17 @@ record HttpConnectionFactory(
         }
     }
 
-    private SSLEngine createClientEngine(Route route) {
-        SSLEngine engine = sslContext.createSSLEngine(route.host(), route.port());
-        engine.setUseClientMode(true);
-
-        SSLParameters params = sslParameters != null
-                ? copyParameters(sslParameters)
-                : engine.getSSLParameters();
-        params.setEndpointIdentificationAlgorithm("HTTPS");
-        params.setApplicationProtocols(versionPolicy.alpnProtocols());
-        engine.setSSLParameters(params);
-        return engine;
-    }
-
+    // SSLParameters for the HTTP/1.1-only SSLSocket fast path (and proxy TLS). The SSLEngine path is
+    // handled by JdkTlsProvider; this mirrors its parameter handling for the SSLSocket case.
     private SSLParameters socketParameters(SSLSocket sslSocket, String[] applicationProtocols) {
         SSLParameters params = sslParameters != null
-                ? copyParameters(sslParameters)
+                ? JdkTlsProvider.copyParameters(sslParameters)
                 : sslSocket.getSSLParameters();
         params.setEndpointIdentificationAlgorithm("HTTPS");
         if (applicationProtocols != null) {
             params.setApplicationProtocols(applicationProtocols);
         }
         return params;
-    }
-
-    private static SSLParameters copyParameters(SSLParameters src) {
-        SSLParameters dst = new SSLParameters();
-        dst.setCipherSuites(src.getCipherSuites());
-        dst.setProtocols(src.getProtocols());
-        dst.setWantClientAuth(src.getWantClientAuth());
-        dst.setNeedClientAuth(src.getNeedClientAuth());
-        dst.setAlgorithmConstraints(src.getAlgorithmConstraints());
-        dst.setEndpointIdentificationAlgorithm(src.getEndpointIdentificationAlgorithm());
-        dst.setServerNames(src.getServerNames());
-        dst.setSNIMatchers(src.getSNIMatchers());
-        dst.setUseCipherSuitesOrder(src.getUseCipherSuitesOrder());
-        dst.setEnableRetransmissions(src.getEnableRetransmissions());
-        dst.setMaximumPacketSize(src.getMaximumPacketSize());
-        dst.setApplicationProtocols(src.getApplicationProtocols());
-        return dst;
     }
 
     enum Protocol {
@@ -469,9 +403,12 @@ record HttpConnectionFactory(
                 }
                 notifyProxyConnectEnd(exchangeId, route, proxy, proxyAddress, result.statusCode(), null);
 
-                ConnectionTransport transport = versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1
-                        ? performTlsSocketHandshake(proxySocket, route, exchangeId)
-                        : performTlsHandshake(proxySocket, route, exchangeId);
+                // Mirror the direct path: the SSLSocket shortcut is a JDK-default optimization, so a
+                // custom or discovered provider must own the end-to-end handshake through the tunnel.
+                ConnectionTransport transport =
+                        versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1 && defaultJdkTls
+                                ? performTlsSocketHandshake(proxySocket, route, exchangeId)
+                                : performTlsHandshake(proxySocket, route, exchangeId);
                 return createProtocolConnection(transport, route);
             }
 

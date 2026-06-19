@@ -1,0 +1,2 @@
+software.amazon.smithy.java.http.client.connection.AvailableTestTlsProvider
+software.amazon.smithy.java.http.client.connection.UnavailableTestTlsProvider

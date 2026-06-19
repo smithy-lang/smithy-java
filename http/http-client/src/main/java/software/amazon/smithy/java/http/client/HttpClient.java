@@ -13,12 +13,12 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
-import software.amazon.smithy.java.http.client.connection.ClientSslEngineFactory;
 import software.amazon.smithy.java.http.client.connection.ConnectionConfig;
 import software.amazon.smithy.java.http.client.connection.ConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpSocketFactory;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
+import software.amazon.smithy.java.http.client.connection.TlsProvider;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 
 /**
@@ -277,10 +277,24 @@ public interface HttpClient extends AutoCloseable {
         }
 
         /**
-         * Set the {@link SSLContext} used for TLS connections. When null, the JDK default context is used.
+         * Sets the {@link SSLContext} for the JDK TLS path. When null, {@link SSLContext#getDefault()}
+         * is used.
          *
-         * <p>Ignored when a {@link #sslEngineFactory(ClientSslEngineFactory)} is supplied, since that
-         * factory provides its own engines.
+         * <p>This configures the built-in JDK provider and is convenience equivalent to
+         * {@code tlsProvider(JdkTlsProvider.builder().sslContext(context).build())}. It governs:
+         * <ul>
+         *   <li>the default (JDK) TLS connection to the target, when no custom
+         *       {@link #tlsProvider(TlsProvider)} is set; and</li>
+         *   <li>the HTTP/1.1-only {@code SSLSocket} fast path.</li>
+         * </ul>
+         *
+         * <p>It is <em>ignored</em> for the target connection when a custom {@link #tlsProvider} is set
+         * (that provider supplies its own TLS configuration).
+         *
+         * <p><b>HTTPS proxies:</b> the TLS connection <em>to an {@code https} proxy</em> always uses this
+         * context (and {@link #sslParameters}), independent of {@link #tlsProvider} — a custom provider
+         * applies only to the end-to-end connection through the tunnel, not to the proxy leg. To trust a
+         * proxy differently from the target, set a context here that covers both.
          *
          * @param context the SSL context, or null for the JDK default
          * @return this builder
@@ -291,8 +305,14 @@ public interface HttpClient extends AutoCloseable {
         }
 
         /**
-         * Set custom {@link SSLParameters} (cipher suites, protocols, SNI, etc.) for TLS connections.
-         * When null, parameters derived from the {@link #sslContext(SSLContext)} are used.
+         * Sets {@link SSLParameters} (cipher suites, protocols, SNI, etc.) for the JDK TLS path. When
+         * null, parameters derived from the {@link #sslContext} are used.
+         *
+         * <p>Convenience equivalent to
+         * {@code tlsProvider(JdkTlsProvider.builder().sslParameters(params).build())}. Applies to the
+         * same connections as {@link #sslContext} — the JDK target path, the HTTP/1.1 {@code SSLSocket}
+         * fast path, and the {@code https}-proxy leg — and is likewise ignored for the target connection
+         * when a custom {@link #tlsProvider} is set.
          *
          * @param parameters the SSL parameters, or null for defaults
          * @return this builder
@@ -303,15 +323,22 @@ public interface HttpClient extends AutoCloseable {
         }
 
         /**
-         * Set a factory that supplies the {@link javax.net.ssl.SSLEngine} for each secure connection,
-         * replacing the JDK provider (e.g. a native BoringSSL engine). When set, it takes precedence over
-         * {@link #sslContext(SSLContext)} for engine creation.
+         * Select the TLS provider used for secure connections, replacing the built-in JDK provider.
          *
-         * @param factory the SSL engine factory, or null to use the JDK provider
+         * <p>A provider turns a connected socket into a handshaken transport; it need not be based on a
+         * {@code javax.net.ssl.SSLEngine}. This is the provider-neutral way to choose a TLS
+         * implementation (e.g. a native stack).
+         *
+         * <p>An explicit provider set here always takes precedence. When none is set, a provider may be
+         * selected by the {@value TlsProvider#PROVIDER_PROPERTY} system property (set to a registered
+         * provider's fully-qualified class name); otherwise the JDK provider is used. Merely having a
+         * provider module on the classpath does not engage it — the property is the opt-in.
+         *
+         * @param provider the TLS provider, or null to use property selection / the JDK provider
          * @return this builder
          */
-        public Builder sslEngineFactory(ClientSslEngineFactory factory) {
-            connectionConfig.sslEngineFactory(factory);
+        public Builder tlsProvider(TlsProvider provider) {
+            connectionConfig.tlsProvider(provider);
             return this;
         }
 

@@ -33,7 +33,7 @@ public record ConnectionConfig(
         Duration writeTimeout,
         SSLContext sslContext,
         SSLParameters sslParameters,
-        ClientSslEngineFactory sslEngineFactory,
+        TlsProvider tlsProvider,
         HttpVersionPolicy versionPolicy,
         DnsResolver dnsResolver,
         HttpSocketFactory socketFactory,
@@ -127,7 +127,7 @@ public record ConnectionConfig(
         Duration writeTimeout = Duration.ofSeconds(30);
         SSLContext sslContext;
         SSLParameters sslParameters;
-        ClientSslEngineFactory sslEngineFactory;
+        TlsProvider tlsProvider;
         HttpVersionPolicy versionPolicy = HttpVersionPolicy.AUTOMATIC;
         DnsResolver dnsResolver;
         HttpSocketFactory socketFactory; // null => HttpConnectionPool synthesizes the default
@@ -189,8 +189,8 @@ public record ConnectionConfig(
             return this;
         }
 
-        public Builder sslEngineFactory(ClientSslEngineFactory factory) {
-            this.sslEngineFactory = factory;
+        public Builder tlsProvider(TlsProvider provider) {
+            this.tlsProvider = provider;
             return this;
         }
 
@@ -275,7 +275,7 @@ public record ConnectionConfig(
                     writeTimeout,
                     sslContext,
                     sslParameters,
-                    sslEngineFactory,
+                    tlsProvider,
                     versionPolicy,
                     dnsResolver,
                     socketFactory,
