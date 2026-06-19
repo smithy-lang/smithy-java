@@ -37,7 +37,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
 
     @Override
     public void accept(T directive) {
-        if (directive.symbol().getProperty(SymbolProperties.EXTERNAL_TYPE).isPresent()) {
+        if (directive.symbol().getProperty(SymbolProperties.EXTERNAL_TYPE).orElse(false)) {
             // skip external types
             return;
         }

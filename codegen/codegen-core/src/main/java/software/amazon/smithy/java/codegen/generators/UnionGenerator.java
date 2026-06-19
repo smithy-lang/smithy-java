@@ -37,7 +37,7 @@ public final class UnionGenerator
 
     @Override
     public void accept(GenerateUnionDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        if (directive.symbol().getProperty(SymbolProperties.EXTERNAL_TYPE).isPresent()) {
+        if (directive.symbol().getProperty(SymbolProperties.EXTERNAL_TYPE).orElse(false)) {
             // Skip external types.
             return;
         }
