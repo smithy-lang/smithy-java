@@ -13,6 +13,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
@@ -23,6 +24,7 @@ import software.amazon.smithy.java.http.api.ModifiableHttpRequest;
 import software.amazon.smithy.java.http.client.HttpClientListener;
 import software.amazon.smithy.java.http.client.HttpCredentials;
 import software.amazon.smithy.java.http.client.ProxyConfiguration;
+import software.amazon.smithy.java.http.client.RequestOptions;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 import software.amazon.smithy.java.http.client.h1.H1Connection;
 import software.amazon.smithy.java.http.client.h2.H2Connection;
@@ -66,20 +68,28 @@ record HttpConnectionFactory(
      * Create a new connection to the given route.
      *
      * @param route the route to connect to
+     * @param exchangeId opaque client-generated exchange id used to correlate listener events
+     * @param options per-request options; non-null connect/read timeout overrides take precedence
+     *                over this factory's configured defaults for this connection
      * @return a new HttpConnection
      * @throws IOException if connection fails
      */
-    HttpConnection create(Route route, long exchangeId) throws IOException {
+    HttpConnection create(Route route, long exchangeId, RequestOptions options) throws IOException {
+        // Per-request connect/read timeout overrides apply to every socket/epoll/TLS step of this
+        // connection attempt. Because this type is a record whose connect logic reads connectTimeout/
+        // readTimeout off `this`, the cleanest way to apply them everywhere (including the proxy tunnel)
+        // is to resolve a factory copy with those two fields overridden, then run the usual machinery.
+        HttpConnectionFactory factory = withOverrides(options);
         if (route.usesProxy()) {
-            return connectViaProxy(route, exchangeId);
+            return factory.connectViaProxy(route, exchangeId);
         }
 
-        List<InetAddress> addresses = resolve(route.host(), exchangeId);
+        List<InetAddress> addresses = factory.resolve(route.host(), exchangeId);
 
         IOException lastException = null;
         for (InetAddress address : addresses) {
             try {
-                return connectToAddress(address, route, addresses, exchangeId);
+                return factory.connectToAddress(address, route, addresses, exchangeId);
             } catch (IOException e) {
                 lastException = e;
                 dnsResolver.reportFailure(address);
@@ -89,6 +99,37 @@ record HttpConnectionFactory(
         throw new IOException(
                 "Failed to connect to " + route.host() + " on any resolved IP (" + addresses.size() + " tried)",
                 lastException);
+    }
+
+    // Returns this factory, or a copy with connectTimeout/readTimeout replaced by the request's non-null
+    // overrides. Only these two are per-request; all other fields (TLS, buffers, listeners, timers) are
+    // shared client config and are carried over unchanged.
+    private HttpConnectionFactory withOverrides(RequestOptions options) {
+        Duration connect = options.connectTimeout() != null ? options.connectTimeout() : connectTimeout;
+        Duration read = options.readTimeout() != null ? options.readTimeout() : readTimeout;
+        if (Objects.equals(connect, connectTimeout) && Objects.equals(read, readTimeout)) {
+            return this;
+        }
+        return new HttpConnectionFactory(
+                connect,
+                tlsNegotiationTimeout,
+                read,
+                writeTimeout,
+                sslContext,
+                sslParameters,
+                tlsProvider,
+                versionPolicy,
+                dnsResolver,
+                listeners,
+                hasListeners,
+                socketFactory,
+                readTimer,
+                epollConnector,
+                h2InitialWindowSize,
+                h2MaxFrameSize,
+                h2BufferSize,
+                tlsReadBufferSize,
+                tlsWriteBufferSize);
     }
 
     private HttpConnection connectToAddress(
@@ -408,7 +449,8 @@ record HttpConnectionFactory(
                 }
             }
 
-            var exchange = conn.newExchange(connectRequest);
+            // The CONNECT tunnel handshake carries no per-request overrides of its own.
+            var exchange = conn.newExchange(connectRequest, RequestOptions.defaults());
             exchange.writeRequestBody(null);
 
             int status = exchange.responseStatusCode();

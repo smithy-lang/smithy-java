@@ -13,6 +13,7 @@ import javax.net.ssl.SSLSession;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpExchange;
+import software.amazon.smithy.java.http.client.RequestOptions;
 import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
 import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 import software.amazon.smithy.java.http.client.connection.ConnectionTransport;
@@ -35,7 +36,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * </ul>
  *
  * <h2>Thread Safety</h2>
- * <p>This class is thread-safe for {@link #newExchange(HttpRequest)} - only one exchange can be active at a time.
+ * <p>This class is thread-safe for {@link #newExchange} - only one exchange can be active at a time.
  * Concurrent calls to {@code newExchange()} will fail with an exception if another exchange is already active.
  */
 public final class H1Connection implements HttpConnection {
@@ -81,7 +82,7 @@ public final class H1Connection implements HttpConnection {
     }
 
     @Override
-    public HttpExchange newExchange(HttpRequest request) throws IOException {
+    public HttpExchange newExchange(HttpRequest request, RequestOptions options) throws IOException {
         if (!active) {
             throw new IOException("Connection is closed");
         } else if (!inUse.compareAndSet(false, true)) {
@@ -89,7 +90,7 @@ public final class H1Connection implements HttpConnection {
         }
 
         try {
-            return exchange.init(request);
+            return exchange.init(options.applyExpectContinue(request));
         } catch (IOException e) {
             releaseExchange();
             throw e;

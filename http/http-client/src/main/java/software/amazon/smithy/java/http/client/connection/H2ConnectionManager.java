@@ -13,6 +13,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.http.client.HttpClientListener;
+import software.amazon.smithy.java.http.client.RequestOptions;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -61,7 +62,7 @@ final class H2ConnectionManager {
 
     @FunctionalInterface
     interface ConnectionFactory {
-        MultiplexedHttpConnection create(Route route, long exchangeId) throws IOException;
+        MultiplexedHttpConnection create(Route route, long exchangeId, RequestOptions options) throws IOException;
     }
 
     H2ConnectionManager(
@@ -95,9 +96,11 @@ final class H2ConnectionManager {
      * @return an H2 connection ready for use
      * @throws IOException if acquisition times out or is interrupted
      */
-    MultiplexedHttpConnection acquire(Route route, int maxConnectionsForRoute, long exchangeId) throws IOException {
+    MultiplexedHttpConnection acquire(Route route, int maxConnectionsForRoute, long exchangeId, RequestOptions options)
+            throws IOException {
         RouteState state = stateFor(route);
-        long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(acquireTimeoutMs);
+        long acquireMs = options.acquireTimeout() != null ? options.acquireTimeout().toMillis() : acquireTimeoutMs;
+        long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(acquireMs);
 
         state.lock.lock();
         try {
@@ -163,16 +166,20 @@ final class H2ConnectionManager {
             state.lock.unlock();
         }
 
-        return createNewH2Connection(route, state, exchangeId);
+        return createNewH2Connection(route, state, exchangeId, options);
     }
 
-    private MultiplexedHttpConnection createNewH2Connection(Route route, RouteState state, long exchangeId)
-            throws IOException {
+    private MultiplexedHttpConnection createNewH2Connection(
+            Route route,
+            RouteState state,
+            long exchangeId,
+            RequestOptions options
+    ) throws IOException {
         // Create new connection OUTSIDE the lock to avoid deadlock.
         MultiplexedHttpConnection newConn = null;
         IOException createException = null;
         try {
-            newConn = connectionFactory.create(route, exchangeId);
+            newConn = connectionFactory.create(route, exchangeId, options);
             // Signal waiters when a stream is released so they can re-check capacity
             newConn.setStreamReleaseCallback(() -> {
                 state.lock.lock();

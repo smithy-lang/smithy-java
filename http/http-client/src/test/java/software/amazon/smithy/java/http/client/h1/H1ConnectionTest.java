@@ -24,6 +24,7 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.http.client.RequestOptions;
 import software.amazon.smithy.java.http.client.connection.ConnectionTransport;
 import software.amazon.smithy.java.http.client.connection.Route;
 import software.amazon.smithy.java.io.uri.SmithyUri;
@@ -50,7 +51,7 @@ class H1ConnectionTest {
         var request = HttpRequest.create()
                 .setMethod("GET")
                 .setUri(SmithyUri.of("https://example.com/test"));
-        var exchange = connection.newExchange(request);
+        var exchange = connection.newExchange(request, RequestOptions.defaults());
 
         assertNotNull(exchange);
         exchange.close();
@@ -64,9 +65,9 @@ class H1ConnectionTest {
                 .setMethod("GET")
                 .setUri(SmithyUri.of("https://example.com/test"));
 
-        connection.newExchange(request);
+        connection.newExchange(request, RequestOptions.defaults());
 
-        assertThrows(IOException.class, () -> connection.newExchange(request));
+        assertThrows(IOException.class, () -> connection.newExchange(request, RequestOptions.defaults()));
     }
 
     @Test
@@ -79,7 +80,7 @@ class H1ConnectionTest {
 
         connection.close();
 
-        assertThrows(IOException.class, () -> connection.newExchange(request));
+        assertThrows(IOException.class, () -> connection.newExchange(request, RequestOptions.defaults()));
     }
 
     @Test

@@ -174,10 +174,10 @@ class DefaultHttpClientTest {
         };
         var pool = new TestConnectionPool() {
             @Override
-            public HttpConnection acquire(Route route, long exchangeId) {
+            public HttpConnection acquire(Route route, long exchangeId, RequestOptions options) {
                 return new TestConnection() {
                     @Override
-                    public HttpExchange newExchange(HttpRequest request) throws IOException {
+                    public HttpExchange newExchange(HttpRequest request, RequestOptions options) throws IOException {
                         throw new IOException("exchange creation failed");
                     }
                 };
@@ -219,17 +219,18 @@ class DefaultHttpClientTest {
         };
         var pool = new TestConnectionPool() {
             @Override
-            public HttpConnection acquire(Route route, long exchangeId) {
+            public HttpConnection acquire(Route route, long exchangeId, RequestOptions options) {
                 acquiredExchangeIds.add(exchangeId);
                 if (route.proxy() != null && route.proxy().port() == 8080) {
                     return new TestConnection() {
                         @Override
-                        public HttpExchange newExchange(HttpRequest request) throws IOException {
+                        public HttpExchange newExchange(HttpRequest request, RequestOptions options)
+                                throws IOException {
                             throw new IOException("first proxy failed");
                         }
                     };
                 }
-                return super.acquire(route, exchangeId);
+                return super.acquire(route, exchangeId, options);
             }
         };
         var proxy1 = new ProxyConfiguration(SmithyUri.of("http://proxy1.example.com:8080"),
@@ -270,11 +271,11 @@ class DefaultHttpClientTest {
         };
         var pool = new TestConnectionPool() {
             @Override
-            public HttpConnection acquire(Route route, long exchangeId) {
+            public HttpConnection acquire(Route route, long exchangeId, RequestOptions options) {
                 if (route.proxy() != null && route.proxy().port() == 8080) {
                     return new TestConnection() {
                         @Override
-                        public HttpExchange newExchange(HttpRequest request) {
+                        public HttpExchange newExchange(HttpRequest request, RequestOptions options) {
                             return new TestHttpExchange() {
                                 @Override
                                 public int responseStatusCode() throws IOException {
@@ -284,7 +285,7 @@ class DefaultHttpClientTest {
                         }
                     };
                 }
-                return super.acquire(route, exchangeId);
+                return super.acquire(route, exchangeId, options);
             }
         };
         var proxy1 = new ProxyConfiguration(SmithyUri.of("http://proxy1.example.com:8080"),
@@ -399,18 +400,19 @@ class DefaultHttpClientTest {
         var httpAttempted = new AtomicBoolean(false);
         var pool = new TestConnectionPool() {
             @Override
-            public HttpConnection acquire(Route route, long exchangeId) {
+            public HttpConnection acquire(Route route, long exchangeId, RequestOptions options) {
                 if (route.proxy() != null && route.proxy().type() == ProxyConfiguration.ProxyType.SOCKS5) {
                     socksAttempted.set(true);
                     return new TestConnection() {
                         @Override
-                        public HttpExchange newExchange(HttpRequest request) throws IOException {
+                        public HttpExchange newExchange(HttpRequest request, RequestOptions options)
+                                throws IOException {
                             throw new IOException("SOCKS proxies not yet supported: SOCKS5");
                         }
                     };
                 }
                 httpAttempted.set(true);
-                return super.acquire(route, exchangeId);
+                return super.acquire(route, exchangeId, options);
             }
         };
         var socks = new ProxyConfiguration(SmithyUri.of("http://socks.example.com:1080"),
@@ -526,11 +528,11 @@ class DefaultHttpClientTest {
         var proxyUsed = new AtomicBoolean(false);
         var pool = new TestConnectionPool() {
             @Override
-            public HttpConnection acquire(Route route, long exchangeId) {
+            public HttpConnection acquire(Route route, long exchangeId, RequestOptions options) {
                 if (route.usesProxy()) {
                     proxyUsed.set(true);
                 }
-                return super.acquire(route, exchangeId);
+                return super.acquire(route, exchangeId, options);
             }
         };
         var proxy = new ProxyConfiguration(SmithyUri.of("http://proxy.example.com:8080"),
@@ -554,17 +556,18 @@ class DefaultHttpClientTest {
         var attemptedProxies = new AtomicInteger(0);
         var pool = new TestConnectionPool() {
             @Override
-            public HttpConnection acquire(Route route, long exchangeId) {
+            public HttpConnection acquire(Route route, long exchangeId, RequestOptions options) {
                 attemptedProxies.incrementAndGet();
                 if (route.proxy() != null && route.proxy().port() == 8080) {
                     return new TestConnection() {
                         @Override
-                        public HttpExchange newExchange(HttpRequest request) throws IOException {
+                        public HttpExchange newExchange(HttpRequest request, RequestOptions options)
+                                throws IOException {
                             throw new IOException("first proxy failed");
                         }
                     };
                 }
-                return super.acquire(route, exchangeId);
+                return super.acquire(route, exchangeId, options);
             }
         };
         var proxy1 = new ProxyConfiguration(SmithyUri.of("http://proxy1.example.com:8080"),
@@ -604,11 +607,11 @@ class DefaultHttpClientTest {
         var attemptedProxies = new AtomicInteger(0);
         var pool = new TestConnectionPool() {
             @Override
-            public HttpConnection acquire(Route route, long exchangeId) {
+            public HttpConnection acquire(Route route, long exchangeId, RequestOptions options) {
                 attemptedProxies.incrementAndGet();
                 return new TestConnection() {
                     @Override
-                    public HttpExchange newExchange(HttpRequest request) throws IOException {
+                    public HttpExchange newExchange(HttpRequest request, RequestOptions options) throws IOException {
                         throw new IOException("proxy " + attemptedProxies.get() + " failed");
                     }
                 };
@@ -638,10 +641,10 @@ class DefaultHttpClientTest {
         var evicted = new AtomicBoolean(false);
         var pool = new TestConnectionPool() {
             @Override
-            public HttpConnection acquire(Route route, long exchangeId) {
+            public HttpConnection acquire(Route route, long exchangeId, RequestOptions options) {
                 return new TestConnection() {
                     @Override
-                    public HttpExchange newExchange(HttpRequest request) throws IOException {
+                    public HttpExchange newExchange(HttpRequest request, RequestOptions options) throws IOException {
                         throw new IOException("exchange creation failed");
                     }
                 };
@@ -746,10 +749,10 @@ class DefaultHttpClientTest {
 
     private static class TestConnectionPool implements ConnectionPool {
         @Override
-        public HttpConnection acquire(Route route, long exchangeId) {
+        public HttpConnection acquire(Route route, long exchangeId, RequestOptions options) {
             return new TestConnection() {
                 @Override
-                public HttpExchange newExchange(HttpRequest request) {
+                public HttpExchange newExchange(HttpRequest request, RequestOptions options) {
                     return createExchange();
                 }
             };
@@ -774,7 +777,7 @@ class DefaultHttpClientTest {
 
     private static class TestConnection implements HttpConnection {
         @Override
-        public HttpExchange newExchange(HttpRequest request) throws IOException {
+        public HttpExchange newExchange(HttpRequest request, RequestOptions options) throws IOException {
             return new TestHttpExchange();
         }
 

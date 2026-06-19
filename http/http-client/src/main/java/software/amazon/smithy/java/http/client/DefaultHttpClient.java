@@ -76,28 +76,31 @@ final class DefaultHttpClient implements HttpClient {
         notifyRequestStart(exchangeId, request);
         try {
             return timeout != null
-                    ? sendWithTimeout(request, timeout, exchangeId, requestEnded)
-                    : sendInternal(request, exchangeId, requestEnded);
+                    ? sendWithTimeout(request, options, timeout, exchangeId, requestEnded)
+                    : sendInternal(request, options, exchangeId, requestEnded);
         } catch (IOException | RuntimeException e) {
             notifyRequestEnd(exchangeId, requestEnded, e);
             throw e;
         }
     }
 
-    private HttpResponse sendInternal(HttpRequest request, long exchangeId, AtomicBoolean requestEnded)
-            throws IOException {
+    private HttpResponse sendInternal(
+            HttpRequest request,
+            RequestOptions options,
+            long exchangeId,
+            AtomicBoolean requestEnded
+    ) throws IOException {
         var target = request.uri();
         List<ProxyConfiguration> proxies = proxySelector.select(target);
-
         if (proxies.isEmpty()) {
-            return sendForRoute(request, Route.from(target, null), exchangeId, requestEnded);
+            return sendForRoute(request, options, Route.from(target, null), exchangeId, requestEnded);
         }
 
         IOException last = null;
         for (ProxyConfiguration proxy : proxies) {
             Route route = Route.from(target, proxy);
             try {
-                return sendForRoute(request, route, exchangeId, requestEnded);
+                return sendForRoute(request, options, route, exchangeId, requestEnded);
             } catch (IOException e) {
                 last = e;
                 proxySelector.connectFailed(target, proxy, e);
@@ -108,14 +111,15 @@ final class DefaultHttpClient implements HttpClient {
 
     private HttpResponse sendForRoute(
             HttpRequest request,
+            RequestOptions options,
             Route route,
             long exchangeId,
             AtomicBoolean requestEnded
     ) throws IOException {
-        HttpConnection conn = connectionPool.acquire(route, exchangeId);
+        HttpConnection conn = connectionPool.acquire(route, exchangeId, options);
         HttpExchange exchange;
         try {
-            exchange = conn.newExchange(request);
+            exchange = conn.newExchange(request, options);
         } catch (Exception e) {
             connectionPool.evict(conn, true);
             if (e instanceof IOException ioe) {
@@ -460,11 +464,13 @@ final class DefaultHttpClient implements HttpClient {
 
     private HttpResponse sendWithTimeout(
             HttpRequest request,
+            RequestOptions options,
             Duration timeout,
             long exchangeId,
             AtomicBoolean requestEnded
     ) throws IOException {
-        Future<HttpResponse> future = executorService.submit(() -> sendInternal(request, exchangeId, requestEnded));
+        Future<HttpResponse> future =
+                executorService.submit(() -> sendInternal(request, options, exchangeId, requestEnded));
 
         try {
             return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);

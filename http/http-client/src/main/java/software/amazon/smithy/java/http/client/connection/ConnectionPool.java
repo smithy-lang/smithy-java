@@ -7,6 +7,7 @@ package software.amazon.smithy.java.http.client.connection;
 
 import java.io.IOException;
 import java.time.Duration;
+import software.amazon.smithy.java.http.client.RequestOptions;
 
 /**
  * Connection pool for managing HTTP connections.
@@ -25,11 +26,13 @@ public interface ConnectionPool extends AutoCloseable {
      *
      * @param route the route to connect to
      * @param exchangeId opaque client-generated exchange id used to correlate listener events
+     * @param options per-request options; non-null overrides (connect/read/acquire timeouts) take
+     *                precedence over the pool's configured defaults
      * @return a usable connection
      * @throws IOException if connection cannot be established
      * @throws IllegalStateException if pool is closed
      */
-    HttpConnection acquire(Route route, long exchangeId) throws IOException;
+    HttpConnection acquire(Route route, long exchangeId, RequestOptions options) throws IOException;
 
     /**
      * Release a connection back to the pool for reuse.

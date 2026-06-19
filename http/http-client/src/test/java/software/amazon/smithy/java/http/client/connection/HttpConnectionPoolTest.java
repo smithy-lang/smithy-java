@@ -7,6 +7,7 @@ package software.amazon.smithy.java.http.client.connection;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -23,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.client.HttpClientListener;
+import software.amazon.smithy.java.http.client.RequestOptions;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 
 class HttpConnectionPoolTest {
@@ -47,14 +49,44 @@ class HttpConnectionPoolTest {
                 })
                 .build())) {
 
-            var first = pool.acquire(Route.direct("http", "one.example.com", 80), 1);
+            var first = pool.acquire(Route.direct("http", "one.example.com", 80), 1, RequestOptions.defaults());
             pool.release(first);
 
             var ex = assertThrows(
                     IOException.class,
-                    () -> pool.acquire(Route.direct("http", "two.example.com", 80), 2));
+                    () -> pool.acquire(Route.direct("http", "two.example.com", 80), 2, RequestOptions.defaults()));
             assertEquals("Connection pool exhausted: 1 connections in use (timed out after 0ms)", ex.getMessage());
             assertEquals(1, socketCreates.get(), "The idle first-route socket should still hold the global permit");
+        }
+    }
+
+    @Test
+    void perRequestAcquireTimeoutOverridesPoolDefault() throws IOException {
+        var dns = DnsResolver.staticMapping(Map.of(
+                "one.example.com",
+                List.of(InetAddress.getByName("127.0.0.1")),
+                "two.example.com",
+                List.of(InetAddress.getByName("127.0.0.1"))));
+        // Pool default acquire timeout is effectively unbounded; if the per-request override were ignored
+        // the second acquire would block ~forever instead of failing fast.
+        try (var pool = new HttpConnectionPool(ConnectionConfig.builder()
+                .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
+                .maxTotalConnections(1)
+                .maxConnectionsPerRoute(1)
+                .acquireTimeout(Duration.ofHours(1))
+                .dnsResolver(dns)
+                .socketFactory((route, endpoints) -> new FakeSocket())
+                .build())) {
+
+            var first = pool.acquire(Route.direct("http", "one.example.com", 80), 1, RequestOptions.defaults());
+            pool.release(first);
+
+            var shortTimeout = RequestOptions.builder().acquireTimeout(Duration.ofMillis(1)).build();
+            var ex = assertThrows(
+                    IOException.class,
+                    () -> pool.acquire(Route.direct("http", "two.example.com", 80), 2, shortTimeout));
+            assertTrue(ex.getMessage().contains("timed out after 1ms"),
+                    "Expected per-request 1ms override in message, got: " + ex.getMessage());
         }
     }
 
@@ -101,7 +133,7 @@ class HttpConnectionPoolTest {
                 .socketFactory((route, endpoints) -> new FakeSocket())
                 .addListener(listener)
                 .build())) {
-            pool.acquire(Route.direct("http", "example.com", 80), 123);
+            pool.acquire(Route.direct("http", "example.com", 80), 123, RequestOptions.defaults());
         }
 
         assertEquals(List.of(
@@ -136,10 +168,10 @@ class HttpConnectionPoolTest {
                 .socketFactory((route, endpoints) -> new FakeSocket())
                 .addListener(listener)
                 .build())) {
-            var first = pool.acquire(Route.direct("http", "one.example.com", 80), 1);
+            var first = pool.acquire(Route.direct("http", "one.example.com", 80), 1, RequestOptions.defaults());
             pool.evict(first, false);
 
-            var second = pool.acquire(Route.direct("http", "two.example.com", 80), 2);
+            var second = pool.acquire(Route.direct("http", "two.example.com", 80), 2, RequestOptions.defaults());
             assertEquals("two.example.com", second.route().host());
         }
     }

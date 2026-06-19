@@ -10,6 +10,7 @@ import javax.net.ssl.SSLSession;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpExchange;
+import software.amazon.smithy.java.http.client.RequestOptions;
 
 /**
  * Protocol-agnostic HTTP connection.
@@ -21,11 +22,12 @@ public interface HttpConnection extends AutoCloseable {
      * <p>For HTTP/1.1: only one exchange at a time. For HTTP/2: multiple concurrent exchanges (multiplexing).
      *
      * @param request the HTTP request to execute
+     * @param options per-request options (e.g. {@link RequestOptions#expectContinue()}); never null
      * @return a new exchange for this request
      * @throws IOException           if the connection is not in a valid state or network error occurs
      * @throws IllegalStateException if connection is closed
      */
-    HttpExchange newExchange(HttpRequest request) throws IOException;
+    HttpExchange newExchange(HttpRequest request, RequestOptions options) throws IOException;
 
     /**
      * Protocol version of this connection.

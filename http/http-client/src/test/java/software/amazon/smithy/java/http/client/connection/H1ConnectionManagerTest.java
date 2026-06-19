@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpExchange;
+import software.amazon.smithy.java.http.client.RequestOptions;
 
 class H1ConnectionManagerTest {
 
@@ -349,7 +350,7 @@ class H1ConnectionManagerTest {
     // Test connection implementation
     private static class TestConnection implements HttpConnection {
         @Override
-        public HttpExchange newExchange(HttpRequest request) {
+        public HttpExchange newExchange(HttpRequest request, RequestOptions options) {
             return null;
         }
 

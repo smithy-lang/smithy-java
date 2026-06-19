@@ -47,6 +47,7 @@ import javax.net.ssl.SSLSession;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.client.HttpExchange;
+import software.amazon.smithy.java.http.client.RequestOptions;
 import software.amazon.smithy.java.http.client.connection.ConnectionTransport;
 import software.amazon.smithy.java.http.client.connection.MultiplexedHttpConnection;
 import software.amazon.smithy.java.http.client.connection.Route;
@@ -635,10 +636,12 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
     // ==================== Exchange Creation ====================
 
     @Override
-    public HttpExchange newExchange(HttpRequest request) throws IOException {
+    public HttpExchange newExchange(HttpRequest request, RequestOptions options) throws IOException {
         if (state.get() != State.CONNECTED) {
             throw new IOException("Connection is not in CONNECTED state: " + state.get());
         }
+
+        request = options.applyExpectContinue(request);
 
         // Update last activity tick when creating a new exchange
         lastActivityTick = muxer.currentTimeoutTick();

@@ -18,6 +18,7 @@ import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import software.amazon.smithy.java.http.client.HttpClientListener;
+import software.amazon.smithy.java.http.client.RequestOptions;
 import software.amazon.smithy.java.http.client.dns.DnsResolver;
 
 /**
@@ -75,7 +76,7 @@ import software.amazon.smithy.java.http.client.dns.DnsResolver;
  *
  * <h2>Pool Exhaustion and Backpressure</h2>
  * <p>When route capacity, stream capacity, or {@code maxTotalConnections} is exhausted,
- * {@link #acquire(Route, long)} blocks for up to {@code acquireTimeout} (default: 30 seconds)
+ * {@link #acquire} blocks for up to {@code acquireTimeout} (default: 30 seconds)
  * waiting for capacity to become available. This behavior is consistent for both HTTP/1.1
  * and HTTP/2 connections.
  *
@@ -219,21 +220,27 @@ public final class HttpConnectionPool implements ConnectionPool {
     }
 
     @Override
-    public HttpConnection acquire(Route route, long exchangeId) throws IOException {
+    public HttpConnection acquire(Route route, long exchangeId, RequestOptions options) throws IOException {
         if (closed) {
             throw new IllegalStateException("Connection pool is closed");
         } else if ((route.isSecure() && versionPolicy != HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 || (!route.isSecure() && versionPolicy.usesH2cForCleartext())) {
-            return h2Manager.acquire(route, maxConnectionsPerRoute, exchangeId);
+            return h2Manager.acquire(route, maxConnectionsPerRoute, exchangeId, options);
         } else {
-            return acquireH1(route, exchangeId);
+            return acquireH1(route, exchangeId, options);
         }
     }
 
-    private HttpConnection acquireH1(Route route, long exchangeId) throws IOException {
-        int maxConns = maxConnectionsPerRoute;
+    // Per-request acquire timeout override falls back to the pool default.
+    private long acquireTimeoutMs(RequestOptions options) {
+        return options.acquireTimeout() != null ? options.acquireTimeout().toMillis() : acquireTimeoutMs;
+    }
 
-        h1Manager.acquireActive(route, maxConns, acquireTimeoutMs);
+    private HttpConnection acquireH1(Route route, long exchangeId, RequestOptions options) throws IOException {
+        int maxConns = maxConnectionsPerRoute;
+        long timeoutMs = acquireTimeoutMs(options);
+
+        h1Manager.acquireActive(route, maxConns, timeoutMs);
 
         try {
             // Idle H1 connections already hold a global connection permit.
@@ -244,7 +251,7 @@ public final class HttpConnectionPool implements ConnectionPool {
             }
 
             // No pooled connection, so acquire global capacity for a new physical socket.
-            acquirePermit();
+            acquirePermit(timeoutMs);
 
             // Re-check the pool: a connection may have been released while we waited. If we reuse one,
             // give back the just-acquired permit since the idle socket already owns one.
@@ -255,18 +262,18 @@ public final class HttpConnectionPool implements ConnectionPool {
                 return pooled;
             }
 
-            return createH1Connection(route, exchangeId);
+            return createH1Connection(route, exchangeId, options);
         } catch (IOException | RuntimeException e) {
             h1Manager.releaseActive(route);
             throw e;
         }
     }
 
-    private HttpConnection createH1Connection(Route route, long exchangeId) throws IOException {
+    private HttpConnection createH1Connection(Route route, long exchangeId, RequestOptions options) throws IOException {
         HttpConnection conn = null;
         boolean success = false;
         try {
-            conn = connectionFactory.create(route, exchangeId);
+            conn = connectionFactory.create(route, exchangeId, options);
             notifyConnected(conn);
             notifyAcquire(conn, false);
             success = true;
@@ -287,14 +294,15 @@ public final class HttpConnectionPool implements ConnectionPool {
     }
 
     // Called by H2ConnectionManager when a new connection is needed.
-    private MultiplexedHttpConnection onNewH2Connection(Route route, long exchangeId) throws IOException {
+    private MultiplexedHttpConnection onNewH2Connection(Route route, long exchangeId, RequestOptions options)
+            throws IOException {
         // Dead-connection cleanup is left to the background thread; doing it here caused lock contention.
-        acquirePermit();
+        acquirePermit(acquireTimeoutMs(options));
 
         HttpConnection conn = null;
         boolean success = false;
         try {
-            conn = connectionFactory.create(route, exchangeId);
+            conn = connectionFactory.create(route, exchangeId, options);
             notifyConnected(conn);
             if (conn instanceof MultiplexedHttpConnection h2conn) {
                 success = true;
@@ -320,11 +328,11 @@ public final class HttpConnectionPool implements ConnectionPool {
     /**
      * Acquire a connection permit, blocking up to acquireTimeout.
      */
-    private void acquirePermit() throws IOException {
+    private void acquirePermit(long timeoutMs) throws IOException {
         try {
-            if (!connectionPermits.tryAcquire(acquireTimeoutMs, TimeUnit.MILLISECONDS)) {
+            if (!connectionPermits.tryAcquire(timeoutMs, TimeUnit.MILLISECONDS)) {
                 throw new IOException("Connection pool exhausted: " + maxTotalConnections +
-                        " connections in use (timed out after " + acquireTimeoutMs + "ms)");
+                        " connections in use (timed out after " + timeoutMs + "ms)");
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

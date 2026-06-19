@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.http.client.RequestOptions;
 import software.amazon.smithy.java.http.client.connection.ConnectionTransport;
 import software.amazon.smithy.java.http.client.connection.Route;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -56,7 +57,7 @@ class H1ExchangeTest {
                         + "Connection: close\r\n"
                         + "Content-Length: 0\r\n"
                         + "\r\n");
-        var exchange = conn.newExchange(getRequest());
+        var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
         exchange.responseHeaders();
 
         assertFalse(conn.isKeepAlive(), "Connection: close should disable keep-alive");
@@ -70,7 +71,7 @@ class H1ExchangeTest {
                         + "Connection: keep-alive\r\n"
                         + "Content-Length: 0\r\n"
                         + "\r\n");
-        var exchange = conn.newExchange(getRequest());
+        var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
         exchange.responseHeaders();
 
         assertTrue(conn.isKeepAlive(),
@@ -84,7 +85,7 @@ class H1ExchangeTest {
                 "HTTP/1.0 200 OK\r\n"
                         + "Content-Length: 0\r\n"
                         + "\r\n");
-        var exchange = conn.newExchange(getRequest());
+        var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
         exchange.responseHeaders();
 
         assertFalse(conn.isKeepAlive(),
@@ -98,7 +99,7 @@ class H1ExchangeTest {
                 "HTTP/1.1 200 OK\r\n"
                         + "Content-Length: 0\r\n"
                         + "\r\n");
-        var exchange = conn.newExchange(getRequest());
+        var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
         exchange.responseHeaders();
 
         assertTrue(conn.isKeepAlive(),
@@ -112,7 +113,7 @@ class H1ExchangeTest {
                 "HTTP/1.1 200 OK\r\n"
                         + "Content-Length: 0\r\n"
                         + "\r\n");
-        var exchange = conn.newExchange(getRequest());
+        var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
 
         assertEquals(HttpVersion.HTTP_1_1, exchange.responseVersion());
         exchange.close();
@@ -125,7 +126,7 @@ class H1ExchangeTest {
                         + "Content-Length: 5\r\n"
                         + "\r\n"
                         + "hello");
-        var exchange = conn.newExchange(getRequest());
+        var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
         var body = new String(exchange.responseBody().readAllBytes());
 
         assertEquals("hello", body);
@@ -142,13 +143,13 @@ class H1ExchangeTest {
                         + "HTTP/1.1 204 No Content\r\n"
                         + "Content-Length: 0\r\n"
                         + "\r\n");
-        var first = conn.newExchange(getRequest());
+        var first = conn.newExchange(getRequest(), RequestOptions.defaults());
         var out = new ByteArrayOutputStream();
 
         assertEquals(5, first.responseBody().transferTo(out));
         assertEquals("hello", out.toString(java.nio.charset.StandardCharsets.US_ASCII));
 
-        var second = conn.newExchange(getRequest());
+        var second = conn.newExchange(getRequest(), RequestOptions.defaults());
         assertEquals(204, second.responseStatusCode());
         second.close();
     }
@@ -160,7 +161,7 @@ class H1ExchangeTest {
                         + "Content-Length: 5\r\n"
                         + "\r\n"
                         + "he");
-        var exchange = conn.newExchange(getRequest());
+        var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
 
         assertThrows(IOException.class, () -> exchange.responseBody().transferTo(OutputStream.nullOutputStream()));
     }
@@ -173,7 +174,7 @@ class H1ExchangeTest {
                         + "Content-Length: 5\r\n"
                         + "\r\n"
                         + "hello");
-        var exchange = conn.newExchange(getRequest());
+        var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
 
         assertEquals(5, exchange.responseContentLength());
         assertEquals("hello", new String(exchange.responseBody().readAllBytes()));
@@ -188,7 +189,7 @@ class H1ExchangeTest {
                         + "Content-Length: 6\r\n"
                         + "\r\n"
                         + "hello");
-        var exchange = conn.newExchange(getRequest());
+        var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
 
         assertThrows(IOException.class, exchange::responseHeaders);
     }
@@ -200,7 +201,7 @@ class H1ExchangeTest {
                         + "Content-Length: 5\r\n"
                         + "\r\n"
                         + "hello");
-        var exchange = conn.newExchange(getRequest());
+        var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
         var out = new ByteArrayOutputStream();
 
         Channels.newInputStream(exchange.responseBodyChannel()).transferTo(out);
@@ -219,13 +220,13 @@ class H1ExchangeTest {
                         + "Content-Length: 0\r\n"
                         + "\r\n");
 
-        var first = conn.newExchange(getRequest());
+        var first = conn.newExchange(getRequest(), RequestOptions.defaults());
         var channel = first.responseBodyChannel();
         ByteBuffer dst = ByteBuffer.allocate(16);
         assertEquals(5, channel.read(dst));
         assertEquals(-1, channel.read(dst.clear()));
 
-        var second = conn.newExchange(getRequest());
+        var second = conn.newExchange(getRequest(), RequestOptions.defaults());
         assertEquals(204, second.responseStatusCode());
         second.close();
     }
@@ -241,13 +242,13 @@ class H1ExchangeTest {
                         + "Content-Length: 0\r\n"
                         + "\r\n");
 
-        var first = conn.newExchange(getRequest());
+        var first = conn.newExchange(getRequest(), RequestOptions.defaults());
         var channel = first.responseBodyChannel();
         ByteBuffer dst = ByteBuffer.allocate(2);
         assertEquals(2, channel.read(dst));
         channel.close();
 
-        var second = conn.newExchange(getRequest());
+        var second = conn.newExchange(getRequest(), RequestOptions.defaults());
         assertEquals(204, second.responseStatusCode());
         second.close();
     }
@@ -260,7 +261,7 @@ class H1ExchangeTest {
                         + "\r\n"
                         + "he");
 
-        var exchange = conn.newExchange(getRequest());
+        var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
         var channel = exchange.responseBodyChannel();
         ByteBuffer dst = ByteBuffer.allocate(16);
         assertEquals(2, channel.read(dst));
@@ -277,7 +278,7 @@ class H1ExchangeTest {
                         + "Content-Length: 5\r\n"
                         + "\r\n"
                         + "hello");
-        var exchange = conn.newExchange(getRequest());
+        var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
 
         assertEquals("text/plain", exchange.responseContentType());
         assertEquals(5, exchange.responseContentLength());
@@ -295,11 +296,11 @@ class H1ExchangeTest {
                         + "Content-Length: 0\r\n"
                         + "\r\n");
 
-        var first = conn.newExchange(getRequest());
+        var first = conn.newExchange(getRequest(), RequestOptions.defaults());
         assertEquals(200, first.responseStatusCode());
         first.discardResponseBody();
 
-        var second = conn.newExchange(getRequest());
+        var second = conn.newExchange(getRequest(), RequestOptions.defaults());
         assertEquals(204, second.responseStatusCode());
         second.close();
     }
@@ -319,11 +320,11 @@ class H1ExchangeTest {
                         + "Content-Length: 0\r\n"
                         + "\r\n");
 
-        var first = conn.newExchange(getRequest());
+        var first = conn.newExchange(getRequest(), RequestOptions.defaults());
         assertEquals(200, first.responseStatusCode());
         first.discardResponseBody();
 
-        var second = conn.newExchange(getRequest());
+        var second = conn.newExchange(getRequest(), RequestOptions.defaults());
         assertEquals(204, second.responseStatusCode());
         second.close();
     }
@@ -338,10 +339,10 @@ class H1ExchangeTest {
                         + "Content-Length: 0\r\n"
                         + "\r\n");
 
-        var first = conn.newExchange(headRequest());
+        var first = conn.newExchange(headRequest(), RequestOptions.defaults());
         assertEquals(-1, first.responseBody().read());
 
-        var second = conn.newExchange(getRequest());
+        var second = conn.newExchange(getRequest(), RequestOptions.defaults());
         assertEquals(204, second.responseStatusCode());
         second.close();
     }
@@ -356,11 +357,11 @@ class H1ExchangeTest {
                         + "Content-Length: 0\r\n"
                         + "\r\n");
 
-        var first = conn.newExchange(getRequest());
+        var first = conn.newExchange(getRequest(), RequestOptions.defaults());
         assertEquals(204, first.responseStatusCode());
         first.discardResponseBody();
 
-        var second = conn.newExchange(getRequest());
+        var second = conn.newExchange(getRequest(), RequestOptions.defaults());
         assertEquals(200, second.responseStatusCode());
         second.close();
     }
@@ -378,11 +379,66 @@ class H1ExchangeTest {
                 .setHeaders(HttpHeaders.of(Map.of("Expect", List.of("100-continue"))))
                 .setBody(DataStream.ofString("request-body"));
 
-        var exchange = conn.newExchange(request);
+        var exchange = conn.newExchange(request, RequestOptions.defaults());
         exchange.writeRequestBody(request.body());
 
         assertEquals(413, exchange.responseStatusCode());
         assertFalse(socket.outputString().contains("request-body"));
+        exchange.close();
+    }
+
+    @Test
+    void expectContinueOverrideTrueAddsHeaderAndWaitsForContinue() throws IOException {
+        // Server replies 100 Continue, then the final 200 once the body is sent.
+        var socket = new H1ConnectionTest.FakeSocket(
+                "HTTP/1.1 100 Continue\r\n"
+                        + "\r\n"
+                        + "HTTP/1.1 200 OK\r\n"
+                        + "Content-Length: 0\r\n"
+                        + "\r\n");
+        var conn = new H1Connection(ConnectionTransport.of(socket), TEST_ROUTE, READ_TIMEOUT);
+        // Request does NOT carry an Expect header; the override forces it.
+        var request = HttpRequest.create()
+                .setMethod("POST")
+                .setUri(SmithyUri.of("https://example.com/test"))
+                .setBody(DataStream.ofString("request-body"));
+        var options = RequestOptions.builder().expectContinue(true).build();
+
+        var exchange = conn.newExchange(request, options);
+        exchange.writeRequestBody(request.body());
+
+        assertEquals(200, exchange.responseStatusCode());
+        var written = socket.outputString();
+        assertTrue(written.toLowerCase().contains("expect: 100-continue"), "Expect header should be on the wire");
+        // 100 Continue was received, so the body is sent.
+        assertTrue(written.contains("request-body"));
+        exchange.close();
+    }
+
+    @Test
+    void expectContinueOverrideFalseStripsHeaderAndSkipsHandshake() throws IOException {
+        // Only a final response is queued: if the client wrongly waited for 100 Continue it would
+        // consume this 200 as the interim response and misbehave. It must send the body immediately.
+        var socket = new H1ConnectionTest.FakeSocket(
+                "HTTP/1.1 200 OK\r\n"
+                        + "Content-Length: 0\r\n"
+                        + "\r\n");
+        var conn = new H1Connection(ConnectionTransport.of(socket), TEST_ROUTE, READ_TIMEOUT);
+        // Request carries Expect: 100-continue; the override suppresses it.
+        var request = HttpRequest.create()
+                .setMethod("POST")
+                .setUri(SmithyUri.of("https://example.com/test"))
+                .setHeaders(HttpHeaders.of(Map.of("Expect", List.of("100-continue"))))
+                .setBody(DataStream.ofString("request-body"));
+        var options = RequestOptions.builder().expectContinue(false).build();
+
+        var exchange = conn.newExchange(request, options);
+        exchange.writeRequestBody(request.body());
+
+        assertEquals(200, exchange.responseStatusCode());
+        var written = socket.outputString();
+        assertFalse(written.toLowerCase().contains("expect:"), "Expect header should be suppressed");
+        assertTrue(written.contains("request-body"));
         exchange.close();
     }
 
@@ -410,7 +466,7 @@ class H1ExchangeTest {
                 .setUri(SmithyUri.of("https://example.com/test"))
                 .setHeaders(HttpHeaders.of(Map.of("X-Big", List.of("x".repeat(9000)))));
 
-        var thrown = assertThrows(IOException.class, () -> conn.newExchange(request));
+        var thrown = assertThrows(IOException.class, () -> conn.newExchange(request, RequestOptions.defaults()));
         assertEquals("boom", thrown.getMessage());
     }
 
@@ -422,7 +478,7 @@ class H1ExchangeTest {
                 .setMethod("GET")
                 .setUri(SmithyUri.of("https://example.com/a%2Fb?prefix=x%2Fy"));
 
-        var exchange = conn.newExchange(request);
+        var exchange = conn.newExchange(request, RequestOptions.defaults());
         exchange.responseStatusCode();
 
         assertTrue(socket.outputString().startsWith("GET /a%2Fb?prefix=x%2Fy HTTP/1.1\r\n"));
