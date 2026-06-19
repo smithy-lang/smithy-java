@@ -31,10 +31,10 @@ import software.amazon.smithy.java.context.Context;
 public final class EnvironmentVariableIdentityResolver implements AwsCredentialsResolver {
     public static final EnvironmentVariableIdentityResolver INSTANCE = new EnvironmentVariableIdentityResolver();
 
-    private static final String ACCESS_KEY_PROPERTY = "AWS_ACCESS_KEY_ID";
-    private static final String SECRET_KEY_PROPERTY = "AWS_SECRET_ACCESS_KEY";
-    private static final String SESSION_TOKEN_PROPERTY = "AWS_SESSION_TOKEN";
-    private static final String ACCOUNT_ID_PROPERTY = "AWS_ACCOUNT_ID";
+    static final String ACCESS_KEY_PROPERTY = "AWS_ACCESS_KEY_ID";
+    static final String SECRET_KEY_PROPERTY = "AWS_SECRET_ACCESS_KEY";
+    static final String SESSION_TOKEN_PROPERTY = "AWS_SESSION_TOKEN";
+    static final String ACCOUNT_ID_PROPERTY = "AWS_ACCOUNT_ID";
     private static final IdentityResult<AwsCredentialsIdentity> NOT_FOUND = IdentityResult.ofError(
             EnvironmentVariableIdentityResolver.class,
             "Could not resolve an AWS identity using the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment "

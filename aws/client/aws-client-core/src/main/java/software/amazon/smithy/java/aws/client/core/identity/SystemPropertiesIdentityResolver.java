@@ -33,10 +33,10 @@ import software.amazon.smithy.java.context.Context;
 public final class SystemPropertiesIdentityResolver implements AwsCredentialsResolver {
     public static final SystemPropertiesIdentityResolver INSTANCE = new SystemPropertiesIdentityResolver();
 
-    private static final String ACCESS_KEY_PROPERTY = "aws.accessKeyId";
-    private static final String SECRET_KEY_PROPERTY = "aws.secretAccessKey";
-    private static final String SESSION_TOKEN_PROPERTY = "aws.sessionToken";
-    private static final String ACCOUNT_ID_PROPERTY = "aws.accountId";
+    static final String ACCESS_KEY_PROPERTY = "aws.accessKeyId";
+    static final String SECRET_KEY_PROPERTY = "aws.secretAccessKey";
+    static final String SESSION_TOKEN_PROPERTY = "aws.sessionToken";
+    static final String ACCOUNT_ID_PROPERTY = "aws.accountId";
     private static final IdentityResult<AwsCredentialsIdentity> NOT_FOUND = IdentityResult.ofError(
             SystemPropertiesIdentityResolver.class,
             "Could not resolve AWS identity from the aws.accessKeyId and aws.secretAccessKey system properties");

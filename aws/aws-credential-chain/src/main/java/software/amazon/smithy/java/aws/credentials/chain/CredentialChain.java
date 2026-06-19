@@ -93,6 +93,19 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
             List<ChainIdentityProvider> registrations,
             ScheduledExecutorService executor
     ) {
+        return assemble(identityType, registrations, executor, ChainSetup.builder().executor(executor).build());
+    }
+
+    /**
+     * Assemble a chain using a caller-supplied {@link ChainSetup}. Lets tests inject a deterministic environment
+     * and profile rather than reading the real process environment and config files.
+     */
+    static <I extends Identity> CredentialChain<I> assemble(
+            Class<I> identityType,
+            List<ChainIdentityProvider> registrations,
+            ScheduledExecutorService executor,
+            ChainSetup setup
+    ) {
         // Check for duplicate names.
         Set<String> seenNames = new HashSet<>();
         for (ChainIdentityProvider r : registrations) {
@@ -104,9 +117,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
         // Sort providers by ordering constraint (enum order for Standard, relative for Before/After).
         List<ChainIdentityProvider> sorted = sortByOrdering(registrations);
 
-        // Call create() on each provider in sorted order.
-        ChainSetup setup = ChainSetup.builder().executor(executor).build();
-
+        // Call setup() on each provider in sorted order.
         for (ChainIdentityProvider provider : sorted) {
             setup.setCurrentProvider(provider);
             provider.setup(identityType, setup);
