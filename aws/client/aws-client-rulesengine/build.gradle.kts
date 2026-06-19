@@ -23,7 +23,7 @@ dependencies {
     testImplementation(project(":client:dynamic-client"))
 
     s3Model("software.amazon.api.models:s3:1.0.20")
-    lambdaModel("software.amazon.api.models:lambda:1.0.20")
+    lambdaModel("software.amazon.api.models:lambda:1.0.19")
 }
 
 // Add service models to test and JMH classpaths
