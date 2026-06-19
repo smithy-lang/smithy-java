@@ -49,10 +49,6 @@ record HttpConnectionFactory(
         SSLContext sslContext,
         SSLParameters sslParameters,
         TlsProvider tlsProvider,
-        // True when tlsProvider is the built-in JDK provider derived from the config's sslContext/
-        // sslParameters (no explicit or discovered provider). Gates the HTTP/1.1-only SSLSocket fast
-        // path, which is a JDK-only optimization using those same config-level settings.
-        boolean defaultJdkTls,
         HttpVersionPolicy versionPolicy,
         DnsResolver dnsResolver,
         List<HttpClientListener> listeners,
@@ -113,11 +109,6 @@ record HttpConnectionFactory(
         ConnectionTransport transport;
         if (!route.isSecure()) {
             transport = ConnectionTransport.of(socket);
-        } else if (versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1 && defaultJdkTls) {
-            // HTTP/1.1-only on the default JDK provider: the SSLSocket path is cheaper than the
-            // SSLEngine wrap/unwrap loop and uses the same config sslContext/sslParameters. A custom or
-            // discovered provider must own the handshake, so it takes the provider path instead.
-            transport = performTlsSocketHandshake(socket, route, exchangeId);
         } else {
             transport = performTlsHandshake(socket, route, exchangeId);
         }
@@ -221,42 +212,8 @@ record HttpConnectionFactory(
                 .tlsWriteBufferSize(tlsWriteBufferSize);
     }
 
-    private ConnectionTransport performTlsSocketHandshake(Socket socket, Route route, long exchangeId)
-            throws IOException {
-        SSLSocket sslSocket = null;
-        try {
-            sslSocket = (SSLSocket) sslContext.getSocketFactory()
-                    .createSocket(socket, route.host(), route.port(), true);
-            sslSocket.setSSLParameters(socketParameters(sslSocket, versionPolicy.alpnProtocols()));
-
-            int originalTimeout = sslSocket.getSoTimeout();
-            sslSocket.setSoTimeout(toIntMillis(tlsNegotiationTimeout));
-            try {
-                notifyTlsStart(exchangeId, route);
-                try {
-                    sslSocket.startHandshake();
-                    notifyTlsEnd(exchangeId,
-                            route,
-                            sslSocket.getApplicationProtocol(),
-                            sslSocket.getSession().getCipherSuite(),
-                            null);
-                } catch (IOException | RuntimeException e) {
-                    notifyTlsEnd(exchangeId, route, null, null, e);
-                    throw e;
-                }
-            } finally {
-                sslSocket.setSoTimeout(originalTimeout);
-            }
-
-            return ConnectionTransport.of(sslSocket);
-        } catch (IOException e) {
-            closeQuietly(sslSocket != null ? sslSocket : socket);
-            throw new IOException("TLS handshake failed for " + route.host(), e);
-        }
-    }
-
-    // SSLParameters for the HTTP/1.1-only SSLSocket fast path (and proxy TLS). The SSLEngine path is
-    // handled by JdkTlsProvider; this mirrors its parameter handling for the SSLSocket case.
+    // SSLParameters for the proxy-leg SSLSocket TLS (client -> https proxy). The target-leg TLS is
+    // handled by the TlsProvider; this configures only the connection to the proxy itself.
     private SSLParameters socketParameters(SSLSocket sslSocket, String[] applicationProtocols) {
         SSLParameters params = sslParameters != null
                 ? JdkTlsProvider.copyParameters(sslParameters)
@@ -403,12 +360,9 @@ record HttpConnectionFactory(
                 }
                 notifyProxyConnectEnd(exchangeId, route, proxy, proxyAddress, result.statusCode(), null);
 
-                // Mirror the direct path: the SSLSocket shortcut is a JDK-default optimization, so a
-                // custom or discovered provider must own the end-to-end handshake through the tunnel.
-                ConnectionTransport transport =
-                        versionPolicy == HttpVersionPolicy.ENFORCE_HTTP_1_1 && defaultJdkTls
-                                ? performTlsSocketHandshake(proxySocket, route, exchangeId)
-                                : performTlsHandshake(proxySocket, route, exchangeId);
+                // The TLS provider owns the end-to-end handshake to the target through the tunnel. (The
+                // JDK provider still picks its SSLSocket fast path internally for HTTP/1.1.)
+                ConnectionTransport transport = performTlsHandshake(proxySocket, route, exchangeId);
                 return createProtocolConnection(transport, route);
             }
 

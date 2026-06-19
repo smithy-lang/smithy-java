@@ -173,7 +173,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         this.listeners = config.listeners();
         this.hasListeners = !listeners.isEmpty();
 
-        ResolvedTls tls = resolveTls(config);
+        TlsProvider tls = resolveTls(config);
 
         // Use the epoll backend only when the native library is available AND the resolved TLS provider
         // supports it. The epoll path hands the provider a null-socket context whose byte channel is
@@ -181,7 +181,7 @@ public final class HttpConnectionPool implements ConnectionPool {
         // own socket I/O (supportsEpoll() == false) must get the NIO socket path so socket() is non-null.
         // Note: this also routes cleartext connections on such a client through NIO — acceptable, since a
         // custom TLS provider is configured for secure traffic.
-        EpollConnector epollConnector = tls.provider().supportsEpoll()
+        EpollConnector epollConnector = tls.supportsEpoll()
                 ? EpollConnector.createIfAvailable(
                         config.socketReceiveBufferSize(),
                         config.socketSendBufferSize(),
@@ -195,8 +195,7 @@ public final class HttpConnectionPool implements ConnectionPool {
                 config.writeTimeout(),
                 config.sslContext(),
                 config.sslParameters(),
-                tls.provider(),
-                tls.defaultJdk(),
+                tls,
                 config.versionPolicy(),
                 dnsResolver,
                 listeners,
@@ -545,34 +544,22 @@ public final class HttpConnectionPool implements ConnectionPool {
         }
     }
 
-    /**
-     * Resolve the effective socket factory. If the user supplied an explicit {@code socketFactory}
-     * we honor it verbatim. Otherwise, if either of the buffer-size knobs was set on the builder,
-     * build a factory that uses the library defaults (TCP_NODELAY, SO_KEEPALIVE) and applies only
-     * the supplied buffer knobs. {@code -1} means "kernel autotune" — that direction is omitted
-     * from the socket configuration entirely.
-     */
-    // The effective TLS provider for a pool, plus whether it is the built-in JDK default (no explicit
-    // or discovered provider) — which enables the HTTP/1.1 SSLSocket fast path.
-    private record ResolvedTls(TlsProvider provider, boolean defaultJdk) {}
-
     // Resolve once per pool: an explicit provider from the config wins; otherwise an opt-in provider
     // selected by the smithy-java.tls-provider system property; otherwise the built-in JDK provider
-    // configured from the convenience sslContext/sslParameters.
-    private static ResolvedTls resolveTls(ConnectionConfig config) {
+    // configured from the convenience sslContext/sslParameters. The JDK provider picks its own
+    // SSLSocket-vs-SSLEngine strategy per connection.
+    private static TlsProvider resolveTls(ConnectionConfig config) {
         if (config.tlsProvider() != null) {
-            return new ResolvedTls(config.tlsProvider(), false);
+            return config.tlsProvider();
         }
         var discovered = TlsProvider.fromSystemProperty();
         if (discovered != null) {
-            return new ResolvedTls(discovered, false);
+            return discovered;
         }
-        return new ResolvedTls(
-                JdkTlsProvider.builder()
-                        .sslContext(config.sslContext())
-                        .sslParameters(config.sslParameters())
-                        .build(),
-                true);
+        return JdkTlsProvider.builder()
+                .sslContext(config.sslContext())
+                .sslParameters(config.sslParameters())
+                .build();
     }
 
     private static HttpSocketFactory resolveSocketFactory(ConnectionConfig config) {

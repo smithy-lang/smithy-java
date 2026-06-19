@@ -12,9 +12,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.net.ssl.SSLParameters;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -66,6 +70,42 @@ class JdkTlsProviderTest {
         var ctx = TlsConnectionContext.builder().alpnProtocols(mutable).build();
         mutable.add("http/1.1");
         assertEquals(List.of("h2"), ctx.alpnProtocols(), "context must not reflect later mutation of the source list");
+    }
+
+    @Test
+    void connectClosesSocketWhenEngineSetupFails() throws IOException {
+        // Bad SSLParameters make createEngine().setSSLParameters() throw IllegalArgumentException before
+        // the transport takes ownership. The provider must close the supplied socket before rethrowing
+        // (TlsProvider contract), not leak it. ALPN != http/1.1 forces the SSLEngine path.
+        assertSocketClosedOnSetupFailure(List.of("h2"));
+    }
+
+    @Test
+    void connectClosesSocketWhenSslSocketSetupFails() throws IOException {
+        // Same, on the SSLSocket fast path (http/1.1-only over a plain socket).
+        assertSocketClosedOnSetupFailure(List.of("http/1.1"));
+    }
+
+    private void assertSocketClosedOnSetupFailure(List<String> alpn) throws IOException {
+        try (ServerSocket server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
+                Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.getLocalPort());
+                // Complete the TCP connect so the client socket is genuinely connected.
+                Socket accepted = server.accept()) {
+            SSLParameters bad = new SSLParameters();
+            bad.setProtocols(new String[] {"NoSuchTLSProtocol"}); // rejected by the JSSE engine/socket
+            var ctx = TlsConnectionContext.builder()
+                    .host(InetAddress.getLoopbackAddress().getHostAddress())
+                    .port(server.getLocalPort())
+                    .alpnProtocols(alpn)
+                    .negotiationTimeoutMillis(1000)
+                    .tlsReadBufferSize(16384)
+                    .tlsWriteBufferSize(16384)
+                    .socket(socket)
+                    .build();
+            var provider = JdkTlsProvider.builder().sslParameters(bad).build();
+            assertThrows(Exception.class, () -> provider.connect(ctx));
+            assertTrue(socket.isClosed(), "connect() must close the supplied socket on setup failure");
+        }
     }
 
     @Test
