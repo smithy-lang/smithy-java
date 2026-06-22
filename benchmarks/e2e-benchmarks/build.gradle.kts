@@ -54,6 +54,7 @@ dependencies {
     implementation(project(":aws:client:aws-client-restxml")) // S3 protocol
     implementation(project(":aws:client:aws-client-awsjson")) // DynamoDB protocol
     implementation(project(":aws:client:aws-client-rulesengine"))
+    implementation(project(":aws:client:aws-client-s3")) // S3 virtual-host bucket addressing
 
     // Codecs
     implementation(project(":codecs:json-codec", configuration = "shadow"))

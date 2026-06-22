@@ -30,4 +30,17 @@ public final class RulesEngineSettings {
      */
     public static final Context.Key<Map<String, Object>> ADDITIONAL_ENDPOINT_PARAMS = Context.key(
             "Additional endpoint parameters to pass to the rules engine");
+
+    /**
+     * Opt-in sink for capturing the resolved endpoint parameter values (parameter name to value) during
+     * resolution. To use it, place a <em>mutable</em> map under this key before the call; the rules
+     * engine fills it (via {@code putAll}) with the parameters it resolved, and the caller reads the map
+     * back afterwards. When the key is absent the resolver does no extra work, so the normal resolution
+     * path is unaffected. A map (rather than a boolean flag plus a separate result key) is used because
+     * the resolution-time context is unmodifiable: the resolver cannot {@code put} a result onto it, it
+     * can only mutate a container the caller already supplied. Intended for tooling/debugging (e.g. a
+     * CLI "plan" mode that shows exactly which parameters drove endpoint resolution).
+     */
+    public static final Context.Key<Map<String, Object>> RESOLVED_ENDPOINT_PARAMS = Context.key(
+            "Mutable sink for capturing resolved endpoint parameters during resolution");
 }

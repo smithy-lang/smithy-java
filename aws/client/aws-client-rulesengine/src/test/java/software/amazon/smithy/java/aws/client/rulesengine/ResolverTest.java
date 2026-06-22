@@ -42,11 +42,9 @@ import software.amazon.smithy.java.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.java.rulesengine.RulesEvaluationError;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
-import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.traits.HttpTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.transform.ModelTransformer;
 import software.amazon.smithy.rulesengine.traits.EndpointTestCase;
@@ -62,27 +60,10 @@ public class ResolverTest {
     private Map<String, Object> overrideMap = null;
     private Object inputParams = null;
 
-    // S3 requires a customization to remove buckets from the path :(
+    // Remove the streaming trait (not yet supported here). S3Plugin handles bucket-in-path removal.
     private static Model customizeS3Model(Model model) {
-        var transformer = ModelTransformer.create();
-
-        // Remove streaming trait - not yet supported
-        Model m = transformer.removeTraitsIf(model, (shape, trait) -> trait instanceof StreamingTrait);
-
-        return transformer.mapShapes(m, s -> {
-            if (s.isOperationShape()) {
-                var httpTrait = s.getTrait(HttpTrait.class).orElse(null);
-                if (httpTrait != null && httpTrait.getUri().getLabel("Bucket").isPresent()) {
-                    // Remove the bucket from the URI pattern.
-                    var uriString = httpTrait.getUri().toString().replace("{Bucket}", "");
-                    uriString = uriString.replace("//", "/");
-                    var newUri = UriPattern.parse(uriString);
-                    var newHttpTrait = httpTrait.toBuilder().uri(newUri).build();
-                    return Shape.shapeToBuilder(s).addTrait(newHttpTrait).build();
-                }
-            }
-            return s;
-        });
+        return ModelTransformer.create()
+                .removeTraitsIf(model, (shape, trait) -> trait instanceof StreamingTrait);
     }
 
     @BeforeAll

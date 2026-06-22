@@ -21,6 +21,9 @@ dependencies {
     testImplementation(project(":aws:client:aws-client-restxml"))
     testImplementation(project(":aws:client:aws-client-restjson"))
     testImplementation(project(":client:dynamic-client"))
+    // S3Plugin (AutoClientPlugin) fixes virtual-host bucket addressing in the resolver tests + jmh.
+    testImplementation(project(":aws:client:aws-client-s3"))
+    jmhImplementation(project(":aws:client:aws-client-s3"))
 
     s3Model("software.amazon.api.models:s3:1.0.20")
     lambdaModel("software.amazon.api.models:lambda:1.0.19")

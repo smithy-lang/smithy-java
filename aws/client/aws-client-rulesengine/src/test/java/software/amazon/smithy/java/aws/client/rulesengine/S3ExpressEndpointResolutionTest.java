@@ -37,11 +37,8 @@ import software.amazon.smithy.java.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.java.rulesengine.RulesEvaluationError;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
-import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ServiceShape;
-import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.traits.HttpTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.transform.ModelTransformer;
 
@@ -148,20 +145,9 @@ public class S3ExpressEndpointResolutionTest {
         return captured[0];
     }
 
+    // Remove the streaming trait (not supported here). S3Plugin handles bucket-in-path removal.
     private static Model customizeS3Model(Model model) {
-        var transformer = ModelTransformer.create();
-        Model m = transformer.removeTraitsIf(model, (shape, trait) -> trait instanceof StreamingTrait);
-        return transformer.mapShapes(m, s -> {
-            if (s.isOperationShape()) {
-                var httpTrait = s.getTrait(HttpTrait.class).orElse(null);
-                if (httpTrait != null && httpTrait.getUri().getLabel("Bucket").isPresent()) {
-                    var uriString = httpTrait.getUri().toString().replace("{Bucket}", "");
-                    uriString = uriString.replace("//", "/");
-                    var newUri = UriPattern.parse(uriString);
-                    return Shape.shapeToBuilder(s).addTrait(httpTrait.toBuilder().uri(newUri).build()).build();
-                }
-            }
-            return s;
-        });
+        return ModelTransformer.create()
+                .removeTraitsIf(model, (shape, trait) -> trait instanceof StreamingTrait);
     }
 }

@@ -59,6 +59,16 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
         // Reset the evaluator and prepare new registers from the sink.
         evaluator.resetFromSink(ctx);
 
+        // Optionally snapshot the resolved parameter values for tooling/debugging. Off by default; when
+        // no sink map is present this is a single null check with no allocation, leaving the hot path
+        // unaffected. We mutate the caller-supplied map rather than putting onto the context because the
+        // resolution-time context is unmodifiable. Captured after resetFromSink so the snapshot includes
+        // input params, builtins, and defaults regardless of how the BDD short-circuits during eval.
+        var paramSink = ctx.get(RulesEngineSettings.RESOLVED_ENDPOINT_PARAMS);
+        if (paramSink != null) {
+            paramSink.putAll(evaluator.captureParameters());
+        }
+
         LOGGER.debug("Resolving endpoint of {} using VM", operation);
 
         return evaluator.evaluateBdd();

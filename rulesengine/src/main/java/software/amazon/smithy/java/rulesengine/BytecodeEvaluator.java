@@ -8,6 +8,7 @@ package software.amazon.smithy.java.rulesengine;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -76,6 +77,23 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         registerSink.drainTo(registers);
         // Fill builtins and validate
         registerFiller.fillRegisters(registers, context, prefilled);
+    }
+
+    /**
+     * Snapshots the resolved endpoint parameter values (name to value) from the input registers. Call
+     * after {@link #resetFromSink} -- registers are then fully populated (input params + builtins +
+     * defaults), so this captures the complete parameter set regardless of which the BDD later reads.
+     * Only invoked when capture is explicitly requested, so the allocation never touches the hot path.
+     */
+    Map<String, Object> captureParameters() {
+        Map<String, Object> params = new LinkedHashMap<>();
+        for (var entry : bytecode.getInputRegisterMap().entrySet()) {
+            Object value = registers[entry.getValue()];
+            if (value != null) {
+                params.put(entry.getKey(), value);
+            }
+        }
+        return params;
     }
 
     @Override
