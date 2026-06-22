@@ -15,7 +15,7 @@ import java.io.IOException;
  * <p>This exception carries an HTTP/2 error code that can be used to send
  * RST_STREAM or GOAWAY frames to the peer.
  */
-public final class H2Exception extends IOException {
+final class H2Exception extends IOException {
 
     private final int errorCode;
     private final int streamId;

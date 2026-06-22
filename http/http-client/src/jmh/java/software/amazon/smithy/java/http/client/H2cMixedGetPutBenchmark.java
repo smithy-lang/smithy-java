@@ -28,10 +28,6 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
-import software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport;
-import software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig;
-import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
-import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -64,8 +60,6 @@ public class H2cMixedGetPutBenchmark {
     private int streamsPerConnection;
 
     private HttpClient smithyClient;
-    private NettyHttpClientTransport productionNettyTransport;
-    private CrtHttpClientTransport crtTransport;
     private Context transportContext;
     private List<EventLoopH2cTransport> eventLoopTransports;
     private AtomicInteger eventLoopIndex;
@@ -84,17 +78,6 @@ public class H2cMixedGetPutBenchmark {
                 .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
                 .dnsResolver(BenchmarkSupport.staticDns())
                 .build();
-        var nettyTransportConfig = new NettyHttpTransportConfig()
-                .maxConnectionsPerHost(connections)
-                .h2StreamsPerConnection(streamsPerConnection)
-                .httpVersionPolicy(software.amazon.smithy.java.client.http.netty.HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE);
-        productionNettyTransport =
-                new NettyHttpClientTransport(nettyTransportConfig);
-        var crtConfig = new CrtHttpTransportConfig()
-                .maxConnectionsPerHost(connections)
-                .h2StreamsPerConnection(streamsPerConnection);
-        crtConfig.httpVersion(software.amazon.smithy.java.http.api.HttpVersion.HTTP_2);
-        crtTransport = new CrtHttpClientTransport(crtConfig);
         transportContext = Context.create();
         eventLoopTransports = new ArrayList<>(connections);
         for (int i = 0; i < connections; i++) {
@@ -135,14 +118,6 @@ public class H2cMixedGetPutBenchmark {
             if (smithyClient != null) {
                 smithyClient.close();
                 smithyClient = null;
-            }
-            if (productionNettyTransport != null) {
-                productionNettyTransport.close();
-                productionNettyTransport = null;
-            }
-            if (crtTransport != null) {
-                crtTransport.close();
-                crtTransport = null;
             }
             if (eventLoopTransports != null) {
                 for (var transport : eventLoopTransports) {
@@ -213,42 +188,6 @@ public class H2cMixedGetPutBenchmark {
         counter.putRequests = mixedRequests.totalPutRequests.get() - startPut;
 
         counter.logErrors("Smithy H2c mixed GET+PUT");
-    }
-
-    @Benchmark
-    @OperationsPerInvocation(OPS)
-    @Threads(1)
-    public void h2cProductionNettyMixedGetPutMb(Counter counter) throws InterruptedException {
-        long startGet = mixedRequests.totalGetRequests.get();
-        long startPut = mixedRequests.totalPutRequests.get();
-        BenchmarkSupport.runBenchmark(concurrency, OPS, (MixedRequests requests) -> {
-            var request = requests.next();
-            try (var response = productionNettyTransport.send(transportContext, request)) {
-                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
-            }
-        }, mixedRequests, counter);
-        counter.getRequests = mixedRequests.totalGetRequests.get() - startGet;
-        counter.putRequests = mixedRequests.totalPutRequests.get() - startPut;
-
-        counter.logErrors("Production-Netty H2c mixed GET+PUT");
-    }
-
-    @Benchmark
-    @OperationsPerInvocation(OPS)
-    @Threads(1)
-    public void h2cCrtMixedGetPutMb(Counter counter) throws InterruptedException {
-        long startGet = mixedRequests.totalGetRequests.get();
-        long startPut = mixedRequests.totalPutRequests.get();
-        BenchmarkSupport.runBenchmark(concurrency, OPS, (MixedRequests requests) -> {
-            var request = requests.next();
-            try (var response = crtTransport.send(transportContext, request)) {
-                response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
-            }
-        }, mixedRequests, counter);
-        counter.getRequests = mixedRequests.totalGetRequests.get() - startGet;
-        counter.putRequests = mixedRequests.totalPutRequests.get() - startPut;
-
-        counter.logErrors("CRT H2c mixed GET+PUT");
     }
 
     @Benchmark

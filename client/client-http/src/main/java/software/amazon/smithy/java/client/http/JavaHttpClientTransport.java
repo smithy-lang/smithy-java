@@ -47,7 +47,7 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
 
     // Drop content-length
     private static final HeaderWithValueConsumer<java.net.http.HttpRequest.Builder> VALUE_CONSUMER = (b, n, v) -> {
-        if (n != HeaderName.CONTENT_LENGTH.name()) {
+        if (!HeaderName.CONTENT_LENGTH.name().equals(n)) {
             b.header(n, v);
         }
     };

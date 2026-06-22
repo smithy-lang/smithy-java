@@ -73,13 +73,9 @@ dependencies {
     implementation(project(":aws:aws-credential-chain"))
     implementation(project(":aws:aws-credentials-imds"))
 
-    // Alternate transports — selected at runtime via -De2e.transport=netty|smithy|apache|apache-classic|crt
-    implementation(project(":client:client-http-netty"))
+    // Alternate transports — selected at runtime via -De2e.transport=smithy|smithy-boringssl
     implementation(project(":client:client-http-smithy"))
     implementation(project(":client:client-http-boringssl"))
-    implementation(project(":client:client-http-apache"))
-    implementation(project(":client:client-http-apache-classic"))
-    implementation(project(":client:client-http-crt"))
 }
 
 // Two projections so that DynamoDB and S3 generate into different namespaces

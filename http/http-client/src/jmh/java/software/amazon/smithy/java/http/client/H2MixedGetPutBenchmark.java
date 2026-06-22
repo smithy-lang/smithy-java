@@ -29,11 +29,7 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
-import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
-import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
 import software.amazon.smithy.java.client.http.boringssl.BoringSslTlsProvider;
-import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
-import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -73,8 +69,6 @@ public class H2MixedGetPutBenchmark {
     private java.net.http.HttpClient javaClient;
     private ExecutorService javaExecutor;
     private JavaHttpClientTransport javaTransport;
-    private ApacheHttpClientTransport apacheTransport;
-    private NettyHttpClientTransport productionNettyTransport;
     private Context transportContext;
     private MixedRequests mixedRequests;
     private String runId;
@@ -105,23 +99,6 @@ public class H2MixedGetPutBenchmark {
                 .executor(javaExecutor)
                 .build();
         javaTransport = new JavaHttpClientTransport(javaClient);
-        var apacheConfig = new ApacheHttpTransportConfig();
-        apacheConfig.httpVersion(software.amazon.smithy.java.http.api.HttpVersion.HTTP_2);
-        apacheConfig.maxConnectionsPerHost(connections);
-        apacheConfig.h2StreamsPerConnection(streamsPerConnection);
-        apacheConfig.ioThreads(1);
-        apacheTransport = new ApacheHttpClientTransport(apacheConfig, sslContext);
-
-        // Thread parity: pin Netty's event-loop group to the core count so it has the same CPU budget
-        // as Smithy's virtual-thread carrier pool (also defaulted to #cores; pin it explicitly in the
-        // fork JVM args via -Djdk.virtualThreadScheduler.parallelism for a controlled comparison).
-        var nettyTransportConfig = new NettyHttpTransportConfig()
-                .maxConnectionsPerHost(connections)
-                .h2StreamsPerConnection(streamsPerConnection)
-                .eventLoopThreads(Runtime.getRuntime().availableProcessors())
-                .httpVersionPolicy(software.amazon.smithy.java.client.http.netty.HttpVersionPolicy.ENFORCE_HTTP_2);
-        productionNettyTransport =
-                new NettyHttpClientTransport(nettyTransportConfig);
         transportContext = Context.create();
 
         BenchmarkSupport.resetServer(smithyClient, BenchmarkSupport.H2_URL);
@@ -173,14 +150,6 @@ public class H2MixedGetPutBenchmark {
             }
             if (javaTransport != null) {
                 javaTransport = null;
-            }
-            if (apacheTransport != null) {
-                apacheTransport.close();
-                apacheTransport = null;
-            }
-            if (productionNettyTransport != null) {
-                productionNettyTransport.close();
-                productionNettyTransport = null;
             }
         }
     }
@@ -293,45 +262,5 @@ public class H2MixedGetPutBenchmark {
 
         counter.logErrors("Java-wrapper H2 mixed GET+PUT");
         counter.throwIfErrored("Java-wrapper H2 mixed GET+PUT");
-    }
-
-    @Benchmark
-    @OperationsPerInvocation(OPS)
-    @Threads(1)
-    public void h2ProductionNettyMixedGetPutMb(Counter counter) throws InterruptedException {
-        long startGet = mixedRequests.totalGetRequests.get();
-        long startPut = mixedRequests.totalPutRequests.get();
-        BenchmarkSupport.runBenchmark(concurrency, OPS, (MixedRequests requests) -> {
-            var request = requests.next();
-            try (var response = productionNettyTransport.send(transportContext, request.request())) {
-                long responseBytes = response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
-                requests.recordCompletion(request, responseBytes);
-            }
-        }, mixedRequests, counter);
-        counter.getRequests = mixedRequests.totalGetRequests.get() - startGet;
-        counter.putRequests = mixedRequests.totalPutRequests.get() - startPut;
-
-        counter.logErrors("Production-Netty H2 mixed GET+PUT");
-        counter.throwIfErrored("Production-Netty H2 mixed GET+PUT");
-    }
-
-    @Benchmark
-    @OperationsPerInvocation(OPS)
-    @Threads(1)
-    public void h2ApacheAsyncMixedGetPutMb(Counter counter) throws InterruptedException {
-        long startGet = mixedRequests.totalGetRequests.get();
-        long startPut = mixedRequests.totalPutRequests.get();
-        BenchmarkSupport.runBenchmark(concurrency, OPS, (MixedRequests requests) -> {
-            var request = requests.next();
-            try (var response = apacheTransport.send(transportContext, request.request())) {
-                long responseBytes = response.body().asInputStream().transferTo(OutputStream.nullOutputStream());
-                requests.recordCompletion(request, responseBytes);
-            }
-        }, mixedRequests, counter);
-        counter.getRequests = mixedRequests.totalGetRequests.get() - startGet;
-        counter.putRequests = mixedRequests.totalPutRequests.get() - startPut;
-
-        counter.logErrors("Apache-async H2 mixed GET+PUT");
-        counter.throwIfErrored("Apache-async H2 mixed GET+PUT");
     }
 }

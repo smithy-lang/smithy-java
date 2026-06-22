@@ -20,14 +20,7 @@ import software.amazon.smithy.java.benchmarks.e2e.dynamodb.client.DynamoDBClient
 import software.amazon.smithy.java.benchmarks.e2e.s3.client.S3Client;
 import software.amazon.smithy.java.benchmarks.e2e.s3.model.CreateSessionInput;
 import software.amazon.smithy.java.client.core.ClientTransport;
-import software.amazon.smithy.java.client.http.apache.ApacheHttpClientTransport;
-import software.amazon.smithy.java.client.http.apache.ApacheHttpTransportConfig;
-import software.amazon.smithy.java.client.http.apache.classic.ApacheClassicHttpClientTransport;
 import software.amazon.smithy.java.client.http.boringssl.BoringSslTlsProvider;
-import software.amazon.smithy.java.client.http.crt.CrtHttpClientTransport;
-import software.amazon.smithy.java.client.http.crt.CrtHttpTransportConfig;
-import software.amazon.smithy.java.client.http.netty.NettyHttpClientTransport;
-import software.amazon.smithy.java.client.http.netty.NettyHttpTransportConfig;
 import software.amazon.smithy.java.client.http.smithy.SmithyHttpClientTransport;
 import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
@@ -88,29 +81,12 @@ final class Clients {
 
     /**
      * Returns the alternate transport selected via {@code -De2e.transport=...}, or null for the
-     * default JDK HttpClient. Recognized values: {@code netty}, {@code smithy}.
+     * default JDK HttpClient. Recognized values: {@code smithy}, {@code smithy-boringssl}.
      */
     private static ClientTransport<?, ?> selectTransport() {
         var name = System.getProperty("e2e.transport", "").trim().toLowerCase();
         return switch (name) {
             case "", "jdk" -> null;
-            case "netty" -> {
-                var cfg = new NettyHttpTransportConfig()
-                        .maxConnectionsPerHost(maxConnections());
-                yield new NettyHttpClientTransport(cfg);
-            }
-            case "apache" -> {
-                var cfg = new ApacheHttpTransportConfig()
-                        .maxConnectionsPerHost(512)
-                        .ioThreads(Runtime.getRuntime().availableProcessors());
-                yield new ApacheHttpClientTransport(cfg);
-            }
-            case "apache-classic" -> new ApacheClassicHttpClientTransport(512, 512);
-            case "crt" -> {
-                var cfg = new CrtHttpTransportConfig()
-                        .maxConnectionsPerHost(512);
-                yield new CrtHttpClientTransport(cfg);
-            }
             case "smithy" -> new SmithyHttpClientTransport(smithyPool(false));
             // Same smithy native transport, but TLS is driven by the BoringSSL (netty-tcnative)
             // SSLEngine instead of the JDK engine — keeps the cheaper AES-GCM without the Netty
@@ -118,7 +94,7 @@ final class Clients {
             case "smithy-boringssl" -> new SmithyHttpClientTransport(smithyPool(true));
             default -> throw new IllegalArgumentException(
                     "Unknown e2e.transport: '" + name
-                            + "' (expected one of: jdk, netty, smithy, smithy-boringssl, apache, apache-classic, crt)");
+                            + "' (expected one of: jdk, smithy, smithy-boringssl)");
         };
     }
 

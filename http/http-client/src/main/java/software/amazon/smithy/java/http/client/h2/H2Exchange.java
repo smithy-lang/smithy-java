@@ -59,7 +59,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  * returned after consumption. Flow control sends WINDOW_UPDATE after DATA frame bytes
  * are consumed or discarded.
  */
-public final class H2Exchange implements HttpExchange {
+final class H2Exchange implements HttpExchange {
 
     // Max frames to acquire flow control for in a single batch (64 frames = 1MB at default 16KB frame size)
     private static final int FLOW_CONTROL_BATCH_FRAMES = 64;

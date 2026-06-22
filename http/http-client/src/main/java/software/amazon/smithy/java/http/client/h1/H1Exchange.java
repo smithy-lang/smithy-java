@@ -55,7 +55,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  * <h2>Transfer Encoding</h2>
  * <p>Supports both chunked transfer encoding and fixed Content-Length for request and response bodies.
  */
-public final class H1Exchange implements HttpExchange {
+final class H1Exchange implements HttpExchange {
 
     private static final int MAX_RESPONSE_HEADER_COUNT = 512;
     private static final long DEFAULT_CONTINUE_TIMEOUT_MS = 1000; // 1 second
