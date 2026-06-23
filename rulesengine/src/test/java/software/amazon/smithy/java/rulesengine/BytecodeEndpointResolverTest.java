@@ -65,7 +65,7 @@ class BytecodeEndpointResolverTest {
 
         EndpointResolverParams params = createParams("us-east-1", "my-bucket");
 
-        Endpoint endpoint = resolver.resolveEndpoint(params);
+        Endpoint endpoint = resolveBothWays(resolver, params);
 
         assertNotNull(endpoint);
         assertEquals("https://example.com", endpoint.uri().toString());
@@ -114,7 +114,7 @@ class BytecodeEndpointResolverTest {
 
         EndpointResolverParams params = createParams("us-west-2", "bucket", context);
 
-        Endpoint endpoint = resolver.resolveEndpoint(params);
+        Endpoint endpoint = resolveBothWays(resolver, params);
         assertEquals("https://custom.example.com", endpoint.uri().toString());
     }
 
@@ -143,7 +143,7 @@ class BytecodeEndpointResolverTest {
 
         EndpointResolverParams params = createParams("us-east-1", "bucket");
 
-        Endpoint endpoint = resolver.resolveEndpoint(params);
+        Endpoint endpoint = resolveBothWays(resolver, params);
         assertNull(endpoint);
     }
 
@@ -220,13 +220,13 @@ class BytecodeEndpointResolverTest {
 
         // Test with region provided
         EndpointResolverParams params = createParams("us-east-1", "bucket");
-        Endpoint endpoint = resolver.resolveEndpoint(params);
+        Endpoint endpoint = resolveBothWays(resolver, params);
         assertNotNull(endpoint);
         assertEquals("https://example.com", endpoint.uri().toString());
 
         // Test without region
         params = createParams(null, "bucket");
-        endpoint = resolver.resolveEndpoint(params);
+        endpoint = resolveBothWays(resolver, params);
         assertNull(endpoint); // Should return no match (result 0)
     }
 
@@ -291,6 +291,17 @@ class BytecodeEndpointResolverTest {
 
         var e = Assertions.assertThrows(RulesEvaluationError.class, () -> resolver.resolveEndpoint(params));
         assertTrue(e.getMessage().contains("bucket"));
+
+        // The traced path must fail the same way.
+        Context tracedContext = params.context().put(RulesEngineSettings.BDD_TRACE_SINK, (bc, p) -> NO_OP_TRACE);
+        EndpointResolverParams tracedParams = EndpointResolverParams.builder()
+                .operation(params.operation())
+                .inputValue(params.inputValue())
+                .context(tracedContext)
+                .build();
+        var tracedError = Assertions.assertThrows(RulesEvaluationError.class,
+                () -> resolver.resolveEndpoint(tracedParams));
+        assertTrue(tracedError.getMessage().contains("bucket"));
     }
 
     @Test
@@ -330,7 +341,7 @@ class BytecodeEndpointResolverTest {
         // Don't provide region, should use default
         EndpointResolverParams params = createParams(null, "my-bucket");
 
-        Endpoint endpoint = resolver.resolveEndpoint(params);
+        Endpoint endpoint = resolveBothWays(resolver, params);
         assertNotNull(endpoint);
         assertEquals("us-west-2/my-bucket", endpoint.uri().toString());
     }
@@ -535,6 +546,35 @@ class BytecodeEndpointResolverTest {
     }
 
     // Helper methods
+
+    /**
+     * Resolves {@code params} twice: once untraced ({@link BytecodeEvaluator#evaluateBdd}) and once with
+     * a no-op trace sink attached ({@link BytecodeEvaluator#evaluateBddTraced}), asserts both produce the
+     * same endpoint, and returns it. The two methods duplicate the BDD traversal loop, so routing the
+     * outcome assertions through here guards against them de-syncing.
+     */
+    private static Endpoint resolveBothWays(BytecodeEndpointResolver resolver, EndpointResolverParams params) {
+        Endpoint untraced = resolver.resolveEndpoint(params);
+
+        // Same inputs, but with a sink whose begin() returns a real trace so the traced loop is exercised
+        // (returning null would sample out and fall back to the untraced loop, defeating the comparison).
+        Context tracedContext = params.context().put(RulesEngineSettings.BDD_TRACE_SINK, (bc, p) -> NO_OP_TRACE);
+        EndpointResolverParams tracedParams = EndpointResolverParams.builder()
+                .operation(params.operation())
+                .inputValue(params.inputValue())
+                .context(tracedContext)
+                .build();
+        Endpoint traced = resolver.resolveEndpoint(tracedParams);
+
+        if (untraced == null) {
+            assertNull(traced, "traced path resolved an endpoint but untraced did not");
+        } else {
+            assertNotNull(traced, "untraced path resolved an endpoint but traced did not");
+            assertEquals(untraced.uri().toString(), traced.uri().toString(),
+                    "traced and untraced paths resolved different endpoints");
+        }
+        return untraced;
+    }
 
     private EndpointResolverParams createParams(String region, String bucket) {
         return createParams(region, bucket, Context.create());
