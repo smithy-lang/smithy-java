@@ -570,7 +570,8 @@ class BytecodeEndpointResolverTest {
             assertNull(traced, "traced path resolved an endpoint but untraced did not");
         } else {
             assertNotNull(traced, "untraced path resolved an endpoint but traced did not");
-            assertEquals(untraced.uri().toString(), traced.uri().toString(),
+            assertEquals(untraced.uri().toString(),
+                    traced.uri().toString(),
                     "traced and untraced paths resolved different endpoints");
         }
         return untraced;
