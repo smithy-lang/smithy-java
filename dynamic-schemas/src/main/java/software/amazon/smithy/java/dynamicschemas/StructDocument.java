@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.dynamicschemas;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -16,6 +17,7 @@ import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -186,7 +188,7 @@ public final class StructDocument implements Document, SerializableStruct {
             }
             case BOOLEAN -> new ContentDocument(schema, delegate.asBoolean());
             case STRING, ENUM -> new ContentDocument(schema, delegate.asString());
-            case TIMESTAMP -> new ContentDocument(schema, delegate.asTimestamp());
+            case TIMESTAMP -> new ContentDocument(schema, convertTimestamp(delegate));
             case BYTE, SHORT, INTEGER, INT_ENUM,
                     LONG, FLOAT, DOUBLE, BIG_INTEGER, BIG_DECIMAL ->
                 new ContentDocument(schema, delegate.asNumber());
@@ -199,6 +201,28 @@ public final class StructDocument implements Document, SerializableStruct {
             }
             default -> throw new IllegalArgumentException("Unsupported schema type: " + schema);
         };
+    }
+
+    /**
+     * Coerces an untyped document into an {@link Instant} for a modeled timestamp member.
+     *
+     * <p>The DynamicClient input model is the protocol-agnostic, in-memory Smithy data model, so a timestamp value
+     * is interpreted by its modeled representation rather than any wire format: a number is epoch-seconds and a string
+     * is {@code date-time} (ISO-8601). This mirrors how Smithy interprets timestamp values in model nodes (which also
+     * ignore {@code @timestampFormat}). The protocol's {@code @timestampFormat} is applied later, when the resulting
+     * Instant is serialized onto the wire.
+     */
+    private static Instant convertTimestamp(Document delegate) {
+        var type = delegate.type();
+        if (type == ShapeType.TIMESTAMP) {
+            // Already a typed timestamp document (e.g. an Instant passed via Document.ofObject).
+            return delegate.asTimestamp();
+        } else if (type != ShapeType.STRING) {
+            // Not-string means number, and numbers are epoch-seconds.
+            return TimestampFormatter.Prelude.EPOCH_SECONDS.readFromNumber(delegate.asNumber());
+        } else {
+            return TimestampFormatter.Prelude.DATE_TIME.readFromString(delegate.asString(), false);
+        }
     }
 
     @Override
