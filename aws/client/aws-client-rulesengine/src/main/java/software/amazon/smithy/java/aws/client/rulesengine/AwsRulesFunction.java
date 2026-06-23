@@ -7,6 +7,8 @@ package software.amazon.smithy.java.aws.client.rulesengine;
 
 import software.amazon.smithy.java.rulesengine.PropertyGetter;
 import software.amazon.smithy.java.rulesengine.RulesFunction;
+import software.amazon.smithy.model.node.Node;
+import software.amazon.smithy.model.node.ToNode;
 import software.amazon.smithy.rulesengine.aws.language.functions.AwsArn;
 import software.amazon.smithy.rulesengine.aws.language.functions.AwsPartition;
 import software.amazon.smithy.rulesengine.aws.language.functions.IsVirtualHostableS3Bucket;
@@ -33,7 +35,7 @@ enum AwsRulesFunction implements RulesFunction {
         // Most of the entries aren't needed for evaluating rules, so map entries are created lazily (something that
         // isn't needed when evaluating rules), and accessing map values is done using a switch (something that is
         // essentially compiled into a map lookup via a lookupswitch).
-        private record PartitionMap(Partition partition) implements PropertyGetter {
+        private record PartitionMap(Partition partition) implements PropertyGetter, ToNode {
             @Override
             public Object getProperty(String name) {
                 return switch (name) {
@@ -45,6 +47,12 @@ enum AwsRulesFunction implements RulesFunction {
                     case "implicitGlobalRegion" -> partition.getOutputs().getImplicitGlobalRegion();
                     default -> null;
                 };
+            }
+
+            // Lets a consumer (e.g. a trace) render this as structured data rather than a stringified blob.
+            @Override
+            public Node toNode() {
+                return partition.toNode();
             }
         }
     },

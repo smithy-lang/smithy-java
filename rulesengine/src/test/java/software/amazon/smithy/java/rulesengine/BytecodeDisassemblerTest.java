@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.containsString;
 
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class BytecodeDisassemblerTest {
@@ -187,6 +188,73 @@ class BytecodeDisassemblerTest {
         assertThat(result, containsString("conditions:"));
         assertThat(result, containsString("results:"));
         assertThat(result, containsString("root:"));
+    }
+
+    @Test
+    void describesSingleConditionAndResultById() {
+        BytecodeWriter writer = new BytecodeWriter();
+
+        // Condition 0: isSet(register 0), return.
+        writer.markConditionStart();
+        writer.writeByte(Opcodes.TEST_REGISTER_ISSET);
+        writer.writeByte(0);
+        writer.writeByte(Opcodes.RETURN_VALUE);
+
+        // Result 0: load a constant URL and return an endpoint.
+        writer.markResultStart();
+        writer.writeByte(Opcodes.LOAD_CONST);
+        writer.writeByte(0);
+        writer.writeByte(Opcodes.RETURN_ENDPOINT);
+        writer.writeByte(0);
+
+        RegisterDefinition[] registers = {
+                new RegisterDefinition("region", true, null, null, false)
+        };
+        Bytecode bytecode = writer.build(registers, new RulesFunction[0], new int[] {-1, 1, -1}, 1);
+
+        String condition = bytecode.describeCondition(0);
+        String result = bytecode.describeResult(0);
+
+        // Per-id output names the relevant opcodes...
+        assertThat(condition, containsString("TEST_REGISTER_ISSET"));
+        assertThat(result, containsString("RETURN_ENDPOINT"));
+        // ...and carries no surrounding program headers (it's just the one section).
+        Assertions.assertFalse(condition.contains("=== "));
+        Assertions.assertFalse(result.contains("=== "));
+
+        // The per-id text is consistent with the matching section of the full disassembly.
+        String full = bytecode.toString();
+        assertThat(full, containsString("TEST_REGISTER_ISSET"));
+        assertThat(full, containsString("RETURN_ENDPOINT"));
+    }
+
+    @Test
+    void describeRejectsOutOfRangeIds() {
+        BytecodeWriter writer = new BytecodeWriter();
+        writer.markConditionStart();
+        writer.writeByte(Opcodes.TEST_REGISTER_ISSET);
+        writer.writeByte(0);
+        writer.writeByte(Opcodes.RETURN_VALUE);
+        writer.markResultStart();
+        writer.writeByte(Opcodes.LOAD_CONST);
+        writer.writeByte(0);
+        writer.writeByte(Opcodes.RETURN_ENDPOINT);
+        writer.writeByte(0);
+        Bytecode bytecode = writer.build(
+                new RegisterDefinition[] {new RegisterDefinition("region", true, null, null, false)},
+                new RulesFunction[0],
+                new int[] {-1, 1, -1},
+                1);
+
+        // One condition (id 0) and one result (id 0); anything else is out of range.
+        Assertions.assertThrows(IndexOutOfBoundsException.class,
+                () -> bytecode.describeCondition(1));
+        Assertions.assertThrows(IndexOutOfBoundsException.class,
+                () -> bytecode.describeCondition(-1));
+        Assertions.assertThrows(IndexOutOfBoundsException.class,
+                () -> bytecode.describeResult(1));
+        Assertions.assertThrows(IndexOutOfBoundsException.class,
+                () -> bytecode.describeResult(-1));
     }
 
     @Test

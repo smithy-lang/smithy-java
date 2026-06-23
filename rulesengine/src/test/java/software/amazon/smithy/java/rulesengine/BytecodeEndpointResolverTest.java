@@ -363,11 +363,16 @@ class BytecodeEndpointResolverTest {
         assertEquals("us-east-1", sink.inputs.get("region"));
         // One condition evaluated: region is set -> true, and (uncomplemented node) the high edge taken.
         assertEquals(1, sink.conditions.size());
-        assertEquals(0, sink.conditions.get(0).id);
-        assertTrue(sink.conditions.get(0).satisfied);
-        assertTrue(sink.conditions.get(0).branch);
-        // Terminated at result 1 with the variable snapshot available.
+        var step = sink.conditions.get(0);
+        assertEquals(0, step.id);
+        assertTrue(step.satisfied);
+        assertTrue(step.branch);
+        // Node path: root ref 2 (node idx 1); the high edge leads to result 1, reported by result().
+        assertEquals(2, step.nodeRef);
+        // Terminated at result 1 with the resolved endpoint and variable snapshot available.
         assertEquals(1, sink.resultId);
+        assertNotNull(sink.resultEndpoint);
+        assertEquals("https://example.com", sink.resultEndpoint.uri().toString());
         assertEquals("us-east-1", sink.variables.get("region"));
     }
 
@@ -431,10 +436,10 @@ class BytecodeEndpointResolverTest {
         Object[] readAtResult = new Object[1];
         BddTraceSink sink = (bytecode, view) -> new BddTrace() {
             @Override
-            public void condition(int conditionId, boolean satisfied, boolean branch) {}
+            public void node(int nodeRef, int conditionId, boolean satisfied, boolean branch) {}
 
             @Override
-            public void result(int resultId) {
+            public void result(int resultId, Endpoint endpoint) {
                 // Read the same held view at result time; it reflects current register state.
                 readAtResult[0] = view.get("region");
             }
@@ -474,6 +479,95 @@ class BytecodeEndpointResolverTest {
         assertEquals("https://example.com", endpoint.uri().toString());
     }
 
+    @Test
+    void traceSeesVariableAssignedDuringTraversal() {
+        // The second condition assigns `style` mid-traversal via SET_REG_RETURN. The live param view
+        // should not have it at the start but should have it by result time.
+        Bytecode bc = assignsVariableBytecode();
+        BytecodeEndpointResolver resolver = new BytecodeEndpointResolver(bc, List.of(), Map.of());
+
+        RecordingSink sink = new RecordingSink();
+        Context context = Context.create().put(RulesEngineSettings.BDD_TRACE_SINK, sink);
+        Endpoint endpoint = resolver.resolveEndpoint(createParams("us-east-1", "my-bucket", context));
+
+        // Endpoint built from region + "." + style.
+        assertNotNull(endpoint);
+        assertEquals("us-east-1.virtual", endpoint.uri().toString());
+        // `style` wasn't an input...
+        assertNull(sink.inputs.get("style"));
+        // ...but the live view picked it up once the condition assigned it (captured at result time).
+        assertEquals("virtual", sink.variables.get("style"));
+    }
+
+    /**
+     * Bytecode with two conditions where the second assigns a variable, so a trace can show a variable
+     * diff. cond 0 = isSet(region); cond 1 assigns style="virtual" (and is truthy). On the all-true path
+     * the endpoint URI is built as {@code region + "." + style}.
+     *
+     * <pre>
+     *   registers: 0=region, 1=bucket, 2=style (assigned during traversal)
+     *   constants: 0=null, 1="virtual", 2="."
+     *   BDD: root -&gt; cond0 ? cond1 : result0 ;  cond1 ? result1 : result0
+     * </pre>
+     */
+    private static Bytecode assignsVariableBytecode() {
+        byte[] cond0 = {Opcodes.TEST_REGISTER_ISSET, 0, Opcodes.RETURN_VALUE};
+        // Load "virtual" and store it into register 2 (style); SET_REG_RETURN returns the stored value,
+        // which is truthy, so the condition is satisfied.
+        byte[] cond1 = {Opcodes.LOAD_CONST, 1, Opcodes.SET_REG_RETURN, 2};
+        byte[] result0 = {Opcodes.LOAD_CONST, 0, Opcodes.RETURN_VALUE};
+        byte[] result1 = {
+                Opcodes.LOAD_REGISTER,
+                0, // region
+                Opcodes.LOAD_CONST,
+                2, // "."
+                Opcodes.LOAD_REGISTER,
+                2, // style
+                Opcodes.RESOLVE_TEMPLATE,
+                3,
+                Opcodes.RETURN_ENDPOINT,
+                0
+        };
+
+        byte[] program = new byte[cond0.length + cond1.length + result0.length + result1.length];
+        int p = 0;
+        System.arraycopy(cond0, 0, program, p, cond0.length);
+        p += cond0.length;
+        System.arraycopy(cond1, 0, program, p, cond1.length);
+        p += cond1.length;
+        int result0Off = p;
+        System.arraycopy(result0, 0, program, p, result0.length);
+        p += result0.length;
+        int result1Off = p;
+        System.arraycopy(result1, 0, program, p, result1.length);
+
+        return new Bytecode(
+                program,
+                new int[] {0, cond0.length}, // condition offsets
+                new int[] {result0Off, result1Off}, // result offsets
+                new RegisterDefinition[] {
+                        new RegisterDefinition("region", false, null, null, false),
+                        new RegisterDefinition("bucket", false, null, null, false),
+                        new RegisterDefinition("style", false, null, null, false)
+                },
+                new Object[] {null, "virtual", "."},
+                new RulesFunction[0],
+                // nodes (3 ints each): idx0 terminal; idx1 cond0 high->idx2(ref3) low->result0;
+                // idx2 cond1 high->result1 low->result0
+                new int[] {
+                        -1,
+                        -1,
+                        -1,
+                        0,
+                        3,
+                        100_000_000,
+                        1,
+                        100_000_001,
+                        100_000_000
+                },
+                2); // root -> idx1 (cond0)
+    }
+
     /** Bytecode: condition 0 = isSet(region); if set return endpoint (result 1), else no match (result 0). */
     private static Bytecode conditionalRegionBytecode() {
         byte[] conditionBytecode = {Opcodes.TEST_REGISTER_ISSET, 0, Opcodes.RETURN_VALUE};
@@ -506,20 +600,21 @@ class BytecodeEndpointResolverTest {
     /** A trace that records nothing, for tests that only care about begin()'s callback. */
     private static final BddTrace NO_OP_TRACE = new BddTrace() {
         @Override
-        public void condition(int conditionId, boolean satisfied, boolean branch) {}
+        public void node(int nodeRef, int conditionId, boolean satisfied, boolean branch) {}
 
         @Override
-        public void result(int resultId) {}
+        public void result(int resultId, Endpoint endpoint) {}
     };
 
     /** Sink that begins a single recorder and remembers it, so tests can assert on what it captured. */
     private static final class RecordingSink implements BddTraceSink {
-        private record Cond(int id, boolean satisfied, boolean branch) {}
+        private record Cond(int nodeRef, int id, boolean satisfied, boolean branch) {}
 
         Bytecode bytecode;
         Map<String, Object> inputs;
         final List<Cond> conditions = new ArrayList<>();
         int resultId = Integer.MIN_VALUE;
+        Endpoint resultEndpoint;
         Map<String, Object> variables;
         // The live view handed to begin(); read it during result() for the final variable set.
         private Map<String, Object> liveView;
@@ -532,13 +627,14 @@ class BytecodeEndpointResolverTest {
             this.inputs = new LinkedHashMap<>(parameters);
             return new BddTrace() {
                 @Override
-                public void condition(int conditionId, boolean satisfied, boolean branch) {
-                    conditions.add(new Cond(conditionId, satisfied, branch));
+                public void node(int nodeRef, int conditionId, boolean satisfied, boolean branch) {
+                    conditions.add(new Cond(nodeRef, conditionId, satisfied, branch));
                 }
 
                 @Override
-                public void result(int resultId) {
+                public void result(int resultId, Endpoint endpoint) {
                     RecordingSink.this.resultId = resultId;
+                    RecordingSink.this.resultEndpoint = endpoint;
                     variables = new LinkedHashMap<>(liveView); // live view; copy to retain
                 }
             };

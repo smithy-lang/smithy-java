@@ -504,6 +504,20 @@ public final class Bytecode {
         return inputRegisterMap;
     }
 
+    /**
+     * Name-to-index map for <em>all</em> named registers, including temps (variables assigned during
+     * evaluation, e.g. {@code partitionResult}). Unlike {@link #getInputRegisterMap}, which is limited to
+     * declared input parameters for register filling, this is for inspecting the full variable set (e.g.
+     * a trace's variable view). Built on demand; not used on the resolution hot path.
+     */
+    Map<String, Integer> getRegisterNameMap() {
+        Map<String, Integer> map = new HashMap<>(registerDefinitions.length);
+        for (int i = 0; i < registerDefinitions.length; i++) {
+            map.put(registerDefinitions[i].name(), i);
+        }
+        return map;
+    }
+
     private static Map<String, Integer> createInputRegisterMap(RegisterDefinition[] definitions) {
         Map<String, Integer> map = new HashMap<>();
         for (int i = 0; i < definitions.length; i++) {
@@ -551,6 +565,32 @@ public final class Bytecode {
     @Override
     public String toString() {
         return new BytecodeDisassembler(this).disassemble();
+    }
+
+    /**
+     * Disassembles a single condition to human-readable text (e.g. for tracing a {@code conditionId}
+     * reported to a {@link BddTraceSink}). Decodes straight from the compiled bytecode, so it needs no
+     * source trait and works regardless of how this bytecode was obtained.
+     *
+     * @param conditionId index of the condition, in {@code [0, getConditionCount())}.
+     * @return the disassembled condition.
+     * @throws IndexOutOfBoundsException if {@code conditionId} is out of range.
+     */
+    public String describeCondition(int conditionId) {
+        return new BytecodeDisassembler(this).disassembleCondition(conditionId);
+    }
+
+    /**
+     * Disassembles a single result rule to human-readable text (e.g. for tracing a {@code resultId}
+     * reported to a {@link BddTraceSink}). Decodes straight from the compiled bytecode, so it needs no
+     * source trait and works regardless of how this bytecode was obtained.
+     *
+     * @param resultId index of the result, in {@code [0, getResultCount())}.
+     * @return the disassembled result.
+     * @throws IndexOutOfBoundsException if {@code resultId} is out of range.
+     */
+    public String describeResult(int resultId) {
+        return new BytecodeDisassembler(this).disassembleResult(resultId);
     }
 
     @Override

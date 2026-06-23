@@ -56,7 +56,7 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         this.bytecode = bytecode;
         this.extensions = extensions;
         this.registers = new Object[bytecode.getRegisterDefinitions().length];
-        this.registerView = new RegisterView(registers, bytecode.getInputRegisterMap());
+        this.registerView = new RegisterView(registers, bytecode.getRegisterNameMap());
         this.registerFiller = registerFiller;
         this.registerSink = new ContextProvider.RegisterSink(registers.length, bytecode.getInputRegisterMap());
     }
@@ -126,7 +126,9 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                 default -> test(condIdx);
             };
 
-            ref = (result ^ (ref < 0)) ? nodes[base + 1] : nodes[base + 2];
+            // `branch` applies the node's complement bit to the condition result to pick high/low.
+            boolean branch = result ^ (ref < 0);
+            ref = branch ? nodes[base + 1] : nodes[base + 2];
         }
 
         if (Bdd.isTerminal(ref)) {
@@ -136,9 +138,11 @@ final class BytecodeEvaluator implements ConditionEvaluator {
     }
 
     /**
-     * Traced twin of {@link #evaluateBdd()}: same traversal, but reports each step to {@code sink}. Kept
-     * as a separate method so the fast path above stays free of any per-node trace branch; the resolver
-     * picks this only when a sink is present.
+     * Traced twin of {@link #evaluateBdd()}. The traversal loop is intentionally kept line-for-line
+     * identical to the fast path, differing only by the {@link BddTrace#node} / {@link BddTrace#result}
+     * callbacks: keep the two in sync if either changes. It is a separate method (rather than a flag in
+     * the fast loop) so the hot path carries no per-node trace branch; the resolver calls this only when
+     * a sink is present, and it falls back to {@link #evaluateBdd()} if the sink declines to trace.
      */
     Endpoint evaluateBddTraced(BddTraceSink sink) {
         BddTrace trace = sink.begin(bytecode, registerView);
@@ -173,22 +177,22 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                 default -> test(condIdx);
             };
 
-            // `branch` is the post-complement edge selector (true -> high, false -> low); `result` is the
-            // condition's own truth value. They differ only when the node ref is complemented.
+            // `branch` applies the node's complement bit to the condition result to pick high/low.
+            // Reported to the trace alongside `result` (they differ only on a complemented node ref).
             boolean branch = result ^ (ref < 0);
-            trace.condition(condIdx, result, branch);
+            trace.node(ref, condIdx, result, branch);
             ref = branch ? nodes[base + 1] : nodes[base + 2];
         }
 
         if (Bdd.isTerminal(ref)) {
-            trace.result(-1);
+            trace.result(-1, null);
             return null;
         }
+
         int resultId = ref - Bdd.RESULT_OFFSET;
-        // The trace can read the live register view (inputs plus variables assigned during traversal)
-        // that drove this result during its result() callback.
-        trace.result(resultId);
-        return resolveResult(resultId);
+        Endpoint endpoint = resolveResult(resultId);
+        trace.result(resultId, endpoint);
+        return endpoint;
     }
 
     public Endpoint resolveResult(int resultIndex) {

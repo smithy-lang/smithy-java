@@ -21,10 +21,12 @@ public interface BddTraceSink {
      * Begins tracing one resolution, or returns {@code null} to skip it.
      *
      * @param bytecode the compiled BDD program being evaluated.
-     * @param parameters resolved input parameters (name to value). This is a live, zero-allocation view
-     *                   over the evaluator's registers; the returned {@link BddTrace} may hold it and
-     *                   re-read it during later callbacks, since its contents evolve as resolution
-     *                   proceeds. Copy it (e.g. {@code new LinkedHashMap<>(parameters)}) to retain.
+     * @param parameters live view of the named registers (name to value): the resolved input parameters
+     *                   at first, plus any variables assigned during evaluation (e.g. {@code
+     *                   partitionResult}) as they are set. This is a live, zero-allocation view over the
+     *                   evaluator's registers; the returned {@link BddTrace} may hold it and re-read it
+     *                   during later callbacks, since its contents evolve as resolution proceeds. Copy it
+     *                   (e.g. {@code new LinkedHashMap<>(parameters)}) to retain.
      * @return a recorder for this resolution, or {@code null} to not trace it.
      */
     BddTrace begin(Bytecode bytecode, Map<String, Object> parameters);

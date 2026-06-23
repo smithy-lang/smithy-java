@@ -29,6 +29,7 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
+import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.endpoints.EndpointResolverParams;
 import software.amazon.smithy.java.rulesengine.BddTrace;
@@ -383,10 +384,10 @@ public class S3EndpointBenchmark {
         }
 
         @Override
-        public void condition(int conditionId, boolean satisfied, boolean branch) {}
+        public void node(int nodeRef, int conditionId, boolean satisfied, boolean branch) {}
 
         @Override
-        public void result(int resultId) {}
+        public void result(int resultId, Endpoint endpoint) {}
     }
 
     @Benchmark

@@ -213,6 +213,28 @@ final class BytecodeDisassembler {
         return s.toString();
     }
 
+    /** Disassembles a single condition section by id, with no surrounding headers. */
+    String disassembleCondition(int conditionId) {
+        if (conditionId < 0 || conditionId >= bytecode.getConditionCount()) {
+            throw new IndexOutOfBoundsException("No condition with id " + conditionId
+                    + " (count=" + bytecode.getConditionCount() + ")");
+        }
+        StringBuilder s = new StringBuilder();
+        disassembleSection(s, bytecode.getConditionStartOffset(conditionId), "");
+        return s.toString().stripTrailing();
+    }
+
+    /** Disassembles a single result section by id, with no surrounding headers. */
+    String disassembleResult(int resultId) {
+        if (resultId < 0 || resultId >= bytecode.getResultCount()) {
+            throw new IndexOutOfBoundsException("No result with id " + resultId
+                    + " (count=" + bytecode.getResultCount() + ")");
+        }
+        StringBuilder s = new StringBuilder();
+        disassembleSection(s, bytecode.getResultOffset(resultId), "");
+        return s.toString().stripTrailing();
+    }
+
     private void disassembleSection(StringBuilder s, int startOffset, String indent) {
         try {
             disassembleSectionUnsafe(s, startOffset, indent);
