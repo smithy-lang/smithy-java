@@ -31,6 +31,7 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.endpoints.EndpointResolverParams;
+import software.amazon.smithy.java.rulesengine.BddTrace;
 import software.amazon.smithy.java.rulesengine.BddTraceSink;
 import software.amazon.smithy.java.rulesengine.Bytecode;
 import software.amazon.smithy.java.rulesengine.BytecodeEndpointResolver;
@@ -372,18 +373,20 @@ public class S3EndpointBenchmark {
         }
     }
 
-    /** A trace sink that discards everything, so the benchmark measures pure trace-loop overhead. */
-    private enum NoopTraceSink implements BddTraceSink {
+    /** A sink whose trace discards everything, so the benchmark measures pure trace-loop overhead. */
+    private enum NoopTraceSink implements BddTraceSink, BddTrace {
         INSTANCE;
 
         @Override
-        public void init(Bytecode bytecode, Map<String, Object> parameters) {}
+        public BddTrace begin(Bytecode bytecode, Map<String, Object> parameters) {
+            return this;
+        }
 
         @Override
         public void condition(int conditionId, boolean satisfied, boolean branch) {}
 
         @Override
-        public void result(int resultId, Map<String, Object> variables) {}
+        public void result(int resultId) {}
     }
 
     @Benchmark

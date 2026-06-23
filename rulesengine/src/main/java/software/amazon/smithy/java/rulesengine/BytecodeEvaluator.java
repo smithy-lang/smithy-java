@@ -141,7 +141,11 @@ final class BytecodeEvaluator implements ConditionEvaluator {
      * picks this only when a sink is present.
      */
     Endpoint evaluateBddTraced(BddTraceSink sink) {
-        sink.init(bytecode, registerView);
+        BddTrace trace = sink.begin(bytecode, registerView);
+        if (trace == null) {
+            // Sampled out by the sink: run the untraced fast path.
+            return evaluateBdd();
+        }
 
         int ref = bytecode.getBddRootRef();
         int[] nodes = bytecode.getBddNodes();
@@ -172,18 +176,18 @@ final class BytecodeEvaluator implements ConditionEvaluator {
             // `branch` is the post-complement edge selector (true -> high, false -> low); `result` is the
             // condition's own truth value. They differ only when the node ref is complemented.
             boolean branch = result ^ (ref < 0);
-            sink.condition(condIdx, result, branch);
+            trace.condition(condIdx, result, branch);
             ref = branch ? nodes[base + 1] : nodes[base + 2];
         }
 
         if (Bdd.isTerminal(ref)) {
-            sink.result(-1, registerView);
+            trace.result(-1);
             return null;
         }
         int resultId = ref - Bdd.RESULT_OFFSET;
-        // Snapshot the named registers (inputs plus any variables assigned during traversal) that drove
-        // the decision, then build the endpoint from them.
-        sink.result(resultId, registerView);
+        // The trace can read the live register view (inputs plus variables assigned during traversal)
+        // that drove this result during its result() callback.
+        trace.result(resultId);
         return resolveResult(resultId);
     }
 

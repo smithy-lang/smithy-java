@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -388,68 +387,70 @@ class BytecodeEndpointResolverTest {
         BytecodeEndpointResolver resolver = new BytecodeEndpointResolver(bc, List.of(), Map.of());
 
         boolean[] checked = {false};
-        BddTraceSink sink = new BddTraceSink() {
-            @Override
-            public void init(Bytecode bytecode, Map<String, Object> p) {
-                // present
-                assertTrue(p.containsKey("region"));
-                assertEquals("us-east-1", p.get("region"));
-                // absent name (not a register at all)
-                assertFalse(p.containsKey("nope"));
-                assertNull(p.get("nope"));
-                // name whose register is unset reads as absent (bucket not provided)
-                assertFalse(p.containsKey("bucket"));
-                assertNull(p.get("bucket"));
-                // entrySet reflects only set registers, and size agrees
-                assertEquals(1, p.size());
-                assertEquals(Map.of("region", "us-east-1"),
-                        p.entrySet()
-                                .stream()
-                                .collect(Collectors.toMap(Map.Entry::getKey,
-                                        Map.Entry::getValue)));
-                checked[0] = true;
-            }
-
-            @Override
-            public void condition(int conditionId, boolean satisfied, boolean branch) {}
-
-            @Override
-            public void result(int resultId, Map<String, Object> variables) {}
+        BddTraceSink sink = (bytecode, p) -> {
+            // present
+            assertTrue(p.containsKey("region"));
+            assertEquals("us-east-1", p.get("region"));
+            // absent name (not a register at all)
+            assertFalse(p.containsKey("nope"));
+            assertNull(p.get("nope"));
+            // name whose register is unset reads as absent (bucket not provided)
+            assertFalse(p.containsKey("bucket"));
+            assertNull(p.get("bucket"));
+            // entrySet reflects only set registers, and size agrees
+            assertEquals(1, p.size());
+            assertEquals(Map.of("region", "us-east-1"),
+                    p.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+            checked[0] = true;
+            return NO_OP_TRACE;
         };
 
         Context context = Context.create().put(RulesEngineSettings.BDD_TRACE_SINK, sink);
         resolver.resolveEndpoint(createParams("us-east-1", null, context));
-        assertTrue(checked[0], "init was not invoked");
+        assertTrue(checked[0], "begin was not invoked");
     }
 
     @Test
-    void traceSinkReusesSameViewInstanceWithLiveValues() {
-        // The view is reused and live: the same Map instance is handed to init and result, and reading it
-        // at result time reflects current register state (zero-allocation contract).
+    void traceSinkHoldsLiveViewReadableAtResult() {
+        // The view handed to begin() is live: the trace holds it and reads current register state during
+        // result() (zero-allocation contract; no need to re-pass it).
         Bytecode bc = conditionalRegionBytecode();
         BytecodeEndpointResolver resolver = new BytecodeEndpointResolver(bc, List.of(), Map.of());
 
-        Map<String, Object>[] seen = new Map[2];
-        BddTraceSink sink = new BddTraceSink() {
-            @Override
-            public void init(Bytecode bytecode, Map<String, Object> p) {
-                seen[0] = p;
-            }
-
+        Object[] readAtResult = new Object[1];
+        BddTraceSink sink = (bytecode, view) -> new BddTrace() {
             @Override
             public void condition(int conditionId, boolean satisfied, boolean branch) {}
 
             @Override
-            public void result(int resultId, Map<String, Object> variables) {
-                seen[1] = variables;
-                assertEquals("us-east-1", variables.get("region"));
+            public void result(int resultId) {
+                // Read the same held view at result time; it reflects current register state.
+                readAtResult[0] = view.get("region");
             }
         };
 
         Context context = Context.create().put(RulesEngineSettings.BDD_TRACE_SINK, sink);
         resolver.resolveEndpoint(createParams("us-east-1", "bucket", context));
-        assertNotNull(seen[0]);
-        assertSame(seen[0], seen[1], "init and result should receive the same reused view instance");
+        assertEquals("us-east-1", readAtResult[0]);
+    }
+
+    @Test
+    void traceSinkSampledOutStillResolves() {
+        // begin() returning null (sampled out) must fall through to the untraced fast path.
+        Bytecode bc = conditionalRegionBytecode();
+        BytecodeEndpointResolver resolver = new BytecodeEndpointResolver(bc, List.of(), Map.of());
+
+        boolean[] beganCalled = {false};
+        BddTraceSink sink = (bytecode, view) -> {
+            beganCalled[0] = true;
+            return null; // sample out
+        };
+
+        Context context = Context.create().put(RulesEngineSettings.BDD_TRACE_SINK, sink);
+        Endpoint endpoint = resolver.resolveEndpoint(createParams("us-east-1", "bucket", context));
+        assertTrue(beganCalled[0], "begin should be consulted");
+        assertNotNull(endpoint);
+        assertEquals("https://example.com", endpoint.uri().toString());
     }
 
     @Test
@@ -491,6 +492,16 @@ class BytecodeEndpointResolverTest {
                 2);
     }
 
+    /** A trace that records nothing, for tests that only care about begin()'s callback. */
+    private static final BddTrace NO_OP_TRACE = new BddTrace() {
+        @Override
+        public void condition(int conditionId, boolean satisfied, boolean branch) {}
+
+        @Override
+        public void result(int resultId) {}
+    };
+
+    /** Sink that begins a single recorder and remembers it, so tests can assert on what it captured. */
     private static final class RecordingSink implements BddTraceSink {
         private record Cond(int id, boolean satisfied, boolean branch) {}
 
@@ -499,23 +510,27 @@ class BytecodeEndpointResolverTest {
         final List<Cond> conditions = new ArrayList<>();
         int resultId = Integer.MIN_VALUE;
         Map<String, Object> variables;
+        // The live view handed to begin(); read it during result() for the final variable set.
+        private Map<String, Object> liveView;
 
         @Override
-        public void init(Bytecode bytecode, Map<String, Object> parameters) {
+        public BddTrace begin(Bytecode bytecode, Map<String, Object> parameters) {
             this.bytecode = bytecode;
-            // The map is a live view; copy it to assert on after resolution returns.
+            this.liveView = parameters;
+            // The view is live; copy it to assert on after resolution returns.
             this.inputs = new LinkedHashMap<>(parameters);
-        }
+            return new BddTrace() {
+                @Override
+                public void condition(int conditionId, boolean satisfied, boolean branch) {
+                    conditions.add(new Cond(conditionId, satisfied, branch));
+                }
 
-        @Override
-        public void condition(int conditionId, boolean satisfied, boolean branch) {
-            conditions.add(new Cond(conditionId, satisfied, branch));
-        }
-
-        @Override
-        public void result(int resultId, Map<String, Object> variables) {
-            this.resultId = resultId;
-            this.variables = new LinkedHashMap<>(variables); // live view; copy to retain
+                @Override
+                public void result(int resultId) {
+                    RecordingSink.this.resultId = resultId;
+                    variables = new LinkedHashMap<>(liveView); // live view; copy to retain
+                }
+            };
         }
     }
 
