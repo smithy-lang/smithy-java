@@ -31,6 +31,7 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.endpoints.EndpointResolverParams;
+import software.amazon.smithy.java.rulesengine.BddTraceSink;
 import software.amazon.smithy.java.rulesengine.Bytecode;
 import software.amazon.smithy.java.rulesengine.BytecodeEndpointResolver;
 import software.amazon.smithy.java.rulesengine.RulesEngineBuilder;
@@ -187,6 +188,10 @@ public class S3EndpointBenchmark {
         EndpointResolverParams dataPlaneShortZoneParams;
         EndpointResolverParams vanillaAccessPointArnParams;
         EndpointResolverParams s3OutpostsVanillaParams;
+        // Same inputs as vanillaVirtualAddressing, but with a no-op BddTraceSink on the context. Pairs
+        // with vanillaVirtualAddressing to A/B the trace overhead: traced (full per-condition callbacks)
+        // vs untraced (one null ctx.get on the otherwise-untouched fast loop).
+        EndpointResolverParams tracedVirtualAddressingParams;
 
         @Setup
         public void setup() {
@@ -295,6 +300,26 @@ public class S3EndpointBenchmark {
                             "Bucket",
                             "arn:aws:s3-outposts:us-west-2:123456789012:outpost/op-01234567890123456/accesspoint/reports"));
 
+            // Same as vanilla virtual addressing, but with a no-op trace sink on the context.
+            tracedVirtualAddressingParams = buildParams(client,
+                    getObject,
+                    canned,
+                    Map.of("Bucket", Document.of("bucket-name"), "Key", Document.of("key")),
+                    "us-west-2",
+                    Map.of("Accelerate",
+                            false,
+                            "Bucket",
+                            "bucket-name",
+                            "ForcePathStyle",
+                            false,
+                            "Region",
+                            "us-west-2",
+                            "UseDualStack",
+                            false,
+                            "UseFIPS",
+                            false),
+                    NoopTraceSink.INSTANCE);
+
             // Dump disassembly to tmp file for analysis
             dumpDisassembly(treeMode);
         }
@@ -318,12 +343,27 @@ public class S3EndpointBenchmark {
                 String region,
                 Map<String, Object> additionalParams
         ) {
+            return buildParams(client, operation, canned, inputMembers, region, additionalParams, null);
+        }
+
+        private static EndpointResolverParams buildParams(
+                DynamicClient client,
+                ApiOperation<?, ?> operation,
+                boolean canned,
+                Map<String, Document> inputMembers,
+                String region,
+                Map<String, Object> additionalParams,
+                BddTraceSink traceSink
+        ) {
             var inputValue = client.createStruct(
                     ShapeId.from("com.amazonaws.s3#GetObjectRequest"),
                     Document.of(canned ? Map.of() : inputMembers));
             var ctx = Context.create();
             ctx.put(RegionSetting.REGION, region);
             ctx.put(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS, additionalParams);
+            if (traceSink != null) {
+                ctx.put(RulesEngineSettings.BDD_TRACE_SINK, traceSink);
+            }
             return EndpointResolverParams.builder()
                     .context(ctx)
                     .inputValue(inputValue)
@@ -332,9 +372,30 @@ public class S3EndpointBenchmark {
         }
     }
 
+    /** A trace sink that discards everything, so the benchmark measures pure trace-loop overhead. */
+    private enum NoopTraceSink implements BddTraceSink {
+        INSTANCE;
+
+        @Override
+        public void init(Bytecode bytecode, Map<String, Object> parameters) {}
+
+        @Override
+        public void condition(int conditionId, boolean satisfied, boolean branch) {}
+
+        @Override
+        public void result(int resultId, Map<String, Object> variables) {}
+    }
+
     @Benchmark
     public Object vanillaVirtualAddressing(ParamState params) {
         return params.resolver.resolveEndpoint(params.vanillaVirtualAddressingParams);
+    }
+
+    /** Identical to {@link #vanillaVirtualAddressing} but with a no-op trace sink set, to measure the
+     * traced-loop overhead. The delta between the two is the cost of tracing. */
+    @Benchmark
+    public Object tracedVirtualAddressing(ParamState params) {
+        return params.resolver.resolveEndpoint(params.tracedVirtualAddressingParams);
     }
 
     @Benchmark
