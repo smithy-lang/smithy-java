@@ -84,4 +84,40 @@ public class CodegenTest {
                 .contains(Path.of("/java/test/smithy/codegen/model/Gadget.java"))
                 .contains(Path.of("/java/test/smithy/codegen/model/StandaloneType.java"));
     }
+
+    @Test
+    void skipsShapesNotBoundToPrimaryService() {
+        // The authored closure pulls in an operation and a resource that are not bound to the
+        // primary service. Combined mode must skip both artifacts while still generating the
+        // primary service.
+        var manifest = new MockManifest();
+        SmithyBuildPlugin plugin = new JavaCodegenPlugin();
+        var settings = ObjectNode.builder()
+                .withMember("service", "smithy.java.codegen.combined.it#CombinedItService")
+                .withMember("namespace", "test.smithy.codegen")
+                .withMember("modes", ArrayNode.fromStrings("client", "types"))
+                .withMember("closure", "smithy.java.codegen.combined.it#closureWithUnboundShapes")
+                .build();
+        var context = PluginContext.builder()
+                .fileManifest(manifest)
+                .settings(settings)
+                .model(model)
+                .build();
+
+        plugin.execute(context);
+
+        assertThat(manifest.getFiles())
+                // The primary service still generates.
+                .contains(Path.of("/java/test/smithy/codegen/client/CombinedItServiceClient.java"))
+                // No operation or resource artifact is generated for the shapes outside the primary
+                // service's closure. (OrphanOpInput below proves the operation did enter the closure,
+                // so the missing OrphanOp artifact reflects the skip, not an empty closure.)
+                .doesNotContain(Path.of("/java/test/smithy/codegen/model/OrphanOp.java"))
+                .doesNotContain(Path.of("/java/test/smithy/codegen/model/OrphanResource.java"))
+                // The unbound operation's input and output are still generated as standalone data
+                // shapes, which is expected: they are plain data, unlike the operation artifact
+                // whose service wiring would be wrong.
+                .contains(Path.of("/java/test/smithy/codegen/model/OrphanOpInput.java"))
+                .contains(Path.of("/java/test/smithy/codegen/model/OrphanOpOutput.java"));
+    }
 }

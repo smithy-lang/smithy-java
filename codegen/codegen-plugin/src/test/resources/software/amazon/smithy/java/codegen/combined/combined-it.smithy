@@ -10,6 +10,13 @@ metadata shapeClosures = [
             "smithy.java.codegen.combined.it#Widget": "Gadget"
         }
     }
+    {
+        // Includes the primary service plus shapes not bound to it: a standalone operation and a
+        // standalone resource. Used to verify that combined mode skips operations and resources
+        // outside the primary service's closure.
+        id: "smithy.java.codegen.combined.it#closureWithUnboundShapes"
+        includeBySelector: ":is([id = 'smithy.java.codegen.combined.it#CombinedItService'], [id = 'smithy.java.codegen.combined.it#OrphanOp'], [id = 'smithy.java.codegen.combined.it#OrphanResource'])"
+    }
 ]
 
 namespace smithy.java.codegen.combined.it
@@ -51,4 +58,21 @@ structure Widget {
 /// Not reachable from the service. In combined mode this must still be generated.
 structure StandaloneType {
     value: String
+}
+
+/// An operation not bound to the primary service. A closure can pull it in, but combined mode must
+/// not generate it until multi-service generation is supported.
+operation OrphanOp {
+    input := {
+        value: String
+    }
+    output := {
+        result: String
+    }
+}
+
+/// A resource not bound to the primary service. A closure can pull it in, but combined mode must
+/// not generate it until multi-service generation is supported.
+resource OrphanResource {
+    identifiers: { id: String }
 }

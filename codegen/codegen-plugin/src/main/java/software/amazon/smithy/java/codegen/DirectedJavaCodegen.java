@@ -21,6 +21,7 @@ import software.amazon.smithy.codegen.core.directed.GenerateResourceDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateStructureDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateUnionDirective;
+import software.amazon.smithy.codegen.core.directed.ShapeDirective;
 import software.amazon.smithy.java.codegen.client.generators.BddFileGenerator;
 import software.amazon.smithy.java.codegen.client.generators.ClientImplementationGenerator;
 import software.amazon.smithy.java.codegen.client.generators.ClientInterfaceGenerator;
@@ -39,6 +40,7 @@ import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.java.codegen.generators.UnionGenerator;
 import software.amazon.smithy.java.codegen.server.generators.OperationInterfaceGenerator;
 import software.amazon.smithy.java.codegen.server.generators.ServiceGenerator;
+import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.SmithyUnstableApi;
@@ -137,6 +139,12 @@ final class DirectedJavaCodegen
         if (isTypesOnly()) {
             return;
         }
+        // A closure can include operations that are not bound to the primary service. Until
+        // multi-service generation is supported, skip them so we don't emit operations bound to
+        // the wrong service.
+        if (notBoundToPrimaryService(directive)) {
+            return;
+        }
         if (modes.contains(CodegenMode.SERVER)) {
             new OperationInterfaceGenerator().accept(directive);
         }
@@ -148,6 +156,12 @@ final class DirectedJavaCodegen
         // In types-only mode there is no service to generate. The director also skips this call when
         // generating data shapes only, but it can't hurt to double check.
         if (isTypesOnly()) {
+            return;
+        }
+        // A closure can include services other than the primary one. Until multi-service
+        // generation is supported, generate only the primary service.
+        var primaryService = directive.getService().orElse(null);
+        if (primaryService != null && !directive.shape().equals(primaryService)) {
             return;
         }
 
@@ -174,6 +188,11 @@ final class DirectedJavaCodegen
 
     @Override
     public void generateResource(GenerateResourceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
+        // A closure can include resources not bound to the primary service. Until multi-service
+        // generation is supported, skip them.
+        if (notBoundToPrimaryService(directive)) {
+            return;
+        }
         new ResourceGenerator().accept(directive);
     }
 
@@ -196,5 +215,21 @@ final class DirectedJavaCodegen
         return modes.contains(CodegenMode.TYPES)
                 && !modes.contains(CodegenMode.CLIENT)
                 && !modes.contains(CodegenMode.SERVER);
+    }
+
+    // True if the operation or resource being generated is not in the primary service's closure.
+    // In combined mode a pre-authored closure can pull in operations and resources bound to other
+    // services (or to none); those should be skipped until multi-service generation is supported.
+    // This is a no-op outside combined mode: with no primary service nothing is skipped, and in
+    // pure-service mode the generated closure is exactly the service's closure.
+    private boolean notBoundToPrimaryService(ShapeDirective<?, CodeGenerationContext, JavaCodegenSettings> directive) {
+        var service = directive.getService().orElse(null);
+        if (service == null) {
+            return false;
+        }
+        var index = TopDownIndex.of(directive.model());
+        var shape = directive.shape();
+        return !index.getContainedOperations(service).contains(shape)
+                && !index.getContainedResources(service).contains(shape);
     }
 }
