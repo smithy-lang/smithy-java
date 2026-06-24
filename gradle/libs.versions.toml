@@ -13,7 +13,7 @@ jackson = "3.2.0"
 fastdoubleparser = "2.0.1"
 netty = "4.2.15.Final"
 dep-analysis = "3.15.0"
-aws-sdk = "2.46.13"
+aws-sdk = "2.46.17"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 jreleaser = "1.24.0"
@@ -26,9 +26,9 @@ pitest-gradle = "1.19.0"
 json-schema-validator = "3.0.0"
 opentelemetry = "1.63.0"
 jspecify = "1.0.0"
-commonmark = "0.28.0"
+commonmark = "0.29.0"
 jsoup = "1.22.2"
-aws-api-models = "1.0.254"
+aws-api-models = "1.0.258"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
