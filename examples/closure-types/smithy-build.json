@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "plugins": {
+    "java-codegen": {
+      "service": "smithy.example.birds#iBird",
+      "namespace": "software.amazon.smithy.java.example.closure",
+      "headerFile": "license.txt",
+      "modes": ["server", "types"],
+      "closure": "smithy.example.birds#fullService"
+    }
+  }
+}

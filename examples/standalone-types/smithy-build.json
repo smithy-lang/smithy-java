@@ -4,7 +4,8 @@
     "java-codegen": {
       "namespace": "software.amazon.smithy.java.example.standalone",
       "headerFile": "license.txt",
-      "modes": ["types"]
+      "modes": ["types"],
+      "closure": "smithy.example#allTypes"
     }
   }
 }

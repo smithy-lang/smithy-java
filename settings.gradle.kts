@@ -115,6 +115,7 @@ include(":examples:event-streaming-client")
 include(":examples:lambda")
 include(":examples:restjson-client")
 include(":examples:standalone-types")
+include(":examples:closure-types")
 include(":examples:mcp-server")
 include(":examples:mcp-traits-example")
 

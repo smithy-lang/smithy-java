@@ -57,6 +57,14 @@
         ".gitignore"
       ]
     },
+    "closure-types": {
+      "documentation": "Code generation of both standalone types and mixed service + standalone types, driven by a modeled shape closure.",
+      "path": "examples/closure-types",
+      "include": [
+        "examples/gradle.properties",
+        ".gitignore"
+      ]
+    },
     "mcp-server" : {
       "documentation" : "Generate or create an MCP server.",
       "path": "examples/mcp-server",

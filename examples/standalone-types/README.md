@@ -14,7 +14,7 @@ before release, publish the plugin to Maven Local first:
 To use this example as a template, run the following command with the [Smithy CLI](https://smithy.io/2.0/guides/smithy-cli/index.html):
 
 ```console
-smithy init -t restjson-client --url https://github.com/smithy-lang/smithy-java
+smithy init -t standalone-types --url https://github.com/smithy-lang/smithy-java
 ```
 
 or 
