@@ -536,7 +536,10 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     private static boolean isIgnoredHeader(String name) {
         return switch (name) {
-            case "connection", "content-length", "x-amzn-trace-id", "user-agent", "expect" -> true;
+            // "authorization" is the output of signing; ignoring it keeps re-signing a reused request idempotent.
+            case "authorization", "connection", "content-length", "transfer-encoding", "x-amzn-trace-id",
+                    "user-agent", "expect" ->
+                true;
             default -> false;
         };
     }
