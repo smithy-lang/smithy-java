@@ -78,6 +78,10 @@ final class DirectedJavaCodegen
     ) {
         String pluginName = getPluginName();
         this.context = new CodeGenerationContext(directive, pluginName);
+        // Allow integrations to customize settings
+        for (var integration : directive.integrations()) {
+            integration.customizeSettings(context);
+        }
         return context;
     }
 
