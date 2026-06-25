@@ -156,6 +156,16 @@ final class H2StreamBody {
         return size == 0;
     }
 
+    /**
+     * True only once the producer has signalled end-of-body ({@link #complete()}) AND no chunk is
+     * queued. Unlike {@link #isEmpty()}, this never reports empty during the window between the
+     * reader thread setting END_STREAM and offering the trailing DATA chunk, so it is safe for the
+     * empty-response fast path in {@link H2Exchange#responseBody()}.
+     */
+    synchronized boolean isCompletedEmpty() {
+        return completed && size == 0;
+    }
+
     synchronized int close() {
         completed = true;
         int released = 0;

@@ -370,6 +370,17 @@ final class H2Exchange implements HttpExchange {
         } finally {
             dataLock.unlock();
         }
+        if (endStream) {
+            // END_STREAM on a HEADERS frame ends the body, in two cases: an empty response (END_STREAM on
+            // the response headers, no DATA) or trailers (a HEADERS frame after DATA). DATA frames signal
+            // end-of-body via enqueueData -> streamBody.complete(); HEADERS frames must do the same, or a
+            // body reader blocked in H2StreamBody.take() (the trailers case) never sees EOF and stalls
+            // until the read-timeout watchdog fires, and the completion-based empty-response check in
+            // responseBody() never trips. The queued event is classified and processed on the consumer
+            // thread (initial headers in readResponseHeaders, trailers in drainPendingTrailers), keeping
+            // all header classification single-threaded and in frame order.
+            streamBody.complete();
+        }
     }
 
     /**
@@ -487,6 +498,7 @@ final class H2Exchange implements HttpExchange {
             if (state.getReadState() == RS_ERROR) {
                 throw readError;
             }
+            drainPendingTrailers();
             if (state.getStreamState() != SS_CLOSED) {
                 state.setStreamStateClosed();
                 if (streamId > 0) {
@@ -501,6 +513,25 @@ final class H2Exchange implements HttpExchange {
         return true;
     }
 
+    /**
+     * Drain any HEADERS events still queued after the body has been fully read. Once response headers
+     * are received, a further HEADERS frame can only be trailers (RFC 9113 §8.1); the reader thread
+     * leaves it in {@code pendingHeadersQueue} for the consumer to classify so that header processing
+     * stays single-threaded. Processing it here sets {@code trailerHeaders} and the END_STREAM state
+     * (read-state DONE, cleared read deadline) via {@link #handleHeadersEvent}.
+     */
+    private void drainPendingTrailers() throws IOException {
+        dataLock.lock();
+        try {
+            PendingHeadersEvent event;
+            while ((event = pendingHeadersQueue.poll()) != null) {
+                handleHeadersEvent(event.fields(), event.endStream());
+            }
+        } finally {
+            dataLock.unlock();
+        }
+    }
+
     int awaitChunks(H2StreamBody.ChunkSlot[] dest, int maxChunks) throws IOException {
         if (!state.isResponseHeadersReceived()) {
             readResponseHeaders();
@@ -511,6 +542,7 @@ final class H2Exchange implements HttpExchange {
             if (state.getReadState() == RS_ERROR) {
                 throw readError;
             }
+            drainPendingTrailers();
             if (state.getStreamState() != SS_CLOSED) {
                 state.setStreamStateClosed();
                 if (streamId > 0) {
@@ -628,9 +660,13 @@ final class H2Exchange implements HttpExchange {
             // Optimization: for empty responses, return a null stream to avoid H2DataInputStream allocation.
             // But only do this if:
             // - content-length is explicitly 0, OR
-            // - end stream is received AND no data is queued (truly empty response)
-            boolean isEmpty = expectedContentLength == 0
-                    || (state.isEndStreamReceived() && streamBody.isEmpty());
+            // - the body stream is completed with no chunk queued (truly empty response).
+            // isCompletedEmpty() (not isEndStreamReceived() && isEmpty()) is required: the reader thread
+            // sets the END_STREAM flag before offering the trailing DATA chunk, so the latter pair can
+            // momentarily read true-while-non-empty under concurrency and drop the body. complete() is
+            // published with the final chunk, so isCompletedEmpty() only reports empty for a genuinely
+            // empty body.
+            boolean isEmpty = expectedContentLength == 0 || streamBody.isCompletedEmpty();
             if (isEmpty) {
                 responseIn = new H2EmptyResponseInputStream(this);
             } else {
