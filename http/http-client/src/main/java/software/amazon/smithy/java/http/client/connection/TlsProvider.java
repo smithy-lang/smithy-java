@@ -16,9 +16,10 @@ import java.util.ServiceLoader;
  *
  * <p>This is the provider-neutral seam for selecting a TLS implementation. A provider need not be based
  * on a {@code javax.net.ssl.SSLEngine}: one that performs TLS some other way (for example a native
- * stack that does its own socket I/O) simply returns its own {@code ConnectionTransport}. Engine-based
- * providers (the built-in JDK provider, BoringSSL) build the standard transport via
- * {@link SslEngineTransports}; an out-of-module provider may return any {@code ConnectionTransport}.
+ * stack that does its own socket I/O, or a QUIC stack with integrated TLS 1.3 for a future HTTP/3
+ * transport) simply returns its own {@code ConnectionTransport}. Engine-based providers (the built-in
+ * JDK provider, BoringSSL) build the standard transport via {@link SslEngineTransports}; an out-of-module
+ * provider may return any {@code ConnectionTransport}.
  *
  * <p>The provider owns the handshake: {@link #connect} returns only after TLS negotiation has
  * succeeded, and the returned transport is positioned for application I/O. On failure the provider
@@ -28,7 +29,7 @@ import java.util.ServiceLoader;
  * Providers may be registered for {@link ServiceLoader} (e.g. the BoringSSL module ships a
  * {@code META-INF/services} entry). Discovery is <b>opt-in</b>: a registered provider is engaged only
  * when the system property {@value #PROVIDER_PROPERTY} names its fully-qualified class name. Merely
- * having a provider on the classpath changes nothing — the built-in JDK provider remains the default —
+ * having a provider on the classpath changes nothing (the built-in JDK provider remains the default),
  * and an explicit {@code HttpClient.Builder.tlsProvider(...)} always takes precedence over the property.
  */
 @FunctionalInterface
@@ -71,7 +72,7 @@ public interface TlsProvider {
      * {@link TlsConnectionContext#socket()} is {@code null}; the underlying byte channel is internal and
      * is consumable only through {@link SslEngineTransports} (i.e. by engine-based providers). A provider
      * that does its own socket I/O therefore needs a real {@code socket()} and must return {@code false}
-     * — the default — so the client uses the NIO socket path for it. Built-in engine-based providers
+     * (the default), so the client uses the NIO socket path for it. Built-in engine-based providers
      * (JDK, BoringSSL) return {@code true} since they delegate to {@code SslEngineTransports}.
      *
      * @return true if the provider supports the internal epoll transport (and thus a null {@code socket()})

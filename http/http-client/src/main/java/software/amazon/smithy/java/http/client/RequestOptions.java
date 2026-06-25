@@ -80,8 +80,8 @@ public final class RequestOptions {
      * suppresses it even if the request carries it, {@code null} defers to the request's {@code Expect}
      * header (the default behavior).
      *
-     * <p>The full handshake — sending only the headers, then waiting for an interim {@code 100} response
-     * before writing the body — is performed on HTTP/1.1 only. On HTTP/2 this toggle controls only whether
+     * <p>The full handshake (sending only the headers, then waiting for an interim {@code 100} response
+     * before writing the body) is performed on HTTP/1.1 only. On HTTP/2 this toggle controls only whether
      * the header is on the wire; the request body is sent without waiting.
      */
     public Boolean expectContinue() {
@@ -106,6 +106,13 @@ public final class RequestOptions {
     @Override
     public int hashCode() {
         return Objects.hash(requestTimeout, connectTimeout, readTimeout, acquireTimeout, expectContinue);
+    }
+
+    @Override
+    public String toString() {
+        return "RequestOptions{acquireTimeout=" + acquireTimeout + ", requestTimeout=" + requestTimeout +
+                ", connectTimeout=" + connectTimeout + ", readTimeout=" + readTimeout
+                + ", expectContinue=" + expectContinue + '}';
     }
 
     /**

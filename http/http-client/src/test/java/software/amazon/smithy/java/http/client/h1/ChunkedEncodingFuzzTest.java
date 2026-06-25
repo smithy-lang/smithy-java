@@ -12,8 +12,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 
 /**
  * Fuzz tests for HTTP/1.1 chunked transfer encoding.

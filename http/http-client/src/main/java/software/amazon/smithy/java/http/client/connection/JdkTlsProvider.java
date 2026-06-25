@@ -22,7 +22,7 @@ import javax.net.ssl.SSLSocket;
  *   <li><b>SSLSocket</b> for an HTTP/1.1-only connection on a plain socket (no epoll): a blocking
  *       {@link SSLSocket} read/written directly, which is cheaper than the {@code SSLEngine}
  *       wrap/unwrap loop and is the common case for HTTP/1.1 services.</li>
- *   <li><b>SSLEngine</b> (via {@link SslEngineTransports}) otherwise — HTTP/2 / ALPN negotiation, or
+ *   <li><b>SSLEngine</b> (via {@link SslEngineTransports}) otherwise, such as for HTTP/2 / ALPN negotiation, or
  *       the epoll backend, where the engine drives TLS over the byte channel.</li>
  * </ul>
  *

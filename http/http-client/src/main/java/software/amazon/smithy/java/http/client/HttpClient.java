@@ -292,7 +292,7 @@ public interface HttpClient extends AutoCloseable {
          * (that provider supplies its own TLS configuration).
          *
          * <p><b>HTTPS proxies:</b> the TLS connection <em>to an {@code https} proxy</em> always uses this
-         * context (and {@link #sslParameters}), independent of {@link #tlsProvider} — a custom provider
+         * context (and {@link #sslParameters}), independent of {@link #tlsProvider}: a custom provider
          * applies only to the end-to-end connection through the tunnel, not to the proxy leg. To trust a
          * proxy differently from the target, set a context here that covers both.
          *
@@ -310,8 +310,8 @@ public interface HttpClient extends AutoCloseable {
          *
          * <p>Convenience equivalent to
          * {@code tlsProvider(JdkTlsProvider.builder().sslParameters(params).build())}. Applies to the
-         * same connections as {@link #sslContext} — the JDK target path, the HTTP/1.1 {@code SSLSocket}
-         * fast path, and the {@code https}-proxy leg — and is likewise ignored for the target connection
+         * same connections as {@link #sslContext} (the JDK target path, the HTTP/1.1 {@code SSLSocket}
+         * fast path, and the {@code https}-proxy leg), and is likewise ignored for the target connection
          * when a custom {@link #tlsProvider} is set.
          *
          * @param parameters the SSL parameters, or null for defaults
@@ -332,7 +332,7 @@ public interface HttpClient extends AutoCloseable {
          * <p>An explicit provider set here always takes precedence. When none is set, a provider may be
          * selected by the {@value TlsProvider#PROVIDER_PROPERTY} system property (set to a registered
          * provider's fully-qualified class name); otherwise the JDK provider is used. Merely having a
-         * provider module on the classpath does not engage it — the property is the opt-in.
+         * provider module on the classpath does not engage it; the property is the opt-in.
          *
          * @param provider the TLS provider, or null to use property selection / the JDK provider
          * @return this builder

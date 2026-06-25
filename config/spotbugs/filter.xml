@@ -158,4 +158,25 @@
         <Class name="software.amazon.smithy.java.codecs.commons.Schubfach$FloatToDecimal" />
     </Match>
 
+    <!--
+    ~ Intentional String reference (==) fast path before the equals() comparison. Header names are
+    ~ canonicalized to interned constants, so a reference hit is a cheap shortcut; every == check is
+    ~ paired with an equals()/regionMatches() fallback, so correctness never depends on it.
+    -->
+    <Match>
+        <Class name="software.amazon.smithy.java.http.api.HeaderName"/>
+        <Method name="canonicalize"/>
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+    </Match>
+    <Match>
+        <Class name="software.amazon.smithy.java.http.api.ArrayHttpHeaders"/>
+        <Method name="setHeaderCanonical"/>
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+    </Match>
+
+    <Match>
+        <Class name="~software\.amazon\.smithy\.java\.mcp\.server\.ProtocolVersion\$.*"/>
+        <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS"/>
+    </Match>
+
 </FindBugsFilter>

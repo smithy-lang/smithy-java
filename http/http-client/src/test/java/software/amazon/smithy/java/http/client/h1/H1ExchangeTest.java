@@ -176,7 +176,7 @@ class H1ExchangeTest {
                         + "hello");
         var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
 
-        assertEquals(5, exchange.responseContentLength());
+        assertEquals(5L, exchange.responseHeaders().contentLength());
         assertEquals("hello", new String(exchange.responseBody().readAllBytes()));
         exchange.close();
     }
@@ -280,8 +280,8 @@ class H1ExchangeTest {
                         + "hello");
         var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
 
-        assertEquals("text/plain", exchange.responseContentType());
-        assertEquals(5, exchange.responseContentLength());
+        assertEquals("text/plain", exchange.responseHeaders().contentType());
+        assertEquals(5L, exchange.responseHeaders().contentLength());
         exchange.close();
     }
 

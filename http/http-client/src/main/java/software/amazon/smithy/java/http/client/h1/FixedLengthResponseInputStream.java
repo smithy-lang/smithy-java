@@ -8,7 +8,6 @@ package software.amazon.smithy.java.http.client.h1;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
 
 final class FixedLengthResponseInputStream extends InputStream {
     private final H1Exchange exchange;

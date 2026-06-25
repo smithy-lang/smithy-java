@@ -80,7 +80,7 @@ final class ManagedResponseInputStream extends InputStream {
             long len = remaining;
             result = (len >= 0 && len <= MAX_PRESIZED_LEN) ? readKnownLength((int) len) : inner.readAllBytes();
         } catch (IOException e) {
-            // A failed (e.g. interrupted) read must NOT fire the success terminal — that would report a
+            // A failed (e.g. interrupted) read must NOT fire the success terminal. That would report a
             // clean completion (onRequestEnd(null)) for a torn read and pool a broken connection.
             throw failed(e);
         }
@@ -199,9 +199,7 @@ final class ManagedResponseInputStream extends InputStream {
         try {
             inner.close();
         } catch (IOException e) {
-            // A close that errors leaves the connection suspect — route to the error terminal (evict)
-            // rather than reporting a clean close. One-shot latches make this a no-op if the body was
-            // already fully read and a terminal ran.
+            // Throw to evict
             throw failed(e);
         }
         onClose.run();

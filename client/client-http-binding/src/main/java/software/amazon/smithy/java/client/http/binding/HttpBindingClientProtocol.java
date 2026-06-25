@@ -72,8 +72,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
                 .payloadMediaType(payloadMediaType())
                 .shapeValue(input)
                 .endpoint(endpoint)
-                .omitEmptyPayload(omitEmptyPayload())
-                .requestFactory(requestFactory(context));
+                .omitEmptyPayload(omitEmptyPayload());
 
         if (operation.inputEventBuilderSupplier() != null) {
             serializer.eventEncoderFactory(getEventEncoderFactory(operation));

@@ -78,7 +78,7 @@ final class EpollRuntime implements AutoCloseable {
      * virtual-thread blocking model, so both models are configured by one knob. The JDK runs
      * {@code jdk.readPollers} read-poller threads plus {@code jdk.writePollers} write-poller threads
      * (each count must be a power of two). Our reactor handles both readiness directions in a single
-     * epfd per shard, so we use {@code readPollers + writePollers} shards — the same total number of
+     * epfd per shard, so we use {@code readPollers + writePollers} shards, the same total number of
      * epoll poller platform threads the JDK would start.
      */
     private static int shardCount() {

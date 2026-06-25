@@ -673,8 +673,8 @@ class DefaultHttpClientTest {
             protected HttpExchange createExchange() {
                 return new TestHttpExchange() {
                     @Override
-                    public long responseContentLength() {
-                        return 9;
+                    public HttpHeaders responseHeaders() {
+                        return HttpHeaders.of(Map.of("content-length", List.of("9")));
                     }
                 };
             }

@@ -161,8 +161,9 @@ final class DefaultHttpClient implements HttpClient {
             HttpHeaders headers = exchange.responseHeaders();
             HttpVersion version = exchange.responseVersion();
             boolean isH2 = version == HttpVersion.HTTP_2;
-            String contentType = exchange.responseContentType();
-            long contentLength = exchange.responseContentLength();
+            String contentType = headers.contentType();
+            Long contentLengthValue = headers.contentLength();
+            long contentLength = contentLengthValue == null ? -1 : contentLengthValue;
 
             // Wrap body so close releases connection
             DataStream managedBody = new ManagedResponseBody(
@@ -372,8 +373,8 @@ final class DefaultHttpClient implements HttpClient {
             boolean errored = false;
             Throwable error = null;
 
-            // H1: drain body for connection reuse. H2: skip — exchange.close() sends RST_STREAM.
-            // The body may not have been read at all (wrappedStream == null) — e.g. when the
+            // H1: drain body for connection reuse. H2: skip, since exchange.close() sends RST_STREAM.
+            // The body may not have been read at all (wrappedStream == null), e.g. when the
             // SDK calls discard() without first opening the stream. In that case we still need
             // to drain through the exchange so the H1 keepalive contract is honored; reusing the
             // connection without consuming the response body would corrupt the next exchange.
@@ -391,8 +392,8 @@ final class DefaultHttpClient implements HttpClient {
 
         /**
          * Release the response body according to how the caller opened it: drain an opened stream (so an
-         * H1 keepalive connection is left clean for reuse), close an opened channel, or — if the body was
-         * never opened — discard it at the exchange level.
+         * H1 keepalive connection is left clean for reuse), close an opened channel, or, if the body was
+         * never opened, discard it at the exchange level.
          */
         private void drainOrDiscardBody() throws IOException {
             if (wrappedStream != null) {
@@ -444,7 +445,7 @@ final class DefaultHttpClient implements HttpClient {
          * Terminal for a failed body read (e.g. an interrupted or errored stream read): close the exchange
          * and fire {@code onRequestEnd} with the failure rather than reporting a clean close.
          *
-         * <p>This evicts the physical connection for both H1 and H2. For H1 that is required — a connection
+         * <p>This evicts the physical connection for both H1 and H2. For H1 that is required: a connection
          * abandoned mid-response can't be reused. For H2 it is conservative: a single failed stream only
          * strictly needs a RST_STREAM with the connection kept for other/future streams, but we currently
          * evict the whole connection rather than implement stream-only recovery. One-shot via the same

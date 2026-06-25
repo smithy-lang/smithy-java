@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.http.client.connection;
 
-import io.netty.channel.epoll.EpollAccess;
+import io.netty.channel.unix.Buffer;
 import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import java.io.EOFException;
@@ -157,7 +157,7 @@ final class SSLEngineTransport implements ConnectionTransport {
     // Allocate netIn/netOut/appIn sized to at least one TLS record. netIn holds buffered ciphertext;
     // appIn holds the plaintext drained from it. Per TLS record plaintext < ciphertext (record framing
     // + AEAD tag overhead), so sizing appIn >= netIn guarantees one drain pass empties every whole
-    // record netIn can hold without an appIn overflow mid-pass — keeping the trailing compact to at
+    // record netIn can hold without an appIn overflow mid-pass, keeping the trailing compact to at
     // most one partial record. netOut must hold at least one whole packet; larger lets write() coalesce
     // several records.
     private void allocateBuffers(boolean direct, int readBufferSize, int writeBufferSize) {
@@ -274,10 +274,10 @@ final class SSLEngineTransport implements ConnectionTransport {
             // Raw-address read straight into netIn's off-heap region: recvAddress on the buffer's
             // native memory address advances nothing itself, so we bump netIn's position by the
             // count. The address is recomputed per call because netIn may have been reallocated by
-            // ensureCapacity (the recompute is a cheap Unsafe field read — still cheaper than the
+            // ensureCapacity (the recompute is a cheap Unsafe field read, still cheaper than the
             // per-op GetDirectBufferAddress the ByteBuffer overload would pay). The read deadline
             // mirrors SO_TIMEOUT on the NIO path.
-            long base = EpollAccess.memoryAddress(netIn);
+            long base = Buffer.memoryAddress(netIn);
             int pos = netIn.position();
             int limit = netIn.limit();
             n = epollChannel.readAddress(base, pos, limit, epollReadTimeoutMs);
@@ -311,7 +311,7 @@ final class SSLEngineTransport implements ConnectionTransport {
      * ignores {@code SO_TIMEOUT}, so instead of opening an epoll {@code Selector} per read (which cost
      * an {@code epoll_create1}/{@code eventfd}/{@code close} cycle and a blocking-mode flip every call)
      * the read parks the virtual thread and a single shared {@link #readTimer} closes the channel if
-     * the deadline passes — waking the parked read with an {@code AsynchronousCloseException} that is
+     * the deadline passes, waking the parked read with an {@code AsynchronousCloseException} that is
      * surfaced as a {@link SocketTimeoutException}. The channel stays in blocking mode throughout.
      */
     private int readWithTimeout(int timeoutMs) throws IOException {
@@ -334,7 +334,7 @@ final class SSLEngineTransport implements ConnectionTransport {
         try {
             socketChannel.close();
         } catch (IOException ignored) {
-            // best effort — the parked read will unblock with AsynchronousCloseException
+            // best effort: the parked read will unblock with AsynchronousCloseException
         }
     }
 
@@ -347,7 +347,7 @@ final class SSLEngineTransport implements ConnectionTransport {
             // sends / back-pressure), so advance netOut to its limit in one step afterward.
             int pos = netOut.position();
             int limit = netOut.limit();
-            epollChannel.writeAddress(EpollAccess.memoryAddress(netOut), pos, limit);
+            epollChannel.writeAddress(Buffer.memoryAddress(netOut), pos, limit);
             netOut.position(limit);
         } else if (socketChannel != null) {
             while (netOut.hasRemaining()) {
@@ -466,7 +466,7 @@ final class SSLEngineTransport implements ConnectionTransport {
                 if (status == Status.OK) {
                     handlePostResult(result);
                     // No forward progress (defensive against a pathological 0/0 OK) or netIn drained
-                    // of whole records — stop the drain and serve what we have.
+                    // of whole records, so stop the drain and serve what we have.
                     if ((result.bytesConsumed() == 0 && result.bytesProduced() == 0) || !netIn.hasRemaining()) {
                         break;
                     }
@@ -486,7 +486,7 @@ final class SSLEngineTransport implements ConnectionTransport {
                 return toCopy;
             }
 
-            // No plaintext produced — act on why the drain stopped.
+            // No plaintext produced, so act on why the drain stopped.
             switch (status) {
                 case BUFFER_UNDERFLOW -> {
                     netIn = ensureCapacity(netIn, engine.getSession().getPacketBufferSize());
@@ -580,7 +580,7 @@ final class SSLEngineTransport implements ConnectionTransport {
                         }
                     }
                     case BUFFER_OVERFLOW -> {
-                        // dst too small despite our check — fall through to appIn path
+                        // dst too small despite our check, so fall through to appIn path
                         directUnwrap = false;
                     }
                     case CLOSED -> {

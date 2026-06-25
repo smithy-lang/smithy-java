@@ -7,10 +7,8 @@ package software.amazon.smithy.java.client.http;
 
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.MessageExchange;
-import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.api.HttpRequestFactory;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -33,21 +31,6 @@ public abstract class HttpClientProtocol implements ClientProtocol<HttpRequest, 
     @Override
     public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
         return HttpMessageExchange.INSTANCE;
-    }
-
-    /**
-     * The transport-supplied request factory for this call, if any.
-     *
-     * <p>HTTP protocols use this to serialize a request directly into the transport's native
-     * representation (e.g. headers backed by the transport's own container) instead of a generic one
-     * the transport then copies. Returns null when no transport opted in, in which case the default
-     * array-backed containers are used.
-     *
-     * @param context the per-call context.
-     * @return the transport request factory, or null.
-     */
-    protected static HttpRequestFactory requestFactory(Context context) {
-        return context == null ? null : context.get(HttpContext.TRANSPORT_REQUEST_FACTORY);
     }
 
     @Override

@@ -150,7 +150,7 @@ public final class HttpConnectionPool implements ConnectionPool {
     // Shared single-thread watchdog enforcing read deadlines for the SSLEngineTransport channel path.
     // A blocking SocketChannel.read ignores SO_TIMEOUT, so instead of opening an epoll Selector per
     // read (epoll_create1/eventfd/close churn) the read parks the VT and this timer closes the channel
-    // if the deadline passes. One wheel for the whole pool — O(1) arm/cancel per read.
+    // if the deadline passes. One wheel for the whole pool, giving O(1) arm/cancel per read.
     private final HashedWheelTimer readTimer;
 
     // Listeners for client lifecycle events
@@ -180,8 +180,8 @@ public final class HttpConnectionPool implements ConnectionPool {
         // supports it. The epoll path hands the provider a null-socket context whose byte channel is
         // consumable only by engine-based providers (via SslEngineTransports); a provider that does its
         // own socket I/O (supportsEpoll() == false) must get the NIO socket path so socket() is non-null.
-        // Note: this also routes cleartext connections on such a client through NIO — acceptable, since a
-        // custom TLS provider is configured for secure traffic.
+        // Note: this also routes cleartext connections on such a client through NIO, which is acceptable,
+        // since a custom TLS provider is configured for secure traffic.
         EpollConnector epollConnector = tls.supportsEpoll()
                 ? EpollConnector.createIfAvailable(
                         config.socketReceiveBufferSize(),

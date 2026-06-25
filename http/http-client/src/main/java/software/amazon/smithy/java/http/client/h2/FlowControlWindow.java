@@ -13,7 +13,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * HTTP/2 flow control window.
  *
- * <p>Fast path uses an {@link AtomicLong} CAS loop with no lock — under typical load
+ * <p>Fast path uses an {@link AtomicLong} CAS loop with no lock. Under typical load
  * (window available, no waiters) acquires and releases are lock-free. The lock is only
  * acquired on the slow path when a caller has to wait for window.
  *

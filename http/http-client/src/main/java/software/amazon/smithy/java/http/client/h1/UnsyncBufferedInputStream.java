@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.http.client;
+package software.amazon.smithy.java.http.client.h1;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,7 +14,7 @@ import java.io.OutputStream;
  *
  * <p>This class exposes its guts for optimal performance. Be responsible, and note the warnings on each method.
  */
-public final class UnsyncBufferedInputStream extends InputStream {
+final class UnsyncBufferedInputStream extends InputStream {
     private final InputStream in;
     private final byte[] buf;
     private int pos;

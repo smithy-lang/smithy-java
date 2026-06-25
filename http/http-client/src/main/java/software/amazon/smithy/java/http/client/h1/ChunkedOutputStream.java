@@ -10,7 +10,6 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.util.Objects;
 import software.amazon.smithy.java.http.api.HttpHeaders;
-import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 
 /**
  * OutputStream that writes HTTP/1.1 chunked transfer encoding format (RFC 9112).

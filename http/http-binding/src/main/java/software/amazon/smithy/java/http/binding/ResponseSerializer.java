@@ -160,8 +160,7 @@ public final class ResponseSerializer {
                 isFailure,
                 false,
                 headerErrorSerializer,
-                context,
-                null); // response direction does not use a transport request factory
+                context);
         shapeValue.serialize(serializer);
         serializer.flush();
 

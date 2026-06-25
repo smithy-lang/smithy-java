@@ -14,7 +14,7 @@ import javax.net.ssl.SSLEngine;
  *
  * <p>This is the helper a {@link TlsProvider} uses when its TLS is engine-based: the provider mints a
  * client-mode {@link SSLEngine} (JDK, BoringSSL via netty-tcnative, …) and hands it here, and this
- * performs the connect-time dance — select the epoll vs. socket I/O backend, apply the negotiation
+ * performs the connect-time dance: select the epoll vs. socket I/O backend, apply the negotiation
  * deadline, run the handshake, and release the engine on any failure. The underlying transport type is
  * internal to this module; providers in other modules reach it only through this entry point.
  */

@@ -35,7 +35,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  * <p><b>Usage Pattern with try-with-resources (recommended):</b>
  * {@snippet :
  * try (HttpExchange exchange = client.newExchange(request)) {
- *     exchange.writeRequestBody();
+ *     exchange.writeRequestBody(request.body());
  *     int status = exchange.responseStatusCode();
  *     try (InputStream in = exchange.responseBody()) {
  *         byte[] body = in.readAllBytes();
@@ -53,15 +53,6 @@ public interface HttpExchange extends AutoCloseable {
      * @return the HTTP request
      */
     HttpRequest request();
-
-    /**
-     * Write the request body from {@link HttpRequest#body()} to the output stream.
-     *
-     * @throws IOException if an I/O error occurs
-     */
-    default void writeRequestBody() throws IOException {
-        writeRequestBody(request().body());
-    }
 
     /**
      * Write the given request body to the exchange.
@@ -125,9 +116,8 @@ public interface HttpExchange extends AutoCloseable {
     /**
      * Get a readable byte channel for the response body.
      *
-     * <p>Default wraps {@link #responseBody()} via Channels.newChannel().
-     * H2 exchanges override this to return a native channel that avoids
-     * intermediate byte[] copies.
+     * <p>Default wraps {@link #responseBody()} via Channels.newChannel(). H2 exchanges override this to return a
+     * native channel that avoids intermediate byte[] copies.
      *
      * @return a readable byte channel for the response body
      */
@@ -138,41 +128,19 @@ public interface HttpExchange extends AutoCloseable {
     /**
      * Response headers. Blocks until received.
      *
-     * <p><b>IMPORTANT:</b> On HTTP/1.1, this will block until the request body
-     * is fully written and closed.
+     * <p><b>IMPORTANT:</b> On HTTP/1.1, this will block until the request body is fully written and closed.
      *
      * @return HTTP response headers.
      */
     HttpHeaders responseHeaders() throws IOException;
 
     /**
-     * Get the response content type, if known.
-     *
-     * @return response content type, or null if not present.
-     * @throws IOException if an I/O error occurs while reading response headers.
-     */
-    default String responseContentType() throws IOException {
-        return responseHeaders().contentType();
-    }
-
-    /**
-     * Get the response content length, if known.
-     *
-     * @return response content length, or -1 if not present.
-     * @throws IOException if an I/O error occurs while reading response headers.
-     */
-    default long responseContentLength() throws IOException {
-        Long length = responseHeaders().contentLength();
-        return length == null ? -1 : length;
-    }
-
-    /**
      * Get trailer headers if any were received.
      *
      * <p>Trailers are headers sent after the message body. They are supported in:
      * <ul>
-     *   <li><b>HTTP/1.1:</b> Via chunked transfer encoding (RFC 9112 Section 7.1)</li>
-     *   <li><b>HTTP/2:</b> Via HEADERS frame after DATA with END_STREAM (RFC 9113 Section 8.1)</li>
+     *   <li><b>HTTP/1.1:</b> Via chunked transfer encoding</li>
+     *   <li><b>HTTP/2:</b> Via HEADERS frame after DATA with END_STREAM</li>
      * </ul>
      *
      * <p><b>Important:</b> Trailers are only available after the entire response body has been read.
@@ -197,9 +165,8 @@ public interface HttpExchange extends AutoCloseable {
 
     /**
      * Check if this exchange supports true bidirectional streaming.
-     * Returns true for HTTP/2, false for HTTP/1.1.
      *
-     * <p>If false, the request body must be fully written and closed before
+     * <p>If false (e.g., HTTP/1.1), the request body must be fully written and closed before
      * attempting to read the response.
      *
      * @return true if the exchange supports bidirectional streaming.
@@ -235,7 +202,6 @@ public interface HttpExchange extends AutoCloseable {
      * {@inheritDoc}
      *
      * <p>This method is idempotent and may be called multiple times safely.
-     * Subsequent calls after the first have no effect.
      */
     @Override
     void close() throws IOException;

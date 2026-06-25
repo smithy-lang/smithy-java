@@ -5,24 +5,27 @@
 
 package io.netty.channel.epoll;
 
-import io.netty.channel.unix.Buffer;
 import io.netty.channel.unix.FileDescriptor;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
-/** Thin bridge exposing Netty's package-private epoll bits to the connection package. */
+/**
+ * Bridge to Netty's epoll internals. Lives in this package only because {@link EpollEventArray} and the
+ * {@code epollWait(fd, array, int)} overload are package-private; the rest is public {@link Native} API
+ * re-exported so callers depend on one class. Classpath-only (split package is illegal under JPMS) and
+ * built on unsupported API, so a Netty upgrade can break it. HTTP client implementation detail.
+ */
 public final class EpollAccess {
 
     private EpollAccess() {}
 
-    // --- epoll event flags (already public on Native, re-exported for convenience) ---
+    // --- epoll event flags ---
     public static final int EPOLLIN = Native.EPOLLIN;
     public static final int EPOLLOUT = Native.EPOLLOUT;
     public static final int EPOLLET = Native.EPOLLET;
     public static final int EPOLLRDHUP = Native.EPOLLRDHUP;
     public static final int EPOLLERR = Native.EPOLLERR;
 
-    // --- epfd / eventfd lifecycle (public Native factories) ---
+    // --- epfd / eventfd lifecycle ---
     public static FileDescriptor newEpollCreate() {
         return Native.newEpollCreate();
     }
@@ -39,7 +42,7 @@ public final class EpollAccess {
         Native.eventFdRead(fd);
     }
 
-    // --- epoll_ctl (public on Native; re-exported so callers need only this class) ---
+    // --- epoll_ctl ---
     public static void epollCtlAdd(int efd, int fd, int flags) throws IOException {
         Native.epollCtlAdd(efd, fd, flags);
     }
@@ -53,15 +56,14 @@ public final class EpollAccess {
     }
 
     /**
-     * Blocking {@code epoll_wait} into {@code events}. {@code timeoutMillis < 0} waits indefinitely;
-     * {@code 0} polls. Returns the number of ready descriptors. This is the package-private
-     * {@link Native#epollWait(FileDescriptor, EpollEventArray, int)} overload.
+     * Blocking {@code epoll_wait} into {@code events}. {@code timeoutMillis < 0} waits indefinitely,
+     * {@code 0} polls. Returns the number of ready descriptors.
      */
     public static int epollWait(FileDescriptor epfd, EpollEventArray events, int timeoutMillis) throws IOException {
         return Native.epollWait(epfd, events, timeoutMillis);
     }
 
-    // --- EpollEventArray (package-private ctor + readers) ---
+    // --- EpollEventArray (package-private) ---
     public static EpollEventArray newEventArray(int length) {
         return new EpollEventArray(length);
     }
@@ -84,10 +86,5 @@ public final class EpollAccess {
 
     public static void free(EpollEventArray arr) {
         arr.free();
-    }
-
-    /** Native memory address of a direct {@link ByteBuffer} (for the raw-address recv/send path). */
-    public static long memoryAddress(ByteBuffer directBuffer) {
-        return Buffer.memoryAddress(directBuffer);
     }
 }

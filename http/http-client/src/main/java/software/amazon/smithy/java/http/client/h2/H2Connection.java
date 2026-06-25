@@ -376,7 +376,7 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
             } else {
                 // Always normalize HEADERS through readHeaderBlock so padding, priority, and
                 // PUSH_PROMISE promised-stream-id are stripped before the header block reaches
-                // HPACK — otherwise those bytes corrupt HPACK state and tear the connection.
+                // HPACK. Otherwise those bytes corrupt HPACK state and tear the connection.
                 // Also enforces a running cap on accumulated CONTINUATION growth.
                 byte[] headerPayload = payload;
                 int headerLength = length;
@@ -405,7 +405,7 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
                 }
             }
         } finally {
-            // Non-DATA payloads are plain byte[] from borrowByteArray, not pooled — no return needed
+            // Non-DATA payloads are plain byte[] from borrowByteArray, not pooled, so no return needed
         }
     }
 
@@ -689,7 +689,7 @@ public final class H2Connection implements MultiplexedHttpConnection, H2Muxer.Co
 
     /**
      * Get internal diagnostic stats for this connection.
-     * Package-private — for tests and benchmarks only.
+     * Package-private, for tests and benchmarks only.
      */
     H2ConnectionStats getStats() {
         return stats;

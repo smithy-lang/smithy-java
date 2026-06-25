@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.LongAdder;
  * <p>All counters use {@link LongAdder} for contention-free increments on hot paths.
  * Max gauges use {@link AtomicLong} with CAS updates.
  *
- * <p>Package-private. Not a public API — shape may change without notice.
+ * <p>Package-private. Not a public API; the shape may change without notice.
  */
 final class H2ConnectionStats {
 

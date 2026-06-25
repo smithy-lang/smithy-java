@@ -84,7 +84,7 @@ final class H2StreamBody {
         return 0;
     }
 
-    /** Wake any consumer waiting on data — called after a burst of {@link #offer} with {@code signal=false}. */
+    /** Wake any consumer waiting on data. Called after a burst of {@link #offer} with {@code signal=false}. */
     synchronized void signal() {
         notifyAll();
     }
@@ -184,8 +184,8 @@ final class H2StreamBody {
 
     /**
      * Build the exception thrown when a consumer is interrupted waiting for response data. Uses
-     * {@link InterruptedIOException} (not a plain {@link IOException}) so callers — e.g. those composing
-     * under structured concurrency — can distinguish cancellation from a transport/server failure. The
+     * {@link InterruptedIOException} (not a plain {@link IOException}) so callers (e.g. those composing
+     * under structured concurrency) can distinguish cancellation from a transport/server failure. The
      * interrupt status is restored by the caller before this is thrown.
      */
     private static InterruptedIOException interrupted(InterruptedException cause) {

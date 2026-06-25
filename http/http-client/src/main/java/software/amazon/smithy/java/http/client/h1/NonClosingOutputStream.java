@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.http.client;
+package software.amazon.smithy.java.http.client.h1;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -13,7 +13,7 @@ import java.io.OutputStream;
  *
  * <p>Used for HTTP/1.1 request bodies where we don't want to close the socket when the request body is done.
  */
-public final class NonClosingOutputStream extends OutputStream {
+final class NonClosingOutputStream extends OutputStream {
     private final OutputStream delegate;
     private boolean closed = false;
 

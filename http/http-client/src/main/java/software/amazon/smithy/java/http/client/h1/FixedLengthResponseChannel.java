@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
 
 final class FixedLengthResponseChannel implements ReadableByteChannel {
     private final H1Exchange h1Exchange;

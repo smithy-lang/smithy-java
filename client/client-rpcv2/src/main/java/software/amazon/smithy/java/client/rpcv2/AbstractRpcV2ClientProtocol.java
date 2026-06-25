@@ -108,18 +108,7 @@ public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
             SmithyUri endpoint
     ) {
         var target = targetPathPrefix + operation.schema().id().getName();
-        // With a transport-supplied factory, build the request directly in the transport's native
-        // representation; otherwise reuse the cached template (unchanged behavior).
-        var factory = requestFactory(context);
-        ModifiableHttpRequest builder;
-        if (factory == null) {
-            builder = templateRequest.toModifiableCopy();
-        } else {
-            builder = HttpRequest.create(factory);
-            builder.setMethod("POST");
-            builder.addHeader(HeaderName.SMITHY_PROTOCOL, smithyProtocolValue);
-            builder.addHeader(HeaderName.ACCEPT, payloadMediaType);
-        }
+        ModifiableHttpRequest builder = templateRequest.toModifiableCopy();
         builder.setUri(endpoint.withConcatPath(target));
 
         if (operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {

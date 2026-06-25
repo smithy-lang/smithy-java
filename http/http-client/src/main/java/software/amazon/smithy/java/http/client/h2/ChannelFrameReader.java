@@ -119,7 +119,7 @@ final class ChannelFrameReader {
     }
 
     /**
-     * Read payload directly into a ByteBuffer (for DATA frames — zero copy path).
+     * Read payload directly into a ByteBuffer (for DATA frames, the zero copy path).
      * The destination buffer must be in write mode.
      *
      * <p>First drains any buffered data, then reads remaining directly from channel
@@ -136,7 +136,7 @@ final class ChannelFrameReader {
             length -= toDrain;
         }
 
-        // Read remainder directly from channel into dest — no intermediate buffer
+        // Read remainder directly from channel into dest, with no intermediate buffer
         while (length > 0) {
             int oldLimit = dest.limit();
             dest.limit(dest.position() + length);

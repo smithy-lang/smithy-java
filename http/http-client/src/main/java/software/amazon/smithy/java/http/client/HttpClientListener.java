@@ -23,7 +23,7 @@ import software.amazon.smithy.java.http.client.connection.Route;
  * response body. If the caller drops the response without doing any of these, the underlying connection is leaked
  * (never released to the pool) and <strong>{@code onRequestEnd} is intentionally never fired</strong>. A request with
  * an {@link #onRequestStart} and no matching {@code onRequestEnd} is therefore the canonical signal that a response
- * body was leaked — the missing event is not a defect, it is how a leak is detected. The client does not fire a late
+ * body was leaked (the missing event is not a defect, it is how a leak is detected). The client does not fire a late
  * {@code onRequestEnd} from a finalizer/{@link java.lang.ref.Cleaner}, because doing so would report a leak as a
  * normal (and wildly mis-timed) completion and corrupt any duration metric.
  *

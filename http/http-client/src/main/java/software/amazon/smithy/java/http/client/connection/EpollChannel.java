@@ -34,7 +34,7 @@ final class EpollChannel {
     private final int baseFlags; // EPOLLIN | EPOLLET | EPOLLRDHUP
     // Shared wheel-timer watchdog for read deadlines (the SAME one the NIO SSLEngineTransport path
     // uses). On the hot read path we park UNTIMED and let a one-shot wheel timeout close the channel
-    // if the deadline passes — an O(1) bucket arm/cancel per read. This deliberately avoids
+    // if the deadline passes, an O(1) bucket arm/cancel per read. This deliberately avoids
     // LockSupport.parkNanos, which arms a JDK DelayScheduler timer entry per read (a measurable
     // cross-thread signal/unpark tax that the NIO path does not pay). Null => untimed reads.
     private final Timer readTimer;
@@ -112,7 +112,7 @@ final class EpollChannel {
                 throw new SocketTimeoutException("Connect timed out");
             }
             while (!socket.finishConnect()) {
-                // Spurious wakeup before completion — loop until finished or error thrown.
+                // Spurious wakeup before completion, so loop until finished or error thrown.
                 if (!awaitWritable(deadline)) {
                     throw new SocketTimeoutException("Connect timed out");
                 }
@@ -128,9 +128,9 @@ final class EpollChannel {
 
     /**
      * Read into {@code [base+pos, base+limit)} of an off-heap region (the memory address of a direct
-     * buffer, obtained via {@link EpollAccess#memoryAddress}). Blocks the calling virtual thread
-     * until at least one byte is read (returning the count), EOF/peer-close/local-close is observed
-     * (returning {@code -1}), or — if {@code timeoutMs > 0} — the deadline passes (throwing
+     * buffer, obtained via {@code io.netty.channel.unix.Buffer#memoryAddress}). Blocks the calling virtual
+     * thread until at least one byte is read (returning the count), EOF/peer-close/local-close is observed
+     * (returning {@code -1}), or, if {@code timeoutMs > 0}, the deadline passes (throwing
      * {@link SocketTimeoutException}).
      *
      * <p>Uses Netty's {@code recvAddress}, which goes straight to {@code recv(2)} on the raw pointer,
@@ -383,7 +383,7 @@ final class EpollChannel {
     }
 
     // ---------------------------------------------------------------------
-    // EPOLLOUT arm/disarm — the only epoll_ctl on the hot path, and only under write back-pressure
+    // EPOLLOUT arm/disarm: the only epoll_ctl on the hot path, and only under write back-pressure
     // ---------------------------------------------------------------------
 
     private void armEpollOut() throws IOException {

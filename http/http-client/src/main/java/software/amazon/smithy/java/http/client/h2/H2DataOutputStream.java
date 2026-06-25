@@ -58,7 +58,7 @@ final class H2DataOutputStream extends OutputStream {
             throw new IOException("Cannot write body: END_STREAM already sent with headers");
         }
 
-        // Fast path: large write — flush buffer, then write directly
+        // Fast path: large write, so flush buffer, then write directly
         if (len >= buffer.capacity()) {
             flush();
             exchange.writeData(b, off, len, false);

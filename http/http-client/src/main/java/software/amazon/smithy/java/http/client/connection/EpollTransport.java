@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.http.client.connection;
 
-import io.netty.channel.epoll.EpollAccess;
+import io.netty.channel.unix.Buffer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -95,7 +95,7 @@ final class EpollTransport implements ConnectionTransport {
             }
             if (dst.isDirect()) {
                 int pos = dst.position();
-                int n = channel.readAddress(EpollAccess.memoryAddress(dst), pos, dst.limit(), readTimeoutMs);
+                int n = channel.readAddress(Buffer.memoryAddress(dst), pos, dst.limit(), readTimeoutMs);
                 if (n > 0) {
                     dst.position(pos + n);
                 }
@@ -107,7 +107,7 @@ final class EpollTransport implements ConnectionTransport {
             // Cap the read at the destination's remaining bytes so a partially-reused scratch buffer
             // (sized from an earlier larger read) can't overflow dst.
             int cap = Math.min(want, direct.capacity());
-            int n = channel.readAddress(EpollAccess.memoryAddress(direct), 0, cap, readTimeoutMs);
+            int n = channel.readAddress(Buffer.memoryAddress(direct), 0, cap, readTimeoutMs);
             if (n > 0) {
                 direct.limit(n);
                 dst.put(direct);
@@ -152,7 +152,7 @@ final class EpollTransport implements ConnectionTransport {
             int len = src.remaining();
             if (src.isDirect()) {
                 int pos = src.position();
-                channel.writeAddress(EpollAccess.memoryAddress(src), pos, src.limit());
+                channel.writeAddress(Buffer.memoryAddress(src), pos, src.limit());
                 src.position(src.limit());
                 return len;
             }
@@ -164,7 +164,7 @@ final class EpollTransport implements ConnectionTransport {
             direct.put(src);
             src.limit(limit);
             direct.flip();
-            channel.writeAddress(EpollAccess.memoryAddress(direct), 0, n);
+            channel.writeAddress(Buffer.memoryAddress(direct), 0, n);
             return n;
         }
 

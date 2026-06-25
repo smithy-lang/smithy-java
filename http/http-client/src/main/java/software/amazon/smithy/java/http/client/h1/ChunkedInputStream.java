@@ -11,7 +11,6 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
 
 /**
  * InputStream that reads HTTP/1.1 chunked transfer encoding format (RFC 9112).

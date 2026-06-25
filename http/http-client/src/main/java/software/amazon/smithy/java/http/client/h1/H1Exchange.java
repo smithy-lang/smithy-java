@@ -19,9 +19,6 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
 import software.amazon.smithy.java.http.client.HttpExchange;
-import software.amazon.smithy.java.http.client.NonClosingOutputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
-import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 import software.amazon.smithy.java.http.client.connection.Route;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
@@ -76,7 +73,6 @@ final class H1Exchange implements HttpExchange {
     private ChunkedInputStream chunkedResponseIn; // Reference for trailer access
     private HttpHeaders responseHeaders;
     private HttpVersion responseVersion;
-    private String responseContentType;
     private long responseContentLength = -1;
     private boolean responseChunked;
     // Keep-alive override from the response Connection header: null = not specified (use protocol
@@ -116,7 +112,6 @@ final class H1Exchange implements HttpExchange {
         this.chunkedResponseIn = null;
         this.responseHeaders = null;
         this.responseVersion = null;
-        this.responseContentType = null;
         this.responseContentLength = -1;
         this.responseChunked = false;
         this.responseKeepAlive = null;
@@ -281,24 +276,6 @@ final class H1Exchange implements HttpExchange {
             parseStatusLineAndHeaders();
         }
         return responseHeaders;
-    }
-
-    @Override
-    public String responseContentType() throws IOException {
-        if (responseHeaders == null) {
-            ensureRequestComplete();
-            parseStatusLineAndHeaders();
-        }
-        return responseContentType;
-    }
-
-    @Override
-    public long responseContentLength() throws IOException {
-        if (responseHeaders == null) {
-            ensureRequestComplete();
-            parseStatusLineAndHeaders();
-        }
-        return responseContentLength;
     }
 
     @Override
@@ -642,8 +619,9 @@ final class H1Exchange implements HttpExchange {
         }
     }
 
-    // Records the content-length, transfer-encoding, content-type, and connection (keep-alive) response
-    // headers into the corresponding instance fields. Other headers are ignored here.
+    // Records the content-length, transfer-encoding, and connection (keep-alive) response headers into
+    // the corresponding instance fields. Other headers (including content-type) are still parsed into
+    // responseHeaders by the caller; they just don't drive transport behavior, so they are ignored here.
     private void captureControlHeader(byte[] line, int valueStart, int valueEnd, String name) throws IOException {
         switch (name) {
             case "content-length" -> {
@@ -655,11 +633,6 @@ final class H1Exchange implements HttpExchange {
                 responseContentLength = length;
             }
             case "transfer-encoding" -> responseChunked = containsChunked(line, valueStart, valueEnd);
-            case "content-type" -> responseContentType = new String(
-                    line,
-                    valueStart,
-                    valueEnd - valueStart,
-                    StandardCharsets.US_ASCII);
             case "connection" -> {
                 if (equalsIgnoreCase(line, valueStart, valueEnd, "close")) {
                     responseKeepAlive = Boolean.FALSE;

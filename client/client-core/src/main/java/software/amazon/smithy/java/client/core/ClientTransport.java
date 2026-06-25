@@ -49,19 +49,6 @@ public interface ClientTransport<RequestT, ResponseT> extends Closeable {
     MessageExchange<RequestT, ResponseT> messageExchange();
 
     /**
-     * Hook invoked once per call, before the protocol serializes the request, letting a transport
-     * advertise per-call request-construction capabilities into the context.
-     *
-     * <p>A transport overrides this to publish a request factory (e.g. one that backs request
-     * headers with the transport's own native container) so the protocol serializes directly into
-     * the transport's representation, avoiding a translation copy at send time. The default is a
-     * no-op, so transports that do not opt in are unaffected.
-     *
-     * @param context the mutable per-call context.
-     */
-    default void contributeRequestFactory(Context context) {}
-
-    /**
      * {@inheritDoc}
      *
      * <p>Default implementation is a no-op.

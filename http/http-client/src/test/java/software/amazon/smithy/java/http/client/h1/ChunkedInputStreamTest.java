@@ -14,7 +14,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.http.client.UnsyncBufferedInputStream;
 
 class ChunkedInputStreamTest {
 

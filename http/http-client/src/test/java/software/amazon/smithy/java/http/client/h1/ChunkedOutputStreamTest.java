@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.http.api.HttpHeaders;
-import software.amazon.smithy.java.http.client.UnsyncBufferedOutputStream;
 
 class ChunkedOutputStreamTest {
 

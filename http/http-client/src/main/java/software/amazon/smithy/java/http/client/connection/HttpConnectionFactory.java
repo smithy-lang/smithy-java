@@ -499,7 +499,7 @@ record HttpConnectionFactory(
         notifyDnsStart(exchangeId, host);
         try {
             List<InetAddress> addresses = dnsResolver.resolve(host);
-            // An empty result is a DNS failure indistinguishable from a thrown one — both mean no usable
+            // An empty result is a DNS failure indistinguishable from a thrown one: both mean no usable
             // address. Report it as such (onDnsEnd with an error) rather than firing a success event and
             // letting the caller discover emptiness afterwards.
             if (addresses.isEmpty()) {
