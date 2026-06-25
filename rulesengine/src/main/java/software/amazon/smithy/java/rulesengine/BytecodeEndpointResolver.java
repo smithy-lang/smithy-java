@@ -61,6 +61,9 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
 
         LOGGER.debug("Resolving endpoint of {} using VM", operation);
 
-        return evaluator.evaluateBdd();
+        var traceSink = ctx.get(RulesEngineSettings.BDD_TRACE_SINK);
+        return traceSink != null
+                ? evaluator.evaluateBddTraced(traceSink)
+                : evaluator.evaluateBdd();
     }
 }

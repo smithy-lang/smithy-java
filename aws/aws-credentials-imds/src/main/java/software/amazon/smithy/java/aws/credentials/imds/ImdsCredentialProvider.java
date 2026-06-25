@@ -11,13 +11,13 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Set;
+import java.util.function.Function;
 import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
 import software.amazon.smithy.java.aws.config.AwsProfile;
-import software.amazon.smithy.java.aws.config.AwsProfileFile;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
@@ -62,13 +62,16 @@ public final class ImdsCredentialProvider implements ChainIdentityProvider {
             return;
         }
 
-        AwsProfileFile profileFile = setup.profileFile();
-        if (isDisabled(profileFile)) {
+        // Read environment and profile state through the setup so this provider composes with the rest of the
+        // chain: an injected environment is honored, and the profile is the one SharedConfigProvider already
+        // resolved (which respects any profile-name override) rather than one re-derived from AWS_PROFILE here.
+        AwsProfile profile = setup.profile();
+        if (isDisabled(setup::getenv, profile)) {
             return;
         }
 
-        URI endpoint = resolveEndpoint();
-        String profileName = resolveProfileName(profileFile);
+        URI endpoint = resolveEndpoint(setup::getenv);
+        String profileName = resolveProfileName(setup::getenv, profile);
         ImdsClient client = new ImdsClient(endpoint);
         AwsCredentialsResolver delegate = ctx -> fetchAndParse(client, profileName);
 
@@ -128,36 +131,36 @@ public final class ImdsCredentialProvider implements ChainIdentityProvider {
         return member == null ? null : member.asString();
     }
 
-    private static boolean isDisabled(AwsProfileFile profileFile) {
+    private static boolean isDisabled(Function<String, String> getenv, AwsProfile profile) {
         // Priority: system property > env var > config file. First non-null value wins.
         String value = System.getProperty("aws.disableEc2Metadata");
         if (value == null) {
-            value = System.getenv("AWS_EC2_METADATA_DISABLED");
+            value = getenv.apply("AWS_EC2_METADATA_DISABLED");
         }
         if (value == null) {
-            value = getProfileProperty(profileFile, "disable_ec2_metadata");
+            value = profileProperty(profile, "disable_ec2_metadata");
         }
         return "true".equalsIgnoreCase(value);
     }
 
-    private static URI resolveEndpoint() {
-        String override = System.getenv("AWS_EC2_METADATA_SERVICE_ENDPOINT");
+    private static URI resolveEndpoint(Function<String, String> getenv) {
+        String override = getenv.apply("AWS_EC2_METADATA_SERVICE_ENDPOINT");
         return override != null && !override.isEmpty() ? URI.create(override) : DEFAULT_ENDPOINT;
     }
 
-    private static String resolveProfileName(AwsProfileFile profileFile) {
+    private static String resolveProfileName(Function<String, String> getenv, AwsProfile profile) {
         // Priority: system property > env var > config file
         String prop = System.getProperty("aws.ec2InstanceProfileName");
         if (prop != null) {
             return ensureNotBlank("aws.ec2InstanceProfileName", prop);
         }
 
-        String env = System.getenv("AWS_EC2_INSTANCE_PROFILE_NAME");
+        String env = getenv.apply("AWS_EC2_INSTANCE_PROFILE_NAME");
         if (env != null) {
             return ensureNotBlank("AWS_EC2_INSTANCE_PROFILE_NAME", env);
         }
 
-        String config = getProfileProperty(profileFile, "ec2_instance_profile_name");
+        String config = profileProperty(profile, "ec2_instance_profile_name");
         if (config != null) {
             return ensureNotBlank("ec2_instance_profile_name", config);
         }
@@ -173,18 +176,7 @@ public final class ImdsCredentialProvider implements ChainIdentityProvider {
         return value;
     }
 
-    private static String getProfileProperty(AwsProfileFile profileFile, String key) {
-        if (profileFile == null) {
-            return null;
-        }
-
-        // Resolve profile name
-        String profileName = System.getenv("AWS_PROFILE");
-        if (profileName == null || profileName.isEmpty()) {
-            profileName = "default";
-        }
-
-        AwsProfile profile = profileFile.profile(profileName);
+    private static String profileProperty(AwsProfile profile, String key) {
         return profile != null ? profile.property(key) : null;
     }
 }

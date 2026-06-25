@@ -7,6 +7,7 @@ package software.amazon.smithy.java.codegen;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -96,7 +97,7 @@ public final class JavaCodegenSettings {
         this.transportName = builder.transportName;
         this.transportSettings = builder.transportSettings;
         this.defaultPlugins = new ArrayList<>(builder.defaultPlugins);
-        this.defaultSettings = Collections.unmodifiableList(builder.defaultSettings);
+        this.defaultSettings = new ArrayList<>(builder.defaultSettings);
         this.relativeDate = builder.relativeDate;
         this.relativeVersion = builder.relativeVersion;
         this.edition = Objects.requireNonNullElse(builder.edition, SmithyJavaCodegenEdition.LATEST);
@@ -167,16 +168,62 @@ public final class JavaCodegenSettings {
         return transportSettings;
     }
 
+    /**
+     * Fully-qualified class names of {@code ClientPlugin}s applied by default to generated clients.
+     *
+     * @return an unmodifiable view of the configured default plugins.
+     */
     public List<String> defaultPlugins() {
         return Collections.unmodifiableList(defaultPlugins);
     }
 
+    /**
+     * Registers a {@code ClientPlugin} to apply by default to generated clients.
+     *
+     * <p>The plugin must have a public, zero-arg constructor. Integrations should call this from
+     * {@link JavaCodegenIntegration#customizeSettings(CodeGenerationContext)}, which runs before the
+     * client builder is generated; calling it later (for example from
+     * {@link JavaCodegenIntegration#customize(CodeGenerationContext)}) has no effect because the default
+     * plugins have already been read.
+     *
+     * @param pluginClass fully-qualified class name of the plugin to add.
+     */
     public void addDefaultPlugin(String pluginClass) {
         defaultPlugins.add(pluginClass);
     }
 
+    /**
+     * Fully-qualified class names of {@code ClientSetting}s applied by default to generated client builders.
+     *
+     * @return an unmodifiable view of the configured default settings.
+     */
     public List<String> defaultSettings() {
-        return defaultSettings;
+        return Collections.unmodifiableList(defaultSettings);
+    }
+
+    /**
+     * Registers a {@code ClientSetting} to apply by default to generated client builders.
+     *
+     * <p>Integrations should call this from
+     * {@link JavaCodegenIntegration#customizeSettings(CodeGenerationContext)}, which runs before the
+     * client builder is generated; calling it later (for example from
+     * {@link JavaCodegenIntegration#customize(CodeGenerationContext)}) has no effect because the default
+     * settings have already been read.
+     *
+     * @param settingClass fully-qualified class name of the setting to add.
+     */
+    public void addDefaultSetting(String settingClass) {
+        defaultSettings.add(settingClass);
+    }
+
+    /**
+     * Registers {@code ClientSetting}s to apply by default to generated client builders.
+     *
+     * @param settingClasses fully-qualified class names of the settings to add.
+     * @see #addDefaultSetting(String)
+     */
+    public void addDefaultSettings(Collection<String> settingClasses) {
+        defaultSettings.addAll(settingClasses);
     }
 
     public String relativeDate() {

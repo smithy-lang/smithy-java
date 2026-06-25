@@ -95,6 +95,7 @@ enum Color {
     YELLOW
 }
 
+@sparse
 list StringList {
     member: String
 }

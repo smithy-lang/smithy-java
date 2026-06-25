@@ -63,7 +63,6 @@ public class PluginTestRunner {
         var modelDir = new File(dir, "model");
         var model = Model.assembler()
                 .addImport(modelDir.toPath())
-                .discoverModels()
                 .assemble()
                 .unwrap();
         var manifests = new ArrayList<MockManifest>();

@@ -15,6 +15,7 @@ import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeOption;
+import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolverParams;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.InputHook;
@@ -136,20 +137,15 @@ final class ClientPipeline<RequestT, ResponseT> {
             ClientCall<I, O> call,
             RequestHook<I, O, RequestT> requestHook
     ) {
-        try {
-            // 8. RetryStrategy: Invoke AcquireRetryToken.
-            //    Can potentially short-circuit the request.
-            var result = call.retryStrategy.acquireInitialToken(new AcquireInitialTokenRequest(call.retryScope));
-            call.retryToken = result.token();
-            // Delay if the initial request is pre-emptively throttled.
-            if (result.delay().toMillis() > 0) {
-                sleep(result.delay());
-            }
-            return doSendOrRetry(call, requestHook);
-        } catch (TokenAcquisitionFailedException e) {
-            // Don't send the request if the circuit breaker prevents it.
-            throw e;
+        // 8. RetryStrategy: Invoke AcquireRetryToken.
+        //    Can potentially short-circuit the request.
+        var result = call.retryStrategy.acquireInitialToken(new AcquireInitialTokenRequest(call.retryScope));
+        call.setRetryToken(result.token());
+        // Delay if the initial request is pre-emptively throttled.
+        if (result.delay().toMillis() > 0) {
+            sleep(result.delay());
         }
+        return doSendOrRetry(call, requestHook);
     }
 
     private <I extends SerializableStruct, O extends SerializableStruct> O doSendOrRetry(
@@ -459,7 +455,7 @@ final class ClientPipeline<RequestT, ResponseT> {
 
         // Clear out the retry token.
         var token = call.retryToken;
-        call.retryToken = null;
+        call.setRetryToken(null);
 
         // 9.c.i If successful: RetryStrategy: Invoke RecordSuccess.
         if (error == null) {
@@ -509,7 +505,7 @@ final class ClientPipeline<RequestT, ResponseT> {
             Duration after
     ) {
         // Associate the retry token with the call.
-        call.retryToken = retryToken;
+        call.setRetryToken(retryToken);
         // Adjust the current retry count on the context (e.g., protocols can use this to add retry headers).
         call.context.put(CallContext.RETRY_ATTEMPT, ++call.attemptCount);
 

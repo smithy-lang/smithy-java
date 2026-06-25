@@ -12,6 +12,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -21,7 +23,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.Validator;
 import software.amazon.smithy.java.core.serde.InterceptingSerializer;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeDeserializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
@@ -491,6 +495,169 @@ public class SchemaGuidedDocumentBuilderTest {
 
         var result = builder.build();
         assertThat(result.getMember("events").asEventStream(), equalTo(es));
+    }
+
+    @Test
+    public void throwsForNullInDenseList() {
+        var testModel = Model.assembler()
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+                        namespace smithy.example
+                        structure TestShape { values: DenseList }
+                        list DenseList { member: String }
+                        """)
+                .assemble()
+                .unwrap();
+        var converter = new SchemaConverter(testModel);
+        var schema = converter.getSchema(testModel.expectShape(ShapeId.from("smithy.example#TestShape")));
+        var builder = SchemaConverter.createDocumentBuilder(schema);
+        var codec = JsonCodec.builder().build();
+        var json = "{\"values\":[\"a\",null,\"b\"]}".getBytes(StandardCharsets.UTF_8);
+        Assertions.assertThrows(
+                SerializationException.class,
+                () -> codec.deserializeShape(json, builder));
+    }
+
+    @Test
+    public void preservesNullInSparseList() {
+        var testModel = Model.assembler()
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+                        namespace smithy.example
+                        structure TestShape { values: SparseList }
+                        @sparse list SparseList { member: String }
+                        """)
+                .assemble()
+                .unwrap();
+        var converter = new SchemaConverter(testModel);
+        var schema = converter.getSchema(testModel.expectShape(ShapeId.from("smithy.example#TestShape")));
+        var builder = SchemaConverter.createDocumentBuilder(schema);
+        var codec = JsonCodec.builder().build();
+        var json = "{\"values\":[\"a\",null,\"b\"]}".getBytes(StandardCharsets.UTF_8);
+        var result = codec.deserializeShape(json, builder);
+        var list = result.getMember("values").asList();
+        assertThat(list.size(), equalTo(3));
+        assertThat(list.get(0).asString(), equalTo("a"));
+        assertThat(list.get(1), equalTo(null));
+        assertThat(list.get(2).asString(), equalTo("b"));
+    }
+
+    @Test
+    public void throwsForNullInDenseMap() {
+        var testModel = Model.assembler()
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+                        namespace smithy.example
+                        structure TestShape { values: DenseMap }
+                        map DenseMap { key: String, value: String }
+                        """)
+                .assemble()
+                .unwrap();
+        var converter = new SchemaConverter(testModel);
+        var schema = converter.getSchema(testModel.expectShape(ShapeId.from("smithy.example#TestShape")));
+        var builder = SchemaConverter.createDocumentBuilder(schema);
+        var codec = JsonCodec.builder().build();
+        var json = "{\"values\":{\"a\":\"x\",\"b\":null}}".getBytes(StandardCharsets.UTF_8);
+        Assertions.assertThrows(
+                SerializationException.class,
+                () -> codec.deserializeShape(json, builder));
+    }
+
+    @Test
+    public void preservesNullInSparseMap() {
+        var testModel = Model.assembler()
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+                        namespace smithy.example
+                        structure TestShape { values: SparseMap }
+                        @sparse map SparseMap { key: String, value: String }
+                        """)
+                .assemble()
+                .unwrap();
+        var converter = new SchemaConverter(testModel);
+        var schema = converter.getSchema(testModel.expectShape(ShapeId.from("smithy.example#TestShape")));
+        var builder = SchemaConverter.createDocumentBuilder(schema);
+        var codec = JsonCodec.builder().build();
+        var json = "{\"values\":{\"a\":\"x\",\"b\":null}}".getBytes(StandardCharsets.UTF_8);
+        var result = codec.deserializeShape(json, builder);
+        var map = result.getMember("values").asStringMap();
+        assertThat(map.size(), equalTo(2));
+        assertThat(map.get("a").asString(), equalTo("x"));
+        assertThat(map.get("b"), equalTo(null));
+    }
+
+    @Test
+    public void validationFailsForNullInDenseListViaSetMemberValue() {
+        var testModel = Model.assembler()
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+                        namespace smithy.example
+                        structure TestShape { values: DenseList }
+                        list DenseList { member: String }
+                        """)
+                .assemble()
+                .unwrap();
+        var converter = new SchemaConverter(testModel);
+        var schema = converter.getSchema(testModel.expectShape(ShapeId.from("smithy.example#TestShape")));
+        var builder = SchemaConverter.createDocumentBuilder(schema);
+        var listWithNull = new ArrayList<Document>();
+        listWithNull.add(Document.of("a"));
+        listWithNull.add(null);
+        listWithNull.add(Document.of("b"));
+        builder.setMemberValue(schema.member("values"), Document.of(listWithNull));
+        var result = builder.build();
+        var validator = Validator.builder().build();
+        var errors = validator.validate(result);
+        assertThat(errors.isEmpty(), equalTo(false));
+    }
+
+    @Test
+    public void validationFailsForNullInDenseMapViaSetMemberValue() {
+        var testModel = Model.assembler()
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+                        namespace smithy.example
+                        structure TestShape { values: DenseMap }
+                        map DenseMap { key: String, value: String }
+                        """)
+                .assemble()
+                .unwrap();
+        var converter = new SchemaConverter(testModel);
+        var schema = converter.getSchema(testModel.expectShape(ShapeId.from("smithy.example#TestShape")));
+        var builder = SchemaConverter.createDocumentBuilder(schema);
+        var mapWithNull = new LinkedHashMap<String, Document>();
+        mapWithNull.put("a", Document.of("x"));
+        mapWithNull.put("b", null);
+        builder.setMemberValue(schema.member("values"), Document.of(mapWithNull));
+        var result = builder.build();
+        var validator = Validator.builder().build();
+        var errors = validator.validate(result);
+        assertThat(errors.isEmpty(), equalTo(false));
+    }
+
+    @Test
+    public void serializingNullInDenseMapDoesNotNpe() {
+        // Reproduces customer scenario: deserializing a response with null in a dense map
+        // Previously this would succeed deserialization but NPE during serialization/getMember.
+        // Now it throws SerializationException during deserialization.
+        var testModel = Model.assembler()
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+                        namespace smithy.example
+                        structure TestShape { values: OuterMap }
+                        map OuterMap { key: String, value: InnerMap }
+                        map InnerMap { key: String, value: String }
+                        """)
+                .assemble()
+                .unwrap();
+        var converter = new SchemaConverter(testModel);
+        var schema = converter.getSchema(testModel.expectShape(ShapeId.from("smithy.example#TestShape")));
+        var builder = SchemaConverter.createDocumentBuilder(schema);
+        var codec = JsonCodec.builder().build();
+        var json = "{\"values\":{\"outer\":{\"a\":\"x\",\"b\":null}}}".getBytes(StandardCharsets.UTF_8);
+        Assertions.assertThrows(
+                SerializationException.class,
+                () -> codec.deserializeShape(json, builder));
     }
 
     @Test

@@ -715,7 +715,7 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
 
     @Test
     void selfClosingElementsInListSkippedAsNull() {
-        // Self-closing and empty elements in lists are treated as null (skipped) by the generated code
+        // Self-closing and empty elements in sparse lists are treated as null and preserved
         String xml = "<ComplexStruct><id>1</id><count>1</count><enabled>true</enabled>"
                 + "<ratio>1.0</ratio><score>1.0</score><bigCount>1</bigCount>"
                 + "<nested><field1>a</field1><field2>1</field2></nested>"
@@ -724,7 +724,7 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
         var staxResult = deserialize(STAX, xml, ComplexStruct.builder());
         var nativeResult = deserialize(NATIVE, xml, ComplexStruct.builder());
         assertThat(nativeResult.getTags()).isEqualTo(staxResult.getTags());
-        assertThat(nativeResult.getTags()).containsExactly("hello");
+        assertThat(nativeResult.getTags()).containsExactly(null, "hello", null);
     }
 
     @PerProvider

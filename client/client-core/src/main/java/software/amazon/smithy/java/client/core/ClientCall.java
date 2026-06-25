@@ -110,6 +110,17 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
     }
 
     /**
+     * Set the retry token for the call, keeping {@link CallContext#RETRY_TOKEN} in sync so interceptors observe the
+     * token in effect for the current attempt.
+     *
+     * @param retryToken the token to associate with the call, or {@code null} once the token is released.
+     */
+    void setRetryToken(RetryToken retryToken) {
+        this.retryToken = retryToken;
+        this.context.put(CallContext.RETRY_TOKEN, retryToken);
+    }
+
+    /**
      * Check if a retry is disallowed for this call.
      *
      * <p>Currently only looks at whether a non-replayable stream is used in the input.

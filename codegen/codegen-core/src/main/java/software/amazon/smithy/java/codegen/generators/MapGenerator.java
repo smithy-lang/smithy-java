@@ -14,6 +14,7 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.MapSerializer;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.traits.SparseTrait;
@@ -95,8 +96,8 @@ public final class MapGenerator
                                                 @Override
                                                 public void accept(${shape:B} state, ${string:T} key, ${shapeDeserializer:T} deserializer) {
                                                     if (deserializer.isNull()) {
-                                                        ${?sparse}state.put(${?enumKey}${key:T}.from(${/enumKey}key${?enumKey})${/enumKey}, ${/sparse}deserializer.readNull()${?sparse})${/sparse};
-                                                        return;
+                                                        ${?sparse}state.put(${?enumKey}${key:T}.from(${/enumKey}key${?enumKey})${/enumKey}, deserializer.readNull());
+                                                        return;${/sparse}${^sparse}throw new ${serdeException:T}("Null value found in dense map");${/sparse}
                                                     }
                                                     state.put(${?enumKey}${key:T}.from(${/enumKey}key${?enumKey})${/enumKey}, $memberDeserializer:C);
                                                 }
@@ -143,6 +144,7 @@ public final class MapGenerator
                                             .expectShape(directive.shape().getKey().getTarget())
                                             .isEnumShape());
                             writer.putContext("sparse", directive.shape().hasTrait(SparseTrait.class));
+                            writer.putContext("serdeException", SerializationException.class);
                             writer.write(template);
                             writer.popState();
 

@@ -29,8 +29,11 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
+import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.endpoints.EndpointResolverParams;
+import software.amazon.smithy.java.rulesengine.BddTrace;
+import software.amazon.smithy.java.rulesengine.BddTraceSink;
 import software.amazon.smithy.java.rulesengine.Bytecode;
 import software.amazon.smithy.java.rulesengine.BytecodeEndpointResolver;
 import software.amazon.smithy.java.rulesengine.RulesEngineBuilder;
@@ -38,11 +41,8 @@ import software.amazon.smithy.java.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.java.rulesengine.RulesExtension;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
-import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ServiceShape;
-import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.traits.HttpTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.transform.ModelTransformer;
 import software.amazon.smithy.rulesengine.aws.s3.S3TreeRewriter;
@@ -151,22 +151,10 @@ public class S3EndpointBenchmark {
             return bytecode;
         }
 
+        // Remove the streaming trait (not supported here). S3Plugin handles bucket-in-path removal.
         private static Model customizeS3Model(Model model) {
-            var transformer = ModelTransformer.create();
-            Model m = transformer.removeTraitsIf(model, (shape, trait) -> trait instanceof StreamingTrait);
-            return transformer.mapShapes(m, s -> {
-                if (s.isOperationShape()) {
-                    var httpTrait = s.getTrait(HttpTrait.class).orElse(null);
-                    if (httpTrait != null && httpTrait.getUri().getLabel("Bucket").isPresent()) {
-                        var uriString = httpTrait.getUri().toString().replace("{Bucket}", "");
-                        uriString = uriString.replace("//", "/");
-                        var newUri = UriPattern.parse(uriString);
-                        var newHttpTrait = httpTrait.toBuilder().uri(newUri).build();
-                        return Shape.shapeToBuilder(s).addTrait(newHttpTrait).build();
-                    }
-                }
-                return s;
-            });
+            return ModelTransformer.create()
+                    .removeTraitsIf(model, (shape, trait) -> trait instanceof StreamingTrait);
         }
     }
 
@@ -202,6 +190,10 @@ public class S3EndpointBenchmark {
         EndpointResolverParams dataPlaneShortZoneParams;
         EndpointResolverParams vanillaAccessPointArnParams;
         EndpointResolverParams s3OutpostsVanillaParams;
+        // Same inputs as vanillaVirtualAddressing, but with a no-op BddTraceSink on the context. Pairs
+        // with vanillaVirtualAddressing to A/B the trace overhead: traced (full per-condition callbacks)
+        // vs untraced (one null ctx.get on the otherwise-untouched fast loop).
+        EndpointResolverParams tracedVirtualAddressingParams;
 
         @Setup
         public void setup() {
@@ -310,6 +302,26 @@ public class S3EndpointBenchmark {
                             "Bucket",
                             "arn:aws:s3-outposts:us-west-2:123456789012:outpost/op-01234567890123456/accesspoint/reports"));
 
+            // Same as vanilla virtual addressing, but with a no-op trace sink on the context.
+            tracedVirtualAddressingParams = buildParams(client,
+                    getObject,
+                    canned,
+                    Map.of("Bucket", Document.of("bucket-name"), "Key", Document.of("key")),
+                    "us-west-2",
+                    Map.of("Accelerate",
+                            false,
+                            "Bucket",
+                            "bucket-name",
+                            "ForcePathStyle",
+                            false,
+                            "Region",
+                            "us-west-2",
+                            "UseDualStack",
+                            false,
+                            "UseFIPS",
+                            false),
+                    NoopTraceSink.INSTANCE);
+
             // Dump disassembly to tmp file for analysis
             dumpDisassembly(treeMode);
         }
@@ -333,12 +345,27 @@ public class S3EndpointBenchmark {
                 String region,
                 Map<String, Object> additionalParams
         ) {
+            return buildParams(client, operation, canned, inputMembers, region, additionalParams, null);
+        }
+
+        private static EndpointResolverParams buildParams(
+                DynamicClient client,
+                ApiOperation<?, ?> operation,
+                boolean canned,
+                Map<String, Document> inputMembers,
+                String region,
+                Map<String, Object> additionalParams,
+                BddTraceSink traceSink
+        ) {
             var inputValue = client.createStruct(
                     ShapeId.from("com.amazonaws.s3#GetObjectRequest"),
                     Document.of(canned ? Map.of() : inputMembers));
             var ctx = Context.create();
             ctx.put(RegionSetting.REGION, region);
             ctx.put(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS, additionalParams);
+            if (traceSink != null) {
+                ctx.put(RulesEngineSettings.BDD_TRACE_SINK, traceSink);
+            }
             return EndpointResolverParams.builder()
                     .context(ctx)
                     .inputValue(inputValue)
@@ -347,9 +374,32 @@ public class S3EndpointBenchmark {
         }
     }
 
+    /** A sink whose trace discards everything, so the benchmark measures pure trace-loop overhead. */
+    private enum NoopTraceSink implements BddTraceSink, BddTrace {
+        INSTANCE;
+
+        @Override
+        public BddTrace begin(Bytecode bytecode, Map<String, Object> parameters) {
+            return this;
+        }
+
+        @Override
+        public void node(int nodeRef, int conditionId, boolean satisfied, boolean branch) {}
+
+        @Override
+        public void result(int resultId, Endpoint endpoint) {}
+    }
+
     @Benchmark
     public Object vanillaVirtualAddressing(ParamState params) {
         return params.resolver.resolveEndpoint(params.vanillaVirtualAddressingParams);
+    }
+
+    /** Identical to {@link #vanillaVirtualAddressing} but with a no-op trace sink set, to measure the
+     * traced-loop overhead. The delta between the two is the cost of tracing. */
+    @Benchmark
+    public Object tracedVirtualAddressing(ParamState params) {
+        return params.resolver.resolveEndpoint(params.tracedVirtualAddressingParams);
     }
 
     @Benchmark

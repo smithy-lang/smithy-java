@@ -11,6 +11,7 @@ import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
+import software.amazon.smithy.java.retries.api.RetryToken;
 
 /**
  * Context parameters made available to underlying transports like HTTP clients.
@@ -50,6 +51,17 @@ public final class CallContext {
      * <p>This is a read-only value; modifying this value has no effect on a request.
      */
     public static final Context.Key<Integer> RETRY_MAX = Context.key("Max retries");
+
+    /**
+     * The opaque retry token for the current in-progress attempt, if a retry strategy is in use.
+     *
+     * <p>The token is acquired before the first attempt and refreshed after each retryable failure, so the value
+     * observed by an interceptor is always the token in effect for the current attempt. It is {@code null} once the
+     * call completes and the token is released.
+     *
+     * <p>This is a read-only value; modifying this value has no effect on a request.
+     */
+    public static final Context.Key<RetryToken> RETRY_TOKEN = Context.key("Retry token");
 
     /**
      * The idempotency token used with the call, if any.

@@ -30,4 +30,14 @@ public final class RulesEngineSettings {
      */
     public static final Context.Key<Map<String, Object>> ADDITIONAL_ENDPOINT_PARAMS = Context.key(
             "Additional endpoint parameters to pass to the rules engine");
+
+    /**
+     * Opt-in sink that receives a step-by-step trace of BDD endpoint resolution (inputs, each condition
+     * evaluated, and the matched result) for tooling and debugging. When the key is absent the resolver
+     * runs its original loop and does no extra work, so the normal resolution path is unaffected.
+     *
+     * @see BddTraceSink
+     */
+    public static final Context.Key<BddTraceSink> BDD_TRACE_SINK = Context.key(
+            "Sink for tracing BDD endpoint resolution");
 }

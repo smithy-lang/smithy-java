@@ -374,6 +374,94 @@ public class StructDocumentTest {
     }
 
     @Test
+    public void parsesIsoStringForTimestampMember() {
+        var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
+                .putMember("when", PreludeSchemas.TIMESTAMP)
+                .build();
+        var document = Document.ofObject(Map.of("when", "2024-01-01T00:00:00Z"));
+
+        var sd = StructDocument.of(schema, document, ShapeId.from("smithy.example#S"));
+
+        var when = sd.getMember("when");
+        assertThat(when.type(), is(ShapeType.TIMESTAMP));
+        assertThat(when.asTimestamp(), equalTo(Instant.parse("2024-01-01T00:00:00Z")));
+    }
+
+    @Test
+    public void readsEpochNumberForTimestampMember() {
+        var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
+                .putMember("when", PreludeSchemas.TIMESTAMP)
+                .build();
+        var document = Document.ofObject(Map.of("when", 1704067200));
+
+        var sd = StructDocument.of(schema, document, ShapeId.from("smithy.example#S"));
+
+        assertThat(sd.getMember("when").asTimestamp(), equalTo(Instant.parse("2024-01-01T00:00:00Z")));
+    }
+
+    @Test
+    public void parsesIsoStringsForNestedTimestamps() {
+        var model = Model.assembler()
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+                        namespace smithy.example
+
+                        structure Foo {
+                            items: ItemList
+                        }
+
+                        list ItemList {
+                            member: Item
+                        }
+
+                        structure Item {
+                            when: Timestamp
+                        }
+                        """)
+                .assemble()
+                .unwrap();
+        var converter = new SchemaConverter(model);
+        var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#Foo")));
+
+        var input = Document.ofObject(Map.of(
+                "items",
+                List.of(
+                        Map.of("when", "2024-01-01T00:00:00Z"),
+                        Map.of("when", "2024-06-22T12:00:00Z"))));
+        var sd = StructDocument.of(schema, input);
+
+        var items = sd.getMember("items").asList();
+        assertThat(items, hasSize(2));
+        assertThat(items.get(0).getMember("when").asTimestamp(), equalTo(Instant.parse("2024-01-01T00:00:00Z")));
+        assertThat(items.get(1).getMember("when").asTimestamp(), equalTo(Instant.parse("2024-06-22T12:00:00Z")));
+    }
+
+    @Test
+    public void ignoresTimestampFormatTraitWhenCoercingInput() {
+        // @timestampFormat is a wire-serialization concern; the protocol-agnostic input model always treats
+        // a string as date-time (ISO-8601), regardless of any trait on the member.
+        var model = Model.assembler()
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+                        namespace smithy.example
+
+                        structure Foo {
+                            @timestampFormat("epoch-seconds")
+                            when: Timestamp
+                        }
+                        """)
+                .assemble()
+                .unwrap();
+        var converter = new SchemaConverter(model);
+        var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#Foo")));
+
+        var input = Document.ofObject(Map.of("when", "2024-01-01T00:00:00Z"));
+        var sd = StructDocument.of(schema, input);
+
+        assertThat(sd.getMember("when").asTimestamp(), equalTo(Instant.parse("2024-01-01T00:00:00Z")));
+    }
+
+    @Test
     public void convertDocumentPassesThroughDataStream() {
         var model = Model.assembler()
                 .addUnparsedModel("test.smithy", """

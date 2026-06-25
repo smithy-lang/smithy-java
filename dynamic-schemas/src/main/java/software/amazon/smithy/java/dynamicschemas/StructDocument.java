@@ -5,17 +5,20 @@
 
 package software.amazon.smithy.java.dynamicschemas;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.java.core.serde.document.DocumentUtils;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -29,13 +32,63 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public final class StructDocument implements Document, SerializableStruct {
 
     private final Schema schema;
-    private final ShapeId service;
-    private final Map<String, Document> members;
+    // Structure: member-indexed array. Union: always null (uses unionValue/unionMemberSchema instead).
+    private final Document[] values;
+    // Union only: the set member's value. Object (not Document) so scalars can be stored raw, skipping
+    // the ContentDocument wrapper — the biggest allocation win for union-dense payloads (e.g. DynamoDB AttributeValue).
+    private final Object unionValue;
+    // Union only: cached schema of the set member (avoids re-resolving on every serialize).
+    private final Schema unionMemberSchema;
+    private Map<String, Document> mapView;
 
-    StructDocument(Schema schema, Map<String, Document> members, ShapeId service) {
-        this.service = service;
+    StructDocument(Schema schema, Document[] values) {
         this.schema = schema;
-        this.members = members;
+        if (schema.type() == ShapeType.UNION) {
+            // Collapse the per-member array down to the single set value; unions never retain the array.
+            int idx = findSetMember(values);
+            this.values = null;
+            this.unionValue = idx >= 0 ? unwrapScalar(values[idx]) : null;
+            this.unionMemberSchema = idx >= 0 ? schema.members().get(idx) : null;
+        } else {
+            this.values = values;
+            this.unionValue = null;
+            this.unionMemberSchema = null;
+        }
+    }
+
+    StructDocument(Schema schema, Object unionValue, Schema unionMemberSchema) {
+        this.schema = schema;
+        this.values = null;
+        this.unionValue = unionValue;
+        this.unionMemberSchema = unionMemberSchema;
+    }
+
+    private static int findSetMember(Document[] values) {
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] != null) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static Object unwrapScalar(Document d) {
+        if (d instanceof ContentDocument cd && cd.isScalar()) {
+            return cd.rawValue();
+        }
+        return d;
+    }
+
+    // Cold path: re-wraps a raw scalar union value as a Document for the accessor API.
+    private Document unionValueAsDocument() {
+        Object uv = unionValue;
+        if (uv == null) {
+            return null;
+        }
+        if (uv instanceof Document d) {
+            return d;
+        }
+        return new ContentDocument(unionMemberSchema, uv);
     }
 
     /**
@@ -76,14 +129,28 @@ public final class StructDocument implements Document, SerializableStruct {
     }
 
     private static Document convertStructureDocument(Schema schema, Document delegate, ShapeId service) {
-        Map<String, Document> result = new LinkedHashMap<>();
-        for (var member : schema.members()) {
+        List<Schema> schemaMembers = schema.members();
+        if (schema.type() == ShapeType.UNION) {
+            for (int i = 0, n = schemaMembers.size(); i < n; i++) {
+                Schema member = schemaMembers.get(i);
+                var value = delegate.getMember(member.memberName());
+                if (value != null) {
+                    return new StructDocument(schema,
+                            unwrapScalar(convertDocument(member, value, service)),
+                            member);
+                }
+            }
+            return new StructDocument(schema, (Object) null, (Schema) null);
+        }
+        Document[] result = new Document[schemaMembers.size()];
+        for (int i = 0, n = schemaMembers.size(); i < n; i++) {
+            Schema member = schemaMembers.get(i);
             var value = delegate.getMember(member.memberName());
             if (value != null) {
-                result.put(member.memberName(), convertDocument(member, value, service));
+                result[member.memberIndex()] = convertDocument(member, value, service);
             }
         }
-        return new StructDocument(schema, result, service);
+        return new StructDocument(schema, result);
     }
 
     static Document convertDocument(Schema schema, Document delegate, ShapeId service) {
@@ -105,7 +172,7 @@ public final class StructDocument implements Document, SerializableStruct {
                         result.put(entry.getKey(), convertDocument(valueMember, entry.getValue(), service));
                     }
                 }
-                yield new ContentDocument(Document.of(result), schema);
+                yield new ContentDocument(schema, result);
             }
             case LIST, SET -> {
                 List<Document> result = new ArrayList<>();
@@ -117,23 +184,45 @@ public final class StructDocument implements Document, SerializableStruct {
                         result.add(convertDocument(valueMember, value, service));
                     }
                 }
-                yield new ContentDocument(Document.of(result), schema);
+                yield new ContentDocument(schema, result);
             }
-            case BOOLEAN -> new ContentDocument(Document.of(delegate.asBoolean()), schema);
-            case STRING, ENUM -> new ContentDocument(Document.of(delegate.asString()), schema);
-            case TIMESTAMP -> new ContentDocument(Document.of(delegate.asTimestamp()), schema);
+            case BOOLEAN -> new ContentDocument(schema, delegate.asBoolean());
+            case STRING, ENUM -> new ContentDocument(schema, delegate.asString());
+            case TIMESTAMP -> new ContentDocument(schema, convertTimestamp(delegate));
             case BYTE, SHORT, INTEGER, INT_ENUM,
                     LONG, FLOAT, DOUBLE, BIG_INTEGER, BIG_DECIMAL ->
-                new ContentDocument(Document.ofNumber(delegate.asNumber()), schema);
-            case DOCUMENT -> new ContentDocument(delegate, schema);
+                new ContentDocument(schema, delegate.asNumber());
+            case DOCUMENT -> new ContentDocument.SchemaDocument(schema, delegate);
             case BLOB -> {
                 if (schema.hasTrait(TraitKey.STREAMING_TRAIT)) {
                     yield Document.of(schema, delegate.asDataStream());
                 }
-                yield new ContentDocument(Document.of(delegate.asBlob()), schema);
+                yield new ContentDocument(schema, delegate.asBlob());
             }
             default -> throw new IllegalArgumentException("Unsupported schema type: " + schema);
         };
+    }
+
+    /**
+     * Coerces an untyped document into an {@link Instant} for a modeled timestamp member.
+     *
+     * <p>The DynamicClient input model is the protocol-agnostic, in-memory Smithy data model, so a timestamp value
+     * is interpreted by its modeled representation rather than any wire format: a number is epoch-seconds and a string
+     * is {@code date-time} (ISO-8601). This mirrors how Smithy interprets timestamp values in model nodes (which also
+     * ignore {@code @timestampFormat}). The protocol's {@code @timestampFormat} is applied later, when the resulting
+     * Instant is serialized onto the wire.
+     */
+    private static Instant convertTimestamp(Document delegate) {
+        var type = delegate.type();
+        if (type == ShapeType.TIMESTAMP) {
+            // Already a typed timestamp document (e.g. an Instant passed via Document.ofObject).
+            return delegate.asTimestamp();
+        } else if (type != ShapeType.STRING) {
+            // Not-string means number, and numbers are epoch-seconds.
+            return TimestampFormatter.Prelude.EPOCH_SECONDS.readFromNumber(delegate.asNumber());
+        } else {
+            return TimestampFormatter.Prelude.DATE_TIME.readFromString(delegate.asString(), false);
+        }
     }
 
     @Override
@@ -153,20 +242,52 @@ public final class StructDocument implements Document, SerializableStruct {
 
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
-        for (var name : getMemberNames()) {
-            var value = getMember(name);
-            if (value != null) {
-                var member = schema.member(name);
-                if (member != null) {
+        Document[] values = this.values;
+        if (values != null) {
+            for (int i = 0; i < values.length; i++) {
+                Document value = values[i];
+                if (value != null) {
                     value.serialize(serializer);
                 }
+            }
+        } else {
+            Object uv = unionValue;
+            if (uv instanceof Document d) {
+                // Aggregate / struct / document union member: serialize through the Document.
+                d.serialize(serializer);
+            } else if (uv != null) {
+                // Scalar union member stored raw (no ContentDocument wrapper): write it directly against the member
+                // schema. Skips both the wrapper allocation and the extra virtual ContentDocument.serialize hop.
+                ContentDocument.serializeScalar(serializer, unionMemberSchema, uv);
             }
         }
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
-        return DocumentUtils.getMemberValue(this, schema, member);
+        SchemaUtils.validateMemberInSchema(schema, member, null);
+        Object value;
+        if (values != null) {
+            int idx = member.memberIndex();
+            value = idx < values.length ? values[idx] : null;
+        } else {
+            value = unionMemberSchema != null && member.memberIndex() == unionMemberSchema.memberIndex()
+                    ? unionValue
+                    : null;
+        }
+        if (value == null) {
+            return null;
+        }
+        try {
+            // A raw scalar union value is already a valid asObject() result (String/Number/Boolean/Instant/...);
+            // a Document (structure, aggregate, document member, or any structure member value) is unwrapped.
+            return (T) (value instanceof Document d ? d.asObject() : value);
+        } catch (ClassCastException e) {
+            throw new ClassCastException(
+                    "Unable to cast document member `" + member.id() + "` from document with schema `"
+                            + schema.id() + "`: " + e.getMessage());
+        }
     }
 
     @Override
@@ -181,30 +302,84 @@ public final class StructDocument implements Document, SerializableStruct {
 
     @Override
     public int size() {
-        return members.size();
+        Document[] values = this.values;
+        if (values != null) {
+            int count = 0;
+            for (Document v : values) {
+                if (v != null) {
+                    count++;
+                }
+            }
+            return count;
+        }
+        return unionValue != null ? 1 : 0;
     }
 
     @Override
     public Map<String, Document> asStringMap() {
-        return members;
-    }
-
-    @Override
-    public Object asObject() {
-        Map<String, Object> result = new LinkedHashMap<>();
-        for (var entry : members.entrySet()) {
-            result.put(entry.getKey(), entry.getValue().asObject());
+        Map<String, Document> result = mapView;
+        if (result == null) {
+            Document[] values = this.values;
+            if (values != null) {
+                result = new LinkedHashMap<>();
+                List<Schema> schemaMembers = schema.members();
+                for (int i = 0, n = schemaMembers.size(); i < n; i++) {
+                    Document value = i < values.length ? values[i] : null;
+                    if (value != null) {
+                        result.put(schemaMembers.get(i).memberName(), value);
+                    }
+                }
+                result = Collections.unmodifiableMap(result);
+            } else {
+                result = unionValue != null
+                        ? Map.of(unionMemberSchema.memberName(), unionValueAsDocument())
+                        : Map.of();
+            }
+            mapView = result;
         }
         return result;
     }
 
     @Override
+    public Object asObject() {
+        Document[] values = this.values;
+        if (values != null) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            List<Schema> schemaMembers = schema.members();
+            for (int i = 0, n = schemaMembers.size(); i < n; i++) {
+                Document value = i < values.length ? values[i] : null;
+                if (value != null) {
+                    result.put(schemaMembers.get(i).memberName(), value.asObject());
+                }
+            }
+            return result;
+        }
+        if (unionValue == null) {
+            return Map.of();
+        }
+        Object uv = unionValue;
+        Object asObject = uv instanceof Document d ? d.asObject() : uv;
+        return Map.of(unionMemberSchema.memberName(), asObject);
+    }
+
+    @Override
     public Document getMember(String memberName) {
-        return members.get(memberName);
+        Schema memberSchema = schema.member(memberName);
+        if (memberSchema == null) {
+            return null;
+        }
+        int idx = memberSchema.memberIndex();
+        Document[] values = this.values;
+        if (values != null) {
+            return idx < values.length ? values[idx] : null;
+        }
+        return unionMemberSchema != null && idx == unionMemberSchema.memberIndex()
+                ? unionValueAsDocument()
+                : null;
     }
 
     @Override
     public Set<String> getMemberNames() {
-        return members.keySet();
+        return asStringMap().keySet();
     }
 }

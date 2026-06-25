@@ -85,8 +85,8 @@ public final class ListGenerator
                                                 @Override
                                                 public void accept(${shape:B} state, ${shapeDeserializer:T} deserializer) {
                                                     if (deserializer.isNull()) {
-                                                        ${?sparse}state.add(deserializer.readNull());${/sparse}
-                                                        return;
+                                                        ${?sparse}state.add(deserializer.readNull());
+                                                        return;${/sparse}${^sparse}throw new ${serdeException:T}("Null value found in dense list");${/sparse}
                                                     }
                                                     state.add($memberDeserializer:C);
                                                 }

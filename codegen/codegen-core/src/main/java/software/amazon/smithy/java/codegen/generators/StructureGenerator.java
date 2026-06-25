@@ -90,7 +90,7 @@ public final class StructureGenerator<
     public void accept(T directive) {
         if (directive.shape().hasTrait(UnitTypeTrait.class) || directive.symbol()
                 .getProperty(SymbolProperties.EXTERNAL_TYPE)
-                .isPresent()) {
+                .orElse(false)) {
             // Skip Unit structures or external types.
             return;
         }
