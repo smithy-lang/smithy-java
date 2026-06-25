@@ -86,6 +86,18 @@
         <Bug pattern="DCN_NULLPOINTER_EXCEPTION" />
     </Match>
 
+    <!--
+    ~ signal() intentionally calls notifyAll() with no state change of its own: the queue state was
+    ~ already mutated under the same monitor by a preceding burst of offer(..., signal=false) calls,
+    ~ and signal() just flushes the deferred consumer wake. The naked-notify heuristic can't see the
+    ~ prior offers, so this is a false positive.
+    -->
+    <Match>
+        <Class name="software.amazon.smithy.java.http.client.h2.H2StreamBody"/>
+        <Method name="signal"/>
+        <Bug pattern="NN_NAKED_NOTIFY"/>
+    </Match>
+
     <!-- JMH benchmark files - not production code -->
     <Match>
         <Class name="~.*\.http\.client\.VirtualThreadScalingBenchmark.*"/>
