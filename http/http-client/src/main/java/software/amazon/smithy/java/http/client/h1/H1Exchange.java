@@ -184,6 +184,9 @@ final class H1Exchange implements HttpExchange {
     public void writeRequestBody(DataStream body) throws IOException {
         try (OutputStream out = requestBody()) {
             if (body != null) {
+                // Use writeTo, not asInputStream().transferTo: a body can flush per message via writeTo,
+                // which for a chunked request sends each message as its own chunk. transferTo would
+                // coalesce them, deadlocking a send-then-await-reply event protocol.
                 body.writeTo(out);
             }
         }

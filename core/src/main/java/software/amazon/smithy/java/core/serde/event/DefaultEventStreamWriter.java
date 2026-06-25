@@ -5,6 +5,10 @@
 
 package software.amazon.smithy.java.core.serde.event;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -31,16 +35,19 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
         F extends Frame<?>>
         implements ProtocolEventStreamWriter<T, IE, F> {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(DefaultEventStreamWriter.class);
+
     /**
      * Default timeout to block waiting to write.
      */
     private static final int WRITE_TIMEOUT_MILLIS = 10_000;
+
     /**
      * This latch is used to ensure that the protocol handler writes the initial event
      * before any other event is written. Protocols that don't require the initial event still have
      * to unlatch the writer by bootstrapping it with a null value.
      */
     private final CountDownLatch readyLatch = new CountDownLatch(1);
+
     /**
      * Pipes bytes written by this writer to an input stream used
      * to send them over the wire.
@@ -184,8 +191,7 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
 
     @Override
     public EventStreamReader<T> asReader() {
-        throw new UnsupportedOperationException(
-                "This writer cannot be converted to a reader");
+        throw new UnsupportedOperationException("This writer cannot be converted to a reader");
     }
 
     @Override
@@ -233,6 +239,64 @@ final class DefaultEventStreamWriter<IE extends SerializableStruct, T extends Se
      */
     @Override
     public DataStream toDataStream() {
-        return DataStream.ofInputStream(pipeStream);
+        return new EventStreamDataStream(pipeStream);
+    }
+
+    /**
+     * A {@link DataStream} over the event pipe whose {@link #writeTo(OutputStream)} flushes after each event
+     * (see {@link EventPipeStream#writeMessagesTo}), so a transport draining via {@code writeTo} emits one
+     * frame per event. Still works as an ordinary unknown-length, non-replayable {@code InputStream}-backed
+     * stream via {@link #asInputStream()}.
+     */
+    private static final class EventStreamDataStream implements DataStream {
+        private final EventPipeStream pipeStream;
+        // The pipe is single-use: once drained (via writeTo/asInputStream) or closed it cannot be replayed.
+        private final AtomicBoolean consumed = new AtomicBoolean(false);
+
+        EventStreamDataStream(EventPipeStream pipeStream) {
+            this.pipeStream = pipeStream;
+        }
+
+        @Override
+        public void writeTo(OutputStream out) throws IOException {
+            consumed.set(true);
+            pipeStream.writeMessagesTo(out);
+        }
+
+        @Override
+        public InputStream asInputStream() {
+            consumed.set(true);
+            return pipeStream;
+        }
+
+        @Override
+        public long contentLength() {
+            return -1;
+        }
+
+        @Override
+        public String contentType() {
+            return null;
+        }
+
+        @Override
+        public boolean isReplayable() {
+            return false;
+        }
+
+        @Override
+        public boolean isAvailable() {
+            return !consumed.get();
+        }
+
+        @Override
+        public void close() {
+            consumed.set(true);
+            try {
+                pipeStream.close();
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to close event stream", e);
+            }
+        }
     }
 }

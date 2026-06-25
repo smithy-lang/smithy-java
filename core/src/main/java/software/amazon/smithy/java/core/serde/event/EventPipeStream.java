@@ -7,6 +7,7 @@ package software.amazon.smithy.java.core.serde.event;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -30,6 +31,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
  */
 final class EventPipeStream extends InputStream {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(EventPipeStream.class);
+
     /**
      * Poison pill used to signal the end of the stream.
      */
@@ -158,6 +160,56 @@ final class EventPipeStream extends InputStream {
         }
 
         return b & 0xFF;
+    }
+
+    /**
+     * Drains queued event messages to {@code out}, writing each whole and flushing after it. This keeps
+     * per-event boundaries (unlike a byte-oriented {@code transferTo}), so a flushing transport sends each
+     * event as its own frame instead of buffering. Blocks the consumer thread until {@link #complete()}
+     * (returns) or {@link #completeWithError} (throws).
+     *
+     * @param out the sink to write messages to
+     * @throws IOException if writing fails, the producer signalled an error, or the thread is interrupted
+     */
+    void writeMessagesTo(OutputStream out) throws IOException {
+        if (closed) {
+            throw new IOException("Stream is closed");
+        }
+
+        // Flush any buffer left partially consumed by a prior read() first.
+        if (current != null && current != POISON_PILL) {
+            writeBuffer(out, current);
+            current = null;
+            out.flush();
+        }
+
+        while (true) {
+            ByteBuffer message;
+            try {
+                message = queue.take();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while reading", e);
+            }
+
+            if (message == POISON_PILL) {
+                checkError();
+                return;
+            }
+
+            writeBuffer(out, message);
+            out.flush();
+        }
+    }
+
+    private static void writeBuffer(OutputStream out, ByteBuffer message) throws IOException {
+        if (message.hasArray()) {
+            out.write(message.array(), message.arrayOffset() + message.position(), message.remaining());
+        } else {
+            byte[] tmp = new byte[message.remaining()];
+            message.get(tmp);
+            out.write(tmp);
+        }
     }
 
     @Override

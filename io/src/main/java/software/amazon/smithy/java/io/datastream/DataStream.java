@@ -95,6 +95,12 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      * Implementations may override this to avoid intermediate InputStream allocation
      * (e.g., writing directly from a byte array or ByteBuffer).
      *
+     * <p>Flushing is part of this contract, not just an optimization. An implementation carrying discrete
+     * messages (e.g. an event stream) may flush after each, and transports turn each flush into a wire
+     * frame/chunk. A send-then-await-reply event protocol deadlocks if its messages are buffered instead,
+     * so transports should drain a body via {@code writeTo}, not {@code asInputStream().transferTo(out)}
+     * (which is byte-oriented and drops these boundaries).
+     *
      * @param out the output stream to write to
      * @throws IOException if an I/O error occurs
      */

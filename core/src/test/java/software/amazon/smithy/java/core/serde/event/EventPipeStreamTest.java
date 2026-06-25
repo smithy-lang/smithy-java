@@ -9,8 +9,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -82,5 +86,43 @@ class EventPipeStreamTest {
 
     static byte[] charToUtf8Bytes(char c) {
         return Character.toString(c).getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void writeMessagesToFlushesOncePerEvent() throws IOException {
+        var pipe = new EventPipeStream();
+        var events = new String[] {"syn", "event-two", "fin"};
+        Thread.ofVirtual().start(() -> {
+            for (var e : events) {
+                pipe.write(ByteBuffer.wrap(e.getBytes(StandardCharsets.UTF_8)));
+            }
+            pipe.complete();
+        });
+
+        // Records the bytes accumulated at each flush() so we can assert one flush == one whole event.
+        var flushes = new ArrayList<String>();
+        var current = new ByteArrayOutputStream();
+        var recordingSink = new OutputStream() {
+            @Override
+            public void write(int b) {
+                current.write(b);
+            }
+
+            @Override
+            public void write(byte[] b, int off, int len) {
+                current.write(b, off, len);
+            }
+
+            @Override
+            public void flush() {
+                flushes.add(current.toString(StandardCharsets.UTF_8));
+                current.reset();
+            }
+        };
+
+        pipe.writeMessagesTo(recordingSink);
+
+        // One flush per event, in order, proving boundaries are preserved (transferTo would coalesce them).
+        assertEquals(List.of("syn", "event-two", "fin"), flushes);
     }
 }

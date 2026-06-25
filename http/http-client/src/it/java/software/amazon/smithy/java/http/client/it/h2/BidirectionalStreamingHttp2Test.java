@@ -26,24 +26,15 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  * Proves true HTTP/2 bidirectional (full-duplex) streaming: the response is read while the request body is
  * still open and unfinished.
  *
- * <p>The request body ({@link BlockingInputStream}) hands over a leading payload and then <em>blocks
- * indefinitely</em> before signalling end-of-stream — it only unblocks once the test thread releases it,
- * which the test does only <em>after</em> {@code client.send(...)} has returned and the leading echo has
- * been read. The server ({@link EchoHttp2ClientHandler}) sends response HEADERS as soon as the request
- * HEADERS arrive and echoes each request DATA frame straight back.
+ * <p>The request body ({@link BlockingInputStream}) hands over a leading payload then blocks indefinitely,
+ * unblocking only after the test releases it, which the test does only after {@code client.send(...)} has
+ * returned and the leading echo has been read. The server ({@link EchoHttp2ClientHandler}) sends response
+ * HEADERS on the request HEADERS and echoes each request DATA frame back.
  *
- * <p>This is a strict discriminator for duplex:
- * <ul>
- *   <li><b>Full duplex (correct):</b> the client writes the request body on a background virtual thread
- *       (see {@code DefaultHttpClient.sendForRoute}), so {@code send()} returns on the response HEADERS
- *       while the body is still blocked. The test reads the leading echo, then releases the body to finish.</li>
- *   <li><b>Serialized (broken):</b> if the client wrote the request body inline before reading the
- *       response, {@code send()} would block inside the body write forever — the test thread that releases
- *       the body never runs — and the test fails on the timeout.</li>
- * </ul>
- *
- * <p>Verified to be a real discriminator: forcing the client onto the inline-write path makes this test
- * hang to the timeout, while the duplex path passes.
+ * <p>Verified discriminator: the client writes the request body on a background virtual thread (see
+ * {@code DefaultHttpClient.sendForRoute}), so {@code send()} returns on the response HEADERS while the body
+ * is still blocked. Forcing the inline-write path instead makes {@code send()} block in the body write
+ * forever and the test times out.
  */
 public class BidirectionalStreamingHttp2Test extends BaseHttpClientIntegTest {
 
@@ -89,11 +80,9 @@ public class BidirectionalStreamingHttp2Test extends BaseHttpClientIntegTest {
             assertEquals(200, response.statusCode());
 
             try (InputStream in = response.body().asInputStream()) {
-                // Read one full 16 KB frame of the echo while the request body is still blocked. Receiving
-                // any response body before releasing the request is the proof that the two directions
-                // interleave. (Reading the whole leading payload could block on bytes the client hasn't
-                // flushed yet, since an OutputStream-backed body only flushes on a full frame buffer or
-                // close — one frame is enough.)
+                // Read one full 16 KB frame of the echo while the request body is still blocked. Getting any
+                // response body before releasing the request proves the two directions interleave. (One
+                // frame, not the whole payload, since the body only flushes on a full frame buffer.)
                 int prefixLen = 16 * 1024;
                 byte[] leadingEcho = readN(in, prefixLen);
                 byte[] expectedPrefix = Arrays.copyOf(LEADING_PAYLOAD, prefixLen);

@@ -71,7 +71,10 @@ final class H2StreamRequestBody {
         }
 
         try (OutputStream out = outputStream()) {
-            body.asInputStream().transferTo(out);
+            // Use writeTo, not asInputStream().transferTo: a body can flush per message via writeTo (event
+            // streams send each event as its own DATA frame). Default writeTo is transferTo, so bulk bodies
+            // are unchanged. close() flushes any remainder and sends END_STREAM.
+            body.writeTo(out);
         } finally {
             body.close();
         }
