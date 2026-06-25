@@ -69,6 +69,16 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
     }
 
     /**
+     * Add a header with a pre-canonicalized name.
+     *
+     * <p>Use this when {@code name} is already canonical lowercase. The value is
+     * still normalized and validated.
+     */
+    default void addHeaderCanonical(String name, String value) {
+        addHeader(name, value);
+    }
+
+    /**
      * Adds the given {@code headers}, similarly to if {@link #addHeader(String, List)} were to be called for each
      * entry in the given map.
      *
@@ -178,6 +188,17 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
      * The default delegates to {@link #addHeader(HeaderName, String)}.
      */
     default void addHeaderTrusted(HeaderName name, String value) {
+        addHeader(name, value);
+    }
+
+    /**
+     * Add a header with a pre-canonicalized name and pre-validated value, bypassing
+     * name canonicalization and value normalization when supported.
+     *
+     * <p>Use this only when {@code name} is already canonical lowercase and
+     * {@code value} is known to be valid.
+     */
+    default void addHeaderTrusted(String name, String value) {
         addHeader(name, value);
     }
 

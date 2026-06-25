@@ -31,8 +31,12 @@ public final class AwsJson1Protocol extends AwsJsonProtocol {
     }
 
     private static ShapeId extractErrorType(Document document, String namespace) {
+        // Per the awsJson1_0 spec, the __type discriminator may carry an over-the-wire namespace
+        // like "com.amazonaws.dynamodb.v20120810#ResourceNotFoundException" that doesn't match
+        // the model's namespace. Strip the namespace and let parseDiscriminator re-attach the
+        // service's namespace so registry lookup succeeds.
         return DocumentDeserializer.parseDiscriminator(
-                ErrorTypeUtils.removeUri(ErrorTypeUtils.readTypeAndCode(document)),
+                ErrorTypeUtils.removeNamespaceAndUri(ErrorTypeUtils.readTypeAndCode(document)),
                 namespace);
     }
 
