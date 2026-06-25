@@ -28,7 +28,6 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
-import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 import software.amazon.smithy.java.http.client.h2.ConnectionAgentH2cTransport;
@@ -60,7 +59,6 @@ public class H2cMixedGetPutBenchmark {
     private int streamsPerConnection;
 
     private HttpClient smithyClient;
-    private Context transportContext;
     private List<EventLoopH2cTransport> eventLoopTransports;
     private AtomicInteger eventLoopIndex;
     private List<ConnectionAgentH2cTransport> agentTransports;
@@ -78,7 +76,6 @@ public class H2cMixedGetPutBenchmark {
                 .httpVersionPolicy(HttpVersionPolicy.H2C_PRIOR_KNOWLEDGE)
                 .dnsResolver(BenchmarkSupport.staticDns())
                 .build();
-        transportContext = Context.create();
         eventLoopTransports = new ArrayList<>(connections);
         for (int i = 0; i < connections; i++) {
             eventLoopTransports.add(new EventLoopH2cTransport(BenchmarkSupport.BENCH_HOST, BenchmarkSupport.H2C_PORT));

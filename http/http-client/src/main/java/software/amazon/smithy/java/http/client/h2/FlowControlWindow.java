@@ -76,7 +76,11 @@ final class FlowControlWindow {
                 if (remainingNs <= 0) {
                     return 0;
                 }
-                available.awaitNanos(Math.min(remainingNs, POLL_INTERVAL_NS));
+                // Return value intentionally ignored: the loop re-checks the window via
+                // tryAcquireNonBlocking and recomputes the remaining time from deadlineNs, so the
+                // nanos-left hint from awaitNanos adds nothing. A short POLL_INTERVAL_NS cap bounds
+                // the wait so a missed release signal is still picked up on the next tick.
+                long ignored = available.awaitNanos(Math.min(remainingNs, POLL_INTERVAL_NS));
             }
         } finally {
             lock.unlock();

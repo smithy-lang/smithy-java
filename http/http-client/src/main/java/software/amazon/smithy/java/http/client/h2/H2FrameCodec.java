@@ -395,10 +395,8 @@ final class H2FrameCodec {
         if (initialPayload != null && initialLength > 0
                 && (currentType == FRAME_TYPE_HEADERS || currentType == FRAME_TYPE_PUSH_PROMISE)) {
             if ((initialFlags & FLAG_PADDED) != 0) {
-                if (fragmentLength < 1) {
-                    throw new H2Exception(ERROR_FRAME_SIZE_ERROR,
-                            frameTypeName(currentType) + " padded frame missing pad-length byte");
-                }
+                // fragmentLength >= 1 is guaranteed by the initialLength > 0 guard above (fragmentLength
+                // was initialized to initialLength), so the pad-length byte is always present here.
                 int padLen = initialPayload[fragmentOffset] & 0xFF;
                 fragmentOffset++;
                 fragmentLength--;

@@ -103,6 +103,25 @@
         <Class name="~.*\.http\.client\.VirtualThreadScalingBenchmark.*"/>
     </Match>
 
+    <!--
+    ~ http-client JMH benchmark harness (src/jmh) - not production code:
+    ~ - @AuxCounters Counter fields are written by the benchmark and read reflectively by JMH (UrF).
+    ~ - Shared payload constants are intentionally public so benchmarks in sibling packages reuse them (MS).
+    ~ - Benchmark teardown intentionally ignores close() errors (DE).
+    -->
+    <Match>
+        <Class name="~software\.amazon\.smithy\.java\.http\.client\..*Benchmark(\$.*)?"/>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD,UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD,MS_MUTABLE_ARRAY,MS_PKGPROTECT,MS_CANNOT_BE_FINAL"/>
+    </Match>
+    <Match>
+        <Class name="software.amazon.smithy.java.http.client.BenchmarkSupport"/>
+        <Bug pattern="MS_MUTABLE_ARRAY,MS_PKGPROTECT,MS_CANNOT_BE_FINAL"/>
+    </Match>
+    <Match>
+        <Class name="~software\.amazon\.smithy\.java\.http\.client\.h2\.(EventLoopH2cTransport|ConnectionAgentH2cTransport|EventLoopH2Transport)"/>
+        <Bug pattern="DE_MIGHT_IGNORE"/>
+    </Match>
+
     <!-- JMH reads @AuxCounters fields reflectively to report them as auxiliary counters. -->
     <Match>
         <Class name="software.amazon.smithy.java.aws.client.rulesengine.S3EndpointBenchmark$BytecodeMetrics" />

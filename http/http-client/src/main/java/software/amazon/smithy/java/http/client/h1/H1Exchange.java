@@ -79,6 +79,10 @@ final class H1Exchange implements HttpExchange {
     private String responseContentType;
     private long responseContentLength = -1;
     private boolean responseChunked;
+    // Keep-alive override from the response Connection header: null = not specified (use protocol
+    // default), TRUE = keep-alive, FALSE = close. Set by captureControlHeader alongside the other
+    // response header fields.
+    private Boolean responseKeepAlive;
     private int statusCode = -1;
     private boolean requestWritten = false;
     private boolean expectContinueHandled = false;
@@ -115,6 +119,7 @@ final class H1Exchange implements HttpExchange {
         this.responseContentType = null;
         this.responseContentLength = -1;
         this.responseChunked = false;
+        this.responseKeepAlive = null;
         this.statusCode = -1;
         this.requestWritten = false;
         this.expectContinueHandled = false;
@@ -607,7 +612,6 @@ final class H1Exchange implements HttpExchange {
 
         ModifiableHttpHeaders headers = HttpHeaders.ofModifiable();
         int headerCount = 0;
-        Boolean keepAlive = null;
 
         int lineLen;
         while ((lineLen = readLine(in)) > 0) {
@@ -625,21 +629,20 @@ final class H1Exchange implements HttpExchange {
             int valueStart = H1Utils.headerValueStart(responseLineBuffer, colon, lineLen);
             int valueEnd = H1Utils.headerValueEnd(responseLineBuffer, valueStart, lineLen);
             String name = H1Utils.parseHeaderLine(responseLineBuffer, colon, valueStart, valueEnd, headers);
-            Boolean keepAliveOverride = captureControlHeader(responseLineBuffer, valueStart, valueEnd, name);
-            if (keepAliveOverride != null) {
-                keepAlive = keepAliveOverride;
-            }
+            captureControlHeader(responseLineBuffer, valueStart, valueEnd, name);
         }
 
         this.responseHeaders = headers;
 
-        if (keepAlive != null) {
-            connection.setKeepAlive(keepAlive);
+        if (responseKeepAlive != null) {
+            connection.setKeepAlive(responseKeepAlive);
         }
     }
 
-    private Boolean captureControlHeader(byte[] line, int valueStart, int valueEnd, String name) throws IOException {
-        return switch (name) {
+    // Records the content-length, transfer-encoding, content-type, and connection (keep-alive) response
+    // headers into the corresponding instance fields. Other headers are ignored here.
+    private void captureControlHeader(byte[] line, int valueStart, int valueEnd, String name) throws IOException {
+        switch (name) {
             case "content-length" -> {
                 long length = parseContentLength(line, valueStart, valueEnd);
                 if (responseContentLength >= 0 && responseContentLength != length) {
@@ -647,30 +650,23 @@ final class H1Exchange implements HttpExchange {
                             + responseContentLength + " and " + length);
                 }
                 responseContentLength = length;
-                yield null;
             }
-            case "transfer-encoding" -> {
-                responseChunked = containsChunked(line, valueStart, valueEnd);
-                yield null;
-            }
-            case "content-type" -> {
-                responseContentType = new String(
-                        line,
-                        valueStart,
-                        valueEnd - valueStart,
-                        StandardCharsets.US_ASCII);
-                yield null;
-            }
+            case "transfer-encoding" -> responseChunked = containsChunked(line, valueStart, valueEnd);
+            case "content-type" -> responseContentType = new String(
+                    line,
+                    valueStart,
+                    valueEnd - valueStart,
+                    StandardCharsets.US_ASCII);
             case "connection" -> {
                 if (equalsIgnoreCase(line, valueStart, valueEnd, "close")) {
-                    yield Boolean.FALSE;
+                    responseKeepAlive = Boolean.FALSE;
                 } else if (equalsIgnoreCase(line, valueStart, valueEnd, "keep-alive")) {
-                    yield Boolean.TRUE;
+                    responseKeepAlive = Boolean.TRUE;
                 }
-                yield null;
             }
-            default -> null;
-        };
+            default -> {
+            }
+        }
     }
 
     private static boolean isOWS(byte b) {

@@ -182,7 +182,9 @@ final class DefaultHttpClient implements HttpClient {
         } catch (IOException e) {
             try {
                 exchange.close();
-            } catch (IOException ignored) {}
+            } catch (IOException closeError) {
+                LOGGER.debug("Error closing exchange after request failure: {}", closeError.getMessage());
+            }
             connectionPool.evict(conn, true);
             // Do not fire onRequestEnd here: a per-route attempt failure may be retried on the next
             // proxy, and send() owns the single terminal failure event.
@@ -548,6 +550,8 @@ final class DefaultHttpClient implements HttpClient {
         executorService.shutdownNow();
         try {
             connectionPool.shutdown(timeout);
-        } catch (IOException ignored) {}
+        } catch (IOException e) {
+            LOGGER.debug("Error shutting down connection pool: {}", e.getMessage());
+        }
     }
 }
