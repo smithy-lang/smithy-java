@@ -10,10 +10,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
-import software.amazon.smithy.java.aws.credentials.chain.CredentialChain;
+import software.amazon.smithy.java.aws.credentials.chain.IdentityChain;
 
 /**
- * Demonstrates that the assembled credential chain fails to fall through past the
+ * Demonstrates that the assembled {@link IdentityChain} fails to fall through past the
  * {@code JAVA_SYSTEM_PROPERTIES} slot.
  *
  * <p>{@link SystemPropertiesCredentialProvider} registers its resolver via
@@ -23,7 +23,7 @@ import software.amazon.smithy.java.aws.credentials.chain.CredentialChain;
  *
  * <p>This test encodes the correct behavior and therefore fails against the current implementation.
  */
-public class CredentialChainFallthroughTest {
+public class IdentityChainFallthroughTest {
 
     /**
      * When system properties are absent, the assembled chain should contain the {@code Environment} provider so
@@ -37,7 +37,7 @@ public class CredentialChainFallthroughTest {
         // no aws.accessKeyId/aws.secretAccessKey system properties, then restore.
         String savedAccessKey = System.clearProperty("aws.accessKeyId");
         String savedSecretKey = System.clearProperty("aws.secretAccessKey");
-        try (var chain = CredentialChain.create(AwsCredentialsIdentity.class)) {
+        try (var chain = IdentityChain.create(AwsCredentialsIdentity.class)) {
             var providers = chain.providerNames();
             assertTrue(providers.contains("Environment"),
                     "Environment provider was dropped from the chain. SystemPropertiesCredentialProvider "

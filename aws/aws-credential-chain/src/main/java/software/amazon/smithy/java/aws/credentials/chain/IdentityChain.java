@@ -24,31 +24,32 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
- * A credential provider chain.
+ * A chain of identity providers, parameterized by the {@link Identity} type it resolves (e.g.,
+ * {@code AwsCredentialsIdentity} or {@code TokenIdentity}).
  *
  * <p>Discovers {@link ChainIdentityProvider} implementations via {@link ServiceLoader}, assembles them into an
- * ordered chain based on {@link StandardProvider} slots and relative ordering constraints, and resolves
- * credentials by trying each provider in order.
+ * ordered chain based on {@link StandardProvider} slots and relative ordering constraints, and resolves an
+ * identity by trying each provider in order.
  *
  * <p>Usage:
- * {@snippet lang="java" :
- * var chain = CredentialChain.create();
+ * {@snippet lang = "java":
+ * var chain = IdentityChain.create();
  * var result = chain.resolveIdentity(Context.empty());
- * }
+ *}
  *
  * <p>The chain is assembled once at creation time. Providers that are not on the classpath simply don't
- * participate: their slots are skipped. If no provider in the chain can resolve credentials, the chain returns an
+ * participate: their slots are skipped. If no provider in the chain can resolve an identity, the chain returns an
  * error result describing which providers were tried.
  */
-public final class CredentialChain<I extends Identity> implements IdentityResolver<I>, AutoCloseable {
+public final class IdentityChain<I extends Identity> implements IdentityResolver<I>, AutoCloseable {
 
-    private static final InternalLogger LOGGER = InternalLogger.getLogger(CredentialChain.class);
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(IdentityChain.class);
 
     private final Class<I> identityType;
     private final List<ChainSetup.NamedResolver> resolvers;
     private final ScheduledExecutorService executor;
 
-    private CredentialChain(
+    private IdentityChain(
             Class<I> identityType,
             List<ChainSetup.NamedResolver> resolvers,
             ScheduledExecutorService executor
@@ -59,13 +60,13 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
     }
 
     /**
-     * Create a credential chain by discovering providers via ServiceLoader.
+     * Create an identity chain by discovering providers via ServiceLoader.
      *
      * @param identityType Identity type to resolve.
      * @return the assembled chain.
      * @throws IllegalStateException if two providers claim the same standard slot.
      */
-    public static <I extends Identity> CredentialChain<I> create(Class<I> identityType) {
+    public static <I extends Identity> IdentityChain<I> create(Class<I> identityType) {
         return create(identityType, Executors.newSingleThreadScheduledExecutor(r2 -> {
             Thread t = new Thread(r2, "aws-credential-chain-refresh");
             t.setDaemon(true);
@@ -74,19 +75,19 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
     }
 
     /**
-     * Create a credential chain by discovering providers via ServiceLoader.
+     * Create an identity chain by discovering providers via ServiceLoader.
      *
      * @param identityType Identity type to resolve.
      * @param ex Executor used for background resolution.
      * @return the assembled chain.
      * @throws IllegalStateException if two providers claim the same standard slot.
      */
-    public static <I extends Identity> CredentialChain<I> create(Class<I> identityType, ScheduledExecutorService ex) {
+    public static <I extends Identity> IdentityChain<I> create(Class<I> identityType, ScheduledExecutorService ex) {
         return create(identityType, ex, null);
     }
 
     /**
-     * Create a credential chain by discovering providers via ServiceLoader, using a caller-supplied AWS
+     * Create an identity chain by discovering providers via ServiceLoader, using a caller-supplied AWS
      * config/credentials file.
      *
      * <p>When {@code profileFile} is non-null, the {@code SHARED_CONFIG} provider uses it instead of reading
@@ -99,7 +100,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
      * @return the assembled chain.
      * @throws IllegalStateException if two providers claim the same standard slot.
      */
-    public static <I extends Identity> CredentialChain<I> create(
+    public static <I extends Identity> IdentityChain<I> create(
             Class<I> identityType,
             ScheduledExecutorService ex,
             AwsProfileFile profileFile
@@ -112,7 +113,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
         return assemble(identityType, registrations, ex, setup);
     }
 
-    static <I extends Identity> CredentialChain<I> assemble(
+    static <I extends Identity> IdentityChain<I> assemble(
             Class<I> identityType,
             List<ChainIdentityProvider> registrations,
             ScheduledExecutorService executor
@@ -124,7 +125,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
      * Assemble a chain using a caller-supplied {@link ChainSetup}. Lets tests inject a deterministic environment
      * and profile rather than reading the real process environment and config files.
      */
-    static <I extends Identity> CredentialChain<I> assemble(
+    static <I extends Identity> IdentityChain<I> assemble(
             Class<I> identityType,
             List<ChainIdentityProvider> registrations,
             ScheduledExecutorService executor,
@@ -153,7 +154,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
         var ordered = setup.resolvers();
 
         if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("Assembled credential chain: {}",
+            LOGGER.debug("Assembled identity chain: {}",
                     ordered.stream().map(ChainSetup.NamedResolver::name).collect(Collectors.joining(", ")));
         }
 
@@ -168,7 +169,7 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
             }
         }
         warnDetectedButUnclaimed(claimed);
-        return new CredentialChain<>(identityType, Collections.unmodifiableList(ordered), executor);
+        return new IdentityChain<>(identityType, Collections.unmodifiableList(ordered), executor);
     }
 
     private static List<ChainIdentityProvider> sortByOrdering(List<ChainIdentityProvider> providers) {

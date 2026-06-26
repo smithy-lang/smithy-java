@@ -28,19 +28,19 @@ import software.amazon.smithy.java.context.Context;
 
 /**
  * End-to-end assembly + resolution test that wires the <em>real</em> credential providers together through the
- * real {@link CredentialChain#assemble} and exercises fall-through across the sources.
+ * real {@link IdentityChain#assemble} and exercises fall-through across the sources.
  *
  * <p>Scope: this module ({@code aws-client-core}) sees the system-property, environment, and profile
  * (static/session keys) providers. It does not depend on {@code aws-credentials-sts} or
  * {@code aws-credentials-imds}, so the STS and IMDS slots are not covered here — a fuller test spanning those
  * would need a module that depends on all of them.
  *
- * <p>Determinism comes from the package-private {@link CredentialChain#assemble} overload that accepts a
+ * <p>Determinism comes from the package-private {@link IdentityChain#assemble} overload that accepts a
  * caller-built {@link ChainSetup}: the environment is injected and the profile is pre-set, so nothing reads the
  * real process environment or {@code ~/.aws} files. The profile is set directly rather than via
  * {@code SharedConfigProvider} (which loads real config files and cannot be pointed at a temp path).
  */
-class CredentialChainEndToEndTest {
+class IdentityChainEndToEndTest {
 
     private static final List<ChainIdentityProvider> PROVIDERS = List.of(
             new SystemPropertiesCredentialProvider(),
@@ -103,7 +103,7 @@ class CredentialChainEndToEndTest {
         assertNull(result.identity());
     }
 
-    private static CredentialChain<AwsCredentialsIdentity> assembleWith(
+    private static IdentityChain<AwsCredentialsIdentity> assembleWith(
             Function<String, String> env,
             AwsProfileFile profileFile
     ) {
@@ -112,7 +112,7 @@ class CredentialChainEndToEndTest {
             setup.setProfileFile(profileFile);
             setup.setProfile(profileFile.profile("default"));
         }
-        return CredentialChain.assemble(AwsCredentialsIdentity.class, PROVIDERS, null, setup);
+        return IdentityChain.assemble(AwsCredentialsIdentity.class, PROVIDERS, null, setup);
     }
 
     private static AwsProfileFile writeConfig(Path tmp, String contents) throws IOException {

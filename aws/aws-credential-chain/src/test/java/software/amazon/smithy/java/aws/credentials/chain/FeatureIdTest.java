@@ -24,7 +24,7 @@ class FeatureIdTest {
 
     @Test
     void successfulProviderEmitsFeatureId() {
-        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+        var chain = IdentityChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         provider("env",
                                 StandardProvider.ENVIRONMENT,
@@ -44,7 +44,7 @@ class FeatureIdTest {
 
     @Test
     void failedProviderDoesNotEmitFeatureId() {
-        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+        var chain = IdentityChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         provider("env",
                                 StandardProvider.ENVIRONMENT,
@@ -68,7 +68,7 @@ class FeatureIdTest {
 
     @Test
     void multipleFeatureIdsEmitted() {
-        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+        var chain = IdentityChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         provider("proc",
                                 StandardProvider.SHARED_CONFIG,
@@ -93,7 +93,7 @@ class FeatureIdTest {
 
     @Test
     void noFeatureIdsWhenContextKeyNotSet() {
-        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+        var chain = IdentityChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         provider("env",
                                 StandardProvider.ENVIRONMENT,

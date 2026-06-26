@@ -15,6 +15,7 @@ import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
  * <ol>
  *   <li>The region attached to the credential source (profile-level
  *       {@code region} carried on {@code AssumeRole} / {@code WebIdentityToken}).</li>
+ *   <li>The client-specified region override ({@link ChainSetup#regionOverride()}).</li>
  *   <li>{@code AWS_REGION} env var.</li>
  *   <li>{@code AWS_DEFAULT_REGION} env var.</li>
  *   <li>The active profile's {@code region} property.</li>
@@ -37,6 +38,9 @@ record StsEndpointConfig(String region, boolean useGlobalEndpoint) {
 
     static StsEndpointConfig resolve(String sourceRegion, ChainSetup setup) {
         String region = sourceRegion;
+        if (region == null) {
+            region = setup.regionOverride();
+        }
         if (region == null) {
             region = setup.getenv("AWS_REGION");
         }

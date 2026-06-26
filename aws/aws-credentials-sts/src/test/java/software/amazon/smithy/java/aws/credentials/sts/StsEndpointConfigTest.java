@@ -30,6 +30,23 @@ class StsEndpointConfigTest {
     }
 
     @Test
+    void regionOverrideWinsOverEnvAndProfile(@TempDir Path tmp) throws IOException {
+        var setup = setupWith(
+                Map.of("AWS_REGION", "us-west-2"),
+                profileWith(tmp, "region = eu-west-1"),
+                "ap-southeast-2");
+        var cfg = StsEndpointConfig.resolve(null, setup);
+        assertEquals("ap-southeast-2", cfg.region());
+    }
+
+    @Test
+    void sourceRegionWinsOverRegionOverride(@TempDir Path tmp) throws IOException {
+        var setup = setupWith(Map.of(), null, "ap-southeast-2");
+        var cfg = StsEndpointConfig.resolve("ap-south-1", setup);
+        assertEquals("ap-south-1", cfg.region());
+    }
+
+    @Test
     void awsRegionEnvWinsOverDefaultRegionAndProfile(@TempDir Path tmp) throws IOException {
         var setup = setupWith(
                 Map.of("AWS_REGION", "us-west-2", "AWS_DEFAULT_REGION", "us-east-2"),
@@ -98,8 +115,12 @@ class StsEndpointConfigTest {
     }
 
     private static ChainSetup setupWith(Map<String, String> env, AwsProfileFile profileFile) {
+        return setupWith(env, profileFile, null);
+    }
+
+    private static ChainSetup setupWith(Map<String, String> env, AwsProfileFile profileFile, String regionOverride) {
         Map<String, String> envCopy = new HashMap<>(env);
-        var setup = ChainSetup.builder().env(envCopy::get).build();
+        var setup = ChainSetup.builder().env(envCopy::get).regionOverride(regionOverride).build();
         if (profileFile != null) {
             setup.setProfileFile(profileFile);
             setup.setProfile(profileFile.activeProfile(k -> null));

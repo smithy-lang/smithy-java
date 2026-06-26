@@ -7,7 +7,7 @@ package software.amazon.smithy.java.aws.client.core;
 
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
-import software.amazon.smithy.java.aws.credentials.chain.CredentialChain;
+import software.amazon.smithy.java.aws.credentials.chain.IdentityChain;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
@@ -38,7 +38,7 @@ public final class AwsCredentialChainPlugin implements ClientPlugin {
     @Override
     public void configureClient(ClientConfig.Builder config) {
         if (needsAwsCredentials(config) && !hasAwsCredentialsResolver(config)) {
-            var chain = CredentialChain.create(AwsCredentialsIdentity.class);
+            var chain = IdentityChain.create(AwsCredentialsIdentity.class);
             config.addIdentityResolver(chain);
             config.addInterceptor(new InvalidateOnAuthFailureInterceptor(chain));
         }

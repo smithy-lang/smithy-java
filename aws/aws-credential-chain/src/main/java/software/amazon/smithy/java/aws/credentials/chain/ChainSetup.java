@@ -18,7 +18,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Mutable assembly context passed to each {@link ChainIdentityProvider#setup} during
- * credential chain construction.
+ * {@link IdentityChain} construction.
  *
  * <p>Providers use this to:
  * <ul>
@@ -37,6 +37,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 public final class ChainSetup {
     private final ScheduledExecutorService executor;
     private final String profileNameOverride;
+    private final String regionOverride;
     private final Context properties;
     private final List<NamedResolver> resolvers = new ArrayList<>();
     private final Function<String, String> envFn;
@@ -48,6 +49,7 @@ public final class ChainSetup {
     private ChainSetup(Builder builder) {
         this.executor = builder.executor;
         this.profileNameOverride = builder.profileNameOverride;
+        this.regionOverride = builder.regionOverride;
         this.properties = Context.create();
         this.envFn = builder.envFn;
         this.profileFile = builder.profileFile;
@@ -80,6 +82,19 @@ public final class ChainSetup {
      */
     public String profileNameOverride() {
         return profileNameOverride;
+    }
+
+    /**
+     * Returns the client-specified region override used by providers that resolve credentials via a service call
+     * (e.g., STS, SSO), or {@code null} to fall back to the {@code AWS_REGION}/{@code AWS_DEFAULT_REGION}
+     * environment variables and the profile {@code region} property.
+     *
+     * <p>This affects only which regional endpoint those providers call; it does not parameterize the chain itself.
+     *
+     * @return the region override, or {@code null}.
+     */
+    public String regionOverride() {
+        return regionOverride;
     }
 
     /**
@@ -214,6 +229,7 @@ public final class ChainSetup {
     public static final class Builder {
         private ScheduledExecutorService executor;
         private String profileNameOverride;
+        private String regionOverride;
         private Function<String, String> envFn = System::getenv;
         private AwsProfileFile profileFile;
 
@@ -239,6 +255,19 @@ public final class ChainSetup {
          */
         public Builder profileNameOverride(String profileNameOverride) {
             this.profileNameOverride = profileNameOverride;
+            return this;
+        }
+
+        /**
+         * Sets the region override. When set, providers that resolve credentials via a service call (e.g., STS,
+         * SSO) use this region for their endpoint instead of resolving it from {@code AWS_REGION},
+         * {@code AWS_DEFAULT_REGION}, or the profile {@code region} property.
+         *
+         * @param regionOverride the region to use, e.g. {@code "us-west-2"}.
+         * @return this builder.
+         */
+        public Builder regionOverride(String regionOverride) {
+            this.regionOverride = regionOverride;
             return this;
         }
 

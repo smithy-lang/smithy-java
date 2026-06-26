@@ -19,10 +19,10 @@ import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.context.Context;
 
-class AwsCredentialChainTest {
+class IdentityChainTest {
     @Test
     void standardProvidersAreOrderedByEnumOrder() {
-        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+        var chain = IdentityChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         registration("imds",
                                 new OrderingConstraint.Standard(StandardProvider.EC2_INSTANCE_METADATA),
@@ -40,7 +40,7 @@ class AwsCredentialChainTest {
 
     @Test
     void firstSuccessfulProviderWins() {
-        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+        var chain = IdentityChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         registration("env",
                                 new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
@@ -57,7 +57,7 @@ class AwsCredentialChainTest {
 
     @Test
     void allFailReturnsAggregatedError() {
-        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+        var chain = IdentityChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         registration("env",
                                 new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
@@ -76,7 +76,7 @@ class AwsCredentialChainTest {
     @Test
     void duplicateSlotThrows() {
         assertThrows(IllegalStateException.class,
-                () -> CredentialChain.assemble(AwsCredentialsIdentity.class,
+                () -> IdentityChain.assemble(AwsCredentialsIdentity.class,
                         List.of(
                                 registration("a",
                                         new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
@@ -89,7 +89,7 @@ class AwsCredentialChainTest {
 
     @Test
     void relativeAfterInsertsCorrectly() {
-        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+        var chain = IdentityChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         registration("env",
                                 new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
@@ -107,7 +107,7 @@ class AwsCredentialChainTest {
 
     @Test
     void relativeBeforeInsertsCorrectly() {
-        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+        var chain = IdentityChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         registration("env",
                                 new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
@@ -125,7 +125,7 @@ class AwsCredentialChainTest {
 
     @Test
     void relativeToUnclaimedSlotAppendsAtEnd() {
-        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class,
+        var chain = IdentityChain.assemble(AwsCredentialsIdentity.class,
                 List.of(
                         registration("env",
                                 new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
@@ -141,7 +141,7 @@ class AwsCredentialChainTest {
     @Test
     void duplicateNameThrows() {
         assertThrows(IllegalStateException.class,
-                () -> CredentialChain.assemble(AwsCredentialsIdentity.class,
+                () -> IdentityChain.assemble(AwsCredentialsIdentity.class,
                         List.of(
                                 registration("env",
                                         new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
@@ -154,7 +154,7 @@ class AwsCredentialChainTest {
 
     @Test
     void emptyChainReturnsDescriptiveError() {
-        var chain = CredentialChain.assemble(AwsCredentialsIdentity.class, List.of(), null);
+        var chain = IdentityChain.assemble(AwsCredentialsIdentity.class, List.of(), null);
         IdentityResult<AwsCredentialsIdentity> result = chain.resolveIdentity(Context.empty());
 
         assertNull(result.identity());
@@ -182,7 +182,7 @@ class AwsCredentialChainTest {
     }
 
     private static IdentityResolver<AwsCredentialsIdentity> errorResolver(String msg) {
-        IdentityResult<AwsCredentialsIdentity> result = IdentityResult.ofError(AwsCredentialChainTest.class, msg);
+        IdentityResult<AwsCredentialsIdentity> result = IdentityResult.ofError(IdentityChainTest.class, msg);
         return new IdentityResolver<>() {
             public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context ctx) {
                 return result;
