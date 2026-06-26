@@ -48,6 +48,11 @@ final class StsAssumeRoleResolver implements IdentityResolver<AwsCredentialsIden
         return AwsCredentialsIdentity.class;
     }
 
+    // Visible for testing: the STS endpoint configuration this resolver was assembled with.
+    StsEndpointConfig endpoint() {
+        return endpoint;
+    }
+
     @Override
     public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context ctx) {
         AwsCredentialsIdentity sourceCredentials = resolveSourceCredentials(source, new HashSet<>());

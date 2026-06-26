@@ -7,6 +7,7 @@ package software.amazon.smithy.java.aws.client.core;
 
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
 import software.amazon.smithy.java.aws.credentials.chain.IdentityChain;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientPlugin;
@@ -32,13 +33,19 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 public final class AwsCredentialChainPlugin implements ClientPlugin {
     @Override
     public Phase getPluginPhase() {
-        return Phase.DEFAULTS;
+        // Run after DEFAULTS so the client's region (and any other defaults) are populated on the config before we
+        // read them to assemble the chain.
+        return Phase.AFTER_DEFAULTS;
     }
 
     @Override
     public void configureClient(ClientConfig.Builder config) {
         if (needsAwsCredentials(config) && !hasAwsCredentialsResolver(config)) {
-            var chain = IdentityChain.create(AwsCredentialsIdentity.class);
+            // Pass the client's configured region so credential providers that make a service call (STS, SSO) use
+            // the same region as the client. Null when no region is configured, in which case the providers fall
+            // back to the environment and profile.
+            String region = config.context().get(RegionSetting.REGION);
+            var chain = IdentityChain.create(AwsCredentialsIdentity.class, null, region);
             config.addIdentityResolver(chain);
             config.addInterceptor(new InvalidateOnAuthFailureInterceptor(chain));
         }

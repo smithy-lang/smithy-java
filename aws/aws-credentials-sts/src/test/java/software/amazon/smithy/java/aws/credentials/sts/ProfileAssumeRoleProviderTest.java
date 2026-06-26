@@ -65,6 +65,34 @@ class ProfileAssumeRoleProviderTest {
     }
 
     @Test
+    void regionOverrideFlowsIntoStsEndpoint(@TempDir Path tmp) throws IOException {
+        Path config = tmp.resolve("config");
+        Files.writeString(config, """
+                [default]
+                role_arn = arn:aws:iam::123456789:role/RoleA
+                source_profile = creds
+
+                [profile creds]
+                aws_access_key_id = AK
+                aws_secret_access_key = SK
+                """);
+
+        var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
+        // No AWS_REGION/profile region; the client's region override should drive the STS endpoint.
+        var setup = ChainSetup.builder().env(k -> null).regionOverride("eu-central-1").build();
+        setup.setProfileFile(profileFile);
+        setup.setProfile(profileFile.activeProfile(k -> null));
+        var provider = new ProfileAssumeRoleProvider();
+        setup.setCurrentProvider(provider);
+
+        provider.setup(AwsCredentialsIdentity.class, setup);
+
+        assertEquals(1, setup.resolvers().size());
+        var resolver = (StsAssumeRoleResolver) setup.resolvers().get(0).resolver();
+        assertEquals("eu-central-1", resolver.endpoint().region());
+    }
+
+    @Test
     void skipsWhenNoRoleArn(@TempDir Path tmp) throws IOException {
         Path config = tmp.resolve("config");
         Files.writeString(config, """

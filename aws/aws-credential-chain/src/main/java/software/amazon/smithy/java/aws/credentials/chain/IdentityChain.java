@@ -67,11 +67,33 @@ public final class IdentityChain<I extends Identity> implements IdentityResolver
      * @throws IllegalStateException if two providers claim the same standard slot.
      */
     public static <I extends Identity> IdentityChain<I> create(Class<I> identityType) {
-        return create(identityType, Executors.newSingleThreadScheduledExecutor(r2 -> {
+        return create(identityType, defaultExecutor(), null, null);
+    }
+
+    /**
+     * Create an identity chain by discovering providers via ServiceLoader, using a caller-supplied AWS
+     * config/credentials file and region, with a default background-refresh executor.
+     *
+     * @param identityType Identity type to resolve.
+     * @param profileFile Already-parsed profile file to use, or {@code null} to load from the default locations.
+     * @param regionOverride Region for service-calling providers to use, or {@code null} to resolve it normally.
+     * @return the assembled chain.
+     * @throws IllegalStateException if two providers claim the same standard slot.
+     */
+    public static <I extends Identity> IdentityChain<I> create(
+            Class<I> identityType,
+            AwsProfileFile profileFile,
+            String regionOverride
+    ) {
+        return create(identityType, defaultExecutor(), profileFile, regionOverride);
+    }
+
+    private static ScheduledExecutorService defaultExecutor() {
+        return Executors.newSingleThreadScheduledExecutor(r2 -> {
             Thread t = new Thread(r2, "aws-credential-chain-refresh");
             t.setDaemon(true);
             return t;
-        }));
+        });
     }
 
     /**
@@ -83,33 +105,43 @@ public final class IdentityChain<I extends Identity> implements IdentityResolver
      * @throws IllegalStateException if two providers claim the same standard slot.
      */
     public static <I extends Identity> IdentityChain<I> create(Class<I> identityType, ScheduledExecutorService ex) {
-        return create(identityType, ex, null);
+        return create(identityType, ex, null, null);
     }
 
     /**
      * Create an identity chain by discovering providers via ServiceLoader, using a caller-supplied AWS
-     * config/credentials file.
+     * config/credentials file and region.
      *
      * <p>When {@code profileFile} is non-null, the {@code SHARED_CONFIG} provider uses it instead of reading
      * {@code ~/.aws/config} and {@code ~/.aws/credentials} from disk. Use this when the file has already been
      * loaded, or to point the chain at a non-default location.
      *
+     * <p>When {@code regionOverride} is non-null, providers that resolve credentials via a service call (e.g.,
+     * STS, SSO) use it for their endpoint instead of resolving the region from the environment or profile. This is
+     * how a client's configured region flows into credential resolution.
+     *
      * @param identityType Identity type to resolve.
      * @param ex Executor used for background resolution.
      * @param profileFile Already-parsed profile file to use, or {@code null} to load from the default locations.
+     * @param regionOverride Region for service-calling providers to use, or {@code null} to resolve it normally.
      * @return the assembled chain.
      * @throws IllegalStateException if two providers claim the same standard slot.
      */
     public static <I extends Identity> IdentityChain<I> create(
             Class<I> identityType,
             ScheduledExecutorService ex,
-            AwsProfileFile profileFile
+            AwsProfileFile profileFile,
+            String regionOverride
     ) {
         List<ChainIdentityProvider> registrations = new ArrayList<>();
         for (ChainIdentityProvider r : ServiceLoader.load(ChainIdentityProvider.class)) {
             registrations.add(r);
         }
-        ChainSetup setup = ChainSetup.builder().executor(ex).profileFile(profileFile).build();
+        ChainSetup setup = ChainSetup.builder()
+                .executor(ex)
+                .profileFile(profileFile)
+                .regionOverride(regionOverride)
+                .build();
         return assemble(identityType, registrations, ex, setup);
     }
 
