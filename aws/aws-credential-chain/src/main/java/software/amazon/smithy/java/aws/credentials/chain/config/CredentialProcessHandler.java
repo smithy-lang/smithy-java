@@ -37,6 +37,10 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * <p>The command string is captured at assembly time and does not change after construction.
  * Each call to {@code resolveIdentity()} re-executes the process to obtain fresh credentials,
  * so expiring credentials returned by the process are naturally refreshed without caching.
+ *
+ * <p>This provider registers terminally: once a profile declares {@code credential_process}, the chain commits
+ * to it, and a process failure is returned as an error rather than falling through to a lower-priority provider
+ * (per the Extensible Credentials SEP).
  */
 public final class CredentialProcessHandler implements ChainIdentityProvider {
 
@@ -76,7 +80,7 @@ public final class CredentialProcessHandler implements ChainIdentityProvider {
         }
         for (AwsConfigCredentialSource source : profile.credentialSources()) {
             if (source instanceof AwsConfigCredentialSource.CredentialProcess(String commandLine)) {
-                setup.addResolver(new Resolver(commandLine));
+                setup.addTerminalResolver(new Resolver(commandLine));
                 return;
             }
         }
