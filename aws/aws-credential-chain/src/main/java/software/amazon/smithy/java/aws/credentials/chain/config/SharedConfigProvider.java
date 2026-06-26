@@ -31,7 +31,13 @@ public final class SharedConfigProvider implements ChainIdentityProvider {
 
     @Override
     public void setup(Class<? extends Identity> identityType, ChainSetup setup) {
-        AwsProfileFile profileFile = AwsProfileFile.loadSilently();
+        // Defer to a profile file already supplied on the setup (e.g., injected by the client builder or an
+        // upstream provider) instead of reading from disk. Only fall back to loading the shared config/credentials
+        // files when none was provided.
+        AwsProfileFile profileFile = setup.profileFile();
+        if (profileFile == null) {
+            profileFile = AwsProfileFile.loadSilently();
+        }
         if (profileFile != null) {
             setup.setProfileFile(profileFile);
             String name = setup.profileNameOverride();

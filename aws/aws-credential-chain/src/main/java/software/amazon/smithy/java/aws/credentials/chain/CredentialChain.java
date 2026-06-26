@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
+import software.amazon.smithy.java.aws.config.AwsProfileFile;
 import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -81,11 +82,34 @@ public final class CredentialChain<I extends Identity> implements IdentityResolv
      * @throws IllegalStateException if two providers claim the same standard slot.
      */
     public static <I extends Identity> CredentialChain<I> create(Class<I> identityType, ScheduledExecutorService ex) {
+        return create(identityType, ex, null);
+    }
+
+    /**
+     * Create a credential chain by discovering providers via ServiceLoader, using a caller-supplied AWS
+     * config/credentials file.
+     *
+     * <p>When {@code profileFile} is non-null, the {@code SHARED_CONFIG} provider uses it instead of reading
+     * {@code ~/.aws/config} and {@code ~/.aws/credentials} from disk. Use this when the file has already been
+     * loaded, or to point the chain at a non-default location.
+     *
+     * @param identityType Identity type to resolve.
+     * @param ex Executor used for background resolution.
+     * @param profileFile Already-parsed profile file to use, or {@code null} to load from the default locations.
+     * @return the assembled chain.
+     * @throws IllegalStateException if two providers claim the same standard slot.
+     */
+    public static <I extends Identity> CredentialChain<I> create(
+            Class<I> identityType,
+            ScheduledExecutorService ex,
+            AwsProfileFile profileFile
+    ) {
         List<ChainIdentityProvider> registrations = new ArrayList<>();
         for (ChainIdentityProvider r : ServiceLoader.load(ChainIdentityProvider.class)) {
             registrations.add(r);
         }
-        return assemble(identityType, registrations, ex);
+        ChainSetup setup = ChainSetup.builder().executor(ex).profileFile(profileFile).build();
+        return assemble(identityType, registrations, ex, setup);
     }
 
     static <I extends Identity> CredentialChain<I> assemble(

@@ -50,6 +50,7 @@ public final class ChainSetup {
         this.profileNameOverride = builder.profileNameOverride;
         this.properties = Context.create();
         this.envFn = builder.envFn;
+        this.profileFile = builder.profileFile;
     }
 
     /**
@@ -214,6 +215,7 @@ public final class ChainSetup {
         private ScheduledExecutorService executor;
         private String profileNameOverride;
         private Function<String, String> envFn = System::getenv;
+        private AwsProfileFile profileFile;
 
         private Builder() {}
 
@@ -249,6 +251,19 @@ public final class ChainSetup {
          */
         public Builder env(Function<String, String> envFn) {
             this.envFn = envFn;
+            return this;
+        }
+
+        /**
+         * Supplies an already-parsed AWS config/credentials file. When set, the {@code SHARED_CONFIG} provider
+         * uses this file instead of reading {@code ~/.aws/config} and {@code ~/.aws/credentials} from disk. Use
+         * when the caller has already loaded the profile file, or to point the chain at a non-default location.
+         *
+         * @param profileFile the parsed profile file.
+         * @return this builder.
+         */
+        public Builder profileFile(AwsProfileFile profileFile) {
+            this.profileFile = profileFile;
             return this;
         }
 
