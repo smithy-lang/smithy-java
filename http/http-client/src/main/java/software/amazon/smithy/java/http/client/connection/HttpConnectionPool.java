@@ -177,12 +177,14 @@ public final class HttpConnectionPool implements ConnectionPool {
         TlsProvider tls = resolveTls(config);
 
         // Use the epoll backend only when the native library is available AND the resolved TLS provider
-        // supports it. The epoll path hands the provider a null-socket context whose byte channel is
-        // consumable only by engine-based providers (via SslEngineTransports); a provider that does its
-        // own socket I/O (supportsEpoll() == false) must get the NIO socket path so socket() is non-null.
-        // Note: this also routes cleartext connections on such a client through NIO, which is acceptable,
-        // since a custom TLS provider is configured for secure traffic.
-        EpollConnector epollConnector = tls.supportsEpoll()
+        // supports it AND the user has not supplied a custom socket factory. The epoll path hands the
+        // provider a null-socket context whose byte channel is consumable only by engine-based providers
+        // (via SslEngineTransports); a provider that does its own socket I/O (supportsEpoll() == false)
+        // must get the NIO socket path so socket() is non-null. Note: this also routes cleartext
+        // connections on such a client through NIO, which is acceptable, since a custom TLS provider is
+        // configured for secure traffic. A custom socketFactory likewise forces the NIO path: the epoll
+        // connector creates its own channels and would otherwise silently bypass the user's factory.
+        EpollConnector epollConnector = tls.supportsEpoll() && config.socketFactory() == null
                 ? EpollConnector.createIfAvailable(
                         config.socketReceiveBufferSize(),
                         config.socketSendBufferSize(),

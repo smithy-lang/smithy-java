@@ -362,6 +362,12 @@ final class H1Exchange implements HttpExchange {
         }
         expectContinueHandled = true;
 
+        // The request line and headers were buffered in init() but not flushed (a body is present, and
+        // the body write normally flushes). For Expect: 100-continue we must put the headers on the wire
+        // now -- otherwise the server never sees the request, never sends the interim 100, and we block
+        // until the read times out (which, on the epoll transport, closes the connection).
+        connection.getOutputStream().flush();
+
         UnsyncBufferedInputStream in = connection.getInputStream();
 
         // Set socket timeout for 100-continue response
