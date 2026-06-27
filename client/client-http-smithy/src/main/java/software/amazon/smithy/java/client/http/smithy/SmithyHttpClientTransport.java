@@ -74,6 +74,11 @@ public final class SmithyHttpClientTransport implements ClientTransport<HttpRequ
         }
 
         @Override
+        public byte priority() {
+            return 1;
+        }
+
+        @Override
         public SmithyHttpClientTransport createTransport(Document node, Document pluginSettings) {
             var config = new SmithyHttpTransportConfig().fromDocument(pluginSettings.asStringMap()
                     .getOrDefault("httpConfig", Document.EMPTY_MAP));
