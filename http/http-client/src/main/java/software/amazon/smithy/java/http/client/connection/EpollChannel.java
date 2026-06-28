@@ -18,6 +18,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * A single TCP connection with a <b>blocking virtual-thread API</b> ({@link #readAddress}/
@@ -27,6 +28,11 @@ import java.util.concurrent.locks.LockSupport;
  * backend is enabled and {@link EpollRuntime#isAvailable()} is true.
  */
 final class EpollChannel {
+
+    // Sentinel returned by the guarded syscall helpers when the channel was closed before the syscall
+    // could run under the fd lock. Distinct from any recv/send/writev result (which are >= -1), so the
+    // I/O loops route it back to their top-of-loop closed handling instead of treating it as data/EOF.
+    private static final int CLOSED = -2;
 
     private final EpollRuntime runtime;
     private final Socket socket;
@@ -51,6 +57,17 @@ final class EpollChannel {
 
     private final AtomicBoolean closed = new AtomicBoolean();
     private volatile boolean epollOutArmed;
+
+    // Guards the file descriptor against the close/syscall race. Every fd syscall (recv/send/writev)
+    // runs under the read lock; close() takes the write lock before calling socket.close(). This
+    // establishes the invariant that socket.close() happens-after the last in-flight syscall and that no
+    // new syscall starts once the fd has been released to the kernel. Without it, a syscall that has
+    // already passed the `closed` check could run recv(2)/send(2) on the raw fd number after close()
+    // released it and the kernel handed that number to another connection, reading or writing the wrong
+    // socket (cross-connection data disclosure on a TLS transport). Reads and writes hold the lock only
+    // around the non-blocking syscall itself (never across a park), so a reader and writer still proceed
+    // concurrently and close() never waits on a parked thread.
+    private final ReentrantReadWriteLock fdLock = new ReentrantReadWriteLock();
 
     private EpollChannel(EpollRuntime runtime, Socket socket, Timer readTimer) {
         this.runtime = runtime;
@@ -158,7 +175,10 @@ final class EpollChannel {
                 if (pos >= limit) {
                     return 0;
                 }
-                int n = socket.recvAddress(base, pos, limit); // >0 bytes, 0 EAGAIN, -1 EOF
+                int n = guardedRecv(base, pos, limit); // >0 bytes, 0 EAGAIN, -1 EOF, CLOSED if closed
+                if (n == CLOSED) {
+                    continue; // re-run the top-of-loop closed handling
+                }
                 if (n > 0) {
                     return n;
                 }
@@ -195,7 +215,10 @@ final class EpollChannel {
                 if (closed.get()) {
                     throw new IOException("channel closed");
                 }
-                int n = socket.sendAddress(base, pos, limit); // >0 bytes, 0 EAGAIN
+                int n = guardedSend(base, pos, limit); // >0 bytes, 0 EAGAIN, CLOSED if closed
+                if (n == CLOSED) {
+                    continue; // re-run the top-of-loop closed handling (throws)
+                }
                 if (n > 0) {
                     pos += n;
                     continue;
@@ -231,7 +254,10 @@ final class EpollChannel {
                     throw new IOException("channel closed");
                 }
                 int first = firstRemaining(buffers, offset, end);
-                long n = socket.writev(buffers, first, end - first, remaining);
+                long n = guardedWritev(buffers, first, end - first, remaining); // >0, 0 EAGAIN, CLOSED
+                if (n == CLOSED) {
+                    continue; // re-run the top-of-loop closed handling (throws)
+                }
                 if (n > 0) {
                     advance(buffers, first, end, n);
                     written += n;
@@ -280,6 +306,49 @@ final class EpollChannel {
             result += buffers[i].remaining();
         }
         return result;
+    }
+
+    // The fd syscalls below run under the read lock with a re-check of `closed` inside the lock. close()
+    // holds the write lock while it releases the fd, so once it wins the lock these helpers see `closed`
+    // and return CLOSED without touching the fd; conversely, a syscall already holding the read lock
+    // completes before close() can release the fd. Either way recv/send/writev never runs on a released
+    // (and possibly reused) fd. The lock is dropped immediately after the syscall so parking happens
+    // unlocked.
+
+    private int guardedRecv(long base, int pos, int limit) throws IOException {
+        fdLock.readLock().lock();
+        try {
+            if (closed.get()) {
+                return CLOSED;
+            }
+            return socket.recvAddress(base, pos, limit);
+        } finally {
+            fdLock.readLock().unlock();
+        }
+    }
+
+    private int guardedSend(long base, int pos, int limit) throws IOException {
+        fdLock.readLock().lock();
+        try {
+            if (closed.get()) {
+                return CLOSED;
+            }
+            return socket.sendAddress(base, pos, limit);
+        } finally {
+            fdLock.readLock().unlock();
+        }
+    }
+
+    private long guardedWritev(ByteBuffer[] buffers, int offset, int length, long maxBytes) throws IOException {
+        fdLock.readLock().lock();
+        try {
+            if (closed.get()) {
+                return CLOSED;
+            }
+            return socket.writev(buffers, offset, length, maxBytes);
+        } finally {
+            fdLock.readLock().unlock();
+        }
     }
 
     private boolean awaitReadable(long deadline) throws InterruptedIOException {
@@ -420,8 +489,9 @@ final class EpollChannel {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-        runtime.deregister(fd);
-        // Wake any parked waiters so they observe `closed` and unwind.
+        // `closed` is now set, so any syscall helper that has not yet taken the read lock will see it and
+        // bail. Wake parked waiters first (this never blocks): a thread parked in awaitReadable/Writable
+        // holds no lock, so it can wake, observe `closed`, and release without contending for the fd lock.
         readReady = true;
         writeReady = true;
         Thread r = reader;
@@ -432,10 +502,17 @@ final class EpollChannel {
         if (w != null) {
             LockSupport.unpark(w);
         }
+        // Take the write lock to release the fd. This drains any syscall already in flight under the read
+        // lock and blocks new ones, so socket.close() (which returns the fd number to the kernel) cannot
+        // overlap a recv/send/writev. The non-blocking syscalls return promptly, so this wait is bounded.
+        fdLock.writeLock().lock();
         try {
+            runtime.deregister(fd);
             socket.close();
         } catch (IOException ignore) {
             // best effort
+        } finally {
+            fdLock.writeLock().unlock();
         }
     }
 
