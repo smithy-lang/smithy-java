@@ -251,6 +251,29 @@ class H2FrameCodecTest {
     }
 
     @Test
+    void throwsOnContinuationFlood() throws IOException {
+        // CONTINUATION-flood guard (CVE-2024-27316 class): a HEADERS frame without END_HEADERS followed by
+        // an endless run of empty CONTINUATION frames carries no header bytes, so the byte cap never trips.
+        // The small-CONTINUATION count cap must abort with ENHANCE_YOUR_CALM instead of spinning forever.
+        var out = new ByteArrayOutputStream();
+        out.write(buildFrame(1, 0, 1, new byte[] {1})); // HEADERS, no END_HEADERS
+        for (int i = 0; i < 100; i++) {
+            out.write(buildFrame(9, 0, 1, new byte[0])); // empty CONTINUATION, never END_HEADERS
+        }
+        var codec = new H2FrameCodec(wrapIn(out.toByteArray()), wrapOut(new ByteArrayOutputStream()), 16384);
+
+        var ex = assertThrows(H2Exception.class, () -> {
+            codec.nextFrame();
+            int streamId = codec.frameStreamId();
+            int length = codec.framePayloadLength();
+            byte[] payload = new byte[length];
+            codec.readPayloadInto(payload, 0, length);
+            codec.readHeaderBlock(streamId, payload, length, H2Constants.DEFAULT_MAX_HEADER_LIST_SIZE);
+        });
+        assertEquals(H2Constants.ERROR_ENHANCE_YOUR_CALM, ex.errorCode());
+    }
+
+    @Test
     void readHeaderBlockFromPushPromise() throws IOException {
         byte[] framePayload = {0, 0, 0, 2, 'a', 'b'};
         var codec = new H2FrameCodec(wrapIn(buildFrame(5, 0x04, 1, framePayload)),

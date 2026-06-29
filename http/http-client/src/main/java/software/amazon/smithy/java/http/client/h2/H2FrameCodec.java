@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.http.client.h2;
 
 import static software.amazon.smithy.java.http.client.h2.H2Constants.CONNECTION_PREFACE;
+import static software.amazon.smithy.java.http.client.h2.H2Constants.ERROR_ENHANCE_YOUR_CALM;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.ERROR_FRAME_SIZE_ERROR;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.ERROR_PROTOCOL_ERROR;
 import static software.amazon.smithy.java.http.client.h2.H2Constants.FLAG_ACK;
@@ -58,6 +59,16 @@ final class H2FrameCodec {
     // Scratch buffer for writing control frames - writer thread only.
     private static final int WRITE_SCRATCH_SIZE = 64;
     private final byte[] writeScratch = new byte[WRITE_SCRATCH_SIZE];
+
+    // CONTINUATION-flood defense (CVE-2024-27316 class). The accumulated header-block byte cap already
+    // stops a flood of byte-carrying CONTINUATION frames, but a peer can also send an endless run of
+    // tiny/empty CONTINUATION frames that never set END_HEADERS: those add little or no bytes, so the
+    // byte cap never trips and the reader thread spins forever. Mirroring Netty, we additionally cap the
+    // number of consecutive "small" CONTINUATION fragments (below half the minimum max-frame-size) per
+    // header block and abort with ENHANCE_YOUR_CALM. A legitimate peer never sends a long run of tiny
+    // CONTINUATION frames, so this can't trip on valid traffic.
+    private static final int SMALL_CONTINUATION_THRESHOLD = 16384 / 2;
+    private static final int MAX_SMALL_CONTINUATION_FRAMES = 16;
 
     // Reusable buffer for accumulating header blocks when CONTINUATION frames are needed.
     private final ByteBufferOutputStream headerBlockBuffer = new ByteBufferOutputStream(4096);
@@ -453,6 +464,7 @@ final class H2FrameCodec {
             headerBlockBuffer.write(initialPayload, fragmentOffset, fragmentLength);
         }
 
+        int smallContinuations = 0;
         while (true) {
             int type = nextFrame();
             if (type < 0) {
@@ -474,6 +486,18 @@ final class H2FrameCodec {
             }
 
             int contLength = currentPayloadLength;
+            boolean endHeaders = hasFrameFlag(FLAG_END_HEADERS);
+
+            // CONTINUATION-flood guard: a non-terminal, small (or empty) fragment carries little or no
+            // payload, so a run of them evades the byte cap below while pinning the reader thread. Cap
+            // how many we tolerate before aborting the connection.
+            if (!endHeaders && contLength < SMALL_CONTINUATION_THRESHOLD
+                    && ++smallContinuations > MAX_SMALL_CONTINUATION_FRAMES) {
+                throw new H2Exception(ERROR_ENHANCE_YOUR_CALM,
+                        "Too many small CONTINUATION frames in a header block (limit "
+                                + MAX_SMALL_CONTINUATION_FRAMES + ")");
+            }
+
             if (contLength > 0) {
                 if ((long) headerBlockBuffer.size() + contLength > maxAccumulatedSize) {
                     throw new H2Exception(ERROR_PROTOCOL_ERROR,
@@ -484,7 +508,7 @@ final class H2FrameCodec {
                 readPayloadIntoBuffer(contLength);
             }
 
-            if (hasFrameFlag(FLAG_END_HEADERS)) {
+            if (endHeaders) {
                 break;
             }
         }
