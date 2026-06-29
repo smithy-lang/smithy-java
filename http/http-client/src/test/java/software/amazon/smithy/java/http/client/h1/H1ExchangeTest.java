@@ -490,6 +490,34 @@ class H1ExchangeTest {
     }
 
     @Test
+    void rejectsRequestLineInjectionViaMethod() throws IOException {
+        // A method containing CR/LF would inject extra bytes into the request line. RFC 7230 method =
+        // token, so it must be rejected before being written.
+        var socket = new H1ConnectionTest.FakeSocket("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+        var conn = new H1Connection(ConnectionTransport.of(socket), TEST_ROUTE, READ_TIMEOUT);
+        var request = HttpRequest.create()
+                .setMethod("GET\r\nX-Injected: 1\r\nGET")
+                .setUri(SmithyUri.of("https://example.com/test"));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> conn.newExchange(request, RequestOptions.defaults()));
+        // Nothing malformed reached the wire.
+        assertFalse(socket.outputString().contains("X-Injected"));
+    }
+
+    @Test
+    void rejectsMethodWithSpace() throws IOException {
+        var socket = new H1ConnectionTest.FakeSocket("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+        var conn = new H1Connection(ConnectionTransport.of(socket), TEST_ROUTE, READ_TIMEOUT);
+        var request = HttpRequest.create()
+                .setMethod("GET ")
+                .setUri(SmithyUri.of("https://example.com/test"));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> conn.newExchange(request, RequestOptions.defaults()));
+    }
+
+    @Test
     void writesRawPathAndQueryInRequestLine() throws IOException {
         var socket = new H1ConnectionTest.FakeSocket("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
         var conn = new H1Connection(ConnectionTransport.of(socket), TEST_ROUTE, READ_TIMEOUT);

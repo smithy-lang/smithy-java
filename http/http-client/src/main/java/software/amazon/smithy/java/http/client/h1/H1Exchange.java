@@ -63,6 +63,26 @@ final class H1Exchange implements HttpExchange {
     private static final byte[] COLON_SPACE = ": ".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] HOST_HEADER = "Host: ".getBytes(StandardCharsets.US_ASCII);
 
+    // RFC 7230 token characters (method = token). Used to validate the request method before it is
+    // written raw into the request line, so a hostile method string cannot inject CR/LF (request-line
+    // injection). Marks each valid tchar as true.
+    private static final boolean[] METHOD_TOKEN_CHARS = new boolean[128];
+
+    static {
+        for (char c = 'a'; c <= 'z'; c++) {
+            METHOD_TOKEN_CHARS[c] = true;
+        }
+        for (char c = 'A'; c <= 'Z'; c++) {
+            METHOD_TOKEN_CHARS[c] = true;
+        }
+        for (char c = '0'; c <= '9'; c++) {
+            METHOD_TOKEN_CHARS[c] = true;
+        }
+        for (char c : "!#$%&'*+-.^_`|~".toCharArray()) {
+            METHOD_TOKEN_CHARS[c] = true;
+        }
+    }
+
     private final H1Connection connection;
     private final Route route;
     private final byte[] responseLineBuffer = new byte[H1Connection.RESPONSE_LINE_BUFFER_SIZE];
@@ -417,8 +437,24 @@ final class H1Exchange implements HttpExchange {
         return in.readLine(responseLineBuffer, H1Connection.RESPONSE_LINE_BUFFER_SIZE);
     }
 
+    // RFC 7230: method = token. Reject anything else (in particular CR/LF and SP) before it is written
+    // raw into the request line, so an attacker-controlled method can't inject extra request-line bytes.
+    private static void validateMethod(String method) {
+        if (method.isEmpty()) {
+            throw new IllegalArgumentException("HTTP method must not be empty");
+        }
+        for (int i = 0; i < method.length(); i++) {
+            char c = method.charAt(i);
+            if (c >= 128 || !METHOD_TOKEN_CHARS[c]) {
+                throw new IllegalArgumentException("Invalid character in HTTP method: " + method);
+            }
+        }
+    }
+
     private void writeRequestLine(UnsyncBufferedOutputStream out) throws IOException {
-        out.writeAscii(request.method());
+        String method = request.method();
+        validateMethod(method);
+        out.writeAscii(method);
         out.write(' ');
 
         var uri = request.uri();
