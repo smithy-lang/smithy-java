@@ -195,6 +195,25 @@ class H1ExchangeTest {
     }
 
     @Test
+    void rejectsResponseWithBothTransferEncodingAndContentLength() throws IOException {
+        // RFC 9112 6.1: a response carrying both Transfer-Encoding and Content-Length is malformed (a
+        // request-smuggling vector). It must be rejected, and the connection must not be reused.
+        var conn = connection(
+                "HTTP/1.1 200 OK\r\n"
+                        + "Transfer-Encoding: chunked\r\n"
+                        + "Content-Length: 5\r\n"
+                        + "\r\n"
+                        + "5\r\n"
+                        + "hello\r\n"
+                        + "0\r\n"
+                        + "\r\n");
+        var exchange = conn.newExchange(getRequest(), RequestOptions.defaults());
+
+        assertThrows(IOException.class, exchange::responseBody);
+        assertFalse(conn.isKeepAlive(), "Ambiguous framing must disable connection reuse");
+    }
+
+    @Test
     void readsFixedLengthResponseBodyAsChannel() throws IOException {
         var conn = connection(
                 "HTTP/1.1 200 OK\r\n"

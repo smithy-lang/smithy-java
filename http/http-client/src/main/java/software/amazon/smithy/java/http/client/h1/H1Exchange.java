@@ -682,6 +682,14 @@ final class H1Exchange implements HttpExchange {
             return new FixedLengthResponseInputStream(this, socketIn, 0);
         }
 
+        // RFC 9112 6.1: a message with both Transfer-Encoding and Content-Length is malformed (a request
+        // smuggling vector). Reject it, and don't reuse the connection -- its framing is ambiguous, so any
+        // leftover bytes would desync the next exchange on this connection.
+        if (responseChunked && responseContentLength >= 0) {
+            connection.setKeepAlive(false);
+            throw new IOException("Response has both Transfer-Encoding and Content-Length headers");
+        }
+
         if (responseChunked) {
             chunkedResponseIn = new ChunkedInputStream(socketIn, this, responseLineBuffer);
             return chunkedResponseIn;
