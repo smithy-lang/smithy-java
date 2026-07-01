@@ -20,7 +20,7 @@ dependencies {
 
     // Test dependencies
     testImplementation("software.amazon.smithy.java:aws-sdkv2-auth:$smithyJavaVersion")
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.1")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
