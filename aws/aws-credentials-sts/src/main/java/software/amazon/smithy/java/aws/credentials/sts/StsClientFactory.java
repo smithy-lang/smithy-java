@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.aws.credentials.sts;
 
+import java.util.Objects;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.client.awsquery.AwsQueryClientProtocol;
@@ -65,6 +66,9 @@ final class StsClientFactory {
     private static final class ModelHolder {
         static final Model MODEL = Model.assembler()
                 .discoverModels(StsClientFactory.class.getClassLoader())
+                .addImport(Objects.requireNonNull(
+                        StsClientFactory.class.getResource("sts-2011-06-15.json"),
+                        "Bundled STS model resource not found"))
                 .assemble()
                 .unwrap();
     }
