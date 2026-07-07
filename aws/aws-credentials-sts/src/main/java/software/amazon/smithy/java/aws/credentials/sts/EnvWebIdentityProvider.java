@@ -27,7 +27,7 @@ public final class EnvWebIdentityProvider implements ChainIdentityProvider {
 
     @Override
     public String name() {
-        return "EnvWebIdentity";
+        return "WebIdentityTokenEnv";
     }
 
     @Override

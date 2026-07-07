@@ -90,7 +90,7 @@ class IdentityChainEndToEndTest {
         var identity = chain.resolveIdentity(Context.empty()).unwrap();
         assertEquals("profile_ak", identity.accessKeyId());
         // Fell through both env-based slots before reaching the profile static keys.
-        assertEquals(List.of("StaticKeys"), chain.providerNames());
+        assertEquals(List.of("ProfileStaticKeys"), chain.providerNames());
     }
 
     @Test

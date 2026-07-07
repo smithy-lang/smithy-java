@@ -56,7 +56,7 @@ public final class CredentialProcessHandler implements ChainIdentityProvider {
 
     @Override
     public String name() {
-        return "CredentialProcess";
+        return "ProfileCredentialProcess";
     }
 
     @Override

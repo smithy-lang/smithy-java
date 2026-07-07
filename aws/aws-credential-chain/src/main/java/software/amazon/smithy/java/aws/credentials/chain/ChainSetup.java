@@ -111,6 +111,17 @@ public final class ChainSetup {
     }
 
     /**
+     * Returns the environment variable lookup function this setup was built with, so the chain can perform slot
+     * detection ({@link StandardProvider#isDetected(Function)}) against the same environment it was assembled
+     * against rather than the real process environment.
+     *
+     * @return the environment variable lookup function.
+     */
+    Function<String, String> envFn() {
+        return envFn;
+    }
+
+    /**
      * Returns a general-purpose typed property bag for sharing additional state between
      * providers during assembly.
      *

@@ -9,11 +9,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
@@ -43,19 +44,34 @@ import software.amazon.smithy.java.logging.InternalLogger;
  */
 public final class IdentityChain<I extends Identity> implements IdentityResolver<I>, AutoCloseable {
 
+    /**
+     * Optional debugging hook. Register a {@link Consumer} of {@link ChainResolutionDiagnostics} under this key on the
+     * request {@link Context} to observe the structured breakdown (providers tried, module suggestions) whenever
+     * resolution fails. This keeps chain-specific diagnostics off the shared {@code IdentityResult} type. The same
+     * information is always present in the human-readable {@code IdentityResult.error()} message.
+     */
+    public static final Context.Key<Consumer<ChainResolutionDiagnostics>> DIAGNOSTICS =
+            Context.key("Credential chain resolution diagnostics sink");
+
     private static final InternalLogger LOGGER = InternalLogger.getLogger(IdentityChain.class);
 
     private final Class<I> identityType;
     private final List<ChainSetup.NamedResolver> resolvers;
+    private final Set<StandardProvider> claimedSlots;
+    private final Function<String, String> envFn;
     private final ScheduledExecutorService executor;
 
     private IdentityChain(
             Class<I> identityType,
             List<ChainSetup.NamedResolver> resolvers,
+            Set<StandardProvider> claimedSlots,
+            Function<String, String> envFn,
             ScheduledExecutorService executor
     ) {
         this.identityType = identityType;
         this.resolvers = resolvers;
+        this.claimedSlots = claimedSlots;
+        this.envFn = envFn;
         this.executor = executor;
     }
 
@@ -200,8 +216,12 @@ public final class IdentityChain<I extends Identity> implements IdentityResolver
                 }
             }
         }
-        warnDetectedButUnclaimed(claimed);
-        return new IdentityChain<>(identityType, Collections.unmodifiableList(ordered), executor);
+        warnDetectedButUnclaimed(claimed, setup.envFn());
+        return new IdentityChain<>(identityType,
+                Collections.unmodifiableList(ordered),
+                Collections.unmodifiableSet(claimed),
+                setup.envFn(),
+                executor);
     }
 
     private static List<ChainIdentityProvider> sortByOrdering(List<ChainIdentityProvider> providers) {
@@ -262,9 +282,9 @@ public final class IdentityChain<I extends Identity> implements IdentityResolver
         return list.size();
     }
 
-    private static void warnDetectedButUnclaimed(Set<StandardProvider> claimed) {
+    private static void warnDetectedButUnclaimed(Set<StandardProvider> claimed, Function<String, String> envFn) {
         for (StandardProvider slot : StandardProvider.values()) {
-            if (slot.moduleSuggestion() != null && !claimed.contains(slot) && slot.isDetected()) {
+            if (slot.moduleSuggestion() != null && !claimed.contains(slot) && slot.isDetected(envFn)) {
                 LOGGER.warn("{} credentials detected but no provider is registered for the '{}' slot. "
                         + "Add '{}' to your dependencies.",
                         slot.name(),
@@ -278,12 +298,14 @@ public final class IdentityChain<I extends Identity> implements IdentityResolver
     @SuppressWarnings("unchecked")
     public IdentityResult<I> resolveIdentity(Context requestProperties) {
         if (resolvers.isEmpty()) {
+            emitDiagnostics(requestProperties, new ChainResolutionDiagnostics(List.of(), detectedButMissingModules()));
             return IdentityResult.ofError(getClass(),
                     "No credential providers were discovered. Ensure at least one "
                             + "aws-credentials-* module is on the classpath." + detectedButMissingHints());
         }
 
-        // More cheaply build up a list of failures, and defer string-ing them into a StringBuilder.
+        // Track the ordered names of everything tried, and defer string-ing the errors into a message.
+        List<String> providersTried = new ArrayList<>(resolvers.size());
         List<Object> errors = new ArrayList<>();
 
         for (var nr : resolvers) {
@@ -297,9 +319,12 @@ public final class IdentityChain<I extends Identity> implements IdentityResolver
                 }
                 return (IdentityResult<I>) result;
             }
+            providersTried.add(nr.name());
             errors.add(nr.name());
             errors.add(result.error());
         }
+
+        emitDiagnostics(requestProperties, new ChainResolutionDiagnostics(providersTried, detectedButMissingModules()));
 
         StringBuilder missing = new StringBuilder();
         for (var i = 0; i < errors.size(); i += 2) {
@@ -314,29 +339,43 @@ public final class IdentityChain<I extends Identity> implements IdentityResolver
                         + detectedButMissingHints());
     }
 
+    private void emitDiagnostics(Context requestProperties, ChainResolutionDiagnostics diagnostics) {
+        var sink = requestProperties.get(DIAGNOSTICS);
+        if (sink != null) {
+            sink.accept(diagnostics);
+        }
+    }
+
+    /**
+     * @return the module-suggestion coordinates for every slot that is detected but has no registered provider,
+     *         in slot order. Never null; empty when there is nothing to suggest.
+     */
+    private List<String> detectedButMissingModules() {
+        List<String> suggestions = new ArrayList<>();
+        for (StandardProvider slot : StandardProvider.values()) {
+            if (slot.moduleSuggestion() != null && slot.isDetected(envFn) && !isClaimed(slot)) {
+                suggestions.add(slot.moduleSuggestion());
+            }
+        }
+        return suggestions;
+    }
+
     private String detectedButMissingHints() {
         StringBuilder hints = new StringBuilder();
         for (StandardProvider slot : StandardProvider.values()) {
-            if (slot.moduleSuggestion() != null && slot.isDetected()) {
-                if (!isClaimed(slot)) {
-                    hints.append(" Detected ")
-                            .append(slot.name())
-                            .append(" credentials; add '")
-                            .append(slot.moduleSuggestion())
-                            .append("' to your dependencies.");
-                }
+            if (slot.moduleSuggestion() != null && slot.isDetected(envFn) && !isClaimed(slot)) {
+                hints.append(" Detected ")
+                        .append(slot.name())
+                        .append(" credentials; add '")
+                        .append(slot.moduleSuggestion())
+                        .append("' to your dependencies.");
             }
         }
         return hints.toString();
     }
 
     private boolean isClaimed(StandardProvider slot) {
-        for (var nr : resolvers) {
-            if (nr.name().equals(slot.name().toLowerCase(Locale.ROOT))) {
-                return true;
-            }
-        }
-        return false;
+        return claimedSlots.contains(slot);
     }
 
     /**
