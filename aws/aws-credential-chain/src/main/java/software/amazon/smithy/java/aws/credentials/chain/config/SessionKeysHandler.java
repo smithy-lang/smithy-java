@@ -34,7 +34,7 @@ public final class SessionKeysHandler implements ChainIdentityProvider {
 
     @Override
     public String name() {
-        return "SessionKeys";
+        return "ProfileSessionKeys";
     }
 
     @Override

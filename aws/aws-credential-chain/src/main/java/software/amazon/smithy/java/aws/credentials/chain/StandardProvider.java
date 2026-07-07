@@ -7,6 +7,7 @@ package software.amazon.smithy.java.aws.credentials.chain;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Function;
 
 /**
  * Standard credential provider slots in the AWS default credential chain.
@@ -27,7 +28,7 @@ public enum StandardProvider {
      */
     JAVA_SYSTEM_PROPERTIES("software.amazon.smithy.java:aws-client-core") {
         @Override
-        public boolean isDetected() {
+        public boolean isDetected(Function<String, String> env) {
             return System.getProperty("aws.accessKeyId") != null;
         }
     },
@@ -38,8 +39,8 @@ public enum StandardProvider {
      */
     ENVIRONMENT("software.amazon.smithy.java:aws-client-core") {
         @Override
-        public boolean isDetected() {
-            return System.getenv("AWS_ACCESS_KEY_ID") != null;
+        public boolean isDetected(Function<String, String> env) {
+            return env.apply("AWS_ACCESS_KEY_ID") != null;
         }
     },
 
@@ -51,8 +52,8 @@ public enum StandardProvider {
      */
     WEB_IDENTITY_TOKEN_ENV("software.amazon.smithy.java:aws-credentials-sts") {
         @Override
-        public boolean isDetected() {
-            return System.getenv("AWS_WEB_IDENTITY_TOKEN_FILE") != null && System.getenv("AWS_ROLE_ARN") != null;
+        public boolean isDetected(Function<String, String> env) {
+            return env.apply("AWS_WEB_IDENTITY_TOKEN_FILE") != null && env.apply("AWS_ROLE_ARN") != null;
         }
     },
 
@@ -66,7 +67,7 @@ public enum StandardProvider {
      */
     SHARED_CONFIG(null) {
         @Override
-        public boolean isDetected() {
+        public boolean isDetected(Function<String, String> env) {
             var home = System.getProperty("user.home");
             if (home == null) {
                 return false;
@@ -83,7 +84,7 @@ public enum StandardProvider {
      */
     PROFILE_STATIC_KEYS(null) {
         @Override
-        public boolean isDetected() {
+        public boolean isDetected(Function<String, String> env) {
             return false;
         }
     },
@@ -96,7 +97,7 @@ public enum StandardProvider {
      */
     PROFILE_SESSION_KEYS(null) {
         @Override
-        public boolean isDetected() {
+        public boolean isDetected(Function<String, String> env) {
             return false;
         }
     },
@@ -109,7 +110,7 @@ public enum StandardProvider {
      */
     PROFILE_ASSUME_ROLE("software.amazon.smithy.java:aws-credentials-sts") {
         @Override
-        public boolean isDetected() {
+        public boolean isDetected(Function<String, String> env) {
             return false;
         }
     },
@@ -121,7 +122,7 @@ public enum StandardProvider {
      */
     PROFILE_WEB_IDENTITY("software.amazon.smithy.java:aws-credentials-sts") {
         @Override
-        public boolean isDetected() {
+        public boolean isDetected(Function<String, String> env) {
             return false;
         }
     },
@@ -134,7 +135,7 @@ public enum StandardProvider {
      */
     PROFILE_SSO_SESSION("software.amazon.smithy.java:aws-credentials-sso") {
         @Override
-        public boolean isDetected() {
+        public boolean isDetected(Function<String, String> env) {
             return false;
         }
     },
@@ -147,7 +148,7 @@ public enum StandardProvider {
      */
     PROFILE_LEGACY_SSO("software.amazon.smithy.java:aws-credentials-sso") {
         @Override
-        public boolean isDetected() {
+        public boolean isDetected(Function<String, String> env) {
             return false;
         }
     },
@@ -159,7 +160,7 @@ public enum StandardProvider {
      */
     PROFILE_LOGIN("software.amazon.smithy.java:aws-credentials-login") {
         @Override
-        public boolean isDetected() {
+        public boolean isDetected(Function<String, String> env) {
             return false;
         }
     },
@@ -172,7 +173,7 @@ public enum StandardProvider {
      */
     PROFILE_CREDENTIAL_PROCESS(null) {
         @Override
-        public boolean isDetected() {
+        public boolean isDetected(Function<String, String> env) {
             return false;
         }
     },
@@ -185,9 +186,9 @@ public enum StandardProvider {
      */
     ECS_CONTAINER("software.amazon.smithy.java:aws-credentials-ecs") {
         @Override
-        public boolean isDetected() {
-            return System.getenv("AWS_CONTAINER_CREDENTIALS_FULL_URI") != null
-                    || System.getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") != null;
+        public boolean isDetected(Function<String, String> env) {
+            return env.apply("AWS_CONTAINER_CREDENTIALS_FULL_URI") != null
+                    || env.apply("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") != null;
         }
     },
 
@@ -198,7 +199,7 @@ public enum StandardProvider {
      */
     EC2_INSTANCE_METADATA("software.amazon.smithy.java:aws-credentials-imds") {
         @Override
-        public boolean isDetected() {
+        public boolean isDetected(Function<String, String> env) {
             return false;
         }
     };
@@ -210,12 +211,26 @@ public enum StandardProvider {
     }
 
     /**
-     * Cheaply detect whether this credential source is likely available in the current environment.
-     * This must not perform network calls or expensive I/O.
+     * Cheaply detect whether this credential source is likely available, resolving environment variables through
+     * the supplied lookup. This must not perform network calls or expensive I/O.
+     *
+     * <p>The lookup is threaded from the chain's {@link ChainSetup} so that detection is consistent with the
+     * environment the chain was assembled against (production uses {@link System#getenv(String)}; tests can inject
+     * a deterministic environment).
+     *
+     * @param env environment variable lookup, returning {@code null} for unset variables.
+     * @return {@code true} if signals suggest this source is configured.
+     */
+    public abstract boolean isDetected(Function<String, String> env);
+
+    /**
+     * Cheaply detect whether this credential source is likely available in the current process environment.
      *
      * @return {@code true} if signals suggest this source is configured.
      */
-    public abstract boolean isDetected();
+    public boolean isDetected() {
+        return isDetected(System::getenv);
+    }
 
     /**
      * @return the Maven coordinate to suggest when this source is detected but no implementation

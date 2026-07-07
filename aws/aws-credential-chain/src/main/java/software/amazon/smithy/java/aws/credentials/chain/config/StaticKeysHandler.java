@@ -34,7 +34,7 @@ public final class StaticKeysHandler implements ChainIdentityProvider {
 
     @Override
     public String name() {
-        return "StaticKeys";
+        return "ProfileStaticKeys";
     }
 
     @Override

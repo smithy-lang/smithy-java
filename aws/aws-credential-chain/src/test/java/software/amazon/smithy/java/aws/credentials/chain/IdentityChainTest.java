@@ -161,6 +161,80 @@ class IdentityChainTest {
         assertTrue(result.error().contains("No credential providers were discovered"));
     }
 
+    @Test
+    void diagnosticsSinkReceivesProvidersTriedOnFailure() {
+        var chain = IdentityChain.assemble(AwsCredentialsIdentity.class,
+                List.of(
+                        registration("env",
+                                new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
+                                errorResolver("no env")),
+                        registration("profile",
+                                new OrderingConstraint.Standard(StandardProvider.SHARED_CONFIG),
+                                errorResolver("no profile"))),
+                null);
+
+        var captured = new ChainResolutionDiagnostics[1];
+        var context = Context.create();
+        context.put(IdentityChain.DIAGNOSTICS, d -> captured[0] = d);
+
+        IdentityResult<AwsCredentialsIdentity> result = chain.resolveIdentity(context);
+
+        assertNull(result.identity());
+        assertNotNull(captured[0]);
+        assertEquals(List.of("env", "profile"), captured[0].providersTried());
+        assertTrue(captured[0].moduleSuggestions().isEmpty());
+    }
+
+    @Test
+    void diagnosticsSinkNotInvokedOnSuccess() {
+        var chain = IdentityChain.assemble(AwsCredentialsIdentity.class,
+                List.of(
+                        registration("env",
+                                new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT),
+                                staticResolver("ak", "sk"))),
+                null);
+
+        var captured = new ChainResolutionDiagnostics[1];
+        var context = Context.create();
+        context.put(IdentityChain.DIAGNOSTICS, d -> captured[0] = d);
+
+        IdentityResult<AwsCredentialsIdentity> result = chain.resolveIdentity(context);
+
+        assertNotNull(result.identity());
+        // No sink invocation on success: diagnostics are a failure-path hook only.
+        assertNull(captured[0]);
+    }
+
+    @Test
+    void detectedSlotClaimedByProviderProducesNoMissingModuleHint() {
+        // A provider claims a detected slot (JAVA_SYSTEM_PROPERTIES) but fails to resolve. Because the slot is
+        // claimed, the aggregated error MUST NOT suggest adding a module for it. Regression test for a casing bug
+        // where isClaimed() compared a provider name ("JavaSystemProperties") against the lower-cased slot name
+        // ("java_system_properties"), never matched, and appended a spurious "add module" hint for claimed slots.
+        var previous = System.getProperty("aws.accessKeyId");
+        System.setProperty("aws.accessKeyId", "detected");
+        try {
+            var chain = IdentityChain.assemble(AwsCredentialsIdentity.class,
+                    List.of(
+                            registration("JavaSystemProperties",
+                                    new OrderingConstraint.Standard(StandardProvider.JAVA_SYSTEM_PROPERTIES),
+                                    errorResolver("no system property credentials"))),
+                    null);
+            IdentityResult<AwsCredentialsIdentity> result = chain.resolveIdentity(Context.empty());
+
+            assertNull(result.identity());
+            assertTrue(result.error().contains("JavaSystemProperties: no system property credentials"));
+            assertTrue(!result.error().contains("add"),
+                    "Claimed slot must not produce a missing-module hint, but got: " + result.error());
+        } finally {
+            if (previous == null) {
+                System.clearProperty("aws.accessKeyId");
+            } else {
+                System.setProperty("aws.accessKeyId", previous);
+            }
+        }
+    }
+
     private static ChainIdentityProvider registration(
             String name,
             OrderingConstraint ordering,
