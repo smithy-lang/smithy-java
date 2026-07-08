@@ -31,7 +31,11 @@ public final class AwsCredentialChainIntegration implements JavaCodegenIntegrati
     public void customizeSettings(CodeGenerationContext context) {
         Model model = context.model();
         JavaCodegenSettings settings = context.settings();
-        var service = model.expectShape(settings.service(), ServiceShape.class);
+        var serviceId = settings.getService().orElse(null);
+        if (serviceId == null) {
+            return;
+        }
+        var service = model.expectShape(serviceId, ServiceShape.class);
         var authSchemes = ServiceIndex.of(model).getEffectiveAuthSchemes(service);
         if (authSchemes.containsKey(SIGV4) || authSchemes.containsKey(SIGV4A)) {
             // Only register the plugin if it is actually on the codegen classpath. A model can carry AWS auth

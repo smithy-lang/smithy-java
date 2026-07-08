@@ -31,14 +31,16 @@ public final class DefaultPluginSettingsIntegration implements JavaCodegenIntegr
 
     @Override
     public void customizeSettings(CodeGenerationContext context) {
-        if (context.settings().service().equals(MARKER_SERVICE)) {
+        var serviceId = context.settings().getService().orElse(null);
+        if (MARKER_SERVICE.equals(serviceId)) {
             context.settings().addDefaultPlugin(EarlyDefaultPlugin.class.getCanonicalName());
         }
     }
 
     @Override
     public void customize(CodeGenerationContext context) {
-        if (context.settings().service().equals(MARKER_SERVICE)) {
+        var serviceId = context.settings().getService().orElse(null);
+        if (MARKER_SERVICE.equals(serviceId)) {
             context.settings().addDefaultPlugin(LateDefaultPlugin.class.getCanonicalName());
         }
     }
