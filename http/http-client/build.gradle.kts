@@ -21,7 +21,7 @@ val jmhServerImplementation by configurations.getting
 dependencies {
     jmh(project(":client:client-http"))
 
-    jmhServerImplementation("io.netty:netty-all:4.2.15.Final")
+    jmhServerImplementation("io.netty:netty-all:4.2.16.Final")
     jmhServerImplementation("org.bouncycastle:bcpkix-jdk18on:1.84")
 }
 
