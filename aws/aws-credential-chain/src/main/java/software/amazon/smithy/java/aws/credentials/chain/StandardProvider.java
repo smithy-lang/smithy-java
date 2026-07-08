@@ -78,11 +78,16 @@ public enum StandardProvider {
     },
 
     /**
-     * Profile-based static keys ({@code aws_access_key_id} + {@code aws_secret_access_key}).
+     * Profile-based session keys ({@code aws_access_key_id} + {@code aws_secret_access_key}
+     * + {@code aws_session_token}).
+     *
+     * <p>Ordered before {@link #PROFILE_STATIC_KEYS} as the more specific match: a profile with a
+     * session token is session keys, so the token-bearing slot is tried first and, being terminal,
+     * claims the profile before static keys is consulted.
      *
      * <p>Re-reads from the profile on each resolution to support live reload after invalidation.
      */
-    PROFILE_STATIC_KEYS(null) {
+    PROFILE_SESSION_KEYS(null) {
         @Override
         public boolean isDetected(Function<String, String> env) {
             return false;
@@ -90,12 +95,14 @@ public enum StandardProvider {
     },
 
     /**
-     * Profile-based session keys ({@code aws_access_key_id} + {@code aws_secret_access_key}
-     * + {@code aws_session_token}).
+     * Profile-based static keys ({@code aws_access_key_id} + {@code aws_secret_access_key}).
+     *
+     * <p>Ordered after {@link #PROFILE_SESSION_KEYS}, so it is reached only for a profile with no
+     * {@code aws_session_token} and never shadows session keys.
      *
      * <p>Re-reads from the profile on each resolution to support live reload after invalidation.
      */
-    PROFILE_SESSION_KEYS(null) {
+    PROFILE_STATIC_KEYS(null) {
         @Override
         public boolean isDetected(Function<String, String> env) {
             return false;
