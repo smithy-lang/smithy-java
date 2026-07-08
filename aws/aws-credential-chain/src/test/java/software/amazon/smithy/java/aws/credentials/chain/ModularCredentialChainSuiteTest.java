@@ -37,9 +37,9 @@ import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.config.AwsConfigCredentialSource;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
 import software.amazon.smithy.java.context.Context;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
+import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.json.JsonCodec;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
  * Runs the shared, SDK-agnostic <em>Modular AWS Credential Chains</em> SEP test suite against the real smithy-java
@@ -51,9 +51,9 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <h2>How the SEP model maps onto the engine</h2>
  * <ul>
- *   <li><b>Real engine, stubbed leaves.</b> The genuinely SEP-defined behavior — ordering, terminal vs. non-terminal
- *       fall-through, error aggregation, duplicate detection, invalidation, and detected-but-unclaimed module
- *       suggestions — lives in {@link IdentityChain}. That is exercised for real. The credential <em>sources</em>
+ *   <li><b>Real engine, stubbed leaves.</b> The genuinely SEP-defined behavior lives in {@link IdentityChain}:
+ *       ordering, terminal vs. non-terminal fall-through, error aggregation, duplicate detection, invalidation,
+ *       and detected-but-unclaimed module suggestions. That is exercised for real. The credential <em>sources</em>
  *       (STS/SSO/IMDS/ECS calls) are network operations, so the schema models them as pre-canned responses; this
  *       runner turns each into a stub {@link IdentityResolver}. The suite therefore validates the engine, not the
  *       leaf network clients.</li>
@@ -76,7 +76,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ModularCredentialChainSuiteTest {
 
     private static final String SUITE = "modular-credential-chain-tests.json";
-    private static final ObjectMapper MAPPER = JsonMapper.builder().build();
+    private static final JsonCodec CODEC = JsonCodec.builder().build();
 
     // Cases requiring modules smithy-java does not yet ship (SSO, ECS).
     private static final Set<String> SKIPPED = Set.of("11", "21", "27", "30");
@@ -146,11 +146,15 @@ class ModularCredentialChainSuiteTest {
 
     @TestFactory
     List<DynamicTest> modularCredentialChainSuite() throws IOException {
-        JsonNode cases = MAPPER.readTree(readResource(SUITE));
+        byte[] data;
+        try (InputStream is = readResource(SUITE)) {
+            data = is.readAllBytes();
+        }
+        Document cases = CODEC.createDeserializer(data).readDocument();
         List<DynamicTest> tests = new ArrayList<>();
-        for (JsonNode testCase : cases) {
-            String id = testCase.get("id").asString();
-            String doc = testCase.get("documentation").asString();
+        for (Document testCase : cases.asList()) {
+            String id = testCase.getMember("id").asString();
+            String doc = testCase.getMember("documentation").asString();
             String display = "case " + id + ": " + doc;
             if (SKIPPED.contains(id)) {
                 // Register as a genuine JUnit skip (via an aborted assumption) so the report shows these as skipped
@@ -165,9 +169,9 @@ class ModularCredentialChainSuiteTest {
         return tests;
     }
 
-    private void runCase(JsonNode testCase) throws IOException {
-        JsonNode input = testCase.get("input");
-        JsonNode expected = testCase.get("expected");
+    private void runCase(Document testCase) throws IOException {
+        Document input = testCase.getMember("input");
+        Document expected = testCase.getMember("expected");
 
         Class<? extends Identity> identityType = identityType(input);
         Function<String, String> env = envLookup(input);
@@ -178,13 +182,16 @@ class ModularCredentialChainSuiteTest {
         for (StandardProvider slot : installedSlots) {
             providers.add(standardStub(slot, input, env));
         }
-        for (JsonNode custom : input.path("customProviders")) {
-            providers.add(customStub(custom));
+        Document customProviders = input.getMember("customProviders");
+        if (customProviders != null) {
+            for (Document custom : customProviders.asList()) {
+                providers.add(customStub(custom));
+            }
         }
 
         // Client-supplied resolver bypasses the chain entirely.
-        if (input.has("clientIdentityResolver")) {
-            var identity = awsIdentity(input.get("clientIdentityResolver"));
+        if (input.getMember("clientIdentityResolver") != null) {
+            var identity = awsIdentity(input.getMember("clientIdentityResolver"));
             assertResolved(expected, IdentityResult.of(identity), null);
             return;
         }
@@ -203,10 +210,10 @@ class ModularCredentialChainSuiteTest {
         }
 
         // Assembly-time hard errors (duplicate name / duplicate slot).
-        if (expected.has("assemblyError")) {
+        if (expected.getMember("assemblyError") != null) {
             var ex = assertThrows(IllegalStateException.class,
                     () -> IdentityChain.assemble(identityType, providers, null, setup));
-            assertAssemblyError(expected.get("assemblyError"), ex);
+            assertAssemblyError(expected.getMember("assemblyError"), ex);
             return;
         }
 
@@ -227,21 +234,22 @@ class ModularCredentialChainSuiteTest {
             result = chain.resolveIdentity(context);
 
             // Invalidation: resolve, invalidate, resolve again; the second resolve is the asserted one.
-            if (input.path("invalidateAndResolveAgain").asBoolean(false)) {
+            Document invalidateAgain = input.getMember("invalidateAndResolveAgain");
+            if (invalidateAgain != null && invalidateAgain.asBoolean()) {
                 chain.invalidate();
                 result = chain.resolveIdentity(context);
             }
         } catch (RuntimeException thrown) {
-            if (expected.has("resolutionError")) {
+            if (expected.getMember("resolutionError") != null) {
                 // The chain stopped at the throwing provider; assert the providers tried up to that point.
-                assertThrownStopsChain(expected.get("resolutionError"), thrown, captured[0]);
+                assertThrownStopsChain(expected.getMember("resolutionError"), thrown, captured[0]);
                 return;
             }
             throw thrown;
         }
 
-        if (expected.has("resolutionError")) {
-            assertResolutionError(expected.get("resolutionError"), result, captured[0]);
+        if (expected.getMember("resolutionError") != null) {
+            assertResolutionError(expected.getMember("resolutionError"), result, captured[0]);
         } else {
             assertResolved(expected, result, context);
         }
@@ -254,7 +262,7 @@ class ModularCredentialChainSuiteTest {
      * from the case inputs (is the source present? terminal?) and registers a resolver that returns the pre-canned
      * response, without doing any network I/O.
      */
-    private ChainIdentityProvider standardStub(StandardProvider slot, JsonNode input, Function<String, String> env) {
+    private ChainIdentityProvider standardStub(StandardProvider slot, Document input, Function<String, String> env) {
         String name = SLOT_NAME.get(slot);
         Set<CredentialFeatureId> featureIds = featureIds(slot);
         return new ChainIdentityProvider() {
@@ -281,7 +289,7 @@ class ModularCredentialChainSuiteTest {
     }
 
     /** Assembly-time behavior for each standard slot, driven by the case inputs. */
-    private void slotSetup(StandardProvider slot, JsonNode input, Function<String, String> env, ChainSetup setup) {
+    private void slotSetup(StandardProvider slot, Document input, Function<String, String> env, ChainSetup setup) {
         switch (slot) {
             case JAVA_SYSTEM_PROPERTIES -> {
                 // Not exercised by the (portable) suite; register only if the JVM sysprops happen to be set.
@@ -305,19 +313,19 @@ class ModularCredentialChainSuiteTest {
             }
             case WEB_IDENTITY_TOKEN_ENV -> {
                 if (env.apply("AWS_WEB_IDENTITY_TOKEN_FILE") != null && env.apply("AWS_ROLE_ARN") != null) {
-                    setup.addTerminalResolver(responseResolver(input.path("stsResponse")));
+                    setup.addTerminalResolver(responseResolver(input.getMember("stsResponse")));
                 }
             }
             case ECS_CONTAINER -> {
                 if (env.apply("AWS_CONTAINER_CREDENTIALS_FULL_URI") != null
                         || env.apply("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") != null) {
-                    setup.addTerminalResolver(responseResolver(input.path("httpResponse")));
+                    setup.addTerminalResolver(responseResolver(input.getMember("httpResponse")));
                 }
             }
             case EC2_INSTANCE_METADATA -> {
                 // Non-terminal ambient fallback: always registered when the module is present.
-                if (input.has("imdsResponse")) {
-                    setup.addResolver(responseResolver(input.get("imdsResponse")));
+                if (input.getMember("imdsResponse") != null) {
+                    setup.addResolver(responseResolver(input.getMember("imdsResponse")));
                 }
             }
             case SHARED_CONFIG -> {
@@ -333,22 +341,22 @@ class ModularCredentialChainSuiteTest {
                             src.accountId()));
             case PROFILE_ASSUME_ROLE -> profileSlot(setup,
                     AwsConfigCredentialSource.AssumeRole.class,
-                    src -> responseResolver(input.path("stsResponse")));
+                    src -> responseResolver(input.getMember("stsResponse")));
             case PROFILE_WEB_IDENTITY -> profileSlot(setup,
                     AwsConfigCredentialSource.WebIdentityToken.class,
-                    src -> responseResolver(input.path("stsResponse")));
+                    src -> responseResolver(input.getMember("stsResponse")));
             case PROFILE_SSO_SESSION -> profileSlot(setup,
                     AwsConfigCredentialSource.SsoSession.class,
-                    src -> responseResolver(input.path("ssoResponse")));
+                    src -> responseResolver(input.getMember("ssoResponse")));
             case PROFILE_LEGACY_SSO -> profileSlot(setup,
                     AwsConfigCredentialSource.LegacySso.class,
-                    src -> responseResolver(input.path("ssoResponse")));
+                    src -> responseResolver(input.getMember("ssoResponse")));
             case PROFILE_CREDENTIAL_PROCESS -> profileSlot(setup,
                     AwsConfigCredentialSource.CredentialProcess.class,
-                    src -> responseResolver(input.path("processResponse")));
+                    src -> responseResolver(input.getMember("processResponse")));
             case PROFILE_LOGIN -> profileSlot(setup,
                     AwsConfigCredentialSource.LoginSession.class,
-                    src -> responseResolver(input.path("loginToken")));
+                    src -> responseResolver(input.getMember("loginToken")));
         }
     }
 
@@ -370,13 +378,13 @@ class ModularCredentialChainSuiteTest {
     }
 
     /** A custom (third-party) provider, exercising Before/After ordering and terminal/non-terminal semantics. */
-    private ChainIdentityProvider customStub(JsonNode custom) {
-        String name = custom.get("name").asString();
-        OrderingConstraint ordering = ordering(custom.get("ordering"));
-        boolean supportsType = custom.path("supportsIdentityType").asBoolean(true);
-        boolean present = custom.path("present").asBoolean(true);
-        boolean terminal = custom.path("terminal").asBoolean(true);
-        JsonNode response = custom.get("response");
+    private ChainIdentityProvider customStub(Document custom) {
+        String name = custom.getMember("name").asString();
+        OrderingConstraint ordering = ordering(custom.getMember("ordering"));
+        boolean supportsType = boolOrDefault(custom.getMember("supportsIdentityType"), true);
+        boolean present = boolOrDefault(custom.getMember("present"), true);
+        boolean terminal = boolOrDefault(custom.getMember("terminal"), true);
+        Document response = custom.getMember("response");
         return new ChainIdentityProvider() {
             @Override
             public String name() {
@@ -411,15 +419,15 @@ class ModularCredentialChainSuiteTest {
     }
 
     /** Build a resolver from a single response node (credentials, token, or error). */
-    private IdentityResolver<?> responseResolver(JsonNode response) {
-        if (response == null || response.isMissingNode()) {
+    private IdentityResolver<?> responseResolver(Document response) {
+        if (response == null) {
             return errorResolver("no response configured");
         }
-        if (response.has("error")) {
-            return errorResolver(response.get("error").asString());
+        if (response.getMember("error") != null) {
+            return errorResolver(response.getMember("error").asString());
         }
-        if (response.has("token")) {
-            return tokenResolver(response.get("token").asString());
+        if (response.getMember("token") != null) {
+            return tokenResolver(response.getMember("token").asString());
         }
         return IdentityResolver.of(awsIdentity(response));
     }
@@ -428,12 +436,12 @@ class ModularCredentialChainSuiteTest {
      * Build a resolver whose response may be an array of per-attempt responses (for invalidate-then-resolve cases).
      * Each call to {@code resolveIdentity} advances to the next element; a single object is returned every time.
      */
-    private IdentityResolver<?> perAttemptResolver(JsonNode response) {
-        if (!response.isArray()) {
+    private IdentityResolver<?> perAttemptResolver(Document response) {
+        if (response == null || !response.isType(ShapeType.LIST)) {
             return responseResolver(response);
         }
         List<IdentityResolver<?>> perAttempt = new ArrayList<>();
-        for (JsonNode attempt : response) {
+        for (Document attempt : response.asList()) {
             perAttempt.add(responseResolver(attempt));
         }
         AtomicInteger index = new AtomicInteger(0);
@@ -490,14 +498,14 @@ class ModularCredentialChainSuiteTest {
 
     // --- Assertions -----------------------------------------------------------------------------------------------
 
-    private void assertResolved(JsonNode expected, IdentityResult<? extends Identity> result, Context context) {
-        JsonNode want = expected.get("resolved");
+    private void assertResolved(Document expected, IdentityResult<? extends Identity> result, Context context) {
+        Document want = expected.getMember("resolved");
         var identity = result.identity();
         assertNotNull(identity, () -> "expected a resolved identity but got error: " + result.error());
 
-        if (want.has("token")) {
+        if (want.getMember("token") != null) {
             assertTrue(identity instanceof TokenIdentity, "expected a TokenIdentity");
-            assertEquals(want.get("token").asString(), ((TokenIdentity) identity).token());
+            assertEquals(want.getMember("token").asString(), ((TokenIdentity) identity).token());
         } else {
             assertTrue(identity instanceof AwsCredentialsIdentity, "expected AwsCredentialsIdentity");
             var creds = (AwsCredentialsIdentity) identity;
@@ -507,7 +515,7 @@ class ModularCredentialChainSuiteTest {
             assertEquals(text(want, "accountId"), creds.accountId(), "accountId");
         }
 
-        if (expected.has("featureIds") && context != null) {
+        if (expected.getMember("featureIds") != null && context != null) {
             var emitted = context.get(software.amazon.smithy.java.client.core.CallContext.FEATURE_IDS);
             List<String> emittedIds = new ArrayList<>();
             if (emitted != null) {
@@ -516,7 +524,7 @@ class ModularCredentialChainSuiteTest {
                 }
             }
             List<String> wantIds = new ArrayList<>();
-            for (JsonNode f : expected.get("featureIds")) {
+            for (Document f : expected.getMember("featureIds").asList()) {
                 wantIds.add(f.asString());
             }
             assertEquals(new LinkedHashSet<>(wantIds), new LinkedHashSet<>(emittedIds), "featureIds");
@@ -524,17 +532,17 @@ class ModularCredentialChainSuiteTest {
     }
 
     private void assertResolutionError(
-            JsonNode expected,
+            Document expected,
             IdentityResult<? extends Identity> result,
             ChainResolutionDiagnostics diagnostics
     ) {
         assertNull(result.identity(), "expected resolution failure but an identity was resolved");
         assertNotNull(diagnostics, "expected the diagnostics hook to fire on failure");
 
-        List<String> wantTried = stringList(expected.get("providersTried"));
+        List<String> wantTried = stringList(expected.getMember("providersTried"));
         assertEquals(wantTried, diagnostics.providersTried(), "providersTried");
 
-        List<String> wantModules = stringList(expected.get("moduleSuggestions"));
+        List<String> wantModules = stringList(expected.getMember("moduleSuggestions"));
         // Module suggestions in the suite use language-agnostic shorthand ("sts"); the engine emits the full Maven
         // coordinate. Compare on the trailing artifact segment.
         List<String> gotModules = new ArrayList<>();
@@ -546,12 +554,12 @@ class ModularCredentialChainSuiteTest {
 
     /**
      * A resolver that threw an unrecoverable exception must stop the chain immediately: the throw propagates rather
-     * than being swallowed into a fall-through. The fact that an exception escaped {@code resolveIdentity} — instead
-     * of the chain continuing to a lower-priority provider (e.g. IMDS) and returning its credentials — is the
-     * assertion. The named providers-tried list ends at the throwing provider by construction.
+     * than being swallowed into a fall-through. The assertion is that an exception escaped {@code resolveIdentity}
+     * at all, rather than the chain continuing to a lower-priority provider (e.g. IMDS) and returning its
+     * credentials. The named providers-tried list ends at the throwing provider by construction.
      */
     private void assertThrownStopsChain(
-            JsonNode expected,
+            Document expected,
             RuntimeException thrown,
             ChainResolutionDiagnostics diagnostics
     ) {
@@ -559,8 +567,8 @@ class ModularCredentialChainSuiteTest {
         assertNotNull(thrown.getMessage(), "expected a descriptive exception message");
     }
 
-    private void assertAssemblyError(JsonNode expected, IllegalStateException ex) {
-        String reason = expected.get("reason").asString();
+    private void assertAssemblyError(Document expected, IllegalStateException ex) {
+        String reason = expected.getMember("reason").asString();
         String message = ex.getMessage().toLowerCase();
         switch (reason) {
             case "DuplicateProviderName" -> assertTrue(message.contains("duplicate")
@@ -573,26 +581,29 @@ class ModularCredentialChainSuiteTest {
 
     // --- Input parsing --------------------------------------------------------------------------------------------
 
-    private Class<? extends Identity> identityType(JsonNode input) {
-        String type = input.path("identityType").asString("AwsCredentialsIdentity");
+    private Class<? extends Identity> identityType(Document input) {
+        Document typeNode = input.getMember("identityType");
+        String type = typeNode == null ? "AwsCredentialsIdentity" : typeNode.asString();
         return "TokenIdentity".equals(type) ? TokenIdentity.class : AwsCredentialsIdentity.class;
     }
 
-    private Function<String, String> envLookup(JsonNode input) {
+    private Function<String, String> envLookup(Document input) {
         Map<String, String> env = new HashMap<>();
-        JsonNode envNode = input.path("env");
-        for (String name : envNode.propertyNames()) {
-            env.put(name, envNode.get(name).asString());
+        Document envNode = input.getMember("env");
+        if (envNode != null) {
+            for (String name : envNode.getMemberNames()) {
+                env.put(name, envNode.getMember(name).asString());
+            }
         }
         return env::get;
     }
 
-    private Set<StandardProvider> installedSlots(JsonNode input) {
+    private Set<StandardProvider> installedSlots(Document input) {
         Set<StandardProvider> slots = new LinkedHashSet<>();
-        JsonNode modules = input.path("installedModules");
+        Document modules = input.getMember("installedModules");
         List<String> names = new ArrayList<>();
-        if (modules.isArray() && !modules.isEmpty()) {
-            for (JsonNode m : modules) {
+        if (modules != null && modules.isType(ShapeType.LIST) && !modules.asList().isEmpty()) {
+            for (Document m : modules.asList()) {
                 names.add(m.asString());
             }
         }
@@ -606,12 +617,13 @@ class ModularCredentialChainSuiteTest {
         return slots;
     }
 
-    private AwsProfileFile parseProfileFile(JsonNode input) throws IOException {
+    private AwsProfileFile parseProfileFile(Document input) throws IOException {
         String contents = null;
-        if (input.has("preloadedConfigFile")) {
-            contents = input.get("preloadedConfigFile").asString();
-        } else if (input.path("configFiles").has("aws")) {
-            contents = input.get("configFiles").get("aws").asString();
+        Document configFiles = input.getMember("configFiles");
+        if (input.getMember("preloadedConfigFile") != null) {
+            contents = input.getMember("preloadedConfigFile").asString();
+        } else if (configFiles != null && configFiles.getMember("aws") != null) {
+            contents = configFiles.getMember("aws").asString();
         }
         if (contents == null) {
             return null;
@@ -622,28 +634,28 @@ class ModularCredentialChainSuiteTest {
         return AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
     }
 
-    private String activeProfileName(JsonNode input) {
-        if (input.has("profileNameOverride")) {
-            return input.get("profileNameOverride").asString();
+    private String activeProfileName(Document input) {
+        if (input.getMember("profileNameOverride") != null) {
+            return input.getMember("profileNameOverride").asString();
         }
-        JsonNode env = input.path("env");
-        if (env.has("AWS_PROFILE")) {
-            return env.get("AWS_PROFILE").asString();
+        Document env = input.getMember("env");
+        if (env != null && env.getMember("AWS_PROFILE") != null) {
+            return env.getMember("AWS_PROFILE").asString();
         }
         return "default";
     }
 
-    private OrderingConstraint ordering(JsonNode node) {
-        StandardProvider slot = StandardProvider.valueOf(node.get("slot").asString());
-        return switch (node.get("type").asString()) {
+    private OrderingConstraint ordering(Document node) {
+        StandardProvider slot = StandardProvider.valueOf(node.getMember("slot").asString());
+        return switch (node.getMember("type").asString()) {
             case "Standard" -> new OrderingConstraint.Standard(slot);
             case "Before" -> new OrderingConstraint.Before(slot);
             case "After" -> new OrderingConstraint.After(slot);
-            default -> throw new IllegalArgumentException("bad ordering type: " + node.get("type").asString());
+            default -> throw new IllegalArgumentException("bad ordering type: " + node.getMember("type").asString());
         };
     }
 
-    private AwsCredentialsIdentity awsIdentity(JsonNode node) {
+    private AwsCredentialsIdentity awsIdentity(Document node) {
         return AwsCredentialsIdentity.create(
                 text(node, "accessKeyId"),
                 text(node, "secretAccessKey"),
@@ -662,15 +674,19 @@ class ModularCredentialChainSuiteTest {
 
     // --- Helpers --------------------------------------------------------------------------------------------------
 
-    private static String text(JsonNode node, String field) {
-        JsonNode value = node.get(field);
-        return value == null || value.isNull() ? null : value.asString();
+    private static String text(Document node, String field) {
+        Document value = node.getMember(field);
+        return value == null ? null : value.asString();
     }
 
-    private static List<String> stringList(JsonNode node) {
+    private static boolean boolOrDefault(Document value, boolean defaultValue) {
+        return value == null ? defaultValue : value.asBoolean();
+    }
+
+    private static List<String> stringList(Document node) {
         List<String> list = new ArrayList<>();
         if (node != null) {
-            for (JsonNode n : node) {
+            for (Document n : node.asList()) {
                 list.add(n.asString());
             }
         }

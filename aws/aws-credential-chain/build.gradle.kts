@@ -14,5 +14,4 @@ dependencies {
     implementation(project(":client:client-core"))
     implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(project(":logging"))
-    testImplementation("tools.jackson.core:jackson-databind:3.2.0")
 }
