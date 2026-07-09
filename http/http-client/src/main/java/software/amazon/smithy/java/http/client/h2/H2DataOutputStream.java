@@ -8,6 +8,7 @@ package software.amazon.smithy.java.http.client.h2;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Output stream for writing request body as DATA frames.
@@ -19,11 +20,7 @@ final class H2DataOutputStream extends OutputStream {
     private final H2Muxer muxer;
     private final Runnable onClose;
     private ByteBuffer buffer;
-    private boolean closed = false;
-
-    H2DataOutputStream(H2Exchange exchange, H2Muxer muxer, int bufferSize) {
-        this(exchange, muxer, bufferSize, null);
-    }
+    private final AtomicBoolean closed = new AtomicBoolean(false);
 
     H2DataOutputStream(H2Exchange exchange, H2Muxer muxer, int bufferSize, Runnable onClose) {
         this.exchange = exchange;
@@ -34,7 +31,7 @@ final class H2DataOutputStream extends OutputStream {
 
     @Override
     public void write(int b) throws IOException {
-        if (closed) {
+        if (closed.get()) {
             throw new IOException("Stream closed");
         } else if (buffer == null) {
             throw new IOException("Cannot write body: END_STREAM already sent with headers");
@@ -50,7 +47,7 @@ final class H2DataOutputStream extends OutputStream {
     public void write(byte[] b, int off, int len) throws IOException {
         if (off < 0 || len < 0 || len > b.length - off) {
             throw new IndexOutOfBoundsException();
-        } else if (closed) {
+        } else if (closed.get()) {
             throw new IOException("Stream closed");
         } else if (len == 0) {
             return;
@@ -88,10 +85,9 @@ final class H2DataOutputStream extends OutputStream {
 
     @Override
     public void close() throws IOException {
-        if (closed) {
+        if (!closed.compareAndSet(false, true)) {
             return;
         }
-        closed = true;
 
         try {
             if (buffer != null && buffer.position() > 0) {
@@ -106,9 +102,9 @@ final class H2DataOutputStream extends OutputStream {
                 muxer.returnBuffer(buffer);
                 buffer = null;
             }
-        }
-        if (onClose != null) {
-            onClose.run();
+            if (onClose != null) {
+                onClose.run();
+            }
         }
     }
 }
