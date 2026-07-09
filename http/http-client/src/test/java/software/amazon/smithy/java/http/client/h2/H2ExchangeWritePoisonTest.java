@@ -16,6 +16,7 @@ import java.nio.channels.Channels;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,7 +77,7 @@ class H2ExchangeWritePoisonTest {
                 new H2Exception(H2Constants.ERROR_CANCEL, 1, "reset")));
     }
 
-    private void assertWriterUnblockedBy(java.util.function.Consumer<H2Exchange> poison) throws Exception {
+    private void assertWriterUnblockedBy(Consumer<H2Exchange> poison) throws Exception {
         H2Exchange exchange = new H2Exchange(muxer, null, WRITE_TIMEOUT_MS, WRITE_TIMEOUT_MS, INITIAL_WINDOW_SIZE);
         exchange.setStreamId(1);
 

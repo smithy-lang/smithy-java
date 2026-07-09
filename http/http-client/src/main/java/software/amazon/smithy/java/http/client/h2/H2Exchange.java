@@ -27,9 +27,7 @@ import java.util.ArrayDeque;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
@@ -101,10 +99,7 @@ final class H2Exchange implements HttpExchange {
     // Stream-level timeouts (tick-based: 1 tick = TIMEOUT_POLL_INTERVAL_MS)
     private final long readTimeoutMs;
     private final long writeTimeoutMs;
-    private final int readTimeoutTicks; // Number of ticks before timeout (0 = no timeout)
-    private final AtomicLong readSeq = new AtomicLong(); // Activity counter, incremented on read activity
-    private volatile int readDeadlineTick; // 0 = no deadline, >0 = deadline tick
-    private final AtomicBoolean readTimedOut = new AtomicBoolean(); // At-most-once timeout flag
+    private final H2ReadTimeout readTimeout;
 
     // Response headers (status code is in packedState)
     private volatile HttpHeaders responseHeaders;
@@ -150,10 +145,8 @@ final class H2Exchange implements HttpExchange {
     volatile boolean inWorkQueue;
 
     // === WRITE COMPLETION SIGNALING ===
-    // Lock-free signaling using LockSupport to avoid monitor inflation overhead
-    private volatile Thread waitingWriter;
-    private volatile boolean writeCompleted;
-    private volatile Throwable writeError;
+    // Single-slot park/unpark handshake with the muxer writer thread.
+    private final H2WriteGate writeGate = new H2WriteGate();
 
     /**
      * Create a new HTTP/2 exchange without a stream ID.
@@ -180,10 +173,7 @@ final class H2Exchange implements HttpExchange {
         this.streamId = -1; // Will be set later
         this.readTimeoutMs = readTimeoutMs;
         this.writeTimeoutMs = writeTimeoutMs;
-        // Convert timeout to ticks: ceil(readTimeoutMs / pollIntervalMs)
-        this.readTimeoutTicks = readTimeoutMs <= 0
-                ? 0
-                : Math.max(1, (int) Math.ceil((double) readTimeoutMs / H2Muxer.TIMEOUT_POLL_INTERVAL_MS));
+        this.readTimeout = new H2ReadTimeout(muxer, readTimeoutMs);
         this.sendWindow = new FlowControlWindow(muxer.getRemoteInitialWindowSize());
         this.initialWindowSize = initialWindowSize;
         this.streamRecvWindow = initialWindowSize;
@@ -214,17 +204,17 @@ final class H2Exchange implements HttpExchange {
     }
 
     /**
-     * Get read deadline tick (0 = no deadline).
+     * Get read deadline tick (0 = no deadline). Called by the muxer timeout sweep.
      */
     int getReadDeadlineTick() {
-        return readDeadlineTick;
+        return readTimeout.deadlineTick();
     }
 
     /**
-     * Get read activity sequence number.
+     * Get read activity sequence number. Called by the muxer timeout sweep.
      */
     long getReadSeq() {
-        return readSeq.get();
+        return readTimeout.seq();
     }
 
     /**
@@ -232,29 +222,15 @@ final class H2Exchange implements HttpExchange {
      * Used by timeout sweep to ensure at-most-once timeout per exchange.
      */
     boolean markReadTimedOut() {
-        return readTimedOut.compareAndSet(false, true);
+        return readTimeout.markTimedOut();
     }
 
-    /**
-     * Record read activity: bump sequence and reset deadline.
-     * Called when headers or data arrive.
-     *
-     * <p>Uses tick-based timeout: instead of calling System.nanoTime() (expensive),
-     * we read the current tick from the muxer (cheap volatile read) and compute
-     * the deadline as currentTick + timeoutTicks.
-     */
     private void onReadActivity() {
-        if (readTimeoutTicks > 0) {
-            readSeq.incrementAndGet();
-            readDeadlineTick = muxer.currentTimeoutTick() + readTimeoutTicks;
-        }
+        readTimeout.onActivity();
     }
 
-    /**
-     * Clear read deadline (no timeout).
-     */
     private void clearReadDeadline() {
-        readDeadlineTick = 0;
+        readTimeout.clearDeadline();
     }
 
     /**
@@ -268,78 +244,34 @@ final class H2Exchange implements HttpExchange {
     // ==================== WRITE COMPLETION SIGNALING ====================
 
     /**
-     * Block until signaled by the writer thread, then check for errors.
+     * Block until the muxer writer thread signals write completion, then check for errors.
      *
      * <p>Called by the VT that owns this exchange after submitting work to the muxer.
-     * Uses lock-free LockSupport signaling to avoid monitor inflation overhead.
      *
      * @throws IOException if a write error occurred
      */
     void awaitWriteCompletion() throws IOException {
-        // Fast path: already completed
-        if (writeCompleted) {
-            writeCompleted = false;
-            checkWriteError();
-            return;
-        }
-
-        // Register as waiting and park until signaled
-        waitingWriter = Thread.currentThread();
-        try {
-            while (!writeCompleted) {
-                LockSupport.park();
-                if (Thread.interrupted()) {
-                    throw new IOException("Interrupted waiting for write completion");
-                }
-            }
-        } finally {
-            waitingWriter = null;
-        }
-
-        writeCompleted = false;
-        checkWriteError();
-    }
-
-    private void checkWriteError() throws IOException {
-        Throwable error = writeError;
-        if (error != null) {
-            writeError = null;
-            if (error instanceof IOException ioe) {
-                throw ioe;
-            }
-            throw new IOException("Write failed", error);
-        }
+        writeGate.awaitCompletion();
     }
 
     /**
      * Signal the waiting writer that the write completed successfully.
      *
      * <p>Called by the muxer worker thread after completing a write.
-     * Lock-free: uses volatile write + LockSupport.unpark().
      */
     void signalWriteSuccess() {
-        writeCompleted = true;
-        Thread t = waitingWriter;
-        if (t != null) {
-            LockSupport.unpark(t);
-        }
+        writeGate.signalSuccess();
     }
 
     /**
      * Signal the waiting writer that the write failed.
      *
      * <p>Called by the muxer worker thread when a write error occurs.
-     * Lock-free: uses volatile writes + LockSupport.unpark().
      *
      * @param error the error that occurred
      */
     void signalWriteFailure(Throwable error) {
-        writeError = error;
-        writeCompleted = true;
-        Thread t = waitingWriter;
-        if (t != null) {
-            LockSupport.unpark(t);
-        }
+        writeGate.signalFailure(error);
     }
 
     /**
