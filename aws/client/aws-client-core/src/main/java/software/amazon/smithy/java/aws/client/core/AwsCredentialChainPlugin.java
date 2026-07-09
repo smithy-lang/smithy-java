@@ -47,7 +47,7 @@ public final class AwsCredentialChainPlugin implements ClientPlugin {
             String region = config.context().get(RegionSetting.REGION);
             var chain = IdentityChain.create(AwsCredentialsIdentity.class, null, region);
             config.addIdentityResolver(chain);
-            config.addInterceptor(new InvalidateOnAuthFailureInterceptor(chain));
+            config.addInterceptor(new InvalidateCredentialsInterceptor(chain));
         }
     }
 

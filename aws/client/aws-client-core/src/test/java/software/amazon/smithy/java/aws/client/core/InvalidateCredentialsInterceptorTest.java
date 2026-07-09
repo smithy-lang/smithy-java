@@ -18,30 +18,39 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-class InvalidateOnAuthFailureInterceptorTest {
+class InvalidateCredentialsInterceptorTest {
 
     @Test
     void invalidatesOnExpiredToken() {
         var counter = new CountingResolver();
-        var interceptor = new InvalidateOnAuthFailureInterceptor(counter);
+        var interceptor = new InvalidateCredentialsInterceptor(counter);
 
-        interceptor.readAfterAttempt(null, authError("ExpiredToken"));
+        interceptor.readAfterAttempt(null, credentialError("ExpiredToken"));
         assertEquals(1, counter.invalidateCount.get());
     }
 
     @Test
-    void invalidatesOnAuthFailure() {
+    void invalidatesOnInvalidToken() {
         var counter = new CountingResolver();
-        var interceptor = new InvalidateOnAuthFailureInterceptor(counter);
+        var interceptor = new InvalidateCredentialsInterceptor(counter);
 
-        interceptor.readAfterAttempt(null, authError("AuthFailure"));
+        interceptor.readAfterAttempt(null, credentialError("InvalidToken"));
         assertEquals(1, counter.invalidateCount.get());
     }
 
     @Test
-    void doesNotInvalidateOnNonAuthError() {
+    void doesNotInvalidateOnOtherModeledError() {
         var counter = new CountingResolver();
-        var interceptor = new InvalidateOnAuthFailureInterceptor(counter);
+        var interceptor = new InvalidateCredentialsInterceptor(counter);
+
+        interceptor.readAfterAttempt(null, credentialError("AccessDenied"));
+        assertEquals(0, counter.invalidateCount.get());
+    }
+
+    @Test
+    void doesNotInvalidateOnNonModeledError() {
+        var counter = new CountingResolver();
+        var interceptor = new InvalidateCredentialsInterceptor(counter);
 
         interceptor.readAfterAttempt(null, new RuntimeException("network error"));
         assertEquals(0, counter.invalidateCount.get());
@@ -50,13 +59,13 @@ class InvalidateOnAuthFailureInterceptorTest {
     @Test
     void doesNotInvalidateOnNull() {
         var counter = new CountingResolver();
-        var interceptor = new InvalidateOnAuthFailureInterceptor(counter);
+        var interceptor = new InvalidateCredentialsInterceptor(counter);
 
         interceptor.readAfterAttempt(null, null);
         assertEquals(0, counter.invalidateCount.get());
     }
 
-    private static RuntimeException authError(String errorName) {
+    private static RuntimeException credentialError(String errorName) {
         Schema schema = Schema.createString(ShapeId.from("com.example#" + errorName));
         return new ModeledException(schema, errorName + " error") {
             @Override
