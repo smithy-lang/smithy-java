@@ -386,7 +386,8 @@ final class H2Exchange implements HttpExchange {
     /**
      * Called by connection when it's closing.
      *
-     * <p>Signals the user thread that the connection has closed with an error.
+     * <p>Signals both the read and write sides so that a VT blocked on either
+     * (waiting for response data or for send-window flow control) fails fast.
      */
     void signalConnectionClosed(Throwable error) {
         dataLock.lock();
@@ -398,13 +399,14 @@ final class H2Exchange implements HttpExchange {
             dataLock.unlock();
         }
         streamBody.fail(readError);
+        sendWindow.fail(readError);
     }
 
     /**
      * Called by reader thread when a per-stream error occurs (e.g., RST_STREAM).
      *
-     * <p>This allows read operations to fail fast with a meaningful error
-     * instead of timing out.
+     * <p>This allows both read and write operations to fail fast with a meaningful
+     * error instead of timing out.
      */
     void signalStreamError(H2Exception error) {
         dataLock.lock();
@@ -416,6 +418,7 @@ final class H2Exchange implements HttpExchange {
             dataLock.unlock();
         }
         streamBody.fail(readError);
+        sendWindow.fail(readError);
         if (streamId != 0) {
             muxer.releaseStream(streamId);
         }

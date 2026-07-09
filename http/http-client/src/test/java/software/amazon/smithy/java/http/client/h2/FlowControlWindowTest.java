@@ -6,8 +6,10 @@
 package software.amazon.smithy.java.http.client.h2;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -104,7 +106,7 @@ class FlowControlWindowTest {
     class BlockingAcquireTest {
 
         @Test
-        void tryAcquireUpToReturnsImmediatelyWhenWindowAvailable() throws InterruptedException {
+        void tryAcquireUpToReturnsImmediatelyWhenWindowAvailable() throws InterruptedException, IOException {
             var window = new FlowControlWindow(1000);
             int acquired = window.tryAcquireUpTo(500, 1000);
 
@@ -113,7 +115,7 @@ class FlowControlWindowTest {
         }
 
         @Test
-        void tryAcquireUpToReturnsPartialWhenWindowSmaller() throws InterruptedException {
+        void tryAcquireUpToReturnsPartialWhenWindowSmaller() throws InterruptedException, IOException {
             var window = new FlowControlWindow(100);
             int acquired = window.tryAcquireUpTo(500, 1000);
 
@@ -122,7 +124,7 @@ class FlowControlWindowTest {
         }
 
         @Test
-        void tryAcquireUpToTimesOutWhenWindowEmpty() throws InterruptedException {
+        void tryAcquireUpToTimesOutWhenWindowEmpty() throws InterruptedException, IOException {
             var window = new FlowControlWindow(0);
             long start = System.nanoTime();
             int acquired = window.tryAcquireUpTo(100, 50);
@@ -133,7 +135,7 @@ class FlowControlWindowTest {
         }
 
         @Test
-        void tryAcquireUpToWakesOnRelease() throws InterruptedException {
+        void tryAcquireUpToWakesOnRelease() throws InterruptedException, IOException {
             var window = new FlowControlWindow(0);
 
             Thread releaser = Thread.startVirtualThread(() -> {
@@ -152,6 +154,35 @@ class FlowControlWindowTest {
             assertEquals(100, acquired);
             assertTrue(elapsed < 2000, "Should have woken up quickly after release, took " + elapsed + "ms");
             releaser.join(1000);
+        }
+
+        @Test
+        void tryAcquireUpToThrowsWhenPoisoned() {
+            var window = new FlowControlWindow(0);
+            var cause = new IOException("connection closed");
+            window.fail(cause);
+
+            var thrown = assertThrows(IOException.class, () -> window.tryAcquireUpTo(100, 5000));
+            assertEquals("connection closed", thrown.getMessage());
+        }
+
+        @Test
+        void failWakesBlockedWaiter() throws InterruptedException {
+            var window = new FlowControlWindow(0);
+            var cause = new IOException("stream error");
+
+            Thread waiter = Thread.startVirtualThread(() -> {
+                assertThrows(IOException.class, () -> window.tryAcquireUpTo(100, 30_000));
+            });
+
+            // Give the waiter time to enter the slow path
+            Thread.sleep(50);
+            long start = System.nanoTime();
+            window.fail(cause);
+            waiter.join(2000);
+            long elapsed = (System.nanoTime() - start) / 1_000_000;
+
+            assertTrue(elapsed < 1000, "Waiter should have woken up quickly after fail(), took " + elapsed + "ms");
         }
     }
 }

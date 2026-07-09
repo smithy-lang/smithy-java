@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.http.client.h2;
 
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
@@ -27,6 +28,9 @@ final class FlowControlWindow {
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition available = lock.newCondition();
     private final AtomicLong window;
+    // Poisoned state: non-null when the connection is closed or stream errored, causing
+    // waiting writers to fail fast instead of blocking until writeTimeoutMs expires.
+    private volatile IOException failCause;
 
     FlowControlWindow(int initialWindow) {
         this.window = new AtomicLong(initialWindow);
@@ -55,8 +59,15 @@ final class FlowControlWindow {
      * Try to acquire up to the requested bytes, waiting if the window is empty.
      *
      * @return number of bytes acquired (0 if timeout expired)
+     * @throws IOException if the window has been poisoned (connection closed / stream error)
      */
-    int tryAcquireUpTo(int maxBytes, long timeoutMs) throws InterruptedException {
+    int tryAcquireUpTo(int maxBytes, long timeoutMs) throws InterruptedException, IOException {
+        // Check poisoned state before attempting
+        IOException cause = failCause;
+        if (cause != null) {
+            throw cause;
+        }
+
         // Fast path: lock-free CAS
         int acquired = tryAcquireNonBlocking(maxBytes);
         if (acquired > 0) {
@@ -68,6 +79,10 @@ final class FlowControlWindow {
         try {
             long deadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
             while (true) {
+                cause = failCause;
+                if (cause != null) {
+                    throw cause;
+                }
                 acquired = tryAcquireNonBlocking(maxBytes);
                 if (acquired > 0) {
                     return acquired;
@@ -114,6 +129,24 @@ final class FlowControlWindow {
     int available() {
         long cur = window.get();
         return (int) Math.max(Integer.MIN_VALUE, Math.min(cur, Integer.MAX_VALUE));
+    }
+
+    /**
+     * Poison the window so that waiting and future acquirers fail fast with the given cause.
+     *
+     * <p>Called when the connection is closed or a stream-level error occurs, ensuring
+     * that a VT blocked in {@link #tryAcquireUpTo} does not hang until writeTimeoutMs expires.
+     *
+     * @param cause the error to propagate to waiters
+     */
+    void fail(IOException cause) {
+        this.failCause = cause;
+        lock.lock();
+        try {
+            available.signalAll();
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**
