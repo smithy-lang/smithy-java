@@ -8,7 +8,6 @@ package software.amazon.smithy.java.http.binding;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -45,7 +44,10 @@ public class PayloadDeserializerTest {
     private static SerializableStruct deserializeBody(ApiOperation<?, ?> operation, String bodyContent) {
         var builder = operation.outputBuilder();
         var bodyReadOnlyBuffer = DataStream.ofString(bodyContent).asByteBuffer().asReadOnlyBuffer();
-        var response = HttpResponse.of(HttpVersion.HTTP_1_0, 200, HttpHeaders.ofModifiable().toUnmodifiable(), DataStream.ofByteBuffer(bodyReadOnlyBuffer));
+        var response = HttpResponse.of(HttpVersion.HTTP_1_0,
+                200,
+                HttpHeaders.ofModifiable().toUnmodifiable(),
+                DataStream.ofByteBuffer(bodyReadOnlyBuffer));
         new HttpBinding().responseDeserializer()
                 .payloadCodec(CODEC)
                 .payloadMediaType("application/json")
@@ -108,9 +110,14 @@ public class PayloadDeserializerTest {
 
                     @Override
                     public ShapeBuilder<SerializableStruct> deserialize(ShapeDeserializer decoder) {
-                        decoder.readStruct(StringPayloadInput.SCHEMA, value, (AtomicReference<String> state, Schema memberSchema, ShapeDeserializer memberDeserializer) -> {
-                            state.set(memberDeserializer.readString(StringPayloadInput.VALUE));
-                        });
+                        decoder.readStruct(StringPayloadInput.SCHEMA,
+                                value,
+                                (
+                                        AtomicReference<String> state,
+                                        Schema memberSchema,
+                                        ShapeDeserializer memberDeserializer) -> {
+                                    state.set(memberDeserializer.readString(StringPayloadInput.VALUE));
+                                });
                         return this;
                     }
 
