@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 class TimestampCodecTest {
 
     private static final DateTimeFormatter HTTP_FORMATTER =
-            DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'").withZone(ZoneOffset.UTC);
+            DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'")
+                    .withZone(ZoneOffset.UTC)
+                    .withLocale(Locale.US);
 
     private static Instant parse8601(String s) {
         byte[] buf = s.getBytes(StandardCharsets.US_ASCII);
