@@ -120,9 +120,13 @@ final class PayloadDeserializer implements ShapeDeserializer {
         }
 
         var buffer = body.asByteBuffer();
-        int pos = buffer.arrayOffset() + buffer.position();
-        int len = buffer.remaining();
-        return new String(buffer.array(), pos, len, StandardCharsets.UTF_8);
+        if (buffer.hasArray()) {
+            int pos = buffer.arrayOffset() + buffer.position();
+            int len = buffer.remaining();
+            return new String(buffer.array(), pos, len, StandardCharsets.UTF_8);
+        }
+
+        return StandardCharsets.UTF_8.decode(buffer).toString();
     }
 
     @Override
