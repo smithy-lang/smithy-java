@@ -58,6 +58,7 @@ include(":client:client-mock-plugin")
 include(":client:client-waiters")
 include(":client:client-rulesengine")
 include(":client:client-metrics-otel")
+include(":client:client-inspector-mcp")
 
 // Server
 include(":server:server-api")

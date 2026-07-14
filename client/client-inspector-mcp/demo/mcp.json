@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "sdk-inspector-demo": {
+      "command": "./build/install/client-inspector-mcp/bin/client-inspector-mcp",
+      "args": [],
+      "env": {}
+    }
+  }
+}
