@@ -5,7 +5,7 @@ plugins {
 
 dependencies {
     val smithyJavaVersion: String by project
-    val smithyVersion = "1.71.0"
+    val smithyVersion = "1.72.0"
 
     implementation("software.amazon.api.models:transcribe-streaming:1.0.8")
     implementation("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
@@ -20,7 +20,7 @@ dependencies {
 
     // Test dependencies
     testImplementation("software.amazon.smithy.java:aws-sdkv2-auth:$smithyJavaVersion")
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

@@ -26,36 +26,36 @@ dependencies {
 
     // netty-common provides HashedWheelTimer: a single shared timer wheel backs the per-read
     // deadline watchdog in SSLEngineTransport (arm/cancel is O(1), no per-read epoll Selector).
-    implementation("io.netty:netty-common:4.2.13.Final")
+    implementation("io.netty:netty-common:4.2.16.Final")
 
     // Experimental persistent-registration epoll socket backend (opt-in, Linux-only). Provides the
     // io.netty.channel.unix.Socket / io.netty.channel.epoll.{Native,EpollEventArray,Epoll} types the
     // EpollChannel/EpollReactor/EpollAccess classes use. The classes (compile) are cross-platform; the
     // native .so is pulled per-arch at runtime only and gated behind Epoll.isAvailable() so non-Linux
     // hosts (and the default NIO path) never load it.
-    implementation("io.netty:netty-transport-native-epoll:4.2.13.Final")
-    runtimeOnly("io.netty:netty-transport-native-epoll:4.2.13.Final:linux-x86_64")
-    runtimeOnly("io.netty:netty-transport-native-epoll:4.2.13.Final:linux-aarch_64")
+    implementation("io.netty:netty-transport-native-epoll:4.2.16.Final")
+    runtimeOnly("io.netty:netty-transport-native-epoll:4.2.16.Final:linux-x86_64")
+    runtimeOnly("io.netty:netty-transport-native-epoll:4.2.16.Final:linux-aarch_64")
 
     // Netty for HTTP/2 integration tests
-    testImplementation("io.netty:netty-all:4.2.7.Final")
-    testImplementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
+    testImplementation("io.netty:netty-all:4.2.16.Final")
+    testImplementation("org.bouncycastle:bcpkix-jdk18on:1.85")
     // Jackson for HPACK test suite JSON parsing
-    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
+    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.22.1")
 
     // Jazzer for fuzz testing
     testImplementation(libs.jazzer.junit)
     testImplementation(libs.jazzer.api)
 
     // Add Apache HttpClient for benchmarking comparison
-    jmh("org.apache.httpcomponents.client5:httpclient5:5.5")
+    jmh("org.apache.httpcomponents.client5:httpclient5:5.6.2")
 
     // Helidon WebClient for benchmarking comparison
-    jmh("io.helidon.webclient:helidon-webclient:4.1.6")
-    jmh("io.helidon.webclient:helidon-webclient-http2:4.1.6")
+    jmh("io.helidon.webclient:helidon-webclient:4.5.0")
+    jmh("io.helidon.webclient:helidon-webclient-http2:4.5.0")
 
     // Netty for raw HTTP/2 benchmarking
-    jmh("io.netty:netty-all:4.2.7.Final")
+    jmh("io.netty:netty-all:4.2.16.Final")
 
     // Productionized smithy transports for benchmarking
     jmh(project(":client:client-http"))
@@ -63,8 +63,8 @@ dependencies {
     jmh(project(":client:client-core"))
 
     // Benchmark server dependencies (Netty runs in separate process)
-    jmhServerImplementation("io.netty:netty-all:4.2.7.Final")
-    jmhServerImplementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
+    jmhServerImplementation("io.netty:netty-all:4.2.16.Final")
+    jmhServerImplementation("org.bouncycastle:bcpkix-jdk18on:1.85")
 }
 
 // Fixed ports for benchmark server (matches BenchmarkServer.java defaults)

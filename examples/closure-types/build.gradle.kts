@@ -16,7 +16,7 @@ dependencies {
     implementation("software.amazon.smithy.java:server-rpcv2-cbor:$smithyJavaVersion")
 
     testImplementation("org.hamcrest:hamcrest:3.0")
-    testImplementation("org.junit.jupiter:junit-jupiter:6.0.3")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.assertj:assertj-core:3.27.7")
 }

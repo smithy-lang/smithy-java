@@ -12,5 +12,5 @@ extra["moduleName"] = "software.amazon.smithy.java.aws.config"
 dependencies {
     api(project(":aws:aws-auth-api"))
     implementation(project(":logging"))
-    testImplementation("tools.jackson.core:jackson-databind:3.2.0")
+    testImplementation("tools.jackson.core:jackson-databind:3.2.1")
 }
