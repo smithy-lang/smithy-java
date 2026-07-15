@@ -5,16 +5,45 @@ updates:
     schedule:
       interval: "weekly"
       day: "wednesday"
+      time: "10:00"
+    cooldown:
+      default-days: 7
+      exclude:
+        - "software.amazon.smithy:smithy-model"
+        - "software.amazon.smithy:smithy-codegen-core"
+        - "software.amazon.smithy:smithy-aws-traits"
+        - "software.amazon.smithy:smithy-protocol-traits"
+        - "software.amazon.smithy:smithy-protocol-test-traits"
+        - "software.amazon.smithy:smithy-aws-protocol-tests"
+        - "software.amazon.smithy:smithy-protocol-tests"
+        - "software.amazon.smithy:smithy-validation-model"
+        - "software.amazon.smithy:smithy-jmespath"
+        - "software.amazon.smithy:smithy-jmespath-tests"
+        - "software.amazon.smithy:smithy-waiters"
+        - "software.amazon.smithy:smithy-utils"
+        - "software.amazon.smithy:smithy-trait-codegen"
+        - "software.amazon.smithy:smithy-rules-engine"
+        - "software.amazon.smithy:smithy-aws-endpoints"
+        - "software.amazon.smithy:smithy-aws-smoke-test-model"
+        - "software.amazon.smithy:smithy-aws-smoke-test-traits"
+        - "software.amazon.awssdk:retries-spi"
+        - "software.amazon.awssdk:retries"
+        - "software.amazon.awssdk:sdk-core"
+        - "software.amazon.awssdk:auth"
     groups:
       gradle:
         update-types:
           - "minor"
           - "patch"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "wednesday"
+      time: "10:00"
+    cooldown:
+      default-days: 7
     groups:
       github:
         update-types:
