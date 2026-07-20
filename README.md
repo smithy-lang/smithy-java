@@ -49,7 +49,6 @@ source set wiring, and task ordering automatically:
 ```kotlin
 // build.gradle.kts
 plugins {
-    `java-library` // or `java` / `application` for leaf projects
     id("software.amazon.smithy.java.gradle.smithy-java") version "<smithy-java-version>"
 }
 ```
