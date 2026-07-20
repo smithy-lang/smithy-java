@@ -22,6 +22,7 @@ dependencies {
 
     // Client dependencies
     implementation("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
+    implementation("software.amazon.smithy.java:client-core:$smithyJavaVersion")
 
     // Test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.2")

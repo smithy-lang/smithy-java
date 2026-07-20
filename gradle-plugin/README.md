@@ -197,21 +197,6 @@ When set, these override whatever is in `smithy-build.json` for dependency resol
 
 When empty (default), modes are read from `smithy-build.json` automatically.
 
-### `projections`
-
-When your `smithy-build.json` uses named projections (instead of or in addition to the
-default source projection), list them here so the plugin wires each projection's
-`java-codegen` output into the main source set:
-
-```kotlin
-smithyJava {
-    projections.addAll("rest-json-client", "rpc-v2-cbor-client")
-}
-```
-
-When empty (default), the plugin uses the source projection. Service files from multiple
-projections are merged automatically.
-
 ### `generatedPluginOutputs`
 
 When your `smithy-build.json` has plugins beyond `java-codegen` that produce Java source
@@ -232,8 +217,9 @@ When `true` (default), the plugin automatically adds the correct Smithy Java run
 dependencies based on the active modes. The configuration used depends on which Java plugin
 you apply and the codegen mode:
 
-- **`java-library`**: all runtime dependencies are added to `api` unless the mode is
-  server-only (no types or client), in which case `implementation` is used.
+- **`java-library`**: types/client dependencies (`core`, `framework-errors`, `client-core`)
+  are added to `api`, making them transitively available to consumers. Server dependencies
+  (`server-api`) are added to `implementation` since servers are typically not re-exported.
 - **`java` / `application`**: all runtime dependencies are added to `implementation`.
 
 Set to `false` when you need full control over dependency versions or want to use project

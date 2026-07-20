@@ -18,7 +18,6 @@ import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.DirectoryProperty;
-import org.gradle.api.file.FileSystemOperations;
 import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.InputFiles;
@@ -45,9 +44,6 @@ public abstract class MergeServiceFilesTask extends DefaultTask {
                 layout.getBuildDirectory().dir("merged-services/META-INF/services"));
         setDescription("Merges META-INF/services files from multiple Smithy build plugins.");
     }
-
-    @Inject
-    protected abstract FileSystemOperations getFileSystemOperations();
 
     /**
      * Directories containing {@code META-INF/services} files to merge.
@@ -101,10 +97,7 @@ public abstract class MergeServiceFilesTask extends DefaultTask {
         }
 
         File outputDir = getOutputDirectory().getAsFile().get();
-        if (outputDir.exists()) {
-            getFileSystemOperations().delete(spec -> spec.delete(outputDir));
-        }
-        if (!outputDir.mkdirs()) {
+        if (!outputDir.mkdirs() && !outputDir.isDirectory()) {
             throw new GradleException("Failed to create output directory: " + outputDir);
         }
 
