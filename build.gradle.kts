@@ -25,14 +25,6 @@ val smithyJavaVersion = project.file("VERSION").readText().replace(System.lineSe
 allprojects {
     group = "software.amazon.smithy.java"
     version = smithyJavaVersion
-
-    configurations.all {
-        resolutionStrategy.dependencySubstitution {
-            rootProject.allprojects.forEach {
-                substitute(module("${it.group}:${it.name}")).using(project(it.path))
-            }
-        }
-    }
 }
 println("Smithy-Java version: '${smithyJavaVersion}'")
 

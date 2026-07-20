@@ -28,7 +28,6 @@ public abstract class SmithyJavaExtension {
     public SmithyJavaExtension() {
         getAutoAddDependencies().convention(true);
         getModes().convention(Collections.emptySet());
-        getProjections().convention(Collections.emptyList());
         getGeneratedPluginOutputs().convention(Collections.emptyList());
         getMergeServiceFiles().convention(true);
     }
@@ -40,14 +39,13 @@ public abstract class SmithyJavaExtension {
      * <ul>
      *     <li>Always: {@code codegen-plugin} to smithyBuild; {@code core} and
      *     {@code framework-errors} to api/implementation</li>
-     *     <li>Client mode: {@code client-core} to smithyBuild and api/implementation</li>
-     *     <li>Server mode: {@code server-api} to smithyBuild and api/implementation</li>
+     *     <li>Client mode: {@code client-core} to api/implementation</li>
+     *     <li>Server mode: {@code server-api} to implementation</li>
      * </ul>
      *
-     * <p>When {@code java-library} is applied, all runtime dependencies use {@code api}
-     * unless the mode is server-only, in which case {@code implementation} is used.
-     * When only {@code java} or {@code application} is applied, all dependencies use
-     * {@code implementation}.
+     * <p>When {@code java-library} is applied, types/client dependencies use {@code api}
+     * and server dependencies use {@code implementation}. When only {@code java} or
+     * {@code application} is applied, all dependencies use {@code implementation}.
      *
      * <p>Set to {@code false} to manage all dependencies manually.
      *
@@ -76,26 +74,6 @@ public abstract class SmithyJavaExtension {
     public abstract SetProperty<String> getModes();
 
     /**
-     * Explicit list of projection names whose {@code java-codegen} output should be
-     * wired into the main source set. When non-empty, these are used instead of
-     * the default source projection.
-     *
-     * <p>This is useful for multi-projection builds where each projection generates
-     * code for a different service or protocol:
-     * <pre>{@code
-     * smithyJava {
-     *     projections.addAll("rest-json-client", "rpc-v2-cbor-client")
-     * }
-     * }</pre>
-     *
-     * <p>When empty (default), the plugin uses the single source projection from
-     * the {@code smithy} extension.
-     *
-     * @return list of projection names to wire
-     */
-    public abstract ListProperty<String> getProjections();
-
-    /**
      * Additional Smithy build plugin names (as declared in {@code smithy-build.json})
      * whose generated output directories should be wired into the Java source set.
      * The {@code java-codegen} plugin output is always wired automatically.
@@ -109,11 +87,10 @@ public abstract class SmithyJavaExtension {
     public abstract ListProperty<String> getGeneratedPluginOutputs();
 
     /**
-     * Whether to automatically merge {@code META-INF/services} files when multiple
-     * projections or {@link #getGeneratedPluginOutputs()} are configured. Defaults to
-     * {@code true}.
+     * Whether to automatically merge {@code META-INF/services} files when
+     * {@link #getGeneratedPluginOutputs()} is non-empty. Defaults to {@code true}.
      *
-     * <p>When multiple projections or plugins produce service provider files, they
+     * <p>When multiple Smithy build plugins produce service provider files, they
      * may conflict. This option enables a merge task that combines them.
      *
      * @return property controlling service file merging
