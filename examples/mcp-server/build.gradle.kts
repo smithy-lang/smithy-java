@@ -1,7 +1,6 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.AppendingTransformer
 
 plugins {
-    java
     id("software.amazon.smithy.java.gradle.smithy-java")
     id("com.gradleup.shadow")
 }
