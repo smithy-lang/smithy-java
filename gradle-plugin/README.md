@@ -38,13 +38,12 @@ tasks.processResources { dependsOn("smithyBuild") }
 **After** (with this plugin):
 ```kotlin
 plugins {
-    `java-library`
     id("software.amazon.smithy.java.gradle.smithy-java") version "<version>"
 }
 ```
 
-That's it. The plugin handles `smithy-base`, dependency management, source set wiring, and task
-ordering automatically.
+That's it. The plugin handles `java-library`, `smithy-base`, dependency management, source set
+wiring, and task ordering automatically.
 
 ## Installation
 
@@ -62,11 +61,10 @@ pluginManagement {
 }
 ```
 
-Then apply it in your `build.gradle.kts` along with a Java plugin:
+Then apply it in your `build.gradle.kts`:
 
 ```kotlin
 plugins {
-    `java-library` // or `java` / `application` for leaf projects
     id("software.amazon.smithy.java.gradle.smithy-java")
 }
 ```
@@ -94,7 +92,6 @@ The simplest case, generate data types from a Smithy model with no client or ser
 `build.gradle.kts`:
 ```kotlin
 plugins {
-    `java-library`
     id("software.amazon.smithy.java.gradle.smithy-java")
 }
 ```
@@ -123,13 +120,12 @@ Generate a client for a service.
 `build.gradle.kts`:
 ```kotlin
 plugins {
-    `java-library`
     id("software.amazon.smithy.java.gradle.smithy-java")
 }
 
 dependencies {
     // Add the protocol and transport your service uses
-    implementation("software.amazon.smithy.java:aws-client-restjson:<version>")
+    api("software.amazon.smithy.java:aws-client-restjson:<version>")
 }
 ```
 
@@ -158,7 +154,6 @@ Generate server stubs.
 `build.gradle.kts`:
 ```kotlin
 plugins {
-    java
     id("software.amazon.smithy.java.gradle.smithy-java")
 }
 
@@ -214,16 +209,8 @@ Service files from multiple plugins are merged automatically. Disable with
 ### `autoAddDependencies`
 
 When `true` (default), the plugin automatically adds the correct Smithy Java runtime
-dependencies based on the active modes. The configuration used depends on which Java plugin
-you apply and the codegen mode:
-
-- **`java-library`**: types/client dependencies (`core`, `framework-errors`, `client-core`)
-  are added to `api`, making them transitively available to consumers. Server dependencies
-  (`server-api`) are added to `implementation` since servers are typically not re-exported.
-- **`java` / `application`**: all runtime dependencies are added to `implementation`.
-
-Set to `false` when you need full control over dependency versions or want to use project
-dependencies (e.g. in a monorepo):
+dependencies based on the active modes. Set to `false` when you need full control over
+dependency versions or want to use project dependencies (e.g. in a monorepo):
 
 ```kotlin
 smithyJava {
@@ -241,7 +228,6 @@ dependencies {
 
 - Java 21 or later
 - Gradle 8.5 or later (first version to support Java 21 runtime)
-- A Java plugin applied (`java`, `java-library`, or `application`)
 - A `smithy-build.json` with a `java-codegen` plugin configured
 
 ## Custom Source Projection
