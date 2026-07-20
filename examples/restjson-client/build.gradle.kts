@@ -1,6 +1,7 @@
 plugins {
-    id("software.amazon.smithy.java.gradle.smithy-java")
+    `java-library`
     application
+    id("software.amazon.smithy.gradle.smithy-base")
     id("smithy-java.jmh-conventions")
 }
 
@@ -13,6 +14,8 @@ java {
 dependencies {
     val smithyJavaVersion: String by project
 
+    smithyBuild("software.amazon.smithy.java:codegen-plugin:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:client-core:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:client-core:$smithyJavaVersion")
     api("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
 
@@ -30,14 +33,28 @@ application {
     mainClass = "software.amazon.smithy.java.example.ClientExample"
 }
 
-sourceSets {
-    create("it") {
-        compileClasspath += main.get().output + configurations["testRuntimeClasspath"] + configurations["testCompileClasspath"]
-        runtimeClasspath += output + compileClasspath + test.get().runtimeClasspath + test.get().output
+// Add generated Java sources to the main sourceset
+afterEvaluate {
+    val clientPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
+    sourceSets {
+        main {
+            java {
+                srcDir("$clientPath/java")
+            }
+        }
+        create("it") {
+            compileClasspath += main.get().output + configurations["testRuntimeClasspath"] + configurations["testCompileClasspath"]
+            runtimeClasspath += output + compileClasspath + test.get().runtimeClasspath + test.get().output
+        }
     }
 }
 
 tasks {
+    val smithyBuild by getting
+    compileJava {
+        dependsOn(smithyBuild)
+    }
+
     val integ by registering(Test::class) {
         useJUnitPlatform()
         testClassesDirs = sourceSets["it"].output.classesDirs

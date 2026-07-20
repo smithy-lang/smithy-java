@@ -1,5 +1,6 @@
 plugins {
-    id("software.amazon.smithy.java.gradle.smithy-java")
+    `java-library`
+    id("software.amazon.smithy.gradle.smithy-base")
     application
 }
 
@@ -16,6 +17,10 @@ application {
 dependencies {
     val smithyJavaVersion: String by project
 
+    smithyBuild("software.amazon.smithy.java:codegen-plugin:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:client-core:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:server-api:$smithyJavaVersion")
+
     // Server dependencies
     implementation("software.amazon.smithy.java:server-netty:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-server-restjson:$smithyJavaVersion")
@@ -29,19 +34,45 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-sourceSets {
-    create("it") {
-        compileClasspath += main.get().output + configurations["testRuntimeClasspath"] + configurations["testCompileClasspath"]
-        runtimeClasspath += output + compileClasspath + test.get().runtimeClasspath + test.get().output
+// Add generated Java sources to the main sourceset
+afterEvaluate {
+    val codegenPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
+    sourceSets {
+        main {
+            java {
+                srcDir("$codegenPath/java")
+            }
+            resources {
+                srcDir("$codegenPath/resources")
+            }
+        }
+        create("it") {
+            compileClasspath += main.get().output + configurations["testRuntimeClasspath"] + configurations["testCompileClasspath"]
+            runtimeClasspath += output + compileClasspath + test.get().runtimeClasspath + test.get().output
+        }
     }
 }
 
 tasks {
+    val smithyBuild by getting
+    compileJava {
+        dependsOn(smithyBuild)
+    }
+
     val integ by registering(Test::class) {
         useJUnitPlatform()
         testClassesDirs = sourceSets["it"].output.classesDirs
         classpath = sourceSets["it"].runtimeClasspath
     }
+}
+
+
+tasks.compileJava {
+    dependsOn(tasks.smithyBuild)
+}
+
+tasks.processResources {
+    dependsOn(tasks.compileJava)
 }
 
 repositories {

@@ -1,5 +1,6 @@
 plugins {
-    id("software.amazon.smithy.java.gradle.smithy-java")
+    `java-library`
+    id("software.amazon.smithy.gradle.smithy-base")
 }
 
 dependencies {
@@ -7,6 +8,9 @@ dependencies {
 
     annotationProcessor("com.google.auto.service:auto-service:1.1.1")
     compileOnly("com.google.auto.service:auto-service:1.1.1")
+
+    smithyBuild("software.amazon.smithy.java:codegen-plugin:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:server-api:$smithyJavaVersion")
 
     implementation("software.amazon.smithy.java:aws-lambda-endpoint:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:server-api:$smithyJavaVersion")
@@ -28,6 +32,24 @@ tasks {
             from(jar)
             from(configurations.runtimeClasspath)
         }
+    }
+}
+
+// Add generated Java files to the main sourceSet
+afterEvaluate {
+    val serverPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
+    sourceSets {
+        main {
+            java {
+                srcDir("$serverPath/java")
+            }
+        }
+    }
+}
+
+tasks {
+    compileJava {
+        dependsOn(smithyBuild)
     }
 }
 

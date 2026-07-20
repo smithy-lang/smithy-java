@@ -1,13 +1,16 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.AppendingTransformer
 
 plugins {
-    id("software.amazon.smithy.java.gradle.smithy-java")
+    `java-library`
+    id("software.amazon.smithy.gradle.smithy-base")
     id("com.gradleup.shadow")
 }
 
 dependencies {
     val smithyJavaVersion: String by project
 
+    smithyBuild("software.amazon.smithy.java:codegen-plugin:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:server-api:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:smithy-ai-traits:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:mcp-server:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:server-proxy:$smithyJavaVersion")
@@ -16,6 +19,24 @@ dependencies {
     implementation("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-client-awsjson:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-service-bundle:$smithyJavaVersion")
+}
+
+// Add generated Java files to the main sourceSet
+afterEvaluate {
+    val serverPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
+    sourceSets {
+        main {
+            java {
+                srcDir("$serverPath/java")
+            }
+        }
+    }
+}
+
+tasks {
+    compileJava {
+        dependsOn(smithyBuild)
+    }
 }
 
 repositories {
