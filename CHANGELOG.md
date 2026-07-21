@@ -12,10 +12,6 @@
 
 * Added a modular AWS credential chain with pluggable provider discovery.
   ([#1172](https://github.com/smithy-lang/smithy-java/pull/1172))
-* Added a Gradle plugin for codegen. This replaces the manual `smithy-base` +
-  `afterEvaluate` boilerplate with a single plugin application that auto-wires
-  source sets, dependencies, and task ordering.
-  ([#1235](https://github.com/smithy-lang/smithy-java/pull/1235))
 * Added a lenient root node mode for `XmlCodec`.
   ([#1246](https://github.com/smithy-lang/smithy-java/pull/1246))
 * Updated timestamp deserialization for dynamic to be more protocol agnostic.
