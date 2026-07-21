@@ -1308,7 +1308,7 @@ public final class McpService {
         return Document.of(EPOCH_SECONDS.readFromNumber(doc.asNumber()));
     }
 
-    private Document adaptOutputDocument(Document doc, Schema schema) {
+    Document adaptOutputDocument(Document doc, Schema schema) {
         if (doc == null) {
             return null;
         }
@@ -1316,7 +1316,12 @@ public final class McpService {
         return switch (toType) {
             case BIG_DECIMAL -> Document.of(doc.asBigDecimal().toString());
             case BIG_INTEGER -> Document.of(doc.asBigInteger().toString());
-            case BLOB -> Document.of(Base64.getEncoder().encodeToString(ByteBufferUtils.getBytes(doc.asBlob())));
+            case BLOB -> switch (doc.type()) {
+                case STRING -> Document.of(doc.asString());
+                case BLOB -> Document.of(
+                        Base64.getEncoder().encodeToString(ByteBufferUtils.getBytes(doc.asBlob())));
+                default -> badType(doc.type(), toType);
+            };
             // Use adaptTimestamp() instead of asTimestamp() because oneOf union members are
             // deserialized as untyped Documents (no schema available). Timestamps in these
             // documents remain as strings or numbers rather than being converted to Timestamp Documents.
