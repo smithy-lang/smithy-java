@@ -1,5 +1,87 @@
 # Change Log
 
+## 1.5.0 (7/21/2026)
+> [!IMPORTANT]
+> All client modules are considered stable.  Some modules, including
+> server, CLI, and MCP, are still in developer-preview and may contain
+> bugs.  No guarantee is made about their API stability. Unstable
+> modules are marked with a warning in their `README.md` and with the
+> `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Features
+
+* Added a modular AWS credential chain with pluggable provider discovery.
+  ([#1172](https://github.com/smithy-lang/smithy-java/pull/1172))
+* Added a lenient root node mode for `XmlCodec`.
+  ([#1246](https://github.com/smithy-lang/smithy-java/pull/1246))
+* Updated timestamp deserialization for dynamic to be more protocol agnostic.
+  ([#1258](https://github.com/smithy-lang/smithy-java/pull/1258))
+* Added the ability to trace a BDD evaluation and gave the rules engine
+  the ability to set the input params to a context key.
+  ([#1259](https://github.com/smithy-lang/smithy-java/pull/1259))
+* Added an S3 plugin that removes the bucket from the path of an operation
+  if the operation gets the path from the rules engine.
+  ([#1259](https://github.com/smithy-lang/smithy-java/pull/1259))
+* Added the retry token to the execution context to make it available to
+  interceptors. ([#1263](https://github.com/smithy-lang/smithy-java/pull/1263))
+* Added the ability for integrations to customize things like default settings
+  and default plugins before `interceptors()` runs.
+  ([#1264](https://github.com/smithy-lang/smithy-java/pull/1264))
+* Added support for closure-based code generation.
+  ([#1260](https://github.com/smithy-lang/smithy-java/pull/1260))
+* Added virtual thread friendly, blocking, Smithy HTTP client that supports
+  HTTP 1.1 and HTTP 2 bidirectional streaming.
+  ([#1278](https://github.com/smithy-lang/smithy-java/pull/1278))
+
+### Bug Fixes
+
+* Updated RPC protocol events to always serialize an empty payload with a
+  content-type for events with no payload members.
+  ([#1245](https://github.com/smithy-lang/smithy-java/pull/1245))
+* Fixed a bug where CBOR floats and doubles were rejecting integer-encoded
+  values. ([#1247](https://github.com/smithy-lang/smithy-java/pull/1247))
+* Fixed a bug where outer collection indices were being clobbered in
+  nested collections in `awsQuery`.
+  ([#1248](https://github.com/smithy-lang/smithy-java/pull/1248))
+* Fixed a bug where types introduced by codegen integrations were being
+  skipped for generation in some cases.
+  ([#1256](https://github.com/smithy-lang/smithy-java/pull/1256))
+* Updated serialization to throw when attempting to serialize a null
+  value in a dense collection.
+  ([#1261](https://github.com/smithy-lang/smithy-java/pull/1261))
+* Updated auth to explicitly deny authorization and transfer-encoding headers
+  from appearing in a canonical string to sign in case a mutable request is
+  reused after signing. Authorization is needed to exclude it from the signature
+  when resigned, and transfer-encoding is another addition to keep transient
+  headers out of the signed request.
+  ([#1268](https://github.com/smithy-lang/smithy-java/pull/1268))
+* Fixed a bug where waiter delay was sometimes lower than `minDelayMillis`.
+  ([#1269](https://github.com/smithy-lang/smithy-java/pull/1269))
+* Updated `awsJson` type deser to strip namespaces so make exception 
+  deserialization function properly.
+  ([#1273](https://github.com/smithy-lang/smithy-java/pull/1273))
+* Fixed deserialization of string httpPayload when the response is readonly
+  buffer. ([#1289](https://github.com/smithy-lang/smithy-java/pull/1289))
+* Fixed deserialising string/blob payloads when transferred with chunked
+  encoding. ([#1292](https://github.com/smithy-lang/smithy-java/pull/1292))
+
+### Improvements
+
+* Introduced an optimized, StAX-free XML Codec implementation, currently gated 
+  behind `Builder.useNative(true)` or `-Dsmithy-java.xml-provider=smithy`
+  ([#1231](https://github.com/smithy-lang/smithy-java/pull/1231)).
+* Improved HTTP serializer by avoiding eager allocations for HTTP payloads.
+  ([#1238](https://github.com/smithy-lang/smithy-java/pull/1238))
+* Reduced the number of allocations needed for dynamic schemas, particularly
+  for union-dense payloads (e.g. DynamoDB AttributeValue) and string/enum lists.
+  ([#1255](https://github.com/smithy-lang/smithy-java/pull/1255))
+* Improved performance when serializing API headers.
+  ([#1272](https://github.com/smithy-lang/smithy-java/pull/1272))
+* Added a copy-on-write context to avoid copies.
+  ([#1271](https://github.com/smithy-lang/smithy-java/pull/1271))
+* Improved JSON codec parsing performance.
+  ([#1270](https://github.com/smithy-lang/smithy-java/pull/1270))
+
 ## 1.4.0 (6/10/2026)
 > [!IMPORTANT]
 > All client modules are considered stable.  Some modules, including
