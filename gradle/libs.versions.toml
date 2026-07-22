@@ -1,7 +1,7 @@
 [versions]
 junit5 = "6.1.2"
 hamcrest = "3.0"
-smithy = "1.72.0"
+smithy = "1.72.1"
 jmh = "0.7.3"
 jmhCore = "1.37"
 test-logger-plugin = "4.0.0"
@@ -13,7 +13,7 @@ jackson = "3.2.1"
 fastdoubleparser = "2.0.1"
 netty = "4.2.16.Final"
 dep-analysis = "3.16.1"
-aws-sdk = "2.47.6"
+aws-sdk = "2.49.0"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 jreleaser = "1.25.0"
@@ -28,7 +28,7 @@ opentelemetry = "1.64.0"
 jspecify = "1.0.0"
 commonmark = "0.29.0"
 jsoup = "1.22.2"
-aws-api-models = "1.0.269"
+aws-api-models = "1.0.270"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
