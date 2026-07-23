@@ -474,9 +474,9 @@ public abstract sealed class Schema implements MemberLookup
         if (key.id >= ext.length) {
             return null;
         }
-        // Plain array read (benign race). Safe because extension objects are immutable
-        // (records with final fields), and Java's final field semantics (JLS 17.5)
-        // guarantee visibility once the reference is seen. Worst case: redundant computation.
+        // Plain array read (benign race). Safe because extension objects are safely publishable,
+        // and Java's final field semantics (JLS 17.5) guarantee visibility once the reference is
+        // seen. Worst case: redundant computation or independent cache holders.
         var value = ext[key.id];
         if (value == NOT_COMPUTED) {
             value = computeExtension(key, ext);
@@ -494,8 +494,8 @@ public abstract sealed class Schema implements MemberLookup
             var value = provider.provide(this);
             result = value != null ? value : NULL_SENTINEL;
         }
-        // Plain array write (benign race). The stored object is immutable, so any thread
-        // that later reads this element and sees the object will see all its final fields.
+        // Plain array write (benign race). Any thread that later reads this element and sees
+        // the safely publishable object will see all its final fields.
         ext[key.id] = result;
         return result;
     }
