@@ -43,6 +43,11 @@ public interface SchemaExtensionProvider<T> {
      *       returns.</li>
      * </ul>
      *
+     * <p>An extension may use thread-safe mutable state as a performance cache when the cache is held in
+     * final fields, all cache access uses appropriate synchronization or atomic operations, and cache
+     * contents do not affect behavior. Because concurrent extension computation can produce independent
+     * instances, losing the contents of one such cache must only result in redundant computation.
+     *
      * <p><b>Idempotency:</b> Under concurrent access, multiple threads may invoke this method
      * simultaneously for the same schema and key (benign race). All invocations must produce
      * equivalent results.
