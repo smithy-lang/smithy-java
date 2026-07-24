@@ -32,6 +32,9 @@ public class ShapeTranscoderBenchmark {
                     .putMember("count", PreludeSchemas.INTEGER)
                     .putMember("active", PreludeSchemas.BOOLEAN)
                     .build();
+    private static final Schema SOURCE_SHALLOW_ID = SOURCE_SHALLOW.member("id");
+    private static final Schema SOURCE_SHALLOW_COUNT = SOURCE_SHALLOW.member("count");
+    private static final Schema SOURCE_SHALLOW_ACTIVE = SOURCE_SHALLOW.member("active");
     private static final Schema TARGET_SHALLOW =
             Schema.structureBuilder(ShapeId.from("benchmark.target#Shallow"))
                     .putMember("active", PreludeSchemas.BOOLEAN)
@@ -42,40 +45,57 @@ public class ShapeTranscoderBenchmark {
     private static final Schema SOURCE_LABELS = Schema.listBuilder(ShapeId.from("benchmark.source#Labels"))
             .putMember("member", PreludeSchemas.STRING)
             .build();
+    private static final Schema SOURCE_LABELS_MEMBER = SOURCE_LABELS.listMember();
     private static final Schema SOURCE_METADATA = Schema.mapBuilder(ShapeId.from("benchmark.source#Metadata"))
             .putMember("key", PreludeSchemas.STRING)
             .putMember("value", PreludeSchemas.STRING)
             .build();
+    private static final Schema SOURCE_METADATA_KEY = SOURCE_METADATA.mapKeyMember();
+    private static final Schema SOURCE_METADATA_VALUE = SOURCE_METADATA.mapValueMember();
     private static final Schema SOURCE_LEAF = Schema.structureBuilder(ShapeId.from("benchmark.source#Leaf"))
             .putMember("name", PreludeSchemas.STRING)
             .putMember("score", PreludeSchemas.INTEGER)
             .putMember("labels", SOURCE_LABELS)
             .build();
+    private static final Schema SOURCE_LEAF_NAME = SOURCE_LEAF.member("name");
+    private static final Schema SOURCE_LEAF_SCORE = SOURCE_LEAF.member("score");
+    private static final Schema SOURCE_LEAF_LABELS = SOURCE_LEAF.member("labels");
     private static final Schema SOURCE_LEAVES = Schema.listBuilder(ShapeId.from("benchmark.source#Leaves"))
             .putMember("member", SOURCE_LEAF)
             .build();
+    private static final Schema SOURCE_LEAVES_MEMBER = SOURCE_LEAVES.listMember();
     private static final Schema SOURCE_BRANCH = Schema.structureBuilder(ShapeId.from("benchmark.source#Branch"))
             .putMember("name", PreludeSchemas.STRING)
             .putMember("leaves", SOURCE_LEAVES)
             .putMember("metadata", SOURCE_METADATA)
             .build();
+    private static final Schema SOURCE_BRANCH_NAME = SOURCE_BRANCH.member("name");
+    private static final Schema SOURCE_BRANCH_LEAVES = SOURCE_BRANCH.member("leaves");
+    private static final Schema SOURCE_BRANCH_METADATA = SOURCE_BRANCH.member("metadata");
     private static final Schema SOURCE_BRANCHES = Schema.listBuilder(ShapeId.from("benchmark.source#Branches"))
             .putMember("member", SOURCE_BRANCH)
             .build();
+    private static final Schema SOURCE_BRANCHES_MEMBER = SOURCE_BRANCHES.listMember();
     private static final Schema SOURCE_DEEP = Schema.structureBuilder(ShapeId.from("benchmark.source#Deep"))
             .putMember("requestId", PreludeSchemas.STRING)
             .putMember("primary", SOURCE_BRANCH)
             .putMember("branches", SOURCE_BRANCHES)
             .putMember("metadata", SOURCE_METADATA)
             .build();
+    private static final Schema SOURCE_DEEP_REQUEST_ID = SOURCE_DEEP.member("requestId");
+    private static final Schema SOURCE_DEEP_PRIMARY = SOURCE_DEEP.member("primary");
+    private static final Schema SOURCE_DEEP_BRANCHES = SOURCE_DEEP.member("branches");
+    private static final Schema SOURCE_DEEP_METADATA = SOURCE_DEEP.member("metadata");
 
     private static final Schema TARGET_LABELS = Schema.listBuilder(ShapeId.from("benchmark.target#Labels"))
             .putMember("member", PreludeSchemas.STRING)
             .build();
+    private static final Schema TARGET_LABELS_MEMBER = TARGET_LABELS.listMember();
     private static final Schema TARGET_METADATA = Schema.mapBuilder(ShapeId.from("benchmark.target#Metadata"))
             .putMember("key", PreludeSchemas.STRING)
             .putMember("value", PreludeSchemas.STRING)
             .build();
+    private static final Schema TARGET_METADATA_VALUE = TARGET_METADATA.mapValueMember();
     private static final Schema TARGET_LEAF = Schema.structureBuilder(ShapeId.from("benchmark.target#Leaf"))
             .putMember("labels", TARGET_LABELS)
             .putMember("name", PreludeSchemas.STRING)
@@ -104,6 +124,15 @@ public class ShapeTranscoderBenchmark {
     private static final Schema SOURCE_ATTRIBUTE_VALUE = SOURCE_ATTRIBUTE_SCHEMAS.value();
     private static final Schema SOURCE_ATTRIBUTE_LIST = SOURCE_ATTRIBUTE_SCHEMAS.list();
     private static final Schema SOURCE_ATTRIBUTE_MAP = SOURCE_ATTRIBUTE_SCHEMAS.map();
+    private static final Schema SOURCE_ATTRIBUTE_S = SOURCE_ATTRIBUTE_VALUE.member("S");
+    private static final Schema SOURCE_ATTRIBUTE_N = SOURCE_ATTRIBUTE_VALUE.member("N");
+    private static final Schema SOURCE_ATTRIBUTE_BOOL = SOURCE_ATTRIBUTE_VALUE.member("BOOL");
+    private static final Schema SOURCE_ATTRIBUTE_NULL = SOURCE_ATTRIBUTE_VALUE.member("NULL");
+    private static final Schema SOURCE_ATTRIBUTE_M = SOURCE_ATTRIBUTE_VALUE.member("M");
+    private static final Schema SOURCE_ATTRIBUTE_L = SOURCE_ATTRIBUTE_VALUE.member("L");
+    private static final Schema SOURCE_ATTRIBUTE_LIST_MEMBER = SOURCE_ATTRIBUTE_LIST.listMember();
+    private static final Schema SOURCE_ATTRIBUTE_MAP_KEY = SOURCE_ATTRIBUTE_MAP.mapKeyMember();
+    private static final Schema SOURCE_ATTRIBUTE_MAP_VALUE = SOURCE_ATTRIBUTE_MAP.mapValueMember();
     private static final AttributeSchemas TARGET_ATTRIBUTE_SCHEMAS =
             createAttributeSchemas("benchmark.target", true);
     private static final Schema TARGET_ATTRIBUTE_VALUE = TARGET_ATTRIBUTE_SCHEMAS.value();
@@ -188,9 +217,9 @@ public class ShapeTranscoderBenchmark {
 
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeString(SOURCE_SHALLOW.member("id"), id);
-            serializer.writeInteger(SOURCE_SHALLOW.member("count"), count);
-            serializer.writeBoolean(SOURCE_SHALLOW.member("active"), active);
+            serializer.writeString(SOURCE_SHALLOW_ID, id);
+            serializer.writeInteger(SOURCE_SHALLOW_COUNT, count);
+            serializer.writeBoolean(SOURCE_SHALLOW_ACTIVE, active);
         }
 
         @Override
@@ -207,14 +236,14 @@ public class ShapeTranscoderBenchmark {
 
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeString(SOURCE_LEAF.member("name"), name);
-            serializer.writeInteger(SOURCE_LEAF.member("score"), score);
-            serializer.writeList(SOURCE_LEAF.member("labels"), labels, labels.size(), SourceLeaf::writeLabels);
+            serializer.writeString(SOURCE_LEAF_NAME, name);
+            serializer.writeInteger(SOURCE_LEAF_SCORE, score);
+            serializer.writeList(SOURCE_LEAF_LABELS, labels, labels.size(), SourceLeaf::writeLabels);
         }
 
         private static void writeLabels(List<String> labels, ShapeSerializer serializer) {
             for (var label : labels) {
-                serializer.writeString(SOURCE_LABELS.listMember(), label);
+                serializer.writeString(SOURCE_LABELS_MEMBER, label);
             }
         }
 
@@ -235,10 +264,10 @@ public class ShapeTranscoderBenchmark {
 
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeString(SOURCE_BRANCH.member("name"), name);
-            serializer.writeList(SOURCE_BRANCH.member("leaves"), leaves, leaves.size(), SourceBranch::writeLeaves);
+            serializer.writeString(SOURCE_BRANCH_NAME, name);
+            serializer.writeList(SOURCE_BRANCH_LEAVES, leaves, leaves.size(), SourceBranch::writeLeaves);
             serializer.writeMap(
-                    SOURCE_BRANCH.member("metadata"),
+                    SOURCE_BRANCH_METADATA,
                     metadata,
                     metadata.size(),
                     SourceBranch::writeMetadata);
@@ -246,14 +275,14 @@ public class ShapeTranscoderBenchmark {
 
         private static void writeLeaves(List<SourceLeaf> leaves, ShapeSerializer serializer) {
             for (var leaf : leaves) {
-                serializer.writeStruct(SOURCE_LEAVES.listMember(), leaf);
+                serializer.writeStruct(SOURCE_LEAVES_MEMBER, leaf);
             }
         }
 
         private static void writeMetadata(Map<String, String> metadata, MapSerializer serializer) {
             for (var entry : metadata.entrySet()) {
                 serializer.writeEntry(
-                        SOURCE_METADATA.mapKeyMember(),
+                        SOURCE_METADATA_KEY,
                         entry.getKey(),
                         entry.getValue(),
                         SourceBranch::writeMetadataValue);
@@ -261,7 +290,7 @@ public class ShapeTranscoderBenchmark {
         }
 
         private static void writeMetadataValue(String value, ShapeSerializer serializer) {
-            serializer.writeString(SOURCE_METADATA.mapValueMember(), value);
+            serializer.writeString(SOURCE_METADATA_VALUE, value);
         }
 
         @Override
@@ -282,15 +311,15 @@ public class ShapeTranscoderBenchmark {
 
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeString(SOURCE_DEEP.member("requestId"), requestId);
-            serializer.writeStruct(SOURCE_DEEP.member("primary"), primary);
+            serializer.writeString(SOURCE_DEEP_REQUEST_ID, requestId);
+            serializer.writeStruct(SOURCE_DEEP_PRIMARY, primary);
             serializer.writeList(
-                    SOURCE_DEEP.member("branches"),
+                    SOURCE_DEEP_BRANCHES,
                     branches,
                     branches.size(),
                     SourceDeep::writeBranches);
             serializer.writeMap(
-                    SOURCE_DEEP.member("metadata"),
+                    SOURCE_DEEP_METADATA,
                     metadata,
                     metadata.size(),
                     SourceDeep::writeMetadata);
@@ -298,14 +327,14 @@ public class ShapeTranscoderBenchmark {
 
         private static void writeBranches(List<SourceBranch> branches, ShapeSerializer serializer) {
             for (var branch : branches) {
-                serializer.writeStruct(SOURCE_BRANCHES.listMember(), branch);
+                serializer.writeStruct(SOURCE_BRANCHES_MEMBER, branch);
             }
         }
 
         private static void writeMetadata(Map<String, String> metadata, MapSerializer serializer) {
             for (var entry : metadata.entrySet()) {
                 serializer.writeEntry(
-                        SOURCE_METADATA.mapKeyMember(),
+                        SOURCE_METADATA_KEY,
                         entry.getKey(),
                         entry.getValue(),
                         SourceDeep::writeMetadataValue);
@@ -313,7 +342,7 @@ public class ShapeTranscoderBenchmark {
         }
 
         private static void writeMetadataValue(String value, ShapeSerializer serializer) {
-            serializer.writeString(SOURCE_METADATA.mapValueMember(), value);
+            serializer.writeString(SOURCE_METADATA_VALUE, value);
         }
 
         @Override
@@ -344,40 +373,40 @@ public class ShapeTranscoderBenchmark {
     private record SourceStringAttribute(String value) implements SourceAttributeValue {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeString(SOURCE_ATTRIBUTE_VALUE.member("S"), value);
+            serializer.writeString(SOURCE_ATTRIBUTE_S, value);
         }
     }
 
     private record SourceNumberAttribute(String value) implements SourceAttributeValue {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeString(SOURCE_ATTRIBUTE_VALUE.member("N"), value);
+            serializer.writeString(SOURCE_ATTRIBUTE_N, value);
         }
     }
 
     private record SourceBooleanAttribute(boolean value) implements SourceAttributeValue {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeBoolean(SOURCE_ATTRIBUTE_VALUE.member("BOOL"), value);
+            serializer.writeBoolean(SOURCE_ATTRIBUTE_BOOL, value);
         }
     }
 
     private record SourceNullAttribute() implements SourceAttributeValue {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeBoolean(SOURCE_ATTRIBUTE_VALUE.member("NULL"), true);
+            serializer.writeBoolean(SOURCE_ATTRIBUTE_NULL, true);
         }
     }
 
     private record SourceListAttribute(List<SourceAttributeValue> value) implements SourceAttributeValue {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeList(SOURCE_ATTRIBUTE_VALUE.member("L"), value, value.size(), SourceListAttribute::write);
+            serializer.writeList(SOURCE_ATTRIBUTE_L, value, value.size(), SourceListAttribute::write);
         }
 
         private static void write(List<SourceAttributeValue> values, ShapeSerializer serializer) {
             for (var value : values) {
-                serializer.writeStruct(SOURCE_ATTRIBUTE_LIST.listMember(), value);
+                serializer.writeStruct(SOURCE_ATTRIBUTE_LIST_MEMBER, value);
             }
         }
     }
@@ -385,13 +414,13 @@ public class ShapeTranscoderBenchmark {
     private record SourceMapAttribute(Map<String, SourceAttributeValue> value) implements SourceAttributeValue {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeMap(SOURCE_ATTRIBUTE_VALUE.member("M"), value, value.size(), SourceMapAttribute::write);
+            serializer.writeMap(SOURCE_ATTRIBUTE_M, value, value.size(), SourceMapAttribute::write);
         }
 
         private static void write(Map<String, SourceAttributeValue> values, MapSerializer serializer) {
             for (var entry : values.entrySet()) {
                 serializer.writeEntry(
-                        SOURCE_ATTRIBUTE_MAP.mapKeyMember(),
+                        SOURCE_ATTRIBUTE_MAP_KEY,
                         entry.getKey(),
                         entry.getValue(),
                         SourceMapAttribute::writeValue);
@@ -399,7 +428,7 @@ public class ShapeTranscoderBenchmark {
         }
 
         private static void writeValue(SourceAttributeValue value, ShapeSerializer serializer) {
-            serializer.writeStruct(SOURCE_ATTRIBUTE_MAP.mapValueMember(), value);
+            serializer.writeStruct(SOURCE_ATTRIBUTE_MAP_VALUE, value);
         }
     }
 
@@ -548,7 +577,7 @@ public class ShapeTranscoderBenchmark {
             deserializer.readList(
                     TARGET_LABELS,
                     result,
-                    (labels, value) -> labels.add(value.readString(TARGET_LABELS.listMember())));
+                    (labels, value) -> labels.add(value.readString(TARGET_LABELS_MEMBER)));
             return result;
         }
 
@@ -561,7 +590,7 @@ public class ShapeTranscoderBenchmark {
                     result,
                     (metadata, key, value) -> metadata.put(
                             key,
-                            value.readString(TARGET_METADATA.mapValueMember())));
+                            value.readString(TARGET_METADATA_VALUE)));
             return result;
         }
 
