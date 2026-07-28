@@ -26,11 +26,11 @@ import software.amazon.smithy.java.retries.api.TokenAcquisitionFailedException;
  */
 class SepRetryStrategyTest {
 
-    // Fixed jitter that always returns 1.0 (exponential_base: 1)
+    // Fixed jitter that always returns 0.0, so that (1.0 - nextDouble()) = 1.0 (exponential_base: 1)
     private static final Random FIXED_JITTER = new Random() {
         @Override
         public double nextDouble() {
-            return 1.0;
+            return 0.0;
         }
     };
 

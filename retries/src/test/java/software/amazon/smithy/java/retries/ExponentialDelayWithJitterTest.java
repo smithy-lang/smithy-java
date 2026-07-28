@@ -15,9 +15,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 class ExponentialDelayWithJitterTest {
-    static final ComputedNextDouble MIN_VALUE_RND = new ComputedNextDouble(0.0);
+    // After 1.0 - nextDouble(): 1.0 - 1.0 = 0.0 (min jitter output)
+    static final ComputedNextDouble MIN_VALUE_RND = new ComputedNextDouble(1.0);
     static final ComputedNextDouble MID_VALUE_RND = new ComputedNextDouble(0.5);
-    static final ComputedNextDouble MAX_VALUE_RND = new ComputedNextDouble(1.0);
+    // After 1.0 - nextDouble(): 1.0 - 0.0 = 1.0 (max jitter output)
+    static final ComputedNextDouble MAX_VALUE_RND = new ComputedNextDouble(0.0);
     static final Duration BASE_DELAY = Duration.ofMillis(23);
     static final Duration MAX_DELAY = Duration.ofSeconds(20);
 
@@ -87,7 +89,7 @@ class ExponentialDelayWithJitterTest {
                         .configureRandom(MID_VALUE_RND)
                         .givenAttempt(13)
                         .expectDelayInMs(10000),
-                // --- Using random that returns: 0.0 (no jitter)
+                // --- Using random that returns: 0.0 (min jitter, floor of 1ms)
                 new TestCase()
                         .configureRandom(MIN_VALUE_RND)
                         .givenAttempt(1)
@@ -95,27 +97,27 @@ class ExponentialDelayWithJitterTest {
                 new TestCase()
                         .configureRandom(MIN_VALUE_RND)
                         .givenAttempt(2)
-                        .expectDelayInMs(0),
+                        .expectDelayInMs(1),
                 new TestCase()
                         .configureRandom(MIN_VALUE_RND)
                         .givenAttempt(3)
-                        .expectDelayInMs(0),
+                        .expectDelayInMs(1),
                 new TestCase()
                         .configureRandom(MIN_VALUE_RND)
                         .givenAttempt(5)
-                        .expectDelayInMs(0),
+                        .expectDelayInMs(1),
                 new TestCase()
                         .configureRandom(MIN_VALUE_RND)
                         .givenAttempt(7)
-                        .expectDelayInMs(0),
+                        .expectDelayInMs(1),
                 new TestCase()
                         .configureRandom(MIN_VALUE_RND)
                         .givenAttempt(11)
-                        .expectDelayInMs(0),
+                        .expectDelayInMs(1),
                 new TestCase()
                         .configureRandom(MIN_VALUE_RND)
                         .givenAttempt(13)
-                        .expectDelayInMs(0));
+                        .expectDelayInMs(1));
     }
 
     static class TestCase {
