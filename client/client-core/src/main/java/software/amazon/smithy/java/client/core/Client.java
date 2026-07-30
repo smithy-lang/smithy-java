@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.core;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.function.Predicate;
@@ -42,24 +43,41 @@ public abstract class Client implements Closeable {
     private final ClientInterceptor interceptor;
     private final IdentityResolvers identityResolvers;
     private final RetryStrategy retryStrategy;
+    private final List<AutoCloseable> ownedResources;
 
     protected Client(Builder<?, ?> builder) {
         ClientConfig.Builder configBuilder = builder.configBuilder();
-        this.config = configBuilder.build();
-        this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
-        this.interceptor = config.interceptorChain();
-        this.identityResolvers = IdentityResolvers.of(config.identityResolvers());
-        this.typeRegistry = typeRegistry();
-        if (config.retryStrategy() != null) {
-            this.retryStrategy = config.retryStrategy();
-        } else {
-            this.retryStrategy = StandardRetryStrategy.create();
+        ClientConfig createdConfig = configBuilder.build();
+        List<AutoCloseable> createdOwnedResources = createdConfig.acquireOwnedResources();
+        ClientPipeline<?, ?> createdPipeline;
+        ClientInterceptor createdInterceptor;
+        IdentityResolvers createdIdentityResolvers;
+        TypeRegistry createdTypeRegistry;
+        RetryStrategy createdRetryStrategy;
+        try {
+            createdPipeline = ClientPipeline.of(createdConfig.protocol(), createdConfig.transport());
+            createdInterceptor = createdConfig.interceptorChain();
+            createdIdentityResolvers = IdentityResolvers.of(createdConfig.identityResolvers());
+            createdTypeRegistry = typeRegistry();
+            createdRetryStrategy = createdConfig.retryStrategy() != null
+                    ? createdConfig.retryStrategy()
+                    : StandardRetryStrategy.create();
+            // Claim this strategy, if successful any other client that attempts to claim it
+            // will fail preventing sharing strategies among unrelated clients.
+            if (createdRetryStrategy instanceof Claimable c) {
+                c.claim(this);
+            }
+        } catch (RuntimeException | Error error) {
+            closeResources(createdOwnedResources, error);
+            throw error;
         }
-        // Claim this strategy, if successful any other client that attempts to claim it
-        // will fail preventing sharing strategies among unrelated clients.
-        if (retryStrategy instanceof Claimable c) {
-            c.claim(this);
-        }
+        this.config = createdConfig;
+        this.pipeline = createdPipeline;
+        this.interceptor = createdInterceptor;
+        this.identityResolvers = createdIdentityResolvers;
+        this.typeRegistry = createdTypeRegistry;
+        this.retryStrategy = createdRetryStrategy;
+        this.ownedResources = createdOwnedResources;
     }
 
     /**
@@ -77,58 +95,91 @@ public abstract class Client implements Closeable {
             ApiOperation<I, O> operation,
             RequestOverrideConfig overrideConfig
     ) {
-        ClientPipeline<?, ?> callPipeline = pipeline;
-        IdentityResolvers callIdentityResolvers = identityResolvers;
-        ClientInterceptor callInterceptor = interceptor;
+        List<ClientConfig> acquiredConfigs = new ArrayList<>();
+        List<AutoCloseable> callOwnedResources = new ArrayList<>();
+        Throwable failure = null;
+        try {
+            ClientPipeline<?, ?> callPipeline = pipeline;
+            IdentityResolvers callIdentityResolvers = identityResolvers;
+            ClientInterceptor callInterceptor = interceptor;
 
-        //If there is an override config first apply that before sending to interceptors.
-        ClientConfig callConfig = config;
-        if (overrideConfig != null) {
-            callConfig = callConfig.withRequestOverride(overrideConfig);
-        }
-        ClientConfig afterInterceptionConfig =
-                callInterceptor.modifyBeforeCall(new CallHook<>(operation, callConfig, input));
-        if (afterInterceptionConfig != null && afterInterceptionConfig != callConfig) {
+            // If there is an override config first apply that before sending to interceptors.
+            ClientConfig callConfig = config;
             if (overrideConfig != null) {
-                callConfig = afterInterceptionConfig.withRequestOverride(overrideConfig);
-            } else {
-                callConfig = afterInterceptionConfig;
+                callConfig = callConfig.withRequestOverride(overrideConfig);
+                acquireCallResources(callConfig, acquiredConfigs, callOwnedResources);
+            }
+            ClientConfig afterInterceptionConfig =
+                    callInterceptor.modifyBeforeCall(new CallHook<>(operation, callConfig, input));
+            if (afterInterceptionConfig != null && afterInterceptionConfig != callConfig) {
+                acquireCallResources(afterInterceptionConfig, acquiredConfigs, callOwnedResources);
+                if (overrideConfig != null) {
+                    callConfig = afterInterceptionConfig.withRequestOverride(overrideConfig);
+                    acquireCallResources(callConfig, acquiredConfigs, callOwnedResources);
+                } else {
+                    callConfig = afterInterceptionConfig;
+                }
+            }
+
+            // Rebuild the pipeline, resolvers, etc if the config changed.
+            if (callConfig != config) {
+                callPipeline = ClientPipeline.of(callConfig.protocol(), callConfig.transport());
+                callInterceptor = callConfig.interceptorChain();
+                callIdentityResolvers = IdentityResolvers.of(callConfig.identityResolvers());
+            }
+
+            ClientCall<I, O> call = new ClientCall<>(
+                    input,
+                    operation,
+                    callConfig,
+                    callPipeline,
+                    callInterceptor,
+                    callIdentityResolvers,
+                    // Compose a type registry that adds the errors this operation can encounter.
+                    TypeRegistry.compose(operation.errorRegistry(), typeRegistry),
+                    retryStrategy);
+
+            // Make the running client available to interceptors that need to re-enter.
+            call.context.put(ClientContext.CLIENT, this);
+
+            if (!callInterceptor.interceptCalls()) {
+                return callPipeline.send(call);
+            }
+
+            // Build an InputHook for interceptCall and a terminal Invoker that sends the
+            // (possibly input-substituted) call through the pipeline.
+            InputHook<I, O> hook = new InputHook<>(operation, call.context, input);
+            return callInterceptor.interceptCall(hook, h -> {
+                return h.input() == call.input
+                        ? call.pipeline.send(call)
+                        : call.pipeline.send(new ClientCall<>(call, h.input()));
+            });
+        } catch (RuntimeException | Error error) {
+            failure = error;
+            throw error;
+        } finally {
+            RuntimeException closeFailure = closeResources(callOwnedResources, failure);
+            if (failure == null && closeFailure != null) {
+                throw closeFailure;
             }
         }
+    }
 
-        // Rebuild the pipeline, resolvers, etc if the config changed.
-        if (callConfig != config) {
-            callPipeline = ClientPipeline.of(callConfig.protocol(), callConfig.transport());
-            callInterceptor = callConfig.interceptorChain();
-            callIdentityResolvers = IdentityResolvers.of(callConfig.identityResolvers());
+    private void acquireCallResources(
+            ClientConfig callConfig,
+            List<ClientConfig> acquiredConfigs,
+            List<AutoCloseable> callOwnedResources
+    ) {
+        if (callConfig == config) {
+            return;
         }
-
-        ClientCall<I, O> call = new ClientCall<>(
-                input,
-                operation,
-                callConfig,
-                callPipeline,
-                callInterceptor,
-                callIdentityResolvers,
-                // Compose a type registry that adds the errors this operation can encounter.
-                TypeRegistry.compose(operation.errorRegistry(), typeRegistry),
-                retryStrategy);
-
-        // Make the running client available to interceptors that need to re-enter.
-        call.context.put(ClientContext.CLIENT, this);
-
-        if (!callInterceptor.interceptCalls()) {
-            return callPipeline.send(call);
+        for (ClientConfig acquiredConfig : acquiredConfigs) {
+            if (acquiredConfig == callConfig) {
+                return;
+            }
         }
-
-        // Build an InputHook for interceptCall and a terminal Invoker that sends the
-        // (possibly input-substituted) call through the pipeline.
-        InputHook<I, O> hook = new InputHook<>(operation, call.context, input);
-        return callInterceptor.interceptCall(hook, h -> {
-            return h.input() == call.input
-                    ? call.pipeline.send(call)
-                    : call.pipeline.send(new ClientCall<>(call, h.input()));
-        });
+        callOwnedResources.addAll(callConfig.acquireOwnedResources());
+        acquiredConfigs.add(callConfig);
     }
 
     /**
@@ -150,15 +201,46 @@ public abstract class Client implements Closeable {
     }
 
     /**
-     * Closes the transport used by this client.
+     * Closes resources owned by this client and its transport.
      */
     @Override
     public void close() {
+        RuntimeException failure = closeResources(ownedResources, null);
         try {
             config.transport().close();
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            failure = recordCloseFailure(failure, new UncheckedIOException(e));
         }
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    private static RuntimeException closeResources(List<AutoCloseable> resources, Throwable priorFailure) {
+        RuntimeException closeFailure = null;
+        for (AutoCloseable resource : resources) {
+            try {
+                resource.close();
+            } catch (Exception error) {
+                if (priorFailure == null) {
+                    closeFailure = recordCloseFailure(closeFailure, error);
+                } else {
+                    priorFailure.addSuppressed(error);
+                }
+            }
+        }
+        return closeFailure;
+    }
+
+    private static RuntimeException recordCloseFailure(RuntimeException current, Exception failure) {
+        RuntimeException runtimeFailure = failure instanceof RuntimeException runtime
+                ? runtime
+                : new RuntimeException(failure);
+        if (current == null) {
+            return runtimeFailure;
+        }
+        current.addSuppressed(runtimeFailure);
+        return current;
     }
 
     /**
@@ -212,6 +294,7 @@ public abstract class Client implements Closeable {
                     .endpointResolver(config.endpointResolver())
                     .authSchemeResolver(config.authSchemeResolver())
                     .identityResolvers(config.identityResolvers());
+            config.copyOwnedResourcesTo(configBuilder);
             config.interceptors().forEach(configBuilder::addInterceptor);
             config.supportedAuthSchemes().forEach(configBuilder::putSupportedAuthSchemes);
             configBuilder.putAllConfig(config.context());

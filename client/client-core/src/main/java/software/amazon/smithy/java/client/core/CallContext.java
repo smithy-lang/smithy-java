@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.core;
 import java.util.HashSet;
 import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
@@ -37,6 +38,21 @@ public final class CallContext {
      * <p>This is a read-only value; modifying this value has no effect on a request.
      */
     public static final Context.Key<Identity> IDENTITY = Context.key("Identity of the caller");
+
+    /**
+     * The read-only identity resolver that produced {@link #IDENTITY} for the current attempt.
+     *
+     * <p>This is a read-only value; modifying this value has no effect on a request.
+     */
+    public static final Context.Key<IdentityResolver<?>> IDENTITY_RESOLVER =
+            Context.key("Identity resolver used for the request");
+
+    /**
+     * The normalized error code returned by the service for the current attempt.
+     *
+     * <p>This is a read-only value; modifying this value has no effect on a request.
+     */
+    public static final Context.Key<String> RESPONSE_ERROR_CODE = Context.key("Response error code");
 
     /**
      * The current number of retry attempts the client has made for the current call, starting at 1.

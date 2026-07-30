@@ -12,13 +12,15 @@ import software.amazon.smithy.java.aws.credentials.chain.IdentityChain;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
+import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 
 /**
  * A {@link ClientPlugin} that registers the AWS default credential chain on any client that uses an AWS auth scheme
  * (one whose {@link AuthScheme#identityClass()} is {@link AwsCredentialsIdentity}).
  *
  * <p>This plugin is wired into generated AWS clients by codegen. It is a no-op for clients that do not use
- * AWS authentication or that already have an {@link AwsCredentialsIdentity} resolver registered.
+ * AWS authentication. When an AWS credentials resolver is already registered, the plugin preserves it and installs
+ * only the authentication-failure interceptor.
  *
  * <p>Users can also add it explicitly:
  * {@snippet lang="java" :
@@ -31,6 +33,18 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
  * resolver directly instead of using this plugin.
  */
 public final class AwsCredentialChainPlugin implements ClientPlugin {
+    /**
+     * Returns the interceptor that invalidates AWS credentials rejected by a service.
+     *
+     * <p>This is used by clients that provide their own credential resolver and do not use the default credential
+     * chain plugin.
+     *
+     * @return the AWS credential invalidation interceptor.
+     */
+    public static ClientInterceptor invalidationInterceptor() {
+        return InvalidateCredentialsInterceptor.INSTANCE;
+    }
+
     @Override
     public Phase getPluginPhase() {
         // Run after DEFAULTS so the client's region (and any other defaults) are populated on the config before we
@@ -40,15 +54,21 @@ public final class AwsCredentialChainPlugin implements ClientPlugin {
 
     @Override
     public void configureClient(ClientConfig.Builder config) {
-        if (needsAwsCredentials(config) && !hasAwsCredentialsResolver(config)) {
+        if (!needsAwsCredentials(config)) {
+            return;
+        }
+        if (!hasAwsCredentialsResolver(config)) {
             // Pass the client's configured region so credential providers that make a service call (STS, SSO) use
             // the same region as the client. Null when no region is configured, in which case the providers fall
             // back to the environment and profile.
             String region = config.context().get(RegionSetting.REGION);
-            var chain = IdentityChain.create(AwsCredentialsIdentity.class, null, region);
-            config.addIdentityResolver(chain);
-            config.addInterceptor(new InvalidateCredentialsInterceptor(chain));
+            var resolver = new LeasedIdentityResolver<>(
+                    AwsCredentialsIdentity.class,
+                    () -> IdentityChain.create(AwsCredentialsIdentity.class, null, region));
+            config.addIdentityResolver(resolver);
+            config.addOwnedResource(resolver::acquire);
         }
+        config.addInterceptor(InvalidateCredentialsInterceptor.INSTANCE);
     }
 
     private static boolean needsAwsCredentials(ClientConfig.Builder config) {

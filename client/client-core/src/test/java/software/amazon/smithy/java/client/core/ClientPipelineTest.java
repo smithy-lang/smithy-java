@@ -23,10 +23,14 @@ import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
+import software.amazon.smithy.java.auth.api.identity.TokenIdentity;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
+import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.core.interceptors.OutputHook;
+import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.client.http.mock.MockPlugin;
 import software.amazon.smithy.java.client.http.mock.MockQueue;
@@ -135,12 +139,13 @@ public class ClientPipelineTest {
     public void canRetryRequests() {
         var service = ShapeId.from("smithy.example#Sprockets");
         var calls = new ArrayList<>();
+        var responseErrorCodes = new ArrayList<String>();
 
         var mockQueue = new MockQueue()
                 .enqueue(
                         HttpResponse.create()
                                 .setStatusCode(429)
-                                .setBody(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
+                                .setBody(DataStream.ofString("{\"__type\":\"ExpiredToken\"}"))
                                 .toUnmodifiable())
                 .enqueue(
                         HttpResponse.create()
@@ -153,6 +158,15 @@ public class ClientPipelineTest {
                 .serviceId(service)
                 .model(MODEL)
                 .addPlugin(mock)
+                .addInterceptor(new ClientInterceptor() {
+                    @Override
+                    public void readAfterAttempt(
+                            OutputHook<?, ?, ?, ?> hook,
+                            RuntimeException error
+                    ) {
+                        responseErrorCodes.add(hook.context().get(CallContext.RESPONSE_ERROR_CODE));
+                    }
+                })
                 .endpointResolver(EndpointResolver.staticEndpoint("https://localhost:8081"))
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
                 .retryStrategy(new RetryStrategy() {
@@ -199,6 +213,9 @@ public class ClientPipelineTest {
         assertThat(response.getMember("id").asString(), equalTo("1"));
         assertThat(response, instanceOf(Document.class));
         assertThat(calls, contains("Acquire", "Refresh", "Success: 1"));
+        assertThat(responseErrorCodes.size(), equalTo(2));
+        assertThat(responseErrorCodes.get(0), equalTo("ExpiredToken"));
+        Assertions.assertNull(responseErrorCodes.get(1));
     }
 
     @Test
@@ -207,6 +224,12 @@ public class ClientPipelineTest {
         var testSchemeId = ShapeId.from("smithy.test#testAuth");
         var TEST_KEY = Context.<String>key("test-signing-override");
         var capturedProperties = new AtomicReference<Context>();
+        var capturedIdentity = new AtomicReference<Identity>();
+        var capturedResolver = new AtomicReference<IdentityResolver<?>>();
+        var defaultIdentity = new Identity() {};
+        var overrideIdentity = new Identity() {};
+        var defaultResolver = identityResolver(defaultIdentity);
+        var overrideResolver = identityResolver(overrideIdentity);
 
         // Auth scheme with a signer that captures the properties it receives.
         var testScheme = AuthScheme.of(
@@ -242,22 +265,24 @@ public class ClientPipelineTest {
                 .endpointResolver(endpointResolver)
                 .authSchemeResolver(params -> List.of(new AuthSchemeOption(testSchemeId)))
                 .putSupportedAuthSchemes(testScheme)
-                .addIdentityResolver(new IdentityResolver<>() {
+                .addIdentityResolver(defaultResolver)
+                .addInterceptor(new ClientInterceptor() {
                     @Override
-                    public IdentityResult<Identity> resolveIdentity(Context requestProperties) {
-                        return IdentityResult.of(new Identity() {});
-                    }
-
-                    @Override
-                    public Class<Identity> identityType() {
-                        return Identity.class;
+                    public void readAfterSigning(RequestHook<?, ?, ?> hook) {
+                        capturedIdentity.set(hook.context().get(CallContext.IDENTITY));
+                        capturedResolver.set(hook.context().get(CallContext.IDENTITY_RESOLVER));
                     }
                 })
                 .build();
 
-        client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
+        client.call(
+                "GetSprocket",
+                Document.ofObject(Map.of("id", "1")),
+                RequestOverrideConfig.builder().addIdentityResolver(overrideResolver).build());
 
         assertThat(capturedProperties.get().get(TEST_KEY), equalTo("overridden-value"));
+        assertThat(capturedIdentity.get(), is(overrideIdentity));
+        assertThat(capturedResolver.get(), is(overrideResolver));
     }
 
     @Test
@@ -278,10 +303,24 @@ public class ClientPipelineTest {
                 });
 
         var capturedProperties = new AtomicReference<Context>();
+        var capturedIdentity = new AtomicReference<Identity>();
+        var capturedResolver = new AtomicReference<IdentityResolver<?>>();
+        var targetIdentity = TokenIdentity.create("target");
+        IdentityResolver<TokenIdentity> targetResolver = new IdentityResolver<>() {
+            @Override
+            public IdentityResult<TokenIdentity> resolveIdentity(Context requestProperties) {
+                return IdentityResult.of(targetIdentity);
+            }
+
+            @Override
+            public Class<TokenIdentity> identityType() {
+                return TokenIdentity.class;
+            }
+        };
         var targetScheme = AuthScheme.of(
                 endpointTargetId,
                 HttpRequest.class,
-                Identity.class,
+                TokenIdentity.class,
                 (request, identity, properties) -> {
                     capturedProperties.set(properties);
                     return new SignResult<>(request);
@@ -320,12 +359,21 @@ public class ClientPipelineTest {
                     public Class<Identity> identityType() {
                         return Identity.class;
                     }
+                }, targetResolver)
+                .addInterceptor(new ClientInterceptor() {
+                    @Override
+                    public void readAfterSigning(RequestHook<?, ?, ?> hook) {
+                        capturedIdentity.set(hook.context().get(CallContext.IDENTITY));
+                        capturedResolver.set(hook.context().get(CallContext.IDENTITY_RESOLVER));
+                    }
                 })
                 .build();
 
         client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
 
         assertThat(capturedProperties.get().get(TEST_KEY), equalTo("from-endpoint"));
+        assertThat(capturedIdentity.get(), is(targetIdentity));
+        assertThat(capturedResolver.get(), is(targetResolver));
     }
 
     @Test
@@ -379,6 +427,20 @@ public class ClientPipelineTest {
                 Exception.class,
                 () -> client.call("GetSprocket", Document.ofObject(Map.of("id", "1"))));
         assertThat(ex.getMessage(), Matchers.containsString(endpointTargetId.toString()));
+    }
+
+    private static IdentityResolver<Identity> identityResolver(Identity identity) {
+        return new IdentityResolver<>() {
+            @Override
+            public IdentityResult<Identity> resolveIdentity(Context requestProperties) {
+                return IdentityResult.of(identity);
+            }
+
+            @Override
+            public Class<Identity> identityType() {
+                return Identity.class;
+            }
+        };
     }
 
     private static final class Token implements RetryToken {

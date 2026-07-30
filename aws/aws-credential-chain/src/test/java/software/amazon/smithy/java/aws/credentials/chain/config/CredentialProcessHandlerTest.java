@@ -62,6 +62,22 @@ class CredentialProcessHandlerTest {
     }
 
     @Test
+    void processWithMalformedExpirationReturnsError(@TempDir Path tmp) throws IOException {
+        Path script = writeScript(tmp,
+                """
+                        #!/bin/sh
+                        echo '{"Version": 1, "AccessKeyId": "AK", "SecretAccessKey": "SK", "Expiration": "invalid"}'
+                        """);
+
+        AwsConfigCredentialSource.CredentialProcess source =
+                new AwsConfigCredentialSource.CredentialProcess(script.toString());
+        IdentityResult<AwsCredentialsIdentity> result = createFromProfileResult(source);
+
+        assertNull(result.identity());
+        assertTrue(result.error().contains("unparseable Expiration"));
+    }
+
+    @Test
     void processWithoutSessionTokenReturnsBasicCredentials(@TempDir Path tmp) throws IOException {
         Path script = writeScript(tmp, """
                 #!/bin/sh

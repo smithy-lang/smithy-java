@@ -39,4 +39,11 @@ final class IdentityResolverChain<IdentityT extends Identity> implements Identit
         }
         return IdentityResult.ofError(IdentityResolverChain.class, "Attempted resolvers: " + errors);
     }
+
+    @Override
+    public void invalidate(IdentityT rejectedIdentity) {
+        for (var resolver : resolvers) {
+            resolver.invalidate(rejectedIdentity);
+        }
+    }
 }

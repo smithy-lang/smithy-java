@@ -10,6 +10,7 @@ import software.amazon.smithy.aws.traits.protocols.RestXmlTrait;
 import software.amazon.smithy.java.aws.events.AwsEventDecoderFactory;
 import software.amazon.smithy.java.aws.events.AwsEventEncoderFactory;
 import software.amazon.smithy.java.aws.events.AwsEventFrame;
+import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
@@ -123,6 +124,7 @@ public final class RestXmlClientProtocol extends HttpBindingClientProtocol<AwsEv
                 ) {
                     var deserializer = codec.createDeserializer(buffer);
                     String code = XmlUtil.parseErrorCodeName(deserializer);
+                    context.put(CallContext.RESPONSE_ERROR_CODE, code);
                     var nameSpace = serviceId.getNamespace();
                     var id = ShapeId.fromOptionalNamespace(nameSpace, code);
                     var builder = typeRegistry.createBuilder(id, ModeledException.class);

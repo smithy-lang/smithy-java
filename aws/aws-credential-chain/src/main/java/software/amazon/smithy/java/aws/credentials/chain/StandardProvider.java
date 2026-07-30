@@ -175,8 +175,8 @@ public enum StandardProvider {
     /**
      * Profile-based credential process ({@code credential_process}).
      *
-     * <p>Invokes an external process on each resolution. The command string is captured at
-     * assembly time from the active profile.
+     * <p>Invokes an external process when the credential cache needs to be populated or refreshed.
+     * The command string is captured at assembly time from the active profile.
      */
     PROFILE_CREDENTIAL_PROCESS(null) {
         @Override

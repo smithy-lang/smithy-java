@@ -9,79 +9,92 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BiPredicate;
 import software.amazon.smithy.java.context.Context;
 
-/** * An {@link IdentityResolver} that caches the result of a delegate resolver and refreshes it asynchronously in the
- * background before expiration.
+/**
+ * An {@link IdentityResolver} that caches identities and refreshes them using advisory and mandatory refresh
+ * windows.
  *
- * <p>Behavior:
- * <ul>
- *   <li>On first call (cold start), blocks until the delegate returns a result.</li>
- *   <li>On subsequent calls, returns the cached identity immediately. A background task refreshes the identity when
- *       it enters the prefetch window ({@code expiration - prefetchBuffer}).</li>
- *   <li>If the background refresh fails and {@link Builder#allowExpiredCredentials(boolean)} is {@code true}
- *       (static stability), the expired cached value continues to be returned and refresh is retried after a
- *       jittered 5-10 minute delay.</li>
- *   <li>If the background refresh fails and {@code allowExpiredCredentials} is {@code false} (default), the next
- *       caller that finds the cache expired will block for one synchronous retry.</li>
- *   <li>If the delegate returns an identity with no expiration, it is cached indefinitely until
- *       {@link #invalidate()} is called.</li>
- * </ul>
+ * <p>Only one refresh can run at a time. Advisory refreshes run in the background while callers return cached
+ * identities. Mandatory refreshes block callers and share the result of the in-flight refresh. When static stability
+ * is enabled, failed refreshes retain and return cached identities, including expired identities, and rate-limit
+ * subsequent attempts with a jittered backoff.
  *
- * <p>This class is thread-safe. At most one refresh runs at a time (enforced by an {@link AtomicBoolean}).
- * Callers never block except on cold start.
- *
- * @param <I> the identity type.
+ * @param <I> identity type.
  */
 public final class CachingIdentityResolver<I extends Identity> implements IdentityResolver<I>, AutoCloseable {
 
     private static final System.Logger LOGGER = System.getLogger(CachingIdentityResolver.class.getName());
+    private static final Duration DEFAULT_MANDATORY_WINDOW = Duration.ofMinutes(1);
+    private static final Duration DEFAULT_BACKOFF_MIN = Duration.ofMinutes(5);
+    private static final Duration DEFAULT_BACKOFF_MAX = Duration.ofMinutes(10);
 
     private final IdentityResolver<I> delegate;
-    private final Duration prefetchBuffer;
+    private final Duration configuredAdvisoryWindow;
+    private final Duration mandatoryRefreshWindow;
     private final boolean allowExpiredCredentials;
-    private final Duration staleRefreshDelay;
+    private final Duration refreshBackoffMin;
+    private final Duration refreshBackoffMax;
     private final Clock clock;
     private final ScheduledExecutorService executor;
     private final boolean ownsExecutor;
-    private final AtomicBoolean refreshing = new AtomicBoolean(false);
-    private volatile CountDownLatch coldStartLatch = new CountDownLatch(1);
+    private final boolean closeDelegate;
+    private final boolean proactiveRefresh;
+    private final BiPredicate<I, I> identityMatcher;
+    private final ReentrantLock lock = new ReentrantLock();
 
-    private volatile CachedValue<I> cached;
-    private volatile ScheduledFuture<?> scheduledRefresh;
+    private CachedValue<I> cached;
+    private CompletableFuture<RefreshOutcome<I>> inFlight;
+    private ScheduledFuture<?> scheduledRefresh;
+    private Instant nextRefreshAllowedAt;
+    private Instant nextRefreshAfterSuccessAt;
+    private RefreshOutcome<I> lastFailure;
+    private I lastInvalidatedIdentity;
+    private long invalidationGeneration;
+    private boolean refreshRequired;
+    private boolean closed;
 
     private CachingIdentityResolver(Builder<I> builder) {
         this.delegate = Objects.requireNonNull(builder.delegate, "delegate");
-        this.prefetchBuffer = builder.prefetchBuffer;
+        this.configuredAdvisoryWindow = builder.advisoryRefreshWindow;
+        this.mandatoryRefreshWindow = builder.mandatoryRefreshWindow;
         this.allowExpiredCredentials = builder.allowExpiredCredentials;
-        this.staleRefreshDelay = builder.staleRefreshDelay;
+        this.refreshBackoffMin = builder.refreshBackoffMin;
+        this.refreshBackoffMax = builder.refreshBackoffMax;
         this.clock = builder.clock;
+        this.closeDelegate = builder.closeDelegate;
+        this.proactiveRefresh = builder.proactiveRefresh;
+        this.identityMatcher = builder.identityMatcher;
 
-        if (builder.executor != null) {
-            this.executor = builder.executor;
-            this.ownsExecutor = false;
-        } else {
-            this.executor = Executors.newSingleThreadScheduledExecutor(r -> {
-                Thread t = new Thread(r, "smithy-identity-cache-refresh");
-                t.setDaemon(true);
-                return t;
+        if (builder.executor == null) {
+            this.executor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "smithy-identity-cache-refresh");
+                thread.setDaemon(true);
+                return thread;
             });
             this.ownsExecutor = true;
+        } else {
+            this.executor = builder.executor;
+            this.ownsExecutor = false;
         }
     }
 
     /**
-     * Create a builder.
+     * Creates a caching resolver builder.
      *
-     * @param delegate the underlying resolver to cache.
-     * @param <I>      identity type.
-     * @return a new builder.
+     * @param delegate resolver that obtains identities from the source.
+     * @param <I> identity type.
+     * @return builder.
      */
     public static <I extends Identity> Builder<I> builder(IdentityResolver<I> delegate) {
         return new Builder<>(delegate);
@@ -89,27 +102,61 @@ public final class CachingIdentityResolver<I extends Identity> implements Identi
 
     @Override
     public IdentityResult<I> resolveIdentity(Context requestProperties) {
-        CachedValue<I> current = cached;
+        CompletableFuture<RefreshOutcome<I>> refresh;
+        boolean performRefresh = false;
+        IdentityResult<I> advisoryResult = null;
+        long refreshInvalidationGeneration = 0;
 
-        // Cold start: first caller triggers refresh, others wait.
-        if (current == null) {
-            return coldStart(requestProperties);
+        lock.lock();
+        try {
+            Instant now = clock.instant();
+            if (cached == null) {
+                refresh = inFlight;
+                if (refresh == null) {
+                    refresh = new CompletableFuture<>();
+                    inFlight = refresh;
+                    performRefresh = true;
+                    refreshInvalidationGeneration = invalidationGeneration;
+                }
+            } else if (!refreshNeeded(cached, now)) {
+                return cached.result;
+            } else if (refreshRateLimited(now)) {
+                return resolveOutcome(fallbackOutcome(cached, lastFailure, now));
+            } else if (!mandatoryRefreshNeeded(cached, now)) {
+                refresh = inFlight;
+                if (refresh != null) {
+                    return cached.result;
+                }
+                refresh = new CompletableFuture<>();
+                inFlight = refresh;
+                performRefresh = true;
+                advisoryResult = cached.result;
+                refreshInvalidationGeneration = invalidationGeneration;
+            } else {
+                refresh = inFlight;
+                if (refresh == null) {
+                    refresh = new CompletableFuture<>();
+                    inFlight = refresh;
+                    performRefresh = true;
+                    refreshInvalidationGeneration = invalidationGeneration;
+                }
+            }
+        } finally {
+            lock.unlock();
         }
 
-        // Cache is fresh — return immediately.
-        if (!isInPrefetchWindow(current) && !isExpired(current)) {
-            return current.result;
+        if (performRefresh) {
+            if (advisoryResult != null) {
+                executeAdvisoryRefresh(
+                        requestProperties,
+                        refresh,
+                        advisoryResult,
+                        refreshInvalidationGeneration);
+                return advisoryResult;
+            }
+            executeRefresh(requestProperties, refresh, refreshInvalidationGeneration);
         }
-
-        // Cache is in prefetch window or expired. Kick off async refresh if not already running.
-        triggerAsyncRefresh(requestProperties);
-
-        // If expired and strict mode, we can't return stale — block for the refresh.
-        if (isExpired(current) && !allowExpiredCredentials) {
-            return blockForRefresh(current, requestProperties);
-        }
-
-        return current.result;
+        return awaitRefresh(refresh);
     }
 
     @Override
@@ -118,244 +165,562 @@ public final class CachingIdentityResolver<I extends Identity> implements Identi
     }
 
     @Override
-    public void invalidate() {
-        cached = null;
-        coldStartLatch = new CountDownLatch(1);
-        cancelScheduledRefresh();
+    public void invalidate(I rejectedIdentity) {
+        lock.lock();
+        try {
+            if (cached == null || !identityMatcher.test(cached.identity, rejectedIdentity)) {
+                return;
+            }
+            lastInvalidatedIdentity = rejectedIdentity;
+            invalidationGeneration++;
+            refreshRequired = true;
+            nextRefreshAfterSuccessAt = null;
+            cancelScheduledRefreshLocked();
+            if (nextRefreshAllowedAt != null && clock.instant().isBefore(nextRefreshAllowedAt)) {
+                scheduleRefreshLocked(nextRefreshAllowedAt);
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
     public void close() {
-        cancelScheduledRefresh();
+        lock.lock();
+        try {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            cancelScheduledRefreshLocked();
+        } finally {
+            lock.unlock();
+        }
+        if (closeDelegate && delegate instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception error) {
+                LOGGER.log(System.Logger.Level.WARNING, "Failed to close identity resolver", error);
+            }
+        }
         if (ownsExecutor) {
             executor.shutdownNow();
         }
     }
 
-    private IdentityResult<I> coldStart(Context requestProperties) {
-        if (refreshing.compareAndSet(false, true)) {
+    private void executeRefresh(
+            Context requestProperties,
+            CompletableFuture<RefreshOutcome<I>> refresh,
+            long refreshInvalidationGeneration
+    ) {
+        try {
+            RefreshAttempt<I> attempt = callCredentialSource(requestProperties);
+            RefreshOutcome<I> callerOutcome;
+
+            lock.lock();
             try {
-                return doRefresh(requestProperties);
-            } finally {
-                refreshing.set(false);
-                coldStartLatch.countDown();
-            }
-        }
-
-        // Another thread is doing the cold start — wait for it.
-        try {
-            coldStartLatch.await();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return IdentityResult.ofError(getClass(), "Interrupted waiting for initial credential resolution");
-        }
-
-        CachedValue<I> result = cached;
-        return result != null ? result.result : IdentityResult.ofError(getClass(), "Failed to resolve credentials");
-    }
-
-    private void triggerAsyncRefresh(Context requestProperties) {
-        if (refreshing.compareAndSet(false, true)) {
-            executor.submit(() -> {
-                try {
-                    doRefresh(requestProperties);
-                } finally {
-                    refreshing.set(false);
+                Instant now = clock.instant();
+                if (attempt.identity != null && isFresh(attempt.identity, now)) {
+                    boolean invalidatedDuringRefresh =
+                            invalidationGeneration != refreshInvalidationGeneration;
+                    boolean returnedRejectedIdentity = invalidatedDuringRefresh
+                            && lastInvalidatedIdentity != null
+                            && identityMatcher.test(attempt.identity, lastInvalidatedIdentity);
+                    cached = createCachedValue(attempt.identity, now, requestProperties);
+                    nextRefreshAllowedAt = null;
+                    lastFailure = null;
+                    refreshRequired = returnedRejectedIdentity;
+                    if (returnedRejectedIdentity) {
+                        nextRefreshAfterSuccessAt = null;
+                        cancelScheduledRefreshLocked();
+                    } else {
+                        lastInvalidatedIdentity = null;
+                        nextRefreshAfterSuccessAt = firstRefreshAt(cached, now);
+                        scheduleRefreshLocked(nextRefreshAfterSuccessAt);
+                    }
+                    callerOutcome = RefreshOutcome.result(cached.result);
+                } else {
+                    RefreshOutcome<I> failure = attempt.failureOutcome(this);
+                    nextRefreshAfterSuccessAt = null;
+                    lastFailure = failure;
+                    if (attempt.nonRecoverable) {
+                        nextRefreshAllowedAt = null;
+                        refreshRequired = cached != null;
+                        cancelScheduledRefreshLocked();
+                        callerOutcome = failure;
+                    } else if (cached == null) {
+                        nextRefreshAllowedAt = null;
+                        cancelScheduledRefreshLocked();
+                        callerOutcome = failure;
+                    } else {
+                        Duration backoff = refreshBackoff();
+                        nextRefreshAllowedAt = now.plus(backoff);
+                        boolean useCachedCredentials = allowExpiredCredentials || !isExpired(cached, now);
+                        logRefreshFailure(attempt.failureDescription(), backoff, useCachedCredentials);
+                        callerOutcome = fallbackOutcome(cached, failure, now);
+                        scheduleRefreshLocked(nextRefreshAllowedAt);
+                    }
                 }
-            });
+                if (inFlight == refresh) {
+                    inFlight = null;
+                }
+            } finally {
+                lock.unlock();
+            }
+
+            refresh.complete(callerOutcome);
+        } catch (RuntimeException | Error failure) {
+            failRefresh(refresh, failure);
+            throw failure;
         }
     }
 
-    private IdentityResult<I> blockForRefresh(CachedValue<I> current, Context requestProperties) {
-        // Strict mode: cache is expired. Try one synchronous refresh.
-        if (refreshing.compareAndSet(false, true)) {
+    private void failRefresh(CompletableFuture<RefreshOutcome<I>> refresh, Throwable failure) {
+        lock.lock();
+        try {
+            if (inFlight == refresh) {
+                inFlight = null;
+            }
+        } finally {
+            lock.unlock();
+        }
+        refresh.completeExceptionally(failure);
+    }
+
+    private void executeAdvisoryRefresh(
+            Context requestProperties,
+            CompletableFuture<RefreshOutcome<I>> refresh,
+            IdentityResult<I> cachedResult,
+            long refreshInvalidationGeneration
+    ) {
+        Context refreshProperties = Context.unmodifiableCopy(requestProperties);
+        try {
+            executor.execute(() -> executeRefresh(
+                    refreshProperties,
+                    refresh,
+                    refreshInvalidationGeneration));
+        } catch (RejectedExecutionException error) {
+            lock.lock();
             try {
-                IdentityResult<I> result = doRefresh(requestProperties);
-                // If doRefresh returned the stale cached value (shouldn't in strict mode), check again.
-                CachedValue<I> latest = cached;
-                if (latest != current) {
-                    return latest.result;
+                if (inFlight == refresh) {
+                    inFlight = null;
                 }
-                return result;
             } finally {
-                refreshing.set(false);
+                lock.unlock();
             }
+            refresh.complete(RefreshOutcome.result(cachedResult));
         }
-
-        // Another thread is refreshing — wait briefly then check.
-        try {
-            Thread.sleep(50);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
-        CachedValue<I> latest = cached;
-        if (latest != current && latest != null && !isExpired(latest)) {
-            return latest.result;
-        }
-
-        // Still expired — return error.
-        return IdentityResult.ofError(getClass(), "Credentials are expired and refresh failed");
     }
 
-    private IdentityResult<I> doRefresh(Context requestProperties) {
-        CachedValue<I> current = cached;
-
-        // Stale delay: don't hammer the source (only in static stability mode).
-        if (allowExpiredCredentials && current != null
-                && current.nextRefreshAfter != null
-                && clock.instant().isBefore(current.nextRefreshAfter)) {
-            return current.result;
-        }
-
-        IdentityResult<I> result;
+    private RefreshAttempt<I> callCredentialSource(Context requestProperties) {
         try {
-            result = delegate.resolveIdentity(requestProperties);
-        } catch (RuntimeException e) {
-            LOGGER.log(System.Logger.Level.WARNING, "Credential refresh failed", e);
-            if (current != null && allowExpiredCredentials) {
-                current.nextRefreshAfter = clock.instant().plus(jitteredStaleDelay());
-                return current.result;
+            IdentityResult<I> result = delegate.resolveIdentity(requestProperties);
+            if (result == null) {
+                return RefreshAttempt.resultFailure(
+                        IdentityResult.ofError(getClass(), "Credential source returned no result"));
             }
-            throw e;
+            if (result.identity() != null) {
+                return RefreshAttempt.success(result.identity());
+            }
+            return RefreshAttempt.resultFailure(result);
+        } catch (NonRecoverableIdentityException error) {
+            return RefreshAttempt.nonRecoverable(error);
+        } catch (RuntimeException error) {
+            return RefreshAttempt.exceptionFailure(error);
         }
-
-        if (result.identity() != null) {
-            CachedValue<I> newCached = new CachedValue<>(result.identity());
-            cached = newCached;
-            scheduleNextRefresh(newCached, requestProperties);
-            return newCached.result;
-        }
-
-        // Delegate returned an error.
-        if (current != null && allowExpiredCredentials) {
-            current.nextRefreshAfter = clock.instant().plus(jitteredStaleDelay());
-            return current.result;
-        }
-
-        return result;
     }
 
-    private void scheduleNextRefresh(CachedValue<I> value, Context requestProperties) {
-        cancelScheduledRefresh();
-        Instant expiration = value.identity.expirationTime();
+    private CachedValue<I> createCachedValue(I identity, Instant obtainedAt, Context requestProperties) {
+        Context refreshProperties = Context.unmodifiableCopy(requestProperties);
+        Instant expiration = identity.expirationTime();
         if (expiration == null) {
-            return;
+            return new CachedValue<>(identity, null, null, refreshProperties);
         }
 
-        Instant refreshAt = expiration.minus(prefetchBuffer);
-        long delayMillis = Duration.between(clock.instant(), refreshAt).toMillis();
-        if (delayMillis <= 0) {
-            // Already in prefetch window; refresh was just done.
-            return;
-        }
-
-        scheduledRefresh = executor.schedule(() -> {
-            if (refreshing.compareAndSet(false, true)) {
-                try {
-                    doRefresh(requestProperties);
-                } finally {
-                    refreshing.set(false);
-                }
-            }
-        }, delayMillis, TimeUnit.MILLISECONDS);
+        Duration lifetime = Duration.between(obtainedAt, expiration);
+        Duration advisoryWindow = configuredAdvisoryWindow == null
+                ? defaultAdvisoryRefreshWindow(lifetime)
+                : configuredAdvisoryWindow;
+        Instant advisoryAt = expiration.minus(advisoryWindow);
+        Duration effectiveMandatoryWindow = mandatoryRefreshWindow.compareTo(advisoryWindow) > 0
+                ? advisoryWindow
+                : mandatoryRefreshWindow;
+        return new CachedValue<>(
+                identity,
+                advisoryAt,
+                expiration.minus(effectiveMandatoryWindow),
+                refreshProperties);
     }
 
-    private void cancelScheduledRefresh() {
-        ScheduledFuture<?> f = scheduledRefresh;
-        if (f != null) {
-            f.cancel(false);
+    private boolean refreshNeeded(CachedValue<I> value, Instant now) {
+        boolean advisoryRefreshNeeded = reached(now, value.advisoryRefreshAt)
+                && (nextRefreshAfterSuccessAt == null || reached(now, nextRefreshAfterSuccessAt));
+        return refreshRequired
+                || advisoryRefreshNeeded
+                || reached(now, value.mandatoryRefreshAt)
+                || isExpired(value, now);
+    }
+
+    private boolean mandatoryRefreshNeeded(CachedValue<I> value, Instant now) {
+        return refreshRequired || reached(now, value.mandatoryRefreshAt) || isExpired(value, now);
+    }
+
+    private boolean refreshRateLimited(Instant now) {
+        return nextRefreshAllowedAt != null && now.isBefore(nextRefreshAllowedAt);
+    }
+
+    private RefreshOutcome<I> fallbackOutcome(
+            CachedValue<I> value,
+            RefreshOutcome<I> failure,
+            Instant now
+    ) {
+        if (allowExpiredCredentials || !isExpired(value, now)) {
+            return RefreshOutcome.result(value.result);
+        }
+        if (failure != null) {
+            return failure;
+        }
+        return RefreshOutcome.result(IdentityResult.ofError(
+                getClass(),
+                "Credentials are expired and credential refresh is rate limited"));
+    }
+
+    private IdentityResult<I> resolveOutcome(RefreshOutcome<I> outcome) {
+        if (outcome.exception != null) {
+            throw outcome.exception;
+        }
+        return outcome.result;
+    }
+
+    private IdentityResult<I> awaitRefresh(CompletableFuture<RefreshOutcome<I>> refresh) {
+        try {
+            return resolveOutcome(refresh.get());
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            return IdentityResult.ofError(getClass(), "Interrupted waiting for credential refresh");
+        } catch (ExecutionException error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (cause instanceof Error executionError) {
+                throw executionError;
+            }
+            throw new IllegalStateException("Unexpected credential refresh failure", cause);
+        }
+    }
+
+    private void scheduleRefreshLocked(Instant refreshAt) {
+        cancelScheduledRefreshLocked();
+        if (!proactiveRefresh || closed || cached == null || refreshAt == null) {
+            return;
+        }
+
+        long delayMillis = Math.max(0, Duration.between(clock.instant(), refreshAt).toMillis());
+        try {
+            scheduledRefresh = executor.schedule(this::runScheduledRefresh, delayMillis, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException ignored) {
             scheduledRefresh = null;
         }
     }
 
-    private boolean isInPrefetchWindow(CachedValue<I> value) {
+    private void runScheduledRefresh() {
+        CompletableFuture<RefreshOutcome<I>> refresh = null;
+        Context refreshProperties = null;
+        long refreshInvalidationGeneration = 0;
+        lock.lock();
+        try {
+            scheduledRefresh = null;
+            if (closed || cached == null || inFlight != null) {
+                return;
+            }
+
+            Instant now = clock.instant();
+            if (refreshRateLimited(now)) {
+                scheduleRefreshLocked(nextRefreshAllowedAt);
+                return;
+            }
+            if (!refreshNeeded(cached, now)) {
+                scheduleRefreshLocked(firstRefreshAt(cached, now));
+                return;
+            }
+
+            refresh = new CompletableFuture<>();
+            inFlight = refresh;
+            refreshProperties = cached.refreshProperties;
+            refreshInvalidationGeneration = invalidationGeneration;
+        } finally {
+            lock.unlock();
+        }
+
+        if (refresh != null) {
+            executeRefresh(refreshProperties, refresh, refreshInvalidationGeneration);
+        }
+    }
+
+    private Instant firstRefreshAt(CachedValue<I> value, Instant now) {
+        if (value.advisoryRefreshAt != null && now.isBefore(value.advisoryRefreshAt)) {
+            return value.advisoryRefreshAt;
+        }
+        if (value.mandatoryRefreshAt != null && now.isBefore(value.mandatoryRefreshAt)) {
+            return value.mandatoryRefreshAt;
+        }
+        return null;
+    }
+
+    private void cancelScheduledRefreshLocked() {
+        if (scheduledRefresh != null) {
+            scheduledRefresh.cancel(false);
+            scheduledRefresh = null;
+        }
+    }
+
+    private Duration refreshBackoff() {
+        long minMillis = refreshBackoffMin.toMillis();
+        long maxMillis = refreshBackoffMax.toMillis();
+        if (minMillis == maxMillis) {
+            return refreshBackoffMin;
+        }
+        return Duration.ofMillis(ThreadLocalRandom.current().nextLong(minMillis, maxMillis + 1));
+    }
+
+    private void logRefreshFailure(String error, Duration backoff, boolean useCachedCredentials) {
+        LOGGER.log(
+                System.Logger.Level.WARNING,
+                refreshFailureMessage(error, backoff, useCachedCredentials));
+    }
+
+    static String refreshFailureMessage(String error, Duration backoff, boolean useCachedCredentials) {
+        String cachedCredentialsMessage = useCachedCredentials
+                ? "The SDK will continue using cached credentials."
+                : "The SDK will not use the expired cached credentials.";
+        return "Credential refresh failed: " + error + ". " + cachedCredentialsMessage
+                + " A refresh of these credentials will be attempted again after "
+                + backoff.toSeconds() + " seconds.";
+    }
+
+    private boolean isFresh(I identity, Instant now) {
+        Instant expiration = identity.expirationTime();
+        return expiration == null || expiration.isAfter(now);
+    }
+
+    private static boolean isExpired(CachedValue<?> value, Instant now) {
         Instant expiration = value.identity.expirationTime();
-        return expiration != null && clock.instant().isAfter(expiration.minus(prefetchBuffer));
+        return expiration != null && !now.isBefore(expiration);
     }
 
-    private boolean isExpired(CachedValue<I> value) {
-        Instant exp = value.identity.expirationTime();
-        return exp != null && clock.instant().isAfter(exp);
+    private static boolean reached(Instant now, Instant threshold) {
+        return threshold != null && !now.isBefore(threshold);
     }
 
-    private Duration jitteredStaleDelay() {
-        long baseMillis = staleRefreshDelay.toMillis();
-        long jitter = (long) (Math.random() * baseMillis);
-        return Duration.ofMillis(baseMillis + jitter);
+    static Duration defaultAdvisoryRefreshWindow(Duration lifetime) {
+        if (lifetime.compareTo(Duration.ofMinutes(20)) <= 0) {
+            return Duration.ofMinutes(5);
+        }
+        if (lifetime.compareTo(Duration.ofMinutes(90)) < 0) {
+            return Duration.ofMinutes(15);
+        }
+        return Duration.ofMinutes(60);
     }
 
     private static final class CachedValue<I extends Identity> {
         final I identity;
         final IdentityResult<I> result;
-        volatile Instant nextRefreshAfter;
+        final Instant advisoryRefreshAt;
+        final Instant mandatoryRefreshAt;
+        final Context refreshProperties;
 
-        CachedValue(I identity) {
+        CachedValue(
+                I identity,
+                Instant advisoryRefreshAt,
+                Instant mandatoryRefreshAt,
+                Context refreshProperties
+        ) {
             this.identity = identity;
             this.result = IdentityResult.of(identity);
+            this.advisoryRefreshAt = advisoryRefreshAt;
+            this.mandatoryRefreshAt = mandatoryRefreshAt;
+            this.refreshProperties = refreshProperties;
         }
     }
 
-    /**
-     * Builder for {@link CachingIdentityResolver}.
-     */
+    private static final class RefreshOutcome<I extends Identity> {
+        final IdentityResult<I> result;
+        final RuntimeException exception;
+
+        private RefreshOutcome(IdentityResult<I> result, RuntimeException exception) {
+            this.result = result;
+            this.exception = exception;
+        }
+
+        static <I extends Identity> RefreshOutcome<I> result(IdentityResult<I> result) {
+            return new RefreshOutcome<>(Objects.requireNonNull(result), null);
+        }
+
+        static <I extends Identity> RefreshOutcome<I> exception(RuntimeException exception) {
+            return new RefreshOutcome<>(null, Objects.requireNonNull(exception));
+        }
+    }
+
+    private static final class RefreshAttempt<I extends Identity> {
+        final I identity;
+        final IdentityResult<I> failureResult;
+        final RuntimeException failureException;
+        final boolean nonRecoverable;
+
+        private RefreshAttempt(
+                I identity,
+                IdentityResult<I> failureResult,
+                RuntimeException failureException,
+                boolean nonRecoverable
+        ) {
+            this.identity = identity;
+            this.failureResult = failureResult;
+            this.failureException = failureException;
+            this.nonRecoverable = nonRecoverable;
+        }
+
+        static <I extends Identity> RefreshAttempt<I> success(I identity) {
+            return new RefreshAttempt<>(Objects.requireNonNull(identity), null, null, false);
+        }
+
+        static <I extends Identity> RefreshAttempt<I> resultFailure(IdentityResult<I> result) {
+            return new RefreshAttempt<>(null, Objects.requireNonNull(result), null, false);
+        }
+
+        static <I extends Identity> RefreshAttempt<I> exceptionFailure(RuntimeException exception) {
+            return new RefreshAttempt<>(null, null, Objects.requireNonNull(exception), false);
+        }
+
+        static <I extends Identity> RefreshAttempt<I> nonRecoverable(NonRecoverableIdentityException exception) {
+            return new RefreshAttempt<>(null, null, exception, true);
+        }
+
+        RefreshOutcome<I> failureOutcome(CachingIdentityResolver<I> owner) {
+            if (identity != null) {
+                return RefreshOutcome.result(IdentityResult.ofError(
+                        owner.getClass(),
+                        "Credential source returned credentials that are already expired"));
+            }
+            if (failureException != null) {
+                return RefreshOutcome.exception(failureException);
+            }
+            return RefreshOutcome.result(failureResult);
+        }
+
+        String failureDescription() {
+            if (identity != null) {
+                return "credential source returned credentials that are already expired";
+            }
+            if (failureException != null) {
+                return failureException.toString();
+            }
+            return failureResult.error();
+        }
+    }
+
+    /** Builder for {@link CachingIdentityResolver}. */
     public static final class Builder<I extends Identity> {
         private final IdentityResolver<I> delegate;
-        private Duration prefetchBuffer = Duration.ofMinutes(5);
-        private boolean allowExpiredCredentials = false;
-        private Duration staleRefreshDelay = Duration.ofMinutes(5);
+        private Duration advisoryRefreshWindow;
+        private Duration mandatoryRefreshWindow = DEFAULT_MANDATORY_WINDOW;
+        private boolean allowExpiredCredentials;
+        private Duration refreshBackoffMin = DEFAULT_BACKOFF_MIN;
+        private Duration refreshBackoffMax = DEFAULT_BACKOFF_MAX;
         private Clock clock = Clock.systemUTC();
         private ScheduledExecutorService executor;
+        private boolean closeDelegate;
+        private boolean proactiveRefresh = true;
+        private BiPredicate<I, I> identityMatcher = Objects::equals;
 
         private Builder(IdentityResolver<I> delegate) {
-            this.delegate = delegate;
+            this.delegate = Objects.requireNonNull(delegate, "delegate");
         }
 
         /**
-         * How far before expiration to trigger a background refresh. Default: 5 minutes.
+         * Sets an explicit advisory refresh window. By default the window is derived from credential lifetime.
          */
-        public Builder<I> prefetchBuffer(Duration prefetchBuffer) {
-            this.prefetchBuffer = Objects.requireNonNull(prefetchBuffer);
+        public Builder<I> prefetchBuffer(Duration advisoryRefreshWindow) {
+            this.advisoryRefreshWindow = requirePositive(advisoryRefreshWindow, "advisoryRefreshWindow");
             return this;
         }
 
-        /**
-         * When {@code true}, expired credentials are returned instead of failing. Enables
-         * AWS Static Stability behavior. Default: {@code false}.
-         */
+        /** Sets the mandatory blocking refresh window. Default: 1 minute. */
+        public Builder<I> mandatoryRefreshWindow(Duration mandatoryRefreshWindow) {
+            this.mandatoryRefreshWindow = requirePositive(mandatoryRefreshWindow, "mandatoryRefreshWindow");
+            return this;
+        }
+
+        /** Enables returning cached expired identities after refresh failure. */
         public Builder<I> allowExpiredCredentials(boolean allowExpiredCredentials) {
             this.allowExpiredCredentials = allowExpiredCredentials;
             return this;
         }
 
         /**
-         * Base delay before retrying refresh when credentials are expired and refresh failed.
-         * Actual delay is jittered up to 2x this value. Default: 5 minutes.
+         * Sets the base stale refresh delay. The actual delay is uniformly selected from this value to twice this
+         * value. The default is 5-10 minutes.
          */
         public Builder<I> staleRefreshDelay(Duration staleRefreshDelay) {
-            this.staleRefreshDelay = Objects.requireNonNull(staleRefreshDelay);
+            this.refreshBackoffMin = requirePositive(staleRefreshDelay, "staleRefreshDelay");
+            this.refreshBackoffMax = staleRefreshDelay.multipliedBy(2);
             return this;
         }
 
-        /**
-         * Clock for time comparisons. Default: {@link Clock#systemUTC()}.
-         */
+        /** Sets the clock used for refresh decisions. */
         public Builder<I> clock(Clock clock) {
-            this.clock = Objects.requireNonNull(clock);
+            this.clock = Objects.requireNonNull(clock, "clock");
+            return this;
+        }
+
+        /** Sets the executor used for proactive and advisory refresh work. */
+        public Builder<I> executor(ScheduledExecutorService executor) {
+            this.executor = Objects.requireNonNull(executor, "executor");
             return this;
         }
 
         /**
-         * Executor for background refresh tasks. If not set, a single daemon thread is created
-         * and owned by this resolver (shut down on {@link CachingIdentityResolver#close()}).
+         * Sets whether closing the cache also closes an {@link AutoCloseable} delegate. Disabled by default.
+         *
+         * <p>Enable this only when the cache owns the delegate rather than wrapping a caller-supplied resolver.
          */
-        public Builder<I> executor(ScheduledExecutorService executor) {
-            this.executor = Objects.requireNonNull(executor);
+        public Builder<I> closeDelegate(boolean closeDelegate) {
+            this.closeDelegate = closeDelegate;
             return this;
         }
 
+        /** Enables or disables proactive scheduled refresh. Enabled by default. */
+        public Builder<I> proactiveRefresh(boolean proactiveRefresh) {
+            this.proactiveRefresh = proactiveRefresh;
+            return this;
+        }
+
+        /** Sets how an invalidated identity is matched against the currently cached identity. */
+        public Builder<I> identityMatcher(BiPredicate<I, I> identityMatcher) {
+            this.identityMatcher = Objects.requireNonNull(identityMatcher, "identityMatcher");
+            return this;
+        }
+
+        Builder<I> refreshBackoff(Duration minimum, Duration maximum) {
+            this.refreshBackoffMin = requirePositive(minimum, "refreshBackoffMin");
+            this.refreshBackoffMax = requirePositive(maximum, "refreshBackoffMax");
+            return this;
+        }
+
+        /** Builds the caching resolver. */
         public CachingIdentityResolver<I> build() {
+            if (refreshBackoffMin.compareTo(refreshBackoffMax) > 0) {
+                throw new IllegalArgumentException("refreshBackoffMin must not exceed refreshBackoffMax");
+            }
             return new CachingIdentityResolver<>(this);
+        }
+
+        private static Duration requirePositive(Duration duration, String name) {
+            Objects.requireNonNull(duration, name);
+            if (duration.isZero() || duration.isNegative()) {
+                throw new IllegalArgumentException(name + " must be positive");
+            }
+            return duration;
         }
     }
 }

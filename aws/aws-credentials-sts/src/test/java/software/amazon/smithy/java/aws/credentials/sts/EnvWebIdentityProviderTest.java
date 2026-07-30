@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.aws.credentials.sts;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -13,6 +14,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 
@@ -37,6 +39,7 @@ class EnvWebIdentityProviderTest {
 
         provider.setup(AwsCredentialsIdentity.class, setup);
         assertEquals(1, setup.resolvers().size());
+        assertInstanceOf(CachingIdentityResolver.class, setup.resolvers().getFirst().resolver());
     }
 
     @Test

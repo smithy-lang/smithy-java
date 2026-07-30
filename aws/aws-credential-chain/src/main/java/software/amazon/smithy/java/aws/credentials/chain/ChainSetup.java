@@ -6,7 +6,9 @@
 package software.amazon.smithy.java.aws.credentials.chain;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
@@ -40,6 +42,7 @@ public final class ChainSetup {
     private final String regionOverride;
     private final Context properties;
     private final List<NamedResolver> resolvers = new ArrayList<>();
+    private final Set<StandardProvider> detectedSlots = EnumSet.noneOf(StandardProvider.class);
     private final Function<String, String> envFn;
     private AwsProfileFile profileFile;
     private AwsProfile profile;
@@ -111,6 +114,18 @@ public final class ChainSetup {
     }
 
     /**
+     * Returns the environment lookup function configured for this assembly.
+     *
+     * <p>Resolvers that need environment values after assembly can retain this function without retaining the
+     * mutable {@code ChainSetup}.
+     *
+     * @return the configured environment variable lookup function.
+     */
+    public Function<String, String> environment() {
+        return envFn;
+    }
+
+    /**
      * Returns the environment variable lookup function this setup was built with, so the chain can perform slot
      * detection ({@link StandardProvider#isDetected(Function)}) against the same environment it was assembled
      * against rather than the real process environment.
@@ -173,14 +188,46 @@ public final class ChainSetup {
     }
 
     /**
+     * Records that configuration for a standard provider slot was detected during assembly.
+     *
+     * <p>This is used by providers such as {@code SHARED_CONFIG}, which detects profile-based
+     * sources on behalf of optional provider modules.
+     *
+     * @param slot detected standard provider slot.
+     */
+    public void markDetected(StandardProvider slot) {
+        detectedSlots.add(Objects.requireNonNull(slot, "slot"));
+    }
+
+    Set<StandardProvider> detectedSlots() {
+        return detectedSlots;
+    }
+
+    /**
      * Registers a resolver at the current provider's position. Assembly continues after
      * this call. May be called multiple times to register multiple resolvers that stack
      * at this position.
      *
+     * <p>If the resolver is {@link AutoCloseable}, ownership transfers to the assembled chain. It is closed when the
+     * chain is closed or if assembly fails after registration.
+     *
      * @param resolver the identity resolver to register.
      */
     public void addResolver(IdentityResolver<?> resolver) {
-        resolvers.add(new NamedResolver(currentProvider.name(), currentProvider.featureIds(), resolver));
+        addResolver(resolver, currentProvider.featureIds());
+    }
+
+    /**
+     * Registers a resolver with source-specific feature IDs at the current provider's position.
+     *
+     * <p>If the resolver is {@link AutoCloseable}, ownership transfers to the assembled chain. It is closed when the
+     * chain is closed or if assembly fails after registration.
+     *
+     * @param resolver resolver to register.
+     * @param featureIds feature IDs emitted when this resolver succeeds.
+     */
+    public void addResolver(IdentityResolver<?> resolver, Set<CredentialFeatureId> featureIds) {
+        resolvers.add(new NamedResolver(currentProvider.name(), featureIds, resolver));
     }
 
     /**
@@ -189,10 +236,26 @@ public final class ChainSetup {
      * environment variables contain a complete set of credentials, or a profile explicitly
      * configures assume-role).
      *
+     * <p>If the resolver is {@link AutoCloseable}, ownership transfers to the assembled chain. It is closed when the
+     * chain is closed or if assembly fails after registration.
+     *
      * @param resolver the identity resolver to register.
      */
     public void addTerminalResolver(IdentityResolver<?> resolver) {
-        resolvers.add(new NamedResolver(currentProvider.name(), currentProvider.featureIds(), resolver));
+        addTerminalResolver(resolver, currentProvider.featureIds());
+    }
+
+    /**
+     * Registers a terminal resolver with source-specific feature IDs.
+     *
+     * <p>If the resolver is {@link AutoCloseable}, ownership transfers to the assembled chain. It is closed when the
+     * chain is closed or if assembly fails after registration.
+     *
+     * @param resolver resolver to register.
+     * @param featureIds feature IDs emitted when this resolver succeeds.
+     */
+    public void addTerminalResolver(IdentityResolver<?> resolver, Set<CredentialFeatureId> featureIds) {
+        resolvers.add(new NamedResolver(currentProvider.name(), featureIds, resolver));
         this.terminal = true;
     }
 
@@ -232,7 +295,13 @@ public final class ChainSetup {
      * @param featureIds the feature IDs to emit on successful resolution.
      * @param resolver   the identity resolver.
      */
-    public record NamedResolver(String name, Set<CredentialFeatureId> featureIds, IdentityResolver<?> resolver) {}
+    public record NamedResolver(String name, Set<CredentialFeatureId> featureIds, IdentityResolver<?> resolver) {
+        public NamedResolver {
+            Objects.requireNonNull(name, "name");
+            featureIds = Set.copyOf(featureIds);
+            Objects.requireNonNull(resolver, "resolver");
+        }
+    }
 
     /**
      * Builder for {@link ChainSetup}.
