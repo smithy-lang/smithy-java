@@ -6,18 +6,22 @@
 package software.amazon.smithy.java.aws.credentials.sts;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.config.AwsConfigCredentialSource;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
+import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.context.Context;
 
 class ProfileAssumeRoleProviderTest {
@@ -62,6 +66,32 @@ class ProfileAssumeRoleProviderTest {
 
         provider.setup(AwsCredentialsIdentity.class, setup);
         assertEquals(1, setup.resolvers().size());
+        assertEquals(
+                Set.of(new CredentialFeatureId("o"), new CredentialFeatureId("i")),
+                setup.resolvers().getFirst().featureIds());
+    }
+
+    @Test
+    void credentialSourceUsesCredentialSourceFeatureId(@TempDir Path tmp) throws IOException {
+        Path config = tmp.resolve("config");
+        Files.writeString(config, """
+                [default]
+                role_arn = arn:aws:iam::123456789:role/RoleA
+                credential_source = Environment
+                """);
+
+        var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
+        var setup = ChainSetup.builder().build();
+        setup.setProfileFile(profileFile);
+        setup.setProfile(profileFile.activeProfile(k -> null));
+        var provider = new ProfileAssumeRoleProvider();
+        setup.setCurrentProvider(provider);
+
+        provider.setup(AwsCredentialsIdentity.class, setup);
+
+        assertEquals(
+                Set.of(new CredentialFeatureId("p"), new CredentialFeatureId("i")),
+                setup.resolvers().getFirst().featureIds());
     }
 
     @Test
@@ -88,7 +118,9 @@ class ProfileAssumeRoleProviderTest {
         provider.setup(AwsCredentialsIdentity.class, setup);
 
         assertEquals(1, setup.resolvers().size());
-        var resolver = (StsAssumeRoleResolver) setup.resolvers().get(0).resolver();
+        assertInstanceOf(CachingIdentityResolver.class, setup.resolvers().get(0).resolver());
+        var source = (AwsConfigCredentialSource.AssumeRole) setup.profile().credentialSources().getFirst();
+        var resolver = ProfileAssumeRoleProvider.createResolver(source, setup);
         assertEquals("eu-central-1", resolver.endpoint().region());
     }
 
@@ -127,7 +159,7 @@ class ProfileAssumeRoleProviderTest {
 
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", "B", null);
-        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT);
+        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT, null, name -> null);
 
         var ex = assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
         assertTrue(ex.getMessage().contains("Circular") || ex.getCause().getMessage().contains("Circular"));
@@ -144,7 +176,7 @@ class ProfileAssumeRoleProviderTest {
 
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", "nonexistent", null);
-        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT);
+        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT, null, name -> null);
 
         var ex = assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
         assertTrue(ex.getMessage().contains("nonexistent") || ex.getCause().getMessage().contains("nonexistent"));
@@ -153,7 +185,7 @@ class ProfileAssumeRoleProviderTest {
     @Test
     void failsWithUnsupportedCredentialSource() {
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", null, "CustomUnsupportedProvider");
-        var resolver = new StsAssumeRoleResolver(source, null, TEST_ENDPOINT);
+        var resolver = new StsAssumeRoleResolver(source, null, TEST_ENDPOINT, null, name -> null);
 
         var ex = assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
         assertTrue(ex.getMessage().contains("Unsupported") || ex.getCause().getMessage().contains("Unsupported"));

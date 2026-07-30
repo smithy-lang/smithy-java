@@ -124,7 +124,7 @@ final class S3ExpressIdentityProvider implements IdentityResolver<AwsCredentials
     }
 
     @Override
-    public void invalidate() {
-        cache.invalidateAll();
+    public void invalidate(AwsCredentialsIdentity rejectedIdentity) {
+        cache.invalidateAll(rejectedIdentity);
     }
 }

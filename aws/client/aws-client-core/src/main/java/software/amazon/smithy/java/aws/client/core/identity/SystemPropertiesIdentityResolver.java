@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.aws.client.core.identity;
 
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
@@ -13,8 +15,8 @@ import software.amazon.smithy.java.context.Context;
 /**
  * {@link AwsCredentialsResolver} implementation that loads credentials from Java system properties.
  *
- * <p>This resolver reads system properties once on first access and caches the result. Use
- * {@link #invalidate()} to force re-reading (e.g., in tests).
+ * <p>This resolver reads its source once on first access and caches the result. Call
+ * {@link #invalidate(AwsCredentialsIdentity)} with the cached identity to force re-reading (e.g., in tests).
  *
  * <p>Expected system properties:
  * <dl>
@@ -41,23 +43,29 @@ public final class SystemPropertiesIdentityResolver implements AwsCredentialsRes
             SystemPropertiesIdentityResolver.class,
             "Could not resolve AWS identity from the aws.accessKeyId and aws.secretAccessKey system properties");
 
-    private volatile IdentityResult<AwsCredentialsIdentity> cached;
+    private final AtomicReference<IdentityResult<AwsCredentialsIdentity>> cached = new AtomicReference<>();
 
     @Override
     public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context requestProperties) {
-        IdentityResult<AwsCredentialsIdentity> result = cached;
-        if (result != null) {
-            return result;
-        }
+        while (true) {
+            IdentityResult<AwsCredentialsIdentity> result = cached.get();
+            if (result != null) {
+                return result;
+            }
 
-        result = resolve();
-        cached = result;
-        return result;
+            result = resolve();
+            if (cached.compareAndSet(null, result)) {
+                return result;
+            }
+        }
     }
 
     @Override
-    public void invalidate() {
-        cached = null;
+    public void invalidate(AwsCredentialsIdentity rejectedIdentity) {
+        IdentityResult<AwsCredentialsIdentity> current = cached.get();
+        if (current != null && Objects.equals(current.identity(), rejectedIdentity)) {
+            cached.compareAndSet(current, null);
+        }
     }
 
     private static IdentityResult<AwsCredentialsIdentity> resolve() {

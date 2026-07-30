@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.StringJoiner;
 import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
@@ -153,6 +154,7 @@ final class ClientPipeline<RequestT, ResponseT> {
             RequestHook<I, O, RequestT> requestHook
     ) {
         var request = requestHook.request();
+        call.context.put(CallContext.RESPONSE_ERROR_CODE, null);
 
         // 8.a. Interceptors: Invoke ReadBeforeAttempt.
         call.interceptor.readBeforeAttempt(requestHook);
@@ -178,12 +180,15 @@ final class ClientPipeline<RequestT, ResponseT> {
         // This throws if no identity was found.
         var identity = identityResult.unwrap();
         call.context.put(CallContext.IDENTITY, identity);
+        call.context.put(CallContext.IDENTITY_RESOLVER, resolvedAuthScheme.identityResolver());
 
         Endpoint endpoint = resolveEndpoint(call);
         call.context.put(CallContext.ENDPOINT, endpoint);
 
         // Augment or swap the resolved auth scheme based on the endpoint's authSchemes property.
         resolvedAuthScheme = applyEndpointAuthSchemeOverrides(call, endpoint, resolvedAuthScheme);
+        call.context.put(CallContext.IDENTITY, resolvedAuthScheme.identity().unwrap());
+        call.context.put(CallContext.IDENTITY_RESOLVER, resolvedAuthScheme.identityResolver());
 
         RequestT req = protocol.setServiceEndpoint(requestHook.request(), endpoint);
         var signResult = resolvedAuthScheme.sign(req);
@@ -272,12 +277,17 @@ final class ClientPipeline<RequestT, ResponseT> {
         if (identityResolver == null) {
             return null;
         }
-        return new ResolvedScheme<>(signerProperties, authScheme, identityResolver.resolveIdentity(identityProperties));
+        return new ResolvedScheme<>(
+                signerProperties,
+                authScheme,
+                identityResolver,
+                identityResolver.resolveIdentity(identityProperties));
     }
 
     private record ResolvedScheme<IdentityT extends Identity, RequestT>(
             Context signerProperties,
             AuthScheme<RequestT, IdentityT> authScheme,
+            IdentityResolver<IdentityT> identityResolver,
             IdentityResult<IdentityT> identity) {
         public SignResult<RequestT> sign(RequestT request) {
             // Throws when no identity is found.
@@ -381,7 +391,11 @@ final class ClientPipeline<RequestT, ResponseT> {
         for (var key : overrides) {
             merged.put((Context.Key<Object>) key, endpointAuthScheme.property(key));
         }
-        return new ResolvedScheme<>(merged, resolvedScheme.authScheme(), resolvedScheme.identity());
+        return new ResolvedScheme<>(
+                merged,
+                resolvedScheme.authScheme(),
+                resolvedScheme.identityResolver(),
+                resolvedScheme.identity());
     }
 
     private <I extends SerializableStruct, O extends SerializableStruct> O deserialize(

@@ -167,11 +167,11 @@ final class S3ExpressIdentityCache implements AutoCloseable {
         }
     }
 
-    void invalidateAll() {
+    void invalidateAll(AwsCredentialsIdentity rejectedIdentity) {
         writeLock.lock();
         try {
             for (var entry : entries.values()) {
-                entry.resolver.invalidate();
+                entry.resolver.invalidate(rejectedIdentity);
             }
         } finally {
             writeLock.unlock();

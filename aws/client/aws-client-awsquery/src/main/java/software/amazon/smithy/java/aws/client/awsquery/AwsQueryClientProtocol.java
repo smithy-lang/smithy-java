@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.aws.traits.protocols.AwsQueryErrorTrait;
 import software.amazon.smithy.aws.traits.protocols.AwsQueryTrait;
+import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
@@ -130,6 +131,7 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
                 ) {
                     var deserializer = codec.createDeserializer(buffer);
                     String code = XmlUtil.parseErrorCodeName(deserializer);
+                    context.put(CallContext.RESPONSE_ERROR_CODE, code);
 
                     // First, resolve @awsQueryError custom codes
                     ShapeBuilder<ModeledException> builder = null;

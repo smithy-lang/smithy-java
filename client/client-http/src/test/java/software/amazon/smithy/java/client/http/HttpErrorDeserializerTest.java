@@ -9,6 +9,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.nullValue;
 
 import java.util.List;
 import java.util.Map;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ModeledException;
@@ -129,6 +131,26 @@ public class HttpErrorDeserializerTest {
                 Arguments.of(400, "", "Client HTTP/1.1 400 response from operation com.foo#PutFoo."),
                 Arguments.of(500, "", "Server HTTP/1.1 500 response from operation com.foo#PutFoo."),
                 Arguments.of(600, "", "Unknown HTTP/1.1 600 response from operation com.foo#PutFoo."));
+    }
+
+    @Test
+    public void recordsAndClearsUnmodeledPayloadErrorCode() {
+        var deserializer = HttpErrorDeserializer.builder()
+                .codec(CODEC)
+                .serviceId(SERVICE)
+                .build();
+        var context = Context.create();
+        var errorResponse = HttpResponse.create()
+                .setStatusCode(400)
+                .setBody(DataStream.ofString("{\"__type\":\"com.foo#ExpiredToken\"}"))
+                .toUnmodifiable();
+
+        deserializer.createError(context, OPERATION, TypeRegistry.empty(), errorResponse);
+        assertThat(context.get(CallContext.RESPONSE_ERROR_CODE), equalTo("ExpiredToken"));
+
+        var emptyResponse = HttpResponse.create().setStatusCode(400).toUnmodifiable();
+        deserializer.createError(context, OPERATION, TypeRegistry.empty(), emptyResponse);
+        assertThat(context.get(CallContext.RESPONSE_ERROR_CODE), nullValue());
     }
 
     @Test
