@@ -59,8 +59,6 @@ public final class CachingIdentityResolver<I extends Identity> implements Identi
     private Instant nextRefreshAllowedAt;
     private Instant nextRefreshAfterSuccessAt;
     private RefreshOutcome<I> lastFailure;
-    private I lastInvalidatedIdentity;
-    private long invalidationGeneration;
     private boolean refreshRequired;
     private boolean closed;
 
@@ -105,7 +103,6 @@ public final class CachingIdentityResolver<I extends Identity> implements Identi
         CompletableFuture<RefreshOutcome<I>> refresh;
         boolean performRefresh = false;
         IdentityResult<I> advisoryResult = null;
-        long refreshInvalidationGeneration = 0;
 
         lock.lock();
         try {
@@ -116,7 +113,6 @@ public final class CachingIdentityResolver<I extends Identity> implements Identi
                     refresh = new CompletableFuture<>();
                     inFlight = refresh;
                     performRefresh = true;
-                    refreshInvalidationGeneration = invalidationGeneration;
                 }
             } else if (!refreshNeeded(cached, now)) {
                 return cached.result;
@@ -131,14 +127,12 @@ public final class CachingIdentityResolver<I extends Identity> implements Identi
                 inFlight = refresh;
                 performRefresh = true;
                 advisoryResult = cached.result;
-                refreshInvalidationGeneration = invalidationGeneration;
             } else {
                 refresh = inFlight;
                 if (refresh == null) {
                     refresh = new CompletableFuture<>();
                     inFlight = refresh;
                     performRefresh = true;
-                    refreshInvalidationGeneration = invalidationGeneration;
                 }
             }
         } finally {
@@ -147,14 +141,10 @@ public final class CachingIdentityResolver<I extends Identity> implements Identi
 
         if (performRefresh) {
             if (advisoryResult != null) {
-                executeAdvisoryRefresh(
-                        requestProperties,
-                        refresh,
-                        advisoryResult,
-                        refreshInvalidationGeneration);
+                executeAdvisoryRefresh(requestProperties, refresh, advisoryResult);
                 return advisoryResult;
             }
-            executeRefresh(requestProperties, refresh, refreshInvalidationGeneration);
+            executeRefresh(requestProperties, refresh);
         }
         return awaitRefresh(refresh);
     }
@@ -166,13 +156,18 @@ public final class CachingIdentityResolver<I extends Identity> implements Identi
 
     @Override
     public void invalidate(I rejectedIdentity) {
-        lock.lock();
+        // Invalidation must not make the request path wait for refresh lifecycle state.
+        if (!lock.tryLock()) {
+            return;
+        }
         try {
+            // An active refresh supersedes this rejection and will determine the next cached identity.
+            if (inFlight != null) {
+                return;
+            }
             if (cached == null || !identityMatcher.test(cached.identity, rejectedIdentity)) {
                 return;
             }
-            lastInvalidatedIdentity = rejectedIdentity;
-            invalidationGeneration++;
             refreshRequired = true;
             nextRefreshAfterSuccessAt = null;
             cancelScheduledRefreshLocked();
@@ -208,11 +203,7 @@ public final class CachingIdentityResolver<I extends Identity> implements Identi
         }
     }
 
-    private void executeRefresh(
-            Context requestProperties,
-            CompletableFuture<RefreshOutcome<I>> refresh,
-            long refreshInvalidationGeneration
-    ) {
+    private void executeRefresh(Context requestProperties, CompletableFuture<RefreshOutcome<I>> refresh) {
         try {
             RefreshAttempt<I> attempt = callCredentialSource(requestProperties);
             RefreshOutcome<I> callerOutcome;
@@ -221,29 +212,19 @@ public final class CachingIdentityResolver<I extends Identity> implements Identi
             try {
                 Instant now = clock.instant();
                 if (attempt.identity != null && isFresh(attempt.identity, now)) {
-                    boolean invalidatedDuringRefresh =
-                            invalidationGeneration != refreshInvalidationGeneration;
-                    boolean returnedRejectedIdentity = invalidatedDuringRefresh
-                            && lastInvalidatedIdentity != null
-                            && identityMatcher.test(attempt.identity, lastInvalidatedIdentity);
                     cached = createCachedValue(attempt.identity, now, requestProperties);
                     nextRefreshAllowedAt = null;
                     lastFailure = null;
-                    refreshRequired = returnedRejectedIdentity;
-                    if (returnedRejectedIdentity) {
-                        nextRefreshAfterSuccessAt = null;
-                        cancelScheduledRefreshLocked();
-                    } else {
-                        lastInvalidatedIdentity = null;
-                        nextRefreshAfterSuccessAt = firstRefreshAt(cached, now);
-                        scheduleRefreshLocked(nextRefreshAfterSuccessAt);
-                    }
+                    refreshRequired = false;
+                    nextRefreshAfterSuccessAt = firstRefreshAt(cached, now);
+                    scheduleRefreshLocked(nextRefreshAfterSuccessAt);
                     callerOutcome = RefreshOutcome.result(cached.result);
                 } else {
                     RefreshOutcome<I> failure = attempt.failureOutcome(this);
                     nextRefreshAfterSuccessAt = null;
                     lastFailure = failure;
                     if (attempt.nonRecoverable) {
+                        // Non-recoverable failures are not backed off; cached state forces the next call to retry.
                         nextRefreshAllowedAt = null;
                         refreshRequired = cached != null;
                         cancelScheduledRefreshLocked();
@@ -290,15 +271,11 @@ public final class CachingIdentityResolver<I extends Identity> implements Identi
     private void executeAdvisoryRefresh(
             Context requestProperties,
             CompletableFuture<RefreshOutcome<I>> refresh,
-            IdentityResult<I> cachedResult,
-            long refreshInvalidationGeneration
+            IdentityResult<I> cachedResult
     ) {
         Context refreshProperties = Context.unmodifiableCopy(requestProperties);
         try {
-            executor.execute(() -> executeRefresh(
-                    refreshProperties,
-                    refresh,
-                    refreshInvalidationGeneration));
+            executor.execute(() -> executeRefresh(refreshProperties, refresh));
         } catch (RejectedExecutionException error) {
             lock.lock();
             try {
@@ -427,7 +404,6 @@ public final class CachingIdentityResolver<I extends Identity> implements Identi
     private void runScheduledRefresh() {
         CompletableFuture<RefreshOutcome<I>> refresh = null;
         Context refreshProperties = null;
-        long refreshInvalidationGeneration = 0;
         lock.lock();
         try {
             scheduledRefresh = null;
@@ -448,13 +424,12 @@ public final class CachingIdentityResolver<I extends Identity> implements Identi
             refresh = new CompletableFuture<>();
             inFlight = refresh;
             refreshProperties = cached.refreshProperties;
-            refreshInvalidationGeneration = invalidationGeneration;
         } finally {
             lock.unlock();
         }
 
         if (refresh != null) {
-            executeRefresh(refreshProperties, refresh, refreshInvalidationGeneration);
+            executeRefresh(refreshProperties, refresh);
         }
     }
 

@@ -77,6 +77,20 @@ class CachingIdentityResolverTest {
     }
 
     @Test
+    void nonRecoverableColdStartRaisesSourceErrorAndRetriesOnNextCall() {
+        var delegate = new QueueResolver(
+                new NonRecoverableIdentityException("reauthenticate"),
+                identity("fresh", BASE.plusSeconds(3600)));
+        resolver = resolver(delegate, new MutableClock(BASE), true);
+
+        var error = assertThrows(NonRecoverableIdentityException.class, this::resolve);
+        assertEquals("reauthenticate", error.getMessage());
+
+        assertEquals("fresh", resolve().identity().value());
+        assertEquals(2, delegate.calls.get());
+    }
+
+    @Test
     void concurrentColdStartUsesOneSourceCall() throws Exception {
         var delegate = new BlockingResolver(identity("initial", BASE.plusSeconds(3600)), true);
         resolver = resolver(delegate, new MutableClock(BASE), true);
@@ -198,7 +212,7 @@ class CachingIdentityResolverTest {
     }
 
     @Test
-    void invalidationWaitsForInFlightAdvisoryRefresh() throws Exception {
+    void invalidationDuringInFlightAdvisoryRefreshIsIgnored() throws Exception {
         var clock = new MutableClock(BASE);
         var initial = identity("initial", BASE.plus(Duration.ofHours(2)));
         var refreshed = identity("refreshed", BASE.plus(Duration.ofHours(3)));
@@ -208,28 +222,20 @@ class CachingIdentityResolverTest {
         assertEquals("initial", resolve().identity().value());
         clock.advance(Duration.ofMinutes(61));
 
-        ExecutorService callers = Executors.newSingleThreadExecutor();
-        try {
-            assertEquals("initial", resolve().identity().value());
-            assertTrue(delegate.refreshStarted.await(5, TimeUnit.SECONDS));
+        assertEquals("initial", resolve().identity().value());
+        assertTrue(delegate.refreshStarted.await(5, TimeUnit.SECONDS));
 
-            resolver.invalidate(initial);
-            var invalidatedCaller = callers.submit(this::resolve);
-            assertTrue(!invalidatedCaller.isDone());
-            assertEquals(2, delegate.calls.get());
+        resolver.invalidate(initial);
+        assertEquals("initial", resolve().identity().value());
+        assertEquals(2, delegate.calls.get());
 
-            delegate.releaseRefresh.countDown();
-            assertEquals("refreshed", invalidatedCaller.get(5, TimeUnit.SECONDS).identity().value());
-            assertEquals(2, delegate.calls.get());
-            assertEquals("refreshed", resolve().identity().value());
-            assertEquals(2, delegate.calls.get());
-        } finally {
-            callers.shutdownNow();
-        }
+        delegate.releaseRefresh.countDown();
+        await(() -> "refreshed".equals(resolve().identity().value()));
+        assertEquals(2, delegate.calls.get());
     }
 
     @Test
-    void invalidationDuringRefreshIsPreservedWhenSourceReturnsSameIdentity() throws Exception {
+    void ignoredInvalidationDoesNotForceAnotherRefreshWhenSourceReturnsSameIdentity() throws Exception {
         var clock = new MutableClock(BASE);
         var initial = identity("same", BASE.plus(Duration.ofHours(2)));
         var refreshed = identity("same", BASE.plus(Duration.ofHours(3)));
@@ -250,9 +256,8 @@ class CachingIdentityResolverTest {
         resolver.invalidate(initial);
         delegate.releaseRefresh.countDown();
 
-        assertEquals("same", resolve().identity().value());
-        assertEquals("same", resolve().identity().value());
-        assertEquals(3, delegate.calls.get());
+        await(() -> refreshed.expirationTime().equals(resolve().identity().expirationTime()));
+        assertEquals(2, delegate.calls.get());
     }
 
     @Test
@@ -347,6 +352,41 @@ class CachingIdentityResolverTest {
         resolver.invalidate(initial);
         assertEquals("fresh", resolve().identity().value());
         assertEquals(2, delegate.calls.get());
+    }
+
+    @Test
+    void concurrentInvalidationDoesNotBlock() throws Exception {
+        var initial = identity("initial", BASE.plusSeconds(3600));
+        var delegate = new QueueResolver(initial);
+        var matcherStarted = new CountDownLatch(1);
+        var releaseMatcher = new CountDownLatch(1);
+        var blockFirstMatcher = new AtomicBoolean(true);
+        resolver = CachingIdentityResolver.builder(delegate)
+                .executor(executor)
+                .clock(new MutableClock(BASE))
+                .identityMatcher((cached, rejected) -> {
+                    if (blockFirstMatcher.compareAndSet(true, false)) {
+                        matcherStarted.countDown();
+                        awaitLatch(releaseMatcher);
+                    }
+                    return cached.value().equals(rejected.value());
+                })
+                .build();
+        assertEquals("initial", resolve().identity().value());
+
+        ExecutorService callers = Executors.newFixedThreadPool(2);
+        Future<?> firstInvalidation = callers.submit(() -> resolver.invalidate(initial));
+        try {
+            assertTrue(matcherStarted.await(5, TimeUnit.SECONDS));
+
+            Future<?> concurrentInvalidation = callers.submit(() -> resolver.invalidate(initial));
+            concurrentInvalidation.get(1, TimeUnit.SECONDS);
+            assertFalse(firstInvalidation.isDone());
+        } finally {
+            releaseMatcher.countDown();
+            firstInvalidation.get(5, TimeUnit.SECONDS);
+            callers.shutdownNow();
+        }
     }
 
     @Test
@@ -449,6 +489,61 @@ class CachingIdentityResolverTest {
 
         assertEquals("fresh", resolve().identity().value());
         assertEquals(3, delegate.calls.get());
+    }
+
+    @Test
+    void proactiveNonRecoverableFailureIsRetriedOnDemandWithoutBackoff() throws Exception {
+        var calls = new AtomicInteger();
+        var proactiveAttempted = new CountDownLatch(1);
+        Instant now = Instant.now();
+        IdentityResolver<TestIdentity> delegate = new IdentityResolver<>() {
+            @Override
+            public IdentityResult<TestIdentity> resolveIdentity(Context requestProperties) {
+                return switch (calls.incrementAndGet()) {
+                    case 1 -> IdentityResult.of(identity("initial", now.plusMillis(300)));
+                    case 2 -> {
+                        proactiveAttempted.countDown();
+                        throw new NonRecoverableIdentityException("reauthenticate");
+                    }
+                    case 3 -> throw new NonRecoverableIdentityException("reauthenticate");
+                    default -> IdentityResult.of(identity("fresh", now.plusSeconds(3600)));
+                };
+            }
+
+            @Override
+            public Class<TestIdentity> identityType() {
+                return TestIdentity.class;
+            }
+        };
+        resolver = CachingIdentityResolver.builder(delegate)
+                .executor(executor)
+                .clock(Clock.systemUTC())
+                .allowExpiredCredentials(true)
+                .prefetchBuffer(Duration.ofMillis(200))
+                .mandatoryRefreshWindow(Duration.ofMillis(50))
+                .build();
+
+        assertEquals("initial", resolve().identity().value());
+        assertTrue(proactiveAttempted.await(5, TimeUnit.SECONDS));
+
+        var observed = new AtomicReference<NonRecoverableIdentityException>();
+        await(() -> {
+            if (observed.get() != null) {
+                return true;
+            }
+            try {
+                resolve();
+                return false;
+            } catch (NonRecoverableIdentityException error) {
+                observed.set(error);
+                return true;
+            }
+        });
+        assertEquals("reauthenticate", observed.get().getMessage());
+        assertEquals(3, calls.get());
+
+        assertEquals("fresh", resolve().identity().value());
+        assertEquals(4, calls.get());
     }
 
     @Test
