@@ -117,6 +117,44 @@ public class McpServerTest {
     }
 
     @Test
+    public void initializeWithV2025_11_25ProtocolVersion() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(ProtocolVersion.v2025_11_25.INSTANCE);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+        assertEquals(6, tools.size());
+
+        // 2025-11-25 >= 2025-06-18, so outputSchema must be retained. This is the positive
+        // mirror of noOutputSchemaWithUnsupportedProtocolVersion, which asserts it is stripped.
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("NoInputOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertEquals("NoInputOperation", tool.get("name").asString());
+        assertNotNull(tool.get("inputSchema"));
+
+        var outputSchema = tool.get("outputSchema").asStringMap();
+        assertEquals("object", outputSchema.get("type").asString());
+        assertTrue(outputSchema.get("properties").asStringMap().containsKey("outputStr"));
+    }
+
+    @Test
     public void noOutputSchemaWithUnsupportedProtocolVersion() {
         server = McpServer.builder()
                 .name("smithy-mcp-server")
