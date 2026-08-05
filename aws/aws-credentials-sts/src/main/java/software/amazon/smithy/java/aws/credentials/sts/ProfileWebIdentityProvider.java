@@ -9,6 +9,7 @@ import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.config.AwsConfigCredentialSource;
+import software.amazon.smithy.java.aws.credentials.chain.AwsCredentialCaching;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
@@ -49,7 +50,8 @@ public final class ProfileWebIdentityProvider implements ChainIdentityProvider {
         for (AwsConfigCredentialSource source : setup.profile().credentialSources()) {
             if (source instanceof AwsConfigCredentialSource.WebIdentityToken wit) {
                 var endpoint = StsEndpointConfig.resolve(wit.region(), setup);
-                setup.addTerminalResolver(new StsWebIdentityResolver(wit, StsClientFactory.createNoAuth(endpoint)));
+                var resolver = new StsWebIdentityResolver(wit, StsClientFactory.createNoAuth(endpoint));
+                setup.addTerminalResolver(AwsCredentialCaching.staticallyStable(resolver, setup.executor()));
                 return;
             }
         }

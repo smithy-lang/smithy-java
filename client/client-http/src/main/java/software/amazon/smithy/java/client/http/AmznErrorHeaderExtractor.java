@@ -23,6 +23,11 @@ public final class AmznErrorHeaderExtractor implements HttpErrorDeserializer.Hea
     }
 
     @Override
+    public String errorCode(HttpResponse response) {
+        return ErrorTypeUtils.removeNamespaceAndUri(response.headers().firstValue(ERROR_HEADER));
+    }
+
+    @Override
     public ShapeId resolveId(HttpResponse response, String serviceNamespace, TypeRegistry registry) {
         var header = response.headers().firstValue(ERROR_HEADER);
         return header == null ? null : toShapeId(header, serviceNamespace, registry);

@@ -8,6 +8,7 @@ package software.amazon.smithy.java.aws.credentials.chain;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -24,7 +25,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
@@ -178,6 +178,8 @@ class ModularCredentialChainSuiteTest {
 
         // Assemble the provider list: standard-slot stubs for installed modules, plus any custom providers.
         List<ChainIdentityProvider> providers = new ArrayList<>();
+        List<String> invalidatedProviders = new ArrayList<>();
+        List<Identity> invalidatedIdentities = new ArrayList<>();
         Set<StandardProvider> installedSlots = installedSlots(input);
         for (StandardProvider slot : installedSlots) {
             providers.add(standardStub(slot, input, env));
@@ -185,7 +187,7 @@ class ModularCredentialChainSuiteTest {
         Document customProviders = input.getMember("customProviders");
         if (customProviders != null) {
             for (Document custom : customProviders.asList()) {
-                providers.add(customStub(custom));
+                providers.add(customStub(custom, invalidatedProviders, invalidatedIdentities));
             }
         }
 
@@ -220,6 +222,20 @@ class ModularCredentialChainSuiteTest {
         IdentityChain<? extends Identity> chain =
                 IdentityChain.assemble(identityType, providers, null, setup);
 
+        Document invalidationIdentity = input.getMember("invalidationIdentity");
+        if (invalidationIdentity != null) {
+            var rejectedIdentity = awsIdentity(invalidationIdentity);
+            invalidateChain(chain, rejectedIdentity);
+            assertEquals(stringList(expected.getMember("invalidatedProviders")),
+                    invalidatedProviders,
+                    "invalidatedProviders");
+            assertEquals(invalidatedProviders.size(), invalidatedIdentities.size(), "invalidated identity count");
+            for (Identity invalidatedIdentity : invalidatedIdentities) {
+                assertSame(rejectedIdentity, invalidatedIdentity, "chain must propagate the same identity instance");
+            }
+            return;
+        }
+
         var context = Context.create();
         // Seed the feature-ID sink the way the client pipeline does, so the chain can record the winning provider's
         // feature IDs for the User-Agent.
@@ -232,13 +248,6 @@ class ModularCredentialChainSuiteTest {
         IdentityResult<? extends Identity> result;
         try {
             result = chain.resolveIdentity(context);
-
-            // Invalidation: resolve, invalidate, resolve again; the second resolve is the asserted one.
-            Document invalidateAgain = input.getMember("invalidateAndResolveAgain");
-            if (invalidateAgain != null && invalidateAgain.asBoolean()) {
-                chain.invalidate();
-                result = chain.resolveIdentity(context);
-            }
         } catch (RuntimeException thrown) {
             if (expected.getMember("resolutionError") != null) {
                 // The chain stopped at the throwing provider; assert the providers tried up to that point.
@@ -329,7 +338,8 @@ class ModularCredentialChainSuiteTest {
                 }
             }
             case SHARED_CONFIG -> {
-                /* profile is pre-set on the setup by the runner */ }
+                markDetectedProfileSources(setup);
+            }
             case PROFILE_STATIC_KEYS -> profileSlot(setup,
                     AwsConfigCredentialSource.StaticKeys.class,
                     src -> staticResolver(src.accessKeyId(), src.secretAccessKey(), null, src.accountId()));
@@ -341,7 +351,10 @@ class ModularCredentialChainSuiteTest {
                             src.accountId()));
             case PROFILE_ASSUME_ROLE -> profileSlot(setup,
                     AwsConfigCredentialSource.AssumeRole.class,
-                    src -> responseResolver(input.getMember("stsResponse")));
+                    src -> responseResolver(input.getMember("stsResponse")),
+                    src -> Set.of(
+                            new CredentialFeatureId(src.sourceProfile() != null ? "o" : "p"),
+                            new CredentialFeatureId("i")));
             case PROFILE_WEB_IDENTITY -> profileSlot(setup,
                     AwsConfigCredentialSource.WebIdentityToken.class,
                     src -> responseResolver(input.getMember("stsResponse")));
@@ -366,19 +379,57 @@ class ModularCredentialChainSuiteTest {
             Class<T> sourceType,
             Function<T, IdentityResolver<?>> resolverFactory
     ) {
+        profileSlot(setup, sourceType, resolverFactory, null);
+    }
+
+    private <T extends AwsConfigCredentialSource> void profileSlot(
+            ChainSetup setup,
+            Class<T> sourceType,
+            Function<T, IdentityResolver<?>> resolverFactory,
+            Function<T, Set<CredentialFeatureId>> featureIds
+    ) {
         if (setup.profile() == null) {
             return;
         }
         for (AwsConfigCredentialSource source : setup.profile().credentialSources()) {
             if (sourceType.isInstance(source)) {
-                setup.addTerminalResolver(resolverFactory.apply(sourceType.cast(source)));
+                T typedSource = sourceType.cast(source);
+                IdentityResolver<?> resolver = resolverFactory.apply(typedSource);
+                if (featureIds == null) {
+                    setup.addTerminalResolver(resolver);
+                } else {
+                    setup.addTerminalResolver(resolver, featureIds.apply(typedSource));
+                }
                 return;
             }
         }
     }
 
+    private void markDetectedProfileSources(ChainSetup setup) {
+        if (setup.profile() == null) {
+            return;
+        }
+        for (AwsConfigCredentialSource source : setup.profile().credentialSources()) {
+            setup.markDetected(switch (source) {
+                case AwsConfigCredentialSource.StaticKeys ignored -> StandardProvider.PROFILE_STATIC_KEYS;
+                case AwsConfigCredentialSource.SessionKeys ignored -> StandardProvider.PROFILE_SESSION_KEYS;
+                case AwsConfigCredentialSource.AssumeRole ignored -> StandardProvider.PROFILE_ASSUME_ROLE;
+                case AwsConfigCredentialSource.WebIdentityToken ignored -> StandardProvider.PROFILE_WEB_IDENTITY;
+                case AwsConfigCredentialSource.SsoSession ignored -> StandardProvider.PROFILE_SSO_SESSION;
+                case AwsConfigCredentialSource.LegacySso ignored -> StandardProvider.PROFILE_LEGACY_SSO;
+                case AwsConfigCredentialSource.CredentialProcess ignored ->
+                    StandardProvider.PROFILE_CREDENTIAL_PROCESS;
+                case AwsConfigCredentialSource.LoginSession ignored -> StandardProvider.PROFILE_LOGIN;
+            });
+        }
+    }
+
     /** A custom (third-party) provider, exercising Before/After ordering and terminal/non-terminal semantics. */
-    private ChainIdentityProvider customStub(Document custom) {
+    private ChainIdentityProvider customStub(
+            Document custom,
+            List<String> invalidatedProviders,
+            List<Identity> invalidatedIdentities
+    ) {
         String name = custom.getMember("name").asString();
         OrderingConstraint ordering = ordering(custom.getMember("ordering"));
         boolean supportsType = boolOrDefault(custom.getMember("supportsIdentityType"), true);
@@ -401,7 +452,11 @@ class ModularCredentialChainSuiteTest {
                 if (!supportsType || !present) {
                     return;
                 }
-                IdentityResolver<?> resolver = perAttemptResolver(response);
+                IdentityResolver<?> resolver = recordingResolver(
+                        responseResolver(response),
+                        name,
+                        invalidatedProviders,
+                        invalidatedIdentities);
                 if (terminal) {
                     setup.addTerminalResolver(resolver);
                 } else {
@@ -432,32 +487,37 @@ class ModularCredentialChainSuiteTest {
         return IdentityResolver.of(awsIdentity(response));
     }
 
-    /**
-     * Build a resolver whose response may be an array of per-attempt responses (for invalidate-then-resolve cases).
-     * Each call to {@code resolveIdentity} advances to the next element; a single object is returned every time.
-     */
-    private IdentityResolver<?> perAttemptResolver(Document response) {
-        if (response == null || !response.isType(ShapeType.LIST)) {
-            return responseResolver(response);
-        }
-        List<IdentityResolver<?>> perAttempt = new ArrayList<>();
-        for (Document attempt : response.asList()) {
-            perAttempt.add(responseResolver(attempt));
-        }
-        AtomicInteger index = new AtomicInteger(0);
-        return new IdentityResolver<Identity>() {
+    private <I extends Identity> IdentityResolver<I> recordingResolver(
+            IdentityResolver<I> delegate,
+            String name,
+            List<String> invalidatedProviders,
+            List<Identity> invalidatedIdentities
+    ) {
+        return new IdentityResolver<>() {
+
             @Override
-            @SuppressWarnings("unchecked")
-            public IdentityResult<Identity> resolveIdentity(Context ctx) {
-                int i = Math.min(index.getAndIncrement(), perAttempt.size() - 1);
-                return (IdentityResult<Identity>) perAttempt.get(i).resolveIdentity(ctx);
+            public IdentityResult<I> resolveIdentity(Context requestProperties) {
+                return delegate.resolveIdentity(requestProperties);
             }
 
             @Override
-            public Class<Identity> identityType() {
-                return Identity.class;
+            public Class<I> identityType() {
+                return delegate.identityType();
+            }
+
+            @Override
+            public void invalidate(I rejectedIdentity) {
+                invalidatedProviders.add(name);
+                invalidatedIdentities.add(rejectedIdentity);
             }
         };
+    }
+
+    private static <I extends Identity> void invalidateChain(
+            IdentityChain<I> chain,
+            Identity rejectedIdentity
+    ) {
+        chain.invalidate(chain.identityType().cast(rejectedIdentity));
     }
 
     private IdentityResolver<AwsCredentialsIdentity> errorResolver(String message) {

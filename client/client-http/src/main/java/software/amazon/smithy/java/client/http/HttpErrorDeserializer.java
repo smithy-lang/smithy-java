@@ -7,6 +7,7 @@ package software.amazon.smithy.java.client.http;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
+import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ErrorFault;
@@ -49,6 +50,16 @@ public final class HttpErrorDeserializer {
          * @return the resolved builder, or null if no builder could be found.
          */
         ShapeId resolveId(HttpResponse response, String serviceNamespace, TypeRegistry registry);
+
+        /**
+         * Extract the normalized wire error code, independent of whether it maps to a modeled error.
+         *
+         * @param response Response to inspect.
+         * @return the normalized error code, or null if unavailable.
+         */
+        default String errorCode(HttpResponse response) {
+            return null;
+        }
     }
 
     /**
@@ -144,7 +155,10 @@ public final class HttpErrorDeserializer {
         ) {
             var document = codec.createDeserializer(buffer).readDocument();
             var id = extractErrorType(document, serviceId.getNamespace());
-            var builder = typeRegistry.createBuilder(id, ModeledException.class);
+            if (id != null) {
+                context.put(CallContext.RESPONSE_ERROR_CODE, id.getName());
+            }
+            var builder = id == null ? null : typeRegistry.createBuilder(id, ModeledException.class);
             if (builder != null) {
                 return knownErrorFactory.createErrorFromDocument(
                         context,
@@ -258,6 +272,7 @@ public final class HttpErrorDeserializer {
             TypeRegistry typeRegistry,
             HttpResponse response
     ) {
+        context.put(CallContext.RESPONSE_ERROR_CODE, null);
         var hasErrorHeader = headerErrorExtractor.hasHeader(response);
 
         if (hasErrorHeader) {
@@ -293,6 +308,7 @@ public final class HttpErrorDeserializer {
             TypeRegistry typeRegistry,
             HttpResponse response
     ) {
+        context.put(CallContext.RESPONSE_ERROR_CODE, headerErrorExtractor.errorCode(response));
         // The content can be parsed directly here rather than through an intermediate document like with __type.
         var id = headerErrorExtractor.resolveId(response, serviceId.getNamespace(), typeRegistry);
         var builder = id == null ? null : typeRegistry.createBuilder(id, ModeledException.class);

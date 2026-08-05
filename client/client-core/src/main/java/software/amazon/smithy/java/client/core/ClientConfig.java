@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
@@ -28,6 +29,7 @@ import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.retries.api.RetryStrategy;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * An immutable representation of configurations of a {@link Client}.
@@ -54,6 +56,7 @@ public final class ClientConfig {
     private final ApiService service;
     private final RetryStrategy retryStrategy;
     private final String retryScope;
+    private final List<Supplier<? extends AutoCloseable>> ownedResources;
     private final Set<Class<? extends ClientPlugin>> appliedPluginClasses;
 
     private ClientConfig(Builder builder) {
@@ -99,6 +102,7 @@ public final class ClientConfig {
 
         this.retryStrategy = builder.retryStrategy;
         this.retryScope = builder.retryScope;
+        this.ownedResources = List.copyOf(builder.ownedResources);
 
         this.context = Context.unmodifiableCopy(builder.context);
         this.service = Objects.requireNonNull(builder.service, "Missing required service schema");
@@ -234,6 +238,29 @@ public final class ClientConfig {
         return retryScope;
     }
 
+    List<AutoCloseable> acquireOwnedResources() {
+        List<AutoCloseable> leases = new ArrayList<>(ownedResources.size());
+        try {
+            for (Supplier<? extends AutoCloseable> resource : ownedResources) {
+                leases.add(Objects.requireNonNull(resource.get(), "Client-owned resource lease must not be null"));
+            }
+            return leases;
+        } catch (RuntimeException | Error error) {
+            for (AutoCloseable lease : leases) {
+                try {
+                    lease.close();
+                } catch (Exception | Error closeError) {
+                    error.addSuppressed(closeError);
+                }
+            }
+            throw error;
+        }
+    }
+
+    void copyOwnedResourcesTo(Builder builder) {
+        builder.ownedResources.addAll(ownedResources);
+    }
+
     /**
      * Create a new builder to build {@link ClientConfig}.
      *
@@ -329,6 +356,7 @@ public final class ClientConfig {
         private final Context context = Context.create();
         private RetryStrategy retryStrategy;
         private String retryScope;
+        private final List<Supplier<? extends AutoCloseable>> ownedResources = new ArrayList<>();
         private Predicate<ClientPlugin> pluginPredicate = p -> true;
         private final Map<Class<? extends ClientPlugin>, ClientPlugin> plugins = new LinkedHashMap<>();
         // Mutable set that tracks which plugin classes have been applied to this builder
@@ -351,6 +379,7 @@ public final class ClientConfig {
             context.copyTo(builder.context);
             builder.retryStrategy = retryStrategy;
             builder.retryScope = retryScope;
+            builder.ownedResources.addAll(ownedResources);
             builder.plugins.putAll(plugins);
             builder.pluginPredicate = pluginPredicate;
             builder.appliedPluginClasses.addAll(appliedPluginClasses);
@@ -432,6 +461,23 @@ public final class ClientConfig {
          */
         public String retryScope() {
             return retryScope;
+        }
+
+        /**
+         * Adds a resource lease factory created as part of client configuration.
+         *
+         * <p>The factory is invoked once for each client or request configuration that uses this configuration. The
+         * returned lease is closed when that client, request, or failed initialization releases its resources.
+         * Factories can share an underlying resource by reference counting their returned leases, and must support
+         * acquisition after all previously returned leases have been closed so configurations remain reusable.
+         *
+         * @param resource resource lease factory.
+         * @return the builder.
+         */
+        @SmithyInternalApi
+        public Builder addOwnedResource(Supplier<? extends AutoCloseable> resource) {
+            ownedResources.add(Objects.requireNonNull(resource, "resource"));
+            return this;
         }
 
         /**
@@ -695,4 +741,5 @@ public final class ClientConfig {
             return new ClientConfig(this);
         }
     }
+
 }

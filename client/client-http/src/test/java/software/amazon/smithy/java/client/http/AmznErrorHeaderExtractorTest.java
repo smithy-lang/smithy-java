@@ -132,6 +132,19 @@ public class AmznErrorHeaderExtractorTest {
     }
 
     @Test
+    public void extractsUnmodeledErrorCode() {
+        var extractor = new AmznErrorHeaderExtractor();
+        var response = HttpResponse.create()
+                .setStatusCode(400)
+                .setHeaders(HttpHeaders.of(Map.of(
+                        "x-amzn-errortype",
+                        List.of("other#ExpiredToken:http://example.com"))))
+                .toUnmodifiable();
+
+        assertThat(extractor.errorCode(response), equalTo("ExpiredToken"));
+    }
+
+    @Test
     public void returnsNullWhenNoTypeFound() {
         var extractor = new AmznErrorHeaderExtractor();
         var response = HttpResponse.create()

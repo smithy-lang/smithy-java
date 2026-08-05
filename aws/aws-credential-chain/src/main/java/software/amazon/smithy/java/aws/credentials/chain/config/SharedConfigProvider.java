@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.aws.credentials.chain.config;
 
 import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.aws.config.AwsConfigCredentialSource;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
@@ -46,6 +47,29 @@ public final class SharedConfigProvider implements ChainIdentityProvider {
             } else {
                 setup.setProfile(profileFile.activeProfile(setup::getenv));
             }
+            markDetectedProfileSources(setup);
         }
+    }
+
+    private static void markDetectedProfileSources(ChainSetup setup) {
+        if (setup.profile() == null) {
+            return;
+        }
+        for (AwsConfigCredentialSource source : setup.profile().credentialSources()) {
+            setup.markDetected(slot(source));
+        }
+    }
+
+    private static StandardProvider slot(AwsConfigCredentialSource source) {
+        return switch (source) {
+            case AwsConfigCredentialSource.StaticKeys ignored -> StandardProvider.PROFILE_STATIC_KEYS;
+            case AwsConfigCredentialSource.SessionKeys ignored -> StandardProvider.PROFILE_SESSION_KEYS;
+            case AwsConfigCredentialSource.AssumeRole ignored -> StandardProvider.PROFILE_ASSUME_ROLE;
+            case AwsConfigCredentialSource.WebIdentityToken ignored -> StandardProvider.PROFILE_WEB_IDENTITY;
+            case AwsConfigCredentialSource.SsoSession ignored -> StandardProvider.PROFILE_SSO_SESSION;
+            case AwsConfigCredentialSource.LegacySso ignored -> StandardProvider.PROFILE_LEGACY_SSO;
+            case AwsConfigCredentialSource.CredentialProcess ignored -> StandardProvider.PROFILE_CREDENTIAL_PROCESS;
+            case AwsConfigCredentialSource.LoginSession ignored -> StandardProvider.PROFILE_LOGIN;
+        };
     }
 }

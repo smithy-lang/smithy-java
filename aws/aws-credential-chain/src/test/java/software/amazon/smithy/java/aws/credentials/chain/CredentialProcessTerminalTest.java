@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.aws.credentials.chain;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -12,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
 import software.amazon.smithy.java.aws.credentials.chain.config.CredentialProcessHandler;
@@ -31,6 +33,7 @@ class CredentialProcessTerminalTest {
         setup.setCurrentProvider(handler);
         handler.setup(AwsCredentialsIdentity.class, setup);
 
+        assertInstanceOf(CachingIdentityResolver.class, setup.resolvers().getFirst().resolver());
         assertTrue(setup.isTerminal(),
                 "A profile declaring credential_process must claim the chain terminally so a process failure "
                         + "stops resolution instead of falling through to a lower-priority provider.");
