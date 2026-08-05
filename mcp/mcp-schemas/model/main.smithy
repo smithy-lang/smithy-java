@@ -85,6 +85,10 @@ structure ServerInfo {
 
 structure ListToolsResult {
     tools: ToolInfoList
+
+    /// Opaque cursor for the next page of results, per MCP pagination (spec section 5.4).
+    /// Absent when there are no further pages.
+    nextCursor: String
 }
 
 structure ToolInfo {
@@ -219,6 +223,10 @@ structure TextContent {
 
 structure ListPromptsResult {
     prompts: PromptInfoList
+
+    /// Opaque cursor for the next page of results, per MCP pagination (spec section 5.4).
+    /// Absent when there are no further pages.
+    nextCursor: String
 }
 
 list PromptInfoList {

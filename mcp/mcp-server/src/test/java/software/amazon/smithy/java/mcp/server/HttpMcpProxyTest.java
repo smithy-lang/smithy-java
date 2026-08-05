@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -32,6 +33,8 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
+import software.amazon.smithy.java.mcp.model.ListToolsResult;
+import software.amazon.smithy.java.mcp.model.ToolInfo;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -572,6 +575,57 @@ class HttpMcpProxyTest {
                 exchange.close();
             }
         }
+    }
+
+    @Test
+    void testListToolsPaginatesAcrossPages() throws IOException {
+        // Real wire round-trip: the server pages tools/list with a nextCursor, so listTools() must
+        // follow it and read nextCursor off the actually-deserialized response - not a hand-built
+        // Document like the McpServerProxy unit tests use.
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            try {
+                String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                JsonRpcRequest request = JsonRpcRequest.builder()
+                        .deserialize(JSON_CODEC.createDeserializer(requestBody.getBytes(StandardCharsets.UTF_8)))
+                        .build();
+                var params = request.getParams();
+                String cursor = params != null && params.getMember("cursor") != null
+                        ? params.getMember("cursor").asString()
+                        : null;
+
+                var page = ListToolsResult.builder();
+                if (cursor == null) {
+                    page.tools(List.of(tool("t1"), tool("t2"))).nextCursor("page2");
+                } else {
+                    page.tools(List.of(tool("t3")));
+                }
+
+                JsonRpcResponse response = JsonRpcResponse.builder()
+                        .jsonrpc("2.0")
+                        .id(request.getId())
+                        .result(Document.of(page.build()))
+                        .build();
+                byte[] body = JSON_CODEC.serializeToString(response).getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, body.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(body);
+                }
+            } catch (Exception e) {
+                exchange.sendResponseHeaders(500, 0);
+            } finally {
+                exchange.close();
+            }
+        });
+
+        List<ToolInfo> tools = proxy.listTools();
+
+        assertEquals(List.of("t1", "t2", "t3"), tools.stream().map(ToolInfo::getName).toList());
+    }
+
+    private static ToolInfo tool(String name) {
+        return ToolInfo.builder().name(name).build();
     }
 
     private static class MockMcpHandler implements HttpHandler {

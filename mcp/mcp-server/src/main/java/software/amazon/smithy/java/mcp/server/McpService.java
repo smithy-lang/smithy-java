@@ -25,6 +25,8 @@ import java.util.Set;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -100,6 +102,15 @@ public final class McpService {
     private final SchemaIndex schemaIndex;
     private final McpServerInterceptor interceptor;
     private Consumer<JsonRpcRequest> notificationWriter;
+
+    // Runs tools/list_changed refreshes off the transport's reader thread. A synchronous refresh calls
+    // listTools() whose response is read by that same reader thread, so doing it inline deadlocks it.
+    private final ExecutorService toolRefreshExecutor =
+            Executors.newSingleThreadExecutor(r -> {
+                var t = new Thread(r, "mcp-tools-refresh");
+                t.setDaemon(true);
+                return t;
+            });
 
     McpService(
             Map<String, Service> services,
@@ -555,19 +566,37 @@ public final class McpService {
             // Check if this is a tools/list_changed notification
             if ("notifications/tools/list_changed".equals(notification.getMethod())) {
                 LOG.debug("Received tools/list_changed notification from proxy: {}", proxy.name());
-                // Remove only this proxy's tools
-                tools.entrySet().removeIf(entry -> entry.getValue().proxy() == proxy);
-                // Re-fetch tools from only this proxy
-                List<ToolInfo> proxyTools = proxy.listTools();
-                for (var toolInfo : proxyTools) {
-                    tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
-                }
+                // Refresh on a separate thread. This notification is delivered on the proxy's transport
+                // reader thread, and refreshProxyTools() calls listTools() whose response is read by that
+                // same thread -- doing it inline would deadlock the reader.
+                toolRefreshExecutor.execute(() -> refreshProxyTools(proxy));
             }
             // Forward the notification
             if (baseNotificationWriter != null) {
                 baseNotificationWriter.accept(notification);
             }
         };
+    }
+
+    /**
+     * Re-fetches a proxy's tools after a {@code tools/list_changed} notification and swaps them into the
+     * registry. Runs off the transport reader thread (see caller). Fetches first so a failed or slow
+     * refresh never wipes the current tools, then adds the new set before pruning this proxy's stale
+     * entries, so a concurrent {@code tools/list} never observes a gap (at worst a brief superset).
+     */
+    void refreshProxyTools(McpServerProxy proxy) {
+        try {
+            List<ToolInfo> proxyTools = proxy.listTools();
+            Set<String> newNames = new HashSet<>();
+            for (var toolInfo : proxyTools) {
+                newNames.add(toolInfo.getName());
+                tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
+            }
+            tools.entrySet()
+                    .removeIf(entry -> entry.getValue().proxy() == proxy && !newNames.contains(entry.getKey()));
+        } catch (Exception e) {
+            LOG.error("Failed to re-fetch tools from proxy: " + proxy.name(), e);
+        }
     }
 
     /**
@@ -606,9 +635,13 @@ public final class McpService {
                     proxy.initialize(responseWriter, proxyNotificationWriter, initRequest, protocolVersion);
                 }
 
-                List<ToolInfo> proxyTools = proxy.listTools();
-                for (var toolInfo : proxyTools) {
-                    tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
+                try {
+                    List<ToolInfo> proxyTools = proxy.listTools();
+                    for (var toolInfo : proxyTools) {
+                        tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
+                    }
+                } catch (Exception e) {
+                    LOG.error("Failed to fetch tools from proxy: " + proxy.name(), e);
                 }
 
                 // Fetch and register prompts from proxy
