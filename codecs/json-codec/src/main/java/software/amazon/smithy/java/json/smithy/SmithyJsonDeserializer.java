@@ -616,7 +616,8 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                         && p + 4 <= localEnd
                         && localBuf[p + 1] == 'u'
                         && localBuf[p + 2] == 'l'
-                        && localBuf[p + 3] == 'l') {
+                        && localBuf[p + 3] == 'l'
+                        && !structMemberConsumer.supportsNullValues(member)) {
                     p += 4;
                 } else {
                     // Write pos back before callback, reload after
