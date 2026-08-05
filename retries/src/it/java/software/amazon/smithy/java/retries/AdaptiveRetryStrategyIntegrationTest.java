@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.retries;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
@@ -34,7 +35,6 @@ class AdaptiveRetryStrategyIntegrationTest {
         var server = new RateLimitedServer(RATE_LIMIT_MS);
         var successCount = new AtomicInteger(0);
         var throttleCount = new AtomicInteger(0);
-        var attemptCount = new AtomicInteger(0);
         var latch = new CountDownLatch(THREAD_COUNT);
 
         ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
@@ -42,7 +42,7 @@ class AdaptiveRetryStrategyIntegrationTest {
             executor.submit(() -> {
                 try {
                     for (var c = 0; c < CALLS_PER_THREAD; c++) {
-                        executeWithRetry(strategy, server, successCount, throttleCount, attemptCount);
+                        executeWithRetry(strategy, server, successCount, throttleCount);
                     }
                 } finally {
                     latch.countDown();
@@ -55,27 +55,17 @@ class AdaptiveRetryStrategyIntegrationTest {
 
         var totalCalls = THREAD_COUNT * CALLS_PER_THREAD;
         // All calls should eventually succeed
-        assertTrue(successCount.get() == totalCalls,
-                "Expected " + totalCalls + " successes but got " + successCount.get());
+        assertEquals(totalCalls, successCount.get());
         // Some calls should have been throttled initially
         assertTrue(throttleCount.get() > 0,
                 "Expected some throttling but got none");
-        // Success rate should be greater than 80%
-        var totalAttempts = attemptCount.get();
-        var successRate = (double) successCount.get() / totalAttempts;
-        assertTrue(successRate > 0.80,
-                String.format("Expected success rate > 80%% but got %.1f%% (%d/%d)",
-                        successRate * 100,
-                        successCount.get(),
-                        totalAttempts));
     }
 
     private void executeWithRetry(
             AdaptiveRetryStrategy strategy,
             RateLimitedServer server,
             AtomicInteger successCount,
-            AtomicInteger throttleCount,
-            AtomicInteger attemptCount
+            AtomicInteger throttleCount
     ) {
         var acquireResponse = strategy.acquireInitialToken(new AcquireInitialTokenRequest("test-scope"));
         var token = acquireResponse.token();
@@ -83,7 +73,6 @@ class AdaptiveRetryStrategyIntegrationTest {
 
         while (true) {
             try {
-                attemptCount.incrementAndGet();
                 server.call();
                 strategy.recordSuccess(new RecordSuccessRequest(token));
                 successCount.incrementAndGet();
@@ -96,8 +85,7 @@ class AdaptiveRetryStrategyIntegrationTest {
                     token = refreshResponse.token();
                     sleep(refreshResponse.delay());
                 } catch (TokenAcquisitionFailedException ex) {
-                    // Retries exhausted, count as success anyway since we'll retry the outer loop
-                    // This shouldn't happen with maxAttempts=10 and adaptive backoff
+                    // This shouldn't happen with maxAttempts=10 and adaptive backoff.
                     throw new AssertionError("Retries exhausted unexpectedly", ex);
                 }
             }

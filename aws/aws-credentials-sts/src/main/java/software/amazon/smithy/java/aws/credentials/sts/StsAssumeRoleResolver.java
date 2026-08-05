@@ -9,12 +9,15 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Function;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.config.AwsConfigCredentialSource;
 import software.amazon.smithy.java.aws.config.AwsProfile;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
+import software.amazon.smithy.java.aws.credentials.chain.AwsCredentialCaching;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.imds.ImdsCredentialProvider;
 import software.amazon.smithy.java.context.Context;
@@ -27,20 +30,40 @@ import software.amazon.smithy.java.dynamicclient.DynamicClient;
  * <p>Handles recursive source_profile resolution with cycle detection per the
  * Assume Role SEP.
  */
-final class StsAssumeRoleResolver implements IdentityResolver<AwsCredentialsIdentity> {
+final class StsAssumeRoleResolver implements IdentityResolver<AwsCredentialsIdentity>, AutoCloseable {
 
     private final AwsConfigCredentialSource.AssumeRole source;
     private final AwsProfileFile profileFile;
     private final StsEndpointConfig endpoint;
+    private final ScheduledExecutorService executor;
+    private final Set<String> sourceProfilePath;
+    private final Function<String, String> environment;
+    private volatile IdentityResolver<AwsCredentialsIdentity> sourceResolver;
 
     StsAssumeRoleResolver(
             AwsConfigCredentialSource.AssumeRole source,
             AwsProfileFile profileFile,
-            StsEndpointConfig endpoint
+            StsEndpointConfig endpoint,
+            ScheduledExecutorService executor,
+            Function<String, String> environment
+    ) {
+        this(source, profileFile, endpoint, executor, Set.of(), environment);
+    }
+
+    private StsAssumeRoleResolver(
+            AwsConfigCredentialSource.AssumeRole source,
+            AwsProfileFile profileFile,
+            StsEndpointConfig endpoint,
+            ScheduledExecutorService executor,
+            Set<String> sourceProfilePath,
+            Function<String, String> environment
     ) {
         this.source = source;
         this.profileFile = profileFile;
         this.endpoint = endpoint;
+        this.executor = executor;
+        this.sourceProfilePath = Set.copyOf(sourceProfilePath);
+        this.environment = environment;
     }
 
     @Override
@@ -55,23 +78,40 @@ final class StsAssumeRoleResolver implements IdentityResolver<AwsCredentialsIden
 
     @Override
     public IdentityResult<AwsCredentialsIdentity> resolveIdentity(Context ctx) {
-        AwsCredentialsIdentity sourceCredentials = resolveSourceCredentials(source, new HashSet<>());
-        return callAssumeRole(sourceCredentials, source.roleArn(), source.externalId());
+        var sourceResolver = sourceResolver();
+        AwsCredentialsIdentity sourceCredentials = sourceResolver.resolveIdentity(ctx).unwrap();
+        return callAssumeRole(sourceResolver, sourceCredentials, source.roleArn(), source.externalId());
     }
 
-    private AwsCredentialsIdentity resolveSourceCredentials(
+    IdentityResolver<AwsCredentialsIdentity> sourceResolver() {
+        IdentityResolver<AwsCredentialsIdentity> current = sourceResolver;
+        if (current != null) {
+            return current;
+        }
+        synchronized (this) {
+            if (sourceResolver == null) {
+                sourceResolver = createSourceResolver(source, new HashSet<>(sourceProfilePath));
+            }
+            return sourceResolver;
+        }
+    }
+
+    private IdentityResolver<AwsCredentialsIdentity> createSourceResolver(
             AwsConfigCredentialSource.AssumeRole ar,
             Set<String> visited
     ) {
         if (ar.sourceProfile() != null) {
-            return resolveFromSourceProfile(ar.sourceProfile(), visited);
+            return createSourceProfileResolver(ar.sourceProfile(), visited);
         } else if (ar.credentialSource() != null) {
-            return resolveFromCredentialSource(ar.credentialSource());
+            return createCredentialSourceResolver(ar.credentialSource());
         }
         throw new IllegalStateException("Profile with role_arn must have either source_profile or credential_source");
     }
 
-    private AwsCredentialsIdentity resolveFromSourceProfile(String profileName, Set<String> visited) {
+    private IdentityResolver<AwsCredentialsIdentity> createSourceProfileResolver(
+            String profileName,
+            Set<String> visited
+    ) {
         if (!visited.add(profileName)) {
             throw new IllegalStateException("Circular source_profile reference detected: " + visited);
         } else if (profileFile == null) {
@@ -86,68 +126,82 @@ final class StsAssumeRoleResolver implements IdentityResolver<AwsCredentialsIden
         // Per the Assume Role SEP: terminate at static credentials
         for (AwsConfigCredentialSource src : sourceProfile.credentialSources()) {
             if (src instanceof AwsConfigCredentialSource.StaticKeys(String accessKeyId, String secretAccessKey, String accountId)) {
-                return AwsCredentialsIdentity.create(
+                return IdentityResolver.of(AwsCredentialsIdentity.create(
                         accessKeyId,
                         secretAccessKey,
                         null,
                         null,
-                        accountId);
+                        accountId));
             } else if (src instanceof AwsConfigCredentialSource.SessionKeys(String accessKeyId, String secretAccessKey, String sessionToken, String accountId)) {
-                return AwsCredentialsIdentity.create(
+                return IdentityResolver.of(AwsCredentialsIdentity.create(
                         accessKeyId,
                         secretAccessKey,
                         sessionToken,
                         null,
-                        accountId);
+                        accountId));
             } else if (src instanceof AwsConfigCredentialSource.AssumeRole nested) {
-                // Recursive: resolve source creds for the nested role, then assume it
-                AwsCredentialsIdentity nestedSource = resolveSourceCredentials(nested, visited);
-                return callAssumeRole(nestedSource, nested.roleArn(), nested.externalId()).unwrap();
+                var nestedResolver =
+                        new StsAssumeRoleResolver(nested, profileFile, endpoint, executor, visited, environment);
+                return AwsCredentialCaching.staticallyStable(nestedResolver, executor);
             }
         }
 
         throw new IllegalStateException("Source profile '" + profileName + "' has no resolvable credential source");
     }
 
-    private AwsCredentialsIdentity resolveFromCredentialSource(String credentialSource) {
+    private IdentityResolver<AwsCredentialsIdentity> createCredentialSourceResolver(String credentialSource) {
         return switch (credentialSource) {
             case "Environment" -> {
                 String ak = getRequireEnv("AWS_ACCESS_KEY_ID");
                 String sk = getRequireEnv("AWS_SECRET_ACCESS_KEY");
-                String st = System.getenv("AWS_SESSION_TOKEN");
-                yield AwsCredentialsIdentity.create(ak, sk, st, null, System.getenv("AWS_ACCOUNT_ID"));
+                String st = environment.apply("AWS_SESSION_TOKEN");
+                yield IdentityResolver.of(
+                        AwsCredentialsIdentity.create(ak, sk, st, null, environment.apply("AWS_ACCOUNT_ID")));
             }
             case "Ec2InstanceMetadata" -> {
-                // Create a temporary ChainSetup to let ImdsCredentialProvider register its resolver
-                var tempSetup = ChainSetup.builder().build();
-                new ImdsCredentialProvider().setup(AwsCredentialsIdentity.class, tempSetup);
+                var tempSetup = ChainSetup.builder().executor(executor).env(environment).build();
+                var provider = new ImdsCredentialProvider();
+                tempSetup.setCurrentProvider(provider);
+                provider.setup(AwsCredentialsIdentity.class, tempSetup);
                 var resolvers = tempSetup.resolvers();
                 if (resolvers.isEmpty()) {
                     throw new IllegalStateException("IMDS credential provider did not produce a resolver");
                 }
                 @SuppressWarnings("unchecked")
-                var r = (IdentityResolver<AwsCredentialsIdentity>) resolvers.getFirst().resolver();
-                yield r.resolveIdentity(Context.create()).unwrap();
+                var resolver = (IdentityResolver<AwsCredentialsIdentity>) resolvers.getFirst().resolver();
+                yield resolver;
             }
             default -> throw new IllegalStateException("Unsupported credential_source: " + credentialSource);
         };
     }
 
-    private static String getRequireEnv(String name) {
-        var result = System.getenv(name);
+    private String getRequireEnv(String name) {
+        var result = environment.apply(name);
         if (result == null) {
             throw new IllegalStateException("credential_source=Environment but " + name + " not set");
         }
         return result;
     }
 
+    @Override
+    public void close() {
+        IdentityResolver<AwsCredentialsIdentity> current = sourceResolver;
+        if (current instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception error) {
+                throw new IllegalStateException("Failed to close source credential resolver", error);
+            }
+        }
+    }
+
     private IdentityResult<AwsCredentialsIdentity> callAssumeRole(
+            IdentityResolver<AwsCredentialsIdentity> retainedSourceResolver,
             AwsCredentialsIdentity sourceCredentials,
             String roleArn,
             String externalId
     ) {
-        // Create a static resolver for the source credentials
-        var sourceResolver = createSourceResolver(sourceCredentials);
+        var sourceResolver = createSourceResolver(sourceCredentials, retainedSourceResolver);
 
         try (DynamicClient client = StsClientFactory.create(sourceResolver, endpoint)) {
             // ExternalId is optional; Map.of rejects null values, so only include it when present.
@@ -161,7 +215,10 @@ final class StsAssumeRoleResolver implements IdentityResolver<AwsCredentialsIden
         }
     }
 
-    private static IdentityResolver<AwsCredentialsIdentity> createSourceResolver(AwsCredentialsIdentity creds) {
+    static IdentityResolver<AwsCredentialsIdentity> createSourceResolver(
+            AwsCredentialsIdentity creds,
+            IdentityResolver<AwsCredentialsIdentity> retainedSourceResolver
+    ) {
         IdentityResult<AwsCredentialsIdentity> sourceResult = IdentityResult.of(creds);
         return new IdentityResolver<>() {
             @Override
@@ -172,6 +229,11 @@ final class StsAssumeRoleResolver implements IdentityResolver<AwsCredentialsIden
             @Override
             public Class<AwsCredentialsIdentity> identityType() {
                 return AwsCredentialsIdentity.class;
+            }
+
+            @Override
+            public void invalidate(AwsCredentialsIdentity rejectedIdentity) {
+                retainedSourceResolver.invalidate(rejectedIdentity);
             }
         };
     }

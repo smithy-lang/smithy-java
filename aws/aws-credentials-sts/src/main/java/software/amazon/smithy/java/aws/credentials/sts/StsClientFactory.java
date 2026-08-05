@@ -9,6 +9,7 @@ import java.util.Objects;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.client.awsquery.AwsQueryClientProtocol;
+import software.amazon.smithy.java.aws.client.core.AwsCredentialChainPlugin;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
 import software.amazon.smithy.java.aws.client.core.settings.StsEndpointSettings;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
@@ -51,7 +52,8 @@ final class StsClientFactory {
         var builder = DynamicClient.builder()
                 .model(model())
                 .serviceId(STS_SERVICE)
-                .protocol(new AwsQueryClientProtocol(STS_SERVICE, STS_VERSION));
+                .protocol(new AwsQueryClientProtocol(STS_SERVICE, STS_VERSION))
+                .addInterceptor(AwsCredentialChainPlugin.invalidationInterceptor());
         if (endpoint.region() != null) {
             builder.putConfig(RegionSetting.REGION, endpoint.region());
         }

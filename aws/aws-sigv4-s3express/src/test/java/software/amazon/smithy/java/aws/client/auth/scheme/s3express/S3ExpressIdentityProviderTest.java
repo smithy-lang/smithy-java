@@ -33,7 +33,7 @@ class S3ExpressIdentityProviderTest {
 
         var first = provider.resolveIdentity(context).identity();
         var cached = provider.resolveIdentity(context).identity();
-        provider.invalidate();
+        provider.invalidate(first);
         var refreshed = provider.resolveIdentity(context).identity();
 
         assertThat(cached, is(first));

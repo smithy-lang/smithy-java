@@ -12,12 +12,12 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Set;
 import java.util.function.Function;
-import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
 import software.amazon.smithy.java.aws.config.AwsProfile;
+import software.amazon.smithy.java.aws.credentials.chain.AwsCredentialCaching;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
@@ -75,10 +75,7 @@ public final class ImdsCredentialProvider implements ChainIdentityProvider {
         ImdsClient client = new ImdsClient(endpoint);
         AwsCredentialsResolver delegate = ctx -> fetchAndParse(client, profileName);
 
-        setup.addResolver(CachingIdentityResolver.builder(delegate)
-                .executor(setup.executor())
-                .allowExpiredCredentials(true)
-                .build());
+        setup.addResolver(AwsCredentialCaching.staticallyStable(delegate, setup.executor()));
     }
 
     private static IdentityResult<AwsCredentialsIdentity> fetchAndParse(ImdsClient client, String profileName) {

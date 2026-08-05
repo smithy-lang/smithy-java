@@ -18,6 +18,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
@@ -46,6 +48,7 @@ import software.amazon.smithy.java.dynamicschemas.StructDocument;
 import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.retries.StandardRetryStrategy;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -108,6 +111,172 @@ public class ClientTest {
                 .build();
 
         assertThat(applied, equalTo(EXPECTED_PLUGIN_CLASSES));
+    }
+
+    @Test
+    public void closesResourcesCreatedByPlugins() {
+        var closed = new AtomicBoolean();
+        DynamicClient client = DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(config -> config.addOwnedResource(() -> () -> closed.set(true)))
+                .endpointResolver(EndpointResolver.staticEndpoint("http://localhost"))
+                .build();
+
+        client.close();
+
+        Assertions.assertTrue(closed.get());
+    }
+
+    @Test
+    public void closesSharedPluginResourcesAfterLastClient() {
+        var resource = new ReusableSharedResource();
+        DynamicClient first = DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(config -> config.addOwnedResource(resource::acquire))
+                .endpointResolver(EndpointResolver.staticEndpoint("http://localhost"))
+                .build();
+        DynamicClient second = DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .withConfiguration(first.config())
+                .build();
+
+        first.close();
+        Assertions.assertEquals(0, resource.closes);
+
+        second.close();
+        Assertions.assertEquals(1, resource.closes);
+    }
+
+    @Test
+    public void resourceBearingConfigurationCanBeReusedAfterLastClientCloses() {
+        var resource = new ReusableSharedResource();
+        DynamicClient first = DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(config -> config.addOwnedResource(resource::acquire))
+                .endpointResolver(EndpointResolver.staticEndpoint("http://localhost"))
+                .build();
+        ClientConfig savedConfig = first.config();
+
+        first.close();
+        Assertions.assertEquals(1, resource.generations);
+        Assertions.assertEquals(1, resource.closes);
+
+        DynamicClient second = DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .withConfiguration(savedConfig)
+                .build();
+        Assertions.assertEquals(2, resource.generations);
+
+        second.close();
+        Assertions.assertEquals(2, resource.closes);
+    }
+
+    @Test
+    public void doesNotAcquirePluginResourcesWhenConfigurationFails() {
+        var pluginApplied = new AtomicBoolean();
+        var acquisitions = new AtomicInteger();
+
+        Assertions.assertThrows(
+                NullPointerException.class,
+                () -> ClientConfig.builder()
+                        .addPlugin(config -> {
+                            pluginApplied.set(true);
+                            config.addOwnedResource(() -> {
+                                acquisitions.incrementAndGet();
+                                return () -> {};
+                            });
+                        })
+                        .build());
+
+        Assertions.assertTrue(pluginApplied.get());
+        Assertions.assertEquals(0, acquisitions.get());
+    }
+
+    @Test
+    public void closesResourcesCreatedByRequestOverridePlugins() {
+        var queue = new MockQueue();
+        queue.enqueue(HttpResponse.create().setStatusCode(200).toUnmodifiable());
+        var closed = new AtomicBoolean();
+        DynamicClient client = DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(MockPlugin.builder().addQueue(queue).build())
+                .endpointResolver(EndpointResolver.staticEndpoint("http://localhost"))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .build();
+        var override = RequestOverrideConfig.builder()
+                .addPlugin(config -> config.addOwnedResource(() -> () -> closed.set(true)))
+                .build();
+
+        client.call("GetSprocket", Document.ofObject(Map.of()), override);
+
+        Assertions.assertTrue(closed.get());
+        client.close();
+    }
+
+    @Test
+    public void closesRequestOverrideResourcesWhenModifyBeforeCallFails() {
+        var closed = new AtomicBoolean();
+        DynamicClient client = DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
+                    @Override
+                    public ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
+                        throw new IllegalStateException("stop");
+                    }
+                }))
+                .endpointResolver(EndpointResolver.staticEndpoint("http://localhost"))
+                .build();
+        var override = RequestOverrideConfig.builder()
+                .addPlugin(config -> config.addOwnedResource(() -> () -> closed.set(true)))
+                .build();
+        try {
+            Assertions.assertThrows(
+                    IllegalStateException.class,
+                    () -> client.call("GetSprocket", Document.ofObject(Map.of()), override));
+            Assertions.assertTrue(closed.get());
+        } finally {
+            client.close();
+        }
+    }
+
+    @Test
+    public void closesOwnedResourcesWhenClientInitializationFails() {
+        var retryStrategy = StandardRetryStrategy.create();
+        DynamicClient first = DynamicClient.builder()
+                .model(MODEL)
+                .serviceId(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .retryStrategy(retryStrategy)
+                .endpointResolver(EndpointResolver.staticEndpoint("http://localhost"))
+                .build();
+        var closed = new AtomicBoolean();
+        try {
+            Assertions.assertThrows(
+                    IllegalStateException.class,
+                    () -> DynamicClient.builder()
+                            .model(MODEL)
+                            .serviceId(SERVICE)
+                            .protocol(new RestJsonClientProtocol(SERVICE))
+                            .retryStrategy(retryStrategy)
+                            .addPlugin(config -> config.addOwnedResource(() -> () -> closed.set(true)))
+                            .endpointResolver(EndpointResolver.staticEndpoint("http://localhost"))
+                            .build());
+            Assertions.assertTrue(closed.get());
+        } finally {
+            first.close();
+        }
     }
 
     @Test
@@ -499,5 +668,42 @@ public class ClientTest {
         assertThat(seenInputs.size(), equalTo(1));
         var seen = (StructDocument) seenInputs.get(0);
         assertThat(seen.getMember("id").asString(), equalTo("swapped"));
+    }
+
+    private static final class ReusableSharedResource {
+        private int leases;
+        private int generations;
+        private int closes;
+
+        synchronized AutoCloseable acquire() {
+            if (leases == 0) {
+                generations++;
+            }
+            leases++;
+            return new ResourceLease(this);
+        }
+
+        private synchronized void release() {
+            if (--leases == 0) {
+                closes++;
+            }
+        }
+    }
+
+    private static final class ResourceLease implements AutoCloseable {
+        private final ReusableSharedResource resource;
+        private boolean closed;
+
+        ResourceLease(ReusableSharedResource resource) {
+            this.resource = resource;
+        }
+
+        @Override
+        public synchronized void close() {
+            if (!closed) {
+                closed = true;
+                resource.release();
+            }
+        }
     }
 }

@@ -200,6 +200,11 @@ final class OperationMetricsInterceptor implements ClientInterceptor {
         public Class<I> identityType() {
             return delegate.identityType();
         }
+
+        @Override
+        public void invalidate(I rejectedIdentity) {
+            delegate.invalidate(rejectedIdentity);
+        }
     }
 
     static double elapsedSecondsSinceNs(long startNs) {

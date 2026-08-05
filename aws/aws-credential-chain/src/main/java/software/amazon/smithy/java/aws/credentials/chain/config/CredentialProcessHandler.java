@@ -20,6 +20,7 @@ import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.config.AwsConfigCredentialSource;
 import software.amazon.smithy.java.aws.config.AwsProfile;
+import software.amazon.smithy.java.aws.credentials.chain.AwsCredentialCaching;
 import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
@@ -34,9 +35,9 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * Resolves credentials by invoking an external process specified by {@code credential_process}
  * in the active AWS profile.
  *
- * <p>The command string is captured at assembly time and does not change after construction.
- * Each call to {@code resolveIdentity()} re-executes the process to obtain fresh credentials,
- * so expiring credentials returned by the process are naturally refreshed without caching.
+ * <p>The command string is captured at assembly time and does not change after construction. Returned credentials
+ * are cached and refreshed before expiration. Because the process is an opaque customer-provided source, refresh
+ * failures do not enable expired-credential fallback.
  *
  * <p>This provider registers terminally: once a profile declares {@code credential_process}, the chain commits
  * to it, and a process failure is returned as an error rather than falling through to a lower-priority provider
@@ -80,7 +81,8 @@ public final class CredentialProcessHandler implements ChainIdentityProvider {
         }
         for (AwsConfigCredentialSource source : profile.credentialSources()) {
             if (source instanceof AwsConfigCredentialSource.CredentialProcess(String commandLine)) {
-                setup.addTerminalResolver(new Resolver(commandLine));
+                setup.addTerminalResolver(
+                        AwsCredentialCaching.cachingOnly(new Resolver(commandLine), setup.executor()));
                 return;
             }
         }
@@ -167,7 +169,9 @@ public final class CredentialProcessHandler implements ChainIdentityProvider {
             try {
                 expiration = Instant.parse(expirationStr);
             } catch (DateTimeParseException e) {
-                LOGGER.warn("credential_process returned unparseable Expiration: {}", expirationStr);
+                return IdentityResult.ofError(
+                        CredentialProcessHandler.class,
+                        "credential_process returned unparseable Expiration: " + expirationStr);
             }
         }
         return IdentityResult.of(AwsCredentialsIdentity.create(
