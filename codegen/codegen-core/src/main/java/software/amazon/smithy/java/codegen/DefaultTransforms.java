@@ -23,6 +23,6 @@ public final class DefaultTransforms {
         runner.removeShapesDeprecatedBeforeVersion(settings.relativeVersion());
         runner.removeShapesDeprecatedBeforeDate(settings.relativeDate());
         runner.performDefaultCodegenTransforms();
-        runner.createDedicatedInputsAndOutputs();
+        runner.createDedicatedInputsAndOutputs(settings.inputSuffix(), settings.outputSuffix());
     }
 }
