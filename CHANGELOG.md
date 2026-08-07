@@ -1,12 +1,19 @@
 # Change Log
 
-## 1.5.0 (8/6/2026)
+## 1.5.1 (8/7/2026)
 > [!IMPORTANT]
 > All client modules are considered stable.  Some modules, including
 > server, CLI, and MCP, are still in developer-preview and may contain
 > bugs.  No guarantee is made about their API stability. Unstable
 > modules are marked with a warning in their `README.md` and with the
 > `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Bug Fixes
+
+* Reverted the MCP `tools/list` and `prompts/list` pagination change.
+  ([#1312](https://github.com/smithy-lang/smithy-java/pull/1312))
+
+## 1.5.0 (8/6/2026)
 
 ### Features
 
