@@ -1,120 +1,50 @@
 $version: "2"
 
 metadata shapeClosures = [
-    // A closure that only includes shapes tagged as events.
     {
-        id: "smithy.example.birds#events"
-        includeBySelector: "[trait|tags|(values) = event]"
+        id: "com.example.audubon#events"
+        includeBySelector: "structure[trait|tags|(values) = event]"
     }
 ]
 
-namespace smithy.example.birds
+namespace com.example.audubon
 
-/// Reports an unclassified potential sighting of a bird from a video stream,
-/// detected by a simple computer vision application.
-///
-/// These events are sent to a queue where a more robust algorithm is applied
-/// to verify the sighting and classify the species.
-///
-/// This is an internal event.
-@internal
+/// Published when a member reports a new sighting.
 @tags(["event"])
-structure UnclassifiedStreamSighting {
-    /// The ID of the camera stream where the bird was detected.
+@references([{resource: SightingResource}])
+structure SightingReported {
+    /// The sighting that was reported.
     @required
-    streamId: UUID
+    sightingId: Uuid
 
-    /// The timestamp of the stream where the bird was first detected.
+    /// The bird that was sighted.
     @required
-    start: Timestamp
+    birdId: Uuid
 
-    /// The timestamp of the stream where the bird was last detected.
+    /// When the bird was sighted.
     @required
-    end: Timestamp
+    sightedAt: Timestamp
+
+    /// Where the bird was sighted.
+    @required
+    location: Coordinates
+
+    /// A URL to the photo submitted with the sighting, if there was one.
+    photoUrl: String
+
+    /// The code on the bird's identification band, if the member read one.
+    bandCode: String
 }
 
-/// Reports a sighting from a stream that has been classified.
-///
-/// If confidence is high, these may be automatically added to the list
-/// of verified sightings. Otherwise these are sent to a queue for
-/// review.
-///
-/// This is an internal event.
-@internal
+/// Published when a sighting is withdrawn.
 @tags(["event"])
-structure ClassifiedStreamSighting {
-    /// The ID of the camera stream where the bird was detected.
+@references([{resource: SightingResource}])
+structure SightingWithdrawn {
+    /// The sighting that was withdrawn.
     @required
-    streamId: UUID
+    sightingId: Uuid
 
-    /// The timestamp of the stream where the bird was first detected.
+    /// The bird the withdrawn sighting referred to.
     @required
-    start: Timestamp
-
-    /// The timestamp of the stream where the bird was last detected.
-    @required
-    end: Timestamp
-
-    /// The proposed classification of the bird.
-    @required
-    classification: Classification
-
-    /// The confidence in the classification as a percentage.
-    @required
-    @range(min: 0, max: 100)
-    confidence: Float
-}
-
-/// Reports an unverified sighting submitted by a user.
-///
-/// These are sent to a queue for review.
-///
-/// This is an internal event
-@internal
-@tags(["event"])
-@references([
-    {
-        resource: Bird
-    }
-    {
-        resource: Sighting
-    }
-])
-structure UnverifiedSighting for Sighting {
-    @required
-    $birdId
-
-    @required
-    $sightingId
-}
-
-// This is a public event.
-/// Reports a verified sighting of a bird.
-@tags(["event"])
-@references([
-    {
-        resource: Bird
-    }
-    {
-        resource: Sighting
-    }
-])
-structure VerifiedSighting for Sighting {
-    @required
-    $birdId
-
-    @required
-    classification: Classification
-
-    @required
-    $sightingId
-
-    @required
-    $timestamp
-
-    @required
-    $location
-
-    @required
-    $verified
+    birdId: Uuid
 }

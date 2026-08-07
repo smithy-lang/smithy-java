@@ -1,255 +1,180 @@
 $version: "2"
 
 metadata shapeClosures = [
-    // A closure that includes every shape in the service namespace,
-    // including events.
+    // Everything in the namespace: the service and the events it publishes. Combined
+    // mode requires the primary service to be a member of the closure it generates,
+    // so the server subproject drives generation from this one.
     {
-        id: "smithy.example.birds#fullService"
-        includeNamespaces: ["smithy.example.birds"]
+        id: "com.example.audubon#all"
+        includeNamespaces: ["com.example.audubon"]
     }
 ]
 
-namespace smithy.example.birds
+namespace com.example.audubon
 
 use smithy.protocols#rpcv2Cbor
 
-/// A service that tracks bird sightings for research purposes.
+/// Tracks bird sightings reported by members of a bird-watching club.
 @rpcv2Cbor
-@paginated(inputToken: "nextToken", outputToken: "nextToken", pageSize: "pageSize")
-service iBird {
+service BirdWatcher {
+    version: "2026-08-05"
     resources: [
-        Bird
+        SightingResource
+    ]
+    errors: [
+        SightingNotFound
     ]
 }
 
-/// A resource representing the bird itself.
-///
-/// These may only be created by the service operators.
-resource Bird {
+/// A single report of a bird, submitted by a club member.
+resource SightingResource {
     identifiers: {
-        birdId: UUID
+        sightingId: Uuid
     }
     properties: {
-        classification: Classification
-    }
-    resources: [
-        Sighting
-    ]
-    create: CreateBird
-    read: GetBird
-    list: ListBirds
-}
-
-/// The taxonomic classification of a bird.
-///
-/// Ranks above order are shared by all birds, so they are omitted.
-structure Classification {
-    @required
-    order: NonEmptyString
-
-    @required
-    family: NonEmptyString
-
-    @required
-    genus: NonEmptyString
-
-    @required
-    species: NonEmptyString
-
-    subspecies: NonEmptyString
-}
-
-/// Adds a bird to the database. This is for internal use only.
-@internal
-operation CreateBird {
-    input := for Bird {
-        @required
-        $classification
-    }
-}
-
-/// Retrieves information about a specific bird.
-@readonly
-operation GetBird {
-    input := for Bird {
-        @required
-        $birdId
-    }
-
-    output := for Bird {
-        @required
-        $birdId
-
-        @required
-        $classification
-    }
-}
-
-/// Lists birds present in the database.
-@paginated(items: "birds")
-@readonly
-operation ListBirds {
-    input := with [PaginatedInput] {}
-
-    output := with [PaginatedOutput] {
-        @required
-        birds: BirdList
-    }
-}
-
-list BirdList {
-    member: BirdSummary
-}
-
-/// A summary of a bird's properties.
-structure BirdSummary for Bird {
-    $birdId
-    $classification
-}
-
-/// A resource representing a bird sighting.
-///
-/// These may be created either by user submission or by automated monitoring
-/// systems. Sightings are verified before appearing in listings.
-resource Sighting {
-    identifiers: {
-        birdId: UUID
-        sightingId: UUID
-    }
-    properties: {
-        timestamp: Timestamp
+        birdId: Uuid
+        sightedAt: Timestamp
         location: Coordinates
-        image: Image
-        verified: Boolean
+        photoUrl: String
+        bandCode: String
     }
-    create: CreateSighting
+    create: ReportSighting
     read: GetSighting
     list: ListSightings
+    delete: WithdrawSighting
 }
 
-/// Creates a sighting.
-operation CreateSighting {
-    input := for Sighting {
-        @required
-        $birdId
-
-        @required
-        $timestamp
-
-        @required
-        $location
-
-        @required
-        image: Image
-
-        // For internal use only. Automated sightings from a stream may set
-        // this to true if their confidence is high.
-        @internal
-        verified: Boolean
-    }
-
-    output := for Sighting {
-        @required
-        $sightingId
-    }
-}
-
-/// Gets a sighting.
-///
-/// Unverified sightings may be retrieved here, even if they don't appear in
-/// listings.
-@readonly
-operation GetSighting {
-    input := for Sighting {
-        @required
-        $birdId
-
-        @required
-        $sightingId
-    }
-
-    output := for Sighting {
-        @required
-        $timestamp
-
-        @required
-        $location
-
-        @required
-        $image
-
-        @required
-        $verified
-    }
-}
-
-/// List verified sightings for a particular bird.
-@paginated(items: "sightings")
-@readonly
-operation ListSightings {
-    input := for Bird with [PaginatedInput] {
-        @required
-        $birdId
-    }
-
-    output := with [PaginatedOutput] {
-        @required
-        sightings: SightingSummaryList
-    }
-}
-
-/// Geographical coordinates from where a sighting took place.
-structure Coordinates {
-    latitude: BigDecimal
-    longitude: BigDecimal
-}
-
-list SightingSummaryList {
-    member: SightingSummary
-}
-
-/// A summary of a sighting's properties.
-structure SightingSummary for Sighting {
-    @required
-    $birdId
-
+/// A sighting as the service stores and returns it.
+structure Sighting for SightingResource {
+    /// The identifier assigned to this sighting.
     @required
     $sightingId
 
+    /// The bird that was sighted.
     @required
-    $timestamp
+    $birdId
 
+    /// When the bird was sighted.
+    @required
+    $sightedAt
+
+    /// Where the bird was sighted.
     @required
     $location
 
+    /// A URL to the photo submitted with the sighting, if there was one.
+    $photoUrl
+
+    /// The code on the bird's identification band, if the member read one.
+    $bandCode
+}
+
+/// Records a member's sighting of a bird.
+operation ReportSighting {
+    input := for SightingResource {
+        /// The bird that was sighted.
+        @required
+        $birdId
+
+        /// When the bird was sighted.
+        @required
+        $sightedAt
+
+        /// Where the bird was sighted.
+        @required
+        $location
+
+        /// A photo of the bird.
+        @notProperty
+        photo: Photo
+
+        /// The code on the bird's identification band, if the member read one.
+        $bandCode
+    }
+
+    output := for SightingResource {
+        /// The identifier assigned to the new sighting.
+        @required
+        $sightingId
+    }
+}
+
+/// Retrieves a single sighting.
+@readonly
+operation GetSighting {
+    input := for SightingResource {
+        @required
+        $sightingId
+    }
+
+    output := for SightingResource {
+        @required
+        $sightingId
+
+        @required
+        $birdId
+
+        @required
+        $sightedAt
+
+        @required
+        $location
+
+        $photoUrl
+
+        $bandCode
+    }
+}
+
+/// Lists every sighting.
+@readonly
+operation ListSightings {
+    input := {}
+
+    output := {
+        @required
+        sightings: Sightings
+    }
+}
+
+/// Withdraws a sighting that was reported in error.
+///
+/// The sighting is deleted. Subscribers that acted on it find out through the
+/// `SightingWithdrawn` event.
+@idempotent
+operation WithdrawSighting {
+    input := for SightingResource {
+        @required
+        $sightingId
+    }
+
+    output := {}
+}
+
+list Sightings {
+    member: Sighting
+}
+
+/// Returned when no sighting has the requested identifier.
+@error("client")
+structure SightingNotFound {
     @required
-    $verified
+    message: String
 }
 
-// A mixin to share input pagination parameters.
-@mixin
-@private
-structure PaginatedInput {
-    nextToken: NonEmptyString
+/// Where a sighting took place.
+structure Coordinates {
+    @required
+    latitude: Double
 
-    @range(min: 1, max: 1000)
-    pageSize: Integer = 100
+    @required
+    longitude: Double
 }
 
-// A mixin to share output pagination parameters.
-@mixin
-@private
-structure PaginatedOutput {
-    nextToken: NonEmptyString
-}
-
-/// A UUID-v4 string.
+/// A UUID, used for every identifier in this model.
 @pattern("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
-string UUID
+string Uuid
 
-@length(min: 1)
-string NonEmptyString
-
-/// A JPEG image.
+/// A JPEG photo of a bird.
 @mediaType("image/jpeg")
-blob Image
+blob Photo
