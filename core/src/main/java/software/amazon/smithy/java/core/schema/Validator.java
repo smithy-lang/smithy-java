@@ -190,7 +190,7 @@ public final class Validator {
             depth = 0;
         }
 
-        void pushPath(Object pathSegment) {
+        void pushPath(String pathSegment) {
             // Rather than check if the depth exceeds maxDepth _and_ if depth == path.length, we instead always
             // ensure that the path length never exceeds maxDepth.
             if (depth == path.length) {
@@ -210,7 +210,7 @@ public final class Validator {
             path[depth++] = pathSegment;
         }
 
-        void swapPath(Object pathSegment) {
+        void swapPath(int pathSegment) {
             path[depth - 1] = pathSegment;
         }
 
