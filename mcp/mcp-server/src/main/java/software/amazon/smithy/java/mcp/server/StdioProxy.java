@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.mcp.server;
 
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import java.io.BufferedReader;
@@ -15,7 +14,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -44,7 +42,6 @@ public final class StdioProxy extends McpServerProxy {
     private final Map<String, CompletableFuture<JsonRpcResponse>> pendingRequests = new ConcurrentHashMap<>();
     private volatile boolean running = false;
     private final String name;
-    private final Duration requestTimeout;
 
     private StdioProxy(Builder builder) {
         processBuilder = new ProcessBuilder();
@@ -65,7 +62,6 @@ public final class StdioProxy extends McpServerProxy {
         }
 
         this.name = builder.name;
-        this.requestTimeout = builder.timeout != null ? builder.timeout : Duration.ofMinutes(5);
 
         processBuilder.redirectErrorStream(false); // Keep stderr separate
     }
@@ -76,7 +72,6 @@ public final class StdioProxy extends McpServerProxy {
         private List<String> arguments;
         private Map<String, String> environmentVariables;
         private File workingDirectory;
-        private Duration timeout;
 
         public Builder name(String name) {
             this.name = name;
@@ -100,16 +95,6 @@ public final class StdioProxy extends McpServerProxy {
 
         public Builder workingDirectory(File workingDirectory) {
             this.workingDirectory = workingDirectory;
-            return this;
-        }
-
-        /**
-         * Per-request timeout: a request that never receives a matching response (e.g. a server that
-         * stays alive but goes silent) fails after this duration instead of blocking the caller
-         * forever. Defaults to 5 minutes, symmetric with {@link HttpMcpProxy}.
-         */
-        public Builder timeout(Duration timeout) {
-            this.timeout = timeout;
             return this;
         }
 
@@ -171,15 +156,6 @@ public final class StdioProxy extends McpServerProxy {
                     new RuntimeException("Failed to send request to MCP server: " + e.getMessage(), e));
         } finally {
             writeLock.unlock();
-        }
-
-        // Fail a request that never receives a matching response (server alive but silent) instead of
-        // blocking the caller forever; symmetric with HttpMcpProxy's request timeout. Also removes the
-        // pending-request entry on any completion (success, error, or timeout). Skipped when the write
-        // above already failed and completed the future.
-        if (!responseFuture.isDone()) {
-            responseFuture.orTimeout(requestTimeout.toMillis(), MILLISECONDS)
-                    .whenComplete((response, error) -> pendingRequests.remove(requestId));
         }
 
         return responseFuture;
