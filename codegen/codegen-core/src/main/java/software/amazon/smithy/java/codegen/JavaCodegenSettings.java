@@ -53,6 +53,8 @@ public final class JavaCodegenSettings {
     private static final String RUNTIME_TRAITS_SELECTOR = "runtimeTraitsSelector";
     private static final String MODES = "modes";
     private static final String CLOSURE = "closure";
+    private static final String INPUT_SUFFIX = "inputSuffix";
+    private static final String OUTPUT_SUFFIX = "outputSuffix";
 
     // Legacy default name for types-only generation. Before types generation was driven by a shape
     // closure, it relied on a synthetic service named "TypesGenService", so the generated name
@@ -76,7 +78,9 @@ public final class JavaCodegenSettings {
             RUNTIME_TRAITS,
             RUNTIME_TRAITS_SELECTOR,
             MODES,
-            CLOSURE);
+            CLOSURE,
+            INPUT_SUFFIX,
+            OUTPUT_SUFFIX);
 
     private final ShapeId service;
     private final String closure;
@@ -96,6 +100,8 @@ public final class JavaCodegenSettings {
     private final Selector runtimeTraitsSelector;
     private final ObjectNode httpConfig;
     private final Map<String, Set<Symbol>> generatedSymbols = new HashMap<>();
+    private final String inputSuffix;
+    private final String outputSuffix;
 
     private JavaCodegenSettings(Builder builder) {
         this.service = builder.service;
@@ -115,6 +121,8 @@ public final class JavaCodegenSettings {
         this.runtimeTraits = Collections.unmodifiableList(builder.runtimeTraits);
         this.runtimeTraitsSelector = builder.runtimeTraitsSelector;
         this.httpConfig = builder.httpConfig;
+        this.inputSuffix = builder.inputSuffix;
+        this.outputSuffix = builder.outputSuffix;
     }
 
     // Resolves the generated name: an explicit name wins, otherwise the service name when a service
@@ -155,10 +163,11 @@ public final class JavaCodegenSettings {
                 .getStringMember(EDITION, builder::edition)
                 .getArrayMember(RUNTIME_TRAITS, n -> n.expectStringNode().expectShapeId(), builder::runtimeTraits)
                 .getStringMember(RUNTIME_TRAITS_SELECTOR, builder::runtimeTraitsSelector)
-                .getObjectMember(HTTP_CONFIG, builder::httpConfig);
+                .getObjectMember(HTTP_CONFIG, builder::httpConfig)
+                .getStringMember(INPUT_SUFFIX, builder::inputSuffix)
+                .getStringMember(OUTPUT_SUFFIX, builder::outputSuffix);
 
         builder.sourceLocation(settingsNode.getSourceLocation().getFilename());
-
         return builder.build();
     }
 
@@ -244,7 +253,7 @@ public final class JavaCodegenSettings {
      * <p>The plugin must have a public, zero-arg constructor. Integrations should call this from
      * {@link JavaCodegenIntegration#customizeSettings(CodeGenerationContext)}, which runs before the
      * client builder is generated; calling it later (for example from
-     * {@link JavaCodegenIntegration#customize(CodeGenerationContext)}) has no effect because the default
+     * {@link JavaCodegenIntegration#customizeSettings(CodeGenerationContext)}) has no effect because the default
      * plugins have already been read.
      *
      * @param pluginClass fully-qualified class name of the plugin to add.
@@ -268,7 +277,7 @@ public final class JavaCodegenSettings {
      * <p>Integrations should call this from
      * {@link JavaCodegenIntegration#customizeSettings(CodeGenerationContext)}, which runs before the
      * client builder is generated; calling it later (for example from
-     * {@link JavaCodegenIntegration#customize(CodeGenerationContext)}) has no effect because the default
+     * {@link JavaCodegenIntegration#customizeSettings(CodeGenerationContext)}) has no effect because the default
      * settings have already been read.
      *
      * @param settingClass fully-qualified class name of the setting to add.
@@ -309,6 +318,14 @@ public final class JavaCodegenSettings {
 
     public ObjectNode httpConfig() {
         return httpConfig;
+    }
+
+    public String inputSuffix() {
+        return inputSuffix;
+    }
+
+    public String outputSuffix() {
+        return outputSuffix;
     }
 
     @SmithyInternalApi
@@ -357,6 +374,8 @@ public final class JavaCodegenSettings {
         private final List<ShapeId> runtimeTraits = new ArrayList<>();
         private Selector runtimeTraitsSelector;
         private ObjectNode httpConfig;
+        private String inputSuffix = "Input";
+        private String outputSuffix = "Output";
 
         public Builder service(String string) {
             this.service = ShapeId.from(string);
@@ -463,6 +482,16 @@ public final class JavaCodegenSettings {
 
         public Builder httpConfig(ObjectNode httpConfig) {
             this.httpConfig = httpConfig;
+            return this;
+        }
+
+        public Builder inputSuffix(String inputSuffix) {
+            this.inputSuffix = Objects.requireNonNull(inputSuffix, "inputSuffix");
+            return this;
+        }
+
+        public Builder outputSuffix(String outputSuffix) {
+            this.outputSuffix = Objects.requireNonNull(outputSuffix, "outputSuffix");
             return this;
         }
 

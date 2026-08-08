@@ -10,7 +10,15 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 @SmithyUnstableApi
 public abstract sealed class ProtocolVersion implements Comparable<ProtocolVersion>
         permits ProtocolVersion.UnknownVersion, ProtocolVersion.v2024_11_05, ProtocolVersion.v2025_03_26,
-        ProtocolVersion.v2025_06_18 {
+        ProtocolVersion.v2025_06_18, ProtocolVersion.v2025_11_25 {
+    public static final class v2025_11_25 extends ProtocolVersion {
+        public static final v2025_11_25 INSTANCE = new v2025_11_25();
+
+        private v2025_11_25() {
+            super("2025-11-25");
+        }
+    }
+
     public static final class v2025_06_18 extends ProtocolVersion {
         public static final v2025_06_18 INSTANCE = new v2025_06_18();
 
@@ -69,6 +77,7 @@ public abstract sealed class ProtocolVersion implements Comparable<ProtocolVersi
             case "2024-11-05" -> v2024_11_05.INSTANCE;
             case "2025-03-26" -> v2025_03_26.INSTANCE;
             case "2025-06-18" -> v2025_06_18.INSTANCE;
+            case "2025-11-25" -> v2025_11_25.INSTANCE;
             default -> new UnknownVersion(identifier);
         };
     }
