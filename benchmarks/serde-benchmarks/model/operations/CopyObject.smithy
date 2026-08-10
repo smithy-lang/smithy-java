@@ -33,7 +33,50 @@ use smithy.test#httpResponseTests
         protocol: restXml
         method: "PUT"
         uri: "/dest-bucket/dest-key?x-id=CopyObject"
-        params: { Bucket: "dest-bucket", Key: "dest-key", ACL: "private", CacheControl: "max-age=3600", ChecksumAlgorithm: "SHA256", ContentDisposition: "attachment; filename=\"example.txt\"", ContentEncoding: "gzip", ContentLanguage: "en-US", ContentType: "text/plain", CopySource: "/source-bucket/source-key", CopySourceIfMatch: "\"9bb58f26192e4ba00f01e2e7b136bbd8\"", CopySourceIfModifiedSince: 1609459200, CopySourceIfNoneMatch: "\"different-etag\"", CopySourceIfUnmodifiedSince: 1640995199, Expires: 1641024000, GrantFullControl: "id=canonical-user-id", GrantRead: "id=read-user-id", GrantReadACP: "id=read-acp-user-id", GrantWriteACP: "id=write-acp-user-id", IfMatch: "\"target-etag\"", IfNoneMatch: "\"different-target-etag\"", MetadataDirective: "REPLACE", TaggingDirective: "REPLACE", ServerSideEncryption: "AES256", StorageClass: "STANDARD_IA", WebsiteRedirectLocation: "https://example.com/redirect", SSECustomerAlgorithm: "AES256", SSECustomerKey: "customer-key-base64", SSECustomerKeyMD5: "customer-key-md5-hash", SSEKMSKeyId: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012", SSEKMSEncryptionContext: "encryption-context", BucketKeyEnabled: true, CopySourceSSECustomerAlgorithm: "AES256", CopySourceSSECustomerKey: "source-customer-key-base64", CopySourceSSECustomerKeyMD5: "source-customer-key-md5-hash", RequestPayer: "BucketOwner", Tagging: "key1=value1&key2=value2", ObjectLockMode: "GOVERNANCE", ObjectLockRetainUntilDate: 1641024000, ObjectLockLegalHoldStatus: "ON", ExpectedBucketOwner: "123456789012", ExpectedSourceBucketOwner: "123456789012" }
+        params: {
+            Bucket: "dest-bucket"
+            Key: "dest-key"
+            ACL: "private"
+            CacheControl: "max-age=3600"
+            ChecksumAlgorithm: "SHA256"
+            ContentDisposition: "attachment; filename=\"example.txt\""
+            ContentEncoding: "gzip"
+            ContentLanguage: "en-US"
+            ContentType: "text/plain"
+            CopySource: "/source-bucket/source-key"
+            CopySourceIfMatch: "\"9bb58f26192e4ba00f01e2e7b136bbd8\""
+            CopySourceIfModifiedSince: 1609459200
+            CopySourceIfNoneMatch: "\"different-etag\""
+            CopySourceIfUnmodifiedSince: 1640995199
+            Expires: 1641024000
+            GrantFullControl: "id=canonical-user-id"
+            GrantRead: "id=read-user-id"
+            GrantReadACP: "id=read-acp-user-id"
+            GrantWriteACP: "id=write-acp-user-id"
+            IfMatch: "\"target-etag\""
+            IfNoneMatch: "\"different-target-etag\""
+            MetadataDirective: "REPLACE"
+            TaggingDirective: "REPLACE"
+            ServerSideEncryption: "AES256"
+            StorageClass: "STANDARD_IA"
+            WebsiteRedirectLocation: "https://example.com/redirect"
+            SSECustomerAlgorithm: "AES256"
+            SSECustomerKey: "customer-key-base64"
+            SSECustomerKeyMD5: "customer-key-md5-hash"
+            SSEKMSKeyId: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+            SSEKMSEncryptionContext: "encryption-context"
+            BucketKeyEnabled: true
+            CopySourceSSECustomerAlgorithm: "AES256"
+            CopySourceSSECustomerKey: "source-customer-key-base64"
+            CopySourceSSECustomerKeyMD5: "source-customer-key-md5-hash"
+            RequestPayer: "BucketOwner"
+            Tagging: "key1=value1&key2=value2"
+            ObjectLockMode: "GOVERNANCE"
+            ObjectLockRetainUntilDate: 1641024000
+            ObjectLockLegalHoldStatus: "ON"
+            ExpectedBucketOwner: "123456789012"
+            ExpectedSourceBucketOwner: "123456789012"
+        }
         tags: ["serde-benchmark"]
     }
     {
@@ -54,7 +97,50 @@ use smithy.test#httpResponseTests
         protocol: restJson1
         method: "PUT"
         uri: "/dest-bucket/dest-key?x-id=CopyObject"
-        params: { Bucket: "dest-bucket", Key: "dest-key", ACL: "private", CacheControl: "max-age=3600", ChecksumAlgorithm: "SHA256", ContentDisposition: "attachment; filename=\"example.txt\"", ContentEncoding: "gzip", ContentLanguage: "en-US", ContentType: "text/plain", CopySource: "/source-bucket/source-key", CopySourceIfMatch: "\"9bb58f26192e4ba00f01e2e7b136bbd8\"", CopySourceIfModifiedSince: 1609459200, CopySourceIfNoneMatch: "\"different-etag\"", CopySourceIfUnmodifiedSince: 1640995199, Expires: 1641024000, GrantFullControl: "id=canonical-user-id", GrantRead: "id=read-user-id", GrantReadACP: "id=read-acp-user-id", GrantWriteACP: "id=write-acp-user-id", IfMatch: "\"target-etag\"", IfNoneMatch: "\"different-target-etag\"", MetadataDirective: "REPLACE", TaggingDirective: "REPLACE", ServerSideEncryption: "AES256", StorageClass: "STANDARD_IA", WebsiteRedirectLocation: "https://example.com/redirect", SSECustomerAlgorithm: "AES256", SSECustomerKey: "customer-key-base64", SSECustomerKeyMD5: "customer-key-md5-hash", SSEKMSKeyId: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012", SSEKMSEncryptionContext: "encryption-context", BucketKeyEnabled: true, CopySourceSSECustomerAlgorithm: "AES256", CopySourceSSECustomerKey: "source-customer-key-base64", CopySourceSSECustomerKeyMD5: "source-customer-key-md5-hash", RequestPayer: "BucketOwner", Tagging: "key1=value1&key2=value2", ObjectLockMode: "GOVERNANCE", ObjectLockRetainUntilDate: 1641024000, ObjectLockLegalHoldStatus: "ON", ExpectedBucketOwner: "123456789012", ExpectedSourceBucketOwner: "123456789012" }
+        params: {
+            Bucket: "dest-bucket"
+            Key: "dest-key"
+            ACL: "private"
+            CacheControl: "max-age=3600"
+            ChecksumAlgorithm: "SHA256"
+            ContentDisposition: "attachment; filename=\"example.txt\""
+            ContentEncoding: "gzip"
+            ContentLanguage: "en-US"
+            ContentType: "text/plain"
+            CopySource: "/source-bucket/source-key"
+            CopySourceIfMatch: "\"9bb58f26192e4ba00f01e2e7b136bbd8\""
+            CopySourceIfModifiedSince: 1609459200
+            CopySourceIfNoneMatch: "\"different-etag\""
+            CopySourceIfUnmodifiedSince: 1640995199
+            Expires: 1641024000
+            GrantFullControl: "id=canonical-user-id"
+            GrantRead: "id=read-user-id"
+            GrantReadACP: "id=read-acp-user-id"
+            GrantWriteACP: "id=write-acp-user-id"
+            IfMatch: "\"target-etag\""
+            IfNoneMatch: "\"different-target-etag\""
+            MetadataDirective: "REPLACE"
+            TaggingDirective: "REPLACE"
+            ServerSideEncryption: "AES256"
+            StorageClass: "STANDARD_IA"
+            WebsiteRedirectLocation: "https://example.com/redirect"
+            SSECustomerAlgorithm: "AES256"
+            SSECustomerKey: "customer-key-base64"
+            SSECustomerKeyMD5: "customer-key-md5-hash"
+            SSEKMSKeyId: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+            SSEKMSEncryptionContext: "encryption-context"
+            BucketKeyEnabled: true
+            CopySourceSSECustomerAlgorithm: "AES256"
+            CopySourceSSECustomerKey: "source-customer-key-base64"
+            CopySourceSSECustomerKeyMD5: "source-customer-key-md5-hash"
+            RequestPayer: "BucketOwner"
+            Tagging: "key1=value1&key2=value2"
+            ObjectLockMode: "GOVERNANCE"
+            ObjectLockRetainUntilDate: 1641024000
+            ObjectLockLegalHoldStatus: "ON"
+            ExpectedBucketOwner: "123456789012"
+            ExpectedSourceBucketOwner: "123456789012"
+        }
         tags: ["serde-benchmark"]
     }
 ])
@@ -74,7 +160,18 @@ use smithy.test#httpResponseTests
             """
         protocol: restXml
         code: 200
-        headers: { "x-amz-expiration": "expiry-date=\"Fri, 01 Jan 2022 00:00:00 GMT\", rule-id=\"rule1\"", "x-amz-copy-source-version-id": "source-version-id-12345", "x-amz-version-id": "dest-version-id-67890", "x-amz-server-side-encryption": "AES256", "x-amz-server-side-encryption-customer-algorithm": "AES256", "x-amz-server-side-encryption-customer-key-MD5": "customer-key-md5-hash", "x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012", "x-amz-server-side-encryption-context": "encryption-context", "x-amz-server-side-encryption-bucket-key-enabled": "true", "x-amz-request-charged": "requester" }
+        headers: {
+            "x-amz-expiration": "expiry-date=\"Fri, 01 Jan 2022 00:00:00 GMT\", rule-id=\"rule1\""
+            "x-amz-copy-source-version-id": "source-version-id-12345"
+            "x-amz-version-id": "dest-version-id-67890"
+            "x-amz-server-side-encryption": "AES256"
+            "x-amz-server-side-encryption-customer-algorithm": "AES256"
+            "x-amz-server-side-encryption-customer-key-MD5": "customer-key-md5-hash"
+            "x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+            "x-amz-server-side-encryption-context": "encryption-context"
+            "x-amz-server-side-encryption-bucket-key-enabled": "true"
+            "x-amz-request-charged": "requester"
+        }
         body: """
             <CopyObjectResult>
                 <ETag>"9bb58f26192e4ba00f01e2e7b136bbd8"</ETag>
@@ -104,7 +201,18 @@ use smithy.test#httpResponseTests
             """
         protocol: restJson1
         code: 200
-        headers: { "x-amz-expiration": "expiry-date=\"Fri, 01 Jan 2022 00:00:00 GMT\", rule-id=\"rule1\"", "x-amz-copy-source-version-id": "source-version-id-12345", "x-amz-version-id": "dest-version-id-67890", "x-amz-server-side-encryption": "AES256", "x-amz-server-side-encryption-customer-algorithm": "AES256", "x-amz-server-side-encryption-customer-key-MD5": "customer-key-md5-hash", "x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012", "x-amz-server-side-encryption-context": "encryption-context", "x-amz-server-side-encryption-bucket-key-enabled": "true", "x-amz-request-charged": "requester" }
+        headers: {
+            "x-amz-expiration": "expiry-date=\"Fri, 01 Jan 2022 00:00:00 GMT\", rule-id=\"rule1\""
+            "x-amz-copy-source-version-id": "source-version-id-12345"
+            "x-amz-version-id": "dest-version-id-67890"
+            "x-amz-server-side-encryption": "AES256"
+            "x-amz-server-side-encryption-customer-algorithm": "AES256"
+            "x-amz-server-side-encryption-customer-key-MD5": "customer-key-md5-hash"
+            "x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+            "x-amz-server-side-encryption-context": "encryption-context"
+            "x-amz-server-side-encryption-bucket-key-enabled": "true"
+            "x-amz-request-charged": "requester"
+        }
         body: """
             {
                 "ETag": "\\"9bb58f26192e4ba00f01e2e7b136bbd8\\"",
@@ -127,7 +235,18 @@ use smithy.test#httpResponseTests
             """
         protocol: restXml
         code: 200
-        headers: { "x-amz-expiration": "expiry-date=\"Fri, 01 Jan 2022 00:00:00 GMT\", rule-id=\"rule1\"", "x-amz-copy-source-version-id": "source-version-id-12345", "x-amz-version-id": "dest-version-id-67890", "x-amz-server-side-encryption": "AES256", "x-amz-server-side-encryption-customer-algorithm": "AES256", "x-amz-server-side-encryption-customer-key-MD5": "customer-key-md5-hash", "x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012", "x-amz-server-side-encryption-context": "encryption-context", "x-amz-server-side-encryption-bucket-key-enabled": "true", "x-amz-request-charged": "requester" }
+        headers: {
+            "x-amz-expiration": "expiry-date=\"Fri, 01 Jan 2022 00:00:00 GMT\", rule-id=\"rule1\""
+            "x-amz-copy-source-version-id": "source-version-id-12345"
+            "x-amz-version-id": "dest-version-id-67890"
+            "x-amz-server-side-encryption": "AES256"
+            "x-amz-server-side-encryption-customer-algorithm": "AES256"
+            "x-amz-server-side-encryption-customer-key-MD5": "customer-key-md5-hash"
+            "x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+            "x-amz-server-side-encryption-context": "encryption-context"
+            "x-amz-server-side-encryption-bucket-key-enabled": "true"
+            "x-amz-request-charged": "requester"
+        }
         body: """
             <CopyObjectResult>
                 <UnknownFirst>skip-this-value</UnknownFirst>
@@ -159,7 +278,18 @@ use smithy.test#httpResponseTests
             """
         protocol: restJson1
         code: 200
-        headers: { "x-amz-expiration": "expiry-date=\"Fri, 01 Jan 2022 00:00:00 GMT\", rule-id=\"rule1\"", "x-amz-copy-source-version-id": "source-version-id-12345", "x-amz-version-id": "dest-version-id-67890", "x-amz-server-side-encryption": "AES256", "x-amz-server-side-encryption-customer-algorithm": "AES256", "x-amz-server-side-encryption-customer-key-MD5": "customer-key-md5-hash", "x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012", "x-amz-server-side-encryption-context": "encryption-context", "x-amz-server-side-encryption-bucket-key-enabled": "true", "x-amz-request-charged": "requester" }
+        headers: {
+            "x-amz-expiration": "expiry-date=\"Fri, 01 Jan 2022 00:00:00 GMT\", rule-id=\"rule1\""
+            "x-amz-copy-source-version-id": "source-version-id-12345"
+            "x-amz-version-id": "dest-version-id-67890"
+            "x-amz-server-side-encryption": "AES256"
+            "x-amz-server-side-encryption-customer-algorithm": "AES256"
+            "x-amz-server-side-encryption-customer-key-MD5": "customer-key-md5-hash"
+            "x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+            "x-amz-server-side-encryption-context": "encryption-context"
+            "x-amz-server-side-encryption-bucket-key-enabled": "true"
+            "x-amz-request-charged": "requester"
+        }
         body: """
             {
                 "__unknownFirst": "skip-me",
