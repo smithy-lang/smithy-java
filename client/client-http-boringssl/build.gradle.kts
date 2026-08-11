@@ -21,11 +21,11 @@ dependencies {
     // on (dev: macOS arm64/x64; benchmark + prod: Linux x64/arm64). At runtime Netty loads whichever
     // matches the host; the others are inert. tcnative is optional — BoringSslEngineFactory.isAvailable()
     // reports false when the native lib is absent, and callers fall back to the JDK provider.
-    implementation("io.netty:netty-tcnative-boringssl-static:2.0.80.Final")
-    runtimeOnly("io.netty:netty-tcnative-boringssl-static:2.0.80.Final:osx-aarch_64")
-    runtimeOnly("io.netty:netty-tcnative-boringssl-static:2.0.80.Final:osx-x86_64")
-    runtimeOnly("io.netty:netty-tcnative-boringssl-static:2.0.80.Final:linux-x86_64")
-    runtimeOnly("io.netty:netty-tcnative-boringssl-static:2.0.80.Final:linux-aarch_64")
+    implementation("io.netty:netty-tcnative-boringssl-static:2.0.81.Final")
+    runtimeOnly("io.netty:netty-tcnative-boringssl-static:2.0.81.Final:osx-aarch_64")
+    runtimeOnly("io.netty:netty-tcnative-boringssl-static:2.0.81.Final:osx-x86_64")
+    runtimeOnly("io.netty:netty-tcnative-boringssl-static:2.0.81.Final:linux-x86_64")
+    runtimeOnly("io.netty:netty-tcnative-boringssl-static:2.0.81.Final:linux-aarch_64")
 
     testImplementation(project(":codecs:json-codec", configuration = "shadow"))
 }
