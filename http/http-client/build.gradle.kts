@@ -48,11 +48,11 @@ dependencies {
     testImplementation(libs.jazzer.api)
 
     // Add Apache HttpClient for benchmarking comparison
-    jmh("org.apache.httpcomponents.client5:httpclient5:5.6.2")
+    jmh("org.apache.httpcomponents.client5:httpclient5:5.6.3")
 
     // Helidon WebClient for benchmarking comparison
-    jmh("io.helidon.webclient:helidon-webclient:4.5.0")
-    jmh("io.helidon.webclient:helidon-webclient-http2:4.5.0")
+    jmh("io.helidon.webclient:helidon-webclient:4.5.2")
+    jmh("io.helidon.webclient:helidon-webclient-http2:4.5.2")
 
     // Netty for raw HTTP/2 benchmarking
     jmh("io.netty:netty-all:4.2.16.Final")
