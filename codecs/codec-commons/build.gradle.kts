@@ -33,8 +33,8 @@ tasks {
                         .toString(),
                 ),
             )
-            relocate("ch.randelshofer", "software.amazon.smithy.java.codecs.commons.internal.shaded.ch.randelshofer")
         }
+        relocate("ch.randelshofer", "software.amazon.smithy.java.codecs.commons.internal.shaded.ch.randelshofer")
     }
     jar {
         finalizedBy(shadowJar)
