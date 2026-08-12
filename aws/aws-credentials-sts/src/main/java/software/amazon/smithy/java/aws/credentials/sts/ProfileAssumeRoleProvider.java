@@ -69,11 +69,7 @@ public final class ProfileAssumeRoleProvider implements ChainIdentityProvider {
             ChainSetup setup
     ) {
         var endpoint = StsEndpointConfig.resolve(source.region(), setup);
-        return new StsAssumeRoleResolver(
-                source,
-                setup.profileFile(),
-                endpoint,
-                setup.executor(),
-                setup.environment());
+        var sourceResolver = ProfileSourceResolver.resolve(source, setup.profile().name(), setup);
+        return new StsAssumeRoleResolver(source, endpoint, sourceResolver);
     }
 }

@@ -201,6 +201,9 @@ class ModularCredentialChainSuiteTest {
         // Build the setup with injected env + parsed profile (mirrors SharedConfigProvider, which cannot be pointed
         // at inline config in a test). A profile-name override, if present, selects the active profile.
         ChainSetup.Builder setupBuilder = ChainSetup.builder().env(env);
+        if (input.getMember("profileNameOverride") != null) {
+            setupBuilder.profileNameOverride(input.getMember("profileNameOverride").asString());
+        }
         AwsProfileFile profileFile = parseProfileFile(input);
         if (profileFile != null) {
             setupBuilder.profileFile(profileFile);
@@ -311,6 +314,9 @@ class ModularCredentialChainSuiteTest {
                 }
             }
             case ENVIRONMENT -> {
+                if (setup.profileNameOverride() != null) {
+                    break;
+                }
                 String ak = env.apply("AWS_ACCESS_KEY_ID");
                 String sk = env.apply("AWS_SECRET_ACCESS_KEY");
                 if (ak != null && sk != null) {
@@ -340,15 +346,23 @@ class ModularCredentialChainSuiteTest {
             case SHARED_CONFIG -> {
                 markDetectedProfileSources(setup);
             }
-            case PROFILE_STATIC_KEYS -> profileSlot(setup,
-                    AwsConfigCredentialSource.StaticKeys.class,
-                    src -> staticResolver(src.accessKeyId(), src.secretAccessKey(), null, src.accountId()));
-            case PROFILE_SESSION_KEYS -> profileSlot(setup,
-                    AwsConfigCredentialSource.SessionKeys.class,
-                    src -> staticResolver(src.accessKeyId(),
-                            src.secretAccessKey(),
-                            src.sessionToken(),
-                            src.accountId()));
+            case PROFILE_STATIC_KEYS -> {
+                if (!setup.isDetected(StandardProvider.PROFILE_ASSUME_ROLE)) {
+                    profileSlot(setup,
+                            AwsConfigCredentialSource.StaticKeys.class,
+                            src -> staticResolver(src.accessKeyId(), src.secretAccessKey(), null, src.accountId()));
+                }
+            }
+            case PROFILE_SESSION_KEYS -> {
+                if (!setup.isDetected(StandardProvider.PROFILE_ASSUME_ROLE)) {
+                    profileSlot(setup,
+                            AwsConfigCredentialSource.SessionKeys.class,
+                            src -> staticResolver(src.accessKeyId(),
+                                    src.secretAccessKey(),
+                                    src.sessionToken(),
+                                    src.accountId()));
+                }
+            }
             case PROFILE_ASSUME_ROLE -> profileSlot(setup,
                     AwsConfigCredentialSource.AssumeRole.class,
                     src -> responseResolver(input.getMember("stsResponse")),

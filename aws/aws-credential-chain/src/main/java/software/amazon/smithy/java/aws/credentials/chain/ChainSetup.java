@@ -7,11 +7,15 @@ package software.amazon.smithy.java.aws.credentials.chain;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
+import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.config.AwsProfile;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
@@ -48,6 +52,7 @@ public final class ChainSetup {
     private AwsProfile profile;
     private boolean terminal;
     private ChainIdentityProvider currentProvider;
+    private Map<String, SourceIdentityProvider> sourceProviders = Map.of();
 
     private ChainSetup(Builder builder) {
         this.executor = builder.executor;
@@ -147,6 +152,44 @@ public final class ChainSetup {
     }
 
     /**
+     * Creates a resolver from a discovered provider using its canonical name.
+     *
+     * <p>The provider does not need to participate in the top-level chain. This allows an explicitly selected
+     * profile to suppress top-level environment credentials while still using Environment as an assume-role
+     * {@code credential_source}.
+     *
+     * @param providerName canonical provider name.
+     * @param identityType required identity type.
+     * @param <I> identity type.
+     * @return a resolver created by the named provider.
+     * @throws IllegalStateException if the provider is unavailable, unsupported as a source, disabled, or returns
+     *     an incompatible resolver.
+     */
+    public <I extends Identity> IdentityResolver<I> sourceResolver(String providerName, Class<I> identityType) {
+        Objects.requireNonNull(providerName, "providerName");
+        Objects.requireNonNull(identityType, "identityType");
+        SourceIdentityProvider provider = sourceProviders.get(providerName.toLowerCase(Locale.ROOT));
+        if (provider == null) {
+            throw new IllegalStateException(
+                    "No credential source provider is registered with name '" + providerName + "'");
+        }
+        IdentityResolver<?> resolver = provider.createResolver(identityType, this);
+        if (resolver == null) {
+            throw new IllegalStateException(
+                    "Credential source provider '" + providerName + "' is not available for "
+                            + identityType.getName());
+        }
+        if (!identityType.isAssignableFrom(resolver.identityType())) {
+            throw new IllegalStateException(
+                    "Credential source provider '" + providerName + "' created a resolver for "
+                            + resolver.identityType().getName() + " when " + identityType.getName() + " is required");
+        }
+        @SuppressWarnings("unchecked")
+        IdentityResolver<I> result = (IdentityResolver<I>) resolver;
+        return result;
+    }
+
+    /**
      * Returns the parsed AWS config/credentials file, or {@code null} if not yet loaded.
      *
      * <p>Populated by the {@code SHARED_CONFIG} provider during assembly.
@@ -197,6 +240,20 @@ public final class ChainSetup {
      */
     public void markDetected(StandardProvider slot) {
         detectedSlots.add(Objects.requireNonNull(slot, "slot"));
+    }
+
+    /**
+     * Returns whether configuration for a standard provider slot was detected during assembly.
+     *
+     * <p>Providers can use this to preserve source precedence when a higher-priority provider's module is absent.
+     * For example, profile key providers defer when the selected profile declares assume-role configuration so
+     * that the chain reports the missing STS module instead of silently using those keys directly.
+     *
+     * @param slot standard provider slot.
+     * @return {@code true} if configuration for the slot was detected.
+     */
+    public boolean isDetected(StandardProvider slot) {
+        return detectedSlots.contains(Objects.requireNonNull(slot, "slot"));
     }
 
     Set<StandardProvider> detectedSlots() {
@@ -276,6 +333,24 @@ public final class ChainSetup {
     }
 
     /**
+     * Installs the source-capable providers discovered for this assembly.
+     *
+     * <p>This method is public for provider-level tests. Production code calls it from {@link IdentityChain}.
+     *
+     * @param providers all discovered chain providers.
+     */
+    @SmithyInternalApi
+    public void setProviders(List<ChainIdentityProvider> providers) {
+        Map<String, SourceIdentityProvider> result = new HashMap<>();
+        for (ChainIdentityProvider provider : providers) {
+            if (provider instanceof SourceIdentityProvider sourceProvider) {
+                result.put(provider.name().toLowerCase(Locale.ROOT), sourceProvider);
+            }
+        }
+        sourceProviders = Map.copyOf(result);
+    }
+
+    /**
      * Returns the list of resolvers registered during assembly, in the order they were added.
      *
      * @return the ordered list of named resolvers.
@@ -328,7 +403,8 @@ public final class ChainSetup {
 
         /**
          * Sets the profile name override. When set, the {@code SHARED_CONFIG} provider
-         * uses this name instead of resolving from {@code AWS_PROFILE} or system properties.
+         * uses this name instead of resolving from {@code AWS_PROFILE} or system properties, and top-level
+         * environment credential resolution is suppressed.
          *
          * @param profileNameOverride the profile name to use.
          * @return this builder.

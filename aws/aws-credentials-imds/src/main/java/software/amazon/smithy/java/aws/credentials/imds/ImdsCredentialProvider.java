@@ -13,15 +13,16 @@ import java.time.format.DateTimeParseException;
 import java.util.Set;
 import java.util.function.Function;
 import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
 import software.amazon.smithy.java.aws.config.AwsProfile;
 import software.amazon.smithy.java.aws.credentials.chain.AwsCredentialCaching;
-import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
+import software.amazon.smithy.java.aws.credentials.chain.SourceIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.StandardProvider;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonCodec;
@@ -33,7 +34,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
  * <p>Registers in the {@link StandardProvider#EC2_INSTANCE_METADATA} chain slot. Uses IMDSv2 exclusively
  * (no v1 fallback). Credentials are cached with static stability enabled per the AWS Static Stability SEP.
  */
-public final class ImdsCredentialProvider implements ChainIdentityProvider {
+public final class ImdsCredentialProvider implements SourceIdentityProvider {
 
     private static final Set<CredentialFeatureId> FEATURE_IDS = Set.of(new CredentialFeatureId("0"));
 
@@ -58,8 +59,16 @@ public final class ImdsCredentialProvider implements ChainIdentityProvider {
 
     @Override
     public void setup(Class<? extends Identity> identityType, ChainSetup setup) {
+        var resolver = createResolver(identityType, setup);
+        if (resolver != null) {
+            setup.addResolver(resolver);
+        }
+    }
+
+    @Override
+    public IdentityResolver<?> createResolver(Class<? extends Identity> identityType, ChainSetup setup) {
         if (identityType != AwsCredentialsIdentity.class) {
-            return;
+            return null;
         }
 
         // Read environment and profile state through the setup so this provider composes with the rest of the
@@ -67,7 +76,7 @@ public final class ImdsCredentialProvider implements ChainIdentityProvider {
         // resolved (which respects any profile-name override) rather than one re-derived from AWS_PROFILE here.
         AwsProfile profile = setup.profile();
         if (isDisabled(setup::getenv, profile)) {
-            return;
+            return null;
         }
 
         URI endpoint = resolveEndpoint(setup::getenv);
@@ -75,7 +84,7 @@ public final class ImdsCredentialProvider implements ChainIdentityProvider {
         ImdsClient client = new ImdsClient(endpoint);
         AwsCredentialsResolver delegate = ctx -> fetchAndParse(client, profileName);
 
-        setup.addResolver(AwsCredentialCaching.staticallyStable(delegate, setup.executor()));
+        return AwsCredentialCaching.staticallyStable(delegate, setup.executor());
     }
 
     private static IdentityResult<AwsCredentialsIdentity> fetchAndParse(ImdsClient client, String profileName) {

@@ -13,16 +13,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import software.amazon.smithy.java.auth.api.identity.CachingIdentityResolver;
+import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.config.AwsConfigCredentialSource;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
-import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
+import software.amazon.smithy.java.aws.credentials.chain.SourceIdentityProvider;
+import software.amazon.smithy.java.aws.credentials.chain.StandardProvider;
 
 class ProfileAssumeRoleProviderTest {
 
@@ -81,9 +86,16 @@ class ProfileAssumeRoleProviderTest {
                 """);
 
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
-        var setup = ChainSetup.builder().build();
+        var setup = ChainSetup.builder()
+                .env(name -> switch (name) {
+                    case "AWS_ACCESS_KEY_ID" -> "AK";
+                    case "AWS_SECRET_ACCESS_KEY" -> "SK";
+                    default -> null;
+                })
+                .build();
         setup.setProfileFile(profileFile);
         setup.setProfile(profileFile.activeProfile(k -> null));
+        setup.setProviders(List.of(environmentSourceProvider()));
         var provider = new ProfileAssumeRoleProvider();
         setup.setCurrentProvider(provider);
 
@@ -159,10 +171,11 @@ class ProfileAssumeRoleProviderTest {
 
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", "B", null);
-        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT, null, name -> null);
+        var setup = setup(profileFile);
 
-        var ex = assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
-        assertTrue(ex.getMessage().contains("Circular") || ex.getCause().getMessage().contains("Circular"));
+        var ex = assertThrows(RuntimeException.class,
+                () -> ProfileSourceResolver.resolve(source, "default", setup));
+        assertTrue(ex.getMessage().contains("Circular"));
     }
 
     @Test
@@ -176,18 +189,51 @@ class ProfileAssumeRoleProviderTest {
 
         var profileFile = AwsProfileFile.builder().configFile(config).credentialsFile(null).build();
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", "nonexistent", null);
-        var resolver = new StsAssumeRoleResolver(source, profileFile, TEST_ENDPOINT, null, name -> null);
+        var setup = setup(profileFile);
 
-        var ex = assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
-        assertTrue(ex.getMessage().contains("nonexistent") || ex.getCause().getMessage().contains("nonexistent"));
+        var ex = assertThrows(RuntimeException.class,
+                () -> ProfileSourceResolver.resolve(source, "default", setup));
+        assertTrue(ex.getMessage().contains("nonexistent"));
     }
 
     @Test
     void failsWithUnsupportedCredentialSource() {
         var source = assumeRole("arn:aws:iam::123456789:role/RoleA", null, "CustomUnsupportedProvider");
-        var resolver = new StsAssumeRoleResolver(source, null, TEST_ENDPOINT, null, name -> null);
+        var setup = ChainSetup.builder().build();
 
-        var ex = assertThrows(RuntimeException.class, () -> resolver.resolveIdentity(Context.create()));
-        assertTrue(ex.getMessage().contains("Unsupported") || ex.getCause().getMessage().contains("Unsupported"));
+        var ex = assertThrows(RuntimeException.class,
+                () -> ProfileSourceResolver.resolve(source, "default", setup));
+        assertTrue(ex.getMessage().contains("CustomUnsupportedProvider"));
+    }
+
+    private static ChainSetup setup(AwsProfileFile profileFile) {
+        var setup = ChainSetup.builder().profileFile(profileFile).build();
+        setup.setProfileFile(profileFile);
+        setup.setProfile(profileFile.profile("default"));
+        return setup;
+    }
+
+    private static SourceIdentityProvider environmentSourceProvider() {
+        return new SourceIdentityProvider() {
+            @Override
+            public String name() {
+                return "Environment";
+            }
+
+            @Override
+            public OrderingConstraint ordering() {
+                return new OrderingConstraint.Standard(StandardProvider.ENVIRONMENT);
+            }
+
+            @Override
+            public void setup(Class<? extends Identity> identityType, ChainSetup setup) {}
+
+            @Override
+            public IdentityResolver<?> createResolver(Class<? extends Identity> identityType, ChainSetup setup) {
+                return IdentityResolver.of(AwsCredentialsIdentity.create(
+                        setup.getenv("AWS_ACCESS_KEY_ID"),
+                        setup.getenv("AWS_SECRET_ACCESS_KEY")));
+            }
+        };
     }
 }

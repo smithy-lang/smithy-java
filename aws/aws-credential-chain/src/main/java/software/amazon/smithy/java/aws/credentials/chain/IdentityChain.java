@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.Executors;
@@ -105,7 +106,29 @@ public final class IdentityChain<I extends Identity> implements IdentityResolver
             AwsProfileFile profileFile,
             String regionOverride
     ) {
-        return create(identityType, defaultExecutor(), profileFile, regionOverride);
+        return create(identityType, defaultExecutor(), profileFile, null, regionOverride);
+    }
+
+    /**
+     * Create an identity chain using an explicitly selected profile.
+     *
+     * <p>An explicit profile suppresses top-level environment credentials. Environment remains available to
+     * profile providers through {@code credential_source=Environment}. This differs from selecting a profile with
+     * {@code AWS_PROFILE}, which preserves normal environment-first precedence.
+     *
+     * @param identityType Identity type to resolve.
+     * @param profileFile Already-parsed profile file to use, or {@code null} to load from the default locations.
+     * @param profileNameOverride Explicit profile name.
+     * @param regionOverride Region for service-calling providers, or {@code null}.
+     * @return the assembled credential chain.
+     */
+    public static <I extends Identity> IdentityChain<I> create(
+            Class<I> identityType,
+            AwsProfileFile profileFile,
+            String profileNameOverride,
+            String regionOverride
+    ) {
+        return create(identityType, defaultExecutor(), profileFile, profileNameOverride, regionOverride);
     }
 
     private static ScheduledExecutorService defaultExecutor() {
@@ -155,6 +178,26 @@ public final class IdentityChain<I extends Identity> implements IdentityResolver
             AwsProfileFile profileFile,
             String regionOverride
     ) {
+        return create(identityType, ex, profileFile, null, regionOverride);
+    }
+
+    /**
+     * Create an identity chain using a caller-supplied executor and explicitly selected profile.
+     *
+     * @param identityType Identity type to resolve.
+     * @param ex Executor owned by the returned chain.
+     * @param profileFile Already-parsed profile file, or {@code null}.
+     * @param profileNameOverride Explicit profile name, or {@code null} for normal profile discovery.
+     * @param regionOverride Region for service-calling providers, or {@code null}.
+     * @return the assembled credential chain.
+     */
+    public static <I extends Identity> IdentityChain<I> create(
+            Class<I> identityType,
+            ScheduledExecutorService ex,
+            AwsProfileFile profileFile,
+            String profileNameOverride,
+            String regionOverride
+    ) {
         List<ChainIdentityProvider> registrations;
         ChainSetup setup;
         try {
@@ -165,6 +208,7 @@ public final class IdentityChain<I extends Identity> implements IdentityResolver
             setup = ChainSetup.builder()
                     .executor(ex)
                     .profileFile(profileFile)
+                    .profileNameOverride(profileNameOverride)
                     .regionOverride(regionOverride)
                     .build();
         } catch (RuntimeException | Error failure) {
@@ -196,11 +240,12 @@ public final class IdentityChain<I extends Identity> implements IdentityResolver
             // Check for duplicate names.
             Set<String> seenNames = new HashSet<>();
             for (ChainIdentityProvider r : registrations) {
-                if (!seenNames.add(r.name())) {
+                if (!seenNames.add(r.name().toLowerCase(Locale.ROOT))) {
                     throw new IllegalStateException(
                             "Duplicate credential provider registration name: '" + r.name() + "'");
                 }
             }
+            setup.setProviders(registrations);
 
             // Sort providers by ordering constraint (enum order for Standard, relative for Before/After).
             List<ChainIdentityProvider> sorted = sortByOrdering(registrations);

@@ -78,6 +78,22 @@ public enum StandardProvider {
     },
 
     /**
+     * Profile-based assume role ({@code role_arn} with {@code source_profile} or
+     * {@code credential_source}).
+     *
+     * <p>Role configuration takes priority in the selected profile. When this profile is recursively resolved as
+     * another role's source profile, the assume-role provider instead gives session/static keys priority.
+     *
+     * <p>Requires the STS module. Reads the active profile from {@link ChainSetup#profile()}.
+     */
+    PROFILE_ASSUME_ROLE("software.amazon.smithy.java:aws-credentials-sts") {
+        @Override
+        public boolean isDetected(Function<String, String> env) {
+            return false;
+        }
+    },
+
+    /**
      * Profile-based session keys ({@code aws_access_key_id} + {@code aws_secret_access_key}
      * + {@code aws_session_token}).
      *
@@ -103,19 +119,6 @@ public enum StandardProvider {
      * <p>Re-reads from the profile on each resolution to support live reload after invalidation.
      */
     PROFILE_STATIC_KEYS(null) {
-        @Override
-        public boolean isDetected(Function<String, String> env) {
-            return false;
-        }
-    },
-
-    /**
-     * Profile-based assume role ({@code role_arn} with {@code source_profile} or
-     * {@code credential_source}).
-     *
-     * <p>Requires the STS module. Reads the active profile from {@link ChainSetup#profile()}.
-     */
-    PROFILE_ASSUME_ROLE("software.amazon.smithy.java:aws-credentials-sts") {
         @Override
         public boolean isDetected(Function<String, String> env) {
             return false;

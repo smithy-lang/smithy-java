@@ -42,7 +42,6 @@ dependencies {
     implementation(project(":aws:aws-credential-chain"))
     implementation(project(":aws:aws-config"))
     implementation(project(":aws:aws-auth-api"))
-    implementation(project(":aws:aws-credentials-imds"))
     implementation(project(":auth-api"))
     implementation(project(":client:client-core"))
     implementation(project(":client:dynamic-client"))

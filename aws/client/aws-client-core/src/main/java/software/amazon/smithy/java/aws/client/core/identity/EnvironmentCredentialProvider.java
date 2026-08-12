@@ -9,13 +9,13 @@ import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
-import software.amazon.smithy.java.aws.credentials.chain.ChainIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.chain.CredentialFeatureId;
 import software.amazon.smithy.java.aws.credentials.chain.OrderingConstraint;
+import software.amazon.smithy.java.aws.credentials.chain.SourceIdentityProvider;
 import software.amazon.smithy.java.aws.credentials.chain.StandardProvider;
 
-public final class EnvironmentCredentialProvider implements ChainIdentityProvider {
+public final class EnvironmentCredentialProvider implements SourceIdentityProvider {
 
     private static final Set<CredentialFeatureId> FEATURE_IDS = Set.of(new CredentialFeatureId("g"));
 
@@ -36,7 +36,9 @@ public final class EnvironmentCredentialProvider implements ChainIdentityProvide
 
     @Override
     public void setup(Class<? extends Identity> identityType, ChainSetup setup) {
-        if (identityType != AwsCredentialsIdentity.class) {
+        // An explicitly selected profile is authoritative. AWS_PROFILE is resolved later by SharedConfigProvider
+        // and deliberately does not set profileNameOverride, so ordinary environment-first precedence is preserved.
+        if (identityType != AwsCredentialsIdentity.class || setup.profileNameOverride() != null) {
             return;
         }
 
@@ -49,9 +51,23 @@ public final class EnvironmentCredentialProvider implements ChainIdentityProvide
             return;
         }
 
+        setup.addTerminalResolver(createResolver(identityType, setup));
+    }
+
+    @Override
+    public IdentityResolver<?> createResolver(Class<? extends Identity> identityType, ChainSetup setup) {
+        if (identityType != AwsCredentialsIdentity.class) {
+            return null;
+        }
+        String accessKey = setup.getenv(EnvironmentVariableIdentityResolver.ACCESS_KEY_PROPERTY);
+        String secretKey = setup.getenv(EnvironmentVariableIdentityResolver.SECRET_KEY_PROPERTY);
+        if (accessKey == null || secretKey == null) {
+            throw new IllegalStateException(
+                    "Environment credential source requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY");
+        }
         String sessionToken = setup.getenv(EnvironmentVariableIdentityResolver.SESSION_TOKEN_PROPERTY);
         String accountId = setup.getenv(EnvironmentVariableIdentityResolver.ACCOUNT_ID_PROPERTY);
         var identity = AwsCredentialsIdentity.create(accessKey, secretKey, sessionToken, null, accountId);
-        setup.addTerminalResolver(IdentityResolver.of(identity));
+        return IdentityResolver.of(identity);
     }
 }

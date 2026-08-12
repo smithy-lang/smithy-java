@@ -53,7 +53,7 @@ public final class StaticKeysHandler implements ChainIdentityProvider {
             return;
         }
         AwsProfile profile = setup.profile();
-        if (profile == null) {
+        if (profile == null || setup.isDetected(StandardProvider.PROFILE_ASSUME_ROLE)) {
             return;
         }
         for (AwsConfigCredentialSource source : profile.credentialSources()) {

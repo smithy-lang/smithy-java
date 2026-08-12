@@ -25,7 +25,9 @@ import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.auth.api.identity.TokenIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.config.AwsProfileFile;
+import software.amazon.smithy.java.aws.credentials.chain.config.SessionKeysHandler;
 import software.amazon.smithy.java.aws.credentials.chain.config.SharedConfigProvider;
+import software.amazon.smithy.java.aws.credentials.chain.config.StaticKeysHandler;
 import software.amazon.smithy.java.context.Context;
 
 class IdentityChainTest {
@@ -557,14 +559,12 @@ class IdentityChainTest {
     }
 
     @Test
-    void profileSourceProducesMissingModuleSuggestion(@TempDir Path tempDir) throws IOException {
+    void profileRoleDefersCoreKeysWhenStsModuleIsMissing(@TempDir Path tempDir) throws IOException {
         Path config = tempDir.resolve("config");
         Files.writeString(config, """
                 [default]
                 role_arn = arn:aws:iam::123456789012:role/Foo
-                source_profile = source
-
-                [profile source]
+                source_profile = default
                 aws_access_key_id = AKID
                 aws_secret_access_key = SECRET
                 """);
@@ -572,7 +572,7 @@ class IdentityChainTest {
         var setup = ChainSetup.builder().profileFile(profileFile).env(name -> null).build();
         var chain = IdentityChain.assemble(
                 AwsCredentialsIdentity.class,
-                List.of(new SharedConfigProvider()),
+                List.of(new SharedConfigProvider(), new SessionKeysHandler(), new StaticKeysHandler()),
                 null,
                 setup);
         var diagnostics = new ChainResolutionDiagnostics[1];
