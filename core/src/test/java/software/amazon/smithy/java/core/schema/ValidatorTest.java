@@ -550,7 +550,7 @@ public class ValidatorTest {
             s.writeStruct(unionSchema, TestHelper.create(unionSchema, (schema, serializer) -> {
                 serializer.writeStruct(schema.member("d"),
                         TestHelper.create(schema.member("d"), (passedSchema, innerSerializer) -> {
-                            serializer.writeString(passedSchema.member("foo"), "1234");
+                            innerSerializer.writeString(passedSchema.member("foo"), "1234");
                         }));
             }));
         });
