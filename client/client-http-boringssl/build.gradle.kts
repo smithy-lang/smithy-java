@@ -13,8 +13,8 @@ dependencies {
     api(project(":http:http-client"))
     implementation(project(":logging"))
 
-    implementation("io.netty:netty-handler:4.2.16.Final")
-    implementation("io.netty:netty-buffer:4.2.16.Final")
+    implementation("io.netty:netty-handler:4.2.17.Final")
+    implementation("io.netty:netty-buffer:4.2.17.Final")
 
     // netty-tcnative (BoringSSL): base jar carries the Java classes; the native library ships in
     // per-platform classifier artifacts. We pull the classifiers for the platforms we build/benchmark
