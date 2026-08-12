@@ -5,8 +5,18 @@ namespace smithy.mcp.toolassistant
 use smithy.ai#prompts
 
 @prompts({
-    tool_assistant: { description: "Tool assistant prompt to guide the LLM to use ToolAssistant's Search and Install Tool", template: "{{query}}. Use the SearchTools and InstallTools from ToolAssistant if the current list of MCP tools is not enough to accomplish the task.", arguments: ToolAssistantQuery, preferWhen: "User wants to do a dynamically search and install tools to accomplish a task." }
-    install_tool: { description: "Install tool using ToolAssistant.", template: "Install tool {{toolName}} server using InstallTools.", arguments: InstallToolInput, preferWhen: "User wants to install a tool." }
+    tool_assistant: {
+        description: "Tool assistant prompt to guide the LLM to use ToolAssistant's Search and Install Tool"
+        template: "{{query}}. Use the SearchTools and InstallTools from ToolAssistant if the current list of MCP tools is not enough to accomplish the task."
+        arguments: ToolAssistantQuery
+        preferWhen: "User wants to do a dynamically search and install tools to accomplish a task."
+    }
+    install_tool: {
+        description: "Install tool using ToolAssistant."
+        template: "Install tool {{toolName}} server using InstallTools."
+        arguments: InstallToolInput
+        preferWhen: "User wants to install a tool."
+    }
 })
 @documentation("This service provides methods to search MCP Tools and install MCP servers. Be aware that tools installed using InstallTool are available as part of the ToolAssistant MCP server and the MCP serverId returned from search tool needs to be ignored while tool calling.")
 service ToolAssistant {

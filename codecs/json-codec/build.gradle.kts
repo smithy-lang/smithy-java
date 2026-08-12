@@ -31,8 +31,8 @@ tasks {
                         .toString(),
                 ),
             )
-            relocate("tools.jackson.core", "software.amazon.smithy.java.internal.shaded.tools.jackson.core")
         }
+        relocate("tools.jackson.core", "software.amazon.smithy.java.internal.shaded.tools.jackson.core")
     }
     jar {
         finalizedBy(shadowJar)
