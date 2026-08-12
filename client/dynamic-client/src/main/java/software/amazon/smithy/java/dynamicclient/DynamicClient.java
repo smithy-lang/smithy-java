@@ -47,10 +47,12 @@ import software.amazon.smithy.model.shapes.ToShapeId;
  *
  * <ul>
  *     <li>No code generated types. You have to construct input and use output manually using document APIs.</li>
- *     <li>No support for streaming inputs or outputs.</li>
  *     <li>All errors are created as an {@link DocumentException} if the error is modeled, allowing document access
  *     to the modeled error contents. Other errors are deserialized as {@link CallException}.
  * </ul>
+ *
+ * <p>Streaming blob members and event streams (input, output, and bidirectional) are supported: streaming members
+ * carry the runtime's {@code DataStream}/{@code EventStream} handles rather than being buffered into a document.
  */
 public final class DynamicClient extends Client {
 
