@@ -72,9 +72,45 @@ final class JsonWriteUtils {
     }
 
     /**
-     * Writes a JSON quoted string. Returns new position.
+     * Writes a quoted JSON string. Requires {@link #maxQuotedStringBytes} of capacity.
      */
     static int writeQuotedString(byte[] buf, int pos, String value) {
+        int next = tryWriteQuotedAscii(buf, pos, value);
+        return next >= 0 ? next : writeQuotedStringGeneral(buf, pos, value);
+    }
+
+    /**
+     * Writes a quoted string if every char is unescaped ASCII. Returns {@code -1} otherwise.
+     * Requires {@code value.length() + 2} bytes; on rejection, retry from the original position.
+     */
+    static int tryWriteQuotedAscii(byte[] buf, int pos, String value) {
+        int len = value.length();
+        int p = pos;
+        buf[p++] = '"';
+
+        // The JIT auto-vectorizes this loop on JDK 21.
+        //
+        // Note: we cannot use String.getBytes(int,int,byte[],int) + SWAR here because
+        // that method truncates chars >= 0x100 to their low byte, which can produce
+        // valid-looking ASCII bytes (e.g. U+0123 -> 0x23 '#') indistinguishable from
+        // real ASCII via any byte-level check.
+        for (int i = 0; i < len; i++) {
+            char c = value.charAt(i);
+            if (c >= 0x80 || c < 0x20 || c == '"' || c == '\\') {
+                return -1;
+            }
+            buf[p++] = (byte) c;
+        }
+
+        buf[p++] = '"';
+        return p;
+    }
+
+    /**
+     * Writes a JSON quoted string that may need escaping or multi-byte encoding, from scratch.
+     * Requires {@link #maxQuotedStringBytes} of capacity.
+     */
+    static int writeQuotedStringGeneral(byte[] buf, int pos, String value) {
         int len = value.length();
         buf[pos++] = '"';
 
@@ -83,14 +119,7 @@ final class JsonWriteUtils {
             return pos;
         }
 
-        // Single-pass: write safe ASCII chars directly to buf, bail to slow path
-        // on the first char needing escaping or multi-byte UTF-8 encoding.
-        // The JIT auto-vectorizes this loop on JDK 21.
-        //
-        // Note: we cannot use String.getBytes(int,int,byte[],int) + SWAR here because
-        // that method truncates chars >= 0x100 to their low byte, which can produce
-        // valid-looking ASCII bytes (e.g. U+0123 -> 0x23 '#') indistinguishable from
-        // real ASCII via any byte-level check.
+        // Copy the safe ASCII prefix before using the per-char encoder.
         int i = 0;
         for (; i < len; i++) {
             char c = value.charAt(i);

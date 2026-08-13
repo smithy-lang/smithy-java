@@ -107,6 +107,20 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         buf = Arrays.copyOf(buf, Math.max(buf.length * 2, pos + needed));
     }
 
+    /** Writes with the exact ASCII reservation, widening only when needed. */
+    private void writeQuotedStringExact(String value) {
+        writeQuotedStringExact(value, 0);
+    }
+
+    private void writeQuotedStringExact(String value, int trailingBytes) {
+        int next = JsonWriteUtils.tryWriteQuotedAscii(buf, pos, value);
+        if (next < 0) {
+            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(value) + trailingBytes);
+            next = JsonWriteUtils.writeQuotedStringGeneral(buf, pos, value);
+        }
+        pos = next;
+    }
+
     @Override
     public void flush() {
         try {
@@ -202,8 +216,8 @@ final class SmithyJsonSerializer implements ShapeSerializer {
 
     @Override
     public void writeString(Schema schema, String value) {
-        ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(value));
-        pos = JsonWriteUtils.writeQuotedString(buf, pos, value);
+        ensureCapacity(value.length() + 2);
+        writeQuotedStringExact(value);
     }
 
     @Override
@@ -486,9 +500,9 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         @Override
         public void writeString(Schema schema, String value) {
             byte[] nameBytes = resolveFieldNameBytes(schema);
-            ensureCapacity(nameBytes.length + 1 + JsonWriteUtils.maxQuotedStringBytes(value));
+            ensureCapacity(nameBytes.length + 1 + value.length() + 2);
             writeFieldNameBytesUnchecked(nameBytes);
-            pos = JsonWriteUtils.writeQuotedString(buf, pos, value);
+            writeQuotedStringExact(value);
         }
 
         @Override
@@ -645,8 +659,8 @@ final class SmithyJsonSerializer implements ShapeSerializer {
                 BiConsumer<T, ShapeSerializer> valueSerializer
         ) {
             writeCommaIfNeeded();
-            ensureCapacity(JsonWriteUtils.maxQuotedStringBytes(key) + 1);
-            pos = JsonWriteUtils.writeQuotedString(buf, pos, key);
+            ensureCapacity(key.length() + 2 + 1);
+            writeQuotedStringExact(key, 1);
             buf[pos++] = ':';
             valueSerializer.accept(state, SmithyJsonSerializer.this);
         }
@@ -671,12 +685,10 @@ final class SmithyJsonSerializer implements ShapeSerializer {
             if (parent.settings.serializeTypeInDocuments()) {
                 parent.needsComma[parent.depth] = true;
                 String typeValue = schema.id().toString();
-                parent.ensureCapacity(JsonWriteUtils.maxQuotedStringBytes("__type")
-                        + 1
-                        + JsonWriteUtils.maxQuotedStringBytes(typeValue));
-                parent.pos = JsonWriteUtils.writeQuotedString(parent.buf, parent.pos, "__type");
+                parent.ensureCapacity("__type".length() + 2 + 1 + typeValue.length() + 2);
+                parent.writeQuotedStringExact("__type");
                 parent.buf[parent.pos++] = ':';
-                parent.pos = JsonWriteUtils.writeQuotedString(parent.buf, parent.pos, typeValue);
+                parent.writeQuotedStringExact(typeValue);
             }
             struct.serializeMembers(parent.structSerializer);
             parent.depth--;
