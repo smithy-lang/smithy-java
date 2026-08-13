@@ -283,6 +283,20 @@ final class CborSerializer implements ShapeSerializer {
         }
     }
 
+    void generatedBeginObject() {
+        startMap(-1);
+    }
+
+    void generatedWriteField(byte[] encodedName) {
+        ensureCapacity(encodedName.length);
+        System.arraycopy(encodedName, 0, buf, pos, encodedName.length);
+        pos += encodedName.length;
+    }
+
+    void generatedEndObject() {
+        endMap();
+    }
+
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
         ensureCapacity(1);

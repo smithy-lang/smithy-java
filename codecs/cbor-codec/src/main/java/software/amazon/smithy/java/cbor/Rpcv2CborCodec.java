@@ -7,12 +7,16 @@ package software.amazon.smithy.java.cbor;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenFeature;
 import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 
 public final class Rpcv2CborCodec implements Codec {
+    private static final SmithyGeneratedCborSerde GENERATED = new SmithyGeneratedCborSerde();
     private final CborSettings settings;
 
     private Rpcv2CborCodec(Builder builder) {
@@ -25,7 +29,42 @@ public final class Rpcv2CborCodec implements Codec {
 
     @Override
     public ByteBuffer serialize(SerializableShape shape) {
+        if (runtimeCodegenEnabled() && shape instanceof SerializableStruct struct) {
+            ByteBuffer generated = GENERATED.serialize(struct, settings);
+            if (generated != null) {
+                return generated;
+            }
+        }
         return settings.provider().serialize(shape, settings);
+    }
+
+    @Override
+    public <T extends SerializableShape> T deserializeShape(byte[] source, ShapeBuilder<T> builder) {
+        if (runtimeCodegenEnabled()) {
+            T generated = GENERATED.deserialize(source, builder, settings);
+            if (generated != null) {
+                return generated;
+            }
+        }
+        return Codec.super.deserializeShape(source, builder);
+    }
+
+    @Override
+    public <T extends SerializableShape> T deserializeShape(ByteBuffer source, ShapeBuilder<T> builder) {
+        if (runtimeCodegenEnabled()) {
+            ByteBuffer duplicate = source.duplicate();
+            byte[] bytes = new byte[duplicate.remaining()];
+            duplicate.get(bytes);
+            T generated = GENERATED.deserialize(bytes, builder, settings);
+            if (generated != null) {
+                return generated;
+            }
+        }
+        return Codec.super.deserializeShape(source, builder);
+    }
+
+    private static boolean runtimeCodegenEnabled() {
+        return RuntimeCodegenFeature.enabled("cbor");
     }
 
     @Override

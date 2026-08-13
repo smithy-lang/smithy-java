@@ -13,6 +13,7 @@ import static software.amazon.smithy.java.cbor.CborReadUtil.readStrLen;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -147,6 +148,8 @@ final class CborDeserializer implements ShapeDeserializer {
     private int overhead = 0; // overhead is [0,8]
     private boolean readingTag = false;
     private int depth;
+    private int generatedFieldPosition;
+    private int generatedFieldLength;
 
     CborDeserializer(byte[] payload, CborSettings settings) {
         this.payload = payload;
@@ -844,6 +847,82 @@ final class CborDeserializer implements ShapeDeserializer {
             }
             current = advance();
         }
+    }
+
+    boolean generatedBeginObject() {
+        if (token != Token.START_OBJECT) {
+            readStructEmpty(null, token);
+            return false;
+        }
+        depth++;
+        if (depth > MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        token = advance();
+        if (token == Token.END_OBJECT) {
+            depth--;
+            token = advance();
+            return false;
+        }
+        return true;
+    }
+
+    int generatedReadFieldHash() {
+        if (token != Token.KEY) {
+            throw badType("struct member", token);
+        }
+        generatedFieldPosition = idx;
+        generatedFieldLength = itemLength;
+        int hash = 0;
+        if (isIndefinite(generatedFieldLength)) {
+            String value = CborReadUtil.readTextString(payload, generatedFieldPosition, generatedFieldLength);
+            for (byte b : value.getBytes(java.nio.charset.StandardCharsets.UTF_8)) {
+                hash = 31 * hash + (b & 0xff);
+            }
+        } else {
+            for (
+                    int i = generatedFieldPosition, limit = generatedFieldPosition + generatedFieldLength;
+                    i < limit;
+                    i++) {
+                hash = 31 * hash + (payload[i] & 0xff);
+            }
+        }
+        advance();
+        return hash;
+    }
+
+    boolean generatedFieldEquals(byte[] expected) {
+        int length = generatedFieldLength;
+        if (isIndefinite(length)) {
+            return CborReadUtil.readTextString(payload, generatedFieldPosition, length)
+                    .equals(new String(expected, StandardCharsets.UTF_8));
+        }
+        return length == expected.length
+                && Arrays.equals(
+                        payload,
+                        generatedFieldPosition,
+                        generatedFieldPosition + length,
+                        expected,
+                        0,
+                        expected.length);
+    }
+
+    boolean generatedTryReadNull() {
+        return token == Token.NULL;
+    }
+
+    void generatedSkipValue() {
+        skipUnknownMember();
+    }
+
+    boolean generatedObjectHasNext() {
+        token = advance();
+        if (token == Token.END_OBJECT) {
+            depth--;
+            token = advance();
+            return false;
+        }
+        return true;
     }
 
     @Override
