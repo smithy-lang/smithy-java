@@ -178,6 +178,40 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     }
 
     /**
+     * Decodes a scanner-proven ASCII string through the compact Latin-1 constructor.
+     *
+     * <p>This mirrors {@link #decodeUtf8Cached(byte[], int, int)} but avoids the UTF-8 decoder
+     * after the string scanner has already established that every content byte is ASCII.
+     */
+    String decodeAsciiCached(byte[] buf, int start, int len) {
+        if (len == 0) {
+            return "";
+        }
+        if (len > 8) {
+            return new String(buf, start, len, StandardCharsets.ISO_8859_1);
+        }
+        long key = 0;
+        for (int i = 0; i < len; i++) {
+            key = (key << 8) | (buf[start + i] & 0xFFL);
+        }
+        long[] keys = strCacheKeys;
+        String[] vals = strCacheVals;
+        if (keys == null) {
+            StringCache cache = acquireCache();
+            keys = strCacheKeys = cache.keys;
+            vals = strCacheVals = cache.vals;
+        }
+        int slot = (int) ((key * 0x9E3779B97F4A7C15L) >>> 48) & STR_CACHE_MASK;
+        if (keys[slot] == key) {
+            return vals[slot];
+        }
+        String s = new String(buf, start, len, StandardCharsets.ISO_8859_1);
+        keys[slot] = key;
+        vals[slot] = s;
+        return s;
+    }
+
+    /**
      * Acquires a dedup cache from the striped pool (or allocates a fresh one). Mirrors
      * {@link SmithyJsonSerializer#acquire}, including its virtual-thread handling: the
      * shared pool serves platform and virtual threads alike. The CAS to null gives the
@@ -335,6 +369,10 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     }
 
     double generatedReadDouble() {
+        if (pos < end && buf[pos] != '"' && JsonReadUtils.tryParseIntegerDouble(buf, pos, end, this)) {
+            pos = parsedEndPos;
+            return parsedDouble;
+        }
         return readDoubleValue();
     }
 
@@ -446,74 +484,45 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         return readTimestampValue(format);
     }
 
-    Instant generatedReadTimestamp(int format) {
-        return readTimestampValue(switch (format) {
-            case 1 -> TimestampFormatter.Prelude.DATE_TIME;
-            case 2 -> TimestampFormatter.Prelude.HTTP_DATE;
-            default -> TimestampFormatter.Prelude.EPOCH_SECONDS;
-        });
+    Instant generatedReadEpochTimestamp() {
+        if (pos < end && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
+            int startPos = pos;
+            JsonReadUtils.parseLong(buf, startPos, end, this);
+            int endPos = parsedEndPos;
+            if (endPos >= end || (buf[endPos] != '.' && buf[endPos] != 'e' && buf[endPos] != 'E')) {
+                pos = endPos;
+                return instantFromEpochSecond(parsedLong);
+            }
+            return readFractionalEpochTimestamp(startPos, endPos);
+        }
+        return readTimestampFallback(TimestampFormatter.Prelude.EPOCH_SECONDS);
+    }
+
+    Instant generatedReadDateTimeTimestamp() {
+        if (pos < end && buf[pos] == '"') {
+            Instant result = JsonReadUtils.parseIso8601(buf, pos, end, this);
+            if (result != null) {
+                pos = parsedEndPos;
+                return result;
+            }
+        }
+        return readTimestampFallback(TimestampFormatter.Prelude.DATE_TIME);
+    }
+
+    Instant generatedReadHttpDateTimestamp() {
+        if (pos < end && buf[pos] == '"') {
+            Instant result = JsonReadUtils.parseHttpDate(buf, pos, end, this);
+            if (result != null) {
+                pos = parsedEndPos;
+                return result;
+            }
+        }
+        return readTimestampFallback(TimestampFormatter.Prelude.HTTP_DATE);
     }
 
     private Instant readTimestampValue(TimestampFormatter format) {
-        if (format == TimestampFormatter.Prelude.EPOCH_SECONDS
-                && pos < end
-                && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
-            // Fast path for epoch-seconds: try integer parsing first.
-            // Most epoch-seconds timestamps are whole numbers, so parseLong avoids
-            // the expensive FastDoubleParser path entirely.
-            int startPos = pos;
-            JsonReadUtils.parseLong(buf, pos, end, this);
-            int endPos = parsedEndPos;
-            if (endPos < end && buf[endPos] == '.') {
-                // Fractional epoch-seconds: parse with full nanosecond precision
-                // instead of going through double (which truncates to ~15 significant digits).
-                int fracPos = endPos + 1;
-                int fracStart = fracPos;
-                while (fracPos < end && buf[fracPos] >= '0' && buf[fracPos] <= '9') {
-                    fracPos++;
-                }
-                int fracLen = fracPos - fracStart;
-                // Skip the precision fast path if an exponent follows — the precision
-                // fast path doesn't apply scientific notation and would leave pos before
-                // the 'e'/'E', corrupting subsequent parsing.
-                boolean hasExponent = fracPos < end && (buf[fracPos] == 'e' || buf[fracPos] == 'E');
-                if (fracLen > 0 && !hasExponent) {
-                    int nano = 0;
-                    for (int i = 0; i < 9; i++) {
-                        nano *= 10;
-                        if (i < fracLen) {
-                            nano += buf[fracStart + i] - '0';
-                        }
-                    }
-                    pos = fracPos;
-                    long epochSecond = parsedLong;
-                    boolean negative = buf[startPos] == '-';
-                    if (negative && nano > 0) {
-                        // -0.5 means parsedLong=0 but the value is -0.5 = Instant(-1, 500_000_000)
-                        // -1.5 means parsedLong=-1 but the value is -1.5 = Instant(-2, 500_000_000)
-                        epochSecond -= 1;
-                        nano = 1_000_000_000 - nano;
-                    }
-                    try {
-                        return Instant.ofEpochSecond(epochSecond, nano);
-                    } catch (DateTimeException e) {
-                        throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
-                    }
-                }
-                // No digits after dot, or exponent present -- fall through to double parsing
-            } else if (endPos >= end || (buf[endPos] != 'e' && buf[endPos] != 'E')) {
-                // Pure integer -- no fractional part
-                pos = endPos;
-                try {
-                    return Instant.ofEpochSecond(parsedLong);
-                } catch (DateTimeException e) {
-                    throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
-                }
-            }
-            // Has exponent or unparseable fraction -- fall through to double parsing
-            JsonReadUtils.parseDouble(buf, pos, end, this);
-            pos = parsedEndPos;
-            return format.readFromNumber(parsedDouble);
+        if (format == TimestampFormatter.Prelude.EPOCH_SECONDS) {
+            return generatedReadEpochTimestamp();
         }
         if (pos < end && buf[pos] == '"') {
             // Fast path: parse ISO-8601 and HTTP-date directly from bytes,
@@ -531,7 +540,58 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                     return result;
                 }
             }
-            // Fallback: parse as String and use DateTimeFormatter
+        }
+        return readTimestampFallback(format);
+    }
+
+    private Instant readFractionalEpochTimestamp(int startPos, int integerEnd) {
+        if (buf[integerEnd] == '.') {
+            // Parse with full nanosecond precision instead of going through double,
+            // which truncates to roughly 15 significant digits.
+            int fracPos = integerEnd + 1;
+            int fracStart = fracPos;
+            while (fracPos < end && buf[fracPos] >= '0' && buf[fracPos] <= '9') {
+                fracPos++;
+            }
+            int fracLen = fracPos - fracStart;
+            boolean hasExponent = fracPos < end && (buf[fracPos] == 'e' || buf[fracPos] == 'E');
+            if (fracLen > 0 && !hasExponent) {
+                int nano = 0;
+                for (int i = 0; i < 9; i++) {
+                    nano *= 10;
+                    if (i < fracLen) {
+                        nano += buf[fracStart + i] - '0';
+                    }
+                }
+                pos = fracPos;
+                long epochSecond = parsedLong;
+                if (buf[startPos] == '-' && nano > 0) {
+                    epochSecond -= 1;
+                    nano = 1_000_000_000 - nano;
+                }
+                try {
+                    return Instant.ofEpochSecond(epochSecond, nano);
+                } catch (DateTimeException e) {
+                    throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
+                }
+            }
+        }
+        pos = startPos;
+        JsonReadUtils.parseDouble(buf, startPos, end, this);
+        pos = parsedEndPos;
+        return TimestampFormatter.Prelude.EPOCH_SECONDS.readFromNumber(parsedDouble);
+    }
+
+    private Instant instantFromEpochSecond(long epochSecond) {
+        try {
+            return Instant.ofEpochSecond(epochSecond);
+        } catch (DateTimeException e) {
+            throw new SerializationException("Epoch seconds out of range: " + epochSecond, e);
+        }
+    }
+
+    private Instant readTimestampFallback(TimestampFormatter format) {
+        if (pos < end && buf[pos] == '"') {
             String s = readStringValue();
             try {
                 return format.readFromString(s, true);
@@ -1123,6 +1183,51 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         }
         pos = JsonReadUtils.skipWhitespace(buf, start + length, end);
         return true;
+    }
+
+    boolean generatedTryReadField8(long expected, long mask, int length) {
+        int start = pos;
+        if (start > end - length) {
+            return false;
+        }
+        long actual;
+        if (start <= end - Long.BYTES) {
+            actual = JsonReadUtils.readLongLittleEndian(buf, start) & mask;
+        } else {
+            actual = readPackedToken(start, length);
+        }
+        if (actual != expected) {
+            return false;
+        }
+        pos = JsonReadUtils.skipWhitespace(buf, start + length, end);
+        return true;
+    }
+
+    boolean generatedTryReadField16(long prefix, long suffix, long suffixMask, int length) {
+        int start = pos;
+        if (start > end - length || JsonReadUtils.readLongLittleEndian(buf, start) != prefix) {
+            return false;
+        }
+        int suffixStart = start + Long.BYTES;
+        long actualSuffix;
+        if (suffixStart <= end - Long.BYTES) {
+            actualSuffix = JsonReadUtils.readLongLittleEndian(buf, suffixStart) & suffixMask;
+        } else {
+            actualSuffix = readPackedToken(suffixStart, length - Long.BYTES);
+        }
+        if (actualSuffix != suffix) {
+            return false;
+        }
+        pos = JsonReadUtils.skipWhitespace(buf, start + length, end);
+        return true;
+    }
+
+    private long readPackedToken(int start, int length) {
+        long value = 0;
+        for (int i = 0; i < length; i++) {
+            value |= (long) (buf[start + i] & 0xFF) << (i << 3);
+        }
+        return value;
     }
 
     boolean generatedFieldEquals(byte[] expected) {

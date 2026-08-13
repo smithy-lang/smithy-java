@@ -84,6 +84,21 @@ final class RuntimeJsonCodegenTest {
     }
 
     @Test
+    void acceptsWhitespaceAroundPackedFieldTokens() {
+        var serde = new SmithyGeneratedJsonSerde();
+        byte[] payload = """
+                { "name" : "value", "age": 7 , "active" :false, "createdAt": 1736937000 }
+                """.getBytes(StandardCharsets.UTF_8);
+
+        SimpleStruct result = serde.deserialize(payload, SimpleStruct.builder(), SETTINGS);
+
+        assertThat(result.getName()).isEqualTo("value");
+        assertThat(result.getAge()).isEqualTo(7);
+        assertThat(result.isActive()).isFalse();
+        assertThat(result.getCreatedAt()).isEqualTo(Instant.parse("2025-01-15T10:30:00Z"));
+    }
+
+    @Test
     void supportsBorrowedOutput() {
         var serde = new SmithyGeneratedJsonSerde();
         var value = SimpleStruct.builder().name("x").age(1).build();
@@ -108,6 +123,37 @@ final class RuntimeJsonCodegenTest {
                 () -> serde.deserialize(
                         "{\"name\":\"x\"".getBytes(StandardCharsets.UTF_8),
                         SimpleStruct.builder(),
+                        SETTINGS));
+    }
+
+    @Test
+    void generatedDoubleIntegerFastPathPreservesNumberSemantics() {
+        var serde = new SmithyGeneratedJsonSerde();
+
+        NumericStruct negativeZero = serde.deserialize(
+                "{\"doubleVal\":-0}".getBytes(StandardCharsets.UTF_8),
+                NumericStruct.builder(),
+                SETTINGS);
+        assertThat(Double.doubleToRawLongBits(negativeZero.getDoubleVal()))
+                .isEqualTo(Double.doubleToRawLongBits(-0.0d));
+
+        for (String value : List.of(
+                "123456789012345678",
+                "9223372036854775808",
+                "1.25",
+                "15e2")) {
+            NumericStruct result = serde.deserialize(
+                    ("{\"doubleVal\":" + value + "}").getBytes(StandardCharsets.UTF_8),
+                    NumericStruct.builder(),
+                    SETTINGS);
+            assertThat(result.getDoubleVal()).isEqualTo(Double.parseDouble(value));
+        }
+
+        assertThrows(
+                SerializationException.class,
+                () -> serde.deserialize(
+                        "{\"doubleVal\":01}".getBytes(StandardCharsets.UTF_8),
+                        NumericStruct.builder(),
                         SETTINGS));
     }
 

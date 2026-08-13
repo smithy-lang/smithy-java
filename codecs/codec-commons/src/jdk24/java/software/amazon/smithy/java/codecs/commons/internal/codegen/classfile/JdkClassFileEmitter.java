@@ -126,6 +126,12 @@ public final class JdkClassFileEmitter {
             code.ldc(code.constantPool().stringEntry(string));
         } else if (value instanceof Integer integer) {
             code.loadConstant(integer);
+        } else if (value instanceof Long longValue) {
+            code.loadConstant(longValue);
+        } else if (value instanceof Float floatValue) {
+            code.loadConstant(floatValue);
+        } else if (value instanceof Double doubleValue) {
+            code.loadConstant(doubleValue);
         } else {
             throw new IllegalArgumentException("Unsupported generated constant: " + value);
         }

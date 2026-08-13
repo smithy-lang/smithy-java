@@ -1238,14 +1238,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitJumpInsn(IFEQ, done);
             for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
                 Label next = new Label();
-                method.visitVarInsn(ALOAD, 1);
-                method.visitFieldInsn(GETSTATIC, className, "W" + memberIds.get(member), "[B");
-                method.visitMethodInsn(
-                        INVOKEVIRTUAL,
-                        READER,
-                        "generatedTryReadField",
-                        "([B)Z",
-                        false);
+                emitTryReadField(method, member);
                 method.visitJumpInsn(IFEQ, next);
                 emitReadMember(method, member);
                 method.visitVarInsn(ALOAD, 1);
@@ -1341,14 +1334,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitLabel(nonEmpty);
             for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
                 Label next = new Label();
-                method.visitVarInsn(ALOAD, 1);
-                method.visitFieldInsn(GETSTATIC, className, "W" + memberIds.get(member), "[B");
-                method.visitMethodInsn(
-                        INVOKEVIRTUAL,
-                        READER,
-                        "generatedTryReadField",
-                        "([B)Z",
-                        false);
+                emitTryReadField(method, member);
                 method.visitJumpInsn(IFEQ, next);
                 emitUnionValue(method, member);
                 method.visitLabel(next);
@@ -1514,6 +1500,61 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitVarInsn(ALOAD, 1);
             method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedSkipValue", "()V", false);
             method.visitLabel(after);
+        }
+
+        private void emitTryReadField(MethodVisitor method, RuntimeCodecPlan.MemberPlan member) {
+            byte[] token = fieldToken(member);
+            method.visitVarInsn(ALOAD, 1);
+            if (token.length <= Long.BYTES) {
+                long mask = lowByteMask(token.length);
+                method.visitLdcInsn(packLittleEndian(token, 0, token.length) & mask);
+                method.visitLdcInsn(mask);
+                method.visitLdcInsn(token.length);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedTryReadField8",
+                        "(JJI)Z",
+                        false);
+            } else if (token.length <= Long.BYTES * 2) {
+                int suffixLength = token.length - Long.BYTES;
+                long suffixMask = lowByteMask(suffixLength);
+                method.visitLdcInsn(packLittleEndian(token, 0, Long.BYTES));
+                method.visitLdcInsn(packLittleEndian(token, Long.BYTES, suffixLength) & suffixMask);
+                method.visitLdcInsn(suffixMask);
+                method.visitLdcInsn(token.length);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedTryReadField16",
+                        "(JJJI)Z",
+                        false);
+            } else {
+                method.visitFieldInsn(GETSTATIC, className, "W" + memberIds.get(member), "[B");
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedTryReadField",
+                        "([B)Z",
+                        false);
+            }
+        }
+
+        private byte[] fieldToken(RuntimeCodecPlan.MemberPlan member) {
+            var extension = member.schema().getExtension(SmithyJsonSchemaExtensions.KEY);
+            return useJsonName ? extension.jsonNameBytes() : extension.memberNameBytes();
+        }
+
+        private static long packLittleEndian(byte[] value, int offset, int length) {
+            long packed = 0;
+            for (int i = 0; i < length; i++) {
+                packed |= (long) (value[offset + i] & 0xFF) << (i << 3);
+            }
+            return packed;
+        }
+
+        private static long lowByteMask(int length) {
+            return length == Long.BYTES ? -1L : (1L << (length << 3)) - 1;
         }
 
         private void emitReaderBucket(
@@ -1692,12 +1733,11 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 }
                 case TIMESTAMP -> {
                     method.visitVarInsn(ALOAD, 1);
-                    method.visitLdcInsn(timestampFormat(member));
                     method.visitMethodInsn(
                             INVOKEVIRTUAL,
                             READER,
-                            "generatedReadTimestamp",
-                            "(I)L" + Type.getInternalName(Instant.class) + ";",
+                            timestampReader(member.schema()),
+                            "()L" + Type.getInternalName(Instant.class) + ";",
                             false);
                 }
                 case DOCUMENT -> {
@@ -1847,12 +1887,11 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 }
                 case TIMESTAMP -> {
                     method.visitVarInsn(ALOAD, readerLocal);
-                    method.visitLdcInsn(timestampFormat(schema));
                     method.visitMethodInsn(
                             INVOKEVIRTUAL,
                             READER,
-                            "generatedReadTimestamp",
-                            "(I)L" + Type.getInternalName(Instant.class) + ";",
+                            timestampReader(schema),
+                            "()L" + Type.getInternalName(Instant.class) + ";",
                             false);
                 }
                 case DOCUMENT -> {
@@ -2075,6 +2114,14 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
 
         private int timestampFormat(RuntimeCodecPlan.MemberPlan member) {
             return timestampFormat(member.schema());
+        }
+
+        private String timestampReader(Schema schema) {
+            return switch (timestampFormat(schema)) {
+                case 1 -> "generatedReadDateTimeTimestamp";
+                case 2 -> "generatedReadHttpDateTimestamp";
+                default -> "generatedReadEpochTimestamp";
+            };
         }
 
         private int timestampFormat(Schema schema) {
