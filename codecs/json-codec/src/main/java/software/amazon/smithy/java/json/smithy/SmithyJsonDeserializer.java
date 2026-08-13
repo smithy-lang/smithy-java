@@ -1185,6 +1185,25 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         return true;
     }
 
+    boolean generatedTryReadNextField(byte[] token) {
+        int start = pos;
+        if (start >= end || buf[start] != ',') {
+            return false;
+        }
+        start++;
+        int length = token.length;
+        if (start > end - length) {
+            return false;
+        }
+        for (int i = 0; i < length; i++) {
+            if (buf[start + i] != token[i]) {
+                return false;
+            }
+        }
+        pos = JsonReadUtils.skipWhitespace(buf, start + length, end);
+        return true;
+    }
+
     boolean generatedTryReadField8(long expected, long mask, int length) {
         int start = pos;
         if (start > end - length) {
@@ -1203,8 +1222,53 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         return true;
     }
 
+    boolean generatedTryReadNextField8(long expected, long mask, int length) {
+        int start = pos;
+        if (start >= end || buf[start] != ',') {
+            return false;
+        }
+        start++;
+        if (start > end - length) {
+            return false;
+        }
+        long actual;
+        if (start <= end - Long.BYTES) {
+            actual = JsonReadUtils.readLongLittleEndian(buf, start) & mask;
+        } else {
+            actual = readPackedToken(start, length);
+        }
+        if (actual != expected) {
+            return false;
+        }
+        pos = JsonReadUtils.skipWhitespace(buf, start + length, end);
+        return true;
+    }
+
     boolean generatedTryReadField16(long prefix, long suffix, long suffixMask, int length) {
         int start = pos;
+        if (start > end - length || JsonReadUtils.readLongLittleEndian(buf, start) != prefix) {
+            return false;
+        }
+        int suffixStart = start + Long.BYTES;
+        long actualSuffix;
+        if (suffixStart <= end - Long.BYTES) {
+            actualSuffix = JsonReadUtils.readLongLittleEndian(buf, suffixStart) & suffixMask;
+        } else {
+            actualSuffix = readPackedToken(suffixStart, length - Long.BYTES);
+        }
+        if (actualSuffix != suffix) {
+            return false;
+        }
+        pos = JsonReadUtils.skipWhitespace(buf, start + length, end);
+        return true;
+    }
+
+    boolean generatedTryReadNextField16(long prefix, long suffix, long suffixMask, int length) {
+        int start = pos;
+        if (start >= end || buf[start] != ',') {
+            return false;
+        }
+        start++;
         if (start > end - length || JsonReadUtils.readLongLittleEndian(buf, start) != prefix) {
             return false;
         }

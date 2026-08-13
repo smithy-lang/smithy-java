@@ -1236,11 +1236,21 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedBeginObject", "()Z", false);
             Label done = new Label();
             method.visitJumpInsn(IFEQ, done);
-            for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
-                Label next = new Label();
-                emitTryReadField(method, member);
-                method.visitJumpInsn(IFEQ, next);
-                emitReadMember(method, member);
+            Label loop = new Label();
+            if (canFuseOrderedObjectFraming(structure)) {
+                Label fallback = new Label();
+                RuntimeCodecPlan.MemberPlan first = structure.members().getFirst();
+                emitTryReadField(method, first, false);
+                method.visitJumpInsn(IFEQ, fallback);
+                emitReadMember(method, first);
+                for (int i = 1; i < structure.members().size(); i++) {
+                    RuntimeCodecPlan.MemberPlan member = structure.members().get(i);
+                    Label next = new Label();
+                    emitTryReadField(method, member, true);
+                    method.visitJumpInsn(IFEQ, next);
+                    emitReadMember(method, member);
+                    method.visitLabel(next);
+                }
                 method.visitVarInsn(ALOAD, 1);
                 method.visitMethodInsn(
                         INVOKEVIRTUAL,
@@ -1249,9 +1259,24 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                         "()Z",
                         false);
                 method.visitJumpInsn(IFEQ, done);
-                method.visitLabel(next);
+                method.visitLabel(fallback);
+            } else {
+                for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
+                    Label next = new Label();
+                    emitTryReadField(method, member, false);
+                    method.visitJumpInsn(IFEQ, next);
+                    emitReadMember(method, member);
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedObjectHasNext",
+                            "()Z",
+                            false);
+                    method.visitJumpInsn(IFEQ, done);
+                    method.visitLabel(next);
+                }
             }
-            Label loop = new Label();
             method.visitLabel(loop);
             method.visitVarInsn(ALOAD, 1);
             method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedReadFieldHash", "()I", false);
@@ -1315,6 +1340,12 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             if (structure.union()) {
                 emitUnionValueReader(structure);
             }
+        }
+
+        private boolean canFuseOrderedObjectFraming(RuntimeCodecPlan.StructPlan structure) {
+            return !structure.union()
+                    && !structure.members().isEmpty()
+                    && structure.members().getFirst().required();
         }
 
         private void emitUnionValueReader(RuntimeCodecPlan.StructPlan structure) {
@@ -1503,6 +1534,14 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
         }
 
         private void emitTryReadField(MethodVisitor method, RuntimeCodecPlan.MemberPlan member) {
+            emitTryReadField(method, member, false);
+        }
+
+        private void emitTryReadField(
+                MethodVisitor method,
+                RuntimeCodecPlan.MemberPlan member,
+                boolean afterValue
+        ) {
             byte[] token = fieldToken(member);
             method.visitVarInsn(ALOAD, 1);
             if (token.length <= Long.BYTES) {
@@ -1513,7 +1552,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 method.visitMethodInsn(
                         INVOKEVIRTUAL,
                         READER,
-                        "generatedTryReadField8",
+                        afterValue ? "generatedTryReadNextField8" : "generatedTryReadField8",
                         "(JJI)Z",
                         false);
             } else if (token.length <= Long.BYTES * 2) {
@@ -1526,7 +1565,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 method.visitMethodInsn(
                         INVOKEVIRTUAL,
                         READER,
-                        "generatedTryReadField16",
+                        afterValue ? "generatedTryReadNextField16" : "generatedTryReadField16",
                         "(JJJI)Z",
                         false);
             } else {
@@ -1534,7 +1573,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 method.visitMethodInsn(
                         INVOKEVIRTUAL,
                         READER,
-                        "generatedTryReadField",
+                        afterValue ? "generatedTryReadNextField" : "generatedTryReadField",
                         "([B)Z",
                         false);
             }
