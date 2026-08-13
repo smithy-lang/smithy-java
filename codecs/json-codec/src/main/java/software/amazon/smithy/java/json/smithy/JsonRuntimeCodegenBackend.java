@@ -36,7 +36,6 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJsonCodec>, Opcodes {
-    private static final int STRUCTURE_BUILDER_LOCAL = 9;
     private static final String CODEC = Type.getInternalName(GeneratedJsonCodec.class);
     private static final String WRITER = Type.getInternalName(JsonCodegenWriter.class);
     private static final String READER = Type.getInternalName(SmithyJsonDeserializer.class);
@@ -172,15 +171,59 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             emitClassInitializer();
             emitEnumReaders();
             emitAggregateMethods();
+            RuntimeCodecPlan.StructPlan root = plan.rootStructure();
             for (RuntimeCodecPlan.StructPlan structure : plan.structures()) {
                 emitWriter(structure);
-                emitReader(structure);
+                boolean hasReaderBody = false;
+                if (structure == root) {
+                    emitReader(structure);
+                    hasReaderBody = true;
+                }
+                if (structure.union()) {
+                    emitUnionValueReader(structure);
+                } else if (structure.builderFactory() != null && needsStructureValueReader(structure, root)) {
+                    emitStructureValueReader(structure);
+                    hasReaderBody = true;
+                }
+                if (hasReaderBody) {
+                    emitReaderBuckets(structure);
+                }
             }
             emitWriteEntry();
             emitReadEntry();
             emitScanEntry();
             writer.visitEnd();
             return new Emission(writer.toByteArray(), methodCount);
+        }
+
+        private boolean needsStructureValueReader(
+                RuntimeCodecPlan.StructPlan structure,
+                RuntimeCodecPlan.StructPlan root
+        ) {
+            if (structure != root) {
+                return true;
+            }
+            ShapeId target = structure.schema().id();
+            for (RuntimeCodecPlan.StructPlan candidate : plan.structures()) {
+                for (RuntimeCodecPlan.MemberPlan member : candidate.members()) {
+                    if (containsStructure(member.target(), target)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private boolean containsStructure(Schema schema, ShapeId target) {
+            Schema value = schema.isMember() ? schema.memberTarget() : schema;
+            if (value.id().equals(target)) {
+                return true;
+            }
+            return switch (value.type()) {
+                case LIST, SET -> containsStructure(value.listMember(), target);
+                case MAP -> containsStructure(value.mapValueMember(), target);
+                default -> false;
+            };
         }
 
         private void emitFields() {
@@ -1232,6 +1275,23 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                     null,
                     null);
             method.visitCode();
+            emitReaderBody(method, structure);
+            method.visitInsn(RETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private void emitReaderBuckets(RuntimeCodecPlan.StructPlan structure) {
+            int buckets = readerBucketCount(structure);
+            if (buckets > 1) {
+                for (int bucket = 0; bucket < buckets; bucket++) {
+                    emitReaderBucket(structure, bucket, buckets);
+                }
+            }
+        }
+
+        private void emitReaderBody(MethodVisitor method, RuntimeCodecPlan.StructPlan structure) {
             method.visitVarInsn(ALOAD, 1);
             method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedBeginObject", "()Z", false);
             Label done = new Label();
@@ -1328,18 +1388,25 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedObjectHasNext", "()Z", false);
             method.visitJumpInsn(IFNE, loop);
             method.visitLabel(done);
-            method.visitInsn(RETURN);
+        }
+
+        private void emitStructureValueReader(RuntimeCodecPlan.StructPlan structure) {
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PRIVATE,
+                    structureValueReaderName(structure),
+                    structureValueReaderDescriptor(structure),
+                    null,
+                    null);
+            method.visitCode();
+            invoke(method, structure.builderFactory());
+            method.visitVarInsn(ASTORE, 2);
+            emitReaderBody(method, structure);
+            method.visitVarInsn(ALOAD, 2);
+            invoke(method, findBuild(structure.builderClass(), structure.shapeClass()));
+            method.visitInsn(ARETURN);
             method.visitMaxs(0, 0);
             method.visitEnd();
             methodCount++;
-            if (buckets > 1) {
-                for (int bucket = 0; bucket < buckets; bucket++) {
-                    emitReaderBucket(structure, bucket, buckets);
-                }
-            }
-            if (structure.union()) {
-                emitUnionValueReader(structure);
-            }
         }
 
         private boolean canFuseOrderedObjectFraming(RuntimeCodecPlan.StructPlan structure) {
@@ -2031,21 +2098,23 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
         ) {
             Schema target = schema.isMember() ? schema.memberTarget() : schema;
             RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(target.id());
-            Method factory = nested.builderFactory();
-            invoke(method, factory);
-            method.visitVarInsn(ASTORE, STRUCTURE_BUILDER_LOCAL);
             method.visitVarInsn(ALOAD, 0);
             method.visitVarInsn(ALOAD, readerLocal);
-            method.visitVarInsn(ALOAD, STRUCTURE_BUILDER_LOCAL);
+            if (nested.union()) {
+                method.visitMethodInsn(
+                        INVOKESPECIAL,
+                        className,
+                        unionValueReaderName(nested),
+                        "(L" + READER + ";)L" + Type.getInternalName(nested.shapeClass()) + ";",
+                        false);
+                return;
+            }
             method.visitMethodInsn(
                     INVOKESPECIAL,
                     className,
-                    readerName(nested),
-                    readerDescriptor(nested),
+                    structureValueReaderName(nested),
+                    structureValueReaderDescriptor(nested),
                     false);
-            method.visitVarInsn(ALOAD, STRUCTURE_BUILDER_LOCAL);
-            Method build = findBuild(nested.builderClass(), nested.shapeClass());
-            invoke(method, build);
         }
 
         private static Method findBuild(Class<?> builderClass, Class<?> shapeClass) {
@@ -2115,6 +2184,10 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             return "readU" + structureIds.get(structure);
         }
 
+        private String structureValueReaderName(RuntimeCodecPlan.StructPlan structure) {
+            return "readV" + structureIds.get(structure);
+        }
+
         private String aggregateWriterName(Schema schema) {
             Schema target = schema.isMember() ? schema.memberTarget() : schema;
             return "writeA" + aggregateIds.get(target.id());
@@ -2135,6 +2208,10 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
 
         private static String readerBucketDescriptor(RuntimeCodecPlan.StructPlan structure) {
             return "(L" + READER + ";L" + Type.getInternalName(structure.builderClass()) + ";I)Z";
+        }
+
+        private static String structureValueReaderDescriptor(RuntimeCodecPlan.StructPlan structure) {
+            return "(L" + READER + ";)L" + Type.getInternalName(structure.shapeClass()) + ";";
         }
 
         private static int readerBucketCount(RuntimeCodecPlan.StructPlan structure) {
