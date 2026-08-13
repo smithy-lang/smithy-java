@@ -342,7 +342,7 @@ final class JsonReadUtils {
      * <p>Subtraction can set later lanes through borrow, but never a lane before the first
      * actual stop. Callers only inspect the least-significant set bit.
      */
-    private static long stringStopMask(long word) {
+    static long stringStopMask(long word) {
         long quoteOrControl = (word ^ 0x0202020202020202L) - 0x2121212121212121L;
         long backslash = (word ^ 0x5C5C5C5C5C5C5C5CL) - 0x0101010101010101L;
         return (quoteOrControl | backslash | word) & 0x8080808080808080L;

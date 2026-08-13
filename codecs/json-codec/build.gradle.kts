@@ -85,6 +85,7 @@ tasks.register<Test>("jdk24CodegenTest") {
         javaToolchains.launcherFor {
             languageVersion = JavaLanguageVersion.of(24)
         }
+    jvmArgs("--add-opens=java.base/java.lang.invoke=ALL-UNNAMED")
     filter {
         includeTestsMatching("*RuntimeJsonCodegenTest")
         includeTestsMatching("*GeneratedModelSerdeTest")

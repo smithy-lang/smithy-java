@@ -76,6 +76,15 @@ final class JsonWriteUtils {
      */
     @SuppressWarnings("deprecation")
     static int writeQuotedString(byte[] buf, int pos, String value) {
+        byte[] latin1 = CompactStringAccess.latin1Bytes(value);
+        if (latin1 != null && isJsonAscii(latin1)) {
+            buf[pos++] = '"';
+            System.arraycopy(latin1, 0, buf, pos, latin1.length);
+            pos += latin1.length;
+            buf[pos++] = '"';
+            return pos;
+        }
+
         int len = value.length();
         buf[pos++] = '"';
 
@@ -105,6 +114,25 @@ final class JsonWriteUtils {
 
         buf[pos++] = '"';
         return pos;
+    }
+
+    private static boolean isJsonAscii(byte[] value) {
+        int length = value.length;
+        int index = 0;
+        int wordLimit = length - Long.BYTES;
+        while (index <= wordLimit) {
+            if (JsonReadUtils.stringStopMask(JsonReadUtils.readLongLittleEndian(value, index)) != 0) {
+                return false;
+            }
+            index += Long.BYTES;
+        }
+        while (index < length) {
+            int current = value[index++] & 0xff;
+            if (current < 0x20 || current >= 0x80 || current == '"' || current == '\\') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int writeStringSlowPath(byte[] buf, int pos, String value, int startIdx, int len) {
