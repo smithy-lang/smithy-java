@@ -112,6 +112,16 @@ final class JsonCodegenWriter {
         position += token.length;
     }
 
+    void fieldString(byte[] token, int index, String value) {
+        ensure(token.length + JsonWriteUtils.maxQuotedStringBytes(value) + 1);
+        if (index != 0) {
+            bytes[position++] = ',';
+        }
+        System.arraycopy(token, 0, bytes, position, token.length);
+        position += token.length;
+        position = JsonWriteUtils.writeQuotedString(bytes, position, value);
+    }
+
     void element() {
         separator();
     }
@@ -296,8 +306,12 @@ final class JsonCodegenWriter {
 
     private void ensure(int needed) {
         if (position + needed > bytes.length) {
-            bytes = Arrays.copyOf(bytes, Math.max(bytes.length * 2, position + needed));
+            grow(needed);
         }
+    }
+
+    private void grow(int needed) {
+        bytes = Arrays.copyOf(bytes, Math.max(bytes.length * 2, position + needed));
     }
 
     private static final class WriterPool extends StripedPool<JsonCodegenWriter, JsonSettings> {

@@ -740,8 +740,8 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitInsn(ICONST_0);
             method.visitVarInsn(ISTORE, 3);
             List<RuntimeCodecPlan.MemberPlan> members = structure.members();
-            int chunks = Math.max(1, (members.size() + 7) / 8);
-            for (int chunk = 0; chunk < chunks; chunk++) {
+            List<RuntimeCodecPlan.MethodRange> chunks = structure.writerChunks();
+            for (int chunk = 0; chunk < chunks.size(); chunk++) {
                 method.visitVarInsn(ALOAD, 0);
                 method.visitVarInsn(ALOAD, 1);
                 method.visitVarInsn(ALOAD, 2);
@@ -761,7 +761,8 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitEnd();
             methodCount++;
 
-            for (int chunk = 0; chunk < chunks; chunk++) {
+            for (int chunk = 0; chunk < chunks.size(); chunk++) {
+                RuntimeCodecPlan.MethodRange range = chunks.get(chunk);
                 MethodVisitor chunkMethod = writer.visitMethod(
                         ACC_PRIVATE,
                         writerChunkName(structure, chunk),
@@ -769,8 +770,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                         null,
                         null);
                 chunkMethod.visitCode();
-                int end = Math.min(members.size(), (chunk + 1) * 8);
-                for (int i = chunk * 8; i < end; i++) {
+                for (int i = range.startInclusive(); i < range.endExclusive(); i++) {
                     emitWriteMember(chunkMethod, members.get(i), 3, 4);
                 }
                 chunkMethod.visitVarInsn(ILOAD, 3);
@@ -844,6 +844,11 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 method.visitVarInsn(ASTORE, valueLocal);
                 method.visitVarInsn(ALOAD, valueLocal);
                 method.visitJumpInsn(IFNULL, skip);
+                if (member.target().type() == ShapeType.STRING) {
+                    emitStringField(method, member, indexLocal, valueLocal);
+                    method.visitLabel(skip);
+                    return;
+                }
                 emitField(method, member, indexLocal);
                 if (member.target().type() == ShapeType.STRUCTURE
                         || member.target().type() == ShapeType.UNION) {
@@ -894,6 +899,25 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             invoke(method, member.getter());
             emitWriteValue(method, member, returnType);
             method.visitLabel(skip);
+        }
+
+        private void emitStringField(
+                MethodVisitor method,
+                RuntimeCodecPlan.MemberPlan member,
+                int indexLocal,
+                int valueLocal
+        ) {
+            method.visitVarInsn(ALOAD, 2);
+            method.visitFieldInsn(GETSTATIC, className, "W" + memberIds.get(member), "[B");
+            method.visitVarInsn(ILOAD, indexLocal);
+            method.visitVarInsn(ALOAD, valueLocal);
+            method.visitMethodInsn(
+                    INVOKEVIRTUAL,
+                    WRITER,
+                    "fieldString",
+                    "([BILjava/lang/String;)V",
+                    false);
+            method.visitIincInsn(indexLocal, 1);
         }
 
         private void emitField(

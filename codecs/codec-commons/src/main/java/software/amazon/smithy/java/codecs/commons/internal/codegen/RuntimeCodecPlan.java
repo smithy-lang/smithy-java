@@ -27,7 +27,7 @@ public record RuntimeCodecPlan(
         List<StructPlan> structures,
         int estimatedBytecode) {
     private static final int MEMBER_ESTIMATE = 36;
-    private static final int WRITER_SPLIT_ESTIMATE = 280;
+    private static final int WRITER_SPLIT_ESTIMATE = 220;
     private static final int READER_SPLIT_ESTIMATE = 300;
     private static final int MAX_MEMBERS_PER_WRITER_METHOD = 8;
 
@@ -100,7 +100,7 @@ public record RuntimeCodecPlan(
                     memberEstimate));
             analyze(target, structures, visited);
         }
-        int writerChunks = chunkCount(members, WRITER_SPLIT_ESTIMATE);
+        List<MethodRange> writerChunks = chunkRanges(members, WRITER_SPLIT_ESTIMATE);
         int readerBuckets = Math.max(1, (estimate + READER_SPLIT_ESTIMATE - 1) / READER_SPLIT_ESTIMATE);
         structures.add(new StructPlan(
                 schema,
@@ -128,26 +128,33 @@ public record RuntimeCodecPlan(
         }
     }
 
-    private static int chunkCount(List<MemberPlan> members, int bytecodeLimit) {
-        int chunks = 1;
+    private static List<MethodRange> chunkRanges(List<MemberPlan> members, int bytecodeLimit) {
+        var chunks = new ArrayList<MethodRange>();
+        int start = 0;
         int size = 0;
         int count = 0;
-        for (MemberPlan member : members) {
-            if (count == MAX_MEMBERS_PER_WRITER_METHOD || size + member.estimatedBytecode() > bytecodeLimit) {
-                chunks++;
+        for (int i = 0; i < members.size(); i++) {
+            MemberPlan member = members.get(i);
+            if (count > 0
+                    && (count == MAX_MEMBERS_PER_WRITER_METHOD
+                            || size + member.estimatedBytecode() > bytecodeLimit)) {
+                chunks.add(new MethodRange(start, i, size));
+                start = i;
                 size = 0;
                 count = 0;
             }
             size += member.estimatedBytecode();
             count++;
         }
+        chunks.add(new MethodRange(start, members.size(), size));
         return chunks;
     }
 
     private static int estimateMember(Schema target) {
         return switch (target.type()) {
             case BOOLEAN, BYTE, SHORT, INTEGER, LONG, FLOAT, DOUBLE, INT_ENUM -> 24;
-            case STRING, ENUM, BLOB, TIMESTAMP -> 36;
+            case STRING -> 60;
+            case ENUM, BLOB, TIMESTAMP -> 36;
             case BIG_INTEGER, BIG_DECIMAL, DOCUMENT -> 48;
             case LIST, SET, MAP -> 72;
             case STRUCTURE, UNION -> 44;
@@ -304,12 +311,15 @@ public record RuntimeCodecPlan(
             boolean union,
             List<MemberPlan> members,
             int estimatedBytecode,
-            int writerChunks,
+            List<MethodRange> writerChunks,
             int readerBuckets) {
         public StructPlan {
             members = List.copyOf(members);
+            writerChunks = List.copyOf(writerChunks);
         }
     }
+
+    public record MethodRange(int startInclusive, int endExclusive, int estimatedBytecode) {}
 
     public record MemberPlan(
             Schema schema,
