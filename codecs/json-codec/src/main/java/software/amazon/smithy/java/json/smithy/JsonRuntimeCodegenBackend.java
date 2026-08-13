@@ -342,43 +342,124 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                     null,
                     null);
             method.visitCode();
-            method.visitTypeInsn(NEW, "java/util/ArrayList");
-            method.visitInsn(DUP);
-            method.visitMethodInsn(INVOKESPECIAL, "java/util/ArrayList", "<init>", "()V", false);
+            method.visitInsn(ACONST_NULL);
             method.visitVarInsn(ASTORE, 2);
+            method.visitInsn(ICONST_0);
+            method.visitVarInsn(ISTORE, 3);
+            for (int local = 5; local <= 8; local++) {
+                method.visitInsn(ACONST_NULL);
+                method.visitVarInsn(ASTORE, local);
+            }
             method.visitVarInsn(ALOAD, 1);
             method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedBeginArray", "()Z", false);
             Label done = new Label();
             Label loop = new Label();
             method.visitJumpInsn(IFEQ, done);
             method.visitLabel(loop);
-            method.visitVarInsn(ALOAD, 2);
             method.visitVarInsn(ALOAD, 1);
             method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedTryReadNull", "()Z", false);
             Label value = new Label();
-            Label add = new Label();
+            Label decoded = new Label();
             method.visitJumpInsn(IFEQ, value);
             method.visitInsn(ACONST_NULL);
-            method.visitJumpInsn(GOTO, add);
+            method.visitJumpInsn(GOTO, decoded);
             method.visitLabel(value);
             emitReadTarget(method, schema.listMember(), 1);
-            method.visitLabel(add);
-            method.visitMethodInsn(
-                    INVOKEINTERFACE,
-                    "java/util/List",
-                    "add",
-                    "(Ljava/lang/Object;)Z",
-                    true);
-            method.visitInsn(POP);
+            method.visitLabel(decoded);
+            method.visitVarInsn(ASTORE, 4);
+
+            Label append = new Label();
+            Label added = new Label();
+            method.visitVarInsn(ALOAD, 2);
+            method.visitJumpInsn(IFNONNULL, append);
+            Label spill = new Label();
+            Label[] slots = {new Label(), new Label(), new Label(), new Label()};
+            method.visitVarInsn(ILOAD, 3);
+            method.visitLookupSwitchInsn(spill, new int[] {0, 1, 2, 3}, slots);
+            for (int i = 0; i < slots.length; i++) {
+                method.visitLabel(slots[i]);
+                method.visitVarInsn(ALOAD, 4);
+                method.visitVarInsn(ASTORE, 5 + i);
+                method.visitJumpInsn(GOTO, added);
+            }
+            method.visitLabel(spill);
+            emitNewArrayList(method, 8);
+            method.visitVarInsn(ASTORE, 2);
+            for (int local = 5; local <= 8; local++) {
+                emitArrayListAdd(method, 2, local);
+            }
+            emitArrayListAdd(method, 2, 4);
+            method.visitJumpInsn(GOTO, added);
+
+            method.visitLabel(append);
+            emitArrayListAdd(method, 2, 4);
+            method.visitLabel(added);
+            method.visitIincInsn(3, 1);
             method.visitVarInsn(ALOAD, 1);
             method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedArrayHasNext", "()Z", false);
             method.visitJumpInsn(IFNE, loop);
             method.visitLabel(done);
+
+            Label result = new Label();
+            method.visitVarInsn(ALOAD, 2);
+            method.visitJumpInsn(IFNONNULL, result);
+            method.visitTypeInsn(NEW, "java/util/ArrayList");
+            method.visitInsn(DUP);
+            method.visitVarInsn(ILOAD, 3);
+            method.visitMethodInsn(
+                    INVOKESPECIAL,
+                    "java/util/ArrayList",
+                    "<init>",
+                    "(I)V",
+                    false);
+            method.visitVarInsn(ASTORE, 2);
+            Label impossible = new Label();
+            Label[] sizes = {new Label(), new Label(), new Label(), new Label(), new Label()};
+            method.visitVarInsn(ILOAD, 3);
+            method.visitLookupSwitchInsn(impossible, new int[] {0, 1, 2, 3, 4}, sizes);
+            for (int size = 0; size < sizes.length; size++) {
+                method.visitLabel(sizes[size]);
+                for (int local = 5; local < 5 + size; local++) {
+                    emitArrayListAdd(method, 2, local);
+                }
+                method.visitJumpInsn(GOTO, result);
+            }
+            method.visitLabel(impossible);
+            emitThrow(method, "Invalid staged list size");
+            method.visitLabel(result);
             method.visitVarInsn(ALOAD, 2);
             method.visitInsn(ARETURN);
             method.visitMaxs(0, 0);
             method.visitEnd();
             methodCount++;
+        }
+
+        private static void emitNewArrayList(MethodVisitor method, int capacity) {
+            method.visitTypeInsn(NEW, "java/util/ArrayList");
+            method.visitInsn(DUP);
+            method.visitLdcInsn(capacity);
+            method.visitMethodInsn(
+                    INVOKESPECIAL,
+                    "java/util/ArrayList",
+                    "<init>",
+                    "(I)V",
+                    false);
+        }
+
+        private static void emitArrayListAdd(
+                MethodVisitor method,
+                int listLocal,
+                int valueLocal
+        ) {
+            method.visitVarInsn(ALOAD, listLocal);
+            method.visitVarInsn(ALOAD, valueLocal);
+            method.visitMethodInsn(
+                    INVOKEVIRTUAL,
+                    "java/util/ArrayList",
+                    "add",
+                    "(Ljava/lang/Object;)Z",
+                    false);
+            method.visitInsn(POP);
         }
 
         private void emitMapWriter(Schema schema) {
