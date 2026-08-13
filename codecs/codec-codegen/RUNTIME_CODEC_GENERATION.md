@@ -38,7 +38,7 @@ infrastructure:
 - immutable generation plans;
 - method-size estimates and split points;
 - ASM class emission and hidden-class definition;
-- cache identity and deterministic generated names;
+- cache identity and collision-free generated names;
 - concurrent generation deduplication and atomic publication;
 - failure caching, bounded eviction, diagnostics, and lifecycle counters.
 
@@ -50,8 +50,10 @@ plan interpreter.
 
 Generated classes are hidden nestmates of a backend-owned lookup anchor. This
 avoids a permanent generated-class namespace and permits unloading after cache
-eviction. Cache keys hold model classes weakly through a `ClassValue` root
-partition; entries hold generated instances strongly only until eviction.
+eviction. Each feature-gated provider keeps a bounded, allocation-free
+steady-state publication map. The registry and publication map both cap
+retained roots at 256; entries hold generated instances strongly until
+eviction or explicit clearing.
 
 ## Classfile Backend
 
@@ -113,6 +115,9 @@ Diagnostics count requests, hits, generation successes and failures, fallback
 uses, evictions, emitted classes, emitted bytes, and generation time. They do
 not retain schemas, model classes, generated classes, or class loaders.
 
+The surrounding bounded caches necessarily retain those objects while an entry
+is live. Diagnostics retain only failure class/message/location strings.
+
 ## Semantic Scope
 
 The JSON backend targets structures, unions, lists, maps, primitives, blobs,
@@ -128,6 +133,69 @@ timestamp, document, and numeric behavior must match the generic codec.
 The CBOR slice deliberately supports a smaller graph and is not an adoption
 claim. It must still emit CBOR-specific bytecode and call CBOR-specific parser
 and writer primitives.
+
+## Current Implementation
+
+The JSON backend lowers direct structure getters and builder setters,
+structures, generated unions, lists, maps, scalar primitives, blobs, string
+enums, timestamps, documents, sparse aggregates, borrowed output, detached
+output, full-model input, and an allocation-free validation/token-sink entry.
+Field names and encoded field tokens are class constants. Writers split at
+eight members and wide reader dispatch splits into bounded hash helpers.
+
+Unsupported graphs, including integer enums and generated models without
+public direct access, fall back before a class is published. Pretty printing
+also falls back. Event-stream framing is unchanged and only its JSON payload
+codec can participate.
+
+The CBOR proof lowers direct scalar structures only. Lists, maps, nested
+structures, unions, enums, documents, and other unsupported CBOR graphs use
+the existing codec.
+
+## Short Performance Screen
+
+The short screen ran on JDK 26.0.1, G1, fixed 1 GiB heap,
+`AlwaysPreTouch`, one JMH thread, and CPU 2. It used one 1-second warmup and
+two 3-second average-time measurements, so it is directional rather than an
+adoption result.
+
+| Workload | Surface | Generic ns/op | Generated ns/op | Change |
+| --- | --- | ---: | ---: | ---: |
+| GetItem M | codec deserialize | 5,101 | 5,318 | -4.3% |
+| GetItem L | codec deserialize | 39,532 | 36,105 | +8.7% |
+| GetItem M | protocol deserialize | 5,179 | 4,919 | +5.0% |
+| GetItem L | protocol deserialize | 38,524 | 36,489 | +5.3% |
+| PutItem mixed M | codec serialize | 4,004 | 4,023 | -0.5% |
+| PutItem mixed M | protocol serialize | 4,495 | 3,984 | +11.4% |
+
+After publication-cache correction, allocation was identical within rounding
+for every pair. Results are in
+`build/perf-study/runtime-codegen-production/short-screen-hot-cache.json`.
+The earlier screen, which exposed the per-operation registry regression, is
+retained beside it.
+
+These results pass the 5% end-to-end threshold on the three measured cases but
+do not pass the codec-only 10% threshold. GetItem M also exceeds the 2%
+regression limit. No production-to-monolithic A/B/A comparison has been run,
+so the framework extraction contract is not established.
+
+## Deferred Validation
+
+The full final, A/B/A, historical, metaspace, code-cache, inlining, and
+unloading matrices are intentionally deferred. Run focused screens first and
+keep each invocation below ten minutes:
+
+```shell
+./gradlew :benchmarks:serde-benchmarks:writeJmhClasspath
+CP=$(cat benchmarks/serde-benchmarks/build/runtime-codegen/jmh-classpath.txt)
+taskset -c 2 java -Xms1g -Xmx1g -XX:+UseG1GC -XX:+AlwaysPreTouch \
+  -XX:ActiveProcessorCount=2 -Dsmithy-java.json-provider=smithy \
+  -cp "$CP" org.openjdk.jmh.Main '.*AwsJsonRuntimeCodegen.*' \
+  -bm avgt -tu ns -wi 3 -i 5 -w 2s -r 5s -f 1 -t 1 -prof gc
+```
+
+Run the monolithic study command from `JSON_PERFORMANCE_STUDY.md` on commit
+`c74efb0c2` in a separate worktree, never concurrently with this screen.
 
 ## Adoption
 

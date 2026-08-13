@@ -102,6 +102,22 @@ abstract class GenerateSmithyManifest : DefaultTask() {
     }
 }
 
+abstract class WriteJmhClasspath : DefaultTask() {
+    @get:Classpath
+    abstract val classpath: ConfigurableFileCollection
+
+    @get:OutputFile
+    abstract val outputFile: RegularFileProperty
+
+    @org.gradle.api.tasks.TaskAction
+    fun run() {
+        outputFile.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(classpath.asPath)
+        }
+    }
+}
+
 val generateSmithyManifest by tasks.registering(GenerateSmithyManifest::class) {
     group = "build"
     description = "Copy benchmark .smithy files to META-INF/smithy/ and generate the model manifest."
@@ -153,6 +169,16 @@ tasks.named<Copy>("processJmhResources") {
 
 tasks.named("compileJmhJava") {
     dependsOn("smithyBuild")
+}
+
+tasks.register<WriteJmhClasspath>("writeJmhClasspath") {
+    group = "benchmarks"
+    description = "Write the JMH runtime classpath for external JDK launches."
+    dependsOn("jmhCompileGeneratedClasses")
+    classpath.from(sourceSets["jmh"].runtimeClasspath)
+    classpath.from(layout.buildDirectory.dir("jmh-generated-classes"))
+    classpath.from(layout.buildDirectory.dir("jmh-generated-resources"))
+    outputFile.set(layout.buildDirectory.file("runtime-codegen/jmh-classpath.txt"))
 }
 
 // Test case:  -Pjmh.testCaseId=rpcv2Cbor_PutItemRequest_BinaryData_S
