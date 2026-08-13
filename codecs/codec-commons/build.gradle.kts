@@ -45,6 +45,10 @@ tasks.named<JavaCompile>("compileJdk24Java") {
     options.release.set(24)
 }
 
+tasks.named<Jar>("sourcesJar") {
+    from("src/jdk24/java")
+}
+
 tasks.register<Test>("jdk21Test") {
     testClassesDirs = sourceSets["jdk21Test"].output.classesDirs
     classpath = sourceSets["jdk21Test"].runtimeClasspath

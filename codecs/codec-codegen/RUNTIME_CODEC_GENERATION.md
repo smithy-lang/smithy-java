@@ -14,8 +14,9 @@ The feature does not add a public API and is not selected by default.
 
 ## Assumptions
 
-- Production class files target Java 21. The build may use a newer toolchain,
-  but generated classes must load on Java 21.
+- Published baseline classes and generated codec classes target Java 21.
+  Runtime generation itself is available only on JDK 24 or newer; Java 21-23
+  always use the generic codec.
 - Generated model getters, builder setters, schema fields, and builder factory
   methods are public. A schema graph that does not expose compatible accessors
   is unsupported and uses the generic codec.
@@ -41,7 +42,7 @@ infrastructure:
 - model getter and builder-setter discovery;
 - immutable generation plans;
 - method-size estimates and split points;
-- ASM class emission and hidden-class definition;
+- JDK ClassFile API emission and hidden-class definition;
 - cache identity and collision-free generated names;
 - concurrent generation deduplication and atomic publication;
 - failure caching, bounded eviction, diagnostics, and lifecycle counters.
@@ -61,16 +62,32 @@ eviction or explicit clearing.
 
 ## Classfile Backend
 
-The implementation uses ASM 9.7.1, shaded into `codec-commons`.
+The implementation uses the finalized JDK ClassFile API on JDK 24 or newer.
+The published artifact remains Java 21 compatible:
 
-The JDK ClassFile API is rejected because the production baseline is Java 21
-and the API is not available there. Runtime `javac` is rejected because the
-study measured 193-590 ms per root, it requires a full JDK, and source
-compilation complicates isolation. A new classfile writer is rejected because
-stack-map generation, verifier correctness, and ongoing classfile maintenance
-would dominate this experiment. ASM adds a small shaded dependency, supports
-Java 21 class files, produces ordinary bytecode, and has low generation
-latency.
+- schema planning, instruction recording, cache management, feature selection,
+  diagnostics, and generic fallback compile to Java 21;
+- the ClassFile lowering implementation is compiled in a JDK 24 source set and
+  packaged in the same internal artifact;
+- Java 21 code does not statically link `java.lang.classfile`; it loads the
+  lowering implementation through a cached method handle only after the
+  runtime-version gate succeeds;
+- the recorded generation model lowers completely to codec-specific bytecode
+  and is not retained by generated classes or used on runtime codec paths;
+- generated hidden classes still target Java 17 classfile version 61, matching
+  the previous emitter and remaining below the production Java 21 baseline.
+
+This follows the historical production pattern: a higher-JDK implementation
+is opportunistically available without raising the library baseline. Java
+21-23 ignore enabled generation properties and continue through the generic
+provider. JDK 24 linkage or emission failures are cached and use the same
+fallback path as unsupported schemas.
+
+ASM was removed from the dependency graph and no bytecode library is shaded.
+The ClassFile API owns constant-pool construction, branch layout, stack maps,
+and verifier-correct class emission. Runtime `javac` remains rejected because
+the study measured 193-590 ms per root, requires a full compiler, and adds
+source-generation and isolation costs.
 
 ## Planning And Splitting
 
@@ -94,7 +111,7 @@ generated runtime path.
   experiment and implies JSON generation only for AWS JSON codec instances.
 
 All gates are read when a codec is constructed. Changing a property does not
-mutate an existing codec.
+mutate an existing codec. On Java 21-23 all gates resolve to disabled.
 
 ## Fallback And Failure
 
@@ -191,16 +208,55 @@ on GetItem L protocol deserialization and both PutItem surfaces. No
 production-to-monolithic A/B/A comparison has been run, so the framework
 extraction contract is also not established.
 
+### ClassFile emitter comparison
+
+The ClassFile migration was measured separately from the generic-versus-
+generated screen. A short generated-only A/B/A used ClassFile, the previous
+ASM commit, and ClassFile again with identical JDK 26.0.1, G1, 1 GiB, CPU 2,
+warmup, measurement, and GC-profiler settings:
+
+| Workload | Surface | ClassFile A1 ns/op | ASM B ns/op | ClassFile A2 ns/op |
+| --- | --- | ---: | ---: | ---: |
+| GetItem M | codec deserialize | 4,406 | 4,687 | 4,441 |
+| GetItem L | codec deserialize | 36,176 | 39,742 | 38,148 |
+| GetItem M | protocol deserialize | 4,631 | 4,521 | 4,469 |
+| GetItem L | protocol deserialize | 35,783 | 36,482 | 39,922 |
+| PutItem mixed M | codec serialize | 4,287 | 3,920 | 4,038 |
+| PutItem mixed M | protocol serialize | 3,963 | 4,186 | 3,932 |
+
+The mixed direction and 11.6% spread between the two ClassFile GetItem L
+protocol forks make this screen insufficient for a 2% regression decision.
+Codec serialization repeatedly allocated 64 B/op more with ClassFile, while
+protocol serialization allocated 64 B/op less. Deserialization allocation
+also varied between forks. These effects require a longer multi-fork A/B/A
+with compiler logs before being attributed to either emitter.
+
+For the same planned GetItem L schema and generated name, both emitters
+produced a 14,775-byte, 26-method class. Disassembly had identical method
+instructions and bytecode offsets; only constant-pool numbering and ordering
+differed. Generated operations do not call the instruction recorder or
+ClassFile backend. The migration therefore preserves the runtime instruction
+shape, but the short screen shows that JIT decisions remain sensitive enough
+that steady-state equivalence cannot be claimed from one fork.
+
+Raw results are in
+`build/perf-study/runtime-codegen-production/classfile-short-screen.json`,
+`build/perf-study/runtime-codegen-production/classfile-short-screen-a2.json`,
+and `build/perf-study/runtime-codegen-production/asm-short-screen.json`.
+
 ## Resource Screen
 
-A cold GetItem L generation produced one 14,780-byte hidden class in 36.7 ms.
-This is below the study's 193-590 ms runtime-`javac` range but is one root, not
-a distribution. The valid JMH screen above records steady-state allocation.
+A matched cold GetItem L probe produced the same 14,780-byte hidden class with
+both emitters. ClassFile generation took 28.1 ms and ASM took 32.5 ms in one
+cold sample. This is below the study's 193-590 ms runtime-`javac` range but is
+one root, not a distribution. The shaded `codec-commons` artifact decreased
+from 423,614 to 315,371 bytes after ASM removal, a 105.7 KiB reduction. The
+valid JMH screens above record steady-state allocation.
 
 Production metaspace, post-JIT code-cache size, compiler inlining logs, and
 unloading after eviction have not been measured. The study ranges
 (89-545 KiB generation metaspace and 339 KiB-1.78 MiB post-JIT code cache)
-must not be treated as measurements of this ASM implementation.
+must not be treated as measurements of this implementation.
 
 ## Deferred Validation
 
@@ -209,6 +265,11 @@ unloading matrices are intentionally deferred. Run focused screens first and
 keep each invocation below ten minutes:
 
 ```shell
+./gradlew \
+  :codecs:codec-commons:jdk21Test \
+  :codecs:json-codec:jdk24CodegenTest \
+  :codecs:cbor-codec:jdk24CodegenTest
+
 ./gradlew :benchmarks:serde-benchmarks:writeJmhClasspath
 CP=$(cat benchmarks/serde-benchmarks/build/runtime-codegen/jmh-classpath.txt)
 taskset -c 2 java -Xms1g -Xmx1g -XX:+UseG1GC -XX:+AlwaysPreTouch \
@@ -219,6 +280,9 @@ taskset -c 2 java -Xms1g -Xmx1g -XX:+UseG1GC -XX:+AlwaysPreTouch \
 
 Run the monolithic study command from `JSON_PERFORMANCE_STUDY.md` on commit
 `c74efb0c2` in a separate worktree, never concurrently with this screen.
+For the emitter comparison, run the generated-only command on the current
+commit and `9dbd421d9` in ClassFile/ASM/ClassFile order with at least five
+forks per position.
 
 ## Adoption Decision
 
