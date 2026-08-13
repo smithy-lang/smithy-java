@@ -275,10 +275,13 @@ collection wrapping. Fory fills mutable fields. Serialization is the closer
 comparison; deserialization deliberately includes each library's normal typed
 model materialization.
 
-The latest short screen ran on JDK 26.0.1, G1, fixed 1 GiB heap,
-`AlwaysPreTouch`, one JMH thread, and CPU 2. It used two 1-second warmups and
-three 2-second measurements with the GC profiler. Fory ran with bounded memory
-access and its JDK 25+ VarHandle implementation:
+The latest short screens ran on JDK 26.0.1, G1, fixed 1 GiB heap,
+`AlwaysPreTouch`, one JMH thread, and CPU 2. The serialization rows were
+refreshed with matched five-by-one-second warmups, five-by-two-second
+measurements, and two forks. The deserialization rows use the earlier
+two-by-one-second warmups and three-by-two-second measurements. Both used the
+GC profiler. Fory ran with bounded memory access and its JDK 25+ VarHandle
+implementation:
 
 ```text
 --add-opens=java.base/java.lang.invoke=ALL-UNNAMED
@@ -292,9 +295,9 @@ writer and produces identical output.
 
 | Direction | Size | Smithy ns/op | Fory ns/op | Smithy/Fory | Smithy B/op | Fory B/op |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| serialize | S | 199 | 231 | 0.86x | 296 | 248 |
-| serialize | M | 1,744 | 1,350 | 1.29x | 1,736 | 1,704 |
-| serialize | L | 17,161 | 28,332 | 0.61x | 9,952 | 11,888 |
+| serialize | S | 209 | 225 | 0.93x | 296 | 248 |
+| serialize | M | 1,752 | 1,356 | 1.29x | 1,736 | 1,704 |
+| serialize | L | 18,506 | 28,335 | 0.65x | 9,952 | 11,888 |
 | deserialize | S | 333 | 264 | 1.26x | 632 | 664 |
 | deserialize | M | 2,010 | 1,972 | 1.02x | 4,264 | 4,552 |
 | deserialize | L | 19,395 | 19,299 | 1.00x | 36,152 | 37,672 |
@@ -315,6 +318,99 @@ Smithy deserialization is now statistically level with Fory on M/L and
 allocates less, despite required-member validation and immutable model
 materialization. Small deserialization remains 26% slower. Serialization wins
 S and L but remains 29% slower on M.
+
+### Deep M serialization profile
+
+The M serialization gap was analyzed with matched JDK 26 processes using:
+
+- JMH perfasm with decoded C2 assembly and the software `cpu-clock` event;
+- `-XX:+LogCompilation`, `-XX:+PrintInlining`, and compiler XML logs;
+- async-profiler CPU and allocation captures;
+- two-fork representation and implementation factorials.
+
+The host exposes no hardware PMU events. `cycles`, `instructions`, `branches`,
+`branch-misses`, and cache events all report `<not supported>` even though
+`perf_event_paranoid=0`. Consequently, no hardware branch-miss claim is made.
+JIT branch counts below are compiler profile data, not PMU counters.
+
+The first material finding is that the timed object representations differ.
+Fory setup converts each Smithy `Instant` to a boxed epoch-second `Long` and
+each `StandardUnit` to its wire `String`. Smithy performs `Instant` access and
+sealed-interface `SmithyEnum.getValue()` calls inside the timed serializer.
+Matched access-only controls over the M graph measured:
+
+| Access control | Smithy ns/op | Fory ns/op | Difference |
+| --- | ---: | ---: | ---: |
+| timestamp and enum combined | 121.6 | 28.0 | 93.5 |
+| enum only | 112.2 | 21.3 | 91.0 |
+| timestamp only | 65.2 | 16.0 | 49.2 |
+
+The split controls are not additive because list traversal and arithmetic
+overlap. Against the matched 1,752 versus 1,356 ns serialization result, the
+combined 93.5 ns difference accounts for about 24% of the measured gap. It is
+work moved into Fory benchmark setup, not a JSON writer optimization.
+
+The compiler logs identify a second, genuine writer-layout difference.
+Smithy's 35-byte generated `MetricDatum.writeS2` expands to a 13.2 KiB C2
+nmethod after about 1,832 transitive bytecodes are inlined. Its 170-byte
+`JsonWriteUtils.writeQuotedString` is hot-inlined at multiple generated call
+sites, and C2 then rejects a nested list writer as `already compiled into a
+big method`. Representative generated child nmethods are 9.3 KiB and 7.0 KiB.
+Fory keeps its 583-byte `Utf8JsonWriter.writeString` out of line as a shared
+5.3 KiB C2 subtree; its 431-byte generated `MetricDatum` writer compiles to
+9.5 KiB. Fory also length-specializes compact strings and emits field prefixes
+and numeric values through no-ensure primitives.
+
+Compiler branch profiles show Smithy's compact-string ASCII loop continuing
+about 79% of the time and exiting about 21% of the time for this workload.
+Growth and null branches are uncommon. These probabilities explain which C2
+paths are hot, but they do not provide hardware branch-miss rates.
+
+The matched Smithy CPU capture attributes approximately:
+
+- 20.5% to the general compact-string ASCII scan;
+- 6.5% to four-digit numeric emission;
+- 6.1% to repeated writer capacity checks;
+- 5.8% to quoted-string emission outside the scan;
+- 4.8% to positive integer emission;
+- 1.9% to the sealed-enum interface dispatch.
+
+These percentages describe sampled ownership, not independent speedups.
+Fory also spends heavily in strings, and it spends 11.8% acquiring pooled
+state versus Smithy's 9.4% releasing pooled state. Pooling is therefore not
+the cause of Fory's M advantage. Allocation is also nearly identical: both
+allocate the returned byte array, while Smithy additionally allocates the
+32-byte `HeapByteBuffer` wrapper required by its API.
+
+Factorial controls prevented source-level similarity from being mistaken for
+an optimization:
+
+- forbidding string-writer inlining improved one M screen by 2.1%, but a
+  source-level isolated string owner regressed S materially and was neutral
+  across a two-fork S/M/L screen;
+- forbidding numeric-leaf inlining regressed M by 6.0%;
+- a Fory-style 10,000-entry packed digit table regressed M by 2.6%;
+- `IdentityHashMap` enum lookup improved the access-only control from 112 to
+  96 ns, while `ClassValue` regressed it to 126 ns;
+- a generated identity-hash enum switch regressed serialization from 1,752
+  to 1,796 ns;
+- full generated writer groups were -1.4% on S, -0.8% on M, and +0.6% on L
+  versus the accepted commit, with identical allocation. This is within fork
+  noise and does not justify the additional 500 lines of emitter logic.
+
+The actionable root cause is therefore narrower than "Fory fuses more":
+Fory's M result combines wire-ready benchmark DTO fields with a deliberately
+bounded generated/JIT call graph. Smithy's remaining engine gap is distributed
+across compact-string scanning, numeric emission, capacity checks, and a C2
+graph that is sensitive to seemingly beneficial fusion. Future writer work
+must preserve small and large performance and prove the resulting nmethod
+layout, not merely reduce Java-level calls.
+
+Raw evidence is retained under:
+
+- `build/perf-study/runtime-codegen-writer-groups/deep-profile/`;
+- `build/perf-study/runtime-codegen-writer-groups/deep-profile/final-control/`;
+- `build/perf-study/runtime-codegen-writer-groups/deep-profile/representation-control/`.
 
 The optimization sequence used matched async-profiler CPU/allocation profiles
 and software-clock perfasm captures with hsdis. Accepted changes include:
@@ -361,8 +457,9 @@ about 46 ms. These are individual roots, not a distribution. The shaded
 removal, a 105.7 KiB reduction. The valid JMH screens above record steady-state
 allocation.
 
-Production metaspace, post-JIT code-cache size, compiler inlining logs, and
-unloading after eviction have not been measured. The study ranges
+Production metaspace, aggregate post-JIT code-cache size, and unloading after
+eviction have not been measured. Focused compiler logs and C2 assembly were
+captured for CloudWatch M only. The study ranges
 (89-545 KiB generation metaspace and 339 KiB-1.78 MiB post-JIT code cache)
 must not be treated as measurements of this implementation.
 
