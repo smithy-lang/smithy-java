@@ -3,13 +3,14 @@ package software.amazon.smithy.java.example.standalone.model;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.TreeSet;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import software.amazon.smithy.java.core.schema.PresenceTracker;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.ToStringSerializer;
@@ -151,7 +152,7 @@ public final class JSpecifyStruct implements SerializableStruct {
      * Builder for {@link JSpecifyStruct}.
      */
     public static final class Builder implements ShapeBuilder<JSpecifyStruct> {
-        private final PresenceTracker tracker = PresenceTracker.of($SCHEMA);
+        private long $setMembers;
         private String requiredString;
         private String optionalString;
         private boolean requiredPrimitive;
@@ -170,7 +171,7 @@ public final class JSpecifyStruct implements SerializableStruct {
          */
         public Builder requiredString(String requiredString) {
             this.requiredString = Objects.requireNonNull(requiredString, "requiredString cannot be null");
-            tracker.setMember($SCHEMA_REQUIRED_STRING);
+            $setMembers |= 0x1L;
             return this;
         }
 
@@ -188,7 +189,7 @@ public final class JSpecifyStruct implements SerializableStruct {
          */
         public Builder requiredPrimitive(boolean requiredPrimitive) {
             this.requiredPrimitive = requiredPrimitive;
-            tracker.setMember($SCHEMA_REQUIRED_PRIMITIVE);
+            $setMembers |= 0x2L;
             return this;
         }
 
@@ -202,8 +203,20 @@ public final class JSpecifyStruct implements SerializableStruct {
 
         @Override
         public JSpecifyStruct build() {
-            tracker.validate();
+            if ($setMembers != 0x3L) {
+                validateRequiredMembers();
+            }
             return new JSpecifyStruct(this);
+        }
+        private void validateRequiredMembers() {
+            var missing = new TreeSet<String>();
+            if (($setMembers & 0x1L) == 0L) {
+                missing.add("requiredString");
+            }
+            if (($setMembers & 0x2L) == 0L) {
+                missing.add("requiredPrimitive");
+            }
+            throw new SerializationException("Missing required members: " + missing);
         }
 
         @Override
@@ -220,14 +233,14 @@ public final class JSpecifyStruct implements SerializableStruct {
 
         @Override
         public ShapeBuilder<JSpecifyStruct> errorCorrection() {
-            if (tracker.allSet()) {
+            if ($setMembers == 0x3L) {
                 return this;
             }
-            if (!tracker.checkMember($SCHEMA_REQUIRED_STRING)) {
+            if (!(($setMembers & 0x1L) != 0L)) {
                 requiredString("");
             }
-            if (!tracker.checkMember($SCHEMA_REQUIRED_PRIMITIVE)) {
-                tracker.setMember($SCHEMA_REQUIRED_PRIMITIVE);
+            if (!(($setMembers & 0x2L) != 0L)) {
+                $setMembers |= 0x2L;
             }
             return this;
         }

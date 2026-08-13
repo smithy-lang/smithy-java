@@ -247,7 +247,7 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
                                  */
                                 public Builder required(String required) {
                                     this.required = Objects.requireNonNull(required, "required cannot be null");
-                                    tracker.setMember($SCHEMA_REQUIRED);
+                                    $setMembers |= 0x1L;
                                     return this;
                                 }
                         """));

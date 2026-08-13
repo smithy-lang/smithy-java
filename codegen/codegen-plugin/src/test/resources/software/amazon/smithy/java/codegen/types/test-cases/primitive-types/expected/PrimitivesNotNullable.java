@@ -1,10 +1,11 @@
 package software.amazon.smithy.java.example.standalone.model;
 
-import software.amazon.smithy.java.core.schema.PresenceTracker;
+import java.util.TreeSet;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.ToStringSerializer;
@@ -170,7 +171,7 @@ public final class PrimitivesNotNullable implements SerializableStruct {
      * Builder for {@link PrimitivesNotNullable}.
      */
     public static final class Builder implements ShapeBuilder<PrimitivesNotNullable> {
-        private final PresenceTracker tracker = PresenceTracker.of($SCHEMA);
+        private long $setMembers;
         private byte byteMember;
         private short shortMember;
         private int intMember;
@@ -192,7 +193,7 @@ public final class PrimitivesNotNullable implements SerializableStruct {
          */
         public Builder byteMember(byte byteMember) {
             this.byteMember = byteMember;
-            tracker.setMember($SCHEMA_BYTE_MEMBER);
+            $setMembers |= 0x1L;
             return this;
         }
 
@@ -202,7 +203,7 @@ public final class PrimitivesNotNullable implements SerializableStruct {
          */
         public Builder shortMember(short shortMember) {
             this.shortMember = shortMember;
-            tracker.setMember($SCHEMA_SHORT_MEMBER);
+            $setMembers |= 0x2L;
             return this;
         }
 
@@ -212,7 +213,7 @@ public final class PrimitivesNotNullable implements SerializableStruct {
          */
         public Builder intMember(int intMember) {
             this.intMember = intMember;
-            tracker.setMember($SCHEMA_INT_MEMBER);
+            $setMembers |= 0x4L;
             return this;
         }
 
@@ -222,7 +223,7 @@ public final class PrimitivesNotNullable implements SerializableStruct {
          */
         public Builder longMember(long longMember) {
             this.longMember = longMember;
-            tracker.setMember($SCHEMA_LONG_MEMBER);
+            $setMembers |= 0x8L;
             return this;
         }
 
@@ -232,7 +233,7 @@ public final class PrimitivesNotNullable implements SerializableStruct {
          */
         public Builder floatMember(float floatMember) {
             this.floatMember = floatMember;
-            tracker.setMember($SCHEMA_FLOAT_MEMBER);
+            $setMembers |= 0x10L;
             return this;
         }
 
@@ -242,7 +243,7 @@ public final class PrimitivesNotNullable implements SerializableStruct {
          */
         public Builder doubleMember(double doubleMember) {
             this.doubleMember = doubleMember;
-            tracker.setMember($SCHEMA_DOUBLE_MEMBER);
+            $setMembers |= 0x20L;
             return this;
         }
 
@@ -252,14 +253,41 @@ public final class PrimitivesNotNullable implements SerializableStruct {
          */
         public Builder booleanMember(boolean booleanMember) {
             this.booleanMember = booleanMember;
-            tracker.setMember($SCHEMA_BOOLEAN_MEMBER);
+            $setMembers |= 0x40L;
             return this;
         }
 
         @Override
         public PrimitivesNotNullable build() {
-            tracker.validate();
+            if ($setMembers != 0x7fL) {
+                validateRequiredMembers();
+            }
             return new PrimitivesNotNullable(this);
+        }
+        private void validateRequiredMembers() {
+            var missing = new TreeSet<String>();
+            if (($setMembers & 0x1L) == 0L) {
+                missing.add("byte");
+            }
+            if (($setMembers & 0x2L) == 0L) {
+                missing.add("short");
+            }
+            if (($setMembers & 0x4L) == 0L) {
+                missing.add("int");
+            }
+            if (($setMembers & 0x8L) == 0L) {
+                missing.add("long");
+            }
+            if (($setMembers & 0x10L) == 0L) {
+                missing.add("float");
+            }
+            if (($setMembers & 0x20L) == 0L) {
+                missing.add("double");
+            }
+            if (($setMembers & 0x40L) == 0L) {
+                missing.add("boolean");
+            }
+            throw new SerializationException("Missing required members: " + missing);
         }
 
         @Override
@@ -279,29 +307,29 @@ public final class PrimitivesNotNullable implements SerializableStruct {
 
         @Override
         public ShapeBuilder<PrimitivesNotNullable> errorCorrection() {
-            if (tracker.allSet()) {
+            if ($setMembers == 0x7fL) {
                 return this;
             }
-            if (!tracker.checkMember($SCHEMA_BYTE_MEMBER)) {
-                tracker.setMember($SCHEMA_BYTE_MEMBER);
+            if (!(($setMembers & 0x1L) != 0L)) {
+                $setMembers |= 0x1L;
             }
-            if (!tracker.checkMember($SCHEMA_SHORT_MEMBER)) {
-                tracker.setMember($SCHEMA_SHORT_MEMBER);
+            if (!(($setMembers & 0x2L) != 0L)) {
+                $setMembers |= 0x2L;
             }
-            if (!tracker.checkMember($SCHEMA_INT_MEMBER)) {
-                tracker.setMember($SCHEMA_INT_MEMBER);
+            if (!(($setMembers & 0x4L) != 0L)) {
+                $setMembers |= 0x4L;
             }
-            if (!tracker.checkMember($SCHEMA_LONG_MEMBER)) {
-                tracker.setMember($SCHEMA_LONG_MEMBER);
+            if (!(($setMembers & 0x8L) != 0L)) {
+                $setMembers |= 0x8L;
             }
-            if (!tracker.checkMember($SCHEMA_FLOAT_MEMBER)) {
-                tracker.setMember($SCHEMA_FLOAT_MEMBER);
+            if (!(($setMembers & 0x10L) != 0L)) {
+                $setMembers |= 0x10L;
             }
-            if (!tracker.checkMember($SCHEMA_DOUBLE_MEMBER)) {
-                tracker.setMember($SCHEMA_DOUBLE_MEMBER);
+            if (!(($setMembers & 0x20L) != 0L)) {
+                $setMembers |= 0x20L;
             }
-            if (!tracker.checkMember($SCHEMA_BOOLEAN_MEMBER)) {
-                tracker.setMember($SCHEMA_BOOLEAN_MEMBER);
+            if (!(($setMembers & 0x40L) != 0L)) {
+                $setMembers |= 0x40L;
             }
             return this;
         }

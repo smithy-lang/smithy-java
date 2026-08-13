@@ -20,6 +20,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeSet;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
@@ -36,6 +37,7 @@ import software.amazon.smithy.java.core.error.ErrorFault;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.PresenceTracker;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.model.Model;
@@ -652,6 +654,7 @@ public final class StructureGenerator<
     }
 
     private static final class StructureBuilderGenerator extends BuilderGenerator {
+        private static final int INLINE_PRESENCE_LIMIT = Long.SIZE;
 
         StructureBuilderGenerator(
                 JavaWriter writer,
@@ -681,9 +684,7 @@ public final class StructureGenerator<
                 writer.openBlock("private Builder() {", "}", () -> {
                     writer.write("// Tell the tracker to assume clientOptional members are present.");
                     for (var member : requiredClientOptional) {
-                        var memberName = symbolProvider.toMemberName(member);
-                        var schemaName = CodegenUtils.toMemberSchemaName(memberName);
-                        writer.write("tracker.setMember($L);", schemaName);
+                        writeSetMember(writer, member);
                     }
                 });
             }
@@ -700,13 +701,14 @@ public final class StructureGenerator<
                     """
                             @Override
                             public ${sdkShapeBuilder:T}<${shape:T}> errorCorrection() {
-                                if (tracker.allSet()) {
+                                if ($C) {
                                     return this;
                                 }
                                 ${C|}
                                 return this;
                             }
                             """,
+                    writer.consumer(this::writeAllRequiredSet),
                     writer.consumer(this::writeErrorCorrectionMembers));
         }
 
@@ -716,11 +718,10 @@ public final class StructureGenerator<
                 var target = model.expectShape(member.getTarget());
                 if (CodegenUtils.isRequiredWithNoDefault(member)) {
                     var memberName = symbolProvider.toMemberName(member);
-                    var schemaName = CodegenUtils.toMemberSchemaName(memberName);
                     visitor.memberShape = member;
-                    writer.openBlock("if (!tracker.checkMember($L)) {", "}", schemaName, () -> {
+                    writer.openBlock("if (!$C) {", "}", writer.consumer(w -> writeMemberSet(w, member)), () -> {
                         if (assumeShapeHasErrorCorrectedDefault(target, member, symbolProvider, model)) {
-                            writer.write("tracker.setMember($1L);", schemaName);
+                            writeSetMember(writer, member);
                         } else {
                             writer.write("$L($C);", memberName, visitor);
                         }
@@ -860,8 +861,12 @@ public final class StructureGenerator<
 
             // Add presence tracker if any members are required by validation.
             if (shape.members().stream().anyMatch(CodegenUtils::isRequiredWithNoDefault)) {
-                writer.putContext("tracker", PresenceTracker.class);
-                writer.write("private final ${tracker:T} tracker = ${tracker:T}.of($$SCHEMA);");
+                if (usesInlinePresence()) {
+                    writer.write("private long $$setMembers;");
+                } else {
+                    writer.putContext("tracker", PresenceTracker.class);
+                    writer.write("private final ${tracker:T} tracker = ${tracker:T}.of($$SCHEMA);");
+                }
             }
 
             // Add non-static builder properties
@@ -903,12 +908,13 @@ public final class StructureGenerator<
                 writer.putContext("check", CodegenUtils.requiresSetterNullCheck(symbolProvider, member));
                 writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
                 writer.putContext("schemaName", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
+                writer.putContext("setPresence", writer.consumer(w -> writeSetMember(w, member)));
 
                 writer.write(
                         """
                                 public Builder ${memberName:L}(${?isNullable}${memberSymbol:N}${/isNullable}${^isNullable}${memberSymbol:T}${/isNullable} ${memberName:L}) {
                                     this.${memberName:L} = ${?check}${objects:T}.requireNonNull(${/check}${memberName:L}${?check}, "${memberName:L} cannot be null")${/check};${?tracked}
-                                    tracker.setMember(${schemaName:L});${/tracked}
+                                    ${setPresence:C|}${/tracked}
                                     return this;
                                 }
                                 """);
@@ -937,18 +943,86 @@ public final class StructureGenerator<
 
         @Override
         protected void generateBuild(JavaWriter writer) {
-            writer.pushState();
-            writer.putContext(
-                    "hasRequiredMembers",
-                    shape.members().stream().anyMatch(CodegenUtils::isRequiredWithNoDefault));
-            writer.write("""
-                    @Override
-                    public ${shape:T} build() {${?hasRequiredMembers}
-                        tracker.validate();${/hasRequiredMembers}
-                        return new ${shape:T}(this);
+            writer.openBlock("@Override\npublic ${shape:T} build() {", "}", () -> {
+                if (!requiredMembers().isEmpty()) {
+                    if (usesInlinePresence()) {
+                        writer.openBlock("if ($$setMembers != $L) {", "}", requiredMaskLiteral(), () -> {
+                            writer.write("validateRequiredMembers();");
+                        });
+                    } else {
+                        writer.write("tracker.validate();");
                     }
-                    """);
-            writer.popState();
+                }
+                writer.write("return new ${shape:T}(this);");
+            });
+            if (usesInlinePresence()) {
+                writer.openBlock("private void validateRequiredMembers() {", "}", () -> {
+                    writer.write("var missing = new $T<$T>();", TreeSet.class, String.class);
+                    for (var member : requiredMembers()) {
+                        writer.openBlock(
+                                "if (($$setMembers & $L) == 0L) {",
+                                "}",
+                                memberBitLiteral(member),
+                                () -> writer.write("missing.add($S);", member.getMemberName()));
+                    }
+                    writer.write(
+                            "throw new $T(\"Missing required members: \" + missing);",
+                            SerializationException.class);
+                });
+            }
+        }
+
+        private List<MemberShape> requiredMembers() {
+            return shape.members().stream().filter(CodegenUtils::isRequiredWithNoDefault).toList();
+        }
+
+        private boolean usesInlinePresence() {
+            var count = requiredMembers().size();
+            return count > 0 && count <= INLINE_PRESENCE_LIMIT;
+        }
+
+        private String requiredMaskLiteral() {
+            var count = requiredMembers().size();
+            var mask = count == Long.SIZE ? -1L : (1L << count) - 1L;
+            return longLiteral(mask);
+        }
+
+        private String memberBitLiteral(MemberShape member) {
+            var index = requiredMembers().indexOf(member);
+            if (index < 0) {
+                throw new IllegalArgumentException("Member is not required by validation: " + member.getId());
+            }
+            return longLiteral(1L << index);
+        }
+
+        private static String longLiteral(long value) {
+            return "0x" + Long.toUnsignedString(value, 16) + "L";
+        }
+
+        private void writeSetMember(JavaWriter writer, MemberShape member) {
+            if (usesInlinePresence()) {
+                writer.write("$$setMembers |= $L;", memberBitLiteral(member));
+            } else {
+                var memberName = symbolProvider.toMemberName(member);
+                writer.write("tracker.setMember($L);", CodegenUtils.toMemberSchemaName(memberName));
+            }
+        }
+
+        private void writeMemberSet(JavaWriter writer, MemberShape member) {
+            if (usesInlinePresence()) {
+                writer.writeInline("(($$setMembers & $L) != 0L)", memberBitLiteral(member));
+            } else {
+                var memberName = symbolProvider.toMemberName(member);
+                writer.writeInline("tracker.checkMember($L)", CodegenUtils.toMemberSchemaName(memberName));
+            }
+        }
+
+        private void writeAllRequiredSet(JavaWriter writer) {
+            if (usesInlinePresence()) {
+                writer.writeInline("$$setMembers == $L", requiredMaskLiteral());
+            } else {
+                writer.writeInline("tracker.allSet()");
+            }
         }
 
         /**

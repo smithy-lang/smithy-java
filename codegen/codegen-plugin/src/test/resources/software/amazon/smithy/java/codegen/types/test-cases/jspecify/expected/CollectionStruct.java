@@ -4,13 +4,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeSet;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import software.amazon.smithy.java.core.schema.PresenceTracker;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.ToStringSerializer;
@@ -265,7 +266,7 @@ public final class CollectionStruct implements SerializableStruct {
      * Builder for {@link CollectionStruct}.
      */
     public static final class Builder implements ShapeBuilder<CollectionStruct> {
-        private final PresenceTracker tracker = PresenceTracker.of($SCHEMA);
+        private long $setMembers;
         private List<String> nonSparseList;
         private List<@Nullable String> sparseList;
         private Map<String, String> nonSparseMap;
@@ -300,7 +301,7 @@ public final class CollectionStruct implements SerializableStruct {
          */
         public Builder sparseList(List<@Nullable String> sparseList) {
             this.sparseList = Objects.requireNonNull(sparseList, "sparseList cannot be null");
-            tracker.setMember($SCHEMA_SPARSE_LIST);
+            $setMembers |= 0x1L;
             return this;
         }
 
@@ -322,7 +323,7 @@ public final class CollectionStruct implements SerializableStruct {
          */
         public Builder sparseMap(Map<String, @Nullable String> sparseMap) {
             this.sparseMap = Objects.requireNonNull(sparseMap, "sparseMap cannot be null");
-            tracker.setMember($SCHEMA_SPARSE_MAP);
+            $setMembers |= 0x2L;
             return this;
         }
 
@@ -344,7 +345,7 @@ public final class CollectionStruct implements SerializableStruct {
          */
         public Builder sparseListOfSparseMap(List<@Nullable Map<String, @Nullable String>> sparseListOfSparseMap) {
             this.sparseListOfSparseMap = Objects.requireNonNull(sparseListOfSparseMap, "sparseListOfSparseMap cannot be null");
-            tracker.setMember($SCHEMA_SPARSE_LIST_OF_SPARSE_MAP);
+            $setMembers |= 0x4L;
             return this;
         }
 
@@ -366,14 +367,32 @@ public final class CollectionStruct implements SerializableStruct {
          */
         public Builder nonSparseListOfNonSparseMap(List<Map<String, String>> nonSparseListOfNonSparseMap) {
             this.nonSparseListOfNonSparseMap = Objects.requireNonNull(nonSparseListOfNonSparseMap, "nonSparseListOfNonSparseMap cannot be null");
-            tracker.setMember($SCHEMA_NON_SPARSE_LIST_OF_NON_SPARSE_MAP);
+            $setMembers |= 0x8L;
             return this;
         }
 
         @Override
         public CollectionStruct build() {
-            tracker.validate();
+            if ($setMembers != 0xfL) {
+                validateRequiredMembers();
+            }
             return new CollectionStruct(this);
+        }
+        private void validateRequiredMembers() {
+            var missing = new TreeSet<String>();
+            if (($setMembers & 0x1L) == 0L) {
+                missing.add("sparseList");
+            }
+            if (($setMembers & 0x2L) == 0L) {
+                missing.add("sparseMap");
+            }
+            if (($setMembers & 0x4L) == 0L) {
+                missing.add("sparseListOfSparseMap");
+            }
+            if (($setMembers & 0x8L) == 0L) {
+                missing.add("nonSparseListOfNonSparseMap");
+            }
+            throw new SerializationException("Missing required members: " + missing);
         }
 
         @Override
@@ -394,19 +413,19 @@ public final class CollectionStruct implements SerializableStruct {
 
         @Override
         public ShapeBuilder<CollectionStruct> errorCorrection() {
-            if (tracker.allSet()) {
+            if ($setMembers == 0xfL) {
                 return this;
             }
-            if (!tracker.checkMember($SCHEMA_SPARSE_LIST)) {
+            if (!(($setMembers & 0x1L) != 0L)) {
                 sparseList(Collections.emptyList());
             }
-            if (!tracker.checkMember($SCHEMA_SPARSE_MAP)) {
+            if (!(($setMembers & 0x2L) != 0L)) {
                 sparseMap(Collections.emptyMap());
             }
-            if (!tracker.checkMember($SCHEMA_SPARSE_LIST_OF_SPARSE_MAP)) {
+            if (!(($setMembers & 0x4L) != 0L)) {
                 sparseListOfSparseMap(Collections.emptyList());
             }
-            if (!tracker.checkMember($SCHEMA_NON_SPARSE_LIST_OF_NON_SPARSE_MAP)) {
+            if (!(($setMembers & 0x8L) != 0L)) {
                 nonSparseListOfNonSparseMap(Collections.emptyList());
             }
             return this;
