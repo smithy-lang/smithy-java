@@ -7,6 +7,7 @@ package software.amazon.smithy.java.json;
 
 import java.util.Objects;
 import java.util.ServiceLoader;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenFeature;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 
 /**
@@ -56,10 +57,24 @@ public final class JsonSettings {
                 : JsonFieldMapper.UseMemberName.INSTANCE;
         this.forbidUnknownUnionMembers = builder.forbidUnknownUnionMembers;
         this.defaultNamespace = builder.defaultNamespace;
-        this.provider = builder.provider;
+        this.provider = runtimeCodegenEnabled(builder)
+                ? new CodegenJsonSerdeProvider(builder.provider)
+                : builder.provider;
         this.serializeTypeInDocuments = builder.serializeTypeInDocuments;
         this.prettyPrint = builder.prettyPrint;
         this.useStringForArbitraryPrecision = builder.useStringForArbitraryPrecision;
+    }
+
+    private static boolean runtimeCodegenEnabled(Builder builder) {
+        if (builder.provider instanceof CodegenJsonSerdeProvider
+                || !"smithy".equals(builder.provider.getName())) {
+            return false;
+        }
+        if (RuntimeCodegenFeature.enabled("json")) {
+            return true;
+        }
+        return builder.defaultNamespace != null
+                && Boolean.getBoolean("smithy-java.aws-json-runtime-codegen");
     }
 
     /**

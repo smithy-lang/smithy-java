@@ -64,12 +64,16 @@ public record RuntimeCodecPlan(
             throw new UnsupportedSchemaException("No builder for " + schema.id());
         }
         Class<?> builderClass = builder.getClass();
+        Method builderFactory = resolveBuilderFactory(shapeClass);
         var members = new ArrayList<MemberPlan>(schema.members().size());
         int estimate = 24;
         for (Schema member : schema.members()) {
             Schema target = member.memberTarget();
-            Method getter = resolveGetter(shapeClass, member, type == ShapeType.UNION);
+            Method getter = type == ShapeType.UNION ? null : resolveGetter(shapeClass, member);
+            Method presence = type == ShapeType.UNION ? null : resolvePresence(shapeClass, member);
             Method setter = resolveSetter(builderClass, member);
+            Class<?> unionVariant = type == ShapeType.UNION ? resolveUnionVariant(shapeClass, member) : null;
+            Method unionAccessor = unionVariant == null ? null : resolveUnionAccessor(unionVariant, member);
             String jsonName = member.hasTrait(TraitKey.JSON_NAME_TRAIT)
                     ? member.expectTrait(TraitKey.JSON_NAME_TRAIT).getValue()
                     : null;
@@ -81,7 +85,10 @@ public record RuntimeCodecPlan(
                     member.memberName(),
                     jsonName,
                     getter,
+                    presence,
                     setter,
+                    unionVariant,
+                    unionAccessor,
                     member.hasTrait(TraitKey.REQUIRED_TRAIT),
                     memberEstimate));
             analyze(target, structures, visited);
@@ -92,6 +99,7 @@ public record RuntimeCodecPlan(
                 schema,
                 shapeClass,
                 builderClass,
+                builderFactory,
                 type == ShapeType.UNION,
                 members,
                 estimate,
@@ -148,7 +156,7 @@ public record RuntimeCodecPlan(
         return result;
     }
 
-    private static Method resolveGetter(Class<?> shapeClass, Schema member, boolean union) {
+    private static Method resolveGetter(Class<?> shapeClass, Schema member) {
         String name = member.memberName();
         String capitalized = Character.toUpperCase(name.charAt(0)) + name.substring(1);
         List<String> candidates = new ArrayList<>(4);
@@ -157,9 +165,6 @@ public record RuntimeCodecPlan(
         }
         candidates.add("get" + capitalized);
         candidates.add(name);
-        if (union) {
-            candidates.add(toJavaName(name));
-        }
         for (String candidate : candidates) {
             try {
                 Method method = shapeClass.getMethod(candidate);
@@ -172,6 +177,51 @@ public record RuntimeCodecPlan(
         }
         throw new UnsupportedSchemaException(
                 "No direct getter for " + member.id() + " on " + shapeClass.getName());
+    }
+
+    private static Method resolvePresence(Class<?> shapeClass, Schema member) {
+        String name = member.memberName();
+        String candidate = "has" + Character.toUpperCase(name.charAt(0)) + name.substring(1);
+        try {
+            Method method = shapeClass.getMethod(candidate);
+            return method.getReturnType() == boolean.class && method.getParameterCount() == 0 ? method : null;
+        } catch (NoSuchMethodException ignored) {
+            return null;
+        }
+    }
+
+    private static Method resolveBuilderFactory(Class<?> shapeClass) {
+        try {
+            Method method = shapeClass.getDeclaredMethod("builder");
+            return Modifier.isPublic(method.getModifiers()) ? method : null;
+        } catch (NoSuchMethodException ignored) {
+            return null;
+        }
+    }
+
+    private static Class<?> resolveUnionVariant(Class<?> shapeClass, Schema member) {
+        String accessor = toJavaName(member.memberName());
+        for (Class<?> candidate : shapeClass.getPermittedSubclasses()) {
+            if (!candidate.isRecord()) {
+                continue;
+            }
+            for (var component : candidate.getRecordComponents()) {
+                if (component.getName().equals(accessor)) {
+                    return candidate;
+                }
+            }
+        }
+        throw new UnsupportedSchemaException(
+                "No direct union variant for " + member.id() + " on " + shapeClass.getName());
+    }
+
+    private static Method resolveUnionAccessor(Class<?> variant, Schema member) {
+        try {
+            return variant.getMethod(toJavaName(member.memberName()));
+        } catch (NoSuchMethodException e) {
+            throw new UnsupportedSchemaException(
+                    "No union accessor for " + member.id() + " on " + variant.getName());
+        }
     }
 
     private static Method resolveSetter(Class<?> builderClass, Schema member) {
@@ -219,6 +269,7 @@ public record RuntimeCodecPlan(
             Schema schema,
             Class<?> shapeClass,
             Class<?> builderClass,
+            Method builderFactory,
             boolean union,
             List<MemberPlan> members,
             int estimatedBytecode,
@@ -235,7 +286,10 @@ public record RuntimeCodecPlan(
             String memberName,
             String jsonName,
             Method getter,
+            Method presence,
             Method setter,
+            Class<?> unionVariant,
+            Method unionAccessor,
             boolean required,
             int estimatedBytecode) {
         public String wireName(boolean useJsonName) {

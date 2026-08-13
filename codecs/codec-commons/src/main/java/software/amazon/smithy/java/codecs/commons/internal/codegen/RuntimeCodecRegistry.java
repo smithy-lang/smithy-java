@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codecs.commons.internal.codegen;
 
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -92,19 +93,22 @@ public final class RuntimeCodecRegistry<T> {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(
                     backend.lookupHost(),
                     MethodHandles.lookup());
-            Class<?> generatedClass = lookup.defineHiddenClass(
+            MethodHandles.Lookup hiddenLookup = lookup.defineHiddenClass(
                     emission.bytecode(),
                     true,
-                    MethodHandles.Lookup.ClassOption.NESTMATE).lookupClass();
-            Object instance = generatedClass.getDeclaredConstructor().newInstance();
+                    MethodHandles.Lookup.ClassOption.NESTMATE);
+            Class<?> generatedClass = hiddenLookup.lookupClass();
+            Object instance = hiddenLookup.findConstructor(generatedClass, MethodType.methodType(void.class))
+                    .invoke();
             T codec = backend.codecType().cast(instance);
             long elapsed = System.nanoTime() - start;
             diagnostics.success(emission.bytecode().length, elapsed);
             future.complete(new Result<>(codec, null));
         } catch (Throwable error) {
             long elapsed = System.nanoTime() - start;
-            diagnostics.failure(elapsed);
-            future.complete(new Result<>(null, unwrap(error)));
+            Throwable failure = unwrap(error);
+            diagnostics.failure(failure, elapsed);
+            future.complete(new Result<>(null, failure));
         }
     }
 

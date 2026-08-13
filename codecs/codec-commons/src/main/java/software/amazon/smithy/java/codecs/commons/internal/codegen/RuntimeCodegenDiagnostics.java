@@ -17,6 +17,9 @@ public final class RuntimeCodegenDiagnostics {
     private final LongAdder emittedClasses = new LongAdder();
     private final LongAdder emittedBytes = new LongAdder();
     private final LongAdder generationNanos = new LongAdder();
+    private volatile String lastFailureType;
+    private volatile String lastFailureMessage;
+    private volatile String lastFailureLocation;
 
     void request() {
         requests.increment();
@@ -33,9 +36,13 @@ public final class RuntimeCodegenDiagnostics {
         generationNanos.add(nanos);
     }
 
-    void failure(long nanos) {
+    void failure(Throwable error, long nanos) {
         failures.increment();
         generationNanos.add(nanos);
+        lastFailureType = error.getClass().getName();
+        lastFailureMessage = error.getMessage();
+        StackTraceElement[] trace = error.getStackTrace();
+        lastFailureLocation = trace.length == 0 ? null : trace[0].toString();
     }
 
     public void fallback() {
@@ -56,7 +63,10 @@ public final class RuntimeCodegenDiagnostics {
                 evictions.sum(),
                 emittedClasses.sum(),
                 emittedBytes.sum(),
-                generationNanos.sum());
+                generationNanos.sum(),
+                lastFailureType,
+                lastFailureMessage,
+                lastFailureLocation);
     }
 
     public record Snapshot(
@@ -68,5 +78,8 @@ public final class RuntimeCodegenDiagnostics {
             long evictions,
             long emittedClasses,
             long emittedBytes,
-            long generationNanos) {}
+            long generationNanos,
+            String lastFailureType,
+            String lastFailureMessage,
+            String lastFailureLocation) {}
 }

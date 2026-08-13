@@ -55,6 +55,9 @@ public final class JsonCodec implements Codec {
 
     @Override
     public <T extends SerializableShape> T deserializeShape(byte[] source, ShapeBuilder<T> builder) {
+        if (settings.provider() instanceof CodegenJsonSerdeProvider generated) {
+            return generated.deserialize(source, builder, settings);
+        }
         var deserializer = createDeserializer(source);
         T result;
         try {
@@ -69,6 +72,9 @@ public final class JsonCodec implements Codec {
 
     @Override
     public <T extends SerializableShape> T deserializeShape(ByteBuffer source, ShapeBuilder<T> builder) {
+        if (settings.provider() instanceof CodegenJsonSerdeProvider generated) {
+            return generated.deserialize(source, builder, settings);
+        }
         var deserializer = createDeserializer(source);
         T result;
         try {

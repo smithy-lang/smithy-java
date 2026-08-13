@@ -44,6 +44,9 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     private final JsonSettings settings;
     private final boolean useJsonName;
     private int depth;
+    private int generatedFieldStart;
+    private int generatedFieldEnd;
+    private String generatedFieldName;
 
     // Mutable result fields, avoids allocating arrays on every parse call.
     // Safe because the deserializer is single-threaded (one instance per operation).
@@ -374,8 +377,20 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
     @Override
     public Instant readTimestamp(Schema schema) {
-        skipWhitespace();
         var format = settings.timestampResolver().resolve(schema);
+        return readTimestamp(format);
+    }
+
+    Instant generatedReadTimestamp(int format) {
+        return readTimestamp(switch (format) {
+            case 1 -> TimestampFormatter.Prelude.DATE_TIME;
+            case 2 -> TimestampFormatter.Prelude.HTTP_DATE;
+            default -> TimestampFormatter.Prelude.EPOCH_SECONDS;
+        });
+    }
+
+    private Instant readTimestamp(TimestampFormatter format) {
+        skipWhitespace();
         if (format == TimestampFormatter.Prelude.EPOCH_SECONDS
                 && pos < end
                 && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
@@ -973,6 +988,157 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                 }
             }
         }
+    }
+
+    boolean generatedBeginObject() {
+        skipWhitespace();
+        if (pos >= end || buf[pos] != '{') {
+            throw new SerializationException(
+                    "Expected '{', found: " + JsonReadUtils.describePos(buf, pos, end));
+        }
+        pos++;
+        if (++depth > MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        skipWhitespace();
+        if (pos < end && buf[pos] == '}') {
+            pos++;
+            depth--;
+            return false;
+        }
+        return true;
+    }
+
+    int generatedReadFieldHash() {
+        skipWhitespace();
+        if (pos >= end || buf[pos] != '"') {
+            throw new SerializationException(
+                    "Expected field name, found: " + JsonReadUtils.describePos(buf, pos, end));
+        }
+        int start = ++pos;
+        int hash = 0;
+        while (pos < end && buf[pos] != '"') {
+            byte value = buf[pos];
+            if (value == '\\' || (value & 0xff) < 0x20) {
+                int fieldStart = start - 1;
+                JsonReadUtils.parseString(buf, fieldStart, end, this);
+                String decoded = parsedString;
+                generatedFieldName = decoded;
+                generatedFieldStart = -1;
+                generatedFieldEnd = -1;
+                pos = parsedEndPos;
+                skipWhitespace();
+                expect(':');
+                skipWhitespace();
+                return decoded.hashCode();
+            }
+            hash = 31 * hash + (value & 0xff);
+            pos++;
+        }
+        if (pos >= end) {
+            throw new SerializationException("Unterminated field name");
+        }
+        generatedFieldStart = start;
+        generatedFieldEnd = pos++;
+        generatedFieldName = null;
+        skipWhitespace();
+        expect(':');
+        skipWhitespace();
+        return hash;
+    }
+
+    boolean generatedFieldEquals(byte[] expected) {
+        if (generatedFieldName != null) {
+            return generatedFieldName.equals(new String(expected, StandardCharsets.UTF_8));
+        }
+        int start = generatedFieldStart;
+        int length = generatedFieldEnd - start;
+        return start >= 0
+                && length == expected.length
+                && Arrays.equals(buf, start, generatedFieldEnd, expected, 0, expected.length);
+    }
+
+    String generatedFieldName() {
+        if (generatedFieldName != null) {
+            return generatedFieldName;
+        }
+        generatedFieldName = new String(
+                buf,
+                generatedFieldStart,
+                generatedFieldEnd - generatedFieldStart,
+                StandardCharsets.UTF_8);
+        return generatedFieldName;
+    }
+
+    boolean generatedObjectHasNext() {
+        skipWhitespace();
+        if (pos < end && buf[pos] == '}') {
+            pos++;
+            depth--;
+            return false;
+        }
+        expect(',');
+        skipWhitespace();
+        return true;
+    }
+
+    boolean generatedBeginArray() {
+        skipWhitespace();
+        if (pos >= end || buf[pos] != '[') {
+            throw new SerializationException(
+                    "Expected '[', found: " + JsonReadUtils.describePos(buf, pos, end));
+        }
+        pos++;
+        if (++depth > MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        skipWhitespace();
+        if (pos < end && buf[pos] == ']') {
+            pos++;
+            depth--;
+            return false;
+        }
+        return true;
+    }
+
+    boolean generatedArrayHasNext() {
+        skipWhitespace();
+        if (pos < end && buf[pos] == ']') {
+            pos++;
+            depth--;
+            return false;
+        }
+        expect(',');
+        skipWhitespace();
+        return true;
+    }
+
+    boolean generatedTryReadNull() {
+        skipWhitespace();
+        if (pos + 4 <= end
+                && buf[pos] == 'n'
+                && buf[pos + 1] == 'u'
+                && buf[pos + 2] == 'l'
+                && buf[pos + 3] == 'l') {
+            pos += 4;
+            return true;
+        }
+        return false;
+    }
+
+    String generatedReadString() {
+        return readString(null);
+    }
+
+    void generatedSkipValue() {
+        skipValue();
+    }
+
+    int generatedScan() {
+        int start = pos;
+        skipValue();
+        close();
+        return pos - start;
     }
 
     private void skipString() {
