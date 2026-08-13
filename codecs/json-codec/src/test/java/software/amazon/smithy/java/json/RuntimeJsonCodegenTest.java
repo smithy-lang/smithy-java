@@ -169,7 +169,7 @@ final class RuntimeJsonCodegenTest {
                 .intMap(Map.of("n", 3))
                 .nested(nested)
                 .optionalNested(nested)
-                .structList(List.of(nested))
+                .structList(List.of(nested, nested, nested))
                 .structMap(Map.of("nested", nested))
                 .choice(new BenchUnion.StructValueMember(nested))
                 .color(Color.GREEN)

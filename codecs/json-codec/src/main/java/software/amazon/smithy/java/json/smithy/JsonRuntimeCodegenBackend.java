@@ -36,6 +36,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJsonCodec>, Opcodes {
+    private static final int STRUCTURE_BUILDER_LOCAL = 9;
     private static final String CODEC = Type.getInternalName(GeneratedJsonCodec.class);
     private static final String WRITER = Type.getInternalName(JsonCodegenWriter.class);
     private static final String READER = Type.getInternalName(SmithyJsonDeserializer.class);
@@ -1954,17 +1955,17 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(target.id());
             Method factory = nested.builderFactory();
             invoke(method, factory);
-            method.visitVarInsn(ASTORE, 6);
+            method.visitVarInsn(ASTORE, STRUCTURE_BUILDER_LOCAL);
             method.visitVarInsn(ALOAD, 0);
             method.visitVarInsn(ALOAD, readerLocal);
-            method.visitVarInsn(ALOAD, 6);
+            method.visitVarInsn(ALOAD, STRUCTURE_BUILDER_LOCAL);
             method.visitMethodInsn(
                     INVOKESPECIAL,
                     className,
                     readerName(nested),
                     readerDescriptor(nested),
                     false);
-            method.visitVarInsn(ALOAD, 6);
+            method.visitVarInsn(ALOAD, STRUCTURE_BUILDER_LOCAL);
             Method build = findBuild(nested.builderClass(), nested.shapeClass());
             invoke(method, build);
         }
