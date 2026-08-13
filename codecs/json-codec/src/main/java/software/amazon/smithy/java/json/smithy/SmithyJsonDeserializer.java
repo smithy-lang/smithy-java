@@ -1147,6 +1147,40 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         return generatedFieldName;
     }
 
+    String generatedReadMapKey() {
+        skipWhitespace();
+        if (pos >= end || buf[pos] != '"') {
+            throw new SerializationException(
+                    "Expected map key, found: " + JsonReadUtils.describePos(buf, pos, end));
+        }
+        int start = ++pos;
+        while (pos < end) {
+            byte value = buf[pos];
+            if (value == '"') {
+                String key = decodeUtf8Cached(buf, start, pos - start);
+                pos++;
+                skipWhitespace();
+                expect(':');
+                skipWhitespace();
+                return key;
+            }
+            if (value == '\\') {
+                JsonReadUtils.parseString(buf, start - 1, end, this);
+                String key = parsedString;
+                pos = parsedEndPos;
+                skipWhitespace();
+                expect(':');
+                skipWhitespace();
+                return key;
+            }
+            if ((value & 0xff) < 0x20) {
+                throw new SerializationException("Unescaped control character in map key");
+            }
+            pos++;
+        }
+        throw new SerializationException("Unterminated map key");
+    }
+
     boolean generatedObjectHasNext() {
         skipWhitespace();
         if (pos < end && buf[pos] == '}') {

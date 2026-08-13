@@ -152,6 +152,10 @@ final class RuntimeJsonCodegenTest {
         var sparseMap = new HashMap<String, String>();
         sparseMap.put("present", "value");
         sparseMap.put("null", null);
+        var metadata = new HashMap<String, String>();
+        metadata.put("quote\"slash\\", "escaped");
+        metadata.put("snowman-\u2603", "unicode");
+        metadata.put("line\nbreak", "control");
         var value = ComplexStruct.builder()
                 .id("id")
                 .count(1)
@@ -161,7 +165,7 @@ final class RuntimeJsonCodegenTest {
                 .bigCount(99)
                 .tags(List.of("a", "b", "c", "d", "e", "f"))
                 .intList(List.of(1, 2))
-                .metadata(Map.of("a", "1", "b", "2", "c", "3", "d", "4", "e", "5"))
+                .metadata(metadata)
                 .intMap(Map.of("n", 3))
                 .nested(nested)
                 .optionalNested(nested)

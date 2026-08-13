@@ -562,13 +562,10 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitJumpInsn(IFEQ, done);
             method.visitLabel(loop);
             method.visitVarInsn(ALOAD, 1);
-            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedReadFieldHash", "()I", false);
-            method.visitInsn(POP);
-            method.visitVarInsn(ALOAD, 1);
             method.visitMethodInsn(
                     INVOKEVIRTUAL,
                     READER,
-                    "generatedFieldName",
+                    "generatedReadMapKey",
                     "()Ljava/lang/String;",
                     false);
             method.visitVarInsn(ASTORE, 3);
