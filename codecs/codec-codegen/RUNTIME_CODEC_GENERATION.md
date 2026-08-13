@@ -95,10 +95,14 @@ Plans classify every reachable member by Smithy type, wire name, Java getter,
 builder setter, nullability, collection element/value type, timestamp format,
 and recursive edge. Unsupported edges reject the complete root plan.
 
-Writer methods split after eight members or an estimated 280 bytecodes,
-whichever comes first. Reader dispatch uses hash buckets and splits at an
-estimated 300 bytecodes. These conservative thresholds follow the study result
-that unsplit 32- and 64-member methods regress after JIT inlining stops.
+Plans carry exact member ranges rather than only a helper count. The JSON
+writer targets an estimated 220 inlined bytecodes per helper and assigns
+different costs to presence checks, scalar fields, and aggregate calls. String
+members use a fused field-token/value primitive, while cold buffer growth is
+kept outside the normally inlined capacity check. Reader dispatch uses bounded
+hash helpers at an estimated 300 bytecodes. These thresholds follow measured
+C2 behavior: a 280-byte writer target produced two distinct compilation modes,
+while 220 bytes kept both detached and protocol serialization stable.
 Backends may lower the thresholds but may not defer splitting decisions to the
 generated runtime path.
 
@@ -161,9 +165,15 @@ The JSON backend lowers direct structure getters and builder setters,
 structures, generated sealed-interface unions, lists, maps, scalar primitives,
 blobs, string enums, timestamps, documents, sparse aggregates, borrowed
 output, detached output, full-model input, and an allocation-free
-validation/token-sink entry.
-Field names and encoded field tokens are class constants. Writers split at
-eight members and wide reader dispatch splits into bounded hash helpers.
+validation/token-sink entry. Field names and encoded field tokens come from
+schema extensions and become generated class constants. Canonical member order
+uses exact precomputed token probes; reordered input falls back to bounded hash
+dispatch. Generated map keys use a combined scan/decode primitive, and short
+lists delay materialization so their final capacity is exact.
+
+Writer helpers use the exact schema-plan ranges described above. String fields
+reserve once for the member token and value, and the common writer capacity
+check stays below C2's normal inline threshold.
 
 Unsupported graphs, including integer enums and generated models without
 public direct access, fall back before a class is published. Pretty printing
@@ -243,6 +253,72 @@ Raw results are in
 `build/perf-study/runtime-codegen-production/classfile-short-screen.json`,
 `build/perf-study/runtime-codegen-production/classfile-short-screen-a2.json`,
 and `build/perf-study/runtime-codegen-production/asm-short-screen.json`.
+
+## Fory Comparison
+
+A matched comparison uses Apache Fory JSON source commit
+`c50369695a2d123adf6d267d8f4032dfc602af10`. Fory code generation is enabled
+with asynchronous compilation disabled, field access enabled, and one pooled
+execution state. Smithy generation is required during setup; cached fallback
+aborts the benchmark.
+
+Both implementations serialize equivalent CloudWatch `PutMetricData` S/M/L
+graphs. Fory uses benchmark-local mutable DTOs because it cannot bind directly
+to Smithy's immutable builder-backed classes. Setup deserializes Fory output
+into the Smithy model and requires equality with the original. Both
+deserialization benchmarks consume the same canonical Smithy-produced UTF-8
+bytes, and the Fory result must serialize back to the same Smithy model.
+
+The object-construction contracts are not identical. Smithy invokes builder
+setters, required-member validation, model constructors, and immutable
+collection wrapping. Fory fills mutable fields. Serialization is the closer
+comparison; deserialization deliberately includes each library's normal typed
+model materialization.
+
+The short screen ran on JDK 26.0.1, G1, fixed 1 GiB heap,
+`AlwaysPreTouch`, one JMH thread, and CPU 2. It used two 1-second warmups and
+three 2-second measurements with the GC profiler:
+
+| Direction | Size | Smithy ns/op | Fory ns/op | Smithy/Fory | Smithy B/op | Fory B/op |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| serialize | S | 207 | 240 | 0.86x | 296 | 248 |
+| serialize | M | 2,087 | 1,395 | 1.50x | 1,736 | 1,704 |
+| serialize | L | 20,795 | 28,112 | 0.74x | 9,952 | 11,888 |
+| deserialize | S | 556 | 272 | 2.04x | 888 | 664 |
+| deserialize | M | 3,620 | 1,972 | 1.84x | 5,704 | 4,552 |
+| deserialize | L | 34,112 | 19,468 | 1.75x | 44,776 | 37,672 |
+
+An independent M/L confirmation reproduced the direction:
+
+- M serialization: Smithy 1,986 ns/op, Fory 1,353 ns/op;
+- L serialization: Smithy settled at 19,310-20,213 ns/op after the first
+  measurement, Fory 28,335 ns/op;
+- M deserialization: Smithy 3,587 ns/op, Fory 1,984 ns/op;
+- L deserialization: Smithy 31,458 ns/op, Fory 19,580 ns/op.
+
+Fory output was 2.7%, 1.2%, and 9.2% larger for S, M, and L because its DTO
+double fields retain a decimal suffix where Smithy emits the shortest valid
+number. The payloads are semantically equal, but byte counts must be considered
+when interpreting the large serialization result.
+
+Smithy serialization is therefore already competitive with Fory on this graph:
+it wins S and L, including allocation on L, but remains about 47-50% slower on
+M. Deserialization remains the clear gap at roughly 1.6-2.0x latency and
+8-34% more allocation across the two screens.
+
+Stack sampling attributes the Smithy reader gap primarily to general string
+parsing and UTF-8 cache lookup, epoch timestamp conversion, the generic
+floating-point parser, and immutable model/list construction. Fory's generated
+path calls byte-native nullable-string and numeric token readers directly.
+The next optimization priority is generated byte-cursor scalar/string/
+timestamp parsing plus builder and collection materialization, not broader
+writer fusion.
+
+Results are in:
+
+- `build/perf-study/fory-comparison/cloudwatch-smithy-vs-fory.json`;
+- `build/perf-study/fory-comparison/cloudwatch-smithy-vs-fory-confirm.json`;
+- `build/perf-study/fory-comparison/deserialize-m-stack.txt`.
 
 ## Resource Screen
 

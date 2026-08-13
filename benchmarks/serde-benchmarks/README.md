@@ -56,6 +56,25 @@ Run a subset by class or test case ID:
 ./gradlew :benchmarks:serde-benchmarks:jmh -Pjmh.includes=PutItem
 ```
 
+The optional generated-JSON comparison with a local Fory checkout uses
+reflection so Fory is not a build dependency. Build Fory first, export the JMH
+classpath, then append its two jars when launching JMH:
+
+```shell
+./gradlew :benchmarks:serde-benchmarks:writeJmhClasspath
+CP=$(cat benchmarks/serde-benchmarks/build/runtime-codegen/jmh-classpath.txt)
+FORY=$HOME/workplace/fory/java
+taskset -c 2 java -Xms1g -Xmx1g -XX:+UseG1GC -XX:+AlwaysPreTouch \
+  -Dsmithy-java.json-provider=smithy \
+  -cp "$CP:$FORY/fory-json/target/fory-json-1.7.0-SNAPSHOT.jar:$FORY/fory-core/target/fory-core-1.7.0-SNAPSHOT.jar" \
+  org.openjdk.jmh.Main '.*JsonRuntimeCodegenForyBenchmark.*' \
+  -bm avgt -tu ns -wi 2 -w 1s -i 3 -r 2s -f 1 -t 1 -prof gc
+```
+
+Benchmark setup requires real generated Smithy codecs, synchronous generated
+Fory codecs, equivalent serialized semantics, and successful typed round trips.
+It fails instead of silently measuring either implementation's fallback.
+
 The JMH JSON output is written to:
 
 ```
