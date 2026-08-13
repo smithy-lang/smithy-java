@@ -19,6 +19,7 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonCodec;
+import software.amazon.smithy.java.json.RuntimeCodegenBenchmarkSupport;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -68,6 +69,9 @@ public class AwsJsonRuntimeCodegenDeserializeBenchmark {
         input = ByteBufferUtils.getBytes(body);
         codecDeserialize();
         protocol.deserializeResponse(operation(), state.context, state.typeRegistry, state.request, state.response);
+        if ("generated".equals(implementation)) {
+            RuntimeCodegenBenchmarkSupport.requireGenerated(codec);
+        }
     }
 
     @Benchmark

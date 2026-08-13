@@ -7,6 +7,7 @@ package software.amazon.smithy.java.json;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenDiagnostics;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
@@ -100,5 +101,9 @@ final class CodegenJsonSerdeProvider implements JsonSerdeProvider {
         try (ShapeDeserializer deserializer = delegate.newDeserializer(source, settings)) {
             return builder.deserialize(deserializer).errorCorrection().build();
         }
+    }
+
+    RuntimeCodegenDiagnostics.Snapshot diagnostics(JsonSettings settings) {
+        return generated.diagnostics(settings);
     }
 }

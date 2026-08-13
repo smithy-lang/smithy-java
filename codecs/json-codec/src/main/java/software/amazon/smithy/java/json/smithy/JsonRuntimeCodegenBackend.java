@@ -109,7 +109,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
         private final IdentityHashMap<RuntimeCodecPlan.MemberPlan, Integer> memberIds = new IdentityHashMap<>();
         private final List<RuntimeCodecPlan.MemberPlan> orderedMembers = new ArrayList<>();
         private final IdentityHashMap<Object, RuntimeCodecPlan.StructPlan> structuresBySchema = new IdentityHashMap<>();
-        private final IdentityHashMap<Object, Integer> aggregateIds = new IdentityHashMap<>();
+        private final Map<Object, Integer> aggregateIds = new LinkedHashMap<>();
         private final List<Schema> orderedAggregates = new ArrayList<>();
         private final Map<Class<?>, Integer> enumIds = new LinkedHashMap<>();
         private int methodCount;
@@ -142,13 +142,17 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             schema = schema.isMember() ? schema.memberTarget() : schema;
             switch (schema.type()) {
                 case LIST, SET -> {
-                    if (aggregateIds.put(schema, aggregateIds.size()) == null) {
+                    Object key = schema.id();
+                    if (!aggregateIds.containsKey(key)) {
+                        aggregateIds.put(key, aggregateIds.size());
                         orderedAggregates.add(schema);
                         collectTarget(schema.listMember());
                     }
                 }
                 case MAP -> {
-                    if (aggregateIds.put(schema, aggregateIds.size()) == null) {
+                    Object key = schema.id();
+                    if (!aggregateIds.containsKey(key)) {
+                        aggregateIds.put(key, aggregateIds.size());
                         orderedAggregates.add(schema);
                         collectTarget(schema.mapValueMember());
                     }
@@ -1818,11 +1822,13 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
         }
 
         private String aggregateWriterName(Schema schema) {
-            return "writeA" + aggregateIds.get(schema.isMember() ? schema.memberTarget() : schema);
+            Schema target = schema.isMember() ? schema.memberTarget() : schema;
+            return "writeA" + aggregateIds.get(target.id());
         }
 
         private String aggregateReaderName(Schema schema) {
-            return "readA" + aggregateIds.get(schema.isMember() ? schema.memberTarget() : schema);
+            Schema target = schema.isMember() ? schema.memberTarget() : schema;
+            return "readA" + aggregateIds.get(target.id());
         }
 
         private String enumReaderName(Class<?> enumClass) {

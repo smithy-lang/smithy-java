@@ -16,6 +16,7 @@ import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.json.JsonCodec;
+import software.amazon.smithy.java.json.RuntimeCodegenBenchmarkSupport;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -59,6 +60,9 @@ public class AwsJsonRuntimeCodegenSerializeBenchmark {
         state = SerializeState.forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID);
         codecSerialize();
         protocol.createRequest(operation(), state.input, state.context, state.endpoint);
+        if ("generated".equals(implementation)) {
+            RuntimeCodegenBenchmarkSupport.requireGenerated(codec);
+        }
     }
 
     @Benchmark
