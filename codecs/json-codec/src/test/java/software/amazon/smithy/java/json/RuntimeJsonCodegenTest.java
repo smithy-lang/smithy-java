@@ -237,6 +237,31 @@ final class RuntimeJsonCodegenTest {
     }
 
     @Test
+    void readsKnownEscapedAndUnknownEnums() {
+        var serde = new SmithyGeneratedJsonSerde();
+        var nested = NestedStruct.builder().field1("nested").field2(2).build();
+        var value = ComplexStruct.builder()
+                .id("id")
+                .count(1)
+                .nested(nested)
+                .color(Color.GREEN)
+                .build();
+        ByteBuffer encoded = serde.serialize(value, SETTINGS);
+        String json = StandardCharsets.UTF_8.decode(encoded).toString();
+
+        String escapedGreen = "\"GR" + "\\" + "u0045EN\"";
+        byte[] escaped = json.replace("\"GREEN\"", escapedGreen)
+                .getBytes(StandardCharsets.UTF_8);
+        assertThat(serde.deserialize(escaped, ComplexStruct.builder(), SETTINGS).getColor())
+                .isSameAs(Color.GREEN);
+
+        byte[] unknown = json.replace("\"GREEN\"", "\"PURPLE\"")
+                .getBytes(StandardCharsets.UTF_8);
+        assertThat(serde.deserialize(unknown, ComplexStruct.builder(), SETTINGS).getColor().getValue())
+                .isEqualTo("PURPLE");
+    }
+
+    @Test
     void supportsStructureEncodedSealedInterfaceUnions() {
         var serde = new SmithyGeneratedJsonSerde();
         var value = StructureEncodedUnionModel.Envelope.builder()

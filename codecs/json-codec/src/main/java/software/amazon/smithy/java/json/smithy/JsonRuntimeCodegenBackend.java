@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.json.smithy;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.ByteBuffer;
@@ -268,42 +269,64 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
         private void emitEnumReaders() {
             for (Map.Entry<Class<?>, Integer> entry : enumIds.entrySet()) {
                 Class<?> enumClass = entry.getKey();
-                Method from;
                 Method unknown;
                 try {
-                    from = enumClass.getMethod("from", String.class);
                     unknown = enumClass.getMethod("unknown", String.class);
                 } catch (NoSuchMethodException e) {
-                    throw new UnsupportedSchemaException("Generated enum lacks from/unknown methods: "
+                    throw new UnsupportedSchemaException("Generated enum lacks unknown method: "
                             + enumClass.getName());
                 }
+                List<EnumConstant> constants = enumConstants(enumClass);
                 MethodVisitor method = writer.visitMethod(
                         ACC_PRIVATE,
                         enumReaderName(enumClass),
                         "(L" + READER + ";)L" + Type.getInternalName(enumClass) + ";",
                         null,
                         null);
-                Label start = new Label();
-                Label end = new Label();
-                Label handler = new Label();
-                method.visitTryCatchBlock(start, end, handler, "java/lang/IllegalArgumentException");
                 method.visitCode();
                 method.visitVarInsn(ALOAD, 1);
                 method.visitMethodInsn(
                         INVOKEVIRTUAL,
                         READER,
-                        "generatedReadString",
+                        "generatedReadStringHash",
+                        "()I",
+                        false);
+                method.visitVarInsn(ISTORE, 2);
+                Map<Integer, List<EnumConstant>> groups = new LinkedHashMap<>();
+                for (EnumConstant constant : constants) {
+                    groups.computeIfAbsent(constant.value().hashCode(), ignored -> new ArrayList<>())
+                            .add(constant);
+                }
+                List<Integer> hashes = groups.keySet().stream().sorted().toList();
+                int[] keys = hashes.stream().mapToInt(Integer::intValue).toArray();
+                Label unknownValue = new Label();
+                Label[] labels = hashes.stream().map(ignored -> new Label()).toArray(Label[]::new);
+                method.visitVarInsn(ILOAD, 2);
+                method.visitLookupSwitchInsn(unknownValue, keys, labels);
+                for (int i = 0; i < hashes.size(); i++) {
+                    method.visitLabel(labels[i]);
+                    for (EnumConstant constant : groups.get(hashes.get(i))) {
+                        Label next = new Label();
+                        emitEnumValueEquals(method, constant.value());
+                        method.visitJumpInsn(IFEQ, next);
+                        method.visitFieldInsn(
+                                GETSTATIC,
+                                Type.getInternalName(enumClass),
+                                constant.field().getName(),
+                                "L" + Type.getInternalName(enumClass) + ";");
+                        method.visitInsn(ARETURN);
+                        method.visitLabel(next);
+                    }
+                    method.visitJumpInsn(GOTO, unknownValue);
+                }
+                method.visitLabel(unknownValue);
+                method.visitVarInsn(ALOAD, 1);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedFieldName",
                         "()Ljava/lang/String;",
                         false);
-                method.visitVarInsn(ASTORE, 2);
-                method.visitLabel(start);
-                method.visitVarInsn(ALOAD, 2);
-                invoke(method, from);
-                method.visitLabel(end);
-                method.visitInsn(ARETURN);
-                method.visitLabel(handler);
-                method.visitInsn(POP);
-                method.visitVarInsn(ALOAD, 2);
                 invoke(method, unknown);
                 method.visitInsn(ARETURN);
                 method.visitMaxs(0, 0);
@@ -311,6 +334,67 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 methodCount++;
             }
         }
+
+        private List<EnumConstant> enumConstants(Class<?> enumClass) {
+            List<EnumConstant> result = new ArrayList<>();
+            for (var field : enumClass.getFields()) {
+                if (Modifier.isStatic(field.getModifiers()) && field.getType() == enumClass) {
+                    try {
+                        result.add(new EnumConstant(field, ((SmithyEnum) field.get(null)).getValue()));
+                    } catch (IllegalAccessException e) {
+                        throw new UnsupportedSchemaException("Cannot access enum constant "
+                                + enumClass.getName() + "." + field.getName());
+                    }
+                }
+            }
+            result.sort(Comparator.comparing(constant -> constant.field().getName()));
+            return result;
+        }
+
+        private void emitEnumValueEquals(MethodVisitor method, String value) {
+            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+            method.visitVarInsn(ALOAD, 1);
+            if (bytes.length <= Long.BYTES) {
+                method.visitLdcInsn(packLittleEndian(bytes, 0, bytes.length));
+                method.visitLdcInsn(lowByteMask(bytes.length));
+                method.visitLdcInsn(bytes.length);
+                method.visitLdcInsn(value);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedStringEquals8",
+                        "(JJILjava/lang/String;)Z",
+                        false);
+            } else if (bytes.length <= Long.BYTES * 2) {
+                method.visitLdcInsn(packLittleEndian(bytes, 0, Long.BYTES));
+                method.visitLdcInsn(packLittleEndian(bytes, Long.BYTES, bytes.length - Long.BYTES));
+                method.visitLdcInsn(lowByteMask(bytes.length - Long.BYTES));
+                method.visitLdcInsn(bytes.length);
+                method.visitLdcInsn(value);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedStringEquals16",
+                        "(JJJILjava/lang/String;)Z",
+                        false);
+            } else {
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedFieldName",
+                        "()Ljava/lang/String;",
+                        false);
+                method.visitLdcInsn(value);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        "java/lang/String",
+                        "equals",
+                        "(Ljava/lang/Object;)Z",
+                        false);
+            }
+        }
+
+        private record EnumConstant(Field field, String value) {}
 
         private void emitAggregateMethods() {
             for (var schema : orderedAggregates) {

@@ -486,6 +486,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
     Instant generatedReadEpochTimestamp() {
         if (pos < end && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
+            long fastSecond = JsonReadUtils.tryParseTenDigitEpochSecond(buf, pos, end);
+            if (fastSecond >= 0) {
+                pos += 10;
+                return instantFromEpochSecond(fastSecond);
+            }
             int startPos = pos;
             JsonReadUtils.parseLong(buf, startPos, end, this);
             int endPos = parsedEndPos;
@@ -1170,6 +1175,35 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         return hash;
     }
 
+    int generatedReadStringHash() {
+        if (pos >= end || buf[pos] != '"') {
+            throw new SerializationException(
+                    "Expected string, found: " + JsonReadUtils.describePos(buf, pos, end));
+        }
+        int start = ++pos;
+        int hash = 0;
+        while (pos < end && buf[pos] != '"') {
+            byte value = buf[pos];
+            if (value == '\\' || value < 0 || (value & 0xff) < 0x20) {
+                JsonReadUtils.parseString(buf, start - 1, end, this);
+                generatedFieldName = parsedString;
+                generatedFieldStart = -1;
+                generatedFieldEnd = -1;
+                pos = parsedEndPos;
+                return generatedFieldName.hashCode();
+            }
+            hash = 31 * hash + value;
+            pos++;
+        }
+        if (pos >= end) {
+            throw new SerializationException("Unterminated string");
+        }
+        generatedFieldStart = start;
+        generatedFieldEnd = pos++;
+        generatedFieldName = null;
+        return hash;
+    }
+
     boolean generatedTryReadField(byte[] token) {
         int start = pos;
         int length = token.length;
@@ -1303,6 +1337,42 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         return start >= 0
                 && length == expected.length
                 && Arrays.equals(buf, start, generatedFieldEnd, expected, 0, expected.length);
+    }
+
+    boolean generatedStringEquals8(long expected, long mask, int length, String decoded) {
+        if (generatedFieldName != null) {
+            return generatedFieldName.equals(decoded);
+        }
+        int start = generatedFieldStart;
+        if (generatedFieldEnd - start != length) {
+            return false;
+        }
+        long actual = start <= end - Long.BYTES
+                ? JsonReadUtils.readLongLittleEndian(buf, start) & mask
+                : readPackedToken(start, length);
+        return actual == expected;
+    }
+
+    boolean generatedStringEquals16(
+            long prefix,
+            long suffix,
+            long suffixMask,
+            int length,
+            String decoded
+    ) {
+        if (generatedFieldName != null) {
+            return generatedFieldName.equals(decoded);
+        }
+        int start = generatedFieldStart;
+        if (generatedFieldEnd - start != length
+                || JsonReadUtils.readLongLittleEndian(buf, start) != prefix) {
+            return false;
+        }
+        int suffixStart = start + Long.BYTES;
+        long actualSuffix = suffixStart <= end - Long.BYTES
+                ? JsonReadUtils.readLongLittleEndian(buf, suffixStart) & suffixMask
+                : readPackedToken(suffixStart, length - Long.BYTES);
+        return actualSuffix == suffix;
     }
 
     String generatedFieldName() {
