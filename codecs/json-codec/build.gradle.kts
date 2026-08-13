@@ -13,7 +13,6 @@ extra["moduleName"] = "software.amazon.smithy.java.json"
 dependencies {
     api(project(":core"))
     api(project(":codecs:codec-commons", configuration = "shadow"))
-    implementation(libs.asm)
     compileOnly(libs.jackson.core)
     testRuntimeOnly(libs.jackson.core)
     smithyBuild(project(":codegen:codegen-plugin"))
@@ -27,20 +26,12 @@ tasks {
         dependencies {
             include(
                 dependency(
-                    libs.asm
-                        .get()
-                        .toString(),
-                ),
-            )
-            include(
-                dependency(
                     libs.jackson.core
                         .get()
                         .toString(),
                 ),
             )
         }
-        relocate("org.objectweb.asm", "software.amazon.smithy.java.json.internal.shaded.org.objectweb.asm")
         relocate("tools.jackson.core", "software.amazon.smithy.java.internal.shaded.tools.jackson.core")
     }
     jar {
@@ -85,4 +76,18 @@ tasks.named("compileTestJava") {
 
 tasks.named("processTestResources") {
     dependsOn("smithyBuild")
+}
+
+tasks.register<Test>("jdk24CodegenTest") {
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    javaLauncher =
+        javaToolchains.launcherFor {
+            languageVersion = JavaLanguageVersion.of(24)
+        }
+    filter {
+        includeTestsMatching("*RuntimeJsonCodegenTest")
+        includeTestsMatching("*GeneratedModelSerdeTest")
+    }
+    useJUnitPlatform()
 }

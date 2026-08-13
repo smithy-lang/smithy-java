@@ -14,27 +14,58 @@ description = "Shared utilities for Smithy codec implementations (number formatt
 extra["displayName"] = "Smithy :: Java :: Codec Commons"
 extra["moduleName"] = "software.amazon.smithy.java.codecs.commons"
 
+sourceSets {
+    create("jdk24") {
+        java {
+            srcDir("src/jdk24/java")
+        }
+    }
+    create("jdk21Test") {
+        java {
+            srcDir("src/jdk21Test/java")
+        }
+    }
+}
+
 dependencies {
     api(libs.smithy.utils)
     implementation(project(":core"))
-    implementation(libs.asm)
     compileOnly(libs.fastdoubleparser)
+    testImplementation(sourceSets["jdk24"].output)
     testRuntimeOnly(libs.fastdoubleparser)
+    "jdk24Implementation"(sourceSets.main.get().output)
+    "jdk21TestImplementation"(sourceSets.main.get().output)
+}
+
+tasks.named<JavaCompile>("compileJdk24Java") {
+    javaCompiler =
+        javaToolchains.compilerFor {
+            languageVersion = JavaLanguageVersion.of(24)
+        }
+    options.release.set(24)
+}
+
+tasks.register<Test>("jdk21Test") {
+    testClassesDirs = sourceSets["jdk21Test"].output.classesDirs
+    classpath = sourceSets["jdk21Test"].runtimeClasspath
+    javaLauncher =
+        javaToolchains.launcherFor {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    useJUnitPlatform()
+}
+
+tasks.named("check") {
+    dependsOn("jdk21Test")
 }
 
 tasks {
     shadowJar {
         archiveClassifier.set("")
         mergeServiceFiles()
+        from(sourceSets["jdk24"].output)
         configurations = listOf(project.configurations.compileClasspath.get())
         dependencies {
-            include(
-                dependency(
-                    libs.asm
-                        .get()
-                        .toString(),
-                ),
-            )
             include(
                 dependency(
                     libs.fastdoubleparser
@@ -43,7 +74,6 @@ tasks {
                 ),
             )
         }
-        relocate("org.objectweb.asm", "software.amazon.smithy.java.codecs.commons.internal.shaded.org.objectweb.asm")
         relocate("ch.randelshofer", "software.amazon.smithy.java.codecs.commons.internal.shaded.ch.randelshofer")
     }
     jar {
@@ -53,6 +83,15 @@ tasks {
 
 configurations {
     shadow.get().extendsFrom(api.get())
+    named("jdk24Implementation") {
+        extendsFrom(configurations.implementation.get())
+    }
+    named("jdk21TestImplementation") {
+        extendsFrom(configurations.testImplementation.get())
+    }
+    named("jdk21TestRuntimeOnly") {
+        extendsFrom(configurations.testRuntimeOnly.get())
+    }
 }
 
 configurePublishing {

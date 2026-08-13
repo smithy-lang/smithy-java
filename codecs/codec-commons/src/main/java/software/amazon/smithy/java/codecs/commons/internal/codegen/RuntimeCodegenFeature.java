@@ -13,6 +13,9 @@ public final class RuntimeCodegenFeature {
     private RuntimeCodegenFeature() {}
 
     public static boolean enabled(String backend) {
+        if (Runtime.version().feature() < 24) {
+            return false;
+        }
         String configured = System.getProperty(PROPERTY, "");
         for (String value : configured.split(",")) {
             if (backend.equals(value.trim().toLowerCase(Locale.ROOT))) {

@@ -15,3 +15,16 @@ dependencies {
     testFixturesImplementation(libs.assertj.core)
     testImplementation(project(":codecs:json-codec", configuration = "shadow"))
 }
+
+tasks.register<Test>("jdk24CodegenTest") {
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    javaLauncher =
+        javaToolchains.launcherFor {
+            languageVersion = JavaLanguageVersion.of(24)
+        }
+    filter {
+        includeTestsMatching("*RuntimeCborCodegenTest")
+    }
+    useJUnitPlatform()
+}
