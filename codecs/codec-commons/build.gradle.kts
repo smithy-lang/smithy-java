@@ -16,6 +16,8 @@ extra["moduleName"] = "software.amazon.smithy.java.codecs.commons"
 
 dependencies {
     api(libs.smithy.utils)
+    implementation(project(":core"))
+    implementation(libs.asm)
     compileOnly(libs.fastdoubleparser)
     testRuntimeOnly(libs.fastdoubleparser)
 }
@@ -28,12 +30,20 @@ tasks {
         dependencies {
             include(
                 dependency(
+                    libs.asm
+                        .get()
+                        .toString(),
+                ),
+            )
+            include(
+                dependency(
                     libs.fastdoubleparser
                         .get()
                         .toString(),
                 ),
             )
         }
+        relocate("org.objectweb.asm", "software.amazon.smithy.java.codecs.commons.internal.shaded.org.objectweb.asm")
         relocate("ch.randelshofer", "software.amazon.smithy.java.codecs.commons.internal.shaded.ch.randelshofer")
     }
     jar {

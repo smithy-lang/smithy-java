@@ -29,6 +29,7 @@ jspecify = "1.0.1"
 commonmark = "0.29.0"
 jsoup = "1.23.1"
 aws-api-models = "1.0.286"
+asm = "9.7.1"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -62,6 +63,7 @@ opentelemetry-test-api = {module = "io.opentelemetry:opentelemetry-sdk-testing",
 
 jackson-core = {module = "tools.jackson.core:jackson-core", version.ref = "jackson"}
 fastdoubleparser = {module = "ch.randelshofer:fastdoubleparser", version.ref = "fastdoubleparser"}
+asm = {module = "org.ow2.asm:asm", version.ref = "asm"}
 
 netty-all = {module = "io.netty:netty-all", version.ref = "netty"}
 
