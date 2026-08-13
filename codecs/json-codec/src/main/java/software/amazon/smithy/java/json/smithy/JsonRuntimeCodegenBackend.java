@@ -288,13 +288,13 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 method.visitMethodInsn(
                         INVOKEVIRTUAL,
                         READER,
-                        "generatedReadStringHash",
+                        "generatedReadStringKey",
                         "()I",
                         false);
                 method.visitVarInsn(ISTORE, 2);
                 Map<Integer, List<EnumConstant>> groups = new LinkedHashMap<>();
                 for (EnumConstant constant : constants) {
-                    groups.computeIfAbsent(constant.value().hashCode(), ignored -> new ArrayList<>())
+                    groups.computeIfAbsent(enumSwitchKey(constant.value()), ignored -> new ArrayList<>())
                             .add(constant);
                 }
                 List<Integer> hashes = groups.keySet().stream().sorted().toList();
@@ -392,6 +392,17 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                         "(Ljava/lang/Object;)Z",
                         false);
             }
+        }
+
+        /**
+         * Computes the switch key {@code SmithyJsonDeserializer#generatedReadStringKey} will
+         * produce for an enum wire value. Collisions are allowed: each arm re-verifies the exact
+         * bytes.
+         */
+        private static int enumSwitchKey(String value) {
+            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+            int prefix = Math.min(bytes.length, Long.BYTES);
+            return SmithyJsonDeserializer.stringKey(packLittleEndian(bytes, 0, prefix), bytes.length);
         }
 
         private record EnumConstant(Field field, String value) {}

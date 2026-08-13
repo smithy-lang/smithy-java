@@ -1175,33 +1175,117 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         return hash;
     }
 
-    int generatedReadStringHash() {
-        if (pos >= end || buf[pos] != '"') {
+    /**
+     * Reads a string value and returns a switch key over its first eight content bytes and its
+     * length.
+     *
+     * <p>The key only selects a switch arm; every arm re-verifies the exact bytes through
+     * {@link #generatedStringEquals8} or {@link #generatedStringEquals16}. Key collisions are
+     * therefore benign — they cost an extra word compare — which lets the scan stay
+     * word-at-a-time instead of folding each byte into a serial hash chain.
+     */
+    int generatedReadStringKey() {
+        int p = pos;
+        if (p >= end || buf[p] != '"') {
             throw new SerializationException(
-                    "Expected string, found: " + JsonReadUtils.describePos(buf, pos, end));
+                    "Expected string, found: " + JsonReadUtils.describePos(buf, p, end));
         }
-        int start = ++pos;
-        int hash = 0;
-        while (pos < end && buf[pos] != '"') {
-            byte value = buf[pos];
-            if (value == '\\' || value < 0 || (value & 0xff) < 0x20) {
-                JsonReadUtils.parseString(buf, start - 1, end, this);
-                generatedFieldName = parsedString;
-                generatedFieldStart = -1;
-                generatedFieldEnd = -1;
-                pos = parsedEndPos;
-                return generatedFieldName.hashCode();
+        int start = ++p;
+        if (p <= end - Long.BYTES) {
+            long word = JsonReadUtils.readLongLittleEndian(buf, p);
+            long stopMask = JsonReadUtils.stringStopMask(word);
+            if (stopMask != 0) {
+                // The stop lane is within this word, so the length fits in three bits and the
+                // already-loaded word masked to that length is exactly the key bytes.
+                int length = Long.numberOfTrailingZeros(stopMask) >>> 3;
+                int stop = p + length;
+                if (buf[stop] != '"') {
+                    return generatedStringKeySlow(start - 1);
+                }
+                generatedFieldStart = start;
+                generatedFieldEnd = stop;
+                generatedFieldName = null;
+                pos = stop + 1;
+                return stringKey(word & ((1L << (length << 3)) - 1), length);
             }
-            hash = 31 * hash + value;
-            pos++;
+            p += Long.BYTES;
         }
-        if (pos >= end) {
-            throw new SerializationException("Unterminated string");
+        return generatedReadStringKeyLong(start, p);
+    }
+
+    /** Handles values of eight bytes or more, and values that run into the last eight bytes. */
+    private int generatedReadStringKeyLong(int start, int scan) {
+        int p = scan;
+        while (p <= end - Long.BYTES) {
+            long stopMask = JsonReadUtils.stringStopMask(JsonReadUtils.readLongLittleEndian(buf, p));
+            if (stopMask == 0) {
+                p += Long.BYTES;
+                continue;
+            }
+            int stop = p + (Long.numberOfTrailingZeros(stopMask) >>> 3);
+            if (buf[stop] != '"') {
+                return generatedStringKeySlow(start - 1);
+            }
+            return generatedStringKeyFound(start, stop);
         }
+        while (p < end) {
+            byte value = buf[p];
+            if (value == '"') {
+                return generatedStringKeyFound(start, p);
+            }
+            if (value == '\\' || value < 0 || (value & 0xff) < 0x20) {
+                return generatedStringKeySlow(start - 1);
+            }
+            p++;
+        }
+        throw new SerializationException("Unterminated string");
+    }
+
+    private int generatedStringKeyFound(int start, int stop) {
         generatedFieldStart = start;
-        generatedFieldEnd = pos++;
+        generatedFieldEnd = stop;
         generatedFieldName = null;
-        return hash;
+        pos = stop + 1;
+        int length = stop - start;
+        long word;
+        if (length >= Long.BYTES) {
+            // A value this long always leaves eight readable bytes at its start.
+            word = JsonReadUtils.readLongLittleEndian(buf, start);
+        } else {
+            word = start <= end - Long.BYTES
+                    ? JsonReadUtils.readLongLittleEndian(buf, start) & ((1L << (length << 3)) - 1)
+                    : readPackedToken(start, length);
+        }
+        return stringKey(word, length);
+    }
+
+    /**
+     * Escaped or non-ASCII values decode first, then key off the decoded UTF-8 bytes so that an
+     * escaped spelling still dispatches to the arm its literal spelling would reach.
+     */
+    private int generatedStringKeySlow(int quotePos) {
+        JsonReadUtils.parseString(buf, quotePos, end, this);
+        generatedFieldName = parsedString;
+        generatedFieldStart = -1;
+        generatedFieldEnd = -1;
+        pos = parsedEndPos;
+        byte[] decoded = generatedFieldName.getBytes(StandardCharsets.UTF_8);
+        int prefix = Math.min(decoded.length, Long.BYTES);
+        long word = 0;
+        for (int i = 0; i < prefix; i++) {
+            word |= (long) (decoded[i] & 0xFF) << (i << 3);
+        }
+        return stringKey(word, decoded.length);
+    }
+
+    /**
+     * Mixes a little-endian packed byte prefix and a length into a switch key.
+     *
+     * <p>The runtime codegen backend calls this at emit time to compute the switch keys, so both
+     * sides must derive them here.
+     */
+    static int stringKey(long packedPrefix, int length) {
+        return (int) ((packedPrefix * 0x9E3779B97F4A7C15L) >>> 32) ^ length;
     }
 
     boolean generatedTryReadField(byte[] token) {

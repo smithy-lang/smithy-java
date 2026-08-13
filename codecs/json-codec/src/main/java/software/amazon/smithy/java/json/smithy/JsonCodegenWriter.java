@@ -99,8 +99,7 @@ final class JsonCodegenWriter {
     void field(byte[] token) {
         separator();
         ensure(token.length);
-        System.arraycopy(token, 0, bytes, position, token.length);
-        position += token.length;
+        position = copyToken(token, position);
     }
 
     void field(byte[] token, int index) {
@@ -108,18 +107,65 @@ final class JsonCodegenWriter {
         if (index != 0) {
             bytes[position++] = ',';
         }
-        System.arraycopy(token, 0, bytes, position, token.length);
-        position += token.length;
+        position = copyToken(token, position);
+    }
+
+    /**
+     * Copies a precomputed {@code "name":} token, returning the new position.
+     *
+     * <p>Tokens are almost always short, and {@link System#arraycopy} for a dozen bytes goes
+     * out of line to a stub. One or two word stores replace that; the two-word case overlaps
+     * rather than padding, so nothing past the token is touched. The caller must already have
+     * reserved {@code token.length} bytes.
+     */
+    private int copyToken(byte[] token, int pos) {
+        int length = token.length;
+        if (length <= Long.BYTES * 2) {
+            if (length >= Long.BYTES) {
+                int tail = length - Long.BYTES;
+                JsonReadUtils.writeLongLittleEndian(bytes, pos, JsonReadUtils.readLongLittleEndian(token, 0));
+                JsonReadUtils.writeLongLittleEndian(
+                        bytes,
+                        pos + tail,
+                        JsonReadUtils.readLongLittleEndian(token, tail));
+                return pos + length;
+            }
+            if (length >= Integer.BYTES) {
+                int tail = length - Integer.BYTES;
+                JsonReadUtils.writeIntLittleEndian(bytes, pos, JsonReadUtils.readIntLittleEndian(token, 0));
+                JsonReadUtils.writeIntLittleEndian(
+                        bytes,
+                        pos + tail,
+                        JsonReadUtils.readIntLittleEndian(token, tail));
+                return pos + length;
+            }
+        }
+        System.arraycopy(token, 0, bytes, pos, length);
+        return pos + length;
     }
 
     void fieldString(byte[] token, int index, String value) {
-        ensure(token.length + JsonWriteUtils.maxQuotedStringBytes(value) + 1);
+        byte[] latin1 = CompactStringAccess.latin1Bytes(value);
+        // Reserve the exact encoded size for the overwhelmingly common unescaped-ASCII case,
+        // and widen to the worst case only once that attempt is rejected. The 6x worst-case
+        // reservation is what drives buffer growth on large payloads.
+        ensure(token.length + 1
+                + (latin1 != null
+                        ? latin1.length + 2
+                        : JsonWriteUtils.maxQuotedStringBytes(value)));
         if (index != 0) {
             bytes[position++] = ',';
         }
-        System.arraycopy(token, 0, bytes, position, token.length);
-        position += token.length;
-        position = JsonWriteUtils.writeQuotedString(bytes, position, value);
+        position = copyToken(token, position);
+        if (latin1 != null) {
+            int next = JsonWriteUtils.writeQuotedAscii(bytes, position, latin1);
+            if (next >= 0) {
+                position = next;
+                return;
+            }
+            ensure(JsonWriteUtils.maxQuotedStringBytes(value));
+        }
+        position = JsonWriteUtils.writeQuotedStringGeneral(bytes, position, value);
     }
 
     void element() {
@@ -216,8 +262,17 @@ final class JsonCodegenWriter {
     }
 
     void writeString(String value) {
+        byte[] latin1 = CompactStringAccess.latin1Bytes(value);
+        if (latin1 != null) {
+            ensure(latin1.length + 2);
+            int next = JsonWriteUtils.writeQuotedAscii(bytes, position, latin1);
+            if (next >= 0) {
+                position = next;
+                return;
+            }
+        }
         ensure(JsonWriteUtils.maxQuotedStringBytes(value));
-        position = JsonWriteUtils.writeQuotedString(bytes, position, value);
+        position = JsonWriteUtils.writeQuotedStringGeneral(bytes, position, value);
     }
 
     void writeBlob(ByteBuffer value) {

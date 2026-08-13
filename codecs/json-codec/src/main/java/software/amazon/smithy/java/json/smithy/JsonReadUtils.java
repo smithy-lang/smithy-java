@@ -32,12 +32,26 @@ final class JsonReadUtils {
     // VarHandle for reading 8 bytes at a time from byte arrays (SWAR technique)
     private static final VarHandle LONG_HANDLE =
             MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
+    private static final VarHandle INT_HANDLE =
+            MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
     private static final long ASCII_ZEROES = 0x3030303030303030L;
     private static final long ASCII_NINES = 0x3939393939393939L;
     private static final long ASCII_HIGH_BITS = 0x8080808080808080L;
 
     static long readLongLittleEndian(byte[] buf, int pos) {
         return (long) LONG_HANDLE.get(buf, pos);
+    }
+
+    static void writeLongLittleEndian(byte[] buf, int pos, long value) {
+        LONG_HANDLE.set(buf, pos, value);
+    }
+
+    static int readIntLittleEndian(byte[] buf, int pos) {
+        return (int) INT_HANDLE.get(buf, pos);
+    }
+
+    static void writeIntLittleEndian(byte[] buf, int pos, int value) {
+        INT_HANDLE.set(buf, pos, value);
     }
 
     static long tryParseTenDigitEpochSecond(byte[] buf, int pos, int end) {
@@ -346,6 +360,13 @@ final class JsonReadUtils {
         long quoteOrControl = (word ^ 0x0202020202020202L) - 0x2121212121212121L;
         long backslash = (word ^ 0x5C5C5C5C5C5C5C5CL) - 0x0101010101010101L;
         return (quoteOrControl | backslash | word) & 0x8080808080808080L;
+    }
+
+    /** Four-lane form of {@link #stringStopMask}, for strings too short for a full word. */
+    static int stringStopMask(int word) {
+        int quoteOrControl = (word ^ 0x02020202) - 0x21212121;
+        int backslash = (word ^ 0x5C5C5C5C) - 0x01010101;
+        return (quoteOrControl | backslash | word) & 0x80808080;
     }
 
     private static void parseStringWithEscapes(

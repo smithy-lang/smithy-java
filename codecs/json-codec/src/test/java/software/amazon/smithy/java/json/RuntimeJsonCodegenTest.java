@@ -35,6 +35,7 @@ import software.amazon.smithy.java.json.bench.model.RecursiveStruct;
 import software.amazon.smithy.java.json.bench.model.SimpleStruct;
 import software.amazon.smithy.java.json.bench.model.StringStruct;
 import software.amazon.smithy.java.json.bench.model.TimestampStruct;
+import software.amazon.smithy.java.json.bench.model.WireLengthEnum;
 import software.amazon.smithy.java.json.smithy.SmithyGeneratedJsonSerde;
 
 final class RuntimeJsonCodegenTest {
@@ -259,6 +260,83 @@ final class RuntimeJsonCodegenTest {
                 .getBytes(StandardCharsets.UTF_8);
         assertThat(serde.deserialize(unknown, ComplexStruct.builder(), SETTINGS).getColor().getValue())
                 .isEqualTo("PURPLE");
+    }
+
+    /**
+     * The generated enum reader dispatches on a packed 8-byte prefix plus length, then verifies
+     * the exact bytes per arm. This covers every branch of that scan: values inside one word,
+     * exactly one word, spanning two words, longer than two words, values sharing an 8-byte
+     * prefix (so the length must disambiguate), and values needing escapes or non-ASCII bytes.
+     */
+    @Test
+    void readsEveryEnumWireLengthBranch() {
+        var serde = new SmithyGeneratedJsonSerde();
+        var nested = NestedStruct.builder().field1("nested").field2(2).build();
+        List<WireLengthEnum> all = List.of(
+                WireLengthEnum.ONE,
+                WireLengthEnum.SEVEN,
+                WireLengthEnum.EIGHT,
+                WireLengthEnum.NINE,
+                WireLengthEnum.SIXTEEN,
+                WireLengthEnum.SEVENTEEN,
+                WireLengthEnum.LONG,
+                WireLengthEnum.SHARED_PREFIX_EIGHT,
+                WireLengthEnum.SHARED_PREFIX_NINE,
+                WireLengthEnum.SHARED_PREFIX_LONG,
+                WireLengthEnum.QUOTE,
+                WireLengthEnum.BACKSLASH,
+                WireLengthEnum.NON_ASCII_SHORT,
+                WireLengthEnum.NON_ASCII);
+
+        // Each value as the sole scalar member, and all of them together in a list, so the
+        // reader is entered both at a struct field and at a list element.
+        for (WireLengthEnum value : all) {
+            var single = ComplexStruct.builder()
+                    .id("id")
+                    .count(1)
+                    .nested(nested)
+                    .wireLength(value)
+                    .build();
+            assertRoundTrip(serde, single, ComplexStruct.builder());
+        }
+        var batch = ComplexStruct.builder()
+                .id("id")
+                .count(1)
+                .nested(nested)
+                .wireLengthList(all)
+                .build();
+        assertRoundTrip(serde, batch, ComplexStruct.builder());
+
+        // Values that would collide on a truncated key must not be confused for one another.
+        for (WireLengthEnum value : all) {
+            byte[] payload = ("{\"id\":\"id\",\"count\":1,\"nested\":{\"field1\":\"n\",\"field2\":2},"
+                    + "\"wireLength\":" + quoteJson(value.getValue()) + "}")
+                    .getBytes(StandardCharsets.UTF_8);
+            assertThat(serde.deserialize(payload, ComplexStruct.builder(), SETTINGS).getWireLength())
+                    .isSameAs(value);
+        }
+
+        // An unknown value whose prefix and length match a known arm still reads as unknown.
+        byte[] unknown = ("{\"id\":\"id\",\"count\":1,\"nested\":{\"field1\":\"n\",\"field2\":2},"
+                + "\"wireLength\":\"abcdefgy\"}").getBytes(StandardCharsets.UTF_8);
+        assertThat(serde.deserialize(unknown, ComplexStruct.builder(), SETTINGS).getWireLength().getValue())
+                .isEqualTo("abcdefgy");
+
+        assertThat(serde.diagnostics(SETTINGS).failures()).isZero();
+    }
+
+    /** Escapes a value the way a JSON writer would, so the reader sees a valid literal. */
+    private static String quoteJson(String value) {
+        StringBuilder sb = new StringBuilder(value.length() + 2).append('"');
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                default -> sb.append(c);
+            }
+        }
+        return sb.append('"').toString();
     }
 
     @Test

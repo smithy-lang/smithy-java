@@ -74,6 +74,10 @@ structure ComplexStruct {
 
     colorList: ColorList
 
+    wireLength: WireLengthEnum
+
+    wireLengthList: WireLengthEnumList
+
     sparseStrings: SparseStringList
 
     sparseMap: SparseStringMap
@@ -111,6 +115,30 @@ enum Color {
     GREEN
     BLUE
     YELLOW
+}
+
+/// Exercises every wire-length branch of the generated enum reader: values shorter than one
+/// 8-byte word, exactly one word, spanning two words, and longer than two words. Also covers
+/// values needing JSON escapes and non-ASCII bytes, which take the decode-first path.
+enum WireLengthEnum {
+    ONE = "a"
+    SEVEN = "abcdefg"
+    EIGHT = "abcdefgh"
+    NINE = "abcdefghi"
+    SIXTEEN = "abcdefghijklmnop"
+    SEVENTEEN = "abcdefghijklmnopq"
+    LONG = "abcdefghijklmnopqrstuvwxyz0123456789"
+    SHARED_PREFIX_EIGHT = "abcdefgx"
+    SHARED_PREFIX_NINE = "abcdefghx"
+    SHARED_PREFIX_LONG = "abcdefghijklmnopqx"
+    QUOTE = "a\"b"
+    BACKSLASH = "a\\b"
+    NON_ASCII_SHORT = "ü"
+    NON_ASCII = "café-ünïcøde"
+}
+
+list WireLengthEnumList {
+    member: WireLengthEnum
 }
 
 list StringList {

@@ -72,19 +72,50 @@ final class JsonWriteUtils {
     }
 
     /**
-     * Writes a JSON quoted string. Returns new position.
+     * Writes {@code latin1} as a quoted JSON string, returning the new position, or -1 when any
+     * byte needs escaping and the caller must fall back to {@link #writeQuotedString}.
+     *
+     * <p>Needs only {@code latin1.length + 2} bytes of room at {@code pos} — the exact encoded
+     * size — rather than the {@link #maxQuotedStringBytes} worst case. Bytes within that region
+     * may be written before -1 is returned, so the caller must treat it as scratch and leave
+     * its own write position unchanged until this returns a position.
      */
-    @SuppressWarnings("deprecation")
+    static int writeQuotedAscii(byte[] buf, int pos, byte[] latin1) {
+        int copied = copyJsonAscii(latin1, buf, pos + 1);
+        if (copied < 0) {
+            return -1;
+        }
+        buf[pos] = '"';
+        int endQuote = pos + 1 + copied;
+        buf[endQuote] = '"';
+        return endQuote + 1;
+    }
+
+    /**
+     * Writes a JSON quoted string. Returns new position.
+     *
+     * <p>Callers that can widen their capacity reservation on demand should try
+     * {@link #writeQuotedAscii} first and reserve the worst case only on rejection.
+     */
     static int writeQuotedString(byte[] buf, int pos, String value) {
         byte[] latin1 = CompactStringAccess.latin1Bytes(value);
-        if (latin1 != null && isJsonAscii(latin1)) {
-            buf[pos++] = '"';
-            System.arraycopy(latin1, 0, buf, pos, latin1.length);
-            pos += latin1.length;
-            buf[pos++] = '"';
-            return pos;
+        if (latin1 != null) {
+            int next = writeQuotedAscii(buf, pos, latin1);
+            if (next >= 0) {
+                return next;
+            }
+            // Partially written bytes are discarded: the general path rewrites from pos.
         }
+        return writeQuotedStringGeneral(buf, pos, value);
+    }
 
+    /**
+     * Writes a JSON quoted string without first attempting the unescaped-ASCII fast path.
+     *
+     * <p>Requires {@link #maxQuotedStringBytes} of room. Callers that have already had
+     * {@link #writeQuotedAscii} reject the value come straight here so the scan is not repeated.
+     */
+    static int writeQuotedStringGeneral(byte[] buf, int pos, String value) {
         int len = value.length();
         buf[pos++] = '"';
 
@@ -116,23 +147,108 @@ final class JsonWriteUtils {
         return pos;
     }
 
-    private static boolean isJsonAscii(byte[] value) {
+    /**
+     * Copies Latin-1 bytes that need no JSON escaping to {@code buf} at {@code pos}, returning the
+     * number of bytes written, or -1 if any byte needs escaping or is non-ASCII.
+     *
+     * <p>Validation and copying share one word-at-a-time pass, so each byte is loaded once
+     * instead of once to scan and again to {@code arraycopy}. Bytes may be written before a
+     * rejection is discovered; the caller treats the region as scratch and rewrites it.
+     *
+     * <p>Strings of eight bytes or more finish with a word overlapping the previous one rather
+     * than a byte-at-a-time tail — re-copying a few bytes is cheaper than the branchy loop.
+     */
+    private static int copyJsonAscii(byte[] value, byte[] buf, int pos) {
         int length = value.length;
-        int index = 0;
-        int wordLimit = length - Long.BYTES;
-        while (index <= wordLimit) {
-            if (JsonReadUtils.stringStopMask(JsonReadUtils.readLongLittleEndian(value, index)) != 0) {
-                return false;
+        if (length < Long.BYTES) {
+            if (length >= Integer.BYTES) {
+                // Two overlapping 4-byte words cover lengths 4-7 without a byte loop, and
+                // without touching a byte past the string.
+                int tail = length - Integer.BYTES;
+                int head = JsonReadUtils.readIntLittleEndian(value, 0);
+                int last = JsonReadUtils.readIntLittleEndian(value, tail);
+                if ((JsonReadUtils.stringStopMask(head) | JsonReadUtils.stringStopMask(last)) != 0) {
+                    return -1;
+                }
+                JsonReadUtils.writeIntLittleEndian(buf, pos, head);
+                JsonReadUtils.writeIntLittleEndian(buf, pos + tail, last);
+                return length;
             }
+            for (int index = 0; index < length; index++) {
+                int current = value[index] & 0xff;
+                if (current < 0x20 || current >= 0x80 || current == '"' || current == '\\') {
+                    return -1;
+                }
+                buf[pos + index] = (byte) current;
+            }
+            return length;
+        }
+        int tail = length - Long.BYTES;
+        long head = JsonReadUtils.readLongLittleEndian(value, 0);
+        long last = JsonReadUtils.readLongLittleEndian(value, tail);
+        if (length <= Long.BYTES * 2) {
+            // Two overlapping words cover 8-16 bytes with no loop, so both loads issue in
+            // parallel and one OR validates the whole string.
+            if ((JsonReadUtils.stringStopMask(head) | JsonReadUtils.stringStopMask(last)) != 0) {
+                return -1;
+            }
+            JsonReadUtils.writeLongLittleEndian(buf, pos, head);
+            JsonReadUtils.writeLongLittleEndian(buf, pos + tail, last);
+            return length;
+        }
+        long middle = JsonReadUtils.readLongLittleEndian(value, Long.BYTES);
+        if (length <= Long.BYTES * 3) {
+            // Three overlapping windows cover 17-24 bytes: the third starts no later than
+            // byte 16, so together they are contiguous.
+            if ((JsonReadUtils.stringStopMask(head)
+                    | JsonReadUtils.stringStopMask(middle)
+                    | JsonReadUtils.stringStopMask(last)) != 0) {
+                return -1;
+            }
+            JsonReadUtils.writeLongLittleEndian(buf, pos, head);
+            JsonReadUtils.writeLongLittleEndian(buf, pos + Long.BYTES, middle);
+            JsonReadUtils.writeLongLittleEndian(buf, pos + tail, last);
+            return length;
+        }
+        return copyJsonAsciiLoop(value, buf, pos, length, tail, head, last);
+    }
+
+    /**
+     * Copies strings longer than three words, where the count is not known at compile time.
+     *
+     * <p>Kept out of {@link #copyJsonAscii} so the fixed-size tiers above stay small enough for
+     * C2 to inline at every generated call site. Inlining this loop alongside them made large
+     * serialization bimodal across forks, alternating between roughly 16,700 and 20,400 ns.
+     */
+    private static int copyJsonAsciiLoop(
+            byte[] value,
+            byte[] buf,
+            int pos,
+            int length,
+            int tail,
+            long head,
+            long last
+    ) {
+        long middle = JsonReadUtils.readLongLittleEndian(value, Long.BYTES);
+        if ((JsonReadUtils.stringStopMask(head) | JsonReadUtils.stringStopMask(middle)) != 0) {
+            return -1;
+        }
+        JsonReadUtils.writeLongLittleEndian(buf, pos, head);
+        JsonReadUtils.writeLongLittleEndian(buf, pos + Long.BYTES, middle);
+        int index = Long.BYTES * 2;
+        while (index < tail) {
+            long word = JsonReadUtils.readLongLittleEndian(value, index);
+            if (JsonReadUtils.stringStopMask(word) != 0) {
+                return -1;
+            }
+            JsonReadUtils.writeLongLittleEndian(buf, pos + index, word);
             index += Long.BYTES;
         }
-        while (index < length) {
-            int current = value[index++] & 0xff;
-            if (current < 0x20 || current >= 0x80 || current == '"' || current == '\\') {
-                return false;
-            }
+        if (JsonReadUtils.stringStopMask(last) != 0) {
+            return -1;
         }
-        return true;
+        JsonReadUtils.writeLongLittleEndian(buf, pos + tail, last);
+        return length;
     }
 
     private static int writeStringSlowPath(byte[] buf, int pos, String value, int startIdx, int len) {
