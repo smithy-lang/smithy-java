@@ -19,6 +19,10 @@ The feature does not add a public API and is not selected by default.
 - Generated model getters, builder setters, schema fields, and builder factory
   methods are public. A schema graph that does not expose compatible accessors
   is unsupported and uses the generic codec.
+- Generated union Java types can be sealed interfaces even when protocol
+  projection schemas report them as structures. Planning recognizes the Java
+  representation and normalizes acronym member names such as `S`, `NS`, and
+  `NULL` to their generated record accessors and builder setters.
 - Schema objects and generated model classes are immutable after publication.
 - Protocol settings that affect wire behavior are part of cache identity.
 - Event stream framing remains outside generated payload codecs. Event payloads
@@ -137,9 +141,10 @@ and writer primitives.
 ## Current Implementation
 
 The JSON backend lowers direct structure getters and builder setters,
-structures, generated unions, lists, maps, scalar primitives, blobs, string
-enums, timestamps, documents, sparse aggregates, borrowed output, detached
-output, full-model input, and an allocation-free validation/token-sink entry.
+structures, generated sealed-interface unions, lists, maps, scalar primitives,
+blobs, string enums, timestamps, documents, sparse aggregates, borrowed
+output, detached output, full-model input, and an allocation-free
+validation/token-sink entry.
 Field names and encoded field tokens are class constants. Writers split at
 eight members and wide reader dispatch splits into bounded hash helpers.
 
@@ -155,29 +160,47 @@ the existing codec.
 ## Short Performance Screen
 
 The short screen ran on JDK 26.0.1, G1, fixed 1 GiB heap,
-`AlwaysPreTouch`, one JMH thread, and CPU 2. It used one 1-second warmup and
-two 3-second average-time measurements, so it is directional rather than an
-adoption result.
+`AlwaysPreTouch`, one JMH thread, and CPU 2. It used two 2-second warmups and
+three 3-second average-time measurements, so it is directional rather than an
+adoption result. Every generated case executed a published generated class;
+setup failures abort the benchmark.
 
 | Workload | Surface | Generic ns/op | Generated ns/op | Change |
 | --- | --- | ---: | ---: | ---: |
-| GetItem M | codec deserialize | 5,101 | 5,318 | -4.3% |
-| GetItem L | codec deserialize | 39,532 | 36,105 | +8.7% |
-| GetItem M | protocol deserialize | 5,179 | 4,919 | +5.0% |
-| GetItem L | protocol deserialize | 38,524 | 36,489 | +5.3% |
-| PutItem mixed M | codec serialize | 4,004 | 4,023 | -0.5% |
-| PutItem mixed M | protocol serialize | 4,495 | 3,984 | +11.4% |
+| GetItem M | codec deserialize | 4,984 | 4,366 | +12.4% |
+| GetItem L | codec deserialize | 35,556 | 35,340 | +0.6% |
+| GetItem M | protocol deserialize | 5,036 | 4,408 | +12.5% |
+| GetItem L | protocol deserialize | 34,710 | 35,906 | -3.4% |
+| PutItem mixed M | codec serialize | 3,718 | 3,977 | -6.9% |
+| PutItem mixed M | protocol serialize | 3,925 | 4,462 | -13.7% |
 
-After publication-cache correction, allocation was identical within rounding
-for every pair. Results are in
-`build/perf-study/runtime-codegen-production/short-screen-hot-cache.json`.
-The earlier screen, which exposed the per-operation registry regression, is
-retained beside it.
+Generated deserialization allocated 1,248 B/op more for GetItem M and
+7,527 B/op more for GetItem L. PutItem allocated 64 B/op more codec-only and
+64 B/op less end to end. Results are in
+`build/perf-study/runtime-codegen-production/final-short-screen-generated.json`.
 
-These results pass the 5% end-to-end threshold on the three measured cases but
-do not pass the codec-only 10% threshold. GetItem M also exceeds the 2%
-regression limit. No production-to-monolithic A/B/A comparison has been run,
-so the framework extraction contract is not established.
+The earlier `short-screen-hot-cache.json` result is invalid for generated
+performance comparison. DynamoDB `AttributeValue` was represented as a sealed
+interface behind a structure schema, planning rejected it, and the benchmark
+measured cached generic fallback. That screen remains useful only as a record
+of the publication-cache investigation.
+
+The valid screen passes the codec and end-to-end thresholds only for GetItem M.
+It fails the multiple-workload requirement and exceeds the 2% regression limit
+on GetItem L protocol deserialization and both PutItem surfaces. No
+production-to-monolithic A/B/A comparison has been run, so the framework
+extraction contract is also not established.
+
+## Resource Screen
+
+A cold GetItem L generation produced one 14,780-byte hidden class in 36.7 ms.
+This is below the study's 193-590 ms runtime-`javac` range but is one root, not
+a distribution. The valid JMH screen above records steady-state allocation.
+
+Production metaspace, post-JIT code-cache size, compiler inlining logs, and
+unloading after eviction have not been measured. The study ranges
+(89-545 KiB generation metaspace and 339 KiB-1.78 MiB post-JIT code cache)
+must not be treated as measurements of this ASM implementation.
 
 ## Deferred Validation
 
@@ -197,9 +220,14 @@ taskset -c 2 java -Xms1g -Xmx1g -XX:+UseG1GC -XX:+AlwaysPreTouch \
 Run the monolithic study command from `JSON_PERFORMANCE_STUDY.md` on commit
 `c74efb0c2` in a separate worktree, never concurrently with this screen.
 
-## Adoption
+## Adoption Decision
 
-Keep the implementation experimental unless all of these hold:
+Reject adoption of the current generated JSON backend. Keep it disabled by
+default and continue only as an internal experiment while the allocation and
+large/serialization regressions are investigated. Do not enable the AWS JSON
+integration flag in production.
+
+Reconsider only after all of these hold:
 
 - at least 10% codec-only improvement on multiple medium/large workloads;
 - at least 5% AWS JSON end-to-end improvement on multiple workloads;

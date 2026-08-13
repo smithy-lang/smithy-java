@@ -10,6 +10,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Locale;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -59,6 +60,7 @@ public record RuntimeCodecPlan(
         }
 
         Class<?> shapeClass = requireShapeClass(schema);
+        boolean union = type == ShapeType.UNION || (shapeClass.isInterface() && shapeClass.isSealed());
         ShapeBuilder<?> builder = schema.shapeBuilder();
         if (builder == null) {
             throw new UnsupportedSchemaException("No builder for " + schema.id());
@@ -69,11 +71,14 @@ public record RuntimeCodecPlan(
         int estimate = 24;
         for (Schema member : schema.members()) {
             Schema target = member.memberTarget();
-            Method getter = type == ShapeType.UNION ? null : resolveGetter(shapeClass, member);
-            Method presence = type == ShapeType.UNION ? null : resolvePresence(shapeClass, member);
-            Method setter = resolveSetter(builderClass, member);
-            Class<?> unionVariant = type == ShapeType.UNION ? resolveUnionVariant(shapeClass, member) : null;
+            Method getter = union ? null : resolveGetter(shapeClass, member);
+            Method presence = union ? null : resolvePresence(shapeClass, member);
+            Class<?> unionVariant = union ? resolveUnionVariant(shapeClass, member) : null;
             Method unionAccessor = unionVariant == null ? null : resolveUnionAccessor(unionVariant, member);
+            Method setter = resolveSetter(
+                    builderClass,
+                    member,
+                    unionAccessor == null ? null : unionAccessor.getName());
             String jsonName = member.hasTrait(TraitKey.JSON_NAME_TRAIT)
                     ? member.expectTrait(TraitKey.JSON_NAME_TRAIT).getValue()
                     : null;
@@ -100,7 +105,7 @@ public record RuntimeCodecPlan(
                 shapeClass,
                 builderClass,
                 builderFactory,
-                type == ShapeType.UNION,
+                union,
                 members,
                 estimate,
                 writerChunks,
@@ -200,15 +205,13 @@ public record RuntimeCodecPlan(
     }
 
     private static Class<?> resolveUnionVariant(Class<?> shapeClass, Schema member) {
-        String accessor = toJavaName(member.memberName());
+        String normalized = normalizeName(member.memberName());
         for (Class<?> candidate : shapeClass.getPermittedSubclasses()) {
-            if (!candidate.isRecord()) {
+            if (!candidate.isRecord() || candidate.getRecordComponents().length != 1) {
                 continue;
             }
-            for (var component : candidate.getRecordComponents()) {
-                if (component.getName().equals(accessor)) {
-                    return candidate;
-                }
+            if (normalizeName(candidate.getRecordComponents()[0].getName()).equals(normalized)) {
+                return candidate;
             }
         }
         throw new UnsupportedSchemaException(
@@ -216,16 +219,15 @@ public record RuntimeCodecPlan(
     }
 
     private static Method resolveUnionAccessor(Class<?> variant, Schema member) {
-        try {
-            return variant.getMethod(toJavaName(member.memberName()));
-        } catch (NoSuchMethodException e) {
-            throw new UnsupportedSchemaException(
-                    "No union accessor for " + member.id() + " on " + variant.getName());
+        if (variant.getRecordComponents().length == 1) {
+            return variant.getRecordComponents()[0].getAccessor();
         }
+        throw new UnsupportedSchemaException(
+                "No union accessor for " + member.id() + " on " + variant.getName());
     }
 
-    private static Method resolveSetter(Class<?> builderClass, Schema member) {
-        String expected = toJavaName(member.memberName());
+    private static Method resolveSetter(Class<?> builderClass, Schema member, String unionAccessor) {
+        String expected = unionAccessor == null ? toJavaName(member.memberName()) : unionAccessor;
         for (Method method : builderClass.getMethods()) {
             if (method.getName().equals(expected)
                     && method.getParameterCount() == 1
@@ -238,6 +240,19 @@ public record RuntimeCodecPlan(
     }
 
     private static String toJavaName(String value) {
+        if (value.indexOf('_') < 0 && value.indexOf('-') < 0 && value.indexOf(' ') < 0) {
+            if (Character.isLowerCase(value.charAt(0))) {
+                return value;
+            }
+            int lowercaseUntil = 1;
+            while (lowercaseUntil < value.length() && Character.isUpperCase(value.charAt(lowercaseUntil))) {
+                lowercaseUntil++;
+            }
+            int stop = lowercaseUntil > 1 && lowercaseUntil < value.length()
+                    ? lowercaseUntil - 1
+                    : lowercaseUntil;
+            return value.substring(0, stop).toLowerCase(Locale.ROOT) + value.substring(stop);
+        }
         StringBuilder result = new StringBuilder(value.length());
         boolean capitalize = false;
         for (int i = 0; i < value.length(); i++) {
@@ -252,6 +267,20 @@ public record RuntimeCodecPlan(
             } else {
                 result.append(c);
             }
+        }
+        return result.toString();
+    }
+
+    private static String normalizeName(String value) {
+        StringBuilder result = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char current = value.charAt(i);
+            if (Character.isLetterOrDigit(current)) {
+                result.append(Character.toLowerCase(current));
+            }
+        }
+        if (result.toString().endsWith("member")) {
+            result.setLength(result.length() - "member".length());
         }
         return result.toString();
     }

@@ -1738,12 +1738,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
         ) {
             RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(schema);
             Method factory = nested.builderFactory();
-            method.visitMethodInsn(
-                    INVOKESTATIC,
-                    Type.getInternalName(nested.shapeClass()),
-                    factory.getName(),
-                    Type.getMethodDescriptor(factory),
-                    false);
+            invoke(method, factory);
             method.visitVarInsn(ASTORE, 6);
             method.visitVarInsn(ALOAD, 0);
             method.visitVarInsn(ALOAD, readerLocal);

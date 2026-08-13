@@ -186,6 +186,17 @@ final class RuntimeJsonCodegenTest {
         assertThat(serde.deserialize(bytes, ComplexStruct.builder(), SETTINGS)).isEqualTo(value);
     }
 
+    @Test
+    void supportsStructureEncodedSealedInterfaceUnions() {
+        var serde = new SmithyGeneratedJsonSerde();
+        var value = StructureEncodedUnionModel.Envelope.builder()
+                .attribute(new StructureEncodedUnionModel.Value.SMember("value"))
+                .build();
+
+        assertRoundTrip(serde, value, StructureEncodedUnionModel.Envelope.builder());
+        assertThat(serde.diagnostics(SETTINGS).failures()).isZero();
+    }
+
     private static <T extends SerializableShape> void assertRoundTrip(
             SmithyGeneratedJsonSerde serde,
             T value,
@@ -193,9 +204,12 @@ final class RuntimeJsonCodegenTest {
     ) {
         ByteBuffer encoded =
                 serde.serialize((SerializableStruct) value, SETTINGS);
-        assertThat(encoded).isNotNull();
+        assertThat(encoded)
+                .withFailMessage(() -> serde.diagnostics(SETTINGS).toString())
+                .isNotNull();
         byte[] bytes = new byte[encoded.remaining()];
         encoded.get(bytes);
         assertThat(serde.deserialize(bytes, builder, SETTINGS)).isEqualTo(value);
     }
+
 }
