@@ -534,6 +534,32 @@ public class JsonSerializerTest extends ProviderTestBase {
         }
     }
 
+    @Test
+    public void smithySerializerHandlesExactStringCapacityBoundary() throws Exception {
+        String value = "x".repeat(8191);
+        try (var codec = codec(SMITHY); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                serializer.writeString(PreludeSchemas.STRING, value);
+            }
+            var de = codec.createDeserializer(output.toByteArray());
+            assertThat(de.readString(PreludeSchemas.STRING), equalTo(value));
+        }
+    }
+
+    @Test
+    public void smithySerializerReservesColonAfterWidenedMapKey() throws Exception {
+        String key = "\u0000".repeat(5000);
+        Document value = Document.of(Map.of(key, Document.of("value")));
+
+        try (var codec = codec(SMITHY); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                serializer.writeDocument(PreludeSchemas.DOCUMENT, value);
+            }
+            var result = codec.createDeserializer(output.toByteArray()).readDocument();
+            assertThat(result.asStringMap().get(key).asString(), equalTo("value"));
+        }
+    }
+
     @PerProvider
     public void doubleSerializationRoundtrips(JsonSerdeProvider provider) throws Exception {
         for (double v : new double[] {0.0, 1.0, -1.0, 3.14, 1e100, Double.MIN_VALUE, Double.MAX_VALUE}) {
