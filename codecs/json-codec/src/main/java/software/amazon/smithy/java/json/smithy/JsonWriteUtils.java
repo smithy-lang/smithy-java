@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.json.smithy;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Arrays;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
 import software.amazon.smithy.java.codecs.commons.TimestampCodec;
 import software.amazon.smithy.java.io.ByteBufferUtils;
@@ -238,12 +238,9 @@ final class JsonWriteUtils {
      * Example: for field name "foo", returns bytes for {@code "foo":}
      */
     static byte[] precomputeFieldNameBytes(String fieldName) {
-        byte[] nameUtf8 = fieldName.getBytes(StandardCharsets.UTF_8);
-        byte[] result = new byte[nameUtf8.length + 3];
-        result[0] = '"';
-        System.arraycopy(nameUtf8, 0, result, 1, nameUtf8.length);
-        result[nameUtf8.length + 1] = '"';
-        result[nameUtf8.length + 2] = ':';
-        return result;
+        byte[] result = new byte[Math.max(8, fieldName.length() * 6 + 3)];
+        int position = writeQuotedString(result, 0, fieldName);
+        result[position++] = ':';
+        return Arrays.copyOf(result, position);
     }
 }

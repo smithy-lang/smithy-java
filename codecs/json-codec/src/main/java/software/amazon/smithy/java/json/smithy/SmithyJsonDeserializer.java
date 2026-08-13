@@ -204,6 +204,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public boolean readBoolean(Schema schema) {
         skipWhitespace();
+        return readBooleanValue();
+    }
+
+    boolean generatedReadBoolean() {
+        return readBooleanValue();
+    }
+
+    private boolean readBooleanValue() {
         if (pos + 4 <= end && buf[pos] == 't') {
             if (buf[pos + 1] == 'r' && buf[pos + 2] == 'u' && buf[pos + 3] == 'e') {
                 pos += 4;
@@ -225,6 +233,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public byte readByte(Schema schema) {
         skipWhitespace();
+        return readByteValue();
+    }
+
+    byte generatedReadByte() {
+        return readByteValue();
+    }
+
+    private byte readByteValue() {
         JsonReadUtils.parseLong(buf, pos, end, this);
         pos = parsedEndPos;
         if (parsedLong < Byte.MIN_VALUE || parsedLong > Byte.MAX_VALUE) {
@@ -236,6 +252,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public short readShort(Schema schema) {
         skipWhitespace();
+        return readShortValue();
+    }
+
+    short generatedReadShort() {
+        return readShortValue();
+    }
+
+    private short readShortValue() {
         JsonReadUtils.parseLong(buf, pos, end, this);
         pos = parsedEndPos;
         if (parsedLong < Short.MIN_VALUE || parsedLong > Short.MAX_VALUE) {
@@ -247,6 +271,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public int readInteger(Schema schema) {
         skipWhitespace();
+        return readIntegerValue();
+    }
+
+    int generatedReadInteger() {
+        return readIntegerValue();
+    }
+
+    private int readIntegerValue() {
         JsonReadUtils.parseLong(buf, pos, end, this);
         pos = parsedEndPos;
         if (parsedLong < Integer.MIN_VALUE || parsedLong > Integer.MAX_VALUE) {
@@ -258,6 +290,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public long readLong(Schema schema) {
         skipWhitespace();
+        return readLongValue();
+    }
+
+    long generatedReadLong() {
+        return readLongValue();
+    }
+
+    private long readLongValue() {
         JsonReadUtils.parseLong(buf, pos, end, this);
         pos = parsedEndPos;
         return parsedLong;
@@ -266,6 +306,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public float readFloat(Schema schema) {
         skipWhitespace();
+        return readFloatValue();
+    }
+
+    float generatedReadFloat() {
+        return readFloatValue();
+    }
+
+    private float readFloatValue() {
         if (pos < end && buf[pos] == '"') {
             String s = readStringValue();
             return switch (s) {
@@ -283,6 +331,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public double readDouble(Schema schema) {
         skipWhitespace();
+        return readDoubleValue();
+    }
+
+    double generatedReadDouble() {
+        return readDoubleValue();
+    }
+
+    private double readDoubleValue() {
         if (pos < end && buf[pos] == '"') {
             String s = readStringValue();
             return switch (s) {
@@ -370,6 +426,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public ByteBuffer readBlob(Schema schema) {
         skipWhitespace();
+        return readBlobValue();
+    }
+
+    ByteBuffer generatedReadBlob() {
+        return readBlobValue();
+    }
+
+    private ByteBuffer readBlobValue() {
         ByteBuffer decoded = JsonReadUtils.decodeBase64String(buf, pos, end, this);
         pos = parsedEndPos;
         return decoded;
@@ -378,19 +442,19 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public Instant readTimestamp(Schema schema) {
         var format = settings.timestampResolver().resolve(schema);
-        return readTimestamp(format);
+        skipWhitespace();
+        return readTimestampValue(format);
     }
 
     Instant generatedReadTimestamp(int format) {
-        return readTimestamp(switch (format) {
+        return readTimestampValue(switch (format) {
             case 1 -> TimestampFormatter.Prelude.DATE_TIME;
             case 2 -> TimestampFormatter.Prelude.HTTP_DATE;
             default -> TimestampFormatter.Prelude.EPOCH_SECONDS;
         });
     }
 
-    private Instant readTimestamp(TimestampFormatter format) {
-        skipWhitespace();
+    private Instant readTimestampValue(TimestampFormatter format) {
         if (format == TimestampFormatter.Prelude.EPOCH_SECONDS
                 && pos < end
                 && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
@@ -991,7 +1055,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     }
 
     boolean generatedBeginObject() {
-        skipWhitespace();
         if (pos >= end || buf[pos] != '{') {
             throw new SerializationException(
                     "Expected '{', found: " + JsonReadUtils.describePos(buf, pos, end));
@@ -1047,6 +1110,21 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         return hash;
     }
 
+    boolean generatedTryReadField(byte[] token) {
+        int start = pos;
+        int length = token.length;
+        if (start > end - length) {
+            return false;
+        }
+        for (int i = 0; i < length; i++) {
+            if (buf[start + i] != token[i]) {
+                return false;
+            }
+        }
+        pos = JsonReadUtils.skipWhitespace(buf, start + length, end);
+        return true;
+    }
+
     boolean generatedFieldEquals(byte[] expected) {
         if (generatedFieldName != null) {
             return generatedFieldName.equals(new String(expected, StandardCharsets.UTF_8));
@@ -1062,11 +1140,10 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         if (generatedFieldName != null) {
             return generatedFieldName;
         }
-        generatedFieldName = new String(
+        generatedFieldName = decodeUtf8Cached(
                 buf,
                 generatedFieldStart,
-                generatedFieldEnd - generatedFieldStart,
-                StandardCharsets.UTF_8);
+                generatedFieldEnd - generatedFieldStart);
         return generatedFieldName;
     }
 
@@ -1083,7 +1160,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     }
 
     boolean generatedBeginArray() {
-        skipWhitespace();
         if (pos >= end || buf[pos] != '[') {
             throw new SerializationException(
                     "Expected '[', found: " + JsonReadUtils.describePos(buf, pos, end));
@@ -1114,7 +1190,6 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     }
 
     boolean generatedTryReadNull() {
-        skipWhitespace();
         if (pos + 4 <= end
                 && buf[pos] == 'n'
                 && buf[pos + 1] == 'u'
@@ -1127,7 +1202,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     }
 
     String generatedReadString() {
-        return readString(null);
+        return readStringValue();
     }
 
     void generatedSkipValue() {

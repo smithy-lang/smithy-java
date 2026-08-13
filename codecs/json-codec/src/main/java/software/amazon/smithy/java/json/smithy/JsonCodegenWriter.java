@@ -103,12 +103,38 @@ final class JsonCodegenWriter {
         position += token.length;
     }
 
+    void field(byte[] token, int index) {
+        ensure(token.length + 1);
+        if (index != 0) {
+            bytes[position++] = ',';
+        }
+        System.arraycopy(token, 0, bytes, position, token.length);
+        position += token.length;
+    }
+
     void element() {
         separator();
     }
 
+    void element(int index) {
+        if (index != 0) {
+            ensure(1);
+            bytes[position++] = ',';
+        }
+    }
+
     void dynamicField(String name) {
         separator();
+        writeString(name);
+        ensure(1);
+        bytes[position++] = ':';
+    }
+
+    void dynamicField(String name, int index) {
+        if (index != 0) {
+            ensure(1);
+            bytes[position++] = ',';
+        }
         writeString(name);
         ensure(1);
         bytes[position++] = ':';

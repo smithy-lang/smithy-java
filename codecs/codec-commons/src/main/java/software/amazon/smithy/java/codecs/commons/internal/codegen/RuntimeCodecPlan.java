@@ -8,12 +8,14 @@ package software.amazon.smithy.java.codecs.commons.internal.codegen;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.IdentityHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
@@ -37,7 +39,7 @@ public record RuntimeCodecPlan(
         Schema target = root.isMember() ? root.memberTarget() : root;
         Class<?> rootClass = requireShapeClass(target);
         var structures = new ArrayList<StructPlan>();
-        var visited = new IdentityHashMap<Schema, Boolean>();
+        var visited = new HashSet<ShapeId>();
         analyze(target, structures, visited);
         int estimate = structures.stream().mapToInt(StructPlan::estimatedBytecode).sum();
         return new RuntimeCodecPlan(target, rootClass, structures, estimate);
@@ -46,10 +48,10 @@ public record RuntimeCodecPlan(
     private static void analyze(
             Schema schema,
             List<StructPlan> structures,
-            IdentityHashMap<Schema, Boolean> visited
+            Set<ShapeId> visited
     ) {
         schema = schema.isMember() ? schema.memberTarget() : schema;
-        if (visited.put(schema, Boolean.TRUE) != null) {
+        if (!visited.add(schema.id())) {
             return;
         }
 
@@ -115,7 +117,7 @@ public record RuntimeCodecPlan(
     private static void analyzeChildren(
             Schema schema,
             List<StructPlan> structures,
-            IdentityHashMap<Schema, Boolean> visited
+            Set<ShapeId> visited
     ) {
         switch (schema.type()) {
             case LIST, SET -> analyze(schema.listMember(), structures, visited);
@@ -287,7 +289,7 @@ public record RuntimeCodecPlan(
 
     public StructPlan rootStructure() {
         for (StructPlan structure : structures) {
-            if (structure.schema() == root) {
+            if (structure.schema().id().equals(root.id())) {
                 return structure;
             }
         }

@@ -32,6 +32,7 @@ import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonFieldMapper;
 import software.amazon.smithy.java.json.JsonSettings;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJsonCodec>, Opcodes {
@@ -108,8 +109,8 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
         private final IdentityHashMap<RuntimeCodecPlan.StructPlan, Integer> structureIds = new IdentityHashMap<>();
         private final IdentityHashMap<RuntimeCodecPlan.MemberPlan, Integer> memberIds = new IdentityHashMap<>();
         private final List<RuntimeCodecPlan.MemberPlan> orderedMembers = new ArrayList<>();
-        private final IdentityHashMap<Object, RuntimeCodecPlan.StructPlan> structuresBySchema = new IdentityHashMap<>();
-        private final Map<Object, Integer> aggregateIds = new LinkedHashMap<>();
+        private final Map<ShapeId, RuntimeCodecPlan.StructPlan> structuresBySchema = new LinkedHashMap<>();
+        private final Map<ShapeId, Integer> aggregateIds = new LinkedHashMap<>();
         private final List<Schema> orderedAggregates = new ArrayList<>();
         private final Map<Class<?>, Integer> enumIds = new LinkedHashMap<>();
         private int methodCount;
@@ -129,7 +130,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             for (int i = 0; i < plan.structures().size(); i++) {
                 RuntimeCodecPlan.StructPlan structure = plan.structures().get(i);
                 structureIds.put(structure, i);
-                structuresBySchema.put(structure.schema(), structure);
+                structuresBySchema.put(structure.schema().id(), structure);
                 for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
                     memberIds.put(member, memberIds.size());
                     orderedMembers.add(member);
@@ -142,7 +143,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             schema = schema.isMember() ? schema.memberTarget() : schema;
             switch (schema.type()) {
                 case LIST, SET -> {
-                    Object key = schema.id();
+                    ShapeId key = schema.id();
                     if (!aggregateIds.containsKey(key)) {
                         aggregateIds.put(key, aggregateIds.size());
                         orderedAggregates.add(schema);
@@ -150,7 +151,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                     }
                 }
                 case MAP -> {
-                    Object key = schema.id();
+                    ShapeId key = schema.id();
                     if (!aggregateIds.containsKey(key)) {
                         aggregateIds.put(key, aggregateIds.size());
                         orderedAggregates.add(schema);
@@ -205,10 +206,13 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitCode();
             for (RuntimeCodecPlan.MemberPlan member : orderedMembers) {
                 int id = memberIds.get(member);
-                String name = member.wireName(useJsonName);
-                emitUtf8(method, name);
+                emitUtf8(method, member.wireName(useJsonName));
                 method.visitFieldInsn(PUTSTATIC, className, "N" + id, "[B");
-                emitUtf8(method, "\"" + escape(name) + "\":");
+                var extension = member.schema().getExtension(SmithyJsonSchemaExtensions.KEY);
+                byte[] fieldToken = useJsonName
+                        ? extension.jsonNameBytes()
+                        : extension.memberNameBytes();
+                emitUtf8(method, new String(fieldToken, StandardCharsets.UTF_8));
                 method.visitFieldInsn(PUTSTATIC, className, "W" + id, "[B");
             }
             method.visitInsn(RETURN);
@@ -307,7 +311,8 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                     true);
             method.visitVarInsn(ASTORE, 5);
             method.visitVarInsn(ALOAD, 2);
-            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "element", "()V", false);
+            method.visitVarInsn(ILOAD, 3);
+            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "element", "(I)V", false);
             Label nonNull = new Label();
             Label next = new Label();
             method.visitVarInsn(ALOAD, 5);
@@ -386,6 +391,8 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitCode();
             method.visitVarInsn(ALOAD, 2);
             method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "beginObject", "()V", false);
+            method.visitInsn(ICONST_0);
+            method.visitVarInsn(ISTORE, 6);
             method.visitVarInsn(ALOAD, 1);
             method.visitMethodInsn(INVOKEINTERFACE, "java/util/Map", "entrySet", "()Ljava/util/Set;", true);
             method.visitMethodInsn(
@@ -419,12 +426,14 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                     "()Ljava/lang/Object;",
                     true);
             method.visitTypeInsn(CHECKCAST, "java/lang/String");
+            method.visitVarInsn(ILOAD, 6);
             method.visitMethodInsn(
                     INVOKEVIRTUAL,
                     WRITER,
                     "dynamicField",
-                    "(Ljava/lang/String;)V",
+                    "(Ljava/lang/String;I)V",
                     false);
+            method.visitIincInsn(6, 1);
             method.visitVarInsn(ALOAD, 4);
             method.visitMethodInsn(
                     INVOKEINTERFACE,
@@ -650,18 +659,22 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitCode();
             method.visitVarInsn(ALOAD, 2);
             method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "beginObject", "()V", false);
+            method.visitInsn(ICONST_0);
+            method.visitVarInsn(ISTORE, 3);
             List<RuntimeCodecPlan.MemberPlan> members = structure.members();
             int chunks = Math.max(1, (members.size() + 7) / 8);
             for (int chunk = 0; chunk < chunks; chunk++) {
                 method.visitVarInsn(ALOAD, 0);
                 method.visitVarInsn(ALOAD, 1);
                 method.visitVarInsn(ALOAD, 2);
+                method.visitVarInsn(ILOAD, 3);
                 method.visitMethodInsn(
                         INVOKESPECIAL,
                         className,
                         writerChunkName(structure, chunk),
-                        writerDescriptor(structure),
+                        writerChunkDescriptor(structure),
                         false);
+                method.visitVarInsn(ISTORE, 3);
             }
             method.visitVarInsn(ALOAD, 2);
             method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "endObject", "()V", false);
@@ -674,15 +687,16 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 MethodVisitor chunkMethod = writer.visitMethod(
                         ACC_PRIVATE,
                         writerChunkName(structure, chunk),
-                        writerDescriptor(structure),
+                        writerChunkDescriptor(structure),
                         null,
                         null);
                 chunkMethod.visitCode();
                 int end = Math.min(members.size(), (chunk + 1) * 8);
                 for (int i = chunk * 8; i < end; i++) {
-                    emitWriteMember(chunkMethod, members.get(i));
+                    emitWriteMember(chunkMethod, members.get(i), 3, 4);
                 }
-                chunkMethod.visitInsn(RETURN);
+                chunkMethod.visitVarInsn(ILOAD, 3);
+                chunkMethod.visitInsn(IRETURN);
                 chunkMethod.visitMaxs(0, 0);
                 chunkMethod.visitEnd();
                 methodCount++;
@@ -704,7 +718,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 method.visitVarInsn(ALOAD, 1);
                 method.visitTypeInsn(INSTANCEOF, Type.getInternalName(member.unionVariant()));
                 method.visitJumpInsn(IFEQ, next);
-                emitField(method, member);
+                emitField(method, member, -1);
                 Method accessor = member.unionAccessor();
                 Class<?> valueType = accessor.getReturnType();
                 if (valueType.isPrimitive()) {
@@ -731,7 +745,12 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             methodCount++;
         }
 
-        private void emitWriteMember(MethodVisitor method, RuntimeCodecPlan.MemberPlan member) {
+        private void emitWriteMember(
+                MethodVisitor method,
+                RuntimeCodecPlan.MemberPlan member,
+                int indexLocal,
+                int valueLocal
+        ) {
             Label skip = new Label();
             Method presence = member.presence();
             if (presence != null) {
@@ -744,15 +763,15 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             if (!returnType.isPrimitive()) {
                 method.visitVarInsn(ALOAD, 1);
                 invoke(method, member.getter());
-                method.visitVarInsn(ASTORE, 3);
-                method.visitVarInsn(ALOAD, 3);
+                method.visitVarInsn(ASTORE, valueLocal);
+                method.visitVarInsn(ALOAD, valueLocal);
                 method.visitJumpInsn(IFNULL, skip);
-                emitField(method, member);
+                emitField(method, member, indexLocal);
                 if (member.target().type() == ShapeType.STRUCTURE
                         || member.target().type() == ShapeType.UNION) {
-                    RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(member.target());
+                    RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(member.target().id());
                     method.visitVarInsn(ALOAD, 0);
-                    method.visitVarInsn(ALOAD, 3);
+                    method.visitVarInsn(ALOAD, valueLocal);
                     method.visitVarInsn(ALOAD, 2);
                     method.visitMethodInsn(
                             INVOKESPECIAL,
@@ -763,7 +782,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 } else if (member.target().type() == ShapeType.LIST
                         || member.target().type() == ShapeType.SET) {
                     method.visitVarInsn(ALOAD, 0);
-                    method.visitVarInsn(ALOAD, 3);
+                    method.visitVarInsn(ALOAD, valueLocal);
                     method.visitTypeInsn(CHECKCAST, "java/util/List");
                     method.visitVarInsn(ALOAD, 2);
                     method.visitMethodInsn(
@@ -774,7 +793,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                             false);
                 } else if (member.target().type() == ShapeType.MAP) {
                     method.visitVarInsn(ALOAD, 0);
-                    method.visitVarInsn(ALOAD, 3);
+                    method.visitVarInsn(ALOAD, valueLocal);
                     method.visitTypeInsn(CHECKCAST, "java/util/Map");
                     method.visitVarInsn(ALOAD, 2);
                     method.visitMethodInsn(
@@ -785,13 +804,13 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                             false);
                 } else {
                     method.visitVarInsn(ALOAD, 2);
-                    method.visitVarInsn(ALOAD, 3);
+                    method.visitVarInsn(ALOAD, valueLocal);
                     emitWriteValue(method, member, returnType);
                 }
                 method.visitLabel(skip);
                 return;
             }
-            emitField(method, member);
+            emitField(method, member, indexLocal);
             method.visitVarInsn(ALOAD, 2);
             method.visitVarInsn(ALOAD, 1);
             invoke(method, member.getter());
@@ -799,10 +818,22 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitLabel(skip);
         }
 
-        private void emitField(MethodVisitor method, RuntimeCodecPlan.MemberPlan member) {
+        private void emitField(
+                MethodVisitor method,
+                RuntimeCodecPlan.MemberPlan member,
+                int indexLocal
+        ) {
             method.visitVarInsn(ALOAD, 2);
             method.visitFieldInsn(GETSTATIC, className, "W" + memberIds.get(member), "[B");
-            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "field", "([B)V", false);
+            if (indexLocal < 0) {
+                method.visitInsn(ICONST_0);
+            } else {
+                method.visitVarInsn(ILOAD, indexLocal);
+            }
+            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "field", "([BI)V", false);
+            if (indexLocal >= 0) {
+                method.visitIincInsn(indexLocal, 1);
+            }
         }
 
         private void emitWriteValue(
@@ -924,7 +955,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             var target = schema.isMember() ? schema.memberTarget() : schema;
             switch (target.type()) {
                 case STRUCTURE, UNION -> {
-                    RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(target);
+                    RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(target.id());
                     method.visitVarInsn(ALOAD, 0);
                     method.visitVarInsn(ALOAD, valueLocal);
                     method.visitTypeInsn(CHECKCAST, Type.getInternalName(nested.shapeClass()));
@@ -1102,6 +1133,28 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedBeginObject", "()Z", false);
             Label done = new Label();
             method.visitJumpInsn(IFEQ, done);
+            for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
+                Label next = new Label();
+                method.visitVarInsn(ALOAD, 1);
+                method.visitFieldInsn(GETSTATIC, className, "W" + memberIds.get(member), "[B");
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedTryReadField",
+                        "([B)Z",
+                        false);
+                method.visitJumpInsn(IFEQ, next);
+                emitReadMember(method, member);
+                method.visitVarInsn(ALOAD, 1);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedObjectHasNext",
+                        "()Z",
+                        false);
+                method.visitJumpInsn(IFEQ, done);
+                method.visitLabel(next);
+            }
             Label loop = new Label();
             method.visitLabel(loop);
             method.visitVarInsn(ALOAD, 1);
@@ -1112,7 +1165,26 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 emitReadDispatch(method, structure);
             } else {
                 Label dispatched = new Label();
+                Label unknown = new Label();
+                Map<Integer, Integer> hashBuckets = new LinkedHashMap<>();
+                for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
+                    int hash = fieldHash(member.wireName(useJsonName));
+                    hashBuckets.put(hash, Math.floorMod(hash, buckets));
+                }
+                List<Integer> hashes = hashBuckets.keySet().stream().sorted().toList();
+                int[] switchKeys = hashes.stream().mapToInt(Integer::intValue).toArray();
+                Label[] bucketLabels = new Label[buckets];
                 for (int bucket = 0; bucket < buckets; bucket++) {
+                    bucketLabels[bucket] = new Label();
+                }
+                Label[] switchLabels = new Label[hashes.size()];
+                for (int i = 0; i < hashes.size(); i++) {
+                    switchLabels[i] = bucketLabels[hashBuckets.get(hashes.get(i))];
+                }
+                method.visitVarInsn(ILOAD, 3);
+                method.visitLookupSwitchInsn(unknown, switchKeys, switchLabels);
+                for (int bucket = 0; bucket < buckets; bucket++) {
+                    method.visitLabel(bucketLabels[bucket]);
                     method.visitVarInsn(ALOAD, 0);
                     method.visitVarInsn(ALOAD, 1);
                     method.visitVarInsn(ALOAD, 2);
@@ -1123,8 +1195,10 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                             readerBucketName(structure, bucket),
                             readerBucketDescriptor(structure),
                             false);
-                    method.visitJumpInsn(IFNE, dispatched);
+                    method.visitJumpInsn(IFEQ, unknown);
+                    method.visitJumpInsn(GOTO, dispatched);
                 }
+                method.visitLabel(unknown);
                 method.visitVarInsn(ALOAD, 1);
                 method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedSkipValue", "()V", false);
                 method.visitLabel(dispatched);
@@ -1162,6 +1236,20 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitJumpInsn(IFNE, nonEmpty);
             emitThrow(method, "Union object must contain one member");
             method.visitLabel(nonEmpty);
+            for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
+                Label next = new Label();
+                method.visitVarInsn(ALOAD, 1);
+                method.visitFieldInsn(GETSTATIC, className, "W" + memberIds.get(member), "[B");
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedTryReadField",
+                        "([B)Z",
+                        false);
+                method.visitJumpInsn(IFEQ, next);
+                emitUnionValue(method, member);
+                method.visitLabel(next);
+            }
             method.visitVarInsn(ALOAD, 1);
             method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedReadFieldHash", "()I", false);
             method.visitVarInsn(ISTORE, 2);
@@ -1185,22 +1273,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                     method.visitFieldInsn(GETSTATIC, className, "N" + memberIds.get(member), "[B");
                     method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedFieldEquals", "([B)Z", false);
                     method.visitJumpInsn(IFEQ, next);
-                    String variant = Type.getInternalName(member.unionVariant());
-                    method.visitTypeInsn(NEW, variant);
-                    method.visitInsn(DUP);
-                    emitReadTarget(method, member.schema(), 1);
-                    Class<?> parameter = member.unionAccessor().getReturnType();
-                    unboxIfPrimitive(method, parameter);
-                    method.visitMethodInsn(
-                            INVOKESPECIAL,
-                            variant,
-                            "<init>",
-                            Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(parameter)),
-                            false);
-                    method.visitVarInsn(ASTORE, 3);
-                    emitRequireUnionEnd(method);
-                    method.visitVarInsn(ALOAD, 3);
-                    method.visitInsn(ARETURN);
+                    emitUnionValue(method, member);
                     method.visitLabel(next);
                 }
                 method.visitJumpInsn(GOTO, unknown);
@@ -1236,6 +1309,28 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitMaxs(0, 0);
             method.visitEnd();
             methodCount++;
+        }
+
+        private void emitUnionValue(
+                MethodVisitor method,
+                RuntimeCodecPlan.MemberPlan member
+        ) {
+            String variant = Type.getInternalName(member.unionVariant());
+            method.visitTypeInsn(NEW, variant);
+            method.visitInsn(DUP);
+            emitReadTarget(method, member.schema(), 1);
+            Class<?> parameter = member.unionAccessor().getReturnType();
+            unboxIfPrimitive(method, parameter);
+            method.visitMethodInsn(
+                    INVOKESPECIAL,
+                    variant,
+                    "<init>",
+                    Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(parameter)),
+                    false);
+            method.visitVarInsn(ASTORE, 3);
+            emitRequireUnionEnd(method);
+            method.visitVarInsn(ALOAD, 3);
+            method.visitInsn(ARETURN);
         }
 
         private void emitRequireUnionEnd(MethodVisitor method) {
@@ -1323,10 +1418,10 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 int bucket,
                 int bucketCount
         ) {
-            int chunkSize = (structure.members().size() + bucketCount - 1) / bucketCount;
-            int start = bucket * chunkSize;
-            int end = Math.min(structure.members().size(), start + chunkSize);
-            List<RuntimeCodecPlan.MemberPlan> members = structure.members().subList(start, end);
+            List<RuntimeCodecPlan.MemberPlan> members = structure.members()
+                    .stream()
+                    .filter(member -> Math.floorMod(fieldHash(member.wireName(useJsonName)), bucketCount) == bucket)
+                    .toList();
             MethodVisitor method = writer.visitMethod(
                     ACC_PRIVATE,
                     readerBucketName(structure, bucket),
@@ -1394,78 +1489,71 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             switch (type) {
                 case BOOLEAN -> {
                     method.visitVarInsn(ALOAD, 1);
-                    method.visitInsn(ACONST_NULL);
                     method.visitMethodInsn(
                             INVOKEVIRTUAL,
                             READER,
-                            "readBoolean",
-                            "(Lsoftware/amazon/smithy/java/core/schema/Schema;)Z",
+                            "generatedReadBoolean",
+                            "()Z",
                             false);
                     box(method, parameter, Boolean.class, "(Z)Ljava/lang/Boolean;");
                 }
                 case BYTE -> {
                     method.visitVarInsn(ALOAD, 1);
-                    method.visitInsn(ACONST_NULL);
                     method.visitMethodInsn(
                             INVOKEVIRTUAL,
                             READER,
-                            "readByte",
-                            "(Lsoftware/amazon/smithy/java/core/schema/Schema;)B",
+                            "generatedReadByte",
+                            "()B",
                             false);
                     box(method, parameter, Byte.class, "(B)Ljava/lang/Byte;");
                 }
                 case SHORT -> {
                     method.visitVarInsn(ALOAD, 1);
-                    method.visitInsn(ACONST_NULL);
                     method.visitMethodInsn(
                             INVOKEVIRTUAL,
                             READER,
-                            "readShort",
-                            "(Lsoftware/amazon/smithy/java/core/schema/Schema;)S",
+                            "generatedReadShort",
+                            "()S",
                             false);
                     box(method, parameter, Short.class, "(S)Ljava/lang/Short;");
                 }
                 case INTEGER -> {
                     method.visitVarInsn(ALOAD, 1);
-                    method.visitInsn(ACONST_NULL);
                     method.visitMethodInsn(
                             INVOKEVIRTUAL,
                             READER,
-                            "readInteger",
-                            "(Lsoftware/amazon/smithy/java/core/schema/Schema;)I",
+                            "generatedReadInteger",
+                            "()I",
                             false);
                     box(method, parameter, Integer.class, "(I)Ljava/lang/Integer;");
                 }
                 case LONG -> {
                     method.visitVarInsn(ALOAD, 1);
-                    method.visitInsn(ACONST_NULL);
                     method.visitMethodInsn(
                             INVOKEVIRTUAL,
                             READER,
-                            "readLong",
-                            "(Lsoftware/amazon/smithy/java/core/schema/Schema;)J",
+                            "generatedReadLong",
+                            "()J",
                             false);
                     box(method, parameter, Long.class, "(J)Ljava/lang/Long;");
                 }
                 case FLOAT -> {
                     method.visitVarInsn(ALOAD, 1);
-                    method.visitInsn(ACONST_NULL);
                     method.visitMethodInsn(
                             INVOKEVIRTUAL,
                             READER,
-                            "readFloat",
-                            "(Lsoftware/amazon/smithy/java/core/schema/Schema;)F",
+                            "generatedReadFloat",
+                            "()F",
                             false);
                     box(method, parameter, Float.class, "(F)Ljava/lang/Float;");
                 }
                 case DOUBLE -> {
                     method.visitVarInsn(ALOAD, 1);
-                    method.visitInsn(ACONST_NULL);
                     method.visitMethodInsn(
                             INVOKEVIRTUAL,
                             READER,
-                            "readDouble",
-                            "(Lsoftware/amazon/smithy/java/core/schema/Schema;)D",
+                            "generatedReadDouble",
+                            "()D",
                             false);
                     box(method, parameter, Double.class, "(D)Ljava/lang/Double;");
                 }
@@ -1490,7 +1578,15 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                             "(L" + READER + ";)L" + Type.getInternalName(member.target().shapeClass()) + ";",
                             false);
                 }
-                case BLOB -> readObject(method, "readBlob", "L" + BYTE_BUFFER + ";");
+                case BLOB -> {
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedReadBlob",
+                            "()L" + BYTE_BUFFER + ";",
+                            false);
+                }
                 case TIMESTAMP -> {
                     method.visitVarInsn(ALOAD, 1);
                     method.visitLdcInsn(timestampFormat(member));
@@ -1512,7 +1608,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 }
                 case STRUCTURE -> emitReadStructure(method, member);
                 case UNION -> {
-                    RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(member.target());
+                    RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(member.target().id());
                     method.visitVarInsn(ALOAD, 0);
                     method.visitVarInsn(ALOAD, 1);
                     method.visitMethodInsn(
@@ -1554,7 +1650,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             var target = schema.isMember() ? schema.memberTarget() : schema;
             switch (target.type()) {
                 case BOOLEAN -> {
-                    readPrimitive(method, readerLocal, "readBoolean", "Z");
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadBoolean", "Z");
                     method.visitMethodInsn(
                             INVOKESTATIC,
                             "java/lang/Boolean",
@@ -1563,7 +1659,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                             false);
                 }
                 case BYTE -> {
-                    readPrimitive(method, readerLocal, "readByte", "B");
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadByte", "B");
                     method.visitMethodInsn(
                             INVOKESTATIC,
                             "java/lang/Byte",
@@ -1572,7 +1668,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                             false);
                 }
                 case SHORT -> {
-                    readPrimitive(method, readerLocal, "readShort", "S");
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadShort", "S");
                     method.visitMethodInsn(
                             INVOKESTATIC,
                             "java/lang/Short",
@@ -1581,7 +1677,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                             false);
                 }
                 case INTEGER -> {
-                    readPrimitive(method, readerLocal, "readInteger", "I");
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadInteger", "I");
                     method.visitMethodInsn(
                             INVOKESTATIC,
                             "java/lang/Integer",
@@ -1590,7 +1686,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                             false);
                 }
                 case LONG -> {
-                    readPrimitive(method, readerLocal, "readLong", "J");
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadLong", "J");
                     method.visitMethodInsn(
                             INVOKESTATIC,
                             "java/lang/Long",
@@ -1599,7 +1695,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                             false);
                 }
                 case FLOAT -> {
-                    readPrimitive(method, readerLocal, "readFloat", "F");
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadFloat", "F");
                     method.visitMethodInsn(
                             INVOKESTATIC,
                             "java/lang/Float",
@@ -1608,7 +1704,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                             false);
                 }
                 case DOUBLE -> {
-                    readPrimitive(method, readerLocal, "readDouble", "D");
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadDouble", "D");
                     method.visitMethodInsn(
                             INVOKESTATIC,
                             "java/lang/Double",
@@ -1637,7 +1733,15 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                             "(L" + READER + ";)L" + Type.getInternalName(target.shapeClass()) + ";",
                             false);
                 }
-                case BLOB -> readObject(method, readerLocal, "readBlob", "L" + BYTE_BUFFER + ";");
+                case BLOB -> {
+                    method.visitVarInsn(ALOAD, readerLocal);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedReadBlob",
+                            "()L" + BYTE_BUFFER + ";",
+                            false);
+                }
                 case TIMESTAMP -> {
                     method.visitVarInsn(ALOAD, readerLocal);
                     method.visitLdcInsn(timestampFormat(schema));
@@ -1679,7 +1783,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 }
                 case STRUCTURE -> emitReadStructureValue(method, target, readerLocal);
                 case UNION -> {
-                    RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(target);
+                    RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(target.id());
                     method.visitVarInsn(ALOAD, 0);
                     method.visitVarInsn(ALOAD, readerLocal);
                     method.visitMethodInsn(
@@ -1693,14 +1797,18 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             }
         }
 
-        private void readPrimitive(MethodVisitor method, int readerLocal, String name, String returnDescriptor) {
+        private void readGeneratedPrimitive(
+                MethodVisitor method,
+                int readerLocal,
+                String name,
+                String returnDescriptor
+        ) {
             method.visitVarInsn(ALOAD, readerLocal);
-            method.visitInsn(ACONST_NULL);
             method.visitMethodInsn(
                     INVOKEVIRTUAL,
                     READER,
                     name,
-                    "(Lsoftware/amazon/smithy/java/core/schema/Schema;)" + returnDescriptor,
+                    "()" + returnDescriptor,
                     false);
         }
 
@@ -1740,7 +1848,8 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 Schema schema,
                 int readerLocal
         ) {
-            RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(schema);
+            Schema target = schema.isMember() ? schema.memberTarget() : schema;
+            RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(target.id());
             Method factory = nested.builderFactory();
             invoke(method, factory);
             method.visitVarInsn(ASTORE, 6);
@@ -1807,6 +1916,10 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
 
         private static String writerDescriptor(RuntimeCodecPlan.StructPlan structure) {
             return "(L" + Type.getInternalName(structure.shapeClass()) + ";L" + WRITER + ";)V";
+        }
+
+        private static String writerChunkDescriptor(RuntimeCodecPlan.StructPlan structure) {
+            return "(L" + Type.getInternalName(structure.shapeClass()) + ";L" + WRITER + ";I)I";
         }
 
         private String readerName(RuntimeCodecPlan.StructPlan structure) {
@@ -1883,28 +1996,5 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
             method.visitInsn(ATHROW);
         }
 
-        private static String escape(String value) {
-            StringBuilder result = new StringBuilder(value.length() + 8);
-            for (int i = 0; i < value.length(); i++) {
-                char c = value.charAt(i);
-                switch (c) {
-                    case '"' -> result.append("\\\"");
-                    case '\\' -> result.append("\\\\");
-                    case '\b' -> result.append("\\b");
-                    case '\f' -> result.append("\\f");
-                    case '\n' -> result.append("\\n");
-                    case '\r' -> result.append("\\r");
-                    case '\t' -> result.append("\\t");
-                    default -> {
-                        if (c < 0x20) {
-                            result.append(String.format("\\u%04x", (int) c));
-                        } else {
-                            result.append(c);
-                        }
-                    }
-                }
-            }
-            return result.toString();
-        }
     }
 }
