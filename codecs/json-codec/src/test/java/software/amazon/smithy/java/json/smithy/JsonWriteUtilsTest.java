@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.json.smithy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -14,14 +15,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
+import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 
 public class JsonWriteUtilsTest {
 
     private static final byte FILL = (byte) 0xEE;
+    private static final String TEST_MODE_PROPERTY = "smithy.java.test.compactStringAccessMode";
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "a", "plain ASCII 123", "\u007f"})
+    @MethodSource("asciiBoundaryStrings")
     public void acceptedStringFitsExactReservationAtAnyOffset(String value) {
         for (int pos = 0; pos <= 8; pos++) {
             var buf = new byte[pos + value.length() + 2];
@@ -36,6 +38,52 @@ public class JsonWriteUtilsTest {
                 assertThat(buf[i]).isEqualTo(FILL);
             }
         }
+    }
+
+    @Test
+    public void acceleratedWordMasksAcceptExactlyUnescapedAscii() {
+        assumeTrue(System.getProperty(TEST_MODE_PROPERTY) == null);
+        assumeTrue(CompactStringAccess.latin1Bytes("a") != null);
+
+        byte[] bytes = new byte[Long.BYTES];
+        Arrays.fill(bytes, (byte) 'a');
+        for (int lane = 0; lane < bytes.length; lane++) {
+            for (int current = 0; current <= 0xFF; current++) {
+                bytes[lane] = (byte) current;
+                String value = new String(bytes, StandardCharsets.ISO_8859_1);
+                boolean expected = current >= 0x20
+                        && current < 0x80
+                        && current != '"'
+                        && current != '\\';
+
+                int end = JsonWriteUtils.tryWriteQuotedAscii(new byte[bytes.length + 2], 0, value);
+
+                assertThat(end >= 0)
+                        .as("byte 0x%02X in lane %d", current, lane)
+                        .isEqualTo(expected);
+            }
+            bytes[lane] = 'a';
+        }
+    }
+
+    @Test
+    public void forcedInitializationFailureUsesFallback() {
+        assumeTrue("fallback".equals(System.getProperty(TEST_MODE_PROPERTY)));
+
+        assertThat(CompactStringAccess.isAvailable()).isFalse();
+        assertThat(CompactStringAccess.latin1Bytes("ASCII")).isNull();
+        assertRepresentativeStrings();
+    }
+
+    @Test
+    public void compactStringsDisabledUsesFallback() {
+        assumeTrue("compactStringsDisabled".equals(System.getProperty(TEST_MODE_PROPERTY)));
+
+        assertThat(CompactStringAccess.isAvailable()).isTrue();
+        assertThat(CompactStringAccess.latin1Bytes("")).isNull();
+        assertThat(CompactStringAccess.latin1Bytes("ASCII")).isNull();
+        assertThat(CompactStringAccess.latin1Bytes("caf\u00e9")).isNull();
+        assertRepresentativeStrings();
     }
 
     @Test
@@ -95,6 +143,13 @@ public class JsonWriteUtilsTest {
                 .isEqualTo(expectedJson);
     }
 
+    static List<String> asciiBoundaryStrings() {
+        return List.of(0, 3, 4, 7, 8, 15, 16, 17, 23, 24, 25, 80)
+                .stream()
+                .map(JsonWriteUtilsTest::ascii)
+                .toList();
+    }
+
     private static List<Character> rejectingChars() {
         return List.of(
                 '"',
@@ -124,5 +179,25 @@ public class JsonWriteUtilsTest {
         return List.of(
                 Arguments.of("plain", "\"plain\":"),
                 Arguments.of("\u0001", "\"\\u0001\":"));
+    }
+
+    private static void assertRepresentativeStrings() {
+        assertWritten("", "\"\"");
+        assertWritten("plain ASCII", "\"plain ASCII\"");
+        assertWritten("caf\u00e9", "\"caf\u00e9\"");
+        assertWritten("\u20ac", "\"\u20ac\"");
+        assertWritten("a\"b", "\"a\\\"b\"");
+        assertWritten("\ud83d\ude00", "\"\ud83d\ude00\"");
+    }
+
+    private static void assertWritten(String value, String expected) {
+        byte[] buffer = new byte[JsonWriteUtils.maxQuotedStringBytes(value)];
+        int end = JsonWriteUtils.writeQuotedString(buffer, 0, value);
+        assertThat(new String(buffer, 0, end, StandardCharsets.UTF_8)).isEqualTo(expected);
+    }
+
+    private static String ascii(int length) {
+        String alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        return alphabet.repeat((length + alphabet.length() - 1) / alphabet.length()).substring(0, length);
     }
 }
