@@ -37,6 +37,8 @@ final class JsonReadUtils {
     private static final long ASCII_NINES = 0x3939393939393939L;
     private static final long ASCII_HIGH_BITS = 0x8080808080808080L;
 
+    private static final int MAX_SAFE_LONG_DIGITS = 18;
+
     // Hex digit lookup table: -1 means invalid hex digit
     private static final int[] HEX_VALUES = new int[128];
 
@@ -153,7 +155,8 @@ final class JsonReadUtils {
     static void parseDouble(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
         int start = pos;
 
-        if (pos < end && buf[pos] == '-') {
+        boolean negative = pos < end && buf[pos] == '-';
+        if (negative) {
             pos++;
         }
 
@@ -161,6 +164,7 @@ final class JsonReadUtils {
             throw new SerializationException("Unexpected end of input while parsing number");
         }
 
+        int digitStart = pos;
         byte first = buf[pos];
         if (first < '0' || first > '9') {
             throw new SerializationException("Expected digit, found: " + describeChar(first));
@@ -176,8 +180,10 @@ final class JsonReadUtils {
                 pos++;
             }
         }
+        boolean wholeNumber = pos - digitStart <= MAX_SAFE_LONG_DIGITS;
 
         if (pos < end && buf[pos] == '.') {
+            wholeNumber = false;
             pos++;
             if (pos >= end || buf[pos] < '0' || buf[pos] > '9') {
                 throw new SerializationException("Expected digit after decimal point");
@@ -188,6 +194,7 @@ final class JsonReadUtils {
         }
 
         if (pos < end && (buf[pos] == 'e' || buf[pos] == 'E')) {
+            wholeNumber = false;
             pos++;
             if (pos < end && (buf[pos] == '+' || buf[pos] == '-')) {
                 pos++;
@@ -200,7 +207,16 @@ final class JsonReadUtils {
             }
         }
 
-        deser.parsedDouble = NumberCodec.parseDouble(buf, start, pos - start);
+        if (wholeNumber) {
+            long value = 0;
+            for (int i = digitStart; i < pos; i++) {
+                value = value * 10 + (buf[i] - '0');
+            }
+            // Applying the sign after conversion preserves negative zero.
+            deser.parsedDouble = negative ? -(double) value : (double) value;
+        } else {
+            deser.parsedDouble = NumberCodec.parseDouble(buf, start, pos - start);
+        }
         deser.parsedEndPos = pos;
     }
 

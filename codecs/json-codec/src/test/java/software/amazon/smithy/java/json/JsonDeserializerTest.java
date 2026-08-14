@@ -131,6 +131,54 @@ public class JsonDeserializerTest extends ProviderTestBase {
         }
     }
 
+    @ParameterizedTest
+    @MethodSource("wholeNumberDoubles")
+    public void deserializesWholeNumberDoubleExactly(JsonSerdeProvider provider, String json) {
+        long expected = Double.doubleToRawLongBits(Double.parseDouble(json));
+
+        try (var codec = codec(provider)) {
+            double actual = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                    .readDouble(PreludeSchemas.DOUBLE);
+
+            assertThat(Double.doubleToRawLongBits(actual), is(expected));
+        }
+    }
+
+    static List<Arguments> wholeNumberDoubles() {
+        var result = new ArrayList<Arguments>();
+        var values = List.of(
+                "0",
+                "1",
+                "-1",
+                "9007199254740991",
+                "9007199254740992",
+                "9007199254740993",
+                "123456789012345678",
+                "999999999999999999",
+                "-999999999999999999",
+                "1000000000000000000",
+                "9223372036854775807",
+                "9223372036854775808",
+                "123456789012345678901234567890");
+        for (var provider : List.of(SMITHY, JACKSON)) {
+            for (var value : values) {
+                result.add(Arguments.of(provider, value));
+            }
+        }
+        return result;
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void preservesNegativeWholeNumberZero(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            double actual = codec.createDeserializer("-0".getBytes(StandardCharsets.UTF_8))
+                    .readDouble(PreludeSchemas.DOUBLE);
+
+            assertThat(Double.doubleToRawLongBits(actual), is(Double.doubleToRawLongBits(-0.0d)));
+        }
+    }
+
     @PerProvider
     public void normalDoublesCannotBeStrings(JsonSerdeProvider provider) {
         try (var codec = codec(provider)) {
