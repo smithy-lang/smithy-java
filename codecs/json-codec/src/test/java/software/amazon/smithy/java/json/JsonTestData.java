@@ -22,6 +22,14 @@ public final class JsonTestData {
     static final Schema BIRD_COLOR = BIRD.member("color");
     static final Schema BIRD_NESTED = BIRD.member("nested");
 
+    static final Schema ESCAPED_FIELD_NAMES = Schema.structureBuilder(ShapeId.from("smithy.example#Escaped"))
+            .putMember("quoted", PreludeSchemas.STRING, new JsonNameTrait("has\"quote"))
+            .putMember("slashed", PreludeSchemas.STRING, new JsonNameTrait("has\\slash"))
+            .putMember("tabbed", PreludeSchemas.STRING, new JsonNameTrait("has\ttab"))
+            .putMember("controlled", PreludeSchemas.STRING, new JsonNameTrait("has\u0001control"))
+            .putMember("unicode", PreludeSchemas.STRING, new JsonNameTrait("héllo\u00e9"))
+            .build();
+
     static final ShapeId NESTED_ID = ShapeId.from("smithy.example#Nested");
     static final Schema NESTED = Schema.structureBuilder(NESTED_ID)
             .putMember("number", PreludeSchemas.INTEGER)

@@ -213,6 +213,46 @@ public class JsonSerializerTest extends ProviderTestBase {
     }
 
     @PerProvider
+    public void escapesSpecialCharactersInFieldNames(JsonSerdeProvider provider) {
+        var value = new SerializableStruct() {
+            @Override
+            public Schema schema() {
+                return JsonTestData.ESCAPED_FIELD_NAMES;
+            }
+
+            @Override
+            public void serializeMembers(ShapeSerializer serializer) {
+                serializer.writeString(schema().member("quoted"), "a");
+                serializer.writeString(schema().member("slashed"), "b");
+                serializer.writeString(schema().member("tabbed"), "c");
+                serializer.writeString(schema().member("controlled"), "d");
+                serializer.writeString(schema().member("unicode"), "e");
+            }
+
+            @SuppressWarnings("unchecked")
+            @Override
+            public <T> T getMemberValue(Schema member) {
+                return (T) switch (member.memberName()) {
+                    case "quoted" -> "a";
+                    case "slashed" -> "b";
+                    case "tabbed" -> "c";
+                    case "controlled" -> "d";
+                    case "unicode" -> "e";
+                    default -> null;
+                };
+            }
+        };
+
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            var json = StandardCharsets.UTF_8.decode(codec.serialize(value)).toString();
+            assertThat(
+                    json,
+                    equalTo("{\"has\\\"quote\":\"a\",\"has\\\\slash\":\"b\",\"has\\ttab\":\"c\","
+                            + "\"has\\u0001control\":\"d\",\"héllo\u00e9\":\"e\"}"));
+        }
+    }
+
+    @PerProvider
     public void writesNestedStructures(JsonSerdeProvider provider) throws Exception {
         try (var codec = codec(provider); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {

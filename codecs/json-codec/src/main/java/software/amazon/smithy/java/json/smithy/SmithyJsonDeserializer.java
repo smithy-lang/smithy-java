@@ -575,10 +575,12 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
             // Slow path: scan for closing quote and look up member by hash
             int nameStart = -1, nameEnd = -1;
+            boolean escapedName = false;
             if (member == null) {
                 nameStart = p;
                 while (p < localEnd && localBuf[p] != '"') {
                     if (localBuf[p] == '\\') {
+                        escapedName = true;
                         p++; // skip escaped char
                     }
                     p++;
@@ -591,6 +593,13 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                 p++; // skip closing quote
             }
 
+            // An escaped field name cannot be compared against the lookup table, decode it first.
+            String decodedName = null;
+            if (escapedName) {
+                JsonReadUtils.parseString(localBuf, nameStart - 1, localEnd, this);
+                decodedName = this.parsedString;
+            }
+
             p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
             if (p >= localEnd || localBuf[p] != ':') {
                 this.pos = p;
@@ -601,10 +610,13 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
 
             // Slow path member lookup (only when speculative check missed)
-            if (member == null) {
-                member = lookup != null
-                        ? lookup.lookup(localBuf, nameStart, nameEnd, expectedNext)
-                        : null;
+            if (member == null && lookup != null) {
+                if (decodedName != null) {
+                    byte[] nameBytes = decodedName.getBytes(StandardCharsets.UTF_8);
+                    member = lookup.lookup(nameBytes, 0, nameBytes.length, expectedNext);
+                } else {
+                    member = lookup.lookup(localBuf, nameStart, nameEnd, expectedNext);
+                }
                 if (member != null) {
                     expectedNext = member.memberIndex() + 1;
                 }
@@ -627,9 +639,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             } else {
                 // Unknown field -- validate field name bytes per RFC 8259
                 // (control chars, escape sequences). This is the cold path only.
-                validateSkippedString(localBuf, nameStart, nameEnd);
+                String fieldName;
+                if (decodedName != null) {
+                    fieldName = decodedName; // already validated and unescaped by parseString
+                } else {
+                    validateSkippedString(localBuf, nameStart, nameEnd);
+                    fieldName = new String(localBuf, nameStart, nameEnd - nameStart, StandardCharsets.UTF_8);
+                }
                 this.pos = p;
-                String fieldName = new String(localBuf, nameStart, nameEnd - nameStart, StandardCharsets.UTF_8);
 
                 if (schema.type() == ShapeType.STRUCTURE) {
                     structMemberConsumer.unknownMember(state, fieldName);

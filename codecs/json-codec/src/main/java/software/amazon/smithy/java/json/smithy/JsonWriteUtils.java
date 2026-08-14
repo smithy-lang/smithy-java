@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.json.smithy;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Arrays;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
 import software.amazon.smithy.java.codecs.commons.TimestampCodec;
 import software.amazon.smithy.java.io.ByteBufferUtils;
@@ -74,7 +74,6 @@ final class JsonWriteUtils {
     /**
      * Writes a JSON quoted string. Returns new position.
      */
-    @SuppressWarnings("deprecation")
     static int writeQuotedString(byte[] buf, int pos, String value) {
         int len = value.length();
         buf[pos++] = '"';
@@ -160,20 +159,8 @@ final class JsonWriteUtils {
         return pos;
     }
 
-    /**
-     * Writes a double value as JSON. Handles integer-valued doubles optimization.
-     * Returns new position.
-     */
-    static int writeDouble(byte[] buf, int pos, double value) {
-        return NumberCodec.writeDouble(buf, pos, value);
-    }
-
     static int writeEpochSeconds(byte[] buf, int pos, long epochSecond, int nano) {
         return TimestampCodec.writeEpochSeconds(buf, pos, epochSecond, nano);
-    }
-
-    static int writeFloat(byte[] buf, int pos, float value) {
-        return NumberCodec.writeFloat(buf, pos, value);
     }
 
     static int writeIso8601Timestamp(byte[] buf, int pos, Instant value) {
@@ -188,16 +175,6 @@ final class JsonWriteUtils {
         pos = TimestampCodec.writeHttpDate(buf, pos, value);
         buf[pos++] = '"';
         return pos;
-    }
-
-    /**
-     * Writes an ASCII string directly to the buffer without quoting.
-     * Used for number-to-string conversions (Double.toString, BigDecimal.toString, etc).
-     */
-    static int writeAsciiString(byte[] buf, int pos, String s) {
-        int len = s.length();
-        s.getBytes(0, len, buf, pos);
-        return pos + len;
     }
 
     /**
@@ -232,18 +209,15 @@ final class JsonWriteUtils {
         return ((dataLen + 2) / 3) * 4 + 2;
     }
 
-    /**
-     * Pre-computes the UTF-8 byte representation of a JSON field name prefix.
-     * The result includes the opening quote, the field name, the closing quote, and the colon.
-     * Example: for field name "foo", returns bytes for {@code "foo":}
-     */
-    static byte[] precomputeFieldNameBytes(String fieldName) {
-        byte[] nameUtf8 = fieldName.getBytes(StandardCharsets.UTF_8);
-        byte[] result = new byte[nameUtf8.length + 3];
-        result[0] = '"';
-        System.arraycopy(nameUtf8, 0, result, 1, nameUtf8.length);
-        result[nameUtf8.length + 1] = '"';
-        result[nameUtf8.length + 2] = ':';
-        return result;
+    /// Computes the UTF-8 byte representation of a JSON field name prefix. The result includes the opening quote, the
+    /// field name, the closing quote, and the colon. Example: for field name "foo", returns bytes for `"foo":`
+    ///
+    /// The name is escaped like any other JSON string. Smithy member names are alphanumeric identifiers, but a
+    /// `@jsonName` trait can carry any character, including `"` and `\\`, which would otherwise emit invalid JSON.
+    static byte[] encodeFieldNameToken(String fieldName) {
+        byte[] scratch = new byte[maxQuotedStringBytes(fieldName) + 1];
+        int pos = writeQuotedString(scratch, 0, fieldName);
+        scratch[pos++] = ':';
+        return Arrays.copyOf(scratch, pos);
     }
 }
