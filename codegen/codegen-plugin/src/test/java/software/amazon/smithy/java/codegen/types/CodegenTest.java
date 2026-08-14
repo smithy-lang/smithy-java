@@ -171,4 +171,85 @@ public class CodegenTest {
                 .hasMessageContaining("cannot be combined with the inline");
     }
 
+    @Test
+    void inlinesPresenceTrackingForUpTo64RequiredMembers() {
+        var source = generateStructureSource(requiredStructure("InlinePresence", 64), "InlinePresence.java");
+
+        assertThat(source)
+                .contains("private long $setMembers;")
+                .contains("$setMembers |= 0x8000000000000000L;")
+                .contains("if ($setMembers != 0xffffffffffffffffL)")
+                .contains("PresenceTracker.validateRequiredMembers($SCHEMA, $setMembers);")
+                .doesNotContain("private final PresenceTracker tracker");
+    }
+
+    @Test
+    void retainsPresenceTrackerForMoreThan64RequiredMembers() {
+        var source = generateStructureSource(requiredStructure("TrackedPresence", 65), "TrackedPresence.java");
+
+        assertThat(source)
+                .contains("private final PresenceTracker tracker = PresenceTracker.of($SCHEMA);")
+                .contains("tracker.validate();")
+                .contains("if (tracker.allSet())")
+                .contains("if (!tracker.checkMember($SCHEMA_MEMBER0))")
+                .doesNotContain("private long $setMembers;");
+    }
+
+    @Test
+    void premarksRequiredClientOptionalMembers() {
+        var source = generateStructureSource(
+                """
+                        $version: "2"
+                        namespace smithy.java.codegen.presence
+
+                        structure ClientOptionalPresence {
+                            @required
+                            @clientOptional
+                            value: String
+                        }
+                        """,
+                "ClientOptionalPresence.java");
+
+        assertThat(source)
+                .contains("private Builder() {")
+                .contains("$setMembers |= 0x1L;")
+                .contains("if ($setMembers != 0x1L)");
+    }
+
+    private String generateStructureSource(String modelSource, String fileName) {
+        var generatedModel = Model.assembler()
+                .addUnparsedModel("presence.smithy", modelSource)
+                .assemble()
+                .unwrap();
+        var settings = settingsBuilder.build();
+        var context = PluginContext.builder()
+                .fileManifest(manifest)
+                .model(generatedModel)
+                .settings(settings)
+                .build();
+        plugin.execute(context);
+        var path = manifest.getFiles()
+                .stream()
+                .filter(file -> file.getFileName().toString().equals(fileName))
+                .findFirst()
+                .orElseThrow();
+        return manifest.expectFileString(path);
+    }
+
+    private static String requiredStructure(String name, int memberCount) {
+        var result = new StringBuilder()
+                .append("$version: \"2\"\n")
+                .append("namespace smithy.java.codegen.presence\n\n")
+                .append("structure ")
+                .append(name)
+                .append(" {\n");
+        for (int i = 0; i < memberCount; i++) {
+            result.append("    @required\n")
+                    .append("    member")
+                    .append(i)
+                    .append(": String\n");
+        }
+        return result.append("}\n").toString();
+    }
+
 }
