@@ -8,6 +8,7 @@ package software.amazon.smithy.java.json.smithy;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Arrays;
+import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
 import software.amazon.smithy.java.codecs.commons.TimestampCodec;
 import software.amazon.smithy.java.io.ByteBufferUtils;
@@ -84,16 +85,21 @@ final class JsonWriteUtils {
      * Requires {@code value.length() + 2} bytes; on rejection, retry from the original position.
      */
     static int tryWriteQuotedAscii(byte[] buf, int pos, String value) {
+        byte[] latin1 = CompactStringAccess.latin1Bytes(value);
+        return latin1 != null
+                ? writeQuotedAscii(buf, pos, latin1)
+                : tryWriteQuotedAsciiChars(buf, pos, value);
+    }
+
+    private static int tryWriteQuotedAsciiChars(byte[] buf, int pos, String value) {
         int len = value.length();
         int p = pos;
         buf[p++] = '"';
 
         // The JIT auto-vectorizes this loop on JDK 21.
         //
-        // Note: we cannot use String.getBytes(int,int,byte[],int) + SWAR here because
-        // that method truncates chars >= 0x100 to their low byte, which can produce
-        // valid-looking ASCII bytes (e.g. U+0123 -> 0x23 '#') indistinguishable from
-        // real ASCII via any byte-level check.
+        // String.getBytes(int,int,byte[],int) truncates chars above 0xff, so it cannot
+        // safely replace this fallback.
         for (int i = 0; i < len; i++) {
             char c = value.charAt(i);
             if (c >= 0x80 || c < 0x20 || c == '"' || c == '\\') {
@@ -104,6 +110,17 @@ final class JsonWriteUtils {
 
         buf[p++] = '"';
         return p;
+    }
+
+    private static int writeQuotedAscii(byte[] buf, int pos, byte[] latin1) {
+        int copied = copyJsonAscii(latin1, buf, pos + 1);
+        if (copied < 0) {
+            return -1;
+        }
+        buf[pos] = '"';
+        int endQuote = pos + 1 + copied;
+        buf[endQuote] = '"';
+        return endQuote + 1;
     }
 
     /**
@@ -133,6 +150,86 @@ final class JsonWriteUtils {
 
         buf[pos++] = '"';
         return pos;
+    }
+
+    private static int copyJsonAscii(byte[] value, byte[] buf, int pos) {
+        int length = value.length;
+        if (length < Long.BYTES) {
+            if (length >= Integer.BYTES) {
+                int tail = length - Integer.BYTES;
+                int head = JsonReadUtils.readHalfWord(value, 0);
+                int last = JsonReadUtils.readHalfWord(value, tail);
+                if ((JsonReadUtils.stringStopMask(head) | JsonReadUtils.stringStopMask(last)) != 0) {
+                    return -1;
+                }
+                JsonReadUtils.writeHalfWord(buf, pos, head);
+                JsonReadUtils.writeHalfWord(buf, pos + tail, last);
+                return length;
+            }
+            for (int index = 0; index < length; index++) {
+                int current = value[index] & 0xff;
+                if (current < 0x20 || current >= 0x80 || current == '"' || current == '\\') {
+                    return -1;
+                }
+                buf[pos + index] = (byte) current;
+            }
+            return length;
+        }
+        int tail = length - Long.BYTES;
+        long head = JsonReadUtils.readWord(value, 0);
+        long last = JsonReadUtils.readWord(value, tail);
+        if (length <= Long.BYTES * 2) {
+            if ((JsonReadUtils.stringStopMask(head) | JsonReadUtils.stringStopMask(last)) != 0) {
+                return -1;
+            }
+            JsonReadUtils.writeWord(buf, pos, head);
+            JsonReadUtils.writeWord(buf, pos + tail, last);
+            return length;
+        }
+        long middle = JsonReadUtils.readWord(value, Long.BYTES);
+        if (length <= Long.BYTES * 3) {
+            if ((JsonReadUtils.stringStopMask(head)
+                    | JsonReadUtils.stringStopMask(middle)
+                    | JsonReadUtils.stringStopMask(last)) != 0) {
+                return -1;
+            }
+            JsonReadUtils.writeWord(buf, pos, head);
+            JsonReadUtils.writeWord(buf, pos + Long.BYTES, middle);
+            JsonReadUtils.writeWord(buf, pos + tail, last);
+            return length;
+        }
+        return copyJsonAsciiLoop(value, buf, pos, length, tail, head, last);
+    }
+
+    private static int copyJsonAsciiLoop(
+            byte[] value,
+            byte[] buf,
+            int pos,
+            int length,
+            int tail,
+            long head,
+            long last
+    ) {
+        long middle = JsonReadUtils.readWord(value, Long.BYTES);
+        if ((JsonReadUtils.stringStopMask(head) | JsonReadUtils.stringStopMask(middle)) != 0) {
+            return -1;
+        }
+        JsonReadUtils.writeWord(buf, pos, head);
+        JsonReadUtils.writeWord(buf, pos + Long.BYTES, middle);
+        int index = Long.BYTES * 2;
+        while (index < tail) {
+            long word = JsonReadUtils.readWord(value, index);
+            if (JsonReadUtils.stringStopMask(word) != 0) {
+                return -1;
+            }
+            JsonReadUtils.writeWord(buf, pos + index, word);
+            index += Long.BYTES;
+        }
+        if (JsonReadUtils.stringStopMask(last) != 0) {
+            return -1;
+        }
+        JsonReadUtils.writeWord(buf, pos + tail, last);
+        return length;
     }
 
     private static int writeStringSlowPath(byte[] buf, int pos, String value, int startIdx, int len) {

@@ -71,6 +71,49 @@ afterEvaluate {
     }
 }
 
+val compactStringAccessFallbackTest =
+    tasks.register<Test>("compactStringAccessFallbackTest") {
+        description = "Test JSON string writing when compact String access initialization fails."
+        group = "verification"
+
+        val testSourceSet = project.the<SourceSetContainer>()["test"]
+        testClassesDirs = testSourceSet.output.classesDirs
+        classpath = testSourceSet.runtimeClasspath
+
+        useJUnitPlatform()
+        systemProperty(
+            "software.amazon.smithy.java.codecs.commons.disableCompactStringAccess",
+            "true",
+        )
+        systemProperty("smithy.java.test.compactStringAccessMode", "fallback")
+
+        filter {
+            includeTestsMatching("*JsonWriteUtilsTest.forcedInitializationFailureUsesFallback")
+        }
+    }
+
+val compactStringsDisabledTest =
+    tasks.register<Test>("compactStringsDisabledTest") {
+        description = "Test JSON string writing with HotSpot compact strings disabled."
+        group = "verification"
+
+        val testSourceSet = project.the<SourceSetContainer>()["test"]
+        testClassesDirs = testSourceSet.output.classesDirs
+        classpath = testSourceSet.runtimeClasspath
+
+        useJUnitPlatform()
+        jvmArgs("-XX:-CompactStrings")
+        systemProperty("smithy.java.test.compactStringAccessMode", "compactStringsDisabled")
+
+        filter {
+            includeTestsMatching("*JsonWriteUtilsTest.compactStringsDisabledUsesFallback")
+        }
+    }
+
+tasks.named("check") {
+    dependsOn(compactStringAccessFallbackTest, compactStringsDisabledTest)
+}
+
 tasks.named("compileTestJava") {
     dependsOn("smithyBuild")
 }
