@@ -37,6 +37,7 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
+import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.codecs.commons.StripedPool;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -369,6 +370,19 @@ final class CborSerializer implements ShapeSerializer {
         }
         ensureCapacity(5 + charLen * 3);
         int headerStart = pos;
+        byte[] latin1 = CompactStringAccess.latin1Bytes(value);
+        if (latin1 != null) {
+            for (byte current : latin1) {
+                if (current < 0) {
+                    encodeLatin1TextStringRewind(latin1, headerStart);
+                    return;
+                }
+            }
+            tagAndLengthUnchecked(TYPE_TEXTSTRING, charLen);
+            System.arraycopy(latin1, 0, buf, pos, charLen);
+            pos += charLen;
+            return;
+        }
         //Don't scan if the string is too long.
         if (charLen < 1000) {
             int orAccum = 0;
@@ -383,6 +397,21 @@ final class CborSerializer implements ShapeSerializer {
             }
         }
         encodeUtf8TextStringRewind(value, charLen, headerStart);
+    }
+
+    private void encodeLatin1TextStringRewind(byte[] value, int headerStart) {
+        int writeStart = headerStart + 5;
+        int p = writeStart;
+        for (byte current : value) {
+            int c = current & 0xff;
+            if (c < 0x80) {
+                buf[p++] = current;
+            } else {
+                buf[p++] = (byte) (0xC0 | (c >> 6));
+                buf[p++] = (byte) (0x80 | (c & 0x3F));
+            }
+        }
+        finishTextStringRewind(headerStart, p - writeStart);
     }
 
     /**
@@ -426,7 +455,11 @@ final class CborSerializer implements ShapeSerializer {
                 buf[p++] = (byte) (0x80 | (c & 0x3F));
             }
         }
-        int byteLen = p - writeStart;
+        finishTextStringRewind(headerStart, p - writeStart);
+    }
+
+    private void finishTextStringRewind(int headerStart, int byteLen) {
+        int writeStart = headerStart + 5;
         pos = headerStart;
         tagAndLengthUnchecked(TYPE_TEXTSTRING, byteLen);
         int actualHeaderLen = pos - headerStart;
