@@ -448,11 +448,16 @@ public class JsonDeserializerTest extends ProviderTestBase {
 
         assertThat(values,
                 equalTo(Map.of(
-                        "shortPrefix", "1",
-                        "sevenBytes", "7",
-                        "eightBytes", "8",
-                        "sixUtf8Bytes", "6",
-                        "eightUtf8Bytes", "8u")));
+                        "shortPrefix",
+                        "1",
+                        "sevenBytes",
+                        "7",
+                        "eightBytes",
+                        "8",
+                        "sixUtf8Bytes",
+                        "6",
+                        "eightUtf8Bytes",
+                        "8u")));
     }
 
     @ParameterizedTest
