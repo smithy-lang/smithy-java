@@ -246,61 +246,112 @@ final class JsonReadUtils {
             throw new SerializationException("Expected '\"', found: " + describePos(buf, pos, end));
         }
         pos++; // skip opening quote
-
-        // Fast path: SWAR scan 8 bytes at a time for closing quote, backslash, or control chars.
         int start = pos;
 
-        while (pos + 8 <= end) {
-            long word = (long) LONG_HANDLE.get(buf, pos);
-            if (hasSpecialStringByte(word)) {
-                break; // found something, fall through to scalar loop
+        // Stop on the exact lane containing a quote, backslash, control byte, or non-ASCII byte.
+        while (pos + Long.BYTES <= end) {
+            long stops = stringStopMask((long) LONG_HANDLE.get(buf, pos));
+            if (stops == 0) {
+                pos += Long.BYTES;
+                continue;
             }
-            pos += 8;
+            int stop = pos + stopOffset(stops);
+            byte b = buf[stop];
+            if (b == '"') {
+                deser.parsedString = deser.decodeAsciiCached(buf, start, stop - start);
+                deser.parsedEndPos = stop + 1;
+                return;
+            }
+            if (b == '\\') {
+                parseStringWithEscapes(buf, start, stop, end, deser);
+                return;
+            }
+            if (b >= 0) {
+                throw unescapedControlCharacter(b);
+            }
+            parseStringNonAscii(buf, start, stop + 1, end, deser);
+            return;
         }
 
-        // Scalar loop for remaining bytes and to find the exact special byte
+        parseStringTail(buf, start, pos, end, true, deser);
+    }
+
+    private static void parseStringNonAscii(byte[] buf, int start, int pos, int end, SmithyJsonDeserializer deser) {
+        while (pos + Long.BYTES <= end) {
+            long stops = nonAsciiStringStopMask((long) LONG_HANDLE.get(buf, pos));
+            if (stops == 0) {
+                pos += Long.BYTES;
+                continue;
+            }
+            int stop = pos + stopOffset(stops);
+            byte b = buf[stop];
+            if (b == '"') {
+                deser.parsedString = deser.decodeUtf8Cached(buf, start, stop - start);
+                deser.parsedEndPos = stop + 1;
+                return;
+            }
+            if (b == '\\') {
+                parseStringWithEscapes(buf, start, stop, end, deser);
+                return;
+            }
+            throw unescapedControlCharacter(b);
+        }
+
+        parseStringTail(buf, start, pos, end, false, deser);
+    }
+
+    private static void parseStringTail(
+            byte[] buf,
+            int start,
+            int pos,
+            int end,
+            boolean ascii,
+            SmithyJsonDeserializer deser
+    ) {
         while (pos < end) {
             byte b = buf[pos];
             if (b == '"') {
-                // No escapes found -- fast path. Dedup short strings through the
-                // deserializer's per-document cache (repeated keys/values are common).
-                deser.parsedString = deser.decodeUtf8Cached(buf, start, pos - start);
+                deser.parsedString = ascii
+                        ? deser.decodeAsciiCached(buf, start, pos - start)
+                        : deser.decodeUtf8Cached(buf, start, pos - start);
                 deser.parsedEndPos = pos + 1;
                 return;
             }
             if (b == '\\') {
-                // Has escapes -- slow path
                 parseStringWithEscapes(buf, start, pos, end, deser);
                 return;
             }
             if ((b & 0xFF) < 0x20) {
-                throw new SerializationException(
-                        "Unescaped control character 0x" + Integer.toHexString(b & 0xFF) + " in string");
+                throw unescapedControlCharacter(b);
             }
+            ascii &= b >= 0;
             pos++;
         }
 
         throw new SerializationException("Unterminated string");
     }
 
-    /**
-     * SWAR check: returns true if any byte in the 8-byte word is '"' (0x22), '\\' (0x5C),
-     * or a control character (< 0x20).
-     */
-    private static boolean hasSpecialStringByte(long word) {
-        // Check for control chars (< 0x20): a byte b < 0x20 means (b - 0x20) sets the high bit
-        // when the original high bit was 0. We use the standard "has byte less than" SWAR trick.
-        long controlCheck = (word - 0x2020202020202020L) & ~word & 0x8080808080808080L;
+    private static long stringStopMask(long word) {
+        // Cross-lane borrows can only affect lanes after the earliest stop.
+        long quoteOrControl = (word ^ 0x0202020202020202L) - 0x2121212121212121L;
+        long backslash = (word ^ 0x5C5C5C5C5C5C5C5CL) - 0x0101010101010101L;
+        return (quoteOrControl | backslash | word) & ASCII_HIGH_BITS;
+    }
 
-        // Check for '"' (0x22) using XOR + has-zero-byte trick
-        long xorQuote = word ^ 0x2222222222222222L;
-        long hasQuote = (xorQuote - 0x0101010101010101L) & ~xorQuote & 0x8080808080808080L;
+    private static long nonAsciiStringStopMask(long word) {
+        long ascii = ~word;
+        long quoteOrControl = ((word ^ 0x0202020202020202L) - 0x2121212121212121L) & ascii;
+        long backslash = ((word ^ 0x5C5C5C5C5C5C5C5CL) - 0x0101010101010101L) & ascii;
+        return (quoteOrControl | backslash) & ASCII_HIGH_BITS;
+    }
 
-        // Check for '\\' (0x5C)
-        long xorBackslash = word ^ 0x5C5C5C5C5C5C5C5CL;
-        long hasBackslash = (xorBackslash - 0x0101010101010101L) & ~xorBackslash & 0x8080808080808080L;
+    private static int stopOffset(long stopMask) {
+        return Long.numberOfTrailingZeros(stopMask) >>> 3;
+    }
 
-        return (controlCheck | hasQuote | hasBackslash) != 0;
+    private static SerializationException unescapedControlCharacter(byte b) {
+        return new SerializationException(
+                "Unescaped control character 0x" + Integer.toHexString(b & 0xFF) + " in string");
     }
 
     private static void parseStringWithEscapes(
@@ -323,8 +374,7 @@ final class JsonReadUtils {
             }
 
             if ((b & 0xFF) < 0x20) {
-                throw new SerializationException(
-                        "Unescaped control character 0x" + Integer.toHexString(b & 0xFF) + " in string");
+                throw unescapedControlCharacter(b);
             }
 
             if (b == '\\') {
