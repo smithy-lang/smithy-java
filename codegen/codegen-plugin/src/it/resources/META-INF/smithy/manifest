@@ -58,3 +58,4 @@ bdd-test.smithy
 a.smithy
 b.smithy
 nested/c.smithy
+required-members.smithy
