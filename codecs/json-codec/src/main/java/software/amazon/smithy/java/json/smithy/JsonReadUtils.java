@@ -33,6 +33,10 @@ final class JsonReadUtils {
     private static final VarHandle LONG_HANDLE =
             MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
 
+    private static final long ASCII_ZEROES = 0x3030303030303030L;
+    private static final long ASCII_NINES = 0x3939393939393939L;
+    private static final long ASCII_HIGH_BITS = 0x8080808080808080L;
+
     // Hex digit lookup table: -1 means invalid hex digit
     private static final int[] HEX_VALUES = new int[128];
 
@@ -47,6 +51,42 @@ final class JsonReadUtils {
         for (int i = 'A'; i <= 'F'; i++) {
             HEX_VALUES[i] = 10 + (i - 'A');
         }
+    }
+
+    // Returns -1 when the input is not a positive ten-digit integer.
+    static long tryParseTenDigitEpochSecond(byte[] buf, int pos, int end) {
+        int stop = pos + 10;
+        if (stop > end || (buf[pos] < '1' || buf[pos] > '9')) {
+            return -1;
+        }
+        byte tenthByte = buf[pos + 9];
+        if (tenthByte < '0' || tenthByte > '9') {
+            return -1;
+        }
+        if (stop < end) {
+            byte next = buf[stop];
+            if ((next >= '0' && next <= '9') || next == '.' || next == 'e' || next == 'E') {
+                return -1;
+            }
+        }
+
+        long chunk = (long) LONG_HANDLE.get(buf, pos);
+        long digits = chunk - ASCII_ZEROES;
+        // Subtraction sets a lane's high bit for bytes outside '0'..'9'.
+        if (((digits | (ASCII_NINES - chunk)) & ASCII_HIGH_BITS) != 0) {
+            return -1;
+        }
+        int ninth = buf[pos + 8] - '0';
+        if ((ninth | (9 - ninth)) < 0) {
+            return -1;
+        }
+        int tenth = tenthByte - '0';
+
+        // The little-endian view places the first digit in the low byte.
+        long pairs = (digits * 10 + (digits >>> 8)) & 0x00FF00FF00FF00FFL;
+        long quads = (pairs * 100 + (pairs >>> 16)) & 0x0000FFFF0000FFFFL;
+        long firstEight = (quads & 0xFFFF) * 10_000 + (quads >>> 32);
+        return firstEight * 100 + ninth * 10L + tenth;
     }
 
     /**
