@@ -379,6 +379,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         if (format == TimestampFormatter.Prelude.EPOCH_SECONDS
                 && pos < end
                 && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
+            long tenDigitSecond = JsonReadUtils.tryParseTenDigitEpochSecond(buf, pos, end);
+            if (tenDigitSecond >= 0) {
+                pos += 10;
+                return Instant.ofEpochSecond(tenDigitSecond);
+            }
             // Fast path for epoch-seconds: try integer parsing first.
             // Most epoch-seconds timestamps are whole numbers, so parseLong avoids
             // the expensive FastDoubleParser path entirely.

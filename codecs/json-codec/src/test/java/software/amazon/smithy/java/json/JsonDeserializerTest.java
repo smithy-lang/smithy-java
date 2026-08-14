@@ -1294,6 +1294,30 @@ public class JsonDeserializerTest extends ProviderTestBase {
 
     @ParameterizedTest
     @MethodSource("smithyOnly")
+    public void readsMixedEpochSecondsAndMaintainsTheCursor(JsonSerdeProvider provider) {
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS));
+        var json = "[1000000000, 1, 1712345678.25, 999999999, 9999999999]";
+
+        try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+            var read = new ArrayList<Instant>();
+            codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                    .readList(PreludeSchemas.DOCUMENT, read, (sink, de) -> sink.add(de.readTimestamp(schema)));
+
+            assertThat(
+                    read,
+                    contains(
+                            Instant.ofEpochSecond(1_000_000_000L),
+                            Instant.ofEpochSecond(1),
+                            Instant.ofEpochSecond(1_712_345_678L, 250_000_000),
+                            Instant.ofEpochSecond(999_999_999L),
+                            Instant.ofEpochSecond(9_999_999_999L)));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
     public void rejectsEpochSecondsOutOfRange(JsonSerdeProvider provider) {
         // Instant.MAX.getEpochSecond() is 31556889864403199; one beyond that overflows
         long outOfRange = Instant.MAX.getEpochSecond() + 1;
