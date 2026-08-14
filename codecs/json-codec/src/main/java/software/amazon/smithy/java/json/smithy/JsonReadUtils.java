@@ -349,6 +349,10 @@ final class JsonReadUtils {
         return Long.numberOfTrailingZeros(stopMask) >>> 3;
     }
 
+    static long readWord(byte[] buf, int pos) {
+        return (long) LONG_HANDLE.get(buf, pos);
+    }
+
     private static SerializationException unescapedControlCharacter(byte b) {
         return new SerializationException(
                 "Unescaped control character 0x" + Integer.toHexString(b & 0xFF) + " in string");

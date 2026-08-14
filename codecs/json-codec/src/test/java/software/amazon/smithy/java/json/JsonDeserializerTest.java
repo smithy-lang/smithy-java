@@ -41,6 +41,7 @@ import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.model.traits.Trait;
 
@@ -422,6 +423,52 @@ public class JsonDeserializerTest extends ProviderTestBase {
 
             assertThat(members, contains("name", "color"));
         }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void deserializesFieldNamesAtWordProbeBoundaries(JsonSerdeProvider provider) {
+        var schema = Schema.structureBuilder(ShapeId.from("smithy.test#ProbeBoundaries"))
+                .putMember("shortPrefix", PreludeSchemas.STRING, new JsonNameTrait("a"))
+                .putMember("sevenBytes", PreludeSchemas.STRING, new JsonNameTrait("aaaaaaa"))
+                .putMember("eightBytes", PreludeSchemas.STRING, new JsonNameTrait("aaaaaaaa"))
+                .putMember("sixUtf8Bytes", PreludeSchemas.STRING, new JsonNameTrait("ééé"))
+                .putMember("eightUtf8Bytes", PreludeSchemas.STRING, new JsonNameTrait("éééé"))
+                .build();
+        var json = "{\"aaaaaaaa\":\"8\",\"a\":\"1\",\"aaaaaaa\":\"7\","
+                + "\"ééé\":\"6\",\"éééé\":\"8u\"}";
+        Map<String, String> values = new LinkedHashMap<>();
+
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                    .readStruct(schema,
+                            values,
+                            (state, member, deser) -> state.put(member.memberName(), deser.readString(member)));
+        }
+
+        assertThat(values,
+                equalTo(Map.of(
+                        "shortPrefix", "1",
+                        "sevenBytes", "7",
+                        "eightBytes", "8",
+                        "sixUtf8Bytes", "6",
+                        "eightUtf8Bytes", "8u")));
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void fallsBackWhenFieldNameIsTooCloseToBufferEndForWordRead(JsonSerdeProvider provider) {
+        var schema = Schema.structureBuilder(ShapeId.from("smithy.test#ShortBuffer"))
+                .putMember("a", PreludeSchemas.INTEGER)
+                .build();
+        AtomicReference<Integer> value = new AtomicReference<>();
+
+        try (var codec = codec(provider)) {
+            codec.createDeserializer("{\"a\":0}".getBytes(StandardCharsets.UTF_8))
+                    .readStruct(schema, value, (state, member, deser) -> state.set(deser.readInteger(member)));
+        }
+
+        assertThat(value.get(), equalTo(0));
     }
 
     @PerProvider

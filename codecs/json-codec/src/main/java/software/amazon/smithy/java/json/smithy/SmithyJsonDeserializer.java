@@ -582,9 +582,17 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             if (lookup != null && expectedNext >= 0 && expectedNext < lookup.orderedNameBytes.length) {
                 byte[] expected = lookup.orderedNameBytes[expectedNext];
                 int expLen = expected.length;
-                if (p + expLen < localEnd
-                        && localBuf[p + expLen] == '"'
-                        && Arrays.equals(localBuf, p, p + expLen, expected, 0, expLen)) {
+                long packedName = lookup.orderedPackedNames[expectedNext];
+                boolean matches;
+                if (packedName != 0 && p + Long.BYTES <= localEnd) {
+                    long mask = -1L >>> ((SmithyMemberLookup.PACK_MAX_LEN - expLen) << 3);
+                    matches = (JsonReadUtils.readWord(localBuf, p) & mask) == packedName;
+                } else {
+                    matches = p + expLen < localEnd
+                            && localBuf[p + expLen] == '"'
+                            && Arrays.equals(localBuf, p, p + expLen, expected, 0, expLen);
+                }
+                if (matches) {
                     member = lookup.orderedSchemas[expectedNext];
                     expectedNext = member.memberIndex() + 1;
                     p += expLen + 1; // skip name + closing quote

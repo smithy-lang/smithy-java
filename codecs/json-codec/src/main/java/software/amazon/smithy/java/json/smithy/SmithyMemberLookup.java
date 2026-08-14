@@ -28,14 +28,7 @@ final class SmithyMemberLookup implements MemberLookup {
     final Schema[] orderedSchemas;
     final byte[][] orderedNameBytes;
 
-    // Field names of length 1..7 packed into a long as ((len << 56) | big-endian bytes).
-    // The length lives in the top byte and the <=7 name bytes in the low 56 bits, so the
-    // packed value is a collision-free identity (encoding length defends against inputs
-    // with leading 0x00 bytes, which the struct field-name scanner does not reject). This
-    // lets the common short-name lookup replace the FNV byte-loop + Arrays.equals with a
-    // handful of `long ==` comparisons. Entry is 0 for names of length 0 or >= 8 (sentinel);
-    // the packed-path is only entered for input lengths 1..7, whose key has a non-zero top
-    // byte and so never matches the 0 sentinel.
+    // The closing quote makes packed names length-sensitive and directly probeable.
     static final int PACK_MAX_LEN = 7;
     final long[] orderedPackedNames;
 
@@ -64,14 +57,10 @@ final class SmithyMemberLookup implements MemberLookup {
         }
     }
 
-    /**
-     * Packs a name of length 1..7 into {@code (len << 56) | big-endian bytes}.
-     * Caller ensures {@code 1 <= len <= 7}.
-     */
     private static long packName(byte[] buf, int start, int len) {
-        long key = (long) len << 56;
+        long key = (long) '"' << (len << 3);
         for (int i = 0; i < len; i++) {
-            key |= (buf[start + i] & 0xFFL) << ((len - 1 - i) << 3);
+            key |= (buf[start + i] & 0xFFL) << (i << 3);
         }
         return key;
     }
