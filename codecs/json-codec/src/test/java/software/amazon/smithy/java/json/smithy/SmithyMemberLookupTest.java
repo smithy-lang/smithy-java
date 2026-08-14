@@ -95,4 +95,11 @@ public class SmithyMemberLookupTest {
         assertThat(lookup(l, "ReadCapacityUnits").memberName()).isEqualTo("ReadCapacityUnits");
         assertThat(lookup(l, "WriteCapacityUnits")).isNull();
     }
+
+    @Test
+    public void encodeFieldNameTokenExactlySizedEscapedFieldName() {
+        var result = JsonWriteUtils.encodeFieldNameToken("\u0001");
+
+        assertThat(new String(result, StandardCharsets.UTF_8)).isEqualTo("\"\\u0001\":");
+    }
 }

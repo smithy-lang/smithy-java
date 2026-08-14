@@ -630,9 +630,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
         Assertions.assertThrows(SerializationException.class, () -> {
             try (var codec = codec(provider)) {
                 var de = codec.createDeserializer(input);
-                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
-                    deser.readString(member);
-                });
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> deser.readString(member));
             }
         });
     }
@@ -644,9 +642,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
             try (var codec = codec(provider)) {
                 var de = codec.createDeserializer(
                         "{\"x\":00.5,\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
-                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
-                    deser.readString(member);
-                });
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> deser.readString(member));
             }
         });
     }
@@ -658,9 +654,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
             try (var codec = codec(provider)) {
                 var de = codec.createDeserializer(
                         "{\"x\":1e2e3,\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
-                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
-                    deser.readString(member);
-                });
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> deser.readString(member));
             }
         });
     }
@@ -693,9 +687,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
         Assertions.assertThrows(SerializationException.class, () -> {
             try (var codec = codec(provider)) {
                 var de = codec.createDeserializer(input);
-                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
-                    deser.readString(member);
-                });
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> deser.readString(member));
             }
         });
     }
@@ -707,11 +699,88 @@ public class JsonDeserializerTest extends ProviderTestBase {
             try (var codec = codec(provider)) {
                 var de = codec.createDeserializer(
                         "{\"a\\eb\":1,\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
-                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
-                    deser.readString(member);
-                });
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> deser.readString(member));
             }
         });
+    }
+
+    @PerProvider
+    public void resolvesEscapedFieldNamesOutOfOrder(JsonSerdeProvider provider) {
+        var json = "{"
+                + "\"héllo\u00e9\":\"e\","
+                + "\"has\\u0001control\":\"d\","
+                + "\"has\\\\slash\":\"b\","
+                + "\"has\\ttab\":\"c\","
+                + "\"has\\\"quote\":\"a\""
+                + "}";
+        Map<String, String> values = new LinkedHashMap<>();
+
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                    .readStruct(JsonTestData.ESCAPED_FIELD_NAMES,
+                            values,
+                            (state, member, deser) -> state.put(member.memberName(), deser.readString(member)));
+        }
+
+        assertThat(values,
+                equalTo(Map.of(
+                        "quoted",
+                        "a",
+                        "slashed",
+                        "b",
+                        "tabbed",
+                        "c",
+                        "controlled",
+                        "d",
+                        "unicode",
+                        "e")));
+    }
+
+    @PerProvider
+    public void resolvesGratuitouslyEscapedFieldName(JsonSerdeProvider provider) {
+        var json = "{\"\\u0068as\\\"\\u0071uote\":\"a\"}";
+        Map<String, String> values = new LinkedHashMap<>();
+
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                    .readStruct(JsonTestData.ESCAPED_FIELD_NAMES, values, (state, member, deser) -> {
+                        state.put(member.memberName(), deser.readString(member));
+                    });
+        }
+
+        assertThat(values.get("quoted"), equalTo("a"));
+    }
+
+    @PerProvider
+    public void reportsUnknownMemberByDecodedName(JsonSerdeProvider provider) {
+        var json = "{\"un\\tknown\":\"x\",\"has\\\"quote\":\"a\"}";
+        List<String> unknownNames = new ArrayList<>();
+        Map<String, String> values = new LinkedHashMap<>();
+
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                    .readStruct(
+                            JsonTestData.ESCAPED_FIELD_NAMES,
+                            values,
+                            new ShapeDeserializer.StructMemberConsumer<>() {
+                                @Override
+                                public void accept(
+                                        Map<String, String> state,
+                                        Schema member,
+                                        ShapeDeserializer deser
+                                ) {
+                                    state.put(member.memberName(), deser.readString(member));
+                                }
+
+                                @Override
+                                public void unknownMember(Map<String, String> state, String memberName) {
+                                    unknownNames.add(memberName);
+                                }
+                            });
+        }
+
+        assertThat(unknownNames, contains("un\tknown"));
+        assertThat(values.get("quoted"), equalTo("a"));
     }
 
     @PerProvider
