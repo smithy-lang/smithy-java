@@ -1,6 +1,7 @@
 plugins {
     id("smithy-java.module-conventions")
     id("smithy-java.fuzz-test")
+    id("smithy-java.jmh-conventions")
     id("software.amazon.smithy.gradle.smithy-base")
     id("com.gradleup.shadow")
 }
