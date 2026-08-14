@@ -1134,25 +1134,71 @@ public class JsonDeserializerTest extends ProviderTestBase {
     }
 
     @PerProvider
-    public void parsesLongAsciiString(JsonSerdeProvider provider) {
-        // > 8 bytes to exercise SWAR scanning path
-        String longStr = "abcdefghijklmnopqrstuvwxyz0123456789";
+    public void parsesAsciiAtStringScanBoundaries(JsonSerdeProvider provider) {
         try (var codec = codec(provider)) {
-            assertThat(codec.createDeserializer(("\"" + longStr + "\"").getBytes(StandardCharsets.UTF_8))
-                    .readString(PreludeSchemas.STRING), equalTo(longStr));
+            for (int length : List.of(0, 6, 7, 8, 14, 15, 16, 23, 24)) {
+                var value = "a".repeat(length);
+                assertThat(codec.createDeserializer(("\"" + value + "\"").getBytes(StandardCharsets.UTF_8))
+                        .readString(PreludeSchemas.STRING), equalTo(value));
+            }
+
+            for (char value : List.of(' ', '!', '#', (char) 0x7F)) {
+                for (int position : List.of(0, 6, 7, 8, 14, 15, 16)) {
+                    var expected = "a".repeat(position) + value + "z";
+                    assertThat(codec.createDeserializer(("\"" + expected + "\"").getBytes(StandardCharsets.UTF_8))
+                            .readString(PreludeSchemas.STRING), equalTo(expected));
+                }
+            }
         }
     }
 
     @PerProvider
-    public void parsesUtf8MultiByte(JsonSerdeProvider provider) {
-        // 2-byte UTF-8: e-acute (\u00e9)
-        // 3-byte UTF-8: CJK character (\u4e2d)
-        // 4-byte UTF-8: emoji (U+1F600)
-        // Embed directly as UTF-8 bytes with an escape to trigger slow path
-        String input = "\"\u00e9\\n\u4e2d\"";
+    public void parsesEscapesAtStringScanBoundaries(JsonSerdeProvider provider) {
         try (var codec = codec(provider)) {
-            assertThat(codec.createDeserializer(input.getBytes(StandardCharsets.UTF_8))
-                    .readString(PreludeSchemas.STRING), equalTo("\u00e9\n\u4e2d"));
+            for (int position : List.of(0, 6, 7, 8, 14, 15, 16)) {
+                var prefix = "a".repeat(position);
+                var input = "\"" + prefix + "\\nz\"";
+                assertThat(codec.createDeserializer(input.getBytes(StandardCharsets.UTF_8))
+                        .readString(PreludeSchemas.STRING), equalTo(prefix + "\nz"));
+            }
+        }
+    }
+
+    @PerProvider
+    public void parsesUnescapedUtf8AtStringScanBoundaries(JsonSerdeProvider provider) {
+        var values = List.of(
+                "é",
+                "aaaaaé",
+                "aaaaaaé",
+                "aaaaaaaé",
+                "aaaaaaaaé",
+                "aaaaaaa中z",
+                "aaaaaaa😀z",
+                "中文字符串测试内容值中文字符串测试内容值");
+        try (var codec = codec(provider)) {
+            for (var value : values) {
+                assertThat(codec.createDeserializer(("\"" + value + "\"").getBytes(StandardCharsets.UTF_8))
+                        .readString(PreludeSchemas.STRING), equalTo(value));
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsControlCharactersAfterUnescapedUtf8(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            for (int position : List.of(0, 5, 6, 7, 8, 13, 14, 15, 16)) {
+                var input = new ByteArrayOutputStream();
+                input.write('"');
+                input.writeBytes(("é" + "a".repeat(position)).getBytes(StandardCharsets.UTF_8));
+                input.write(0x1F);
+                input.write('"');
+
+                var exception = Assertions.assertThrows(
+                        SerializationException.class,
+                        () -> codec.createDeserializer(input.toByteArray()).readString(PreludeSchemas.STRING));
+                assertThat(exception.getMessage(), containsString("control character 0x1f"));
+            }
         }
     }
 

@@ -143,11 +143,22 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
      * String is cached. Strings longer than 8 bytes bypass the cache.
      */
     String decodeUtf8Cached(byte[] buf, int start, int len) {
+        return decodeCached(buf, start, len, false);
+    }
+
+    String decodeAsciiCached(byte[] buf, int start, int len) {
+        // ISO-8859-1 is identical for ASCII and avoids UTF-8's multi-byte scan.
+        return decodeCached(buf, start, len, true);
+    }
+
+    private String decodeCached(byte[] buf, int start, int len, boolean ascii) {
         if (len == 0) {
             return "";
         }
         if (len > 8) {
-            return new String(buf, start, len, StandardCharsets.UTF_8);
+            return ascii
+                    ? new String(buf, start, len, StandardCharsets.ISO_8859_1)
+                    : new String(buf, start, len, StandardCharsets.UTF_8);
         }
         // Pack bytes into a long. Every content byte is >= 0x20 here (the no-escape fast
         // path rejects control bytes), so leading bytes are non-zero and length is encoded
@@ -168,7 +179,9 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         if (keys[slot] == key) {
             return vals[slot];
         }
-        String s = new String(buf, start, len, StandardCharsets.UTF_8);
+        String s = ascii
+                ? new String(buf, start, len, StandardCharsets.ISO_8859_1)
+                : new String(buf, start, len, StandardCharsets.UTF_8);
         keys[slot] = key;
         vals[slot] = s;
         return s;
