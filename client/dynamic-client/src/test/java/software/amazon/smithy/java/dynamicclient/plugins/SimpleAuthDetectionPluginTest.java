@@ -16,6 +16,7 @@ import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.HttpBasicAuthTrait;
 
 class SimpleAuthDetectionPluginTest {
 
@@ -31,10 +32,13 @@ class SimpleAuthDetectionPluginTest {
 
                         @awsJson1_0
                         @sigv4(name: "testservice")
+                        @httpBasicAuth
+                        @auth([sigv4])
                         service AuthService {
                             operations: [DoThing]
                         }
 
+                        @auth([httpBasicAuth])
                         operation DoThing {
                             input := {}
                             output := {}
@@ -52,7 +56,9 @@ class SimpleAuthDetectionPluginTest {
 
         var authSchemes = client.config().supportedAuthSchemes();
         var hasSigV4 = authSchemes.stream().anyMatch(s -> s.schemeId().equals(SigV4Trait.ID));
+        var hasHttpBasic = authSchemes.stream().anyMatch(s -> s.schemeId().equals(HttpBasicAuthTrait.ID));
         assertThat("Expected SigV4 auth scheme to be registered", hasSigV4, is(true));
+        assertThat("Expected HTTP basic auth scheme to be registered", hasHttpBasic, is(true));
         assertThat(client.config().authSchemeResolver(), is(AuthSchemeResolver.DEFAULT));
     }
 
