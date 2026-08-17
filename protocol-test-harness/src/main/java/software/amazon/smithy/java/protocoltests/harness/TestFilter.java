@@ -42,6 +42,12 @@ sealed interface TestFilter {
      */
     boolean skipTestCase(EventStreamTestCase testCase);
 
+    /**
+     * Whether to skip the test case for the given projection mode. Recognizes a trailing {@code " [mode]"} suffix
+     * on {@link ProtocolTestFilter#skipTests()} entries (e.g. {@code "SomeTest [dynamic]"}).
+     */
+    boolean skipTestCase(EventStreamTestCase testCase, TestMode mode);
+
     default TestFilter combine(TestFilter other) {
         return new CombinedTestFilter(this, other);
     }
@@ -132,6 +138,17 @@ sealed interface TestFilter {
             return skip(testCase.getId(), skippedTests, tests);
         }
 
+        @Override
+        public boolean skipTestCase(EventStreamTestCase testCase, TestMode mode) {
+            if (skip(testCase.getId(), skippedTests, tests)) {
+                return true;
+            }
+            var skippedForMode = skippedTestsByMode.getOrDefault(mode, Set.of());
+            var allowedForMode = testsByMode.getOrDefault(mode, Set.of());
+            return skippedForMode.contains(testCase.getId())
+                    || (!allowedForMode.isEmpty() && !allowedForMode.contains(testCase.getId()));
+        }
+
         private static boolean skip(String id, Set<String> skipped, Set<String> only) {
             return skipped.contains(id) || (!only.isEmpty() && !only.contains(id));
         }
@@ -156,6 +173,11 @@ sealed interface TestFilter {
 
         @Override
         public boolean skipTestCase(EventStreamTestCase testCase) {
+            return false;
+        }
+
+        @Override
+        public boolean skipTestCase(EventStreamTestCase testCase, TestMode mode) {
             return false;
         }
     }
@@ -188,6 +210,11 @@ sealed interface TestFilter {
         @Override
         public boolean skipTestCase(EventStreamTestCase testCase) {
             return first.skipTestCase(testCase) || second.skipTestCase(testCase);
+        }
+
+        @Override
+        public boolean skipTestCase(EventStreamTestCase testCase, TestMode mode) {
+            return first.skipTestCase(testCase, mode) || second.skipTestCase(testCase, mode);
         }
     }
 }

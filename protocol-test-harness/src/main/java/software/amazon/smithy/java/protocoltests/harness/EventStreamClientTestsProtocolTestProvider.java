@@ -14,7 +14,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
@@ -59,7 +58,6 @@ final class EventStreamClientTestsProtocolTestProvider extends
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     protected Stream<TestTemplateInvocationContext> generateProtocolTests(
             ProtocolTestExtension.SharedClientTestData store,
             EventStreamClientTests annotation,
@@ -69,104 +67,113 @@ final class EventStreamClientTestsProtocolTestProvider extends
                 .stream()
                 .flatMap(operation -> operation.eventStreamTestCases()
                         .stream()
-                        .map(testCase -> {
+                        .flatMap(testCase -> {
                             if (filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)) {
-                                return new IgnoredTestCase(testCase.getId());
+                                return Stream.of(new IgnoredTestCase(testCase.getId()));
                             }
-                            var testProtocol = store.getProtocol(testCase.getProtocol());
-                            var placeholderTransport =
-                                    (MockClient.PlaceHolderTransport<HttpRequest, HttpResponse>) store
-                                            .mockClient()
-                                            .config()
-                                            .transport();
-                            var overrideConfig = RequestOverrideConfig.builder()
-                                    .protocol(testProtocol)
-                                    .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-                                    .build();
-                            var writer =
-                                    operation.operationModel().inputStreamMember() != null ? EventStream.newWriter()
-                                            : null;
-                            var input = buildInput(writer,
-                                    operation.operationModel(),
-                                    testCase.getInitialRequestParams());
-
-                            if (testCase.getInitialRequest().isPresent()) {
-                                var testTransport = new RequestTestTransport();
-                                placeholderTransport.setTransport(testTransport);
-                                return new RequestTestInvocationContext(
-                                        testCase,
-                                        null,
-                                        store.mockClient(),
-                                        operation.operationModel(),
-                                        input,
-                                        null,
-                                        writer,
-                                        overrideConfig,
-                                        testTransport::getCapturedRequest);
-                            }
-
-                            if (testCase.getInitialResponse().isPresent()) {
-                                var testTransport =
-                                        new InitialResponseTestTransport(testCase.getInitialResponse().get());
-                                placeholderTransport.setTransport(testTransport);
-                                var outputBuilder = operation.operationModel().outputBuilder();
-                                testCase.getInitialResponseParams()
-                                        .ifPresent(params -> new ProtocolTestDocument(params, null)
-                                                .deserializeInto(outputBuilder));
-                                return new ResponseTestInvocationContext(
-                                        testCase,
-                                        null,
-                                        store.mockClient(),
-                                        operation.operationModel(),
-                                        input,
-                                        outputBuilder.errorCorrection().build(),
-                                        writer,
-                                        overrideConfig);
-                            }
-
-                            var event = testCase.getEvents().getFirst(); // Currently each test case only has one event.
-                            if (event.getType().equals(EventType.REQUEST)) {
-                                var testTransport = new RequestTestTransport();
-                                placeholderTransport.setTransport(testTransport);
-                                var eventBuilder = operation.operationModel().inputEventBuilderSupplier().get();
-                                event.getParams()
-                                        .ifPresent(params -> new ProtocolTestDocument(params, null)
-                                                .deserializeInto(eventBuilder));
-                                return new RequestTestInvocationContext(
-                                        testCase,
-                                        event,
-                                        store.mockClient(),
-                                        operation.operationModel(),
-                                        input,
-                                        eventBuilder.build(),
-                                        writer,
-                                        overrideConfig,
-                                        testTransport::getCapturedRequest);
-                            } else {
-                                SerializableStruct expectedEvent = null;
-                                if (event.getParams().isPresent()) {
-                                    var eventBuilder = operation.operationModel().outputEventBuilderSupplier().get();
-                                    new ProtocolTestDocument(event.getParams().get(), null)
-                                            .deserializeInto(eventBuilder);
-                                    expectedEvent = eventBuilder.build();
-                                }
-                                var testTransport = new ResponseTestTransport(event);
-                                placeholderTransport.setTransport(testTransport);
-                                return new ResponseTestInvocationContext(
-                                        testCase,
-                                        event,
-                                        store.mockClient(),
-                                        operation.operationModel(),
-                                        input,
-                                        expectedEvent,
-                                        writer,
-                                        overrideConfig);
-                            }
+                            // Run each event-stream test through the codegen model and (when available) the
+                            // document-backed dynamic model.
+                            return TestModes.available(operation)
+                                    .map(mode -> {
+                                        var name = testCase.getId() + " [" + mode.label() + "]";
+                                        if (filter.skipTestCase(testCase, mode)) {
+                                            return new IgnoredTestCase(name);
+                                        }
+                                        try {
+                                            return buildContext(store, operation, testCase, mode);
+                                        } catch (RuntimeException e) {
+                                            return new FailedGenerationTestCase(name, e);
+                                        }
+                                    });
                         }));
+    }
+
+    private TestTemplateInvocationContext buildContext(
+            ProtocolTestExtension.SharedClientTestData store,
+            HttpTestOperation operation,
+            EventStreamTestCase testCase,
+            TestMode mode
+    ) {
+        var apiOperation = operation.operationModel(mode);
+        var testProtocol = store.getProtocol(testCase.getProtocol());
+        var overrideConfig = RequestOverrideConfig.builder()
+                .protocol(testProtocol)
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .build();
+        var writer = apiOperation.inputStreamMember() != null ? EventStream.newWriter() : null;
+        var input = buildInput(writer, apiOperation, testCase.getInitialRequestParams());
+
+        if (testCase.getInitialRequest().isPresent()) {
+            return new RequestTestInvocationContext(
+                    testCase,
+                    mode,
+                    null,
+                    store.mockClient(),
+                    apiOperation,
+                    input,
+                    null,
+                    writer,
+                    overrideConfig,
+                    new RequestTestTransport());
+        }
+
+        if (testCase.getInitialResponse().isPresent()) {
+            var outputBuilder = apiOperation.outputBuilder();
+            testCase.getInitialResponseParams()
+                    .ifPresent(params -> new ProtocolTestDocument(params, null).deserializeInto(outputBuilder));
+            return new ResponseTestInvocationContext(
+                    testCase,
+                    mode,
+                    null,
+                    store.mockClient(),
+                    apiOperation,
+                    input,
+                    outputBuilder.errorCorrection().build(),
+                    writer,
+                    overrideConfig,
+                    new InitialResponseTestTransport(testCase.getInitialResponse().get()));
+        }
+
+        var event = testCase.getEvents().getFirst(); // Currently each test case only has one event.
+        if (event.getType().equals(EventType.REQUEST)) {
+            var eventBuilder = apiOperation.inputEventBuilderSupplier().get();
+            event.getParams()
+                    .ifPresent(params -> new ProtocolTestDocument(params, null).deserializeInto(eventBuilder));
+            return new RequestTestInvocationContext(
+                    testCase,
+                    mode,
+                    event,
+                    store.mockClient(),
+                    apiOperation,
+                    input,
+                    eventBuilder.build(),
+                    writer,
+                    overrideConfig,
+                    new RequestTestTransport());
+        } else {
+            SerializableStruct expectedEvent = null;
+            if (event.getParams().isPresent()) {
+                var eventBuilder = apiOperation.outputEventBuilderSupplier().get();
+                new ProtocolTestDocument(event.getParams().get(), null).deserializeInto(eventBuilder);
+                expectedEvent = eventBuilder.build();
+            }
+            return new ResponseTestInvocationContext(
+                    testCase,
+                    mode,
+                    event,
+                    store.mockClient(),
+                    apiOperation,
+                    input,
+                    expectedEvent,
+                    writer,
+                    overrideConfig,
+                    new ResponseTestTransport(event));
+        }
     }
 
     private record RequestTestInvocationContext(
             EventStreamTestCase testCase,
+            TestMode mode,
             Event event,
             MockClient mockClient,
             ApiOperation apiOperation,
@@ -174,16 +181,22 @@ final class EventStreamClientTestsProtocolTestProvider extends
             SerializableStruct expected,
             EventStream<SerializableStruct> writer,
             RequestOverrideConfig overrideConfig,
-            Supplier<HttpRequest> requestSupplier) implements TestTemplateInvocationContext {
+            RequestTestTransport testTransport) implements TestTemplateInvocationContext {
 
         @Override
         public String getDisplayName(int invocationIndex) {
-            return testCase.getId();
+            return testCase.getId() + " [" + mode.label() + "]";
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public List<Extension> getAdditionalExtensions() {
             return List.of((ProtocolTestParameterResolver) () -> {
+                // Bind this test's transport just before sending, not during generation: contexts for every
+                // test/mode are built up front, so binding at generation would let the last one win.
+                var placeholderTransport =
+                        (MockClient.PlaceHolderTransport<HttpRequest, HttpResponse>) mockClient.config().transport();
+                placeholderTransport.setTransport(testTransport);
                 if (event != null) { // normal request event.
                     Thread.ofVirtual().start(() -> {
                         try (var w = writer.asWriter()) {
@@ -193,7 +206,7 @@ final class EventStreamClientTestsProtocolTestProvider extends
                 }
                 try {
                     mockClient.clientRequest(input, apiOperation, overrideConfig);
-                    var request = requestSupplier.get();
+                    var request = testTransport.getCapturedRequest();
                     if (event != null) {
                         Assertions.assertEventStreamRequestEquals(request, event);
                     } else {
@@ -208,22 +221,30 @@ final class EventStreamClientTestsProtocolTestProvider extends
 
     private record ResponseTestInvocationContext(
             EventStreamTestCase testCase,
+            TestMode mode,
             Event event,
             MockClient mockClient,
             ApiOperation apiOperation,
             SerializableStruct input,
             SerializableStruct expected,
             EventStream<?> writer,
-            RequestOverrideConfig overrideConfig) implements TestTemplateInvocationContext {
+            RequestOverrideConfig overrideConfig,
+            ClientTransport<HttpRequest, HttpResponse> testTransport) implements TestTemplateInvocationContext {
 
         @Override
         public String getDisplayName(int invocationIndex) {
-            return testCase.getId();
+            return testCase.getId() + " [" + mode.label() + "]";
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public List<Extension> getAdditionalExtensions() {
             return List.of((ProtocolTestParameterResolver) () -> {
+                // Bind this test's transport just before sending, not during generation: contexts for every
+                // test/mode are built up front, so binding at generation would let the last one win.
+                var placeholderTransport =
+                        (MockClient.PlaceHolderTransport<HttpRequest, HttpResponse>) mockClient.config().transport();
+                placeholderTransport.setTransport(testTransport);
                 try {
                     var output = mockClient.clientRequest(input, apiOperation, overrideConfig);
                     var actual = output;
