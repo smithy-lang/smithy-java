@@ -164,6 +164,15 @@ public final class SchemaConverter {
                 case UNION -> Schema.unionBuilder(schemaId(shape), convertTraits(shape));
                 default -> throw new UnsupportedOperationException("Expected aggregate shape: " + shape);
             };
+            // Attach a shape-builder supplier so runtime consumers that call Schema#shapeBuilder() on a
+            // dynamic struct/union schema get a schema-guided document builder, matching how codegen schemas
+            // attach a builder for their generated POJO. Without this, code paths like the AWS event-stream
+            // decoder (which constructs each event variant via memberTarget().shapeBuilder()) throw
+            // "Schema does not have a shape builder" on the dynamic path.
+            if (shape.getType() == ShapeType.STRUCTURE || shape.getType() == ShapeType.UNION) {
+                final Shape captured = shape;
+                builder.builderSupplier(() -> createDocumentBuilder(getSchema(captured)));
+            }
             SchemaBuilder previous = recursiveBuilders.putIfAbsent(shape, builder);
             if (previous != null) {
                 builder = previous;
