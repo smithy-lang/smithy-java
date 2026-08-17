@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.dynamicclient;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -144,10 +143,10 @@ public final class DynamicOperation implements ApiOperation<StructDocument, Stru
     ) {
         var operationSchema = schemaConverter.getSchema(shape);
 
-        List<ShapeId> authSchemes = new ArrayList<>();
-        for (var trait : ServiceIndex.of(model).getEffectiveAuthSchemes(service).values()) {
-            authSchemes.add(trait.toShapeId());
-        }
+        var authSchemes = List.copyOf(
+                ServiceIndex.of(model)
+                        .getEffectiveAuthSchemes(service, shape, ServiceIndex.AuthSchemeMode.NO_AUTH_AWARE)
+                        .keySet());
 
         var inputSchema = schemaConverter.getSchema(model.expectShape(shape.getInputShape()));
         var outputSchema = schemaConverter.getSchema(model.expectShape(shape.getOutputShape()));

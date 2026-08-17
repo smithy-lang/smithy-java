@@ -24,6 +24,9 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.DeprecatedTrait;
+import software.amazon.smithy.model.traits.HttpBasicAuthTrait;
+import software.amazon.smithy.model.traits.HttpBearerAuthTrait;
+import software.amazon.smithy.model.traits.synthetic.NoAuthTrait;
 
 public class DynamicOperationTest {
     @Test
@@ -223,6 +226,61 @@ public class DynamicOperationTest {
     }
 
     @Test
+    public void resolvesEffectiveAuthSchemesPerOperation() {
+        Model model = Model.assembler()
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+
+                        namespace smithy.example
+
+                        @httpBasicAuth
+                        @httpBearerAuth
+                        @auth([httpBasicAuth])
+                        service S {
+                            operations: [InheritedAuth, OverriddenAuth, NoAuth, OptionalAuth]
+                        }
+
+                        operation InheritedAuth {
+                            input := {}
+                            output := {}
+                        }
+
+                        @auth([httpBearerAuth])
+                        operation OverriddenAuth {
+                            input := {}
+                            output := {}
+                        }
+
+                        @auth([])
+                        operation NoAuth {
+                            input := {}
+                            output := {}
+                        }
+
+                        @optionalAuth
+                        operation OptionalAuth {
+                            input := {}
+                            output := {}
+                        }
+                        """)
+                .assemble()
+                .unwrap();
+
+        assertThat(
+                createOperation(model, "InheritedAuth").effectiveAuthSchemes(),
+                equalTo(List.of(HttpBasicAuthTrait.ID)));
+        assertThat(
+                createOperation(model, "OverriddenAuth").effectiveAuthSchemes(),
+                equalTo(List.of(HttpBearerAuthTrait.ID)));
+        assertThat(
+                createOperation(model, "NoAuth").effectiveAuthSchemes(),
+                equalTo(List.of(NoAuthTrait.ID)));
+        assertThat(
+                createOperation(model, "OptionalAuth").effectiveAuthSchemes(),
+                equalTo(List.of(HttpBasicAuthTrait.ID, NoAuthTrait.ID)));
+    }
+
+    @Test
     public void convertsSchemas() {
         Model model = Model.assembler()
                 .addUnparsedModel("test.smithy", """
@@ -266,5 +324,18 @@ public class DynamicOperationTest {
         assertThat(o.outputBuilder().schema().id(), equalTo(ShapeId.from("smithy.example#PutFooOutput")));
         assertThat(o.errorRegistry(), is(registry));
         assertThat(o.effectiveAuthSchemes(), empty());
+    }
+
+    private static DynamicOperation createOperation(Model model, String operationName) {
+        var converter = new SchemaConverter(model);
+        var service = model.expectShape(ShapeId.from("smithy.example#S")).asServiceShape().get();
+        var operation = model.expectShape(ShapeId.from("smithy.example#" + operationName)).asOperationShape().get();
+        return DynamicOperation.create(
+                operation,
+                converter,
+                model,
+                service,
+                TypeRegistry.empty(),
+                (id, b) -> {});
     }
 }

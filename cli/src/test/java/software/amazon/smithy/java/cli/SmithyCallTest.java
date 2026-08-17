@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -314,6 +315,9 @@ class SmithyCallTest {
 
     @Test
     void testWithSigV4() {
+        // The Sprockets service models no auth, so its operations' effective auth scheme is noAuth. Even though
+        // --auth sigv4 registers the SigV4 scheme, the resolver picks the operation's effective scheme (noAuth),
+        // matching a code-generated client. The call therefore succeeds without signing (no Authorization header).
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#Sprockets",
@@ -327,9 +331,9 @@ class SmithyCallTest {
         };
 
         int exitCode = commandLine.execute(args);
-        assertTrue(exitCode != 0);
-        String error = errContent.toString();
-        assertTrue(error.contains("No auth scheme could be resolved for operation"));
+        assertEquals(0, exitCode, "Expected noAuth to be used for a service that models no auth. stderr: "
+                + errContent);
+        assertNull(lastAuthorizationHeader, "No SigV4 signing should occur when the effective scheme is noAuth");
     }
 
     @Test

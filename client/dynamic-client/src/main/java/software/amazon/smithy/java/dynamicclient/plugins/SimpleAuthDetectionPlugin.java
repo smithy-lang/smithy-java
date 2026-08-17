@@ -60,7 +60,7 @@ public final class SimpleAuthDetectionPlugin implements AutoClientPlugin {
     @SuppressWarnings("unchecked")
     private void injectAuthSchemeResolver(ClientConfig.Builder config, Model model, ShapeId service) {
         var index = ServiceIndex.of(model);
-        var potentialAuthSchemes = index.getEffectiveAuthSchemes(service);
+        var potentialAuthSchemes = index.getAuthSchemes(service);
         if (potentialAuthSchemes.isEmpty()) {
             config.authSchemeResolver(AuthSchemeResolver.NO_AUTH);
             return;
