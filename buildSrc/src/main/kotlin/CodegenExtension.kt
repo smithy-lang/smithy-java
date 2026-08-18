@@ -91,7 +91,10 @@ fun Project.addGenerateSrcsTask(
             }
         }
     }
-    mergeTask.configure { dependsOn(task) }
+    mergeTask.configure {
+        dependsOn(task)
+        inputs.dir("${taskOutput}/resources")
+    }
     tasks.getByName("processItResources").dependsOn(mergeTask)
 
     return task

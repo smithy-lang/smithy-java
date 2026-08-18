@@ -7,7 +7,6 @@ package software.amazon.smithy.java.rulesengine;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -20,8 +19,6 @@ import software.amazon.smithy.rulesengine.logic.bdd.Bdd;
  * Generates a field-based Java endpoint resolver from compiled rules-engine bytecode.
  */
 public final class JavaEndpointResolverGenerator {
-
-    private static final int BASE64_CHUNK_SIZE = 24_000;
 
     private final Bytecode bytecode;
     private final byte[] instructions;
@@ -46,8 +43,23 @@ public final class JavaEndpointResolverGenerator {
      * @return Java source
      */
     public String generate(String packageName, String className) {
+        return generate(packageName, className, className + ".bdd");
+    }
+
+    /**
+     * Generates a complete Java compilation unit that loads its program from a binary resource.
+     *
+     * @param packageName package for the generated resolver
+     * @param className simple class name
+     * @param programResource class-relative or absolute binary resource name
+     * @return Java source
+     */
+    public String generate(String packageName, String className, String programResource) {
         validateName(packageName, false);
         validateName(className, true);
+        if (programResource == null || programResource.isEmpty()) {
+            throw new IllegalArgumentException("Program resource must not be empty");
+        }
         source.setLength(0);
         structureSizes.clear();
         uriTemplateSizes.clear();
@@ -61,8 +73,7 @@ public final class JavaEndpointResolverGenerator {
                 + "software.amazon.smithy.java.rulesengine.GeneratedEndpointResolver<" + className + ".State> {");
         writeConstants();
         writeFunctionFields();
-        writeProgram();
-        writeConstructor(className);
+        writeConstructor(className, programResource);
         writeParameters();
         writeState();
         writeLifecycle();
@@ -89,23 +100,10 @@ public final class JavaEndpointResolverGenerator {
         }
     }
 
-    private void writeProgram() {
-        String encoded = Base64.getEncoder().encodeToString(bytecode.getBytecode());
-        line("");
-        line("    private static byte[] decodeProgram() {");
-        line("        return java.util.Base64.getDecoder().decode(java.lang.String.join(\"\",");
-        for (int i = 0; i < encoded.length(); i += BASE64_CHUNK_SIZE) {
-            int end = Math.min(encoded.length(), i + BASE64_CHUNK_SIZE);
-            line("                \"" + encoded.substring(i, end) + "\"" + (end == encoded.length() ? "" : ","));
-        }
-        line("        ));");
-        line("    }");
-    }
-
-    private void writeConstructor(String className) {
+    private void writeConstructor(String className, String programResource) {
         line("");
         line("    public " + className + "() {");
-        line("        super(decodeProgram());");
+        line("        super(" + className + ".class, " + quote(programResource) + ");");
         for (int i = 0; i < bytecode.getFunctions().length; i++) {
             line("        this.f" + i + " = function(" + i + ");");
         }

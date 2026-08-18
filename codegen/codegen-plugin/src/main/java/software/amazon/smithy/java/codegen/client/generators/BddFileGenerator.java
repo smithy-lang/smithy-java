@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.client.generators;
 
+import java.io.ByteArrayInputStream;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -31,11 +32,17 @@ public final class BddFileGenerator
         var definitionFile = clientSymbol.getDefinitionFile();
         var separator = definitionFile.lastIndexOf('/');
         var resolverFile = definitionFile.substring(0, separator + 1) + resolverName + ".java";
-        var generated = new JavaEndpointResolverGenerator(bytecode).generate(namespace, resolverName);
+        var resourceName = "/META-INF/endpoints/" + serviceName + ".bdd";
+        var generated = new JavaEndpointResolverGenerator(bytecode)
+                .generate(namespace, resolverName, resourceName);
         var body = generated.substring(generated.indexOf("\n\n") + 2);
         directive.context()
                 .writerDelegator()
                 .useFileWriter(resolverFile, namespace, writer -> writer.write("$L", body));
+        directive.fileManifest()
+                .writeFile(
+                        "./resources" + resourceName,
+                        new ByteArrayInputStream(bytecode.getBytecode()));
     }
 
     private Bytecode compileBytecode(ServiceShape serviceShape) {

@@ -26,6 +26,7 @@ final class GeneratedResolverFactory {
             Path sourceDir = output.resolve(PACKAGE.replace('.', '/'));
             Files.createDirectories(sourceDir);
             Path sourceFile = sourceDir.resolve(className + ".java");
+            Files.write(sourceDir.resolve(className + ".bdd"), bytecode.getBytecode());
             Files.writeString(
                     sourceFile,
                     new JavaEndpointResolverGenerator(bytecode).generate(PACKAGE, className));

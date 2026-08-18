@@ -68,10 +68,13 @@ class JavaEndpointResolverGeneratorTest {
 
         assertFalse(source.contains("Object[]"));
         assertFalse(source.contains("VarHandle"));
+        assertFalse(source.contains("Base64"));
+        assertFalse(source.contains("decodeProgram"));
+        assertTrue(source.contains("super(GeneratedTestResolver.class, \"GeneratedTestResolver.bdd\")"));
         assertTrue(source.contains("private software.amazon.smithy.java.endpoints.Endpoint nodeP2"));
         assertTrue(source.contains("while (true)"));
 
-        GeneratedEndpointResolver<?> generated = compile(source);
+        GeneratedEndpointResolver<?> generated = compile(source, bytecode);
         var vm = new BytecodeEndpointResolver(
                 bytecode,
                 engine.getExtensions(),
@@ -96,8 +99,10 @@ class JavaEndpointResolverGeneratorTest {
     @Test
     void generatedParametersFallBackToThreadLocalStateWhenShared() throws Exception {
         RulesEngineBuilder engine = new RulesEngineBuilder();
+        Bytecode bytecode = engine.compile(testBdd());
         GeneratedEndpointResolver<?> generated = compile(
-                new JavaEndpointResolverGenerator(engine.compile(testBdd())).generate(PACKAGE, CLASS_NAME));
+                new JavaEndpointResolverGenerator(bytecode).generate(PACKAGE, CLASS_NAME),
+                bytecode);
         var parameters = generated.createParameters(Map.of("Required", "present"));
         int threadCount = 8;
         var start = new CountDownLatch(1);
@@ -221,10 +226,11 @@ class JavaEndpointResolverGeneratorTest {
                 .build();
     }
 
-    private GeneratedEndpointResolver<?> compile(String source) throws Exception {
+    private GeneratedEndpointResolver<?> compile(String source, Bytecode bytecode) throws Exception {
         Path sourceDir = tempDir.resolve(PACKAGE.replace('.', '/'));
         Files.createDirectories(sourceDir);
         Path sourceFile = sourceDir.resolve(CLASS_NAME + ".java");
+        Files.write(sourceDir.resolve(CLASS_NAME + ".bdd"), bytecode.getBytecode());
         Files.writeString(sourceFile, source);
         int result = ToolProvider.getSystemJavaCompiler().run(
                 null,

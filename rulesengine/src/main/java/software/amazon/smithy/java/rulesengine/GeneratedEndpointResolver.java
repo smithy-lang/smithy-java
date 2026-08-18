@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.rulesengine;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -50,6 +52,28 @@ public abstract class GeneratedEndpointResolver<S extends GeneratedEndpointResol
                 bytecode,
                 engine.getExtensions(),
                 engine.getBuiltinProviders());
+    }
+
+    /**
+     * Creates a generated resolver from a binary program resource.
+     *
+     * @param resourceOwner class used to load the resource
+     * @param resourceName class-relative or absolute resource name
+     */
+    protected GeneratedEndpointResolver(Class<?> resourceOwner, String resourceName) {
+        this(loadProgram(resourceOwner, resourceName));
+    }
+
+    private static byte[] loadProgram(Class<?> resourceOwner, String resourceName) {
+        try (var stream = resourceOwner.getResourceAsStream(resourceName)) {
+            if (stream == null) {
+                throw new IllegalStateException(
+                        "Endpoint BDD resource not found: " + resourceName + " from " + resourceOwner.getName());
+            }
+            return stream.readAllBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Unable to load endpoint BDD resource: " + resourceName, e);
+        }
     }
 
     /**
