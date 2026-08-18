@@ -12,6 +12,7 @@ import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.rulesengine.BytecodeEndpointResolver;
 import software.amazon.smithy.java.rulesengine.DecisionTreeEndpointResolver;
+import software.amazon.smithy.java.rulesengine.GeneratedEndpointResolver;
 import software.amazon.smithy.java.rulesengine.RulesEngineBuilder;
 import software.amazon.smithy.java.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.java.rulesengine.RulesEngineTraits;
@@ -31,6 +32,11 @@ public final class EndpointRulesPlugin implements AutoClientPlugin {
 
     @Override
     public void configureClient(ClientConfig.Builder config) {
+        if (config.endpointResolver() instanceof GeneratedEndpointResolver<?>) {
+            LOGGER.debug("Using generated endpoint resolver");
+            return;
+        }
+
         // Only modify the endpoint resolver if it isn't set already or if CUSTOM_ENDPOINT is set,
         // and if a program was provided.
         boolean usePlugin = false;

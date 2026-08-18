@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.aws.client.rulesengine;
 
+import java.util.Objects;
 import software.amazon.smithy.java.rulesengine.PropertyGetter;
 import software.amazon.smithy.java.rulesengine.RulesFunction;
 import software.amazon.smithy.model.node.Node;
@@ -21,21 +22,29 @@ import software.amazon.smithy.rulesengine.aws.language.functions.partition.Parti
  */
 enum AwsRulesFunction implements RulesFunction {
     AWS_PARTITION("aws.partition", 1) {
+        private transient volatile PartitionMap cache;
+
         @Override
         public Object apply1(Object arg1) {
             String region = (String) arg1;
+            var cached = cache;
+            if (cached != null && Objects.equals(region, cached.region)) {
+                return cached;
+            }
             var partition = AwsPartition.findPartition(region);
             if (partition == null) {
                 return null;
             }
-            return new PartitionMap(partition);
+            var result = new PartitionMap(region, partition);
+            cache = result;
+            return result;
         }
 
         // Convert AwsPartition to the map structure used in the rules engine.
         // Most of the entries aren't needed for evaluating rules, so map entries are created lazily (something that
         // isn't needed when evaluating rules), and accessing map values is done using a switch (something that is
         // essentially compiled into a map lookup via a lookupswitch).
-        private record PartitionMap(Partition partition) implements PropertyGetter, ToNode {
+        private record PartitionMap(String region, Partition partition) implements PropertyGetter, ToNode {
             @Override
             public Object getProperty(String name) {
                 return switch (name) {
@@ -66,7 +75,7 @@ enum AwsRulesFunction implements RulesFunction {
             String value = (String) arg1;
 
             var c = cache;
-            if (c != null && value.equals(c.key)) {
+            if (c != null && Objects.equals(value, c.key)) {
                 return c;
             }
 

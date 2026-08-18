@@ -57,4 +57,40 @@ public interface RulesExtension {
     ) {
         // by default does nothing.
     }
+
+    /**
+     * Processes one generated auth-scheme endpoint property without materializing its nested maps and lists.
+     *
+     * <p>The default preserves the map-based extension contract. Extensions that understand auth schemes can
+     * override this method to consume the field-based value directly.
+     *
+     * @param builder endpoint being created
+     * @param context resolution context
+     * @param authScheme field-based auth-scheme properties
+     * @param headers resolved endpoint headers
+     */
+    default void extractEndpointAuthScheme(
+            Endpoint.Builder builder,
+            Context context,
+            PropertyGetter authScheme,
+            Map<String, List<String>> headers
+    ) {
+        Map<String, Object> entry = new java.util.HashMap<>(5);
+        for (String name : List.of(
+                "name",
+                "signingName",
+                "signingRegion",
+                "disableDoubleEncoding",
+                "signingRegionSet")) {
+            Object value = authScheme.getProperty(name);
+            if (value != null) {
+                entry.put(name, value);
+            }
+        }
+        extractEndpointProperties(
+                builder,
+                context,
+                Map.of("authSchemes", List.of(entry)),
+                headers);
+    }
 }

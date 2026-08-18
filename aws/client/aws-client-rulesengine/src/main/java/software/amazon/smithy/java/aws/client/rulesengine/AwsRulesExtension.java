@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import software.amazon.smithy.java.aws.client.core.settings.EndpointAuthSchemeSettings;
@@ -20,6 +21,7 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointAuthScheme;
 import software.amazon.smithy.java.rulesengine.EndpointUtils;
+import software.amazon.smithy.java.rulesengine.PropertyGetter;
 import software.amazon.smithy.java.rulesengine.RulesExtension;
 import software.amazon.smithy.java.rulesengine.RulesFunction;
 import software.amazon.smithy.utils.SmithyUnstableApi;
@@ -43,6 +45,7 @@ public class AwsRulesExtension implements RulesExtension {
      */
     private static final ConcurrentHashMap<List<?>, List<EndpointAuthScheme>> AUTH_SCHEME_CACHE =
             new ConcurrentHashMap<>();
+    private static volatile GeneratedAuthSchemeCache generatedAuthSchemeCache;
 
     @Override
     public void putBuiltinProviders(Map<String, Function<Context, Object>> providers) {
@@ -100,6 +103,44 @@ public class AwsRulesExtension implements RulesExtension {
         }
     }
 
+    @Override
+    @SuppressWarnings("unchecked")
+    public void extractEndpointAuthScheme(
+            Endpoint.Builder builder,
+            Context context,
+            PropertyGetter authScheme,
+            Map<String, List<String>> headers
+    ) {
+        String name = (String) authScheme.getProperty("name");
+        String signingName = (String) authScheme.getProperty("signingName");
+        String signingRegion = (String) authScheme.getProperty("signingRegion");
+        Boolean disableDoubleEncoding = (Boolean) authScheme.getProperty("disableDoubleEncoding");
+        List<String> signingRegionSet = (List<String>) authScheme.getProperty("signingRegionSet");
+
+        GeneratedAuthSchemeCache cached = generatedAuthSchemeCache;
+        EndpointAuthScheme result;
+        if (cached != null
+                && Objects.equals(name, cached.name)
+                && Objects.equals(signingName, cached.signingName)
+                && Objects.equals(signingRegion, cached.signingRegion)
+                && Objects.equals(disableDoubleEncoding, cached.disableDoubleEncoding)
+                && Objects.equals(signingRegionSet, cached.signingRegionSet)) {
+            result = cached.authScheme;
+        } else {
+            result = buildAuthScheme(name, signingName, signingRegion, disableDoubleEncoding, signingRegionSet);
+            generatedAuthSchemeCache = new GeneratedAuthSchemeCache(
+                    name,
+                    signingName,
+                    signingRegion,
+                    disableDoubleEncoding,
+                    signingRegionSet,
+                    result);
+        }
+        if (result != null) {
+            builder.addAuthScheme(result);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static List<EndpointAuthScheme> buildAuthSchemes(List<?> entries) {
         var result = new ArrayList<EndpointAuthScheme>(entries.size());
@@ -111,34 +152,56 @@ public class AwsRulesExtension implements RulesExtension {
             if (!(name instanceof String schemeName) || schemeName.isEmpty()) {
                 continue;
             }
-            // Endpoint rules emit names like "sigv4-s3express" with hyphens, but Smithy ShapeIds
-            // (used as map keys for AuthScheme registration) only allow alphanumerics and '_'.
-            // Map each hyphen + following segment to upper-camel ("sigv4-s3express" ->
-            // "sigv4S3Express"). AuthScheme implementations need to use the same mapping for
-            // their canonical id (e.g. S3ExpressAuthScheme.SCHEME_ID).
-            var schemeBuilder = EndpointAuthScheme.builder().authSchemeId(toShapeIdName(schemeName));
-
             Object signingName = EndpointUtils.getProperty(entry, "signingName");
-            if (signingName instanceof String s && !s.isEmpty()) {
-                schemeBuilder.putProperty(EndpointAuthSchemeSettings.SIGNING_NAME, s);
-            }
             Object signingRegion = EndpointUtils.getProperty(entry, "signingRegion");
-            if (signingRegion instanceof String s && !s.isEmpty()) {
-                schemeBuilder.putProperty(EndpointAuthSchemeSettings.SIGNING_REGION, s);
-            }
             Object disableDoubleEncoding = EndpointUtils.getProperty(entry, "disableDoubleEncoding");
-            if (disableDoubleEncoding instanceof Boolean b) {
-                schemeBuilder.putProperty(EndpointAuthSchemeSettings.DISABLE_DOUBLE_ENCODING, b);
-            }
             Object signingRegionSet = EndpointUtils.getProperty(entry, "signingRegionSet");
-            if (signingRegionSet instanceof List<?> set) {
-                schemeBuilder.putProperty(EndpointAuthSchemeSettings.SIGNING_REGION_SET, (List<String>) set);
+            EndpointAuthScheme scheme = buildAuthScheme(
+                    schemeName,
+                    signingName instanceof String s ? s : null,
+                    signingRegion instanceof String s ? s : null,
+                    disableDoubleEncoding instanceof Boolean b ? b : null,
+                    signingRegionSet instanceof List<?> set ? (List<String>) set : null);
+            if (scheme != null) {
+                result.add(scheme);
             }
-
-            result.add(schemeBuilder.build());
         }
         return List.copyOf(result);
     }
+
+    private static EndpointAuthScheme buildAuthScheme(
+            String name,
+            String signingName,
+            String signingRegion,
+            Boolean disableDoubleEncoding,
+            List<String> signingRegionSet
+    ) {
+        if (name == null || name.isEmpty()) {
+            return null;
+        }
+        var builder = EndpointAuthScheme.builder().authSchemeId(toShapeIdName(name));
+        if (signingName != null && !signingName.isEmpty()) {
+            builder.putProperty(EndpointAuthSchemeSettings.SIGNING_NAME, signingName);
+        }
+        if (signingRegion != null && !signingRegion.isEmpty()) {
+            builder.putProperty(EndpointAuthSchemeSettings.SIGNING_REGION, signingRegion);
+        }
+        if (disableDoubleEncoding != null) {
+            builder.putProperty(EndpointAuthSchemeSettings.DISABLE_DOUBLE_ENCODING, disableDoubleEncoding);
+        }
+        if (signingRegionSet != null) {
+            builder.putProperty(EndpointAuthSchemeSettings.SIGNING_REGION_SET, signingRegionSet);
+        }
+        return builder.build();
+    }
+
+    private record GeneratedAuthSchemeCache(
+            String name,
+            String signingName,
+            String signingRegion,
+            Boolean disableDoubleEncoding,
+            List<String> signingRegionSet,
+            EndpointAuthScheme authScheme) {}
 
     /**
      * Convert an endpoint-rule auth scheme name like {@code sigv4-s3express} into a valid

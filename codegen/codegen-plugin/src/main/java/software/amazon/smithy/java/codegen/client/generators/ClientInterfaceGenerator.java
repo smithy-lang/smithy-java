@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.client.generators;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -41,9 +40,8 @@ import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.sections.OperationSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.logging.InternalLogger;
-import software.amazon.smithy.java.rulesengine.RulesEngineBuilder;
-import software.amazon.smithy.java.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
@@ -189,8 +187,11 @@ public final class ClientInterfaceGenerator
                     writer.putContext("hasBdd",
                             service.hasTrait(ENDPOINT_BDD_TRAIT)
                                     || service.hasTrait(ENDPOINT_RULESET_TRAIT));
-                    writer.putContext("loadBddInfo",
-                            new LoadBddInfoGenerator(writer, service.toShapeId().getName()));
+                    writer.putContext(
+                            "loadBddInfo",
+                            new LoadBddInfoGenerator(
+                                    writer,
+                                    service.toShapeId().getName() + "EndpointResolver"));
                     var hasTransportSettings = settings.transportSettings() != null && !settings.transportSettings()
                             .isEmpty();
                     writer.putContext("hasTransportSettings", hasTransportSettings);
@@ -616,22 +617,17 @@ public final class ClientInterfaceGenerator
         return result;
     }
 
-    private record LoadBddInfoGenerator(JavaWriter writer, String serviceName) implements Runnable {
+    private record LoadBddInfoGenerator(JavaWriter writer, String resolver) implements Runnable {
         @Override
         public void run() {
             writer.write("""
-                    try (var stream = getClass().getResourceAsStream("/META-INF/endpoints/$L.bdd")) {
-                        var bytecode = new $T().load(stream.readAllBytes());
-                        putConfig($T.BYTECODE, bytecode);
-                    } catch ($T e) {
-                        throw new $T("Failed to load BDD bytecode binary file", e);
+                    if (configBuilder().endpointResolver() == null
+                            || configBuilder().context().get($T.CUSTOM_ENDPOINT) != null) {
+                        configBuilder().endpointResolver(new $L());
                     }
                     """,
-                    serviceName,
-                    RulesEngineBuilder.class,
-                    RulesEngineSettings.class,
-                    IOException.class,
-                    RuntimeException.class);
+                    EndpointContext.class,
+                    resolver);
         }
     }
 }

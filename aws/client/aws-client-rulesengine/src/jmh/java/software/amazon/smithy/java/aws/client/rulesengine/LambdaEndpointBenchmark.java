@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.aws.client.rulesengine;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -24,6 +25,7 @@ import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.endpoints.EndpointResolverParams;
 import software.amazon.smithy.java.rulesengine.BytecodeEndpointResolver;
+import software.amazon.smithy.java.rulesengine.GeneratedEndpointResolver;
 import software.amazon.smithy.java.rulesengine.RulesEngineBuilder;
 import software.amazon.smithy.java.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.model.Model;
@@ -41,7 +43,7 @@ public class LambdaEndpointBenchmark {
             ShapeId.from("com.amazonaws.lambda#GetAccountSettingsRequest");
 
     private static class SharedResolver {
-        static final EndpointResolver RESOLVER;
+        static final Map<String, EndpointResolver> RESOLVERS = new ConcurrentHashMap<>();
         static final DynamicClient CLIENT;
         static final ApiOperation<?, ?> GET_ACCOUNT_SETTINGS;
 
@@ -66,10 +68,13 @@ public class LambdaEndpointBenchmark {
             // Compile endpointRuleSet through the full optimization pipeline
             var ruleSetTrait = service.expectTrait(EndpointRuleSetTrait.class);
             var bytecode = engine.compile(ruleSetTrait.getEndpointRuleSet());
-            RESOLVER = new BytecodeEndpointResolver(
+            RESOLVERS.put("bytecode", new BytecodeEndpointResolver(
                     bytecode,
                     engine.getExtensions(),
-                    engine.getBuiltinProviders());
+                    engine.getBuiltinProviders()));
+            RESOLVERS.put(
+                    "generated",
+                    GeneratedResolverFactory.create(bytecode, "GeneratedLambda"));
 
             GET_ACCOUNT_SETTINGS = CLIENT.getOperation("GetAccountSettings");
         }
@@ -77,11 +82,18 @@ public class LambdaEndpointBenchmark {
 
     @State(Scope.Benchmark)
     public static class ParamState {
+        @org.openjdk.jmh.annotations.Param({"bytecode", "generated"})
+        private String resolverMode;
+
+        EndpointResolver resolver;
         EndpointResolverParams usEast1NoFipsNoDualStackParams;
         EndpointResolverParams usGovEast1FipsDualStackParams;
+        GeneratedEndpointResolver.GeneratedParameters usEast1NoFipsNoDualStackGeneratedParams;
+        GeneratedEndpointResolver.GeneratedParameters usGovEast1FipsDualStackGeneratedParams;
 
         @Setup
         public void setup() {
+            resolver = SharedResolver.RESOLVERS.get(resolverMode);
             var client = SharedResolver.CLIENT;
             var op = SharedResolver.GET_ACCOUNT_SETTINGS;
 
@@ -96,6 +108,25 @@ public class LambdaEndpointBenchmark {
                     op,
                     "us-gov-east-1",
                     Map.of("Region", "us-gov-east-1", "UseFIPS", true, "UseDualStack", true));
+
+            if (resolver instanceof GeneratedEndpointResolver<?> generated) {
+                usEast1NoFipsNoDualStackGeneratedParams = generated.createParameters(
+                        usEast1NoFipsNoDualStackParams.context()
+                                .expect(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS));
+                usGovEast1FipsDualStackGeneratedParams = generated.createParameters(
+                        usGovEast1FipsDualStackParams.context()
+                                .expect(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS));
+            }
+        }
+
+        Object resolve(
+                EndpointResolverParams params,
+                GeneratedEndpointResolver.GeneratedParameters generatedParams
+        ) {
+            if (generatedParams != null) {
+                return ((GeneratedEndpointResolver<?>) resolver).resolveEndpoint(params.context(), generatedParams);
+            }
+            return resolver.resolveEndpoint(params);
         }
 
         private static EndpointResolverParams buildParams(
@@ -118,11 +149,15 @@ public class LambdaEndpointBenchmark {
 
     @Benchmark
     public Object usEast1NoFipsNoDualStack(ParamState params) {
-        return SharedResolver.RESOLVER.resolveEndpoint(params.usEast1NoFipsNoDualStackParams);
+        return params.resolve(
+                params.usEast1NoFipsNoDualStackParams,
+                params.usEast1NoFipsNoDualStackGeneratedParams);
     }
 
     @Benchmark
     public Object usGovEast1FipsDualStack(ParamState params) {
-        return SharedResolver.RESOLVER.resolveEndpoint(params.usGovEast1FipsDualStackParams);
+        return params.resolve(
+                params.usGovEast1FipsDualStackParams,
+                params.usGovEast1FipsDualStackGeneratedParams);
     }
 }

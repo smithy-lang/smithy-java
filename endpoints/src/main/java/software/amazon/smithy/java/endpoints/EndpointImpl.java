@@ -23,9 +23,12 @@ final class EndpointImpl implements Endpoint {
 
     private EndpointImpl(Builder builder) {
         this.uri = Objects.requireNonNull(builder.uri);
-        this.authSchemes = builder.authSchemes == null ? List.of() : Collections.unmodifiableList(builder.authSchemes);
+        this.authSchemes = builder.authSchemes != null
+                ? Collections.unmodifiableList(builder.authSchemes)
+                : builder.authScheme == null ? List.of() : List.of(builder.authScheme);
         this.properties = builder.properties == null ? Map.of() : Collections.unmodifiableMap(builder.properties);
         // Clear out the builder, making this class immutable and the builder still reusable.
+        builder.authScheme = null;
         builder.authSchemes = null;
         builder.properties = null;
     }
@@ -77,8 +80,10 @@ final class EndpointImpl implements Endpoint {
     static final class Builder implements Endpoint.Builder {
 
         private SmithyUri uri;
+        private EndpointAuthScheme authScheme;
         private List<EndpointAuthScheme> authSchemes;
         private Map<Context.Key<?>, Object> properties;
+        private EndpointImpl cachedEndpoint;
 
         @Override
         public Builder uri(SmithyUri uri) {
@@ -88,10 +93,16 @@ final class EndpointImpl implements Endpoint {
 
         @Override
         public Builder addAuthScheme(EndpointAuthScheme authScheme) {
-            if (this.authSchemes == null) {
+            if (this.authSchemes != null) {
+                this.authSchemes.add(authScheme);
+            } else if (this.authScheme == null) {
+                this.authScheme = authScheme;
+            } else {
                 this.authSchemes = new ArrayList<>();
+                this.authSchemes.add(this.authScheme);
+                this.authSchemes.add(authScheme);
+                this.authScheme = null;
             }
-            this.authSchemes.add(authScheme);
             return this;
         }
 
@@ -106,7 +117,21 @@ final class EndpointImpl implements Endpoint {
 
         @Override
         public Endpoint build() {
-            return new EndpointImpl(this);
+            if (properties == null && authSchemes == null && cachedEndpoint != null
+                    && cachedEndpoint.uri.equals(uri)) {
+                if (authScheme == null && cachedEndpoint.authSchemes.isEmpty()
+                        || authScheme != null
+                                && cachedEndpoint.authSchemes.size() == 1
+                                && cachedEndpoint.authSchemes.getFirst().equals(authScheme)) {
+                    authScheme = null;
+                    return cachedEndpoint;
+                }
+            }
+            EndpointImpl result = new EndpointImpl(this);
+            if (result.properties.isEmpty() && result.authSchemes.size() <= 1) {
+                cachedEndpoint = result;
+            }
+            return result;
         }
     }
 }

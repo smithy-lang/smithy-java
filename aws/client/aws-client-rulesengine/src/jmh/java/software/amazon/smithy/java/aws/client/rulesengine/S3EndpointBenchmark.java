@@ -36,6 +36,7 @@ import software.amazon.smithy.java.rulesengine.BddTrace;
 import software.amazon.smithy.java.rulesengine.BddTraceSink;
 import software.amazon.smithy.java.rulesengine.Bytecode;
 import software.amazon.smithy.java.rulesengine.BytecodeEndpointResolver;
+import software.amazon.smithy.java.rulesengine.GeneratedEndpointResolver;
 import software.amazon.smithy.java.rulesengine.RulesEngineBuilder;
 import software.amazon.smithy.java.rulesengine.RulesEngineSettings;
 import software.amazon.smithy.java.rulesengine.RulesExtension;
@@ -117,11 +118,13 @@ public class S3EndpointBenchmark {
             GET_OBJECT = CLIENT.getOperation("GetObject");
         }
 
-        static EndpointResolver getResolver(String treeMode) {
-            return RESOLVERS.computeIfAbsent(treeMode, mode -> {
-                var transforms = TRANSFORM_COMBOS.get(mode);
-                var bytecode = compileBytecode(SERVICE, ENGINE, mode, transforms);
-                return new BytecodeEndpointResolver(bytecode, EXTENSIONS, BUILTINS);
+        static EndpointResolver getResolver(String treeMode, String resolverMode) {
+            return RESOLVERS.computeIfAbsent(treeMode + ":" + resolverMode, key -> {
+                var transforms = TRANSFORM_COMBOS.get(treeMode);
+                var bytecode = compileBytecode(SERVICE, ENGINE, treeMode, transforms);
+                return "generated".equals(resolverMode)
+                        ? GeneratedResolverFactory.create(bytecode, "GeneratedS3_" + treeMode.replace('+', '_'))
+                        : new BytecodeEndpointResolver(bytecode, EXTENSIONS, BUILTINS);
             });
         }
 
@@ -168,7 +171,7 @@ public class S3EndpointBenchmark {
 
         @Setup
         public void setup(ParamState params) {
-            var bytecode = ((BytecodeEndpointResolver) params.resolver).getBytecode();
+            var bytecode = getBytecode(params.resolver);
             conditions = bytecode.getConditionCount();
             results = bytecode.getResultCount();
             bddNodes = bytecode.getBddNodeCount();
@@ -184,12 +187,20 @@ public class S3EndpointBenchmark {
         @Param({"none", "az", "express", "az+express"})
         private String treeMode;
 
+        @Param({"bytecode", "generated"})
+        private String resolverMode;
+
         EndpointResolver resolver;
         EndpointResolverParams vanillaVirtualAddressingParams;
         EndpointResolverParams vanillaPathStyleParams;
         EndpointResolverParams dataPlaneShortZoneParams;
         EndpointResolverParams vanillaAccessPointArnParams;
         EndpointResolverParams s3OutpostsVanillaParams;
+        GeneratedEndpointResolver.GeneratedParameters vanillaVirtualAddressingGeneratedParams;
+        GeneratedEndpointResolver.GeneratedParameters vanillaPathStyleGeneratedParams;
+        GeneratedEndpointResolver.GeneratedParameters dataPlaneShortZoneGeneratedParams;
+        GeneratedEndpointResolver.GeneratedParameters vanillaAccessPointArnGeneratedParams;
+        GeneratedEndpointResolver.GeneratedParameters s3OutpostsVanillaGeneratedParams;
         // Same inputs as vanillaVirtualAddressing, but with a no-op BddTraceSink on the context. Pairs
         // with vanillaVirtualAddressing to A/B the trace overhead: traced (full per-condition callbacks)
         // vs untraced (one null ctx.get on the otherwise-untouched fast loop).
@@ -198,7 +209,7 @@ public class S3EndpointBenchmark {
         @Setup
         public void setup() {
             boolean canned = "canned".equals(paramMode);
-            resolver = SharedResolver.getResolver(treeMode);
+            resolver = SharedResolver.getResolver(treeMode, resolverMode);
             var client = SharedResolver.CLIENT;
             var getObject = SharedResolver.GET_OBJECT;
 
@@ -322,14 +333,43 @@ public class S3EndpointBenchmark {
                             false),
                     NoopTraceSink.INSTANCE);
 
+            if (resolver instanceof GeneratedEndpointResolver<?> generated) {
+                vanillaVirtualAddressingGeneratedParams = generatedParameters(
+                        generated,
+                        vanillaVirtualAddressingParams);
+                vanillaPathStyleGeneratedParams = generatedParameters(generated, vanillaPathStyleParams);
+                dataPlaneShortZoneGeneratedParams = generatedParameters(generated, dataPlaneShortZoneParams);
+                vanillaAccessPointArnGeneratedParams = generatedParameters(generated, vanillaAccessPointArnParams);
+                s3OutpostsVanillaGeneratedParams = generatedParameters(generated, s3OutpostsVanillaParams);
+            }
+
             // Dump disassembly to tmp file for analysis
             dumpDisassembly(treeMode);
         }
 
+        private static GeneratedEndpointResolver.GeneratedParameters generatedParameters(
+                GeneratedEndpointResolver<?> resolver,
+                EndpointResolverParams params
+        ) {
+            return resolver.createParameters(
+                    params.context().expect(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS));
+        }
+
+        Endpoint resolve(
+                EndpointResolverParams params,
+                GeneratedEndpointResolver.GeneratedParameters generatedParams
+        ) {
+            if (generatedParams != null) {
+                return ((GeneratedEndpointResolver<?>) resolver).resolveEndpoint(params.context(), generatedParams);
+            }
+            return resolver.resolveEndpoint(params);
+        }
+
         private void dumpDisassembly(String label) {
             try {
-                var bytecode = ((BytecodeEndpointResolver) resolver).getBytecode();
-                var path = SharedResolver.CACHE_DIR.resolve("s3-bytecode-" + label + ".txt");
+                var bytecode = getBytecode(resolver);
+                var path = SharedResolver.CACHE_DIR.resolve(
+                        "s3-bytecode-" + label + "-" + resolverMode + ".txt");
                 Files.writeString(path, bytecode.toString());
                 System.out.println("[disasm] Wrote " + path);
             } catch (Exception e) {
@@ -374,6 +414,12 @@ public class S3EndpointBenchmark {
         }
     }
 
+    private static Bytecode getBytecode(EndpointResolver resolver) {
+        return resolver instanceof BytecodeEndpointResolver bytecodeResolver
+                ? bytecodeResolver.getBytecode()
+                : ((GeneratedEndpointResolver<?>) resolver).getBytecode();
+    }
+
     /** A sink whose trace discards everything, so the benchmark measures pure trace-loop overhead. */
     private enum NoopTraceSink implements BddTraceSink, BddTrace {
         INSTANCE;
@@ -392,7 +438,9 @@ public class S3EndpointBenchmark {
 
     @Benchmark
     public Object vanillaVirtualAddressing(ParamState params) {
-        return params.resolver.resolveEndpoint(params.vanillaVirtualAddressingParams);
+        return params.resolve(
+                params.vanillaVirtualAddressingParams,
+                params.vanillaVirtualAddressingGeneratedParams);
     }
 
     /** Identical to {@link #vanillaVirtualAddressing} but with a no-op trace sink set, to measure the
@@ -404,22 +452,22 @@ public class S3EndpointBenchmark {
 
     @Benchmark
     public Object vanillaPathStyle(ParamState params) {
-        return params.resolver.resolveEndpoint(params.vanillaPathStyleParams);
+        return params.resolve(params.vanillaPathStyleParams, params.vanillaPathStyleGeneratedParams);
     }
 
     @Benchmark
     public Object dataPlaneShortZone(ParamState params) {
-        return params.resolver.resolveEndpoint(params.dataPlaneShortZoneParams);
+        return params.resolve(params.dataPlaneShortZoneParams, params.dataPlaneShortZoneGeneratedParams);
     }
 
     @Benchmark
     public Object vanillaAccessPointArn(ParamState params) {
-        return params.resolver.resolveEndpoint(params.vanillaAccessPointArnParams);
+        return params.resolve(params.vanillaAccessPointArnParams, params.vanillaAccessPointArnGeneratedParams);
     }
 
     @Benchmark
     public Object s3OutpostsVanilla(ParamState params) {
-        return params.resolver.resolveEndpoint(params.s3OutpostsVanillaParams);
+        return params.resolve(params.s3OutpostsVanillaParams, params.s3OutpostsVanillaGeneratedParams);
     }
 
     /**
