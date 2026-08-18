@@ -71,6 +71,10 @@ class JavaEndpointResolverGeneratorTest {
         assertFalse(source.contains("VarHandle"));
         assertFalse(source.contains("Base64"));
         assertFalse(source.contains("decodeProgram"));
+        assertFalse(source.contains("evaluateTraced"));
+        assertFalse(source.contains("traceParameters"));
+        assertFalse(source.contains("tracedCondition"));
+        assertFalse(source.contains("tracedResult"));
         assertTrue(source.contains("super(GeneratedTestResolver.class, \"GeneratedTestResolver.bdd\")"));
         assertTrue(source.contains("private software.amazon.smithy.java.endpoints.Endpoint nodeP2"));
         assertTrue(source.contains("while (true)"));
@@ -295,6 +299,15 @@ class JavaEndpointResolverGeneratorTest {
         assertEquals(vmTrace.events, generatedTrace.events);
         assertEquals("present", generatedTrace.requiredAtBegin);
 
+        var directTrace = new RecordingTrace();
+        Context directContext = Context.create().put(RulesEngineSettings.BDD_TRACE_SINK, directTrace);
+        Endpoint directEndpoint = generated.resolveEndpoint(
+                directContext,
+                generated.createParameters(Map.of("Required", "present")));
+        assertEquals(generatedEndpoint, directEndpoint);
+        assertEquals(vmTrace.events, directTrace.events);
+        assertEquals("present", directTrace.requiredAtBegin);
+
         Context sampledOut = Context.create()
                 .put(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS, Map.of("Required", "present"))
                 .put(RulesEngineSettings.BDD_TRACE_SINK, (bytecode, parameters) -> null);
@@ -304,6 +317,13 @@ class JavaEndpointResolverGeneratorTest {
                 .context(sampledOut)
                 .build());
         assertEquals(generatedEndpoint, sampledEndpoint);
+
+        Context directSampledOut = Context.create()
+                .put(RulesEngineSettings.BDD_TRACE_SINK, (bytecode, parameters) -> null);
+        Endpoint directSampledEndpoint = generated.resolveEndpoint(
+                directSampledOut,
+                generated.createParameters(Map.of("Required", "present")));
+        assertEquals(generatedEndpoint, directSampledEndpoint);
     }
 
     private static EndpointResolverParams tracedParams(BddTraceSink sink) {
@@ -345,6 +365,9 @@ class JavaEndpointResolverGeneratorTest {
 
         @Override
         public void put(String name, Object value) {}
+
+        @Override
+        public void copyTo(GeneratedEndpointResolver.ParameterSink sink) {}
     }
 
     private static final class CapturingExtension implements RulesExtension {

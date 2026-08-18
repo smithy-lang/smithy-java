@@ -145,12 +145,19 @@ final class BytecodeEvaluator implements ConditionEvaluator {
      * a sink is present, and it falls back to {@link #evaluateBdd()} if the sink declines to trace.
      */
     Endpoint evaluateBddTraced(BddTraceSink sink) {
-        BddTrace trace = sink.begin(bytecode, registerView);
+        BddTrace trace = beginTrace(sink);
         if (trace == null) {
             // Sampled out by the sink: run the untraced fast path.
             return evaluateBdd();
         }
+        return evaluateBddTraced(trace);
+    }
 
+    BddTrace beginTrace(BddTraceSink sink) {
+        return sink.begin(bytecode, registerView);
+    }
+
+    Endpoint evaluateBddTraced(BddTrace trace) {
         int ref = bytecode.getBddRootRef();
         int[] nodes = bytecode.getBddNodes();
         byte[] condTypes = bytecode.conditionTypes;

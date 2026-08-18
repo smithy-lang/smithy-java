@@ -132,29 +132,6 @@ public final class JavaEndpointResolverGenerator {
             }
         }
         line("        software.amazon.smithy.java.context.Context evaluationContext;");
-        line("        final java.util.Map<String, Object> traceParameters = new java.util.AbstractMap<>() {");
-        line("            @Override");
-        line("            public Object get(Object name) {");
-        for (int i = 0; i < registers.length; i++) {
-            if (!registers[i].temp()) {
-                line("                if (" + quote(registers[i].name()) + ".equals(name)) return r" + i + ";");
-            }
-        }
-        line("                return null;");
-        line("            }");
-        line("");
-        line("            @Override");
-        line("            public java.util.Set<Entry<String, Object>> entrySet() {");
-        line("                var result = new java.util.LinkedHashSet<Entry<String, Object>>();");
-        for (int i = 0; i < registers.length; i++) {
-            if (!registers[i].temp()) {
-                line("                if (r" + i + " != null) result.add(java.util.Map.entry("
-                        + quote(registers[i].name()) + ", r" + i + "));");
-            }
-        }
-        line("                return result;");
-        line("            }");
-        line("        };");
         line("");
         line("        State(software.amazon.smithy.java.rulesengine.RulesExtension[] extensions) {");
         line("            super(extensions);");
@@ -171,6 +148,16 @@ public final class JavaEndpointResolverGenerator {
         }
         line("                default -> { }");
         line("            }");
+        line("        }");
+        line("");
+        line("        @Override");
+        line("        public void copyTo("
+                + "software.amazon.smithy.java.rulesengine.GeneratedEndpointResolver.ParameterSink sink) {");
+        for (int i = 0; i < registers.length; i++) {
+            if (!registers[i].temp()) {
+                line("            if (p" + i + ") sink.put(" + quote(registers[i].name()) + ", r" + i + ");");
+            }
+        }
         line("        }");
         line("    }");
     }
@@ -211,11 +198,6 @@ public final class JavaEndpointResolverGenerator {
         line("    @Override");
         line("    protected State createState() {");
         line("        return new State(extensions());");
-        line("    }");
-        line("");
-        line("    @Override");
-        line("    protected java.util.Map<String, Object> traceParameters(State state) {");
-        line("        return state.traceParameters;");
         line("    }");
         line("");
         line("    @Override");
@@ -290,56 +272,6 @@ public final class JavaEndpointResolverGenerator {
         line("    @Override");
         line("    protected software.amazon.smithy.java.endpoints.Endpoint evaluate(State state) {");
         line("        return " + referenceExpression(bytecode.getBddRootRef()) + ";");
-        line("    }");
-        line("");
-        line("    @Override");
-        line("    protected software.amazon.smithy.java.endpoints.Endpoint evaluateTraced(State state,");
-        line("            software.amazon.smithy.java.rulesengine.BddTrace trace) {");
-        line("        int ref = bddRootRef();");
-        line("        int[] nodes = bddNodes();");
-        line("        while ((ref > 1 && ref < " + Bdd.RESULT_OFFSET + ")");
-        line("                || (ref < -1 && ref > -" + Bdd.RESULT_OFFSET + ")) {");
-        line("            int index = ref > 0 ? ref - 1 : -ref - 1;");
-        line("            int base = index * 3;");
-        line("            int condition = nodes[base];");
-        line("            boolean satisfied = tracedCondition(state, condition);");
-        line("            boolean branch = satisfied ^ (ref < 0);");
-        line("            trace.node(ref, condition, satisfied, branch);");
-        line("            ref = branch ? nodes[base + 1] : nodes[base + 2];");
-        line("        }");
-        line("        int resultId = ref == 1 || ref == -1 ? -1 : ref - " + Bdd.RESULT_OFFSET + ";");
-        line("        software.amazon.smithy.java.endpoints.Endpoint endpoint = resultId < 0");
-        line("                ? null");
-        line("                : tracedResult(state, resultId);");
-        line("        trace.result(resultId, endpoint);");
-        line("        return endpoint;");
-        line("    }");
-        line("");
-        line("    private boolean tracedCondition(State state, int condition) {");
-        if (bytecode.getConditionCount() == 0) {
-            line("        throw invalidPc(condition);");
-        } else {
-            line("        return switch (condition) {");
-            for (int i = 0; i < bytecode.getConditionCount(); i++) {
-                line("            case " + i + " -> " + conditionExpression(i, false) + ";");
-            }
-            line("            default -> throw invalidPc(condition);");
-            line("        };");
-        }
-        line("    }");
-        line("");
-        line("    private software.amazon.smithy.java.endpoints.Endpoint tracedResult(State state, int result) {");
-        if (bytecode.getResultCount() == 0) {
-            line("        throw invalidPc(result);");
-        } else {
-            line("        return switch (result) {");
-            for (int i = 0; i < bytecode.getResultCount(); i++) {
-                line("            case " + i + " -> (software.amazon.smithy.java.endpoints.Endpoint) result"
-                        + i + "(state);");
-            }
-            line("            default -> throw invalidPc(result);");
-            line("        };");
-        }
         line("    }");
 
         int[] nodes = bytecode.getBddNodes();

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
@@ -81,6 +82,24 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
             // Recycle for the next resolve. resetFromSink fully reinitializes per-resolve state, so a
             // stale evaluator carries nothing across uses; the Endpoint just returned holds no
             // reference into it.
+            release(evaluator, base);
+        }
+    }
+
+    Endpoint resolveTraced(
+            Context context,
+            BddTraceSink traceSink,
+            GeneratedEndpointResolver.EvaluationState parameters,
+            Supplier<Endpoint> untraced
+    ) {
+        int base = (int) Thread.currentThread().threadId();
+        BytecodeEvaluator evaluator = acquire(base);
+        try {
+            parameters.copyTo(evaluator.registerSink);
+            evaluator.resetFromSink(context);
+            BddTrace trace = evaluator.beginTrace(traceSink);
+            return trace == null ? untraced.get() : evaluator.evaluateBddTraced(trace);
+        } finally {
             release(evaluator, base);
         }
     }
