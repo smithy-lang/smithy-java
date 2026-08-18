@@ -128,6 +128,12 @@ public class SmithyUriTest {
         }
 
         @Test
+        void trustedConstruction() {
+            var uri = SmithyUri.ofTrusted("https", "example.com", 443, "/path", "key=val");
+            assertThat(uri.toString(), equalTo("https://example.com:443/path?key=val"));
+        }
+
+        @Test
         void nullPathDefaultsToEmpty() {
             var uri = SmithyUri.of("https", "host", -1, null, null);
             assertThat(uri.getPath(), equalTo(""));

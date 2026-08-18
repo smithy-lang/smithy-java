@@ -74,6 +74,17 @@ public interface Endpoint {
     }
 
     /**
+     * Create an endpoint with no properties and at most one authentication scheme.
+     *
+     * @param uri endpoint URI
+     * @param authScheme authentication scheme, or null
+     * @return the endpoint
+     */
+    static Endpoint create(SmithyUri uri, EndpointAuthScheme authScheme) {
+        return new EndpointImpl(uri, authScheme);
+    }
+
+    /**
      * Builder to create an {@link Endpoint}.
      */
     interface Builder {

@@ -18,19 +18,27 @@ import software.amazon.smithy.java.io.uri.SmithyUri;
 final class EndpointImpl implements Endpoint {
 
     private final SmithyUri uri;
-    private final List<EndpointAuthScheme> authSchemes;
+    private final EndpointAuthScheme authScheme;
+    private List<EndpointAuthScheme> authSchemes;
     private final Map<Context.Key<?>, Object> properties;
 
     private EndpointImpl(Builder builder) {
         this.uri = Objects.requireNonNull(builder.uri);
-        this.authSchemes = builder.authSchemes != null
-                ? Collections.unmodifiableList(builder.authSchemes)
-                : builder.authScheme == null ? List.of() : List.of(builder.authScheme);
+        this.authScheme = builder.authSchemes == null ? builder.authScheme : null;
+        this.authSchemes = builder.authSchemes == null
+                ? null
+                : Collections.unmodifiableList(builder.authSchemes);
         this.properties = builder.properties == null ? Map.of() : Collections.unmodifiableMap(builder.properties);
         // Clear out the builder, making this class immutable and the builder still reusable.
         builder.authScheme = null;
         builder.authSchemes = null;
         builder.properties = null;
+    }
+
+    EndpointImpl(SmithyUri uri, EndpointAuthScheme authScheme) {
+        this.uri = Objects.requireNonNull(uri);
+        this.authScheme = authScheme;
+        this.properties = Map.of();
     }
 
     @Override
@@ -51,7 +59,11 @@ final class EndpointImpl implements Endpoint {
 
     @Override
     public List<EndpointAuthScheme> authSchemes() {
-        return authSchemes;
+        List<EndpointAuthScheme> result = authSchemes;
+        if (result == null) {
+            authSchemes = result = authScheme == null ? List.of() : List.of(authScheme);
+        }
+        return result;
     }
 
     @Override
@@ -63,18 +75,18 @@ final class EndpointImpl implements Endpoint {
             return false;
         }
         EndpointImpl endpoint = (EndpointImpl) o;
-        return Objects.equals(uri, endpoint.uri) && Objects.equals(authSchemes, endpoint.authSchemes)
+        return Objects.equals(uri, endpoint.uri) && Objects.equals(authSchemes(), endpoint.authSchemes())
                 && Objects.equals(properties, endpoint.properties);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(uri, authSchemes, properties);
+        return Objects.hash(uri, authSchemes(), properties);
     }
 
     @Override
     public String toString() {
-        return "Endpoint{uri=" + uri + ", authSchemes=" + authSchemes + ", properties=" + properties + '}';
+        return "Endpoint{uri=" + uri + ", authSchemes=" + authSchemes() + ", properties=" + properties + '}';
     }
 
     static final class Builder implements Endpoint.Builder {
@@ -83,7 +95,6 @@ final class EndpointImpl implements Endpoint {
         private EndpointAuthScheme authScheme;
         private List<EndpointAuthScheme> authSchemes;
         private Map<Context.Key<?>, Object> properties;
-        private EndpointImpl cachedEndpoint;
 
         @Override
         public Builder uri(SmithyUri uri) {
@@ -117,21 +128,7 @@ final class EndpointImpl implements Endpoint {
 
         @Override
         public Endpoint build() {
-            if (properties == null && authSchemes == null && cachedEndpoint != null
-                    && cachedEndpoint.uri.equals(uri)) {
-                if (authScheme == null && cachedEndpoint.authSchemes.isEmpty()
-                        || authScheme != null
-                                && cachedEndpoint.authSchemes.size() == 1
-                                && cachedEndpoint.authSchemes.getFirst().equals(authScheme)) {
-                    authScheme = null;
-                    return cachedEndpoint;
-                }
-            }
-            EndpointImpl result = new EndpointImpl(this);
-            if (result.properties.isEmpty() && result.authSchemes.size() <= 1) {
-                cachedEndpoint = result;
-            }
-            return result;
+            return new EndpointImpl(this);
         }
     }
 }

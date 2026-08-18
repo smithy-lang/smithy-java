@@ -9,8 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
 import java.util.function.Function;
 import software.amazon.smithy.java.aws.client.core.settings.EndpointAuthSchemeSettings;
 import software.amazon.smithy.java.aws.client.core.settings.EndpointSettings;
@@ -33,19 +32,6 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  */
 @SmithyUnstableApi
 public class AwsRulesExtension implements RulesExtension {
-
-    /**
-     * Memoize the conversion from raw {@code authSchemes} property bag → typed
-     * {@link EndpointAuthScheme} list. The rules engine reconstructs the property maps on every
-     * resolve call, so the same content shows up at this hook on every request — content-keyed
-     * caching collapses the per-call work to one map lookup.
-     *
-     * <p>Bounded growth: one entry per unique {@code authSchemes} literal in any rule set the
-     * process touches. For S3 today that's ~10 entries.
-     */
-    private static final ConcurrentHashMap<List<?>, List<EndpointAuthScheme>> AUTH_SCHEME_CACHE =
-            new ConcurrentHashMap<>();
-    private static volatile GeneratedAuthSchemeCache generatedAuthSchemeCache;
 
     @Override
     public void putBuiltinProviders(Map<String, Function<Context, Object>> providers) {
@@ -97,7 +83,7 @@ public class AwsRulesExtension implements RulesExtension {
         if (!(raw instanceof List<?> entries) || entries.isEmpty()) {
             return;
         }
-        var schemes = AUTH_SCHEME_CACHE.computeIfAbsent(entries, AwsRulesExtension::buildAuthSchemes);
+        var schemes = buildAuthSchemes(entries);
         for (var s : schemes) {
             builder.addAuthScheme(s);
         }
@@ -117,28 +103,26 @@ public class AwsRulesExtension implements RulesExtension {
         Boolean disableDoubleEncoding = (Boolean) authScheme.getProperty("disableDoubleEncoding");
         List<String> signingRegionSet = (List<String>) authScheme.getProperty("signingRegionSet");
 
-        GeneratedAuthSchemeCache cached = generatedAuthSchemeCache;
-        EndpointAuthScheme result;
-        if (cached != null
-                && Objects.equals(name, cached.name)
-                && Objects.equals(signingName, cached.signingName)
-                && Objects.equals(signingRegion, cached.signingRegion)
-                && Objects.equals(disableDoubleEncoding, cached.disableDoubleEncoding)
-                && Objects.equals(signingRegionSet, cached.signingRegionSet)) {
-            result = cached.authScheme;
-        } else {
-            result = buildAuthScheme(name, signingName, signingRegion, disableDoubleEncoding, signingRegionSet);
-            generatedAuthSchemeCache = new GeneratedAuthSchemeCache(
-                    name,
-                    signingName,
-                    signingRegion,
-                    disableDoubleEncoding,
-                    signingRegionSet,
-                    result);
-        }
+        EndpointAuthScheme result =
+                buildAuthScheme(name, signingName, signingRegion, disableDoubleEncoding, signingRegionSet);
         if (result != null) {
             builder.addAuthScheme(result);
         }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public EndpointAuthScheme createEndpointAuthScheme(
+            Context context,
+            PropertyGetter authScheme,
+            Map<String, List<String>> headers
+    ) {
+        return buildAuthScheme(
+                (String) authScheme.getProperty("name"),
+                (String) authScheme.getProperty("signingName"),
+                (String) authScheme.getProperty("signingRegion"),
+                (Boolean) authScheme.getProperty("disableDoubleEncoding"),
+                (List<String>) authScheme.getProperty("signingRegionSet"));
     }
 
     @SuppressWarnings("unchecked")
@@ -179,36 +163,34 @@ public class AwsRulesExtension implements RulesExtension {
         if (name == null || name.isEmpty()) {
             return null;
         }
-        var builder = EndpointAuthScheme.builder().authSchemeId(toShapeIdName(name));
-        if (signingName != null && !signingName.isEmpty()) {
-            builder.putProperty(EndpointAuthSchemeSettings.SIGNING_NAME, signingName);
-        }
-        if (signingRegion != null && !signingRegion.isEmpty()) {
-            builder.putProperty(EndpointAuthSchemeSettings.SIGNING_REGION, signingRegion);
-        }
-        if (disableDoubleEncoding != null) {
-            builder.putProperty(EndpointAuthSchemeSettings.DISABLE_DOUBLE_ENCODING, disableDoubleEncoding);
-        }
-        if (signingRegionSet != null) {
-            builder.putProperty(EndpointAuthSchemeSettings.SIGNING_REGION_SET, signingRegionSet);
-        }
-        return builder.build();
+        return new DirectAuthScheme(
+                toShapeIdName(name),
+                emptyToNull(signingName),
+                emptyToNull(signingRegion),
+                disableDoubleEncoding,
+                signingRegionSet);
     }
 
-    private record GeneratedAuthSchemeCache(
-            String name,
-            String signingName,
-            String signingRegion,
-            Boolean disableDoubleEncoding,
-            List<String> signingRegionSet,
-            EndpointAuthScheme authScheme) {}
+    private static String emptyToNull(String value) {
+        return value == null || value.isEmpty() ? null : value;
+    }
 
     /**
      * Convert an endpoint-rule auth scheme name like {@code sigv4-s3express} into a valid
-     * Smithy ShapeId-style id ({@code aws.auth#sigv4S3Express}). Hyphenated segments are
+     * Smithy ShapeId-style id ({@code aws.auth#sigv4S3express}). Hyphenated segments are
      * upper-camel-joined; the leading segment is left as-is.
      */
     private static String toShapeIdName(String wireName) {
+        switch (wireName) {
+            case "sigv4":
+                return "aws.auth#sigv4";
+            case "sigv4a":
+                return "aws.auth#sigv4a";
+            case "sigv4-s3express":
+                return "aws.auth#sigv4S3express";
+            default:
+                break;
+        }
         StringBuilder sb = new StringBuilder("aws.auth#");
         boolean upperNext = false;
         for (int i = 0; i < wireName.length(); i++) {
@@ -221,5 +203,46 @@ public class AwsRulesExtension implements RulesExtension {
             upperNext = false;
         }
         return sb.toString();
+    }
+
+    private record DirectAuthScheme(
+            String authSchemeId,
+            String signingName,
+            String signingRegion,
+            Boolean disableDoubleEncoding,
+            List<String> signingRegionSet
+    ) implements EndpointAuthScheme {
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T> T property(Context.Key<T> property) {
+            Object result = property == EndpointAuthSchemeSettings.SIGNING_NAME
+                    ? signingName
+                    : property == EndpointAuthSchemeSettings.SIGNING_REGION
+                            ? signingRegion
+                            : property == EndpointAuthSchemeSettings.DISABLE_DOUBLE_ENCODING
+                                    ? disableDoubleEncoding
+                                    : property == EndpointAuthSchemeSettings.SIGNING_REGION_SET
+                                            ? signingRegionSet
+                                            : null;
+            return (T) result;
+        }
+
+        @Override
+        public Set<Context.Key<?>> properties() {
+            var result = new java.util.HashSet<Context.Key<?>>(4);
+            if (signingName != null) {
+                result.add(EndpointAuthSchemeSettings.SIGNING_NAME);
+            }
+            if (signingRegion != null) {
+                result.add(EndpointAuthSchemeSettings.SIGNING_REGION);
+            }
+            if (disableDoubleEncoding != null) {
+                result.add(EndpointAuthSchemeSettings.DISABLE_DOUBLE_ENCODING);
+            }
+            if (signingRegionSet != null) {
+                result.add(EndpointAuthSchemeSettings.SIGNING_REGION_SET);
+            }
+            return Set.copyOf(result);
+        }
     }
 }

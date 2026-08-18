@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
+import software.amazon.smithy.java.endpoints.EndpointAuthScheme;
 
 /**
  * An SPI used to extend the rules engine with custom builtins and functions.
@@ -92,5 +93,23 @@ public interface RulesExtension {
                 context,
                 Map.of("authSchemes", List.of(entry)),
                 headers);
+    }
+
+    /**
+     * Creates an immutable auth scheme directly for a generated endpoint result.
+     *
+     * <p>Returning null uses the builder-based extension path.
+     *
+     * @param context resolution context
+     * @param authScheme field-based auth-scheme properties
+     * @param headers resolved endpoint headers
+     * @return an immutable auth scheme, or null
+     */
+    default EndpointAuthScheme createEndpointAuthScheme(
+            Context context,
+            PropertyGetter authScheme,
+            Map<String, List<String>> headers
+    ) {
+        return null;
     }
 }

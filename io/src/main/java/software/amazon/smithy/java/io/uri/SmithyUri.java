@@ -289,6 +289,30 @@ public final class SmithyUri {
     }
 
     /**
+     * Create a URI from components that have already been validated and normalized.
+     *
+     * <p>This is intended for generated protocol and endpoint code that derives components from a
+     * previously validated model. Callers must provide a lowercase, unbracketed host and valid raw
+     * path and query components.
+     *
+     * @param scheme validated, lowercase URI scheme
+     * @param host validated, lowercase and unbracketed host
+     * @param port validated port, or -1 for no port
+     * @param path validated raw path
+     * @param query validated raw query
+     * @return the SmithyUri
+     */
+    public static SmithyUri ofTrusted(
+            String scheme,
+            String host,
+            int port,
+            String path,
+            String query
+    ) {
+        return new SmithyUri(scheme, null, host, port, path, query);
+    }
+
+    /**
      * @return the URI scheme (e.g. "https"), or null. Always lowercase.
      */
     public String getScheme() {

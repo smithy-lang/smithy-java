@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.rulesengine;
 
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.rulesengine.language.syntax.parameters.ParameterType;
 
 /**
  * Defines a parameter used in {@link Bytecode}.
@@ -16,6 +17,7 @@ import software.amazon.smithy.java.context.Context;
  * @param builtin A string that defines the builtin that provides a default value for input parameters.
  * @param builtinKey Direct context key for simple builtins (avoids provider function call).
  * @param temp True if this is a temporary register that does not take initial values.
+ * @param type endpoint parameter type, or null for temporary registers and legacy bytecode
  */
 public record RegisterDefinition(
         String name,
@@ -23,8 +25,9 @@ public record RegisterDefinition(
         Object defaultValue,
         String builtin,
         Context.Key<?> builtinKey,
-        boolean temp) {
+        boolean temp,
+        ParameterType type) {
     public RegisterDefinition(String name, boolean required, Object defaultValue, String builtin, boolean temp) {
-        this(name, required, defaultValue, builtin, null, temp);
+        this(name, required, defaultValue, builtin, null, temp, null);
     }
 }

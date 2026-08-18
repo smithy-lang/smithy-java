@@ -65,7 +65,13 @@ final class BytecodeCompiler {
         for (var param : bdd.getParameters()) {
             var defaultValue = param.getDefault().map(Value::toObject).orElse(null);
             var builtin = param.getBuiltIn().orElse(null);
-            registerAllocator.allocate(param.getName().toString(), param.isRequired(), defaultValue, builtin, false);
+            registerAllocator.allocate(
+                    param.getName().toString(),
+                    param.isRequired(),
+                    defaultValue,
+                    builtin,
+                    false,
+                    param.getType());
         }
     }
 

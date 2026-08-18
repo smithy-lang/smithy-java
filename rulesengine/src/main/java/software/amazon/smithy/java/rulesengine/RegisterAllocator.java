@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.rulesengine.language.syntax.parameters.ParameterType;
 
 final class RegisterAllocator {
     private final List<RegisterDefinition> registry = new ArrayList<>();
@@ -20,8 +21,19 @@ final class RegisterAllocator {
         this.builtinKeys = builtinKeys;
     }
 
-    // Allocate an input parameter register.
     byte allocate(String name, boolean required, Object defaultValue, String builtin, boolean temp) {
+        return allocate(name, required, defaultValue, builtin, temp, null);
+    }
+
+    // Allocate an input parameter register.
+    byte allocate(
+            String name,
+            boolean required,
+            Object defaultValue,
+            String builtin,
+            boolean temp,
+            ParameterType type
+    ) {
         if (registryIndex.containsKey(name)) {
             throw new RulesEvaluationError("Duplicate variable name found in rules: " + name);
         } else if (registry.size() >= 256) {
@@ -29,7 +41,7 @@ final class RegisterAllocator {
         }
         // Resolve builtin key at compile time
         Context.Key<?> builtinKey = builtin != null ? builtinKeys.get(builtin) : null;
-        var register = new RegisterDefinition(name, required, defaultValue, builtin, builtinKey, temp);
+        var register = new RegisterDefinition(name, required, defaultValue, builtin, builtinKey, temp, type);
         byte index = (byte) registry.size();
         registryIndex.put(name, index);
         registry.add(register);
@@ -42,7 +54,7 @@ final class RegisterAllocator {
         if (existing != null) {
             return existing;
         }
-        return allocate(name, false, null, null, true);
+        return allocate(name, false, null, null, true, null);
     }
 
     // Gets a register by name, throwing if it doesn't exist.

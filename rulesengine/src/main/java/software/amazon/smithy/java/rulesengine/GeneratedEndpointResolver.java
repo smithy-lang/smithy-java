@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
@@ -295,11 +294,6 @@ public abstract class GeneratedEndpointResolver<S extends GeneratedEndpointResol
         private volatile Thread owner;
         boolean inUse;
         private Context context;
-        private String cachedUriEncodeSource;
-        private String cachedUriEncodeResult;
-        private String cachedUriHost;
-        private String cachedUriPath;
-        private SmithyUri cachedUri;
         private Endpoint.Builder endpointBuilder = Endpoint.builder();
         private final GeneratedAuthSchemeProperties generatedAuthScheme = new GeneratedAuthSchemeProperties();
 
@@ -389,25 +383,11 @@ public abstract class GeneratedEndpointResolver<S extends GeneratedEndpointResol
         }
 
         public final String uriEncode(String value) {
-            if (value == cachedUriEncodeSource
-                    || value != null && value.equals(cachedUriEncodeSource)) {
-                return cachedUriEncodeResult;
-            }
-            String result = URLEncoding.encodeUnreserved(value, false);
-            cachedUriEncodeSource = value;
-            cachedUriEncodeResult = result;
-            return result;
+            return URLEncoding.encodeUnreserved(value, false);
         }
 
         public final SmithyUri buildUri(String scheme, String host, String path) {
-            if (host != null && host.equals(cachedUriHost) && Objects.equals(path, cachedUriPath)) {
-                return cachedUri;
-            }
-            SmithyUri uri = SmithyUri.of(scheme, host, -1, path, null);
-            cachedUriHost = host;
-            cachedUriPath = path;
-            cachedUri = uri;
-            return uri;
+            return SmithyUri.ofTrusted(scheme, host, -1, path, null);
         }
 
         public final Map<String, Object> authSchemeProperties(
@@ -448,6 +428,16 @@ public abstract class GeneratedEndpointResolver<S extends GeneratedEndpointResol
             SmithyUri uri = url instanceof SmithyUri smithyUri
                     ? smithyUri
                     : uriFactory.createUri((String) url);
+            if (headers.isEmpty()
+                    && properties instanceof GeneratedAuthSchemeProperties authScheme
+                    && generatedAuthExtensions.length == 1
+                    && legacyPropertyExtensions.length == 0) {
+                var directAuthScheme = generatedAuthExtensions[0]
+                        .createEndpointAuthScheme(context, authScheme, headers);
+                if (directAuthScheme != null) {
+                    return Endpoint.create(uri, directAuthScheme);
+                }
+            }
             var builder = endpointBuilder.uri(uri);
             try {
                 if (!headers.isEmpty()) {

@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import software.amazon.smithy.rulesengine.language.syntax.parameters.ParameterType;
 import software.amazon.smithy.rulesengine.logic.bdd.Bdd;
 
 /**
@@ -122,30 +123,15 @@ public final class JavaEndpointResolverGenerator {
         line("    static class State extends "
                 + "software.amazon.smithy.java.rulesengine.GeneratedEndpointResolver.EvaluationState {");
         for (int i = 0; i < registers.length; i++) {
-            line("        Object r" + i + ";");
+            line("        " + registerType(registers[i]) + " r" + i + ";");
             if (!registers[i].temp()) {
                 line("        boolean p" + i + ";");
             }
-        }
-        if (!uriTemplateSizes.isEmpty()) {
-            int maxParts = 0;
-            for (int size : uriTemplateSizes) {
-                maxParts = Math.max(maxParts, size);
+            if (registers[i].builtin() != null) {
+                line("        boolean l" + i + ";");
             }
-            line("        int cachedUriPartCount;");
-            line("        String cachedUriScheme;");
-            line("        String cachedUriPath;");
-            for (int i = 0; i < maxParts; i++) {
-                line("        String cachedUriPart" + i + ";");
-            }
-            line("        software.amazon.smithy.java.io.uri.SmithyUri cachedGeneratedUri;");
         }
-        if (hasVirtualHostFunction()) {
-            line("        boolean hasCachedVirtualHostable;");
-            line("        boolean cachedVirtualHostableAllowDots;");
-            line("        boolean cachedVirtualHostableResult;");
-            line("        String cachedVirtualHostableBucket;");
-        }
+        line("        software.amazon.smithy.java.context.Context evaluationContext;");
         line("        final java.util.Map<String, Object> traceParameters = new java.util.AbstractMap<>() {");
         line("            @Override");
         line("            public Object get(Object name) {");
@@ -180,7 +166,7 @@ public final class JavaEndpointResolverGenerator {
         for (int i = 0; i < registers.length; i++) {
             if (!registers[i].temp()) {
                 line("                case " + quote(registers[i].name()) + " -> { r" + i
-                        + " = value; p" + i + " = true; }");
+                        + " = " + castRegisterValue(registers[i], "value") + "; p" + i + " = true; }");
             }
         }
         line("                default -> { }");
@@ -199,7 +185,7 @@ public final class JavaEndpointResolverGenerator {
         for (int i = 0; i < registers.length; i++) {
             RegisterDefinition register = registers[i];
             if (!register.temp()) {
-                line("            r" + i + " = " + constantValue(register.defaultValue()) + ";");
+                line("            r" + i + " = " + registerInitialValue(register, true) + ";");
                 line("            p" + i + " = " + (register.defaultValue() != null) + ";");
             }
         }
@@ -239,9 +225,9 @@ public final class JavaEndpointResolverGenerator {
             if (register.temp()) {
                 continue;
             }
-            String value = register.builtin() == null && register.defaultValue() != null
-                    ? constantValue(register.defaultValue())
-                    : "null";
+            String value = register.builtin() == null
+                    ? registerInitialValue(register, true)
+                    : registerInitialValue(register, false);
             line("        state.r" + i + " = " + value + ";");
             line("        state.p" + i + " = " + (register.builtin() == null
                     && register.defaultValue() != null) + ";");
@@ -263,12 +249,11 @@ public final class JavaEndpointResolverGenerator {
         line("");
         line("    @Override");
         line("    protected void finish(State state, software.amazon.smithy.java.context.Context context) {");
+        line("        state.evaluationContext = context;");
         for (int i = 0; i < registers.length; i++) {
             RegisterDefinition register = registers[i];
             if (register.builtin() != null) {
-                line("        if (!state.p" + i + ") {");
-                line("            state.r" + i + " = builtin(" + i + ", context);");
-                line("        }");
+                line("        state.l" + i + " = false;");
             }
         }
         for (int i = 0; i < registers.length; i++) {
@@ -283,10 +268,24 @@ public final class JavaEndpointResolverGenerator {
             }
         }
         line("    }");
+        for (int i = 0; i < registers.length; i++) {
+            RegisterDefinition register = registers[i];
+            if (register.builtin() == null) {
+                continue;
+            }
+            line("");
+            line("    private " + registerType(register) + " r" + i + "(State state) {");
+            line("        if (!state.p" + i + " && !state.l" + i + ") {");
+            line("            state.r" + i + " = "
+                    + castRegisterValue(register, "builtin(" + i + ", state.evaluationContext)") + ";");
+            line("            state.l" + i + " = true;");
+            line("        }");
+            line("        return state.r" + i + ";");
+            line("    }");
+        }
     }
 
     private void writeEvaluate() {
-        int nodeCount = bytecode.getBddNodeCount();
         line("");
         line("    @Override");
         line("    protected software.amazon.smithy.java.endpoints.Endpoint evaluate(State state) {");
@@ -344,47 +343,196 @@ public final class JavaEndpointResolverGenerator {
         line("    }");
 
         int[] nodes = bytecode.getBddNodes();
-        for (int index = 1; index < nodeCount; index++) {
-            int base = index * 3;
-            int nodeRef = index + 1;
+        Map<Integer, Integer> incoming = new HashMap<>();
+        Set<Integer> reachable = new HashSet<>();
+        ArrayDeque<Integer> pending = new ArrayDeque<>();
+        int root = bytecode.getBddRootRef();
+        pending.add(root);
+        while (!pending.isEmpty()) {
+            int ref = pending.removeFirst();
+            if (!isNodeReference(ref) || !reachable.add(ref)) {
+                continue;
+            }
+            int base = (Math.abs(ref) - 1) * 3;
+            int high = nodes[base + 1];
+            int low = nodes[base + 2];
+            if (isNodeReference(high)) {
+                incoming.merge(high, 1, Integer::sum);
+                pending.add(high);
+            }
+            if (isNodeReference(low)) {
+                incoming.merge(low, 1, Integer::sum);
+                pending.add(low);
+            }
+        }
+
+        Set<Integer> helpers = new HashSet<>();
+        helpers.add(root);
+        for (Map.Entry<Integer, Integer> entry : incoming.entrySet()) {
+            if (entry.getValue() > 1) {
+                helpers.add(entry.getKey());
+            }
+        }
+
+        List<Integer> sortedHelpers = new ArrayList<>(helpers);
+        sortedHelpers.sort((left, right) -> {
+            int result = Integer.compare(Math.abs(left), Math.abs(right));
+            return result != 0 ? result : Integer.compare(left, right);
+        });
+        for (int ref : sortedHelpers) {
             line("");
-            line("    private software.amazon.smithy.java.endpoints.Endpoint nodeP" + nodeRef + "(State state) {");
-            line("        return " + conditionExpression(nodes[base], false));
-            line("                ? " + referenceExpression(nodes[base + 1]));
-            line("                : " + referenceExpression(nodes[base + 2]) + ";");
-            line("    }");
-            line("");
-            line("    private software.amazon.smithy.java.endpoints.Endpoint nodeN" + nodeRef + "(State state) {");
-            line("        return " + conditionExpression(nodes[base], true));
-            line("                ? " + referenceExpression(nodes[base + 1]));
-            line("                : " + referenceExpression(nodes[base + 2]) + ";");
+            line("    private software.amazon.smithy.java.endpoints.Endpoint " + nodeMethod(ref) + "(State state) {");
+            line("        return " + inlineReferenceExpression(ref, helpers, nodes, "                ", true) + ";");
             line("    }");
         }
     }
 
+    private String inlineReferenceExpression(
+            int ref,
+            Set<Integer> helpers,
+            int[] nodes,
+            String indent,
+            boolean expandHelper
+    ) {
+        if (!isNodeReference(ref) || helpers.contains(ref) && !expandHelper) {
+            return referenceExpression(ref);
+        }
+        int base = (Math.abs(ref) - 1) * 3;
+        String nestedIndent = indent + "        ";
+        return conditionExpression(nodes[base], ref < 0)
+                + "\n" + indent + "? " + inlineReferenceExpression(
+                        nodes[base + 1], helpers, nodes, nestedIndent, false)
+                + "\n" + indent + ": " + inlineReferenceExpression(
+                        nodes[base + 2], helpers, nodes, nestedIndent, false);
+    }
+
+    private static boolean isNodeReference(int ref) {
+        return (ref > 1 && ref < Bdd.RESULT_OFFSET)
+                || (ref < -1 && ref > -Bdd.RESULT_OFFSET);
+    }
+
+    private static String nodeMethod(int ref) {
+        return "node" + (ref > 0 ? "P" : "N") + Math.abs(ref);
+    }
+
     private String conditionExpression(int condition, boolean negated) {
         String expression = switch (bytecode.conditionTypes[condition]) {
-            case Bytecode.COND_ISSET -> "state.r" + bytecode.conditionOperands[condition] + " != null";
-            case Bytecode.COND_IS_TRUE -> "state.r" + bytecode.conditionOperands[condition] + " == Boolean.TRUE";
-            case Bytecode.COND_IS_FALSE -> "state.r" + bytecode.conditionOperands[condition] + " == Boolean.FALSE";
-            case Bytecode.COND_NOT_SET -> "state.r" + bytecode.conditionOperands[condition] + " == null";
+            case Bytecode.COND_ISSET -> registerExpression(bytecode.conditionOperands[condition]) + " != null";
+            case Bytecode.COND_IS_TRUE ->
+                registerExpression(bytecode.conditionOperands[condition]) + " == Boolean.TRUE";
+            case Bytecode.COND_IS_FALSE ->
+                registerExpression(bytecode.conditionOperands[condition]) + " == Boolean.FALSE";
+            case Bytecode.COND_NOT_SET -> registerExpression(bytecode.conditionOperands[condition]) + " == null";
             case Bytecode.COND_STRING_EQ_REG_CONST -> {
                 int packed = bytecode.conditionOperands[condition];
                 int register = packed & 0xff;
                 int constant = packed >>> 8;
-                yield "state.r" + register + " != null && state.r" + register + ".equals(C" + constant + ")";
+                String value = registerExpression(register);
+                yield value + " != null && " + value + ".equals(C" + constant + ")";
             }
-            default -> "truthy(condition" + condition + "(state))";
+            default -> {
+                String direct = directConditionExpression(condition);
+                ConditionBinding binding = conditionBinding(condition);
+                yield direct != null
+                        ? direct
+                        : binding != null
+                                ? bindingExpression(binding)
+                                : "truthy(condition" + condition + "(state))";
+            }
         };
         return negated ? "!(" + expression + ")" : expression;
+    }
+
+    private String bindingExpression(ConditionBinding binding) {
+        String assignment = "(state.r" + binding.targetRegister + " = " + binding.expression + ")";
+        return binding.alwaysTruthy
+                ? assignment + " != null"
+                : assignment + " != null && state.r" + binding.targetRegister + " != Boolean.FALSE";
+    }
+
+    private String directConditionExpression(int condition) {
+        int start = bytecode.getConditionStartOffset(condition);
+        Program program = readProgram(start);
+        String optimized = optimizedProgramExpression(program, start);
+        if (optimized != null) {
+            return optimized;
+        }
+        List<Instruction> body = new ArrayList<>(program.instructions.values());
+        if (body.size() == 4
+                && body.get(0).opcode == Opcodes.LOAD_REGISTER
+                && (body.get(1).opcode == Opcodes.LOAD_CONST || body.get(1).opcode == Opcodes.LOAD_CONST_W)
+                && body.get(2).opcode == Opcodes.FN2
+                && body.get(3).opcode == Opcodes.RETURN_VALUE
+                && "aws.isVirtualHostableS3Bucket".equals(
+                        bytecode.getFunctions()[body.get(2).operands[0]].getFunctionName())) {
+            return "isVirtualHostableBucket((String) " + registerExpression(body.get(0).operands[0])
+                    + ", C" + body.get(1).operands[0] + " == Boolean.TRUE)";
+        }
+        Instruction instruction = program.instructions.get(start);
+        Instruction result = instruction == null ? null : program.instructions.get(instruction.next());
+        if (result == null || result.opcode != Opcodes.RETURN_VALUE) {
+            return null;
+        }
+        if (instruction.opcode == Opcodes.SUBSTRING_EQ) {
+            int[] operands = instruction.operands;
+            return substringEqualsExpression(
+                    operands[0], operands[1], operands[2], (operands[3] & 1) != 0, operands[4]);
+        }
+        return null;
+    }
+
+    private ConditionBinding conditionBinding(int condition) {
+        Program program = readProgram(bytecode.getConditionStartOffset(condition));
+        BooleanSelection selection = coalescedBooleanSelection(program);
+        if (selection != null) {
+            String source = registerExpression(selection.sourceRegister);
+            String selected = selection.defaultValue
+                    ? source + " == null || " + source + " == Boolean.TRUE"
+                    : source + " == Boolean.TRUE";
+            return new ConditionBinding(
+                    selection.targetRegister,
+                    selected + " ? C" + selection.trueConstant + " : C" + selection.falseConstant,
+                    true);
+        }
+        if (program.hasControlFlow) {
+            return null;
+        }
+
+        List<Instruction> body = new ArrayList<>(program.instructions.values());
+        if (body.size() == 2 && body.get(1).opcode == Opcodes.SET_REG_RETURN) {
+            Instruction value = body.get(0);
+            if (value.opcode == Opcodes.SELECT_BOOL_REG) {
+                String source = registerExpression(value.operands[0]);
+                return new ConditionBinding(
+                        body.get(1).operands[0],
+                        source + " != null && " + source
+                                + " != Boolean.FALSE ? C" + value.operands[1] + " : C" + value.operands[2],
+                        true);
+            } else if (value.opcode == Opcodes.SPLIT_GET) {
+                return new ConditionBinding(
+                        body.get(1).operands[0],
+                        "state.splitGet((String) " + registerExpression(value.operands[0])
+                                + ", C" + value.operands[1] + ", " + (byte) value.operands[2] + ")",
+                        false);
+            }
+        } else if (body.size() == 3
+                && body.get(0).opcode == Opcodes.LOAD_REGISTER
+                && body.get(1).opcode == Opcodes.FN1
+                && body.get(2).opcode == Opcodes.SET_REG_RETURN) {
+            return new ConditionBinding(
+                    body.get(2).operands[0],
+                    "f" + body.get(1).operands[0] + ".apply1("
+                            + registerExpression(body.get(0).operands[0]) + ")",
+                    false);
+        }
+        return null;
     }
 
     private String referenceExpression(int ref) {
         if (ref == 1 || ref == -1) {
             return "null";
-        } else if ((ref > 1 && ref < Bdd.RESULT_OFFSET)
-                || (ref < -1 && ref > -Bdd.RESULT_OFFSET)) {
-            return "node" + (ref > 0 ? "P" : "N") + Math.abs(ref) + "(state)";
+        } else if (isNodeReference(ref)) {
+            return nodeMethod(ref) + "(state)";
         } else if (ref >= Bdd.RESULT_OFFSET) {
             return "(software.amazon.smithy.java.endpoints.Endpoint) result"
                     + (ref - Bdd.RESULT_OFFSET) + "(state)";
@@ -394,10 +542,16 @@ public final class JavaEndpointResolverGenerator {
 
     private void writeProgramMethods() {
         for (int i = 0; i < bytecode.getConditionCount(); i++) {
-            writeProgramMethod(
-                    "condition" + i,
-                    bytecode.getConditionStartOffset(i),
-                    substringBindings.get(i));
+            if (directConditionExpression(i) != null) {
+                continue;
+            }
+            ConditionBinding binding = conditionBinding(i);
+            if (binding == null) {
+                writeProgramMethod(
+                        "condition" + i,
+                        bytecode.getConditionStartOffset(i),
+                        substringBindings.get(i));
+            }
         }
         for (int i = 0; i < bytecode.getResultCount(); i++) {
             writeProgramMethod("result" + i, bytecode.getResultOffset(i), null);
@@ -410,13 +564,27 @@ public final class JavaEndpointResolverGenerator {
         line("    private Object " + name + "(State state) {");
         if (substringBinding != null) {
             line("        state.r" + substringBinding.targetRegister
-                    + " = state.substringEquals((String) state.r" + substringBinding.sourceRegister
-                    + ", " + substringBinding.start
-                    + ", " + substringBinding.end
-                    + ", " + substringBinding.reverse
-                    + ", C" + substringBinding.expectedConstant
-                    + ") ? C" + substringBinding.expectedConstant + " : null;");
+                    + " = " + substringEqualsExpression(
+                            substringBinding.sourceRegister,
+                            substringBinding.start,
+                            substringBinding.end,
+                            substringBinding.reverse,
+                            substringBinding.expectedConstant)
+                    + " ? C" + substringBinding.expectedConstant + " : null;");
             line("        return state.r" + substringBinding.targetRegister + ";");
+            line("    }");
+            return;
+        }
+        BooleanSelection booleanSelection = coalescedBooleanSelection(program);
+        if (booleanSelection != null) {
+            String source = registerExpression(booleanSelection.sourceRegister);
+            String selected = booleanSelection.defaultValue
+                    ? source + " == null || " + source + " == Boolean.TRUE"
+                    : source + " == Boolean.TRUE";
+            line("        state.r" + booleanSelection.targetRegister + " = " + selected
+                    + " ? C" + booleanSelection.trueConstant
+                    + " : C" + booleanSelection.falseConstant + ";");
+            line("        return state.r" + booleanSelection.targetRegister + ";");
             line("    }");
             return;
         }
@@ -514,7 +682,7 @@ public final class JavaEndpointResolverGenerator {
                 List<String> parts = popExpressions(stack, count);
                 StringBuilder expression = new StringBuilder("buildUri")
                         .append(count)
-                        .append("(state, C")
+                        .append("(C")
                         .append(template.buildUri.operands[0])
                         .append(", (String) C")
                         .append(template.path.operands[0]);
@@ -528,7 +696,7 @@ public final class JavaEndpointResolverGenerator {
 
             switch (opcode) {
                 case Opcodes.LOAD_CONST, Opcodes.LOAD_CONST_W -> stack.add("C" + operands[0]);
-                case Opcodes.LOAD_REGISTER -> stack.add("state.r" + operands[0]);
+                case Opcodes.LOAD_REGISTER -> stack.add(registerExpression(operands[0]));
                 case Opcodes.NOT -> {
                     String value = popExpression(stack);
                     stack.add("Boolean.valueOf(" + value + " == Boolean.FALSE)");
@@ -538,9 +706,9 @@ public final class JavaEndpointResolverGenerator {
                     stack.add("Boolean.valueOf(" + value + " != null)");
                 }
                 case Opcodes.TEST_REGISTER_ISSET ->
-                    stack.add("Boolean.valueOf(state.r" + operands[0] + " != null)");
+                    stack.add("Boolean.valueOf(" + registerExpression(operands[0]) + " != null)");
                 case Opcodes.TEST_REGISTER_NOT_SET ->
-                    stack.add("Boolean.valueOf(state.r" + operands[0] + " == null)");
+                    stack.add("Boolean.valueOf(" + registerExpression(operands[0]) + " == null)");
                 case Opcodes.LIST0 -> stack.add("java.util.List.of()");
                 case Opcodes.LIST1 -> stack.add("java.util.List.of(" + popExpression(stack) + ")");
                 case Opcodes.LIST2 -> {
@@ -609,7 +777,7 @@ public final class JavaEndpointResolverGenerator {
                     List<String> arguments = popExpressions(stack, 2);
                     if ("aws.isVirtualHostableS3Bucket".equals(
                             bytecode.getFunctions()[operands[0]].getFunctionName())) {
-                        stack.add("Boolean.valueOf(isVirtualHostableBucket(state, "
+                        stack.add("Boolean.valueOf(isVirtualHostableBucket("
                                 + asString(arguments.get(0)) + ", " + arguments.get(1) + " == Boolean.TRUE))");
                     } else {
                         stack.add("f" + operands[0] + ".apply2("
@@ -636,15 +804,16 @@ public final class JavaEndpointResolverGenerator {
                 case Opcodes.GET_PROPERTY_REG ->
                     stack.add(propertyExpression(operands[0], operands[1]));
                 case Opcodes.GET_INDEX_REG ->
-                    stack.add("state.getIndex(state.r" + operands[0] + ", " + operands[1] + ")");
+                    stack.add("state.getIndex(" + registerExpression(operands[0])
+                            + ", " + operands[1] + ")");
                 case Opcodes.IS_TRUE -> {
                     String value = popExpression(stack);
                     stack.add("Boolean.valueOf(" + value + " == Boolean.TRUE)");
                 }
                 case Opcodes.TEST_REGISTER_IS_TRUE ->
-                    stack.add("Boolean.valueOf(state.r" + operands[0] + " == Boolean.TRUE)");
+                    stack.add("Boolean.valueOf(" + registerExpression(operands[0]) + " == Boolean.TRUE)");
                 case Opcodes.TEST_REGISTER_IS_FALSE ->
-                    stack.add("Boolean.valueOf(state.r" + operands[0] + " == Boolean.FALSE)");
+                    stack.add("Boolean.valueOf(" + registerExpression(operands[0]) + " == Boolean.FALSE)");
                 case Opcodes.EQUALS -> {
                     List<String> values = popExpressions(stack, 2);
                     stack.add("Boolean.valueOf(java.util.Objects.equals("
@@ -690,20 +859,24 @@ public final class JavaEndpointResolverGenerator {
                     stack.add("state.getNegativeIndex(" + value + ", " + operands[0] + ")");
                 }
                 case Opcodes.GET_NEGATIVE_INDEX_REG ->
-                    stack.add("state.getNegativeIndex(state.r" + operands[0] + ", " + operands[1] + ")");
+                    stack.add("state.getNegativeIndex(" + registerExpression(operands[0])
+                            + ", " + operands[1] + ")");
                 case Opcodes.SUBSTRING_EQ ->
-                    stack.add("Boolean.valueOf(state.substringEquals((String) state.r" + operands[0]
-                            + ", " + operands[1] + ", " + operands[2] + ", " + ((operands[3] & 1) != 0)
-                            + ", C" + operands[4] + "))");
+                    stack.add("Boolean.valueOf(" + substringEqualsExpression(
+                            operands[0], operands[1], operands[2], (operands[3] & 1) != 0, operands[4]) + ")");
                 case Opcodes.SPLIT_GET ->
-                    stack.add("state.splitGet((String) state.r" + operands[0]
+                    stack.add("state.splitGet((String) " + registerExpression(operands[0])
                             + ", C" + operands[1] + ", " + (byte) operands[2] + ")");
-                case Opcodes.SELECT_BOOL_REG ->
-                    stack.add("state.r" + operands[0] + " != null && state.r" + operands[0]
+                case Opcodes.SELECT_BOOL_REG -> {
+                    String value = registerExpression(operands[0]);
+                    stack.add(value + " != null && " + value
                             + " != Boolean.FALSE ? C" + operands[1] + " : C" + operands[2]);
-                case Opcodes.STRING_EQUALS_REG_CONST ->
-                    stack.add("Boolean.valueOf(state.r" + operands[0] + " != null && state.r" + operands[0]
+                }
+                case Opcodes.STRING_EQUALS_REG_CONST -> {
+                    String value = registerExpression(operands[0]);
+                    stack.add("Boolean.valueOf(" + value + " != null && " + value
                             + ".equals(C" + operands[1] + "))");
+                }
                 case Opcodes.BUILD_URI -> {
                     List<String> values = popExpressions(stack, 2);
                     stack.add("state.buildUri(C" + operands[0] + ", "
@@ -754,10 +927,27 @@ public final class JavaEndpointResolverGenerator {
     }
 
     private String propertyExpression(int register, int property) {
-        String target = "state.r" + register;
+        String target = registerExpression(register);
         return structuredRegisters.contains(register)
                 ? "structuredProperty(" + target + ", C" + property + ")"
                 : "state.getProperty(" + target + ", C" + property + ")";
+    }
+
+    private String registerExpression(int register) {
+        return bytecode.getRegisterDefinitions()[register].builtin() == null
+                ? "state.r" + register
+                : "r" + register + "(state)";
+    }
+
+    private String substringEqualsExpression(int register, int start, int end, boolean reverse, int expected) {
+        Object value = bytecode.getConstantPool()[expected];
+        String input = registerExpression(register);
+        if (start == 0 && value instanceof String string && string.length() == end) {
+            return input + " != null && ((String) " + input + ")."
+                    + (reverse ? "endsWith" : "startsWith") + "(C" + expected + ")";
+        }
+        return "state.substringEquals((String) " + input
+                + ", " + start + ", " + end + ", " + reverse + ", C" + expected + ")";
     }
 
     private boolean isStructuredFunction(int function) {
@@ -839,7 +1029,7 @@ public final class JavaEndpointResolverGenerator {
                     .append(base)
                     .append(" = buildUri")
                     .append(count)
-                    .append("(state, C")
+                    .append("(C")
                     .append(template.buildUri.operands[0])
                     .append(", (String) C")
                     .append(template.path.operands[0]);
@@ -1029,6 +1219,36 @@ public final class JavaEndpointResolverGenerator {
         return new UriTemplate(path, buildUri);
     }
 
+    private BooleanSelection coalescedBooleanSelection(Program program) {
+        if (!program.hasControlFlow || program.instructions.size() != 8) {
+            return null;
+        }
+        List<Instruction> body = new ArrayList<>(program.instructions.values());
+        if (body.get(0).opcode != Opcodes.LOAD_REGISTER
+                || body.get(1).opcode != Opcodes.JNN_OR_POP
+                || (body.get(2).opcode != Opcodes.LOAD_CONST && body.get(2).opcode != Opcodes.LOAD_CONST_W)
+                || body.get(3).opcode != Opcodes.JMP_IF_FALSE
+                || (body.get(4).opcode != Opcodes.LOAD_CONST && body.get(4).opcode != Opcodes.LOAD_CONST_W)
+                || body.get(5).opcode != Opcodes.JUMP
+                || (body.get(6).opcode != Opcodes.LOAD_CONST && body.get(6).opcode != Opcodes.LOAD_CONST_W)
+                || body.get(7).opcode != Opcodes.SET_REG_RETURN
+                || body.get(1).target != body.get(3).pc
+                || body.get(5).target != body.get(7).pc
+                || body.get(3).target != body.get(6).pc) {
+            return null;
+        }
+        Object defaultValue = bytecode.getConstantPool()[body.get(2).operands[0]];
+        if (!(defaultValue instanceof Boolean bool)) {
+            return null;
+        }
+        return new BooleanSelection(
+                body.get(0).operands[0],
+                body.get(7).operands[0],
+                bool,
+                body.get(4).operands[0],
+                body.get(6).operands[0]);
+    }
+
     private String optimizedProgramExpression(Program program, int start) {
         Instruction load = program.instructions.get(start);
         if (load == null || load.opcode != Opcodes.LOAD_REGISTER) {
@@ -1065,11 +1285,12 @@ public final class JavaEndpointResolverGenerator {
                 || program.instructions.size() != 7) {
             return null;
         }
-        return "state.substringEquals((String) state.r" + load.operands[0]
-                + ", " + substring.operands[0]
-                + ", " + substring.operands[1]
-                + ", " + (substring.operands[2] != 0)
-                + ", C" + expected.operands[0] + ")";
+        return substringEqualsExpression(
+                load.operands[0],
+                substring.operands[0],
+                substring.operands[1],
+                substring.operands[2] != 0,
+                expected.operands[0]);
     }
 
     private Program readProgram(int start) {
@@ -1174,12 +1395,15 @@ public final class JavaEndpointResolverGenerator {
         switch (op) {
             case Opcodes.LOAD_CONST, Opcodes.LOAD_CONST_W -> line(indent + "s" + depth + " = C" + o[0] + ";");
             case Opcodes.SET_REGISTER -> line(indent + "state.r" + o[0] + " = s" + top + ";");
-            case Opcodes.LOAD_REGISTER -> line(indent + "s" + depth + " = state.r" + o[0] + ";");
+            case Opcodes.LOAD_REGISTER ->
+                line(indent + "s" + depth + " = " + registerExpression(o[0]) + ";");
             case Opcodes.NOT -> line(indent + "s" + top + " = s" + top
                     + " == Boolean.FALSE ? Boolean.TRUE : Boolean.FALSE;");
             case Opcodes.ISSET -> line(indent + "s" + top + " = s" + top + " != null;");
-            case Opcodes.TEST_REGISTER_ISSET -> line(indent + "s" + depth + " = state.r" + o[0] + " != null;");
-            case Opcodes.TEST_REGISTER_NOT_SET -> line(indent + "s" + depth + " = state.r" + o[0] + " == null;");
+            case Opcodes.TEST_REGISTER_ISSET ->
+                line(indent + "s" + depth + " = " + registerExpression(o[0]) + " != null;");
+            case Opcodes.TEST_REGISTER_NOT_SET ->
+                line(indent + "s" + depth + " = " + registerExpression(o[0]) + " == null;");
             case Opcodes.LIST0 -> line(indent + "s" + depth + " = java.util.List.of();");
             case Opcodes.LIST1 -> line(indent + "s" + top + " = java.util.List.of(s" + top + ");");
             case Opcodes.LIST2 -> line(indent + "s" + (depth - 2) + " = java.util.List.of(s"
@@ -1218,7 +1442,7 @@ public final class JavaEndpointResolverGenerator {
                 int base = depth - 2;
                 if ("aws.isVirtualHostableS3Bucket".equals(
                         bytecode.getFunctions()[o[0]].getFunctionName())) {
-                    line(indent + "s" + base + " = isVirtualHostableBucket(state, "
+                    line(indent + "s" + base + " = isVirtualHostableBucket("
                             + "(String) s" + base + ", s" + top + " == Boolean.TRUE);");
                 } else {
                     line(indent + "s" + base + " = f" + o[0] + ".apply2(s"
@@ -1244,13 +1468,13 @@ public final class JavaEndpointResolverGenerator {
             case Opcodes.GET_INDEX -> line(indent + "s" + top + " = state.getIndex(s" + top + ", " + o[0] + ");");
             case Opcodes.GET_PROPERTY_REG ->
                 line(indent + "s" + depth + " = " + propertyExpression(o[0], o[1]) + ";");
-            case Opcodes.GET_INDEX_REG -> line(indent + "s" + depth + " = state.getIndex(state.r"
-                    + o[0] + ", " + o[1] + ");");
+            case Opcodes.GET_INDEX_REG -> line(indent + "s" + depth + " = state.getIndex("
+                    + registerExpression(o[0]) + ", " + o[1] + ");");
             case Opcodes.IS_TRUE -> line(indent + "s" + top + " = s" + top + " == Boolean.TRUE;");
             case Opcodes.TEST_REGISTER_IS_TRUE ->
-                line(indent + "s" + depth + " = state.r" + o[0] + " == Boolean.TRUE;");
+                line(indent + "s" + depth + " = " + registerExpression(o[0]) + " == Boolean.TRUE;");
             case Opcodes.TEST_REGISTER_IS_FALSE ->
-                line(indent + "s" + depth + " = state.r" + o[0] + " == Boolean.FALSE;");
+                line(indent + "s" + depth + " = " + registerExpression(o[0]) + " == Boolean.FALSE;");
             case Opcodes.EQUALS -> line(indent + "s" + (depth - 2) + " = java.util.Objects.equals(s"
                     + (depth - 2) + ", s" + top + ");");
             case Opcodes.STRING_EQUALS, Opcodes.BOOLEAN_EQUALS -> line(indent + "s" + (depth - 2) + " = s"
@@ -1277,7 +1501,7 @@ public final class JavaEndpointResolverGenerator {
             case Opcodes.GET_NEGATIVE_INDEX -> line(indent + "s" + top
                     + " = state.getNegativeIndex(s" + top + ", " + o[0] + ");");
             case Opcodes.GET_NEGATIVE_INDEX_REG -> line(indent + "s" + depth
-                    + " = state.getNegativeIndex(state.r" + o[0] + ", " + o[1] + ");");
+                    + " = state.getNegativeIndex(" + registerExpression(o[0]) + ", " + o[1] + ");");
             case Opcodes.JMP_IF_FALSE -> {
                 line(indent + "pc = s" + top + " != Boolean.TRUE ? " + instruction.target
                         + " : " + instruction.next() + ";");
@@ -1287,15 +1511,20 @@ public final class JavaEndpointResolverGenerator {
                 line(indent + "pc = " + instruction.target + ";");
                 line(indent + "continue;");
             }
-            case Opcodes.SUBSTRING_EQ -> line(indent + "s" + depth
-                    + " = state.substringEquals((String) state.r" + o[0] + ", " + o[1] + ", " + o[2]
-                    + ", " + ((o[3] & 1) != 0) + ", C" + o[4] + ");");
-            case Opcodes.SPLIT_GET -> line(indent + "s" + depth + " = state.splitGet((String) state.r"
-                    + o[0] + ", C" + o[1] + ", " + (byte) o[2] + ");");
-            case Opcodes.SELECT_BOOL_REG -> line(indent + "s" + depth + " = state.r" + o[0]
-                    + " != null && state.r" + o[0] + " != Boolean.FALSE ? C" + o[1] + " : C" + o[2] + ";");
-            case Opcodes.STRING_EQUALS_REG_CONST -> line(indent + "s" + depth + " = state.r" + o[0]
-                    + " != null && state.r" + o[0] + ".equals(C" + o[1] + ");");
+            case Opcodes.SUBSTRING_EQ -> line(indent + "s" + depth + " = "
+                    + substringEqualsExpression(o[0], o[1], o[2], (o[3] & 1) != 0, o[4]) + ";");
+            case Opcodes.SPLIT_GET -> line(indent + "s" + depth + " = state.splitGet((String) "
+                    + registerExpression(o[0]) + ", C" + o[1] + ", " + (byte) o[2] + ");");
+            case Opcodes.SELECT_BOOL_REG -> {
+                String value = registerExpression(o[0]);
+                line(indent + "s" + depth + " = " + value
+                        + " != null && " + value + " != Boolean.FALSE ? C" + o[1] + " : C" + o[2] + ";");
+            }
+            case Opcodes.STRING_EQUALS_REG_CONST -> {
+                String value = registerExpression(o[0]);
+                line(indent + "s" + depth + " = " + value
+                        + " != null && " + value + ".equals(C" + o[1] + ");");
+            }
             case Opcodes.SET_REG_RETURN -> {
                 line(indent + "state.r" + o[0] + " = s" + top + ";");
                 line(indent + "return s" + top + ";");
@@ -1457,15 +1686,10 @@ public final class JavaEndpointResolverGenerator {
         for (int size : sorted(uriTemplateSizes)) {
             line("");
             StringBuilder parameters = new StringBuilder(
-                    "State state, String scheme, String path");
-            StringBuilder matches = new StringBuilder(
-                    "state.cachedUriPartCount == " + size
-                            + " && same(state.cachedUriScheme, scheme)"
-                            + " && same(state.cachedUriPath, path)");
+                    "String scheme, String path");
             StringBuilder host = new StringBuilder();
             for (int i = 0; i < size; i++) {
                 parameters.append(", String p").append(i);
-                matches.append(" && same(state.cachedUriPart").append(i).append(", p").append(i).append(")");
                 if (i > 0) {
                     host.append(" + ");
                 }
@@ -1473,46 +1697,17 @@ public final class JavaEndpointResolverGenerator {
             }
             line("    private static software.amazon.smithy.java.io.uri.SmithyUri buildUri"
                     + size + "(" + parameters + ") {");
-            line("        if (" + matches + ") {");
-            line("            return state.cachedGeneratedUri;");
-            line("        }");
             line("        String host = " + host + ";");
-            line("        var uri = software.amazon.smithy.java.io.uri.SmithyUri.of("
+            line("        return software.amazon.smithy.java.io.uri.SmithyUri.ofTrusted("
                     + "scheme, host, -1, path, null);");
-            line("        state.cachedUriPartCount = " + size + ";");
-            line("        state.cachedUriScheme = scheme;");
-            line("        state.cachedUriPath = path;");
-            for (int i = 0; i < size; i++) {
-                line("        state.cachedUriPart" + i + " = p" + i + ";");
-            }
-            line("        state.cachedGeneratedUri = uri;");
-            line("        return uri;");
-            line("    }");
-        }
-        if (!uriTemplateSizes.isEmpty()) {
-            line("");
-            line("    private static boolean same(String left, String right) {");
-            line("        return left == right || left != null && left.equals(right);");
             line("    }");
         }
         if (hasVirtualHostFunction()) {
             line("");
             line("    private static boolean isVirtualHostableBucket("
-                    + "State state, String bucket, boolean allowDots) {");
-            line("        if (state.hasCachedVirtualHostable");
-            line("                && state.cachedVirtualHostableAllowDots == allowDots");
-            line("                && (state.cachedVirtualHostableBucket == bucket");
-            line("                        || state.cachedVirtualHostableBucket != null");
-            line("                                && state.cachedVirtualHostableBucket.equals(bucket))) {");
-            line("            return state.cachedVirtualHostableResult;");
-            line("        }");
-            line("        boolean result = software.amazon.smithy.rulesengine.aws.language.functions");
+                    + "String bucket, boolean allowDots) {");
+            line("        return software.amazon.smithy.rulesengine.aws.language.functions");
             line("                .IsVirtualHostableS3Bucket.isVirtualHostableBucket(bucket, allowDots);");
-            line("        state.hasCachedVirtualHostable = true;");
-            line("        state.cachedVirtualHostableAllowDots = allowDots;");
-            line("        state.cachedVirtualHostableBucket = bucket;");
-            line("        state.cachedVirtualHostableResult = result;");
-            line("        return result;");
             line("    }");
         }
 
@@ -1576,6 +1771,24 @@ public final class JavaEndpointResolverGenerator {
             line("        }");
             line("    }");
         }
+    }
+
+    private static String registerType(RegisterDefinition register) {
+        if (register.type() == ParameterType.STRING) {
+            return "String";
+        } else if (register.type() == ParameterType.BOOLEAN) {
+            return "Boolean";
+        }
+        return "Object";
+    }
+
+    private static String castRegisterValue(RegisterDefinition register, String expression) {
+        String type = registerType(register);
+        return type.equals("Object") ? expression : "(" + type + ") " + expression;
+    }
+
+    private static String registerInitialValue(RegisterDefinition register, boolean useDefault) {
+        return constantValue(useDefault ? register.defaultValue() : null);
     }
 
     private static String constantType(Object value) {
@@ -1699,6 +1912,15 @@ public final class JavaEndpointResolverGenerator {
     private record UriTemplate(Instruction path, Instruction buildUri) {}
 
     private record AuthSchemeProperties(int extraEntries) {}
+
+    private record BooleanSelection(
+            int sourceRegister,
+            int targetRegister,
+            boolean defaultValue,
+            int trueConstant,
+            int falseConstant) {}
+
+    private record ConditionBinding(int targetRegister, String expression, boolean alwaysTruthy) {}
 
     private record SubstringBinding(
             int sourceRegister,
