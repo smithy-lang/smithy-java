@@ -27,6 +27,7 @@ public final class JavaEndpointResolverGenerator {
     private final Set<Integer> uriTemplateSizes = new HashSet<>();
     private final Set<Integer> listSizes = new HashSet<>();
     private final Set<Integer> mapSizes = new HashSet<>();
+    private final Set<Integer> structuredRegisters = new HashSet<>();
     private final Map<Integer, SubstringBinding> substringBindings = new HashMap<>();
 
     /**
@@ -67,6 +68,7 @@ public final class JavaEndpointResolverGenerator {
         uriTemplateSizes.clear();
         listSizes.clear();
         mapSizes.clear();
+        structuredRegisters.clear();
         substringBindings.clear();
         analyzePrograms();
 
@@ -126,7 +128,10 @@ public final class JavaEndpointResolverGenerator {
             }
         }
         if (!uriTemplateSizes.isEmpty()) {
-            int maxParts = uriTemplateSizes.stream().mapToInt(Integer::intValue).max().orElse(0);
+            int maxParts = 0;
+            for (int size : uriTemplateSizes) {
+                maxParts = Math.max(maxParts, size);
+            }
             line("        int cachedUriPartCount;");
             line("        String cachedUriScheme;");
             line("        String cachedUriPath;");
@@ -586,10 +591,14 @@ public final class JavaEndpointResolverGenerator {
                 }
                 case Opcodes.RESOLVE_TEMPLATE -> {
                     List<String> parts = popExpressions(stack, operands[0]);
-                    stack.add(parts.stream()
-                            .map(JavaEndpointResolverGenerator::asString)
-                            .reduce((left, right) -> left + " + " + right)
-                            .orElse("\"\""));
+                    StringBuilder expression = new StringBuilder();
+                    for (String part : parts) {
+                        if (!expression.isEmpty()) {
+                            expression.append(" + ");
+                        }
+                        expression.append(asString(part));
+                    }
+                    stack.add(expression.isEmpty() ? "\"\"" : expression.toString());
                 }
                 case Opcodes.FN0 -> stack.add("f" + operands[0] + ".apply0()");
                 case Opcodes.FN1 -> {
@@ -625,7 +634,7 @@ public final class JavaEndpointResolverGenerator {
                     stack.add("state.getIndex(" + value + ", " + operands[0] + ")");
                 }
                 case Opcodes.GET_PROPERTY_REG ->
-                    stack.add("state.getProperty(state.r" + operands[0] + ", C" + operands[1] + ")");
+                    stack.add(propertyExpression(operands[0], operands[1]));
                 case Opcodes.GET_INDEX_REG ->
                     stack.add("state.getIndex(state.r" + operands[0] + ", " + operands[1] + ")");
                 case Opcodes.IS_TRUE -> {
@@ -742,6 +751,18 @@ public final class JavaEndpointResolverGenerator {
 
     private static String asString(String expression) {
         return "(String) (" + expression + ")";
+    }
+
+    private String propertyExpression(int register, int property) {
+        String target = "state.r" + register;
+        return structuredRegisters.contains(register)
+                ? "structuredProperty(" + target + ", C" + property + ")"
+                : "state.getProperty(" + target + ", C" + property + ")";
+    }
+
+    private boolean isStructuredFunction(int function) {
+        String name = bytecode.getFunctions()[function].getFunctionName();
+        return "aws.partition".equals(name) || "aws.parseArn".equals(name);
     }
 
     private void writeExpressionEndpoint(Instruction instruction, List<String> stack) {
@@ -977,6 +998,14 @@ public final class JavaEndpointResolverGenerator {
             return;
         }
         for (Instruction instruction : program.instructions.values()) {
+            if (instruction.opcode == Opcodes.FN1
+                    && isStructuredFunction(instruction.operands[0])) {
+                Instruction next = program.instructions.get(instruction.next());
+                if (next != null
+                        && (next.opcode == Opcodes.SET_REGISTER || next.opcode == Opcodes.SET_REG_RETURN)) {
+                    structuredRegisters.add(next.operands[0]);
+                }
+            }
             UriTemplate template = uriTemplate(program, instruction);
             if (template != null) {
                 uriTemplateSizes.add(instruction.operands[0]);
@@ -1079,7 +1108,9 @@ public final class JavaEndpointResolverGenerator {
             int depth = depths.get(instruction.pc);
             maxStack = Math.max(maxStack, depth + Math.max(0, stackDelta(instruction)));
         }
-        return new Program(found, leaders.stream().sorted().toList(), hasControlFlow, depths, maxStack);
+        List<Integer> sortedLeaders = new ArrayList<>(leaders);
+        sortedLeaders.sort(Integer::compareTo);
+        return new Program(found, sortedLeaders, hasControlFlow, depths, maxStack);
     }
 
     private Map<Integer, Integer> computeDepths(int start, Map<Integer, Instruction> instructions) {
@@ -1211,8 +1242,8 @@ public final class JavaEndpointResolverGenerator {
             case Opcodes.GET_PROPERTY -> line(indent + "s" + top + " = state.getProperty(s"
                     + top + ", C" + o[0] + ");");
             case Opcodes.GET_INDEX -> line(indent + "s" + top + " = state.getIndex(s" + top + ", " + o[0] + ");");
-            case Opcodes.GET_PROPERTY_REG -> line(indent + "s" + depth + " = state.getProperty(state.r"
-                    + o[0] + ", C" + o[1] + ");");
+            case Opcodes.GET_PROPERTY_REG ->
+                line(indent + "s" + depth + " = " + propertyExpression(o[0], o[1]) + ";");
             case Opcodes.GET_INDEX_REG -> line(indent + "s" + depth + " = state.getIndex(state.r"
                     + o[0] + ", " + o[1] + ");");
             case Opcodes.IS_TRUE -> line(indent + "s" + top + " = s" + top + " == Boolean.TRUE;");
@@ -1393,6 +1424,14 @@ public final class JavaEndpointResolverGenerator {
         line("    private static boolean equalsNonNull(Object left, Object right) {");
         line("        return left != null && left.equals(right);");
         line("    }");
+        if (!structuredRegisters.isEmpty()) {
+            line("");
+            line("    private static Object structuredProperty(Object value, String property) {");
+            line("        return value == null ? null");
+            line("                : ((software.amazon.smithy.java.rulesengine.PropertyGetter) value)"
+                    + ".getProperty(property);");
+            line("    }");
+        }
         line("");
         line("    private static software.amazon.smithy.java.io.uri.SmithyUri parseUri("
                 + "State state, Object value) {");
@@ -1415,7 +1454,7 @@ public final class JavaEndpointResolverGenerator {
         line("        return state.endpoint(url, properties, headers);");
         line("    }");
 
-        for (int size : uriTemplateSizes.stream().sorted().toList()) {
+        for (int size : sorted(uriTemplateSizes)) {
             line("");
             StringBuilder parameters = new StringBuilder(
                     "State state, String scheme, String path");
@@ -1477,7 +1516,7 @@ public final class JavaEndpointResolverGenerator {
             line("    }");
         }
 
-        for (int size : listSizes.stream().sorted().toList()) {
+        for (int size : sorted(listSizes)) {
             line("");
             StringBuilder parameters = new StringBuilder();
             for (int i = 0; i < size; i++) {
@@ -1495,7 +1534,7 @@ public final class JavaEndpointResolverGenerator {
             line("    }");
         }
 
-        for (int size : mapSizes.stream().sorted().toList()) {
+        for (int size : sorted(mapSizes)) {
             line("");
             StringBuilder parameters = new StringBuilder();
             for (int i = 0; i < size; i++) {
@@ -1517,7 +1556,7 @@ public final class JavaEndpointResolverGenerator {
             line("    }");
         }
 
-        for (int size : structureSizes.stream().sorted().toList()) {
+        for (int size : sorted(structureSizes)) {
             line("");
             StringBuilder components = new StringBuilder();
             for (int i = 0; i < size; i++) {
@@ -1570,10 +1609,14 @@ public final class JavaEndpointResolverGenerator {
                 if (list.isEmpty()) {
                     yield "java.util.List.of()";
                 }
-                yield "java.util.List.of(" + list.stream()
-                        .map(JavaEndpointResolverGenerator::constantValue)
-                        .reduce((a, b) -> a + ", " + b)
-                        .orElse("") + ")";
+                StringBuilder result = new StringBuilder("java.util.List.of(");
+                for (int i = 0; i < list.size(); i++) {
+                    if (i > 0) {
+                        result.append(", ");
+                    }
+                    result.append(constantValue(list.get(i)));
+                }
+                yield result.append(')').toString();
             }
             case Map<?, ?> map -> {
                 if (map.isEmpty()) {
@@ -1613,6 +1656,12 @@ public final class JavaEndpointResolverGenerator {
             }
         }
         return result.append('"').toString();
+    }
+
+    private static List<Integer> sorted(Set<Integer> values) {
+        List<Integer> result = new ArrayList<>(values);
+        result.sort(Integer::compareTo);
+        return result;
     }
 
     private static void validateName(String value, boolean simple) {
