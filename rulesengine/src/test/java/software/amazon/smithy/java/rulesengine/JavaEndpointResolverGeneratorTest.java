@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import javax.tools.ToolProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -73,6 +74,12 @@ class JavaEndpointResolverGeneratorTest {
         assertTrue(source.contains("super(GeneratedTestResolver.class, \"GeneratedTestResolver.bdd\")"));
         assertTrue(source.contains("private software.amazon.smithy.java.endpoints.Endpoint nodeP2"));
         assertTrue(source.contains("while (true)"));
+        assertTrue(source.contains("return state.endpoint("));
+        for (int i = 0; i < bytecode.getResultCount(); i++) {
+            int start = source.indexOf("private Object result" + i + "(State state)");
+            int end = source.indexOf("\n    }", start);
+            assertFalse(source.substring(start, end).contains("Object s"));
+        }
 
         GeneratedEndpointResolver<?> generated = compile(source, bytecode);
         var vm = new BytecodeEndpointResolver(
@@ -84,12 +91,14 @@ class JavaEndpointResolverGeneratorTest {
         Context fallbackContext = Context.create();
         assertEquivalent(vm, generated, parameters, fallbackContext, "https://default.fallback.example.com");
 
-        Context customContext = Context.create().put(
-                EndpointContext.CUSTOM_ENDPOINT,
-                Endpoint.builder().uri("https://custom.example.com").build());
+        Context customContext = Context.create()
+                .put(
+                        EndpointContext.CUSTOM_ENDPOINT,
+                        Endpoint.builder().uri("https://custom.example.com").build());
         assertEquivalent(vm, generated, parameters, customContext, "https://custom-selected.example.com");
 
         assertEquivalent(vm, generated, parameters, fallbackContext, "https://default.fallback.example.com");
+        assertTracingEquivalent(vm, generated);
         var error = assertThrows(
                 RulesEvaluationError.class,
                 () -> generated.resolveEndpoint(Context.create(), generated.createParameters()));
@@ -109,7 +118,7 @@ class JavaEndpointResolverGeneratorTest {
         var failures = new ArrayList<Throwable>();
 
         try (var executor = Executors.newFixedThreadPool(threadCount)) {
-            var futures = new ArrayList<java.util.concurrent.Future<?>>();
+            var futures = new ArrayList<Future<?>>();
             for (int i = 0; i < threadCount; i++) {
                 futures.add(executor.submit(() -> {
                     start.await();
@@ -232,16 +241,17 @@ class JavaEndpointResolverGeneratorTest {
         Path sourceFile = sourceDir.resolve(CLASS_NAME + ".java");
         Files.write(sourceDir.resolve(CLASS_NAME + ".bdd"), bytecode.getBytecode());
         Files.writeString(sourceFile, source);
-        int result = ToolProvider.getSystemJavaCompiler().run(
-                null,
-                null,
-                null,
-                "-proc:none",
-                "-classpath",
-                System.getProperty("java.class.path"),
-                "-d",
-                tempDir.toString(),
-                sourceFile.toString());
+        int result = ToolProvider.getSystemJavaCompiler()
+                .run(
+                        null,
+                        null,
+                        null,
+                        "-proc:none",
+                        "-classpath",
+                        System.getProperty("java.class.path"),
+                        "-d",
+                        tempDir.toString(),
+                        sourceFile.toString());
         assertEquals(0, result);
         var loader = new URLClassLoader(
                 new java.net.URL[] {tempDir.toUri().toURL()},
@@ -270,6 +280,62 @@ class JavaEndpointResolverGeneratorTest {
         assertEquals(expected, vmEndpoint.uri().toString());
         assertEquals(vmEndpoint, generatedEndpoint);
         assertNotSame(vmEndpoint, generatedEndpoint);
+    }
+
+    private static void assertTracingEquivalent(
+            BytecodeEndpointResolver vm,
+            GeneratedEndpointResolver<?> generated
+    ) {
+        var vmTrace = new RecordingTrace();
+        var generatedTrace = new RecordingTrace();
+        Endpoint vmEndpoint = vm.resolveEndpoint(tracedParams(vmTrace));
+        Endpoint generatedEndpoint = generated.resolveEndpoint(tracedParams(generatedTrace));
+
+        assertEquals(vmEndpoint, generatedEndpoint);
+        assertEquals(vmTrace.events, generatedTrace.events);
+        assertEquals("present", generatedTrace.requiredAtBegin);
+
+        Context sampledOut = Context.create()
+                .put(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS, Map.of("Required", "present"))
+                .put(RulesEngineSettings.BDD_TRACE_SINK, (bytecode, parameters) -> null);
+        Endpoint sampledEndpoint = generated.resolveEndpoint(EndpointResolverParams.builder()
+                .operation(new TestOperation())
+                .inputValue(new TestInput())
+                .context(sampledOut)
+                .build());
+        assertEquals(generatedEndpoint, sampledEndpoint);
+    }
+
+    private static EndpointResolverParams tracedParams(BddTraceSink sink) {
+        Context context = Context.create()
+                .put(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS, Map.of("Required", "present"))
+                .put(RulesEngineSettings.BDD_TRACE_SINK, sink);
+        return EndpointResolverParams.builder()
+                .operation(new TestOperation())
+                .inputValue(new TestInput())
+                .context(context)
+                .build();
+    }
+
+    private static final class RecordingTrace implements BddTraceSink, BddTrace {
+        private final List<String> events = new ArrayList<>();
+        private Object requiredAtBegin;
+
+        @Override
+        public BddTrace begin(Bytecode bytecode, Map<String, Object> parameters) {
+            requiredAtBegin = parameters.get("Required");
+            return this;
+        }
+
+        @Override
+        public void node(int nodeRef, int conditionId, boolean satisfied, boolean branch) {
+            events.add("node:" + nodeRef + ':' + conditionId + ':' + satisfied + ':' + branch);
+        }
+
+        @Override
+        public void result(int resultId, Endpoint endpoint) {
+            events.add("result:" + resultId + ':' + endpoint.uri());
+        }
     }
 
     private static final class TestState extends GeneratedEndpointResolver.EvaluationState {

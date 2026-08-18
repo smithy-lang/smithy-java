@@ -35,7 +35,6 @@ public abstract class GeneratedEndpointResolver<S extends GeneratedEndpointResol
     private final Map<String, Function<Context, Object>> builtinProviders;
     private final ContextProvider ctxProvider = new ContextProvider.OrchestratingProvider();
     private final ThreadLocal<S> state = ThreadLocal.withInitial(this::createState);
-    private final BytecodeEndpointResolver tracedResolver;
 
     /**
      * Creates a generated resolver from the serialized program used to produce the subclass.
@@ -48,10 +47,6 @@ public abstract class GeneratedEndpointResolver<S extends GeneratedEndpointResol
         this.functions = bytecode.getFunctions();
         this.extensions = engine.getExtensions().toArray(new RulesExtension[0]);
         this.builtinProviders = engine.getBuiltinProviders();
-        this.tracedResolver = new BytecodeEndpointResolver(
-                bytecode,
-                engine.getExtensions(),
-                engine.getBuiltinProviders());
     }
 
     /**
@@ -88,10 +83,6 @@ public abstract class GeneratedEndpointResolver<S extends GeneratedEndpointResol
     @Override
     public final Endpoint resolveEndpoint(EndpointResolverParams params) {
         Context context = params.context();
-        if (context.get(RulesEngineSettings.BDD_TRACE_SINK) != null) {
-            return tracedResolver.resolveEndpoint(params);
-        }
-
         S state = this.state.get();
         boolean reusable = !state.inUse;
         if (!reusable) {
@@ -108,7 +99,7 @@ public abstract class GeneratedEndpointResolver<S extends GeneratedEndpointResol
                     params.inputValue());
             state.setContext(context);
             finish(state, context);
-            return evaluate(state);
+            return evaluate(state, context);
         } finally {
             state.inUse = false;
         }
@@ -136,7 +127,7 @@ public abstract class GeneratedEndpointResolver<S extends GeneratedEndpointResol
             }
             state.setContext(context);
             finish(state, context);
-            return evaluate(state);
+            return evaluate(state, context);
         } finally {
             state.inUse = false;
         }
@@ -192,6 +183,39 @@ public abstract class GeneratedEndpointResolver<S extends GeneratedEndpointResol
      * Evaluates the generated BDD program.
      */
     protected abstract Endpoint evaluate(S state);
+
+    /**
+     * Evaluates the generated BDD program while reporting each visited node.
+     */
+    protected abstract Endpoint evaluateTraced(S state, BddTrace trace);
+
+    /**
+     * Gets the live named-register view supplied to a trace sink.
+     */
+    protected abstract Map<String, Object> traceParameters(S state);
+
+    /**
+     * Gets the root reference used by generated traced traversal.
+     */
+    protected final int bddRootRef() {
+        return bytecode.getBddRootRef();
+    }
+
+    /**
+     * Gets the node table used by generated traced traversal.
+     */
+    protected final int[] bddNodes() {
+        return bytecode.getBddNodes();
+    }
+
+    private Endpoint evaluate(S state, Context context) {
+        BddTraceSink sink = context.get(RulesEngineSettings.BDD_TRACE_SINK);
+        if (sink == null) {
+            return evaluate(state);
+        }
+        BddTrace trace = sink.begin(bytecode, traceParameters(state));
+        return trace == null ? evaluate(state) : evaluateTraced(state, trace);
+    }
 
     /**
      * Gets a runtime-resolved function by its compiled index.

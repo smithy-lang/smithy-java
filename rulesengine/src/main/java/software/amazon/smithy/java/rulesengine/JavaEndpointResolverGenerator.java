@@ -25,6 +25,8 @@ public final class JavaEndpointResolverGenerator {
     private final StringBuilder source = new StringBuilder();
     private final Set<Integer> structureSizes = new HashSet<>();
     private final Set<Integer> uriTemplateSizes = new HashSet<>();
+    private final Set<Integer> listSizes = new HashSet<>();
+    private final Set<Integer> mapSizes = new HashSet<>();
     private final Map<Integer, SubstringBinding> substringBindings = new HashMap<>();
 
     /**
@@ -63,6 +65,8 @@ public final class JavaEndpointResolverGenerator {
         source.setLength(0);
         structureSizes.clear();
         uriTemplateSizes.clear();
+        listSizes.clear();
+        mapSizes.clear();
         substringBindings.clear();
         analyzePrograms();
 
@@ -137,6 +141,29 @@ public final class JavaEndpointResolverGenerator {
             line("        boolean cachedVirtualHostableResult;");
             line("        String cachedVirtualHostableBucket;");
         }
+        line("        final java.util.Map<String, Object> traceParameters = new java.util.AbstractMap<>() {");
+        line("            @Override");
+        line("            public Object get(Object name) {");
+        for (int i = 0; i < registers.length; i++) {
+            if (!registers[i].temp()) {
+                line("                if (" + quote(registers[i].name()) + ".equals(name)) return r" + i + ";");
+            }
+        }
+        line("                return null;");
+        line("            }");
+        line("");
+        line("            @Override");
+        line("            public java.util.Set<Entry<String, Object>> entrySet() {");
+        line("                var result = new java.util.LinkedHashSet<Entry<String, Object>>();");
+        for (int i = 0; i < registers.length; i++) {
+            if (!registers[i].temp()) {
+                line("                if (r" + i + " != null) result.add(java.util.Map.entry("
+                        + quote(registers[i].name()) + ", r" + i + "));");
+            }
+        }
+        line("                return result;");
+        line("            }");
+        line("        };");
         line("");
         line("        State(software.amazon.smithy.java.rulesengine.RulesExtension[] extensions) {");
         line("            super(extensions);");
@@ -196,6 +223,11 @@ public final class JavaEndpointResolverGenerator {
         line("    }");
         line("");
         line("    @Override");
+        line("    protected java.util.Map<String, Object> traceParameters(State state) {");
+        line("        return state.traceParameters;");
+        line("    }");
+        line("");
+        line("    @Override");
         line("    protected void initialize(State state) {");
         for (int i = 0; i < registers.length; i++) {
             RegisterDefinition register = registers[i];
@@ -237,7 +269,8 @@ public final class JavaEndpointResolverGenerator {
         for (int i = 0; i < registers.length; i++) {
             RegisterDefinition register = registers[i];
             if (register.required() && register.defaultValue() == null
-                    && register.builtin() == null && !register.temp()) {
+                    && register.builtin() == null
+                    && !register.temp()) {
                 line("        if (!state.p" + i + ") {");
                 line("            throw new software.amazon.smithy.java.rulesengine.RulesEvaluationError("
                         + quote("Missing required parameter: " + register.name()) + ");");
@@ -253,6 +286,56 @@ public final class JavaEndpointResolverGenerator {
         line("    @Override");
         line("    protected software.amazon.smithy.java.endpoints.Endpoint evaluate(State state) {");
         line("        return " + referenceExpression(bytecode.getBddRootRef()) + ";");
+        line("    }");
+        line("");
+        line("    @Override");
+        line("    protected software.amazon.smithy.java.endpoints.Endpoint evaluateTraced(State state,");
+        line("            software.amazon.smithy.java.rulesengine.BddTrace trace) {");
+        line("        int ref = bddRootRef();");
+        line("        int[] nodes = bddNodes();");
+        line("        while ((ref > 1 && ref < " + Bdd.RESULT_OFFSET + ")");
+        line("                || (ref < -1 && ref > -" + Bdd.RESULT_OFFSET + ")) {");
+        line("            int index = ref > 0 ? ref - 1 : -ref - 1;");
+        line("            int base = index * 3;");
+        line("            int condition = nodes[base];");
+        line("            boolean satisfied = tracedCondition(state, condition);");
+        line("            boolean branch = satisfied ^ (ref < 0);");
+        line("            trace.node(ref, condition, satisfied, branch);");
+        line("            ref = branch ? nodes[base + 1] : nodes[base + 2];");
+        line("        }");
+        line("        int resultId = ref == 1 || ref == -1 ? -1 : ref - " + Bdd.RESULT_OFFSET + ";");
+        line("        software.amazon.smithy.java.endpoints.Endpoint endpoint = resultId < 0");
+        line("                ? null");
+        line("                : tracedResult(state, resultId);");
+        line("        trace.result(resultId, endpoint);");
+        line("        return endpoint;");
+        line("    }");
+        line("");
+        line("    private boolean tracedCondition(State state, int condition) {");
+        if (bytecode.getConditionCount() == 0) {
+            line("        throw invalidPc(condition);");
+        } else {
+            line("        return switch (condition) {");
+            for (int i = 0; i < bytecode.getConditionCount(); i++) {
+                line("            case " + i + " -> " + conditionExpression(i, false) + ";");
+            }
+            line("            default -> throw invalidPc(condition);");
+            line("        };");
+        }
+        line("    }");
+        line("");
+        line("    private software.amazon.smithy.java.endpoints.Endpoint tracedResult(State state, int result) {");
+        if (bytecode.getResultCount() == 0) {
+            line("        throw invalidPc(result);");
+        } else {
+            line("        return switch (result) {");
+            for (int i = 0; i < bytecode.getResultCount(); i++) {
+                line("            case " + i + " -> (software.amazon.smithy.java.endpoints.Endpoint) result"
+                        + i + "(state);");
+            }
+            line("            default -> throw invalidPc(result);");
+            line("        };");
+        }
         line("    }");
 
         int[] nodes = bytecode.getBddNodes();
@@ -338,6 +421,10 @@ public final class JavaEndpointResolverGenerator {
             line("    }");
             return;
         }
+        if (!program.hasControlFlow && writeExpressionProgram(program)) {
+            line("    }");
+            return;
+        }
         for (int i = 0; i < program.maxStack; i++) {
             line("        Object s" + i + " = null;");
         }
@@ -378,6 +465,308 @@ public final class JavaEndpointResolverGenerator {
         line("    }");
     }
 
+    private boolean writeExpressionProgram(Program program) {
+        for (Instruction instruction : program.instructions.values()) {
+            if (!supportsExpression(instruction.opcode & 0xff)) {
+                return false;
+            }
+        }
+
+        List<Instruction> ordered = new ArrayList<>(program.instructions.values());
+        List<String> stack = new ArrayList<>(program.maxStack);
+        for (int i = 0; i < ordered.size(); i++) {
+            Instruction instruction = ordered.get(i);
+            int opcode = instruction.opcode & 0xff;
+            int[] operands = instruction.operands;
+
+            AuthSchemeProperties authScheme = authSchemeProperties(program, instruction);
+            if (authScheme != null) {
+                List<String> auth = popExpressions(stack, 8);
+                StringBuilder expression = new StringBuilder("state.authSchemeProperties(");
+                if (authScheme.extraEntries == 1) {
+                    List<String> extra = popExpressions(stack, 2);
+                    expression.append(extra.get(0))
+                            .append(", ")
+                            .append(asString(extra.get(1)))
+                            .append(", ");
+                }
+                for (int entry = 0; entry < 4; entry++) {
+                    if (entry > 0) {
+                        expression.append(", ");
+                    }
+                    expression.append(auth.get(entry * 2))
+                            .append(", ")
+                            .append(asString(auth.get(entry * 2 + 1)));
+                }
+                stack.add(expression.append(")").toString());
+                i += 3;
+                continue;
+            }
+
+            UriTemplate template = uriTemplate(program, instruction);
+            if (template != null) {
+                int count = operands[0];
+                List<String> parts = popExpressions(stack, count);
+                StringBuilder expression = new StringBuilder("buildUri")
+                        .append(count)
+                        .append("(state, C")
+                        .append(template.buildUri.operands[0])
+                        .append(", (String) C")
+                        .append(template.path.operands[0]);
+                for (String part : parts) {
+                    expression.append(", ").append(asString(part));
+                }
+                stack.add(expression.append(")").toString());
+                i += 2;
+                continue;
+            }
+
+            switch (opcode) {
+                case Opcodes.LOAD_CONST, Opcodes.LOAD_CONST_W -> stack.add("C" + operands[0]);
+                case Opcodes.LOAD_REGISTER -> stack.add("state.r" + operands[0]);
+                case Opcodes.NOT -> {
+                    String value = popExpression(stack);
+                    stack.add("Boolean.valueOf(" + value + " == Boolean.FALSE)");
+                }
+                case Opcodes.ISSET -> {
+                    String value = popExpression(stack);
+                    stack.add("Boolean.valueOf(" + value + " != null)");
+                }
+                case Opcodes.TEST_REGISTER_ISSET ->
+                    stack.add("Boolean.valueOf(state.r" + operands[0] + " != null)");
+                case Opcodes.TEST_REGISTER_NOT_SET ->
+                    stack.add("Boolean.valueOf(state.r" + operands[0] + " == null)");
+                case Opcodes.LIST0 -> stack.add("java.util.List.of()");
+                case Opcodes.LIST1 -> stack.add("java.util.List.of(" + popExpression(stack) + ")");
+                case Opcodes.LIST2 -> {
+                    List<String> values = popExpressions(stack, 2);
+                    stack.add("java.util.List.of(" + String.join(", ", values) + ")");
+                }
+                case Opcodes.LISTN -> {
+                    int count = operands[0];
+                    List<String> values = popExpressions(stack, count);
+                    listSizes.add(count);
+                    stack.add("list" + count + "(" + String.join(", ", values) + ")");
+                }
+                case Opcodes.MAP0 -> stack.add("java.util.Map.of()");
+                case Opcodes.MAP1 -> {
+                    List<String> entries = popExpressions(stack, 2);
+                    mapSizes.add(1);
+                    stack.add("map1(" + entries.get(0) + ", " + asString(entries.get(1)) + ")");
+                }
+                case Opcodes.MAP2, Opcodes.MAP3, Opcodes.MAP4, Opcodes.MAPN -> {
+                    int count = mapSize(instruction);
+                    List<String> entries = popExpressions(stack, count * 2);
+                    mapSizes.add(count);
+                    StringBuilder expression = new StringBuilder("map").append(count).append("(");
+                    for (int entry = 0; entry < count; entry++) {
+                        if (entry > 0) {
+                            expression.append(", ");
+                        }
+                        expression.append(entries.get(entry * 2))
+                                .append(", ")
+                                .append(asString(entries.get(entry * 2 + 1)));
+                    }
+                    stack.add(expression.append(")").toString());
+                }
+                case Opcodes.STRUCTN -> {
+                    int count = operands[0];
+                    List<String> entries = popExpressions(stack, count * 2);
+                    structureSizes.add(count);
+                    StringBuilder expression = new StringBuilder("new Struct").append(count).append("(");
+                    for (int entry = 0; entry < count; entry++) {
+                        if (entry > 0) {
+                            expression.append(", ");
+                        }
+                        expression.append(entries.get(entry * 2))
+                                .append(", ")
+                                .append(asString(entries.get(entry * 2 + 1)));
+                    }
+                    stack.add(expression.append(")").toString());
+                }
+                case Opcodes.RESOLVE_TEMPLATE -> {
+                    List<String> parts = popExpressions(stack, operands[0]);
+                    stack.add(parts.stream()
+                            .map(JavaEndpointResolverGenerator::asString)
+                            .reduce((left, right) -> left + " + " + right)
+                            .orElse("\"\""));
+                }
+                case Opcodes.FN0 -> stack.add("f" + operands[0] + ".apply0()");
+                case Opcodes.FN1 -> {
+                    String value = popExpression(stack);
+                    stack.add("f" + operands[0] + ".apply1(" + value + ")");
+                }
+                case Opcodes.FN2 -> {
+                    List<String> arguments = popExpressions(stack, 2);
+                    if ("aws.isVirtualHostableS3Bucket".equals(
+                            bytecode.getFunctions()[operands[0]].getFunctionName())) {
+                        stack.add("Boolean.valueOf(isVirtualHostableBucket(state, "
+                                + asString(arguments.get(0)) + ", " + arguments.get(1) + " == Boolean.TRUE))");
+                    } else {
+                        stack.add("f" + operands[0] + ".apply2("
+                                + arguments.get(0) + ", " + arguments.get(1) + ")");
+                    }
+                }
+                case Opcodes.FN3 -> {
+                    List<String> arguments = popExpressions(stack, 3);
+                    stack.add("f" + operands[0] + ".apply(" + String.join(", ", arguments) + ")");
+                }
+                case Opcodes.FN -> {
+                    int count = bytecode.getFunctions()[operands[0]].getArgumentCount();
+                    List<String> arguments = popExpressions(stack, count);
+                    stack.add("f" + operands[0] + ".apply(" + String.join(", ", arguments) + ")");
+                }
+                case Opcodes.GET_PROPERTY -> {
+                    String value = popExpression(stack);
+                    stack.add("state.getProperty(" + value + ", C" + operands[0] + ")");
+                }
+                case Opcodes.GET_INDEX -> {
+                    String value = popExpression(stack);
+                    stack.add("state.getIndex(" + value + ", " + operands[0] + ")");
+                }
+                case Opcodes.GET_PROPERTY_REG ->
+                    stack.add("state.getProperty(state.r" + operands[0] + ", C" + operands[1] + ")");
+                case Opcodes.GET_INDEX_REG ->
+                    stack.add("state.getIndex(state.r" + operands[0] + ", " + operands[1] + ")");
+                case Opcodes.IS_TRUE -> {
+                    String value = popExpression(stack);
+                    stack.add("Boolean.valueOf(" + value + " == Boolean.TRUE)");
+                }
+                case Opcodes.TEST_REGISTER_IS_TRUE ->
+                    stack.add("Boolean.valueOf(state.r" + operands[0] + " == Boolean.TRUE)");
+                case Opcodes.TEST_REGISTER_IS_FALSE ->
+                    stack.add("Boolean.valueOf(state.r" + operands[0] + " == Boolean.FALSE)");
+                case Opcodes.EQUALS -> {
+                    List<String> values = popExpressions(stack, 2);
+                    stack.add("Boolean.valueOf(java.util.Objects.equals("
+                            + values.get(0) + ", " + values.get(1) + "))");
+                }
+                case Opcodes.STRING_EQUALS, Opcodes.BOOLEAN_EQUALS -> {
+                    List<String> values = popExpressions(stack, 2);
+                    stack.add("Boolean.valueOf(equalsNonNull("
+                            + values.get(0) + ", " + values.get(1) + "))");
+                }
+                case Opcodes.SUBSTRING -> {
+                    String value = popExpression(stack);
+                    stack.add("state.substring(" + asString(value) + ", "
+                            + operands[0] + ", " + operands[1] + ", " + (operands[2] != 0) + ")");
+                }
+                case Opcodes.IS_VALID_HOST_LABEL -> {
+                    List<String> values = popExpressions(stack, 2);
+                    stack.add("Boolean.valueOf(state.isValidHostLabel(" + asString(values.get(0))
+                            + ", Boolean.TRUE.equals(" + values.get(1) + ")))");
+                }
+                case Opcodes.PARSE_URL -> {
+                    String value = popExpression(stack);
+                    stack.add("parseUri(state, " + value + ")");
+                }
+                case Opcodes.URI_ENCODE -> {
+                    String value = popExpression(stack);
+                    stack.add("state.uriEncode(" + asString(value) + ")");
+                }
+                case Opcodes.RETURN_ERROR -> {
+                    String value = popExpression(stack);
+                    line("        throw new software.amazon.smithy.java.rulesengine.RulesEvaluationError("
+                            + asString(value) + ", " + instruction.next() + ");");
+                }
+                case Opcodes.RETURN_ENDPOINT -> writeExpressionEndpoint(instruction, stack);
+                case Opcodes.RETURN_VALUE -> line("        return " + popExpression(stack) + ";");
+                case Opcodes.SPLIT -> {
+                    List<String> values = popExpressions(stack, 3);
+                    stack.add("state.split(" + asString(values.get(0)) + ", " + asString(values.get(1))
+                            + ", ((Number) (" + values.get(2) + ")).intValue())");
+                }
+                case Opcodes.GET_NEGATIVE_INDEX -> {
+                    String value = popExpression(stack);
+                    stack.add("state.getNegativeIndex(" + value + ", " + operands[0] + ")");
+                }
+                case Opcodes.GET_NEGATIVE_INDEX_REG ->
+                    stack.add("state.getNegativeIndex(state.r" + operands[0] + ", " + operands[1] + ")");
+                case Opcodes.SUBSTRING_EQ ->
+                    stack.add("Boolean.valueOf(state.substringEquals((String) state.r" + operands[0]
+                            + ", " + operands[1] + ", " + operands[2] + ", " + ((operands[3] & 1) != 0)
+                            + ", C" + operands[4] + "))");
+                case Opcodes.SPLIT_GET ->
+                    stack.add("state.splitGet((String) state.r" + operands[0]
+                            + ", C" + operands[1] + ", " + (byte) operands[2] + ")");
+                case Opcodes.SELECT_BOOL_REG ->
+                    stack.add("state.r" + operands[0] + " != null && state.r" + operands[0]
+                            + " != Boolean.FALSE ? C" + operands[1] + " : C" + operands[2]);
+                case Opcodes.STRING_EQUALS_REG_CONST ->
+                    stack.add("Boolean.valueOf(state.r" + operands[0] + " != null && state.r" + operands[0]
+                            + ".equals(C" + operands[1] + "))");
+                case Opcodes.BUILD_URI -> {
+                    List<String> values = popExpressions(stack, 2);
+                    stack.add("state.buildUri(C" + operands[0] + ", "
+                            + asString(values.get(0)) + ", " + asString(values.get(1)) + ")");
+                }
+                default -> throw new IllegalStateException("Unsupported expression opcode " + opcode);
+            }
+        }
+        return true;
+    }
+
+    private static boolean supportsExpression(int opcode) {
+        return switch (opcode) {
+            case Opcodes.LOAD_CONST, Opcodes.LOAD_CONST_W, Opcodes.LOAD_REGISTER,
+                    Opcodes.NOT, Opcodes.ISSET, Opcodes.TEST_REGISTER_ISSET,
+                    Opcodes.TEST_REGISTER_NOT_SET, Opcodes.LIST0, Opcodes.LIST1,
+                    Opcodes.LIST2, Opcodes.LISTN, Opcodes.MAP0, Opcodes.MAP1,
+                    Opcodes.MAP2, Opcodes.MAP3, Opcodes.MAP4, Opcodes.MAPN,
+                    Opcodes.STRUCTN, Opcodes.RESOLVE_TEMPLATE, Opcodes.FN0,
+                    Opcodes.FN1, Opcodes.FN2, Opcodes.FN3, Opcodes.FN,
+                    Opcodes.GET_PROPERTY, Opcodes.GET_INDEX, Opcodes.GET_PROPERTY_REG,
+                    Opcodes.GET_INDEX_REG, Opcodes.IS_TRUE, Opcodes.TEST_REGISTER_IS_TRUE,
+                    Opcodes.TEST_REGISTER_IS_FALSE, Opcodes.EQUALS, Opcodes.STRING_EQUALS,
+                    Opcodes.BOOLEAN_EQUALS, Opcodes.SUBSTRING, Opcodes.IS_VALID_HOST_LABEL,
+                    Opcodes.PARSE_URL, Opcodes.URI_ENCODE, Opcodes.RETURN_ERROR,
+                    Opcodes.RETURN_ENDPOINT, Opcodes.RETURN_VALUE, Opcodes.SPLIT,
+                    Opcodes.GET_NEGATIVE_INDEX, Opcodes.GET_NEGATIVE_INDEX_REG,
+                    Opcodes.SUBSTRING_EQ, Opcodes.SPLIT_GET, Opcodes.SELECT_BOOL_REG,
+                    Opcodes.STRING_EQUALS_REG_CONST, Opcodes.BUILD_URI ->
+                true;
+            default -> false;
+        };
+    }
+
+    private static String popExpression(List<String> stack) {
+        return stack.removeLast();
+    }
+
+    private static List<String> popExpressions(List<String> stack, int count) {
+        int start = stack.size() - count;
+        List<String> result = new ArrayList<>(stack.subList(start, stack.size()));
+        stack.subList(start, stack.size()).clear();
+        return result;
+    }
+
+    private static String asString(String expression) {
+        return "(String) (" + expression + ")";
+    }
+
+    private void writeExpressionEndpoint(Instruction instruction, List<String> stack) {
+        int flags = instruction.operands[0];
+        boolean hasHeaders = (flags & 1) != 0;
+        boolean hasProperties = (flags & 2) != 0;
+        String url = popExpression(stack);
+        String properties = hasProperties
+                ? "(java.util.Map<String, Object>) (java.util.Map) (" + popExpression(stack) + ")"
+                : "java.util.Map.of()";
+        String headers = hasHeaders
+                ? "(java.util.Map<String, java.util.List<String>>) (java.util.Map) ("
+                        + popExpression(stack) + ")"
+                : "java.util.Map.of()";
+        if (hasHeaders && hasProperties) {
+            line("        return endpoint(state, " + headers + ", " + properties + ", " + url + ");");
+        } else if (hasHeaders) {
+            line("        return endpointWithHeaders(state, " + headers + ", " + url + ");");
+        } else if (hasProperties) {
+            line("        return endpointWithProperties(state, " + properties + ", " + url + ");");
+        } else {
+            line("        return state.endpoint(" + url + ", java.util.Map.of(), java.util.Map.of());");
+        }
+    }
+
     private void writeStraightLineProgram(Program program) {
         List<Instruction> ordered = new ArrayList<>(program.instructions.values());
         for (int i = 0; i < ordered.size(); i++) {
@@ -390,17 +779,28 @@ public final class JavaEndpointResolverGenerator {
                         .append(resultBase)
                         .append(" = state.authSchemeProperties(");
                 if (authScheme.extraEntries == 1) {
-                    call.append("s").append(resultBase)
-                            .append(", (String) s").append(resultBase + 1).append(", ");
+                    call.append("s")
+                            .append(resultBase)
+                            .append(", (String) s")
+                            .append(resultBase + 1)
+                            .append(", ");
                 }
-                call.append("s").append(authBase)
-                        .append(", (String) s").append(authBase + 1)
-                        .append(", s").append(authBase + 2)
-                        .append(", (String) s").append(authBase + 3)
-                        .append(", s").append(authBase + 4)
-                        .append(", (String) s").append(authBase + 5)
-                        .append(", s").append(authBase + 6)
-                        .append(", (String) s").append(authBase + 7)
+                call.append("s")
+                        .append(authBase)
+                        .append(", (String) s")
+                        .append(authBase + 1)
+                        .append(", s")
+                        .append(authBase + 2)
+                        .append(", (String) s")
+                        .append(authBase + 3)
+                        .append(", s")
+                        .append(authBase + 4)
+                        .append(", (String) s")
+                        .append(authBase + 5)
+                        .append(", s")
+                        .append(authBase + 6)
+                        .append(", (String) s")
+                        .append(authBase + 7)
                         .append(");");
                 line(call.toString());
                 i += 3;
@@ -497,13 +897,14 @@ public final class JavaEndpointResolverGenerator {
             }
 
             int[] substring = body.get(1).operands;
-            substringBindings.put(condition, new SubstringBinding(
-                    body.get(0).operands[0],
-                    targetRegister,
-                    substring[0],
-                    substring[1],
-                    substring[2] != 0,
-                    expectedConstant));
+            substringBindings.put(condition,
+                    new SubstringBinding(
+                            body.get(0).operands[0],
+                            targetRegister,
+                            substring[0],
+                            substring[1],
+                            substring[2] != 0,
+                            expectedConstant));
         }
     }
 
@@ -539,7 +940,8 @@ public final class JavaEndpointResolverGenerator {
                         Opcodes.SUBSTRING_EQ,
                         Opcodes.SPLIT_GET,
                         Opcodes.SELECT_BOOL_REG,
-                        Opcodes.STRING_EQUALS_REG_CONST -> instruction.operands[0] == register;
+                        Opcodes.STRING_EQUALS_REG_CONST ->
+                    instruction.operands[0] == register;
                 default -> false;
             }) {
                 return true;
@@ -930,12 +1332,15 @@ public final class JavaEndpointResolverGenerator {
                     Opcodes.FN0, Opcodes.GET_PROPERTY_REG, Opcodes.GET_INDEX_REG,
                     Opcodes.TEST_REGISTER_IS_TRUE, Opcodes.TEST_REGISTER_IS_FALSE,
                     Opcodes.GET_NEGATIVE_INDEX_REG, Opcodes.SUBSTRING_EQ, Opcodes.SPLIT_GET,
-                    Opcodes.SELECT_BOOL_REG, Opcodes.STRING_EQUALS_REG_CONST -> 1;
+                    Opcodes.SELECT_BOOL_REG, Opcodes.STRING_EQUALS_REG_CONST ->
+                1;
             case Opcodes.SET_REGISTER, Opcodes.NOT, Opcodes.ISSET, Opcodes.LIST1, Opcodes.GET_PROPERTY,
                     Opcodes.GET_INDEX, Opcodes.IS_TRUE, Opcodes.SUBSTRING, Opcodes.PARSE_URL, Opcodes.URI_ENCODE,
-                    Opcodes.GET_NEGATIVE_INDEX, Opcodes.FN1 -> 0;
+                    Opcodes.GET_NEGATIVE_INDEX, Opcodes.FN1 ->
+                0;
             case Opcodes.LIST2, Opcodes.MAP1, Opcodes.EQUALS, Opcodes.STRING_EQUALS, Opcodes.BOOLEAN_EQUALS,
-                    Opcodes.IS_VALID_HOST_LABEL, Opcodes.FN2, Opcodes.BUILD_URI -> -1;
+                    Opcodes.IS_VALID_HOST_LABEL, Opcodes.FN2, Opcodes.BUILD_URI ->
+                -1;
             case Opcodes.SPLIT, Opcodes.FN3 -> -2;
             case Opcodes.LISTN, Opcodes.RESOLVE_TEMPLATE -> 1 - instruction.operands[0];
             case Opcodes.MAP2, Opcodes.MAP3, Opcodes.MAP4, Opcodes.MAPN ->
@@ -944,7 +1349,8 @@ public final class JavaEndpointResolverGenerator {
             case Opcodes.FN -> 1 - bytecode.getFunctions()[instruction.operands[0]].getArgumentCount();
             case Opcodes.JNN_OR_POP, Opcodes.JMP_IF_FALSE, Opcodes.JUMP,
                     Opcodes.RETURN_ERROR, Opcodes.RETURN_ENDPOINT, Opcodes.RETURN_VALUE,
-                    Opcodes.SET_REG_RETURN -> 0;
+                    Opcodes.SET_REG_RETURN ->
+                0;
             default -> throw new IllegalArgumentException("Unsupported opcode " + op);
         };
     }
@@ -954,9 +1360,11 @@ public final class JavaEndpointResolverGenerator {
             case Opcodes.SET_REGISTER, Opcodes.NOT, Opcodes.ISSET, Opcodes.LIST1, Opcodes.FN1,
                     Opcodes.GET_PROPERTY, Opcodes.GET_INDEX, Opcodes.IS_TRUE, Opcodes.SUBSTRING,
                     Opcodes.PARSE_URL, Opcodes.URI_ENCODE, Opcodes.RETURN_ERROR, Opcodes.RETURN_VALUE,
-                    Opcodes.JNN_OR_POP, Opcodes.GET_NEGATIVE_INDEX, Opcodes.SET_REG_RETURN -> 1;
+                    Opcodes.JNN_OR_POP, Opcodes.GET_NEGATIVE_INDEX, Opcodes.SET_REG_RETURN ->
+                1;
             case Opcodes.LIST2, Opcodes.MAP1, Opcodes.FN2, Opcodes.EQUALS, Opcodes.STRING_EQUALS,
-                    Opcodes.BOOLEAN_EQUALS, Opcodes.IS_VALID_HOST_LABEL, Opcodes.BUILD_URI -> 2;
+                    Opcodes.BOOLEAN_EQUALS, Opcodes.IS_VALID_HOST_LABEL, Opcodes.BUILD_URI ->
+                2;
             case Opcodes.FN3, Opcodes.SPLIT -> 3;
             case Opcodes.LISTN, Opcodes.RESOLVE_TEMPLATE -> instruction.operands[0];
             case Opcodes.MAP2, Opcodes.MAP3, Opcodes.MAP4, Opcodes.MAPN -> mapSize(instruction) * 2;
@@ -980,6 +1388,31 @@ public final class JavaEndpointResolverGenerator {
         line("");
         line("    private static IllegalStateException invalidPc(int pc) {");
         line("        return new IllegalStateException(\"Invalid generated pc: \" + pc);");
+        line("    }");
+        line("");
+        line("    private static boolean equalsNonNull(Object left, Object right) {");
+        line("        return left != null && left.equals(right);");
+        line("    }");
+        line("");
+        line("    private static software.amazon.smithy.java.io.uri.SmithyUri parseUri("
+                + "State state, Object value) {");
+        line("        return value == null ? null : state.parseUri((String) value);");
+        line("    }");
+        line("");
+        line("    private static software.amazon.smithy.java.endpoints.Endpoint endpointWithProperties(");
+        line("            State state, java.util.Map<String, Object> properties, Object url) {");
+        line("        return state.endpoint(url, properties, java.util.Map.of());");
+        line("    }");
+        line("");
+        line("    private static software.amazon.smithy.java.endpoints.Endpoint endpointWithHeaders(");
+        line("            State state, java.util.Map<String, java.util.List<String>> headers, Object url) {");
+        line("        return state.endpoint(url, java.util.Map.of(), headers);");
+        line("    }");
+        line("");
+        line("    private static software.amazon.smithy.java.endpoints.Endpoint endpoint(");
+        line("            State state, java.util.Map<String, java.util.List<String>> headers,");
+        line("            java.util.Map<String, Object> properties, Object url) {");
+        line("        return state.endpoint(url, properties, headers);");
         line("    }");
 
         for (int size : uriTemplateSizes.stream().sorted().toList()) {
@@ -1044,6 +1477,46 @@ public final class JavaEndpointResolverGenerator {
             line("    }");
         }
 
+        for (int size : listSizes.stream().sorted().toList()) {
+            line("");
+            StringBuilder parameters = new StringBuilder();
+            for (int i = 0; i < size; i++) {
+                if (i > 0) {
+                    parameters.append(", ");
+                }
+                parameters.append("Object v").append(i);
+            }
+            line("    private static java.util.List<Object> list" + size + "(" + parameters + ") {");
+            line("        var result = new java.util.ArrayList<Object>(" + size + ");");
+            for (int i = 0; i < size; i++) {
+                line("        result.add(v" + i + ");");
+            }
+            line("        return result;");
+            line("    }");
+        }
+
+        for (int size : mapSizes.stream().sorted().toList()) {
+            line("");
+            StringBuilder parameters = new StringBuilder();
+            for (int i = 0; i < size; i++) {
+                if (i > 0) {
+                    parameters.append(", ");
+                }
+                parameters.append("Object v").append(i).append(", String k").append(i);
+            }
+            line("    private static java.util.Map<String, Object> map" + size + "(" + parameters + ") {");
+            if (size == 1) {
+                line("        return java.util.Collections.singletonMap(k0, v0);");
+            } else {
+                line("        var result = new java.util.HashMap<String, Object>(" + (size + 1) + ", 1.0f);");
+                for (int i = size - 1; i >= 0; i--) {
+                    line("        result.put(k" + i + ", v" + i + ");");
+                }
+                line("        return result;");
+            }
+            line("    }");
+        }
+
         for (int size : structureSizes.stream().sorted().toList()) {
             line("");
             StringBuilder components = new StringBuilder();
@@ -1097,8 +1570,10 @@ public final class JavaEndpointResolverGenerator {
                 if (list.isEmpty()) {
                     yield "java.util.List.of()";
                 }
-                yield "java.util.List.of(" + list.stream().map(JavaEndpointResolverGenerator::constantValue)
-                        .reduce((a, b) -> a + ", " + b).orElse("") + ")";
+                yield "java.util.List.of(" + list.stream()
+                        .map(JavaEndpointResolverGenerator::constantValue)
+                        .reduce((a, b) -> a + ", " + b)
+                        .orElse("") + ")";
             }
             case Map<?, ?> map -> {
                 if (map.isEmpty()) {
