@@ -575,7 +575,12 @@ final class XmlDeserializer implements ShapeDeserializer, XmlErrorCodeParser {
         @Override
         public boolean isNull() {
             try {
-                return reader.getText().isEmpty();
+                // An element is null only when it is genuinely empty: no text content AND no child
+                // elements. getText() returns "" both for a truly empty element (<x/> or <x></x>)
+                // and for an element whose content is entirely child elements, e.g. a structure
+                // (<x><child>..</child></x>). To tell them apart, require that consuming the text left
+                // us on this element's own end tag rather than on a nested child node.
+                return reader.getText().isEmpty() && reader.atEndElement();
             } catch (XMLStreamException e) {
                 throw error("Failed to determine if value is null", e);
             }

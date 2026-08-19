@@ -77,6 +77,11 @@ sealed abstract class XmlReader implements AutoCloseable {
         return textReader.toString();
     }
 
+    final boolean atEndElement() throws XMLStreamException {
+        nextIfNeeded();
+        return getEventType() == XMLStreamConstants.END_ELEMENT;
+    }
+
     private static boolean readNextString(int event) {
         return switch (event) {
             case XMLStreamReader.CHARACTERS, XMLStreamConstants.CDATA -> true;
