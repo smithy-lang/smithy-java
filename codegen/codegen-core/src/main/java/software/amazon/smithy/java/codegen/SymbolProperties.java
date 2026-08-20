@@ -99,5 +99,14 @@ public final class SymbolProperties {
      */
     public static final Property<Boolean> IS_NULLABLE = Property.named("is-nullable");
 
+    /**
+     * Indicates if a member supports explicit null values during deserialization.
+     *
+     * <p>When set to {@code true}, the generated deserializer will pass null values through to the
+     * struct member consumer rather than skipping them, allowing the member to distinguish between
+     * absent and explicitly null.
+     */
+    public static final Property<Boolean> SUPPORTS_NULL_VALUES = Property.named("supports-null-values");
+
     private SymbolProperties() {}
 }
