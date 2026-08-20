@@ -24,6 +24,7 @@ import smithy.java.xml.test.model.AllListsStruct;
 import smithy.java.xml.test.model.BlobStruct;
 import smithy.java.xml.test.model.Color;
 import smithy.java.xml.test.model.ComplexStruct;
+import smithy.java.xml.test.model.DenseListStruct;
 import smithy.java.xml.test.model.FlattenedListStruct;
 import smithy.java.xml.test.model.FlattenedMapStruct;
 import smithy.java.xml.test.model.InnerStruct;
@@ -32,7 +33,9 @@ import smithy.java.xml.test.model.NestedStruct;
 import smithy.java.xml.test.model.NumericStruct;
 import smithy.java.xml.test.model.RecursiveStruct;
 import smithy.java.xml.test.model.SimpleStruct;
+import smithy.java.xml.test.model.SparseListStruct;
 import smithy.java.xml.test.model.StringStruct;
+import smithy.java.xml.test.model.StructItem;
 import smithy.java.xml.test.model.TimestampStruct;
 import smithy.java.xml.test.model.XmlAttributeStruct;
 import smithy.java.xml.test.model.XmlNameStruct;
@@ -737,6 +740,69 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
         var nativeResult = deserialize(NATIVE, xml, ComplexStruct.builder());
         assertThat(nativeResult.getTags()).isEqualTo(staxResult.getTags());
         assertThat(nativeResult.getTags()).containsExactly(null, "hello", null);
+    }
+
+    @PerProvider
+    void denseStructListDeserializes(boolean useNative) {
+        String xml = "<DenseListStruct><structs><member><id>abcd</id></member></structs></DenseListStruct>";
+        var result = deserialize(useNative, xml, DenseListStruct.builder());
+        assertThat(result.getStructs()).hasSize(1);
+        assertThat(result.getStructs().get(0).getId()).isEqualTo("abcd");
+    }
+
+    @PerProvider
+    void prettyPrintedStructListDeserializes(boolean useNative) {
+        String xml = """
+                <DenseListStruct>
+                  <structs>
+                    <member>
+                      <id>abcd</id>
+                    </member>
+                  </structs>
+                </DenseListStruct>
+                """;
+        var result = deserialize(useNative, xml, DenseListStruct.builder());
+        assertThat(result.getStructs()).hasSize(1);
+        assertThat(result.getStructs().get(0).getId()).isEqualTo("abcd");
+    }
+
+    // Both empty forms, <member/> and <member></member>, are null and rejected by a dense list.
+    @PerProvider
+    void denseStructListNullMemberThrows(boolean useNative) {
+        String singleTag = "<DenseListStruct><structs><member/></structs></DenseListStruct>";
+        assertThatThrownBy(() -> deserialize(useNative, singleTag, DenseListStruct.builder()))
+                .isInstanceOf(SerializationException.class);
+        String separateTag = "<DenseListStruct><structs><member></member></structs></DenseListStruct>";
+        assertThatThrownBy(() -> deserialize(useNative, separateTag, DenseListStruct.builder()))
+                .isInstanceOf(SerializationException.class);
+    }
+
+    @PerProvider
+    void sparseStructListNullMemberIsNull(boolean useNative) {
+        String xml = "<SparseListStruct><structs><member/></structs></SparseListStruct>";
+        var result = deserialize(useNative, xml, SparseListStruct.builder());
+        assertThat(result.getStructs()).containsExactly((StructItem) null);
+    }
+
+    @PerProvider
+    void densePopulatedStringListDeserializes(boolean useNative) {
+        String xml = "<DenseListStruct><strings><member>a</member><member>x</member></strings></DenseListStruct>";
+        var result = deserialize(useNative, xml, DenseListStruct.builder());
+        assertThat(result.getStrings()).containsExactly("a", "x");
+    }
+
+    @PerProvider
+    void denseStringListEmptyMemberThrows(boolean useNative) {
+        String xml = "<DenseListStruct><strings><member></member><member>x</member></strings></DenseListStruct>";
+        assertThatThrownBy(() -> deserialize(useNative, xml, DenseListStruct.builder()))
+                .isInstanceOf(SerializationException.class);
+    }
+
+    @PerProvider
+    void sparseStringListEmptyMemberIsNull(boolean useNative) {
+        String xml = "<SparseListStruct><strings><member></member><member>x</member></strings></SparseListStruct>";
+        var result = deserialize(useNative, xml, SparseListStruct.builder());
+        assertThat(result.getStrings()).containsExactly(null, "x");
     }
 
     @PerProvider
